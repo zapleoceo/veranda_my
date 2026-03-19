@@ -358,7 +358,8 @@ $dashboardQuery = http_build_query([
         .topbar select { padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; }
         .wait-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(245, 124, 0, 0.3); border-top-color: #f57c00; border-radius: 50%; margin-right: 6px; animation: waitSpin 0.9s linear infinite; vertical-align: -1px; }
         @keyframes waitSpin { to { transform: rotate(360deg); } }
-        .cards { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+        .cards { display: flex; flex-wrap: nowrap; gap: 14px; align-items: flex-start; overflow-x: auto; overflow-y: hidden; padding-bottom: 10px; }
+        .ko-card { flex: 0 0 auto; }
         .ko-card { width: 320px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); overflow: hidden; }
         .ko-card-header { padding: 12px 14px; border-bottom: 1px solid #eee; background: #fafafa; }
         .ko-title { font-weight: 800; color: #2c3e50; }
