@@ -201,48 +201,7 @@ try {
         $setMeta('chefassistant_auth_notified_at', date('Y-m-d H:i:s'));
     };
 
-    $lastSync = $getMeta('chefassistant_runtime_sync_at');
-    $shouldSync = true;
-    if ($lastSync !== '') {
-        $ts = strtotime($lastSync);
-        if ($ts !== false && $ts > time() - 120) {
-            $shouldSync = false;
-        }
-    }
-
-    if ($shouldSync) {
-        $codemealAuth = $getMeta('codemeal_auth');
-        $codemealClient = $getMeta('codemeal_client_number');
-        $codemealLocale = $getMeta('codemeal_locale');
-        if ($codemealLocale === '') $codemealLocale = 'en';
-        $codemealTz = $getMeta('codemeal_timezone');
-        if ($codemealTz === '') $codemealTz = 'Asia/Ho_Chi_Minh';
-
-        if ($codemealAuth !== '' && $codemealClient !== '') {
-            try {
-                $from = date('Y/m/d 00:00:00', strtotime('-1 day'));
-                $apiCh = new \App\Classes\CodemealAPI('https://codemeal.pro', $codemealAuth, $codemealClient, $codemealLocale, $codemealTz);
-                $chass = new \App\Classes\ChefAssistantSync($db, $apiCh, $codemealTz);
-                $res = $chass->syncOrders($from, null, 10);
-                if (!empty($res['ok'])) {
-                    $updated = $chass->updateKitchenStatsReadyChAss(date('Y-m-d', strtotime('-1 day')), date('Y-m-d'), $res['order_ids'] ?? []);
-                    $setMeta('chefassistant_runtime_sync_at', date('Y-m-d H:i:s'));
-                    $setMeta('chefassistant_runtime_sync_info', 'saved=' . (int)($res['saved'] ?? 0) . ', pages=' . (int)($res['pages'] ?? 0) . ', updated=' . $updated);
-                } else {
-                    $setMeta('chefassistant_runtime_sync_error', (string)($res['error'] ?? 'ChefAssistant error'));
-                    if (!empty($res['auth_error'])) {
-                        $maybeSendAuthAlert();
-                    }
-                }
-            } catch (\Exception $e) {
-                $setMeta('chefassistant_runtime_sync_error', $e->getMessage());
-                $m = mb_strtolower($e->getMessage());
-                if (str_contains($m, '401') || str_contains($m, '403') || str_contains($m, 'unauthor') || str_contains($m, 'forbidden')) {
-                    $maybeSendAuthAlert();
-                }
-            }
-        }
-    }
+    $shouldSync = false;
 
     // 1. Сначала находим все записи, у которых есть tg_message_id (т.е. уведомление было отправлено)
     $today = date('Y-m-d');
@@ -332,7 +291,7 @@ try {
         }
     };
     $computeProbCloseAt($today);
-    $cleanupFrom = date('Y-m-d H:i:s', time() - 4 * 60 * 60);
+    $cleanupFrom = date('Y-m-d H:i:s', time() - 2 * 60 * 60);
     $activeAlerts = $db->query(
         "SELECT * FROM kitchen_stats
          WHERE tg_message_id IS NOT NULL
