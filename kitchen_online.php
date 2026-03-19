@@ -392,7 +392,7 @@ $dashboardQuery = http_build_query([
         .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; overflow: hidden; }
         .user-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.12); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
-        .user-menu:hover .user-dropdown { display: block; }
+        .user-menu.open .user-dropdown { display: block; }
         .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: #37474f; text-decoration: none; font-weight: 600; }
         .user-dropdown a:hover { background: #f5f6fa; }
         h1 { text-align: center; color: #2c3e50; margin-bottom: 10px; }
@@ -427,12 +427,7 @@ $dashboardQuery = http_build_query([
 <body>
     <div class="container">
         <div class="top-nav">
-            <div class="nav-left">
-                <?php if (veranda_can('dashboard')): ?><a href="dashboard.php?<?= htmlspecialchars($dashboardQuery) ?>">Дашборд</a><?php endif; ?>
-                <?php if (veranda_can('rawdata')): ?><a href="rawdata.php?<?= htmlspecialchars($dashboardQuery) ?>">Сырые данные</a><?php endif; ?>
-                <?php if (veranda_can('kitchen_online')): ?><a href="kitchen_online.php">КухняOnline</a><?php endif; ?>
-                <?php if (veranda_can('admin')): ?><a href="admin.php">УПРАВЛЕНИЕ</a><?php endif; ?>
-            </div>
+            <div class="nav-left"></div>
             <div class="user-menu">
                 <?php
                     $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
@@ -444,12 +439,16 @@ $dashboardQuery = http_build_query([
                     <span><?= htmlspecialchars($userLabel) ?></span>
                 </div>
                 <div class="user-dropdown">
-                    <a href="logout.php">Выйти</a>
+                    <?php if (veranda_can('dashboard')): ?><a href="dashboard.php?<?= htmlspecialchars($dashboardQuery) ?>">Дашюорд</a><?php endif; ?>
+                    <?php if (veranda_can('rawdata')): ?><a href="rawdata.php?<?= htmlspecialchars($dashboardQuery) ?>">Таблица</a><?php endif; ?>
+                    <?php if (veranda_can('kitchen_online')): ?><a href="kitchen_online.php">КухняОнлайн</a><?php endif; ?>
+                    <?php if (veranda_can('admin')): ?><a href="admin.php">Управление</a><?php endif; ?>
+                    <a href="logout.php">Выход</a>
                 </div>
             </div>
         </div>
 
-        <h1><span class="ko-titlebar">КухняOnline <button type="button" class="ko-sound" id="soundToggle" aria-label="Звук">🔊</button></span></h1>
+        <h1><span class="ko-titlebar">КухняОнлайн <button type="button" class="ko-sound" id="soundToggle" aria-label="Звук">🔊</button></span></h1>
 
         <div class="topbar">
             <span>Последнее обновление из Poster: <span id="lastSync"><?= htmlspecialchars($lastSyncLabel) ?></span></span>
@@ -472,6 +471,25 @@ $dashboardQuery = http_build_query([
     </div>
 
     <script>
+        (() => {
+            const menu = document.querySelector('.user-menu');
+            if (!menu) return;
+            let t = null;
+            const open = () => {
+                if (t) { clearTimeout(t); t = null; }
+                menu.classList.add('open');
+            };
+            const scheduleClose = () => {
+                if (t) clearTimeout(t);
+                t = setTimeout(() => {
+                    menu.classList.remove('open');
+                    t = null;
+                }, 1000);
+            };
+            menu.addEventListener('mouseenter', open);
+            menu.addEventListener('mouseleave', scheduleClose);
+        })();
+
         const cardsEl = document.getElementById('cards');
         const emptyEl = document.getElementById('empty');
         const stationEl = document.getElementById('station');
