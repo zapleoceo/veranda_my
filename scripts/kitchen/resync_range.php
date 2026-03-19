@@ -236,4 +236,4 @@ for ($d = $fromTs; $d <= $toTs; $d = strtotime('+1 day', $d)) {
 }
 
 echo "[" . date('Y-m-d H:i:s') . "] DONE\n";
-*** End Patch
+?>
