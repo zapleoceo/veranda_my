@@ -388,6 +388,7 @@ try {
             <a href="dashboard.php?<?= htmlspecialchars($dashboardQuery) ?>">Дашборд</a>
             <a href="rawdata.php">Сырые данные</a>
             <a href="admin.php">УПРАВЛЕНИЕ</a>
+            <a href="kitchen_online.php">КухняOnline</a>
             <a href="logout.php">Выйти (<?= htmlspecialchars($_SESSION['user_email']) ?>)</a>
         </div>
         <h1>Raw Data: Kitchen Transactions</h1>

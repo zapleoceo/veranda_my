@@ -332,11 +332,12 @@ try {
         }
     };
     $computeProbCloseAt($today);
-    $cleanupFrom = date('Y-m-d', strtotime('-7 days'));
+    $cleanupFrom = date('Y-m-d H:i:s', time() - 4 * 60 * 60);
     $activeAlerts = $db->query(
         "SELECT * FROM kitchen_stats
          WHERE tg_message_id IS NOT NULL
-           AND transaction_date >= ?",
+           AND ticket_sent_at IS NOT NULL
+           AND ticket_sent_at >= ?",
         [$cleanupFrom]
     )->fetchAll();
 

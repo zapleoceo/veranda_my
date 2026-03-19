@@ -792,6 +792,7 @@ if ($tab === 'menu') {
             <a href="dashboard.php">Дашборд</a>
             <a href="rawdata.php">Сырые данные</a>
             <a href="logout.php">Выйти (<?= htmlspecialchars($_SESSION['user_email']) ?>)</a>
+            <a href="kitchen_online.php">КухняOnline</a>
         </div>
         <h1>УПРАВЛЕНИЕ</h1>
 
@@ -915,7 +916,7 @@ if ($tab === 'menu') {
             <h4>Логика работы уведомлений в Telegram:</h4>
             <ul>
                 <li><strong>Каждую минуту (cron):</strong> Скрипт сначала очищает старые алерты, затем отправляет актуальные.</li>
-                <li><strong>Очистка:</strong> Для всех сообщений с tg_message_id за последние 7 дней проверяется актуальность. Если блюдо готово/удалено/чек закрыт — бот удаляет сообщение и очищает tg_message_id.</li>
+                <li><strong>Очистка:</strong> Для всех сообщений с tg_message_id за последние 4 часа (по ticket_sent_at) проверяется актуальность. Если блюдо готово/удалено/позиция исключена/чек закрыт/✅ Принято — бот удаляет сообщение и очищает tg_message_id.</li>
                 <li><strong>Динамический тайминг:</strong> Лимит ожидания зависит от нагрузки. Если открыто меньше <b><?= $settings['alert_load_threshold'] ?></b> чеков — <b><?= $settings['alert_timing_low_load'] ?> мин</b>, иначе — <b><?= $settings['alert_timing_high_load'] ?> мин</b>. Если включено "ИСКЛЮЧИТЬ СТОЛ PARTNERS", он не влияет на нагрузку, но отображается в заголовке отдельно (напр. 9+4).</li>
                 <li><strong>Кандидаты на алерт:</strong> Берутся только позиции с ticket_sent_at, которые старше лимита, status=1, ready_pressed_at IS NULL и tg_acknowledged=0.</li>
                 <li><strong>Проверка через Poster:</strong> Перед отправкой по каждой позиции проверяется, что чек всё ещё открыт, и по истории чека определяется готовность (finishedcooking) и удаление позиции (delete/deleteitem или changeitemcount=0).</li>
