@@ -50,7 +50,7 @@ if ($stationFilter === 'kitchen') {
     $stationSql = " AND (station = '3' OR station = 3 OR station = 'Bar Veranda')";
 }
 
-$renderCards = function (array $rows): string {
+$renderCards = function (array $rows, int $waitLimitMinutes): string {
     $cards = [];
     foreach ($rows as $r) {
         $txId = (int)($r['transaction_id'] ?? 0);
@@ -90,6 +90,7 @@ $renderCards = function (array $rows): string {
     });
 
     ob_start();
+    $nowTs = time();
     foreach ($cards as $c) {
         if (empty($c['items'])) continue;
         $receipt = trim((string)$c['receipt_number']);
@@ -111,8 +112,9 @@ $renderCards = function (array $rows): string {
                     <?php
                         $sentTs = (int)($it['sent_ts'] ?? 0);
                         $sentLabel = ($sentTs > 0) ? date('H:i:s', $sentTs) : '—';
+                        $isOverdue = ($waitLimitMinutes > 0 && $sentTs > 0 && ($nowTs - $sentTs) >= ($waitLimitMinutes * 60));
                     ?>
-                    <div class="ko-item">
+                    <div class="ko-item<?= $isOverdue ? ' ko-item-overdue' : '' ?>" data-sent-ts="<?= (int)$sentTs ?>">
                         <div class="ko-item-name"><?= htmlspecialchars($it['dish_name'] ?: ('Dish #' . (int)$it['dish_id'])) ?></div>
                         <div class="ko-item-row">
                             <span class="ko-item-sent">Пришло: <?= htmlspecialchars($sentLabel) ?></span>
@@ -311,6 +313,29 @@ if ($isAjax) {
             }
         }
 
+        $settings = [
+            'alert_timing_low_load' => 20,
+            'alert_load_threshold' => 25,
+            'alert_timing_high_load' => 30,
+            'exclude_partners_from_load' => 0
+        ];
+        foreach ($settings as $key => $default) {
+            $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$key])->fetch();
+            $val = $row ? $row['meta_value'] : $default;
+            $settings[$key] = is_numeric($default) ? (int)$val : $val;
+        }
+        $loadCalculationCount = 0;
+        if (!empty($settings['exclude_partners_from_load'])) {
+            $otherCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM kitchen_stats WHERE status = 1 AND transaction_date = ? AND table_number != 'Partners'", [$today])->fetch();
+            $loadCalculationCount = (int)($otherCountRow['c'] ?? 0);
+        } else {
+            $openCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM kitchen_stats WHERE status = 1 AND transaction_date = ?", [$today])->fetch();
+            $loadCalculationCount = (int)($openCountRow['c'] ?? 0);
+        }
+        $waitLimitMinutes = ($loadCalculationCount < (int)$settings['alert_load_threshold'])
+            ? (int)$settings['alert_timing_low_load']
+            : (int)$settings['alert_timing_high_load'];
+
         $rows = $db->query(
             "SELECT id, transaction_id, receipt_number, table_number, waiter_name, dish_id, dish_name, station, ticket_sent_at
              FROM kitchen_stats
@@ -327,8 +352,8 @@ if ($isAjax) {
             array_merge([$today], $stationParams)
         )->fetchAll();
 
-        $html = $renderCards($rows);
-        echo json_encode(['ok' => true, 'html' => $html, 'last_sync' => $lastSyncLabel], JSON_UNESCAPED_UNICODE);
+        $html = $renderCards($rows, $waitLimitMinutes);
+        echo json_encode(['ok' => true, 'html' => $html, 'last_sync' => $lastSyncLabel, 'wait_limit_minutes' => $waitLimitMinutes], JSON_UNESCAPED_UNICODE);
     } catch (\Exception $e) {
         echo json_encode(['ok' => false, 'error' => 'error'], JSON_UNESCAPED_UNICODE);
     }
@@ -365,7 +390,8 @@ $dashboardQuery = http_build_query([
         .ko-title { font-weight: 800; color: #2c3e50; }
         .ko-meta { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #607d8b; }
         .ko-items { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-        .ko-item { border: 1px solid #eef2f6; border-radius: 10px; padding: 10px; background: #fff; }
+        .ko-item { border: 1px solid #eef2f6; border-radius: 10px; padding: 10px; background: #fff; box-sizing: border-box; }
+        .ko-item-overdue { border: 2px solid #d32f2f; }
         .ko-item-name { font-weight: 700; color: #263238; }
         .ko-item-row { margin-top: 8px; display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: #546e7a; }
         .ko-item-wait { font-weight: 700; color: #d32f2f; white-space: nowrap; }
@@ -417,6 +443,7 @@ $dashboardQuery = http_build_query([
         let loading = false;
         const refreshIntervalSec = 10;
         let refreshRemaining = refreshIntervalSec;
+        let waitLimitSec = 0;
 
         const updateLive = () => {
             const els = Array.from(document.getElementsByClassName('live-wait'));
@@ -425,6 +452,10 @@ $dashboardQuery = http_build_query([
                 const sentTs = parseInt(el.dataset.sentTs || '0', 10);
                 if (!sentTs) continue;
                 const diffSec = Math.max(0, nowSec - sentTs);
+                if (waitLimitSec > 0) {
+                    const itemEl = el.closest('.ko-item');
+                    if (itemEl) itemEl.classList.toggle('ko-item-overdue', diffSec >= waitLimitSec);
+                }
                 const mm = Math.floor(diffSec / 60);
                 const ss = diffSec % 60;
                 const out = String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
@@ -447,6 +478,7 @@ $dashboardQuery = http_build_query([
                 cardsEl.innerHTML = data.html || '';
                 emptyEl.style.display = (cardsEl.children.length === 0) ? 'block' : 'none';
                 if (data.last_sync) lastSyncEl.textContent = data.last_sync;
+                if (typeof data.wait_limit_minutes === 'number') waitLimitSec = data.wait_limit_minutes * 60;
                 updateLive();
             } catch (e) {
             } finally {
@@ -477,6 +509,7 @@ $dashboardQuery = http_build_query([
                 cardsEl.innerHTML = data.html || '';
                 emptyEl.style.display = (cardsEl.children.length === 0) ? 'block' : 'none';
                 if (data.last_sync) lastSyncEl.textContent = data.last_sync;
+                if (typeof data.wait_limit_minutes === 'number') waitLimitSec = data.wait_limit_minutes * 60;
                 updateLive();
             } catch (e) {
             } finally {
