@@ -519,6 +519,16 @@ $dashboardQuery = http_build_query([
 
         stationEl.addEventListener('change', () => loadCards('list'));
 
+        cardsEl.addEventListener('wheel', (e) => {
+            if (!cardsEl || cardsEl.scrollWidth <= cardsEl.clientWidth) return;
+            if (e.shiftKey) return;
+            const dx = Math.abs(e.deltaX || 0);
+            const dy = Math.abs(e.deltaY || 0);
+            if (dx > dy) return;
+            e.preventDefault();
+            cardsEl.scrollLeft += e.deltaY;
+        }, { passive: false });
+
         cardsEl.addEventListener('click', async (e) => {
             const btn = e.target.closest('button.ko-ack');
             if (!btn) return;
