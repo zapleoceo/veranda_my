@@ -200,8 +200,6 @@ $dashboardQuery = http_build_query([
         h1 { text-align: center; color: #2c3e50; margin-bottom: 10px; }
         .topbar { display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; color: #546e7a; }
         .topbar select { padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; }
-        .topbar button { padding: 8px 14px; border-radius: 6px; border: 0; background: #1a73e8; color: #fff; font-weight: 600; cursor: pointer; }
-        .topbar button:hover { background: #1557b0; }
         .wait-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(245, 124, 0, 0.3); border-top-color: #f57c00; border-radius: 50%; margin-right: 6px; animation: waitSpin 0.9s linear infinite; vertical-align: -1px; }
         @keyframes waitSpin { to { transform: rotate(360deg); } }
         .cards { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
@@ -234,6 +232,7 @@ $dashboardQuery = http_build_query([
 
         <div class="topbar">
             <span>Последнее обновление из Poster: <span id="lastSync"><?= htmlspecialchars($lastSyncLabel) ?></span></span>
+            <span>Следующее обновление: <span id="refreshIn">10</span> сек</span>
             <label>
                 Станция:
                 <select id="station">
@@ -242,7 +241,6 @@ $dashboardQuery = http_build_query([
                     <option value="bar">Бар</option>
                 </select>
             </label>
-            <button type="button" id="syncBtn">Обновить из Poster</button>
         </div>
 
         <div id="cards" class="cards"></div>
@@ -253,9 +251,11 @@ $dashboardQuery = http_build_query([
         const cardsEl = document.getElementById('cards');
         const emptyEl = document.getElementById('empty');
         const stationEl = document.getElementById('station');
-        const syncBtn = document.getElementById('syncBtn');
         const lastSyncEl = document.getElementById('lastSync');
+        const refreshInEl = document.getElementById('refreshIn');
         let loading = false;
+        const refreshIntervalSec = 10;
+        let refreshRemaining = refreshIntervalSec;
 
         const updateLive = () => {
             const els = Array.from(document.getElementsByClassName('live-wait'));
@@ -294,11 +294,6 @@ $dashboardQuery = http_build_query([
         };
 
         stationEl.addEventListener('change', () => loadCards('list'));
-        syncBtn.addEventListener('click', async () => {
-            const ok = confirm('Обновление из Poster может нагрузить систему. Используй редко. Продолжить?');
-            if (!ok) return;
-            await loadCards('sync');
-        });
 
         cardsEl.addEventListener('click', async (e) => {
             const btn = e.target.closest('button.ko-ack');
@@ -331,7 +326,15 @@ $dashboardQuery = http_build_query([
 
         loadCards('list');
         setInterval(updateLive, 1000);
-        setInterval(() => loadCards('list'), 15000);
+        setInterval(() => {
+            refreshRemaining = Math.max(0, refreshRemaining - 1);
+            if (refreshInEl) refreshInEl.textContent = String(refreshRemaining);
+        }, 1000);
+        setInterval(() => {
+            refreshRemaining = refreshIntervalSec;
+            if (refreshInEl) refreshInEl.textContent = String(refreshRemaining);
+            loadCards('list');
+        }, refreshIntervalSec * 1000);
     </script>
 </body>
 </html>
