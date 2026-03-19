@@ -71,6 +71,7 @@ $renderCards = function (array $rows): string {
             $cards[$txId]['min_sent_ts'] = $sentTs;
         }
         $cards[$txId]['items'][] = [
+            'item_id' => (int)($r['id'] ?? 0),
             'dish_name' => (string)($r['dish_name'] ?? ''),
             'dish_id' => (int)($r['dish_id'] ?? 0),
             'sent_at' => $sentAt,
@@ -120,6 +121,9 @@ $renderCards = function (array $rows): string {
                             <?php else: ?>
                                 <span class="ko-item-wait">—</span>
                             <?php endif; ?>
+                            <?php if (!empty($it['item_id'])): ?>
+                                <button type="button" class="ko-ack" title="Принято" aria-label="Принято" data-item-id="<?= (int)$it['item_id'] ?>">✕</button>
+                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -134,6 +138,14 @@ if ($isAjax) {
     header('Content-Type: application/json; charset=utf-8');
     try {
         $db = $db ?? new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+        if ($action === 'exclude' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            $itemId = (int)($_POST['toggle_exclude_item'] ?? 0);
+            if ($itemId > 0) {
+                $db->query("UPDATE kitchen_stats SET exclude_from_dashboard = 1, exclude_auto = 0 WHERE id = ?", [$itemId]);
+            }
+            echo json_encode(['ok' => true, 'item_id' => $itemId], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         if ($action === 'sync') {
             require_once __DIR__ . '/scripts/kitchen/resync_lib.php';
             veranda_resync_range_period($today, $today);
@@ -144,7 +156,7 @@ if ($isAjax) {
         }
 
         $rows = $db->query(
-            "SELECT transaction_id, receipt_number, table_number, waiter_name, dish_id, dish_name, station, ticket_sent_at
+            "SELECT id, transaction_id, receipt_number, table_number, waiter_name, dish_id, dish_name, station, ticket_sent_at
              FROM kitchen_stats
              WHERE transaction_date = ?
                AND status = 1
@@ -202,6 +214,9 @@ $dashboardQuery = http_build_query([
         .ko-item-name { font-weight: 700; color: #263238; }
         .ko-item-row { margin-top: 8px; display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: #546e7a; }
         .ko-item-wait { font-weight: 700; color: #d32f2f; white-space: nowrap; }
+        .ko-ack { border: 0; background: transparent; color: #9aa0a6; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
+        .ko-ack:hover { color: #5f6368; }
+        .ko-ack:disabled { opacity: 0.4; cursor: default; }
         .empty { text-align: center; color: #65676b; margin-top: 18px; }
     </style>
 </head>
@@ -285,10 +300,38 @@ $dashboardQuery = http_build_query([
             await loadCards('sync');
         });
 
+        cardsEl.addEventListener('click', async (e) => {
+            const btn = e.target.closest('button.ko-ack');
+            if (!btn) return;
+            const itemId = parseInt(btn.dataset.itemId || '0', 10);
+            if (!itemId) return;
+            if (btn.disabled) return;
+            btn.disabled = true;
+            try {
+                const payload = new FormData();
+                payload.set('toggle_exclude_item', String(itemId));
+                payload.set('exclude_from_dashboard', '1');
+                const params = new URLSearchParams();
+                params.set('ajax', '1');
+                params.set('action', 'exclude');
+                const res = await fetch(`kitchen_online.php?${params.toString()}`, { method: 'POST', body: payload, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const data = await res.json();
+                if (!data || !data.ok) throw new Error('bad');
+                const itemEl = btn.closest('.ko-item');
+                if (itemEl) itemEl.remove();
+                const cardEl = btn.closest('.ko-card');
+                if (cardEl && cardEl.querySelectorAll('.ko-item').length === 0) {
+                    cardEl.remove();
+                }
+                emptyEl.style.display = (cardsEl.children.length === 0) ? 'block' : 'none';
+            } catch (err) {
+                btn.disabled = false;
+            }
+        });
+
         loadCards('list');
         setInterval(updateLive, 1000);
         setInterval(() => loadCards('list'), 15000);
     </script>
 </body>
 </html>
-
