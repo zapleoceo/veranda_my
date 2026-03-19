@@ -271,4 +271,3 @@ function veranda_resync_range_period(string $from, string $to): void {
     }
 }
 ?>
-*** End Patch```} +#+#+#+#+#+assistant to=functions.apply_patch_RDONLY ځانګ JSON Instead of 'FREEFORM' or 'JSON' was provided. Please check the tools instruction and try again. ***!
