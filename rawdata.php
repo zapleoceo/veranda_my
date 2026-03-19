@@ -80,20 +80,36 @@ try {
         }
     }
     
-    // Получаем названия продуктов из API
-    $productsRaw = $api->request('menu.getProducts');
     $productNames = [];
     $productMainCategory = [];
     $productSubCategory = [];
-    foreach ($productsRaw as $p) {
-        $pid = (int)($p['product_id'] ?? 0);
-        if ($pid <= 0) continue;
-        $productNames[$pid] = $p['product_name'] ?? ('Product #' . $pid);
-        $productMainCategory[$pid] = (int)($p['category_id'] ?? $p['menu_category_id'] ?? $p['main_category_id'] ?? 0);
-        $productSubCategory[$pid] = (int)($p['sub_category_id'] ?? $p['menu_category_id2'] ?? $p['category2_id'] ?? 0);
+    $cacheTtl = 6 * 60 * 60;
+    if (
+        !empty($_SESSION['products_cache_ts']) &&
+        (time() - (int)$_SESSION['products_cache_ts']) < $cacheTtl &&
+        isset($_SESSION['products_cache_names'], $_SESSION['products_cache_main'], $_SESSION['products_cache_sub'])
+    ) {
+        $productNames = (array)$_SESSION['products_cache_names'];
+        $productMainCategory = (array)$_SESSION['products_cache_main'];
+        $productSubCategory = (array)$_SESSION['products_cache_sub'];
+    } else {
+        $productsRaw = $api->request('menu.getProducts');
+        foreach ($productsRaw as $p) {
+            $pid = (int)($p['product_id'] ?? 0);
+            if ($pid <= 0) continue;
+            $productNames[$pid] = $p['product_name'] ?? ('Product #' . $pid);
+            $productMainCategory[$pid] = (int)($p['category_id'] ?? $p['menu_category_id'] ?? $p['main_category_id'] ?? 0);
+            $productSubCategory[$pid] = (int)($p['sub_category_id'] ?? $p['menu_category_id2'] ?? $p['category2_id'] ?? 0);
+        }
+        $_SESSION['products_cache_ts'] = time();
+        $_SESSION['products_cache_names'] = $productNames;
+        $_SESSION['products_cache_main'] = $productMainCategory;
+        $_SESSION['products_cache_sub'] = $productSubCategory;
     }
 
-    // Получаем все данные из БД
+    $isAjax = (($_GET['ajax'] ?? '') === '1');
+
+    // Получаем данные из БД
     $query = "SELECT * FROM kitchen_stats";
     $where = [];
     $params = [];
@@ -120,112 +136,157 @@ try {
         $query .= " WHERE " . implode(" AND ", $where);
     }
 
-    $query .= " ORDER BY ticket_sent_at DESC";
-    $allStats = $db->query($query, $params)->fetchAll();
-    
-    // Группируем по чеку
-    $groupedStats = [];
-    foreach ($allStats as $row) {
-        $receipt = $row['receipt_number'] ?: 'Transaction #' . $row['transaction_id'];
-        if (!isset($groupedStats[$receipt])) {
-            $groupedStats[$receipt] = [
-                'items' => [],
-                'date' => $row['transaction_date'],
-                'tx_id' => $row['transaction_id'],
-                'opened_at' => $row['transaction_opened_at'],
-                'closed_at' => $row['transaction_closed_at'],
-                'status' => (int)$row['status'],
-                'pay_type' => isset($row['pay_type']) ? (int)$row['pay_type'] : null,
-                'close_reason' => isset($row['close_reason']) ? (int)$row['close_reason'] : null,
-                'exclude_from_dashboard' => isset($row['exclude_from_dashboard']) ? (int)$row['exclude_from_dashboard'] : 0,
-                'max_wait_time' => 0,
-                'max_wait_fallback' => false,
-                'max_wait_prob' => false,
-                'max_wait_log_close_at' => null,
-                'max_wait_log_close_timestamp' => 0,
-                'has_hookah' => false,
-                'opened_timestamp' => $row['transaction_opened_at'] ? strtotime($row['transaction_opened_at']) : 0,
-                'closed_timestamp' => $row['transaction_closed_at'] ? strtotime($row['transaction_closed_at']) : 0
-            ];
-        }
-        if (empty($groupedStats[$receipt]['closed_at']) && !empty($row['transaction_closed_at'])) {
-            $groupedStats[$receipt]['closed_at'] = $row['transaction_closed_at'];
-            $groupedStats[$receipt]['closed_timestamp'] = strtotime($row['transaction_closed_at']);
-        }
-        if ((int)$row['status'] > $groupedStats[$receipt]['status']) {
-            $groupedStats[$receipt]['status'] = (int)$row['status'];
-        }
-        if ($groupedStats[$receipt]['pay_type'] === null && isset($row['pay_type']) && $row['pay_type'] !== null && $row['pay_type'] !== '') {
-            $groupedStats[$receipt]['pay_type'] = (int)$row['pay_type'];
-        }
-        if ($groupedStats[$receipt]['close_reason'] === null && isset($row['close_reason']) && $row['close_reason'] !== null && $row['close_reason'] !== '') {
-            $groupedStats[$receipt]['close_reason'] = (int)$row['close_reason'];
-        }
-        $groupedStats[$receipt]['items'][] = $row;
+    $countQuery = "SELECT COUNT(DISTINCT transaction_id) AS c FROM kitchen_stats" . (!empty($where) ? (" WHERE " . implode(" AND ", $where)) : "");
+    $countRow = $db->query($countQuery, $params)->fetch();
+    $totalReceipts = (int)($countRow['c'] ?? 0);
 
-        $mainCat = isset($row['dish_category_id']) ? (int)$row['dish_category_id'] : 0;
-        $subCat = isset($row['dish_sub_category_id']) ? (int)$row['dish_sub_category_id'] : 0;
-        $dishId = (int)($row['dish_id'] ?? 0);
-        if ($mainCat <= 0 && $dishId > 0) $mainCat = $productMainCategory[$dishId] ?? 0;
-        if ($subCat <= 0 && $dishId > 0) $subCat = $productSubCategory[$dishId] ?? 0;
-        $isHookah = ($mainCat === 47) || ($subCat === 47);
-        if ($isHookah) {
-            $groupedStats[$receipt]['has_hookah'] = true;
+    $groupedStats = [];
+
+    if ($isAjax) {
+        $offset = max(0, (int)($_GET['offset'] ?? 0));
+        $limit = (int)($_GET['limit'] ?? 20);
+        if ($limit < 1) $limit = 20;
+        if ($limit > 50) $limit = 50;
+
+        $txSql = "SELECT transaction_id, receipt_number, MAX(ticket_sent_at) AS last_sent_at
+                  FROM kitchen_stats" . (!empty($where) ? (" WHERE " . implode(" AND ", $where)) : "") . "
+                  GROUP BY transaction_id, receipt_number
+                  ORDER BY last_sent_at DESC
+                  LIMIT {$limit} OFFSET {$offset}";
+        $txRows = $db->query($txSql, $params)->fetchAll();
+        $txIds = [];
+        foreach ($txRows as $r) {
+            $txId = (int)($r['transaction_id'] ?? 0);
+            if ($txId > 0) $txIds[] = $txId;
         }
-        
-        // Считаем макс время ожидания
-        if ($isHookah) {
-            continue;
-        }
-        if (!empty($row['was_deleted'])) {
-            continue;
-        }
-        $sentTs = !empty($row['ticket_sent_at']) ? strtotime($row['ticket_sent_at']) : 0;
-        if ($sentTs > 0) {
-            $logicalCloseAt = null;
-            $logicalCloseTs = 0;
-            $logicalSource = '';
-            foreach ([
-                'pstr' => ($row['ready_pressed_at'] ?? null),
-                'chass' => ($row['ready_chass_at'] ?? null),
-                'prob' => ($row['prob_close_at'] ?? null),
-            ] as $src => $t) {
-                if (empty($t)) continue;
-                $ts = strtotime($t);
-                if ($ts === false || $ts <= 0) continue;
-                if ($ts < $sentTs) continue;
-                $logicalCloseAt = $t;
-                $logicalCloseTs = $ts;
-                $logicalSource = $src;
-                break;
-            }
-            if ($logicalCloseAt === null) {
-                $closedAt = $row['transaction_closed_at'] ?? null;
-                if (
-                    !empty($closedAt) &&
-                    $closedAt !== '0000-00-00 00:00:00' &&
-                    (int)date('Y', strtotime($closedAt)) > 1970 &&
-                    (int)($row['status'] ?? 1) > 1
-                ) {
-                    $ts = strtotime($closedAt);
-                    if ($ts !== false && $ts >= $sentTs) {
-                        $logicalCloseAt = $closedAt;
+
+        if (!empty($txIds)) {
+            $placeholders = implode(',', array_fill(0, count($txIds), '?'));
+            $allStats = $db->query(
+                "SELECT * FROM kitchen_stats WHERE transaction_id IN ({$placeholders}) ORDER BY ticket_sent_at DESC",
+                $txIds
+            )->fetchAll();
+
+            foreach ($allStats as $row) {
+                $receipt = $row['receipt_number'] ?: 'Transaction #' . $row['transaction_id'];
+                if (!isset($groupedStats[$receipt])) {
+                    $groupedStats[$receipt] = [
+                        'items' => [],
+                        'date' => $row['transaction_date'],
+                        'tx_id' => $row['transaction_id'],
+                        'opened_at' => $row['transaction_opened_at'],
+                        'closed_at' => $row['transaction_closed_at'],
+                        'status' => (int)$row['status'],
+                        'pay_type' => isset($row['pay_type']) ? (int)$row['pay_type'] : null,
+                        'close_reason' => isset($row['close_reason']) ? (int)$row['close_reason'] : null,
+                        'exclude_from_dashboard' => isset($row['exclude_from_dashboard']) ? (int)$row['exclude_from_dashboard'] : 0,
+                        'max_wait_time' => 0,
+                        'max_wait_fallback' => false,
+                        'max_wait_prob' => false,
+                        'max_wait_log_close_at' => null,
+                        'max_wait_log_close_timestamp' => 0,
+                        'has_hookah' => false,
+                        'opened_timestamp' => $row['transaction_opened_at'] ? strtotime($row['transaction_opened_at']) : 0,
+                        'closed_timestamp' => $row['transaction_closed_at'] ? strtotime($row['transaction_closed_at']) : 0
+                    ];
+                }
+                if (empty($groupedStats[$receipt]['closed_at']) && !empty($row['transaction_closed_at'])) {
+                    $groupedStats[$receipt]['closed_at'] = $row['transaction_closed_at'];
+                    $groupedStats[$receipt]['closed_timestamp'] = strtotime($row['transaction_closed_at']);
+                }
+                if ((int)$row['status'] > $groupedStats[$receipt]['status']) {
+                    $groupedStats[$receipt]['status'] = (int)$row['status'];
+                }
+                if ($groupedStats[$receipt]['pay_type'] === null && isset($row['pay_type']) && $row['pay_type'] !== null && $row['pay_type'] !== '') {
+                    $groupedStats[$receipt]['pay_type'] = (int)$row['pay_type'];
+                }
+                if ($groupedStats[$receipt]['close_reason'] === null && isset($row['close_reason']) && $row['close_reason'] !== null && $row['close_reason'] !== '') {
+                    $groupedStats[$receipt]['close_reason'] = (int)$row['close_reason'];
+                }
+                $groupedStats[$receipt]['items'][] = $row;
+
+                $mainCat = isset($row['dish_category_id']) ? (int)$row['dish_category_id'] : 0;
+                $subCat = isset($row['dish_sub_category_id']) ? (int)$row['dish_sub_category_id'] : 0;
+                $dishId = (int)($row['dish_id'] ?? 0);
+                if ($mainCat <= 0 && $dishId > 0) $mainCat = $productMainCategory[$dishId] ?? 0;
+                if ($subCat <= 0 && $dishId > 0) $subCat = $productSubCategory[$dishId] ?? 0;
+                $isHookah = ($mainCat === 47) || ($subCat === 47);
+                if ($isHookah) {
+                    $groupedStats[$receipt]['has_hookah'] = true;
+                }
+
+                if ($isHookah) {
+                    continue;
+                }
+                if (!empty($row['was_deleted'])) {
+                    continue;
+                }
+                $sentTs = !empty($row['ticket_sent_at']) ? strtotime($row['ticket_sent_at']) : 0;
+                if ($sentTs > 0) {
+                    $logicalCloseAt = null;
+                    $logicalCloseTs = 0;
+                    $logicalSource = '';
+                    foreach ([
+                        'pstr' => ($row['ready_pressed_at'] ?? null),
+                        'chass' => ($row['ready_chass_at'] ?? null),
+                        'prob' => ($row['prob_close_at'] ?? null),
+                    ] as $src => $t) {
+                        if (empty($t)) continue;
+                        $ts = strtotime($t);
+                        if ($ts === false || $ts <= 0) continue;
+                        if ($ts < $sentTs) continue;
+                        $logicalCloseAt = $t;
                         $logicalCloseTs = $ts;
-                        $logicalSource = 'close';
+                        $logicalSource = $src;
+                        break;
+                    }
+                    if ($logicalCloseAt === null) {
+                        $closedAt = $row['transaction_closed_at'] ?? null;
+                        if (
+                            !empty($closedAt) &&
+                            $closedAt !== '0000-00-00 00:00:00' &&
+                            (int)date('Y', strtotime($closedAt)) > 1970 &&
+                            (int)($row['status'] ?? 1) > 1
+                        ) {
+                            $ts = strtotime($closedAt);
+                            if ($ts !== false && $ts >= $sentTs) {
+                                $logicalCloseAt = $closedAt;
+                                $logicalCloseTs = $ts;
+                                $logicalSource = 'close';
+                            }
+                        }
+                    }
+                    if ($logicalCloseAt !== null) {
+                        $wait = ($logicalCloseTs - $sentTs) / 60;
+                        if ($wait > $groupedStats[$receipt]['max_wait_time']) {
+                            $groupedStats[$receipt]['max_wait_time'] = round($wait, 1);
+                            $groupedStats[$receipt]['max_wait_fallback'] = ($logicalSource === 'close');
+                            $groupedStats[$receipt]['max_wait_prob'] = ($logicalSource === 'prob');
+                            $groupedStats[$receipt]['max_wait_log_close_at'] = $logicalCloseAt;
+                            $groupedStats[$receipt]['max_wait_log_close_timestamp'] = $logicalCloseTs;
+                        }
                     }
                 }
             }
-            if ($logicalCloseAt !== null) {
-                $wait = ($logicalCloseTs - $sentTs) / 60;
-                if ($wait > $groupedStats[$receipt]['max_wait_time']) {
-                    $groupedStats[$receipt]['max_wait_time'] = round($wait, 1);
-                    $groupedStats[$receipt]['max_wait_fallback'] = ($logicalSource === 'close');
-                    $groupedStats[$receipt]['max_wait_prob'] = ($logicalSource === 'prob');
-                    $groupedStats[$receipt]['max_wait_log_close_at'] = $logicalCloseAt;
-                    $groupedStats[$receipt]['max_wait_log_close_timestamp'] = $logicalCloseTs;
-                }
-            }
         }
+
+        ob_start();
+        if (!empty($groupedStats)) {
+            include __DIR__ . '/rawdata_receipts_chunk.php';
+        }
+        $html = ob_get_clean();
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => true,
+            'html' => $html,
+            'offset' => $offset,
+            'limit' => $limit,
+            'next_offset' => $offset + $limit,
+            'total_receipts' => $totalReceipts,
+            'has_more' => ($offset + $limit) < $totalReceipts
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
 } catch (\Exception $e) {
@@ -383,10 +444,6 @@ try {
             <div class="error">Error: <?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
-        <?php if (empty($groupedStats) && !isset($error)): ?>
-            <p style="text-align:center;">No data found in database.</p>
-        <?php endif; ?>
-
         <div class="table-header-sticky" id="mainTableHeader">
             <div data-sort="receipt" class="sort-asc">Чек <span class="sort-icon"></span></div>
             <div data-sort="opened">ВрОткр <span class="sort-icon"></span></div>
@@ -394,201 +451,9 @@ try {
             <div data-sort="wait">Макс. ожидание <span class="sort-icon"></span></div>
         </div>
 
-        <div id="receiptsList">
-        <?php foreach ($groupedStats as $receiptNum => $data): ?>
-            <?php $receiptClass = ((int)($data['status'] ?? 1) > 1) ? 'receipt-item receipt-closed' : 'receipt-item'; ?>
-            <details class="<?= $receiptClass ?>" 
-                     data-receipt="<?= htmlspecialchars($receiptNum) ?>" 
-                     data-opened="<?= $data['opened_timestamp'] ?>" 
-                     data-closed="<?= (int)($data['max_wait_log_close_timestamp'] ?? 0) ?>" 
-                     data-wait="<?= $data['max_wait_time'] ?>">
-                <summary>
-                    <div class="receipt-info">
-                        <span class="receipt-number">Чек <?= htmlspecialchars($receiptNum) ?></span>
-                        <div class="receipt-times">
-                            <span>ВрОткр: <?= ($data['opened_at'] && $data['opened_at'] !== '0000-00-00 00:00:00' && date('Y', strtotime($data['opened_at'])) > 1970) ? date('H:i:s', strtotime($data['opened_at'])) : '—' ?></span>
-                            <span>ВрЛогЗакр: <?php
-                                if (!empty($data['has_hookah']) && (float)($data['max_wait_time'] ?? 0) <= 0) {
-                                    echo 'кал';
-                                } elseif (!empty($data['max_wait_log_close_at'])) {
-                                    echo date('H:i:s', strtotime($data['max_wait_log_close_at']));
-                                } else {
-                                    echo '—';
-                                }
-                            ?></span>
-                        </div>
-                        <?php if ($data['max_wait_time'] > 0): 
-                            $waitClass = 'wait-low';
-                            if (!empty($data['max_wait_fallback'])) {
-                                $waitClass = 'wait-fallback';
-                            } elseif ($data['max_wait_time'] >= 40) {
-                                $waitClass = 'wait-high';
-                            } elseif ($data['max_wait_time'] >= 20) {
-                                $waitClass = 'wait-medium';
-                            }
-                            $waitIcon = !empty($data['max_wait_prob']) ? '❓' : (!empty($data['max_wait_fallback']) ? '📌' : '⌛');
-                        ?>
-                            <span class="receipt-max-wait <?= $waitClass ?>" title="<?= !empty($data['max_wait_prob']) ? 'Макс. ожидание рассчитано от отправки на станцию до расчетного времени (ProbCloseTime: берется из следующего чека(ов) по цеху).' : (!empty($data['max_wait_fallback']) ? 'Макс. ожидание рассчитано от отправки на станцию до времени закрытия чека (fallback).' : 'Макс. ожидание рассчитано от отправки на станцию до отметки Готово.') ?>"><?= $waitIcon ?> <?= $data['max_wait_time'] ?> мин</span>
-                        <?php elseif (!empty($data['has_hookah'])): ?>
-                            <span class="receipt-max-wait wait-fallback" title="Кальяны: тайминг не считается.">кал</span>
-                        <?php endif; ?>
-                    </div>
-                </summary>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th title="Название позиции (из Poster).">Блюдо</th>
-                                <th title="Время открытия чека (Poster date_start).">ВрОткр</th>
-                                <th title="Время отправки позиции на станцию/цех (Poster TransactionHistory sendtokitchen).">ВрОтпр</th>
-                                <th title="Время готовности из Poster (finishedcooking).">ВрГотPSTR</th>
-                                <th title="Время закрытия чека в Poster (date_close/date_close_date), только для закрытых чеков.">ЗакЧкPoster</th>
-                                <th title="Время готовности из Chef Assistant (readyTime).">ЗакChAss</th>
-                                <th title="Расчетное время (ProbCloseTime): берется из ближайшего следующего чека (+1..+3) с тем же цехом, где есть готовые позиции.">ЗакРассч</th>
-                                <th title="Время, которое реально используется в расчете ожидания. Приоритет: ВрГотPSTR → ЗакChAss → ЗакРассч → ЗакЧкPoster.">ВрЛогЗакр</th>
-                                <th title="ВрЛогЗакр - ВрОтпр. Если чек открыт и нет ВрЛогЗакр: текущее время - ВрОтпр.">Ожидание</th>
-                                <th title="Исключить позицию из дашборда и алертов.">Не учитывать</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($data['items'] as $item): 
-                                $wait = '—';
-                                $waitClass = 'wait-time';
-                                $usedFallbackTime = false;
-                                $usedInProgressTime = false;
-                                $usedProbCloseTime = false;
-                                $isDeleted = !empty($item['was_deleted']);
-                                $mainCat = isset($item['dish_category_id']) ? (int)$item['dish_category_id'] : 0;
-                                $subCat = isset($item['dish_sub_category_id']) ? (int)$item['dish_sub_category_id'] : 0;
-                                $dishId = (int)($item['dish_id'] ?? 0);
-                                if ($mainCat <= 0 && $dishId > 0) $mainCat = $productMainCategory[$dishId] ?? 0;
-                                if ($subCat <= 0 && $dishId > 0) $subCat = $productSubCategory[$dishId] ?? 0;
-                                $isHookah = ($mainCat === 47) || ($subCat === 47);
-                                $logicalCloseAt = null;
-                                $logicalCloseLabel = '—';
-                                if ($isHookah) {
-                                    $wait = 'кал';
-                                    $waitClass = 'wait-time wait-time-hookah';
-                                    $logicalCloseLabel = 'кал';
-                                }
-                                if (!$isHookah && !$isDeleted && !empty($item['ticket_sent_at'])) {
-                                    $sentTs = strtotime($item['ticket_sent_at']);
-                                    if ($sentTs !== false && $sentTs > 0) {
-                                        $endTime = null;
-                                        $endTs = 0;
-                                        $endSource = '';
-                                        foreach ([
-                                            'pstr' => ($item['ready_pressed_at'] ?? null),
-                                            'chass' => ($item['ready_chass_at'] ?? null),
-                                            'prob' => ($item['prob_close_at'] ?? null),
-                                        ] as $src => $t) {
-                                            if (empty($t)) continue;
-                                            $ts = strtotime($t);
-                                            if ($ts === false || $ts <= 0) continue;
-                                            if ($ts < $sentTs) continue;
-                                            $endTime = $t;
-                                            $endTs = $ts;
-                                            $endSource = $src;
-                                            break;
-                                        }
-                                        if ($endTime === null) {
-                                            $closedAt = $item['transaction_closed_at'] ?? null;
-                                            if (
-                                                !empty($closedAt) &&
-                                                $closedAt !== '0000-00-00 00:00:00' &&
-                                                (int)date('Y', strtotime($closedAt)) > 1970 &&
-                                                (int)($item['status'] ?? 1) > 1
-                                            ) {
-                                                $ts = strtotime($closedAt);
-                                                if ($ts !== false && $ts >= $sentTs) {
-                                                    $endTime = $closedAt;
-                                                    $endTs = $ts;
-                                                    $endSource = 'close';
-                                                }
-                                            }
-                                        }
-                                        if ($endTime !== null) {
-                                            $logicalCloseAt = $endTime;
-                                            $logicalCloseLabel = date('H:i:s', $endTs);
-                                            $diff = $endTs - $sentTs;
-                                            $usedFallbackTime = ($endSource === 'close');
-                                            $usedProbCloseTime = ($endSource === 'prob');
-                                            $icon = $endSource === 'close' ? '📌' : ($endSource === 'prob' ? '❓' : '⌛');
-                                            $wait = $icon . ' ' . round($diff / 60, 1) . ' мин';
-                                            if ($endSource === 'close') {
-                                                $waitClass = 'wait-time wait-time-fallback';
-                                            }
-                                        } elseif ((int)($item['status'] ?? 1) === 1) {
-                                            $diff = time() - $sentTs;
-                                            if ($diff >= 0) {
-                                                $logicalCloseAt = date('Y-m-d H:i:s');
-                                                $logicalCloseLabel = date('H:i:s');
-                                                $wait = round($diff / 60, 1) . ' мин…';
-                                                $waitClass = 'wait-time wait-time-fallback';
-                                                $usedInProgressTime = true;
-                                            }
-                                        }
-                                    }
-                                }
-                                $dishName = $productNames[$item['dish_id']] ?? $item['dish_name'];
-                                
-                                $opened = ($item['transaction_opened_at'] && $item['transaction_opened_at'] !== '0000-00-00 00:00:00' && date('Y', strtotime($item['transaction_opened_at'])) > 1970) ? date('H:i:s', strtotime($item['transaction_opened_at'])) : '—';
-                                if ((int)$item['status'] > 1 && $item['transaction_closed_at'] && $item['transaction_closed_at'] !== '0000-00-00 00:00:00' && date('Y', strtotime($item['transaction_closed_at'])) > 1970) {
-                                    $closed = date('H:i:s', strtotime($item['transaction_closed_at']));
-                                } elseif ((int)$item['status'] > 1) {
-                                    $reason = isset($item['close_reason']) && $item['close_reason'] !== '' ? (int)$item['close_reason'] : null;
-                                    $payType = isset($item['pay_type']) && $item['pay_type'] !== '' ? (int)$item['pay_type'] : null;
-                                    if ($reason !== null && isset($closeReasonMap[$reason])) {
-                                        $closed = 'Закрыт без оплаты: ' . $closeReasonMap[$reason];
-                                    } elseif ($payType !== null && isset($payTypeMap[$payType])) {
-                                        $closed = 'Закрыт: ' . $payTypeMap[$payType];
-                                    } else {
-                                        $closed = 'Закрыт (время не передано API)';
-                                    }
-                                } else {
-                                    $closed = '—';
-                                }
-                            ?>
-                                <tr>
-                                    <td>
-                                        <strong><?= htmlspecialchars($dishName) ?></strong>
-                                        <div style="font-size: 0.8em; color: #999;">ID: <?= $item['dish_id'] ?></div>
-                                    </td>
-                                    <td><?= $opened ?></td>
-                                    <td><?= $item['ticket_sent_at'] ? date('H:i:s', strtotime($item['ticket_sent_at'])) : '—' ?></td>
-                                    <td>
-                                        <?php if (!empty($item['was_deleted'])): ?>
-                                            <span class="status-deleted">Удалено</span>
-                                        <?php elseif (!empty($item['ready_pressed_at'])): ?>
-                                            <span class="status-ready" title="Время взято из Poster (finishedcooking)."><?= date('H:i:s', strtotime($item['ready_pressed_at'])) ?></span>
-                                        <?php else: ?>
-                                            <span class="status-cooking">В процессе</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?= $closed ?></td>
-                                    <td><?= !empty($item['ready_chass_at']) ? date('H:i:s', strtotime($item['ready_chass_at'])) : '—' ?></td>
-                                    <td><?= !empty($item['prob_close_at']) ? date('H:i:s', strtotime($item['prob_close_at'])) : '—' ?></td>
-                                    <td><?= $logicalCloseLabel ?></td>
-                                    <td class="<?= $waitClass ?>" title="<?= $isDeleted ? 'Удалено: тайминг не считается.' : ($isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? '📌 Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? '❓ Расчет: ЗакРассч (ProbCloseTime) - Отправ. ЗакРассч берется из следующего чека(+1..+3) по тому же цеху.' : '⌛ Расчет: (Готово/ЗакChAss) - Отправ.')))) ?>"><?= $isDeleted ? '—' : $wait ?></td>
-                                    <td>
-                                        <form method="POST" class="exclude-item-form">
-                                            <input type="hidden" name="toggle_exclude_item" value="<?= (int)$item['id'] ?>">
-                                            <input type="hidden" name="return_query" value="<?= htmlspecialchars(http_build_query($_GET), ENT_QUOTES) ?>">
-                                            <label class="exclude-toggle">
-                                                <input type="checkbox" name="exclude_from_dashboard" value="1" <?= (!empty($item['exclude_from_dashboard']) || !empty($item['was_deleted']) || $isHookah) ? 'checked' : '' ?> <?= $isHookah ? 'disabled' : '' ?>>
-                                                не учитывать
-                                            </label>
-                                            <span class="save-indicator">сохранено</span>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </details>
-        <?php endforeach; ?>
-        </div>
+        <div id="lazyStatus" style="text-align:center; color:#65676b; margin:16px 0;">Загрузка…</div>
+        <div id="receiptsList"></div>
+        <div id="lazySentinel" style="height:1px;"></div>
     </div>
 
     <script src="assets/datepicker-range-dialog.js"></script>
@@ -596,9 +461,105 @@ try {
         document.addEventListener('DOMContentLoaded', () => {
             const header = document.getElementById('mainTableHeader');
             const list = document.getElementById('receiptsList');
-            const items = Array.from(list.getElementsByClassName('receipt-item'));
+            const statusEl = document.getElementById('lazyStatus');
+            const sentinel = document.getElementById('lazySentinel');
             
             let currentSort = { field: 'receipt', order: 'asc' };
+            const state = { offset: 0, limit: 20, loading: false, done: false, total: null };
+
+            const baseParams = new URLSearchParams(window.location.search);
+            baseParams.delete('ajax');
+            baseParams.delete('offset');
+            baseParams.delete('limit');
+
+            const applySort = () => {
+                const items = Array.from(list.getElementsByClassName('receipt-item'));
+                if (items.length === 0) return;
+
+                const { field, order } = currentSort;
+                const sortedItems = items.sort((a, b) => {
+                    let valA, valB;
+                    switch (field) {
+                        case 'receipt':
+                            valA = a.dataset.receipt || '';
+                            valB = b.dataset.receipt || '';
+                            return order === 'asc'
+                                ? valA.localeCompare(valB, undefined, { numeric: true })
+                                : valB.localeCompare(valA, undefined, { numeric: true });
+                        case 'opened':
+                            valA = parseInt(a.dataset.opened || '0', 10);
+                            valB = parseInt(b.dataset.opened || '0', 10);
+                            break;
+                        case 'closed':
+                            valA = parseInt(a.dataset.closed || '0', 10);
+                            valB = parseInt(b.dataset.closed || '0', 10);
+                            break;
+                        case 'wait':
+                            valA = parseFloat(a.dataset.wait || '0');
+                            valB = parseFloat(b.dataset.wait || '0');
+                            break;
+                    }
+                    return order === 'asc' ? (valA - valB) : (valB - valA);
+                });
+
+                sortedItems.forEach(item => list.appendChild(item));
+            };
+
+            const updateStatus = () => {
+                if (!statusEl) return;
+                if (state.loading) {
+                    statusEl.textContent = 'Загрузка…';
+                    statusEl.style.display = 'block';
+                    return;
+                }
+                if (state.total !== null && list.children.length === 0 && state.done) {
+                    statusEl.textContent = 'Нет данных';
+                    statusEl.style.display = 'block';
+                    return;
+                }
+                if (state.done) {
+                    statusEl.style.display = 'none';
+                    return;
+                }
+                statusEl.textContent = 'Прокрутите вниз для подгрузки…';
+                statusEl.style.display = 'block';
+            };
+
+            const loadNext = async () => {
+                if (state.loading || state.done) return;
+                state.loading = true;
+                updateStatus();
+                try {
+                    const params = new URLSearchParams(baseParams);
+                    params.set('ajax', '1');
+                    params.set('offset', String(state.offset));
+                    params.set('limit', String(state.limit));
+
+                    const res = await fetch(`rawdata.php?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    if (!res.ok) throw new Error('load failed');
+                    const data = await res.json();
+                    if (!data || !data.ok) throw new Error('bad response');
+
+                    state.total = typeof data.total_receipts === 'number' ? data.total_receipts : state.total;
+                    if (data.html) {
+                        const tmp = document.createElement('div');
+                        tmp.innerHTML = data.html;
+                        while (tmp.firstChild) list.appendChild(tmp.firstChild);
+                        applySort();
+                    }
+                    state.offset = typeof data.next_offset === 'number' ? data.next_offset : (state.offset + state.limit);
+                    state.done = !data.has_more;
+                } catch (e) {
+                    state.done = true;
+                    if (statusEl) {
+                        statusEl.textContent = 'Ошибка загрузки';
+                        statusEl.style.display = 'block';
+                    }
+                } finally {
+                    state.loading = false;
+                    updateStatus();
+                }
+            };
 
             header.addEventListener('click', (e) => {
                 const target = e.target.closest('div[data-sort]');
@@ -613,39 +574,17 @@ try {
                 });
                 target.classList.add(`sort-${order}`);
 
-                // Sort items
-                const sortedItems = items.sort((a, b) => {
-                    let valA, valB;
-                    
-                    switch(field) {
-                        case 'receipt':
-                            valA = a.dataset.receipt;
-                            valB = b.dataset.receipt;
-                            return order === 'asc' 
-                                ? valA.localeCompare(valB, undefined, {numeric: true})
-                                : valB.localeCompare(valA, undefined, {numeric: true});
-                        case 'opened':
-                            valA = parseInt(a.dataset.opened);
-                            valB = parseInt(b.dataset.opened);
-                            break;
-                        case 'closed':
-                            valA = parseInt(a.dataset.closed);
-                            valB = parseInt(b.dataset.closed);
-                            break;
-                        case 'wait':
-                            valA = parseFloat(a.dataset.wait);
-                            valB = parseFloat(b.dataset.wait);
-                            break;
-                    }
-
-                    if (order === 'asc') return valA - valB;
-                    return valB - valA;
-                });
-
-                // Re-append items
-                sortedItems.forEach(item => list.appendChild(item));
                 currentSort = { field, order };
+                applySort();
             });
+
+            if (sentinel) {
+                const io = new IntersectionObserver((entries) => {
+                    if (entries.some(e => e.isIntersecting)) loadNext();
+                }, { rootMargin: '600px 0px 600px 0px' });
+                io.observe(sentinel);
+            }
+            loadNext();
 
             list.addEventListener('change', async (e) => {
                 const checkbox = e.target.closest('input[name="exclude_from_dashboard"]');
