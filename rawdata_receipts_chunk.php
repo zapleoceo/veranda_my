@@ -162,17 +162,21 @@
                                 <?php elseif (!empty($item['ready_pressed_at'])): ?>
                                     <span class="status-ready" title="Время взято из Poster (finishedcooking)."><?= date('H:i:s', strtotime($item['ready_pressed_at'])) ?></span>
                                 <?php else: ?>
-                                    <?php
-                                        $sentTs = !empty($item['ticket_sent_at']) ? strtotime($item['ticket_sent_at']) : 0;
-                                    ?>
-                                    <span class="status-cooking live-cooking" data-sent-ts="<?= (int)$sentTs ?>"><span class="wait-spinner" aria-hidden="true"></span><span class="live-time">00:00</span></span>
+                                    <span class="status-cooking">В процессе</span>
                                 <?php endif; ?>
                             </td>
                             <td><?= $closed ?></td>
                             <td><?= !empty($item['ready_chass_at']) ? date('H:i:s', strtotime($item['ready_chass_at'])) : '—' ?></td>
                             <td><?= !empty($item['prob_close_at']) ? date('H:i:s', strtotime($item['prob_close_at'])) : '—' ?></td>
                             <td><?= $logicalCloseLabel ?></td>
-                            <td class="<?= $waitClass ?>" title="<?= $isDeleted ? 'Удалено: тайминг не считается.' : ($isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? 'Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? 'Расчет: ЗакРассч (ProbCloseTime) - Отправ.' : 'Расчет: (Готово/ЗакChAss) - Отправ.')))) ?>"><?= htmlspecialchars($isDeleted ? '—' : $wait) ?></td>
+                            <?php $sentTsForTimer = !empty($item['ticket_sent_at']) ? strtotime($item['ticket_sent_at']) : 0; ?>
+                            <td class="<?= $waitClass ?>" title="<?= $isDeleted ? 'Удалено: тайминг не считается.' : ($isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? 'Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? 'Расчет: ЗакРассч (ProbCloseTime) - Отправ.' : 'Расчет: (Готово/ЗакChAss) - Отправ.')))) ?>">
+                                <?php if (!$isDeleted && $usedInProgressTime && $sentTsForTimer > 0): ?>
+                                    <span class="live-wait" data-sent-ts="<?= (int)$sentTsForTimer ?>"><span class="wait-spinner" aria-hidden="true"></span><span class="live-time">00:00</span></span>*
+                                <?php else: ?>
+                                    <?= htmlspecialchars($isDeleted ? '—' : $wait) ?>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <form method="POST" class="exclude-item-form">
                                     <input type="hidden" name="toggle_exclude_item" value="<?= (int)$item['id'] ?>">

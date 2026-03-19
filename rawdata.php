@@ -470,7 +470,7 @@ try {
             <div data-sort="wait">Макс. ожидание <span class="sort-icon"></span></div>
         </div>
 
-        <div id="lazyStatus" style="text-align:center; color:#65676b; margin:16px 0; min-height: 18px;">Загрузка…</div>
+        <div id="lazyStatus" style="text-align:center; color:#65676b; height:0; margin:0; overflow:hidden;"></div>
         <div id="receiptsList"></div>
         <div id="lazySentinel" style="height:1px;"></div>
     </div>
@@ -526,7 +526,7 @@ try {
             };
 
             const updateLiveCooking = () => {
-                const els = Array.from(list.getElementsByClassName('live-cooking'));
+                const els = Array.from(list.getElementsByClassName('live-wait'));
                 if (els.length === 0) return;
                 const nowSec = Math.floor(Date.now() / 1000);
                 for (const el of els) {
@@ -545,16 +545,19 @@ try {
                 if (!statusEl) return;
                 if (state.loading) {
                     statusEl.textContent = 'Загрузка…';
-                    statusEl.style.visibility = 'visible';
+                    statusEl.style.height = '18px';
+                    statusEl.style.margin = '16px 0';
                     return;
                 }
                 if (state.total !== null && list.children.length === 0 && state.done) {
                     statusEl.textContent = 'Нет данных';
-                    statusEl.style.visibility = 'visible';
+                    statusEl.style.height = '18px';
+                    statusEl.style.margin = '16px 0';
                     return;
                 }
                 statusEl.textContent = '';
-                statusEl.style.visibility = 'hidden';
+                statusEl.style.height = '0';
+                statusEl.style.margin = '0';
             };
 
             const loadNext = async () => {
