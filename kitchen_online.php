@@ -2,6 +2,7 @@
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/Database.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
+veranda_require('kitchen_online');
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 if (file_exists(__DIR__ . '/.env')) {
@@ -116,7 +117,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                         $sentLabel = ($sentTs > 0) ? date('H:i:s', $sentTs) : '—';
                         $isOverdue = ($waitLimitMinutes > 0 && $sentTs > 0 && ($nowTs - $sentTs) >= ($waitLimitMinutes * 60));
                     ?>
-                    <div class="ko-item<?= $isOverdue ? ' ko-item-overdue' : '' ?>" data-sent-ts="<?= (int)$sentTs ?>">
+                    <div class="ko-item<?= $isOverdue ? ' ko-item-overdue' : '' ?>" data-sent-ts="<?= (int)$sentTs ?>"<?= !empty($it['item_id']) ? (' data-item-id="' . (int)$it['item_id'] . '"') : '' ?>>
                         <div class="ko-item-name"><?= htmlspecialchars($it['dish_name'] ?: ('Dish #' . (int)$it['dish_id'])) ?></div>
                         <div class="ko-item-row">
                             <span class="ko-item-sent">Пришло: <?= htmlspecialchars($sentLabel) ?></span>
@@ -125,7 +126,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                             <?php else: ?>
                                 <span class="ko-item-wait">—</span>
                             <?php endif; ?>
-                            <?php if (!empty($it['item_id'])): ?>
+                            <?php if (!empty($it['item_id']) && veranda_can('exclude_toggle')): ?>
                                 <button type="button" class="ko-ack" title="Принято" aria-label="Принято" data-item-id="<?= (int)$it['item_id'] ?>">✕</button>
                             <?php endif; ?>
                         </div>
@@ -144,6 +145,11 @@ if ($isAjax) {
         $db = $db ?? new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
         $api = $api ?? new \App\Classes\PosterAPI($token);
         if ($action === 'exclude' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!veranda_can('exclude_toggle')) {
+                http_response_code(403);
+                echo json_encode(['ok' => false], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             $itemId = (int)($_POST['toggle_exclude_item'] ?? 0);
             if ($itemId > 0) {
                 $db->query("UPDATE kitchen_stats SET exclude_from_dashboard = 1, exclude_auto = 0 WHERE id = ?", [$itemId]);
@@ -377,10 +383,21 @@ $dashboardQuery = http_build_query([
     <style>
         body { font-family: Arial, sans-serif; background: #f5f6fa; margin: 0; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; }
-        .nav-links { text-align: center; margin-bottom: 20px; }
-        .nav-links a { color: #1a73e8; text-decoration: none; margin: 0 10px; font-weight: 500; }
-        .nav-links a:hover { text-decoration: underline; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; }
+        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+        .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }
+        .nav-left a:hover { text-decoration: underline; }
+        .user-menu { position: relative; }
+        .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
+        .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; }
+        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.12); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
+        .user-menu:hover .user-dropdown { display: block; }
+        .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: #37474f; text-decoration: none; font-weight: 600; }
+        .user-dropdown a:hover { background: #f5f6fa; }
         h1 { text-align: center; color: #2c3e50; margin-bottom: 10px; }
+        .ko-titlebar { display: inline-flex; align-items: center; gap: 10px; }
+        .ko-sound { border: 0; background: transparent; cursor: pointer; font-size: 18px; line-height: 1; padding: 4px 6px; color: #546e7a; }
+        .ko-sound:hover { color: #1a73e8; }
         .topbar { display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; color: #546e7a; }
         .topbar select { padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; }
         .wait-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(245, 124, 0, 0.3); border-top-color: #f57c00; border-radius: 50%; margin-right: 6px; animation: waitSpin 0.9s linear infinite; vertical-align: -1px; }
@@ -408,15 +425,29 @@ $dashboardQuery = http_build_query([
 </head>
 <body>
     <div class="container">
-        <div class="nav-links">
-            <a href="dashboard.php?<?= htmlspecialchars($dashboardQuery) ?>">Дашборд</a>
-            <a href="rawdata.php?<?= htmlspecialchars($dashboardQuery) ?>">Сырые данные</a>
-            <a href="admin.php">УПРАВЛЕНИЕ</a>
-            <a href="kitchen_online.php">КухняOnline</a>
-            <a href="logout.php">Выйти (<?= htmlspecialchars($_SESSION['user_email']) ?>)</a>
+        <div class="top-nav">
+            <div class="nav-left">
+                <?php if (veranda_can('dashboard')): ?><a href="dashboard.php?<?= htmlspecialchars($dashboardQuery) ?>">Дашборд</a><?php endif; ?>
+                <?php if (veranda_can('rawdata')): ?><a href="rawdata.php?<?= htmlspecialchars($dashboardQuery) ?>">Сырые данные</a><?php endif; ?>
+                <?php if (veranda_can('kitchen_online')): ?><a href="kitchen_online.php">КухняOnline</a><?php endif; ?>
+                <?php if (veranda_can('admin')): ?><a href="admin.php">УПРАВЛЕНИЕ</a><?php endif; ?>
+            </div>
+            <div class="user-menu">
+                <?php
+                    $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
+                    $initial = mb_strtoupper(mb_substr($userLabel !== '' ? $userLabel : 'U', 0, 1));
+                ?>
+                <div class="user-chip">
+                    <span class="user-icon"><?= htmlspecialchars($initial) ?></span>
+                    <span><?= htmlspecialchars($userLabel) ?></span>
+                </div>
+                <div class="user-dropdown">
+                    <a href="logout.php">Выйти</a>
+                </div>
+            </div>
         </div>
 
-        <h1>КухняOnline</h1>
+        <h1><span class="ko-titlebar">КухняOnline <button type="button" class="ko-sound" id="soundToggle" aria-label="Звук">🔊</button></span></h1>
 
         <div class="topbar">
             <span>Последнее обновление из Poster: <span id="lastSync"><?= htmlspecialchars($lastSyncLabel) ?></span></span>
@@ -432,7 +463,7 @@ $dashboardQuery = http_build_query([
         </div>
 
         <div id="cards" class="cards"></div>
-        <div id="empty" class="empty" style="display:none;">Нет активных блюд</div>
+        <div id="empty" class="empty" style="display:none;">ВСЕ ЗАКАЗЫ ВЫДАНЫ</div>
         <div class="ko-footer">
             Табло обновляется автоматически каждые 10 секунд. Если блюдо приготовили или убрали из чека — оно исчезнет из списка. Крестик «✕» рядом с блюдом означает «Принято»: блюдо больше не будет показываться в табло и не будет учитываться в аналитике задержек.
         </div>
@@ -444,10 +475,73 @@ $dashboardQuery = http_build_query([
         const stationEl = document.getElementById('station');
         const lastSyncEl = document.getElementById('lastSync');
         const refreshInEl = document.getElementById('refreshIn');
+        const soundBtn = document.getElementById('soundToggle');
         let loading = false;
         const refreshIntervalSec = 10;
         let refreshRemaining = refreshIntervalSec;
         let waitLimitSec = 0;
+        let seenIds = null;
+        let soundMuted = false;
+        let audioCtx = null;
+
+        const loadMuted = () => {
+            try { soundMuted = (localStorage.getItem('ko_sound_muted') === '1'); } catch (_) { soundMuted = false; }
+        };
+        const saveMuted = () => {
+            try { localStorage.setItem('ko_sound_muted', soundMuted ? '1' : '0'); } catch (_) {}
+        };
+        const renderSoundIcon = () => {
+            if (!soundBtn) return;
+            soundBtn.textContent = soundMuted ? '🔇' : '🔊';
+        };
+        const ensureAudio = async () => {
+            if (audioCtx) return true;
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return false;
+            audioCtx = new Ctx();
+            try { await audioCtx.resume(); } catch (_) {}
+            return true;
+        };
+        const beep = async () => {
+            if (soundMuted) return;
+            const ok = await ensureAudio();
+            if (!ok || !audioCtx) return;
+            if (audioCtx.state === 'suspended') {
+                try { await audioCtx.resume(); } catch (_) { return; }
+            }
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.type = 'sine';
+            o.frequency.value = 880;
+            g.gain.value = 0.0001;
+            o.connect(g);
+            g.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            g.gain.setValueAtTime(0.0001, now);
+            g.gain.exponentialRampToValueAtTime(0.15, now + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+            o.start(now);
+            o.stop(now + 0.26);
+        };
+
+        const extractItemIds = () => {
+            const els = Array.from(cardsEl.querySelectorAll('.ko-item[data-item-id]'));
+            return els.map(el => parseInt(el.getAttribute('data-item-id') || '0', 10)).filter(n => n > 0);
+        };
+        const detectNewItems = () => {
+            const current = extractItemIds();
+            if (seenIds === null) {
+                seenIds = new Set(current);
+                return;
+            }
+            const curSet = new Set(current);
+            let hasNew = false;
+            for (const id of curSet) {
+                if (!seenIds.has(id)) { hasNew = true; break; }
+            }
+            seenIds = curSet;
+            if (hasNew) beep();
+        };
 
         const updateLive = () => {
             const els = Array.from(document.getElementsByClassName('live-wait'));
@@ -484,6 +578,7 @@ $dashboardQuery = http_build_query([
                 if (data.last_sync) lastSyncEl.textContent = data.last_sync;
                 if (typeof data.wait_limit_minutes === 'number') waitLimitSec = data.wait_limit_minutes * 60;
                 updateLive();
+                detectNewItems();
             } catch (e) {
             } finally {
                 loading = false;
@@ -515,6 +610,7 @@ $dashboardQuery = http_build_query([
                 if (data.last_sync) lastSyncEl.textContent = data.last_sync;
                 if (typeof data.wait_limit_minutes === 'number') waitLimitSec = data.wait_limit_minutes * 60;
                 updateLive();
+                detectNewItems();
             } catch (e) {
             } finally {
                 loading = false;
@@ -522,6 +618,19 @@ $dashboardQuery = http_build_query([
         };
 
         stationEl.addEventListener('change', () => loadCards('list'));
+        loadMuted();
+        renderSoundIcon();
+        if (soundBtn) {
+            soundBtn.addEventListener('click', async () => {
+                soundMuted = !soundMuted;
+                saveMuted();
+                renderSoundIcon();
+                if (!soundMuted) {
+                    await ensureAudio();
+                    beep();
+                }
+            });
+        }
 
         cardsEl.addEventListener('wheel', (e) => {
             if (!cardsEl || cardsEl.scrollWidth <= cardsEl.clientWidth) return;

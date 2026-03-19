@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
+veranda_require('rawdata');
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 // Получаем фильтры из GET
@@ -48,6 +49,18 @@ try {
         $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_exclude_item'])) {
+        if (!veranda_can('exclude_toggle')) {
+            $isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
+            if ($isAjax) {
+                http_response_code(403);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            http_response_code(403);
+            echo 'Forbidden';
+            exit;
+        }
         $itemId = (int)($_POST['toggle_exclude_item'] ?? 0);
         $excludeFlag = isset($_POST['exclude_from_dashboard']) ? 1 : 0;
         if ($itemId > 0) {
@@ -373,9 +386,17 @@ try {
         .filter-section button[type="submit"]:hover { background: #1557b0; }
         .filter-section .spacer { flex: 1; }
         
-        .nav-links { text-align: center; margin-bottom: 20px; }
-        .nav-links a { color: #1a73e8; text-decoration: none; margin: 0 10px; font-weight: 500; }
-        .nav-links a:hover { text-decoration: underline; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; }
+        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+        .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }
+        .nav-left a:hover { text-decoration: underline; }
+        .user-menu { position: relative; }
+        .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
+        .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; }
+        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.12); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
+        .user-menu:hover .user-dropdown { display: block; }
+        .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: #37474f; text-decoration: none; font-weight: 600; }
+        .user-dropdown a:hover { background: #f5f6fa; }
         
         .error { color: #d32f2f; background: #fdecea; padding: 15px; border-radius: 8px; border: 1px solid #f5c2c7; margin-bottom: 20px; }
         .last-sync { text-align: center; color: #546e7a; font-size: 0.95em; margin: -18px 0 20px; display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -384,12 +405,26 @@ try {
 </head>
 <body>
     <div class="container">
-        <div class="nav-links">
-            <a href="dashboard.php?<?= htmlspecialchars($dashboardQuery) ?>">Дашборд</a>
-            <a href="rawdata.php">Сырые данные</a>
-            <a href="admin.php">УПРАВЛЕНИЕ</a>
-            <a href="kitchen_online.php">КухняOnline</a>
-            <a href="logout.php">Выйти (<?= htmlspecialchars($_SESSION['user_email']) ?>)</a>
+        <div class="top-nav">
+            <div class="nav-left">
+                <?php if (veranda_can('dashboard')): ?><a href="dashboard.php?<?= htmlspecialchars($dashboardQuery) ?>">Дашборд</a><?php endif; ?>
+                <?php if (veranda_can('rawdata')): ?><a href="rawdata.php">Сырые данные</a><?php endif; ?>
+                <?php if (veranda_can('kitchen_online')): ?><a href="kitchen_online.php">КухняOnline</a><?php endif; ?>
+                <?php if (veranda_can('admin')): ?><a href="admin.php">УПРАВЛЕНИЕ</a><?php endif; ?>
+            </div>
+            <div class="user-menu">
+                <?php
+                    $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
+                    $initial = mb_strtoupper(mb_substr($userLabel !== '' ? $userLabel : 'U', 0, 1));
+                ?>
+                <div class="user-chip">
+                    <span class="user-icon"><?= htmlspecialchars($initial) ?></span>
+                    <span><?= htmlspecialchars($userLabel) ?></span>
+                </div>
+                <div class="user-dropdown">
+                    <a href="logout.php">Выйти</a>
+                </div>
+            </div>
         </div>
         <h1>Raw Data: Kitchen Transactions</h1>
         <div class="last-sync">

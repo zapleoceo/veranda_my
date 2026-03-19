@@ -1,40 +1,9 @@
 <?php
-require_once __DIR__ . '/src/classes/Database.php';
+require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 require_once __DIR__ . '/src/classes/PosterMenuSync.php';
 require_once __DIR__ . '/src/classes/MenuAutoFill.php';
-require_once __DIR__ . '/src/classes/Auth.php';
-
-// Load .env
-if (file_exists(__DIR__ . '/.env')) {
-    $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
-        if (strpos(trim($line), '#') === 0) continue;
-        list($name, $value) = explode('=', $line, 2);
-        $_ENV[$name] = trim($value);
-    }
-}
-
-$dbHost = $_ENV['DB_HOST'] ?? 'localhost';
-$dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
-$dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
-$dbPass = $_ENV['DB_PASS'] ?? '';
-$googleClientId = $_ENV['GOOGLE_CLIENT_ID'] ?? '';
-$googleClientSecret = $_ENV['GOOGLE_CLIENT_SECRET'] ?? '';
-$googleRedirectUri = $_ENV['GOOGLE_REDIRECT_URI'] ?? 'https://veranda.my/auth_callback.php';
-$posterToken = $_ENV['POSTER_API_TOKEN'] ?? '';
-
-$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
-
-// Ensure system_meta exists
-$db->query("CREATE TABLE IF NOT EXISTS system_meta (
-    meta_key VARCHAR(255) PRIMARY KEY,
-    meta_value TEXT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-$auth = new \App\Classes\Auth($db, $googleClientId, $googleClientSecret, $googleRedirectUri);
-
-$auth->requireAuth();
+veranda_require('admin');
 
 $message = '';
 $error = '';
@@ -42,6 +11,40 @@ $error = '';
 $tab = $_GET['tab'] ?? 'main';
 if (!in_array($tab, ['main', 'menu'], true)) {
     $tab = 'main';
+}
+
+$columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
+    $row = $db->query(
+        "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+        [$dbName, $table, $column]
+    )->fetch();
+    return (int)($row['c'] ?? 0) > 0;
+};
+if (!$columnExists($db, $dbName, 'users', 'permissions_json')) {
+    $db->query("ALTER TABLE users ADD COLUMN permissions_json TEXT NULL AFTER is_active");
+}
+if (!$columnExists($db, $dbName, 'users', 'is_active')) {
+    $db->query("ALTER TABLE users ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1");
+}
+
+$permissionKeys = [
+    'dashboard' => 'Дашборд',
+    'rawdata' => 'Сырые данные',
+    'kitchen_online' => 'КухняOnline',
+    'admin' => 'УПРАВЛЕНИЕ',
+    'exclude_toggle' => 'Кнопка «Не учитывать»',
+];
+
+if (isset($_POST['save_user_permissions'])) {
+    $targetEmail = trim((string)($_POST['perm_email'] ?? ''));
+    if ($targetEmail !== '') {
+        $perms = [];
+        foreach ($permissionKeys as $k => $_label) {
+            $perms[$k] = isset($_POST['perm_' . $k]) ? 1 : 0;
+        }
+        $db->query("UPDATE users SET permissions_json = ? WHERE email = ? LIMIT 1", [json_encode($perms, JSON_UNESCAPED_UNICODE), $targetEmail]);
+        $message = "Права для $targetEmail сохранены.";
+    }
 }
 
 // Add user
@@ -750,9 +753,27 @@ if ($tab === 'menu') {
         th { background: #f8f9fa; color: #65676b; font-size: 13px; text-transform: uppercase; font-weight: 600; }
         .delete-btn { color: #d32f2f; text-decoration: none; font-size: 14px; }
         .delete-btn:hover { text-decoration: underline; }
-        .nav-links { text-align: center; margin-bottom: 20px; }
-        .nav-links a { color: #1a73e8; text-decoration: none; margin: 0 10px; font-weight: 500; }
-        .nav-links a:hover { text-decoration: underline; }
+        .perm-gear { border: 0; background: transparent; cursor: pointer; font-size: 16px; color: #546e7a; padding: 4px 8px; }
+        .perm-gear:hover { color: #1a73e8; }
+        .perm-modal { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; }
+        .perm-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
+        .perm-modal-card { position: relative; width: 420px; max-width: calc(100vw - 24px); background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 12px 28px rgba(0,0,0,0.25); }
+        .perm-modal-title { font-weight: 800; color: #2c3e50; margin-bottom: 10px; }
+        .perm-list { display: grid; gap: 8px; margin: 10px 0 14px; }
+        .perm-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 10px; }
+        .perm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+        .perm-cancel { background: #eceff1; color: #37474f; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; }
+        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+        .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }
+        .nav-left a:hover { text-decoration: underline; }
+        .user-menu { position: relative; }
+        .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
+        .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; }
+        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.12); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
+        .user-menu:hover .user-dropdown { display: block; }
+        .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: #37474f; text-decoration: none; font-weight: 600; }
+        .user-dropdown a:hover { background: #f5f6fa; }
         .tab-links { text-align: center; margin: -10px 0 24px; }
         .tab-links a { display: inline-block; padding: 8px 14px; border-radius: 999px; margin: 0 6px; text-decoration: none; font-weight: 600; color: #1a73e8; background: rgba(26,115,232,0.08); }
         .tab-links a.active { color: white; background: #1a73e8; }
@@ -788,11 +809,26 @@ if ($tab === 'menu') {
 </head>
 <body>
     <div class="container">
-        <div class="nav-links">
-            <a href="dashboard.php">Дашборд</a>
-            <a href="rawdata.php">Сырые данные</a>
-            <a href="logout.php">Выйти (<?= htmlspecialchars($_SESSION['user_email']) ?>)</a>
-            <a href="kitchen_online.php">КухняOnline</a>
+        <div class="top-nav">
+            <div class="nav-left">
+                <?php if (veranda_can('dashboard')): ?><a href="dashboard.php">Дашборд</a><?php endif; ?>
+                <?php if (veranda_can('rawdata')): ?><a href="rawdata.php">Сырые данные</a><?php endif; ?>
+                <?php if (veranda_can('kitchen_online')): ?><a href="kitchen_online.php">КухняOnline</a><?php endif; ?>
+                <?php if (veranda_can('admin')): ?><a href="admin.php">УПРАВЛЕНИЕ</a><?php endif; ?>
+            </div>
+            <div class="user-menu">
+                <?php
+                    $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
+                    $initial = mb_strtoupper(mb_substr($userLabel !== '' ? $userLabel : 'U', 0, 1));
+                ?>
+                <div class="user-chip">
+                    <span class="user-icon"><?= htmlspecialchars($initial) ?></span>
+                    <span><?= htmlspecialchars($userLabel) ?></span>
+                </div>
+                <div class="user-dropdown">
+                    <a href="logout.php">Выйти</a>
+                </div>
+            </div>
         </div>
         <h1>УПРАВЛЕНИЕ</h1>
 
@@ -900,6 +936,12 @@ if ($tab === 'menu') {
                         <td><?= htmlspecialchars($user['email']) ?></td>
                         <td><?= date('d.m.Y H:i', strtotime($user['created_at'])) ?></td>
                         <td>
+                            <?php
+                                $rawPerms = (string)($user['permissions_json'] ?? '');
+                                $perms = $rawPerms !== '' ? json_decode($rawPerms, true) : null;
+                                if (!is_array($perms)) $perms = null;
+                            ?>
+                            <button type="button" class="perm-gear" data-email="<?= htmlspecialchars($user['email'], ENT_QUOTES) ?>" data-perms="<?= htmlspecialchars(json_encode($perms, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>">⚙</button>
                             <?php if ($user['email'] !== $_SESSION['user_email']): ?>
                                 <a href="?delete=<?= urlencode($user['email']) ?>" class="delete-btn" onclick="return confirm('Удалить доступ для <?= $user['email'] ?>?')">Удалить</a>
                             <?php else: ?>
@@ -910,6 +952,28 @@ if ($tab === 'menu') {
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            <div class="perm-modal" id="permModal" style="display:none;">
+                <div class="perm-modal-backdrop"></div>
+                <div class="perm-modal-card">
+                    <div class="perm-modal-title">Права доступа</div>
+                    <form method="POST" id="permForm">
+                        <input type="hidden" name="save_user_permissions" value="1">
+                        <input type="hidden" name="perm_email" id="permEmail" value="">
+                        <div class="perm-list">
+                            <?php foreach ($permissionKeys as $k => $label): ?>
+                                <label class="perm-row">
+                                    <input type="checkbox" name="perm_<?= htmlspecialchars($k) ?>" id="perm_<?= htmlspecialchars($k) ?>" value="1">
+                                    <?= htmlspecialchars($label) ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="perm-actions">
+                            <button type="button" class="perm-cancel" id="permCancel">Отмена</button>
+                            <button type="submit">Сохранить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <div class="description-card">
@@ -1703,6 +1767,49 @@ if ($tab === 'menu') {
                 const d = new Date(iso);
                 if (Number.isNaN(d.getTime())) return;
                 el.textContent = d.toLocaleString();
+            });
+        })();
+
+        (() => {
+            const modal = document.getElementById('permModal');
+            const form = document.getElementById('permForm');
+            const emailEl = document.getElementById('permEmail');
+            const cancel = document.getElementById('permCancel');
+            if (!modal || !form || !emailEl || !cancel) return;
+
+            const defaultPerms = {
+                dashboard: true,
+                rawdata: true,
+                kitchen_online: true,
+                admin: true,
+                exclude_toggle: true,
+            };
+
+            const close = () => { modal.style.display = 'none'; };
+            const open = (email, perms) => {
+                emailEl.value = email;
+                const p = Object.assign({}, defaultPerms, perms || {});
+                Object.keys(defaultPerms).forEach((k) => {
+                    const cb = document.getElementById('perm_' + k);
+                    if (cb) cb.checked = !!p[k];
+                });
+                modal.style.display = 'flex';
+            };
+
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.perm-gear');
+                if (!btn) return;
+                const email = btn.getAttribute('data-email') || '';
+                let perms = null;
+                try { perms = JSON.parse(btn.getAttribute('data-perms') || 'null'); } catch (_) { perms = null; }
+                open(email, perms);
+            });
+            modal.addEventListener('click', (e) => {
+                if (e.target.classList.contains('perm-modal-backdrop')) close();
+            });
+            cancel.addEventListener('click', close);
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') close();
             });
         })();
     </script>

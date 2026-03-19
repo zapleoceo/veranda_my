@@ -182,7 +182,7 @@
                                     <input type="hidden" name="toggle_exclude_item" value="<?= (int)$item['id'] ?>">
                                     <input type="hidden" name="return_query" value="<?= htmlspecialchars(http_build_query($_GET), ENT_QUOTES) ?>">
                                     <label class="exclude-toggle">
-                                        <input type="checkbox" name="exclude_from_dashboard" value="1" <?= (!empty($item['exclude_from_dashboard']) || !empty($item['was_deleted']) || $isHookah) ? 'checked' : '' ?> <?= $isHookah ? 'disabled' : '' ?>>
+                                        <input type="checkbox" name="exclude_from_dashboard" value="1" <?= (!empty($item['exclude_from_dashboard']) || !empty($item['was_deleted']) || $isHookah) ? 'checked' : '' ?> <?= ($isHookah || !veranda_can('exclude_toggle')) ? 'disabled' : '' ?>>
                                         не учитывать
                                     </label>
                                     <span class="save-indicator">сохранено</span>
