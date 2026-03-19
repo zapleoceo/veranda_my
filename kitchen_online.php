@@ -101,9 +101,11 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
         ?>
         <div class="ko-card" data-tx-id="<?= (int)$c['transaction_id'] ?>">
             <div class="ko-card-header">
-                <div class="ko-title">Чек <?= htmlspecialchars($receiptLabel) ?></div>
+                <div class="ko-card-top">
+                    <div class="ko-title">Чек <?= htmlspecialchars($receiptLabel) ?></div>
+                    <div class="ko-table">Стол: <?= htmlspecialchars($table !== '' ? $table : '—') ?></div>
+                </div>
                 <div class="ko-meta">
-                    <span>Стол: <?= htmlspecialchars($table !== '' ? $table : '—') ?></span>
                     <span>Официант: <?= htmlspecialchars($waiter) ?></span>
                 </div>
             </div>
@@ -387,7 +389,9 @@ $dashboardQuery = http_build_query([
         .ko-card { flex: 0 0 auto; }
         .ko-card { width: 320px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); overflow: hidden; }
         .ko-card-header { padding: 12px 14px; border-bottom: 1px solid #eee; background: #fafafa; }
+        .ko-card-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
         .ko-title { font-weight: 800; color: #2c3e50; }
+        .ko-table { font-weight: 800; color: #2c3e50; white-space: nowrap; }
         .ko-meta { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #607d8b; }
         .ko-items { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
         .ko-item { border: 1px solid #eef2f6; border-radius: 10px; padding: 10px; background: #fff; box-sizing: border-box; }
