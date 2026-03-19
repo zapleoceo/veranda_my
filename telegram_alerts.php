@@ -486,10 +486,11 @@ try {
     $query = "SELECT * FROM kitchen_stats 
               WHERE ready_pressed_at IS NULL 
               AND ready_chass_at IS NULL
-              AND (prob_close_at IS NULL OR prob_close_at < ticket_sent_at)
               AND ticket_sent_at IS NOT NULL 
               AND transaction_date = ?
               AND status = 1
+              AND COALESCE(was_deleted, 0) = 0
+              AND COALESCE(exclude_from_dashboard, 0) = 0
               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
               AND (
                     COALESCE(tg_acknowledged, 0) = 0
