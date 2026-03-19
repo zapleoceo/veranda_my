@@ -177,6 +177,9 @@ try {
         if ($isHookah) {
             continue;
         }
+        if (!empty($row['was_deleted'])) {
+            continue;
+        }
         $sentTs = !empty($row['ticket_sent_at']) ? strtotime($row['ticket_sent_at']) : 0;
         if ($sentTs > 0) {
             $logicalCloseAt = null;
@@ -454,6 +457,7 @@ try {
                                 $usedFallbackTime = false;
                                 $usedInProgressTime = false;
                                 $usedProbCloseTime = false;
+                                $isDeleted = !empty($item['was_deleted']);
                                 $mainCat = isset($item['dish_category_id']) ? (int)$item['dish_category_id'] : 0;
                                 $subCat = isset($item['dish_sub_category_id']) ? (int)$item['dish_sub_category_id'] : 0;
                                 $dishId = (int)($item['dish_id'] ?? 0);
@@ -467,7 +471,7 @@ try {
                                     $waitClass = 'wait-time wait-time-hookah';
                                     $logicalCloseLabel = 'кал';
                                 }
-                                if (!$isHookah && !empty($item['ticket_sent_at'])) {
+                                if (!$isHookah && !$isDeleted && !empty($item['ticket_sent_at'])) {
                                     $sentTs = strtotime($item['ticket_sent_at']);
                                     if ($sentTs !== false && $sentTs > 0) {
                                         $endTime = null;
@@ -565,7 +569,7 @@ try {
                                     <td><?= !empty($item['ready_chass_at']) ? date('H:i:s', strtotime($item['ready_chass_at'])) : '—' ?></td>
                                     <td><?= !empty($item['prob_close_at']) ? date('H:i:s', strtotime($item['prob_close_at'])) : '—' ?></td>
                                     <td><?= $logicalCloseLabel ?></td>
-                                    <td class="<?= $waitClass ?>" title="<?= $isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? '📌 Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? '❓ Расчет: ЗакРассч (ProbCloseTime) - Отправ. ЗакРассч берется из следующего чека(+1..+3) по тому же цеху.' : '⌛ Расчет: (Готово/ЗакChAss) - Отправ.'))) ?>"><?= $wait ?></td>
+                                    <td class="<?= $waitClass ?>" title="<?= $isDeleted ? 'Удалено: тайминг не считается.' : ($isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? '📌 Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? '❓ Расчет: ЗакРассч (ProbCloseTime) - Отправ. ЗакРассч берется из следующего чека(+1..+3) по тому же цеху.' : '⌛ Расчет: (Готово/ЗакChAss) - Отправ.')))) ?>"><?= $isDeleted ? '—' : $wait ?></td>
                                     <td>
                                         <form method="POST" class="exclude-item-form">
                                             <input type="hidden" name="toggle_exclude_item" value="<?= (int)$item['id'] ?>">

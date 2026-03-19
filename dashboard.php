@@ -7,12 +7,24 @@ $dateFrom = $_GET['dateFrom'] ?? date('Y-m-d');
 $dateTo = $_GET['dateTo'] ?? date('Y-m-d');
 $hourStart = (int)($_GET['hourStart'] ?? 10);
 $hourEnd = (int)($_GET['hourEnd'] ?? 24);
-$excludeZero = isset($_GET['excludeZero']) ? (bool)$_GET['excludeZero'] : false;
-$excludeCloseBased = isset($_GET['excludeCloseBased']) ? (bool)$_GET['excludeCloseBased'] : true;
 $doResync = isset($_GET['resync']) && $_GET['resync'] === '1';
 $lastSyncLabel = '—';
 if ($hourEnd <= $hourStart) {
     $hourEnd = min(24, $hourStart + 1);
+}
+$rawParams = [
+    'dateFrom' => $dateFrom,
+    'dateTo' => $dateTo,
+    'hourStart' => $hourStart,
+    'hourEnd' => $hourEnd
+];
+if ($doResync) {
+    require_once __DIR__ . '/scripts/kitchen/resync_lib.php';
+    veranda_resync_range_period($dateFrom, $dateTo);
+    $redirectParams = $rawParams;
+    $qs = http_build_query($redirectParams);
+    header('Location: dashboard.php' . ($qs ? ('?' . $qs) : ''));
+    exit;
 }
 $rawDataQuery = http_build_query([
     'dateFrom' => $dateFrom,
@@ -20,14 +32,7 @@ $rawDataQuery = http_build_query([
     'hourStart' => $hourStart,
     'hourEnd' => $hourEnd
 ]);
-$dashboardQuery = http_build_query([
-    'dateFrom' => $dateFrom,
-    'dateTo' => $dateTo,
-    'hourStart' => $hourStart,
-    'hourEnd' => $hourEnd,
-    'excludeZero' => $excludeZero ? 1 : 0,
-    'excludeCloseBased' => $excludeCloseBased ? 1 : 0
-]);
+$dashboardQuery = http_build_query($rawParams);
 
 try {
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
@@ -61,21 +66,12 @@ try {
         }
     }
     
-    // По запросу: предварительно сделать ресинк выбранного периода
-    if ($doResync) {
-        require_once __DIR__ . '/scripts/kitchen/resync_lib.php';
-        veranda_resync_range_period($dateFrom, $dateTo);
-    }
     // Получаем данные за период
     $query = "SELECT * FROM kitchen_stats 
               WHERE COALESCE(exclude_from_dashboard, 0) = 0
+              AND COALESCE(was_deleted, 0) = 0
               AND transaction_date BETWEEN ? AND ?";
     $params = [$dateFrom, $dateTo];
-    
-    if ($excludeZero) {
-        $query .= " AND total_sum > 0";
-    }
-    
     $query .= " ORDER BY ticket_sent_at ASC";
     $stats = $db->query($query, $params)->fetchAll();
     
@@ -166,7 +162,7 @@ try {
                 $endTime = $t;
                 break;
             }
-            if ($endTime === null && !$excludeCloseBased) {
+            if ($endTime === null) {
                 $closedAt = $row['transaction_closed_at'] ?? null;
                 if (
                     !empty($closedAt) &&
@@ -235,13 +231,6 @@ try {
         .range-hint { font-size: 0.75em; color: #777; min-height: 16px; margin-top: 4px; }
         .filters button[type="submit"] { padding: 10px 25px; background: #1a73e8; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
         .filters button[type="submit"]:hover { background: #1557b0; }
-        
-        .settings-btn { background: #6c757d; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 500; }
-        .settings-btn:hover { background: #5a6268; }
-        .settings-panel { display: none; background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; position: absolute; top: 100%; right: 0; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 250px; margin-top: 10px; }
-        .settings-panel.active { display: block; }
-        .settings-panel label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9em; color: #444; }
-        .settings-container { position: relative; }
         .last-sync { text-align: center; color: #546e7a; font-size: 0.95em; margin: -25px 0 20px; }
     </style>
 </head>
@@ -262,7 +251,6 @@ try {
                 <div class="dp-range" data-date-range-picker data-from-input="dateFromInput" data-to-input="dateToInput">
                     <div class="dp-field">
                         <input type="text" id="dateRangeBtn" class="dp-display range-btn" readonly>
-                        <button type="button" class="dp-open" aria-label="Выбрать период">📅</button>
                     </div>
                     <input type="hidden" name="dateFrom" id="dateFromInput" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" id="dateToInput" value="<?= htmlspecialchars($dateTo) ?>">
@@ -303,26 +291,9 @@ try {
                 </div>
             </div>
             
-            <div class="settings-container">
-                <button type="button" class="settings-btn" onclick="document.getElementById('settingsPanel').classList.toggle('active')">
-                    ⚙️ Параметры
-                </button>
-                <div class="settings-panel" id="settingsPanel">
-                    <label>
-                        <input type="hidden" name="excludeZero" value="0">
-                        <input type="checkbox" name="excludeZero" value="1" <?= $excludeZero ? 'checked' : '' ?>>
-                        Исключить нулевые чеки
-                    </label>
-                    <label>
-                        <input type="hidden" name="excludeCloseBased" value="0">
-                        <input type="checkbox" name="excludeCloseBased" value="1" <?= $excludeCloseBased ? 'checked' : '' ?>>
-                        Исключить время по закрытию чека
-                    </label>
-                </div>
-            </div>
             <label style="display:flex; align-items:center; gap:6px;">
                 <input type="hidden" name="resync" value="0">
-                <input type="checkbox" name="resync" value="1" <?= $doResync ? 'checked' : '' ?>> Resync
+                <input type="checkbox" name="resync" value="1"> Resync
             </label>
 
             <button type="submit">Обновить</button>
@@ -345,6 +316,27 @@ try {
 
     <script src="assets/datepicker-range-dialog.js"></script>
     <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.querySelector('form.filters');
+        const resync = document.querySelector('input[name="resync"][type="checkbox"]');
+        if (resync) {
+            resync.checked = false;
+            resync.addEventListener('change', () => {
+                if (resync.checked) {
+                    const ok = confirm('Resync делает полную пересинхронизацию данных из Poster за выбранный период и может сильно нагрузить систему. Используй редко. Продолжить?');
+                    if (!ok) resync.checked = false;
+                }
+            });
+        }
+        if (form && resync) {
+            form.addEventListener('submit', (e) => {
+                if (resync.checked) {
+                    const ok = confirm('Подтвердить Resync? Это может занять время и нагрузить систему.');
+                    if (!ok) e.preventDefault();
+                }
+            });
+        }
+    });
     <?php if (!isset($error)): ?>
     const labels = <?= json_encode($hours) ?>;
     const slotDates = <?= json_encode($slotDates) ?>;
