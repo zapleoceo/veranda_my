@@ -224,6 +224,7 @@ try {
         .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }
         .nav-left a:hover { text-decoration: underline; }
         .nav-title { font-weight: 800; color: #2c3e50; }
+        .nav-mid { display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; color: #546e7a; font-size: 0.95em; }
         .user-menu { position: relative; }
         .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
         .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; overflow: hidden; }
@@ -242,7 +243,6 @@ try {
         .range-hint { font-size: 0.75em; color: #777; min-height: 16px; margin-top: 4px; }
         .filters button[type="submit"] { padding: 10px 25px; background: #1a73e8; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
         .filters button[type="submit"]:hover { background: #1557b0; }
-        .last-sync { text-align: center; color: #546e7a; font-size: 0.95em; margin: -25px 0 20px; display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; }
         .resync-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9em; color: #546e7a; }
     </style>
 </head>
@@ -250,6 +250,12 @@ try {
     <div class="container">
         <div class="top-nav">
             <div class="nav-left"><div class="nav-title">Дашборд</div></div>
+            <div class="nav-mid">
+                <span>Последнее обновление из Poster: <?= htmlspecialchars($lastSyncLabel) ?></span>
+                <label class="resync-toggle">
+                    <input type="checkbox" name="resync" value="1" form="dashboardFilters"> Resync
+                </label>
+            </div>
             <div class="user-menu">
                 <?php
                     $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
@@ -268,12 +274,6 @@ try {
                     <a href="logout.php">Выход</a>
                 </div>
             </div>
-        </div>
-        <div class="last-sync">
-            <span>Последнее обновление из Poster: <?= htmlspecialchars($lastSyncLabel) ?></span>
-            <label class="resync-toggle">
-                <input type="checkbox" name="resync" value="1" form="dashboardFilters"> Resync
-            </label>
         </div>
 
         <form class="filters" method="GET" id="dashboardFilters">
