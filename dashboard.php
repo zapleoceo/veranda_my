@@ -112,32 +112,36 @@ try {
             
             if ($hourIdx < 0 || $hourIdx >= count($hours)) continue;
 
+            if (empty($row['ticket_sent_at'])) continue;
+            $sentTs = strtotime($row['ticket_sent_at']);
+            if ($sentTs === false || $sentTs <= 0) continue;
+
             $endTime = null;
-            $candidates = [];
-            if (!empty($row['ready_pressed_at'])) $candidates[] = $row['ready_pressed_at'];
-            if (!empty($row['ready_chass_at'])) $candidates[] = $row['ready_chass_at'];
-            if (!empty($row['prob_close_at'])) $candidates[] = $row['prob_close_at'];
-            if (!empty($candidates)) {
-                usort($candidates, fn($a, $b) => strtotime($a) <=> strtotime($b));
-                $endTime = $candidates[0];
-            } elseif (
-                !$excludeCloseBased &&
-                !empty($row['transaction_closed_at']) &&
-                $row['transaction_closed_at'] !== '0000-00-00 00:00:00' &&
-                (int)date('Y', strtotime($row['transaction_closed_at'])) > 1970 &&
-                (int)$row['status'] > 1
-            ) {
-                $endTime = $row['transaction_closed_at'];
-            } else {
-                continue;
+            foreach ([$row['ready_pressed_at'] ?? null, $row['ready_chass_at'] ?? null, $row['prob_close_at'] ?? null] as $t) {
+                if (empty($t)) continue;
+                $ts = strtotime($t);
+                if ($ts === false || $ts <= 0) continue;
+                if ($ts < $sentTs) continue;
+                $endTime = $t;
+                break;
             }
-            if (empty($row['ticket_sent_at'])) {
-                continue;
+            if ($endTime === null && !$excludeCloseBased) {
+                $closedAt = $row['transaction_closed_at'] ?? null;
+                if (
+                    !empty($closedAt) &&
+                    $closedAt !== '0000-00-00 00:00:00' &&
+                    (int)date('Y', strtotime($closedAt)) > 1970 &&
+                    (int)$row['status'] > 1
+                ) {
+                    $ts = strtotime($closedAt);
+                    if ($ts !== false && $ts >= $sentTs) {
+                        $endTime = $closedAt;
+                    }
+                }
             }
-            $waitTime = (strtotime($endTime) - strtotime($row['ticket_sent_at'])) / 60;
-            if ($waitTime < 0) {
-                continue;
-            }
+            if ($endTime === null) continue;
+
+            $waitTime = (strtotime($endTime) - $sentTs) / 60;
             
             $chartData[$targetStationId]['avg'][$hourIdx] += $waitTime;
             $chartData[$targetStationId]['counts'][$hourIdx]++;

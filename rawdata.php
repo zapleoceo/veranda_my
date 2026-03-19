@@ -138,6 +138,9 @@ try {
                 'exclude_from_dashboard' => isset($row['exclude_from_dashboard']) ? (int)$row['exclude_from_dashboard'] : 0,
                 'max_wait_time' => 0,
                 'max_wait_fallback' => false,
+                'max_wait_prob' => false,
+                'max_wait_log_close_at' => null,
+                'max_wait_log_close_timestamp' => 0,
                 'has_hookah' => false,
                 'opened_timestamp' => $row['transaction_opened_at'] ? strtotime($row['transaction_opened_at']) : 0,
                 'closed_timestamp' => $row['transaction_closed_at'] ? strtotime($row['transaction_closed_at']) : 0
@@ -172,33 +175,50 @@ try {
         if ($isHookah) {
             continue;
         }
-        $readyTimeForWait = null;
-        $fallbackWait = false;
-        $probWait = false;
-        if ($row['ticket_sent_at'] && ($row['ready_pressed_at'] || !empty($row['ready_chass_at']) || !empty($row['prob_close_at']))) {
-            $candidates = [];
-            if ($row['ready_pressed_at']) $candidates[] = $row['ready_pressed_at'];
-            if (!empty($row['ready_chass_at'])) $candidates[] = $row['ready_chass_at'];
-            if (!empty($row['prob_close_at'])) $candidates[] = $row['prob_close_at'];
-            usort($candidates, fn($a, $b) => strtotime($a) <=> strtotime($b));
-            $readyTimeForWait = $candidates[0] ?? null;
-            $probWait = !empty($row['prob_close_at']) && $readyTimeForWait === $row['prob_close_at'] && empty($row['ready_pressed_at']) && empty($row['ready_chass_at']);
-        } elseif (
-            $row['ticket_sent_at'] &&
-            $row['transaction_closed_at'] &&
-            $row['transaction_closed_at'] !== '0000-00-00 00:00:00' &&
-            date('Y', strtotime($row['transaction_closed_at'])) > 1970 &&
-            (int)$row['status'] > 1
-        ) {
-            $readyTimeForWait = $row['transaction_closed_at'];
-            $fallbackWait = true;
-        }
-        if ($readyTimeForWait) {
-            $wait = (strtotime($readyTimeForWait) - strtotime($row['ticket_sent_at'])) / 60;
-            if ($wait > $groupedStats[$receipt]['max_wait_time']) {
-                $groupedStats[$receipt]['max_wait_time'] = round($wait, 1);
-                $groupedStats[$receipt]['max_wait_fallback'] = $fallbackWait;
-                $groupedStats[$receipt]['max_wait_prob'] = $probWait;
+        $sentTs = !empty($row['ticket_sent_at']) ? strtotime($row['ticket_sent_at']) : 0;
+        if ($sentTs > 0) {
+            $logicalCloseAt = null;
+            $logicalCloseTs = 0;
+            $logicalSource = '';
+            foreach ([
+                'pstr' => ($row['ready_pressed_at'] ?? null),
+                'chass' => ($row['ready_chass_at'] ?? null),
+                'prob' => ($row['prob_close_at'] ?? null),
+            ] as $src => $t) {
+                if (empty($t)) continue;
+                $ts = strtotime($t);
+                if ($ts === false || $ts <= 0) continue;
+                if ($ts < $sentTs) continue;
+                $logicalCloseAt = $t;
+                $logicalCloseTs = $ts;
+                $logicalSource = $src;
+                break;
+            }
+            if ($logicalCloseAt === null) {
+                $closedAt = $row['transaction_closed_at'] ?? null;
+                if (
+                    !empty($closedAt) &&
+                    $closedAt !== '0000-00-00 00:00:00' &&
+                    (int)date('Y', strtotime($closedAt)) > 1970 &&
+                    (int)($row['status'] ?? 1) > 1
+                ) {
+                    $ts = strtotime($closedAt);
+                    if ($ts !== false && $ts >= $sentTs) {
+                        $logicalCloseAt = $closedAt;
+                        $logicalCloseTs = $ts;
+                        $logicalSource = 'close';
+                    }
+                }
+            }
+            if ($logicalCloseAt !== null) {
+                $wait = ($logicalCloseTs - $sentTs) / 60;
+                if ($wait > $groupedStats[$receipt]['max_wait_time']) {
+                    $groupedStats[$receipt]['max_wait_time'] = round($wait, 1);
+                    $groupedStats[$receipt]['max_wait_fallback'] = ($logicalSource === 'close');
+                    $groupedStats[$receipt]['max_wait_prob'] = ($logicalSource === 'prob');
+                    $groupedStats[$receipt]['max_wait_log_close_at'] = $logicalCloseAt;
+                    $groupedStats[$receipt]['max_wait_log_close_timestamp'] = $logicalCloseTs;
+                }
             }
         }
     }
@@ -364,8 +384,8 @@ try {
 
         <div class="table-header-sticky" id="mainTableHeader">
             <div data-sort="receipt" class="sort-asc">Чек <span class="sort-icon"></span></div>
-            <div data-sort="opened">Открыт <span class="sort-icon"></span></div>
-            <div data-sort="closed">ЗакрытPoster <span class="sort-icon"></span></div>
+            <div data-sort="opened">ВрОткр <span class="sort-icon"></span></div>
+            <div data-sort="closed">ВрЛогЗакр <span class="sort-icon"></span></div>
             <div data-sort="wait">Макс. ожидание <span class="sort-icon"></span></div>
         </div>
 
@@ -375,24 +395,18 @@ try {
             <details class="<?= $receiptClass ?>" 
                      data-receipt="<?= htmlspecialchars($receiptNum) ?>" 
                      data-opened="<?= $data['opened_timestamp'] ?>" 
-                     data-closed="<?= $data['closed_timestamp'] ?>" 
+                     data-closed="<?= (int)($data['max_wait_log_close_timestamp'] ?? 0) ?>" 
                      data-wait="<?= $data['max_wait_time'] ?>">
                 <summary>
                     <div class="receipt-info">
                         <span class="receipt-number">Чек <?= htmlspecialchars($receiptNum) ?></span>
                         <div class="receipt-times">
-                            <span>Открыт: <?= ($data['opened_at'] && $data['opened_at'] !== '0000-00-00 00:00:00' && date('Y', strtotime($data['opened_at'])) > 1970) ? date('H:i:s', strtotime($data['opened_at'])) : '—' ?></span>
-                            <span>Закрыт: <?php
-                                if ((int)$data['status'] > 1 && $data['closed_at'] && $data['closed_at'] !== '0000-00-00 00:00:00' && date('Y', strtotime($data['closed_at'])) > 1970) {
-                                    echo date('H:i:s', strtotime($data['closed_at']));
-                                } elseif ((int)$data['status'] > 1) {
-                                    if ($data['close_reason'] !== null && isset($closeReasonMap[$data['close_reason']])) {
-                                        echo 'Закрыт без оплаты: ' . $closeReasonMap[$data['close_reason']];
-                                    } elseif ($data['pay_type'] !== null && isset($payTypeMap[$data['pay_type']])) {
-                                        echo 'Закрыт: ' . $payTypeMap[$data['pay_type']];
-                                    } else {
-                                        echo 'Закрыт (время не передано API)';
-                                    }
+                            <span>ВрОткр: <?= ($data['opened_at'] && $data['opened_at'] !== '0000-00-00 00:00:00' && date('Y', strtotime($data['opened_at'])) > 1970) ? date('H:i:s', strtotime($data['opened_at'])) : '—' ?></span>
+                            <span>ВрЛогЗакр: <?php
+                                if (!empty($data['has_hookah']) && (float)($data['max_wait_time'] ?? 0) <= 0) {
+                                    echo 'кал';
+                                } elseif (!empty($data['max_wait_log_close_at'])) {
+                                    echo date('H:i:s', strtotime($data['max_wait_log_close_at']));
                                 } else {
                                     echo '—';
                                 }
@@ -420,13 +434,14 @@ try {
                         <thead>
                             <tr>
                                 <th title="Название позиции (из Poster).">Блюдо</th>
-                                <th title="Время открытия чека (Poster date_start).">Открыт</th>
-                                <th title="Время отправки позиции на станцию/цех (Poster TransactionHistory sendtokitchen).">Отправ</th>
-                                <th title="Время готовности: Poster (finishedcooking) → Chef Assistant (readyTime) → ProbCloseTime.">Готово</th>
-                                <th title="Время закрытия чека в Poster (date_close/date_close_date), только для закрытых чеков.">ЗакPoster</th>
+                                <th title="Время открытия чека (Poster date_start).">ВрОткр</th>
+                                <th title="Время отправки позиции на станцию/цех (Poster TransactionHistory sendtokitchen).">ВрОтпр</th>
+                                <th title="Время готовности из Poster (finishedcooking).">ВрГотPSTR</th>
+                                <th title="Время закрытия чека в Poster (date_close/date_close_date), только для закрытых чеков.">ЗакЧкPoster</th>
                                 <th title="Время готовности из Chef Assistant (readyTime).">ЗакChAss</th>
                                 <th title="Расчетное время (ProbCloseTime): берется из ближайшего следующего чека (+1..+3) с тем же цехом, где есть готовые позиции.">ЗакРассч</th>
-                                <th title="Отправ → (Готово/ЗакChAss/ЗакРассч). Если ничего нет и чек закрыт: Отправ → ЗакPoster (📌).">Время ожидания</th>
+                                <th title="Время, которое реально используется в расчете ожидания. Приоритет: ВрГотPSTR → ЗакChAss → ЗакРассч → ЗакЧкPoster.">ВрЛогЗакр</th>
+                                <th title="ВрЛогЗакр - ВрОтпр. Если чек открыт и нет ВрЛогЗакр: текущее время - ВрОтпр.">Ожидание</th>
                                 <th title="Исключить позицию из дашборда и алертов.">Не учитывать</th>
                             </tr>
                         </thead>
@@ -443,46 +458,70 @@ try {
                                 if ($mainCat <= 0 && $dishId > 0) $mainCat = $productMainCategory[$dishId] ?? 0;
                                 if ($subCat <= 0 && $dishId > 0) $subCat = $productSubCategory[$dishId] ?? 0;
                                 $isHookah = ($mainCat === 47) || ($subCat === 47);
+                                $logicalCloseAt = null;
+                                $logicalCloseLabel = '—';
                                 if ($isHookah) {
                                     $wait = 'кал';
                                     $waitClass = 'wait-time wait-time-hookah';
+                                    $logicalCloseLabel = 'кал';
                                 }
-                                if (!$isHookah && $item['ticket_sent_at'] && ($item['ready_pressed_at'] || !empty($item['ready_chass_at']) || !empty($item['prob_close_at']))) {
-                                    $candidates = [];
-                                    if ($item['ready_pressed_at']) $candidates[] = $item['ready_pressed_at'];
-                                    if (!empty($item['ready_chass_at'])) $candidates[] = $item['ready_chass_at'];
-                                    if (!empty($item['prob_close_at'])) $candidates[] = $item['prob_close_at'];
-                                    usort($candidates, fn($a, $b) => strtotime($a) <=> strtotime($b));
-                                    $endTime = $candidates[0] ?? null;
-                                    if ($endTime) {
-                                        $diff = strtotime($endTime) - strtotime($item['ticket_sent_at']);
-                                        $usedProbCloseTime = !empty($item['prob_close_at']) && $endTime === $item['prob_close_at'] && empty($item['ready_pressed_at']) && empty($item['ready_chass_at']);
-                                        $icon = $usedProbCloseTime ? '❓' : '⌛';
-                                        $wait = $icon . ' ' . round($diff / 60, 1) . ' мин';
-                                    }
-                                } elseif (
-                                    !$isHookah &&
-                                    $item['ticket_sent_at'] &&
-                                    $item['transaction_closed_at'] &&
-                                    $item['transaction_closed_at'] !== '0000-00-00 00:00:00' &&
-                                    date('Y', strtotime($item['transaction_closed_at'])) > 1970 &&
-                                    (int)$item['status'] > 1
-                                ) {
-                                    $diff = strtotime($item['transaction_closed_at']) - strtotime($item['ticket_sent_at']);
-                                    $wait = '📌 ' . round($diff / 60, 1) . ' мин';
-                                    $waitClass = 'wait-time wait-time-fallback';
-                                    $usedFallbackTime = true;
-                                } elseif (
-                                    !$isHookah &&
-                                    $item['ticket_sent_at'] &&
-                                    empty($item['ready_pressed_at']) &&
-                                    (int)$item['status'] === 1
-                                ) {
-                                    $diff = time() - strtotime($item['ticket_sent_at']);
-                                    if ($diff >= 0) {
-                                        $wait = round($diff / 60, 1) . ' мин…';
-                                        $waitClass = 'wait-time wait-time-fallback';
-                                        $usedInProgressTime = true;
+                                if (!$isHookah && !empty($item['ticket_sent_at'])) {
+                                    $sentTs = strtotime($item['ticket_sent_at']);
+                                    if ($sentTs !== false && $sentTs > 0) {
+                                        $endTime = null;
+                                        $endTs = 0;
+                                        $endSource = '';
+                                        foreach ([
+                                            'pstr' => ($item['ready_pressed_at'] ?? null),
+                                            'chass' => ($item['ready_chass_at'] ?? null),
+                                            'prob' => ($item['prob_close_at'] ?? null),
+                                        ] as $src => $t) {
+                                            if (empty($t)) continue;
+                                            $ts = strtotime($t);
+                                            if ($ts === false || $ts <= 0) continue;
+                                            if ($ts < $sentTs) continue;
+                                            $endTime = $t;
+                                            $endTs = $ts;
+                                            $endSource = $src;
+                                            break;
+                                        }
+                                        if ($endTime === null) {
+                                            $closedAt = $item['transaction_closed_at'] ?? null;
+                                            if (
+                                                !empty($closedAt) &&
+                                                $closedAt !== '0000-00-00 00:00:00' &&
+                                                (int)date('Y', strtotime($closedAt)) > 1970 &&
+                                                (int)($item['status'] ?? 1) > 1
+                                            ) {
+                                                $ts = strtotime($closedAt);
+                                                if ($ts !== false && $ts >= $sentTs) {
+                                                    $endTime = $closedAt;
+                                                    $endTs = $ts;
+                                                    $endSource = 'close';
+                                                }
+                                            }
+                                        }
+                                        if ($endTime !== null) {
+                                            $logicalCloseAt = $endTime;
+                                            $logicalCloseLabel = date('H:i:s', $endTs);
+                                            $diff = $endTs - $sentTs;
+                                            $usedFallbackTime = ($endSource === 'close');
+                                            $usedProbCloseTime = ($endSource === 'prob');
+                                            $icon = $endSource === 'close' ? '📌' : ($endSource === 'prob' ? '❓' : '⌛');
+                                            $wait = $icon . ' ' . round($diff / 60, 1) . ' мин';
+                                            if ($endSource === 'close') {
+                                                $waitClass = 'wait-time wait-time-fallback';
+                                            }
+                                        } elseif ((int)($item['status'] ?? 1) === 1) {
+                                            $diff = time() - $sentTs;
+                                            if ($diff >= 0) {
+                                                $logicalCloseAt = date('Y-m-d H:i:s');
+                                                $logicalCloseLabel = date('H:i:s');
+                                                $wait = round($diff / 60, 1) . ' мин…';
+                                                $waitClass = 'wait-time wait-time-fallback';
+                                                $usedInProgressTime = true;
+                                            }
+                                        }
                                     }
                                 }
                                 $dishName = $productNames[$item['dish_id']] ?? $item['dish_name'];
@@ -514,14 +553,8 @@ try {
                                     <td>
                                         <?php if (!empty($item['was_deleted'])): ?>
                                             <span class="status-deleted">Удалено</span>
-                                        <?php elseif ($item['ready_pressed_at']): ?>
-                                            <span class="status-ready" title="Время взято из события Готово на станции кухни/бара."><?= date('H:i:s', strtotime($item['ready_pressed_at'])) ?></span>
-                                        <?php elseif (!empty($item['ready_chass_at'])): ?>
-                                            <span class="status-ready" title="Время взято из Chef Assistant."><?= date('H:i:s', strtotime($item['ready_chass_at'])) ?></span>
-                                        <?php elseif (!empty($item['prob_close_at'])): ?>
-                                            <span class="status-fallback" title="Время вычислено по следующим чекам (ProbCloseTime)."><?= date('H:i:s', strtotime($item['prob_close_at'])) ?></span>
-                                        <?php elseif ($usedFallbackTime): ?>
-                                            <span class="status-fallback" title="Отметки Готово нет. Время взято из закрытия чека как fallback."><?= date('H:i:s', strtotime($item['transaction_closed_at'])) ?></span>
+                                        <?php elseif (!empty($item['ready_pressed_at'])): ?>
+                                            <span class="status-ready" title="Время взято из Poster (finishedcooking)."><?= date('H:i:s', strtotime($item['ready_pressed_at'])) ?></span>
                                         <?php else: ?>
                                             <span class="status-cooking">В процессе</span>
                                         <?php endif; ?>
@@ -529,6 +562,7 @@ try {
                                     <td><?= $closed ?></td>
                                     <td><?= !empty($item['ready_chass_at']) ? date('H:i:s', strtotime($item['ready_chass_at'])) : '—' ?></td>
                                     <td><?= !empty($item['prob_close_at']) ? date('H:i:s', strtotime($item['prob_close_at'])) : '—' ?></td>
+                                    <td><?= $logicalCloseLabel ?></td>
                                     <td class="<?= $waitClass ?>" title="<?= $isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? '📌 Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? '❓ Расчет: ЗакРассч (ProbCloseTime) - Отправ. ЗакРассч берется из следующего чека(+1..+3) по тому же цеху.' : '⌛ Расчет: (Готово/ЗакChAss) - Отправ.'))) ?>"><?= $wait ?></td>
                                     <td>
                                         <form method="POST" class="exclude-item-form">
