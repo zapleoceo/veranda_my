@@ -11,9 +11,7 @@
                 <div class="receipt-times">
                     <span>ВрОткр: <?= ($data['opened_at'] && $data['opened_at'] !== '0000-00-00 00:00:00' && date('Y', strtotime($data['opened_at'])) > 1970) ? date('H:i:s', strtotime($data['opened_at'])) : '—' ?></span>
                     <span>ВрЛогЗакр: <?php
-                        if (!empty($data['has_hookah']) && (float)($data['max_wait_time'] ?? 0) <= 0) {
-                            echo 'кал';
-                        } elseif (!empty($data['max_wait_log_close_at'])) {
+                        if (!empty($data['max_wait_log_close_at'])) {
                             echo date('H:i:s', strtotime($data['max_wait_log_close_at']));
                         } else {
                             echo '—';
@@ -32,8 +30,6 @@
                     $waitIcon = !empty($data['max_wait_prob']) ? '❓' : (!empty($data['max_wait_fallback']) ? '📌' : '⌛');
                 ?>
                     <span class="receipt-max-wait <?= $waitClass ?>" title="<?= !empty($data['max_wait_prob']) ? 'Макс. ожидание рассчитано от отправки на станцию до расчетного времени (ProbCloseTime: берется из следующего чека(ов) по цеху).' : (!empty($data['max_wait_fallback']) ? 'Макс. ожидание рассчитано от отправки на станцию до времени закрытия чека (fallback).' : 'Макс. ожидание рассчитано от отправки на станцию до отметки Готово.') ?>"><?= $waitIcon ?> <?= $data['max_wait_time'] ?> мин</span>
-                <?php elseif (!empty($data['has_hookah'])): ?>
-                    <span class="receipt-max-wait wait-fallback" title="Кальяны: тайминг не считается.">кал</span>
                 <?php endif; ?>
             </div>
         </summary>
@@ -116,8 +112,10 @@
                                     $diff = $endTs - $sentTs;
                                     $usedFallbackTime = ($endSource === 'close');
                                     $usedProbCloseTime = ($endSource === 'prob');
-                                    $icon = $endSource === 'close' ? '📌' : ($endSource === 'prob' ? '❓' : '⌛');
-                                    $wait = $icon . ' ' . round($diff / 60, 1) . ' мин';
+                                    $wait = round($diff / 60, 1) . ' мин';
+                                    if ($endSource !== 'pstr') {
+                                        $wait .= '*';
+                                    }
                                     if ($endSource === 'close') {
                                         $waitClass = 'wait-time wait-time-fallback';
                                     }
@@ -126,7 +124,7 @@
                                     if ($diff >= 0) {
                                         $logicalCloseAt = date('Y-m-d H:i:s');
                                         $logicalCloseLabel = date('H:i:s');
-                                        $wait = round($diff / 60, 1) . ' мин…';
+                                        $wait = round($diff / 60, 1) . ' мин…*';
                                         $waitClass = 'wait-time wait-time-fallback';
                                         $usedInProgressTime = true;
                                     }
@@ -164,14 +162,17 @@
                                 <?php elseif (!empty($item['ready_pressed_at'])): ?>
                                     <span class="status-ready" title="Время взято из Poster (finishedcooking)."><?= date('H:i:s', strtotime($item['ready_pressed_at'])) ?></span>
                                 <?php else: ?>
-                                    <span class="status-cooking">В процессе</span>
+                                    <?php
+                                        $sentTs = !empty($item['ticket_sent_at']) ? strtotime($item['ticket_sent_at']) : 0;
+                                    ?>
+                                    <span class="status-cooking live-cooking" data-sent-ts="<?= (int)$sentTs ?>">В процессе</span>
                                 <?php endif; ?>
                             </td>
                             <td><?= $closed ?></td>
                             <td><?= !empty($item['ready_chass_at']) ? date('H:i:s', strtotime($item['ready_chass_at'])) : '—' ?></td>
                             <td><?= !empty($item['prob_close_at']) ? date('H:i:s', strtotime($item['prob_close_at'])) : '—' ?></td>
                             <td><?= $logicalCloseLabel ?></td>
-                            <td class="<?= $waitClass ?>" title="<?= $isDeleted ? 'Удалено: тайминг не считается.' : ($isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? '📌 Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? '❓ Расчет: ЗакРассч (ProbCloseTime) - Отправ. ЗакРассч берется из следующего чека(+1..+3) по тому же цеху.' : '⌛ Расчет: (Готово/ЗакChAss) - Отправ.')))) ?>"><?= $isDeleted ? '—' : $wait ?></td>
+                            <td class="<?= $waitClass ?>" title="<?= $isDeleted ? 'Удалено: тайминг не считается.' : ($isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? 'Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? 'Расчет: ЗакРассч (ProbCloseTime) - Отправ.' : 'Расчет: (Готово/ЗакChAss) - Отправ.')))) ?>"><?= htmlspecialchars($isDeleted ? '—' : $wait) ?></td>
                             <td>
                                 <form method="POST" class="exclude-item-form">
                                     <input type="hidden" name="toggle_exclude_item" value="<?= (int)$item['id'] ?>">

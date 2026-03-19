@@ -505,6 +505,18 @@ try {
                 sortedItems.forEach(item => list.appendChild(item));
             };
 
+            const updateLiveCooking = () => {
+                const els = Array.from(list.getElementsByClassName('live-cooking'));
+                if (els.length === 0) return;
+                const nowSec = Date.now() / 1000;
+                for (const el of els) {
+                    const sentTs = parseInt(el.dataset.sentTs || '0', 10);
+                    if (!sentTs) continue;
+                    const diffMin = Math.max(0, Math.floor((nowSec - sentTs) / 60));
+                    el.textContent = `В процессе ${diffMin} мин`;
+                }
+            };
+
             const updateStatus = () => {
                 if (!statusEl) return;
                 if (state.loading) {
@@ -546,6 +558,7 @@ try {
                         tmp.innerHTML = data.html;
                         while (tmp.firstChild) list.appendChild(tmp.firstChild);
                         applySort();
+                        updateLiveCooking();
                     }
                     state.offset = typeof data.next_offset === 'number' ? data.next_offset : (state.offset + state.limit);
                     state.done = !data.has_more;
@@ -585,6 +598,7 @@ try {
                 io.observe(sentinel);
             }
             loadNext();
+            setInterval(updateLiveCooking, 10000);
 
             list.addEventListener('change', async (e) => {
                 const checkbox = e.target.closest('input[name="exclude_from_dashboard"]');
