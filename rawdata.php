@@ -340,6 +340,8 @@ try {
         .status-ready { color: #2e7d32; background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
         .status-cooking { color: #f57c00; background: #fff3e0; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
         .status-deleted { color: #757575; background: #f5f5f5; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; text-decoration: line-through; }
+        .wait-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(245, 124, 0, 0.3); border-top-color: #f57c00; border-radius: 50%; margin-right: 6px; animation: waitSpin 0.9s linear infinite; vertical-align: -1px; }
+        @keyframes waitSpin { to { transform: rotate(360deg); } }
         .status-fallback { color: #607d8b; background: #eceff1; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
         .wait-time { font-weight: 500; color: #d32f2f; }
         .wait-time-fallback { color: #78909c; }
@@ -508,12 +510,16 @@ try {
             const updateLiveCooking = () => {
                 const els = Array.from(list.getElementsByClassName('live-cooking'));
                 if (els.length === 0) return;
-                const nowSec = Date.now() / 1000;
+                const nowSec = Math.floor(Date.now() / 1000);
                 for (const el of els) {
                     const sentTs = parseInt(el.dataset.sentTs || '0', 10);
                     if (!sentTs) continue;
-                    const diffMin = Math.max(0, Math.floor((nowSec - sentTs) / 60));
-                    el.textContent = `В процессе ${diffMin} мин`;
+                    const diffSec = Math.max(0, nowSec - sentTs);
+                    const mm = Math.floor(diffSec / 60);
+                    const ss = diffSec % 60;
+                    const out = String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+                    const t = el.querySelector('.live-time');
+                    if (t) t.textContent = out;
                 }
             };
 
@@ -598,7 +604,7 @@ try {
                 io.observe(sentinel);
             }
             loadNext();
-            setInterval(updateLiveCooking, 10000);
+            setInterval(updateLiveCooking, 1000);
 
             list.addEventListener('change', async (e) => {
                 const checkbox = e.target.closest('input[name="exclude_from_dashboard"]');

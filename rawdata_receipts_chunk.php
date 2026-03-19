@@ -165,7 +165,7 @@
                                     <?php
                                         $sentTs = !empty($item['ticket_sent_at']) ? strtotime($item['ticket_sent_at']) : 0;
                                     ?>
-                                    <span class="status-cooking live-cooking" data-sent-ts="<?= (int)$sentTs ?>">В процессе</span>
+                                    <span class="status-cooking live-cooking" data-sent-ts="<?= (int)$sentTs ?>"><span class="wait-spinner" aria-hidden="true"></span><span class="live-time">00:00</span></span>
                                 <?php endif; ?>
                             </td>
                             <td><?= $closed ?></td>
