@@ -345,12 +345,14 @@ try {
         
         // Проверяем, готово ли уже блюдо или закрыт ли чек
         $sentTs = !empty($item['ticket_sent_at']) ? strtotime($item['ticket_sent_at']) : false;
-        $validProbClose = false;
-        if ($sentTs !== false && $sentTs > 0 && !empty($item['prob_close_at'])) {
-            $pTs = strtotime($item['prob_close_at']);
-            $validProbClose = ($pTs !== false && $pTs >= $sentTs);
-        }
-        if ((int)($item['tg_acknowledged'] ?? 0) === 1 || (int)($item['was_deleted'] ?? 0) === 1 || $item['ready_pressed_at'] !== null || !empty($item['ready_chass_at']) || $validProbClose || (int)$item['status'] > 1) {
+        if (
+            (int)($item['tg_acknowledged'] ?? 0) === 1
+            || (int)($item['was_deleted'] ?? 0) === 1
+            || (int)($item['exclude_from_dashboard'] ?? 0) === 1
+            || $item['ready_pressed_at'] !== null
+            || !empty($item['ready_chass_at'])
+            || (int)$item['status'] > 1
+        ) {
             $shouldDelete = true;
         } else {
             // Дополнительная проверка через API для надежности
