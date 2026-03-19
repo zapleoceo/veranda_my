@@ -94,7 +94,7 @@ foreach ($dates as $row) {
     }
 
     $targets = $db->query(
-        "SELECT id, receipt_number, station
+        "SELECT id, receipt_number, station, ticket_sent_at
          FROM kitchen_stats
          WHERE transaction_date = ?
            AND receipt_number REGEXP '^[0-9]+$'
@@ -112,6 +112,9 @@ foreach ($dates as $row) {
         $receipt = (int)($t['receipt_number'] ?? 0);
         $station = (string)($t['station'] ?? '');
         if ($id <= 0 || $receipt <= 0 || $station === '') continue;
+        $sentAt = (string)($t['ticket_sent_at'] ?? '');
+        $sentTs = $sentAt !== '' ? strtotime($sentAt) : false;
+        if ($sentTs === false || $sentTs <= 0) continue;
 
         $candidate = null;
         for ($d = 1; $d <= 3; $d++) {
@@ -119,6 +122,12 @@ foreach ($dates as $row) {
             if (isset($byReceiptStation[$next][$station])) {
                 $candidate = $byReceiptStation[$next][$station];
                 break;
+            }
+        }
+        if ($candidate !== null) {
+            $candTs = strtotime($candidate);
+            if ($candTs === false || $candTs < $sentTs) {
+                $candidate = null;
             }
         }
         if ($candidate === null) continue;

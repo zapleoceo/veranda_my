@@ -273,7 +273,7 @@ try {
         }
 
         $targets = $db->query(
-            "SELECT id, receipt_number, station, prob_close_at
+            "SELECT id, receipt_number, station, prob_close_at, ticket_sent_at
              FROM kitchen_stats
              WHERE transaction_date = ?
                AND status = 1
@@ -295,6 +295,9 @@ try {
             $receipt = (int)($t['receipt_number'] ?? 0);
             $station = (string)($t['station'] ?? '');
             if ($id <= 0 || $receipt <= 0 || $station === '') continue;
+            $sentAt = (string)($t['ticket_sent_at'] ?? '');
+            $sentTs = $sentAt !== '' ? strtotime($sentAt) : false;
+            if ($sentTs === false || $sentTs <= 0) continue;
 
             $candidate = null;
             for ($d = 1; $d <= 3; $d++) {
@@ -302,6 +305,12 @@ try {
                 if (isset($byReceiptStation[$next][$station])) {
                     $candidate = $byReceiptStation[$next][$station];
                     break;
+                }
+            }
+            if ($candidate !== null) {
+                $candTs = strtotime($candidate);
+                if ($candTs === false || $candTs < $sentTs) {
+                    $candidate = null;
                 }
             }
 

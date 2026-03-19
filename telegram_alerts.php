@@ -286,7 +286,7 @@ try {
         }
 
         $targets = $db->query(
-            "SELECT id, receipt_number, station, prob_close_at
+            "SELECT id, receipt_number, station, prob_close_at, ticket_sent_at
              FROM kitchen_stats
              WHERE transaction_date = ?
                AND status = 1
@@ -305,6 +305,9 @@ try {
             $receipt = (int)($t['receipt_number'] ?? 0);
             $station = (string)($t['station'] ?? '');
             if ($id <= 0 || $receipt <= 0 || $station === '') continue;
+            $sentAt = (string)($t['ticket_sent_at'] ?? '');
+            $sentTs = $sentAt !== '' ? strtotime($sentAt) : false;
+            if ($sentTs === false || $sentTs <= 0) continue;
 
             $candidate = null;
             for ($d = 1; $d <= 3; $d++) {
@@ -312,6 +315,12 @@ try {
                 if (isset($byReceiptStation[$next][$station])) {
                     $candidate = $byReceiptStation[$next][$station];
                     break;
+                }
+            }
+            if ($candidate !== null) {
+                $candTs = strtotime($candidate);
+                if ($candTs === false || $candTs < $sentTs) {
+                    $candidate = null;
                 }
             }
 
@@ -335,7 +344,13 @@ try {
         $shouldDelete = false;
         
         // Проверяем, готово ли уже блюдо или закрыт ли чек
-        if ((int)($item['tg_acknowledged'] ?? 0) === 1 || (int)($item['was_deleted'] ?? 0) === 1 || $item['ready_pressed_at'] !== null || !empty($item['ready_chass_at']) || !empty($item['prob_close_at']) || (int)$item['status'] > 1) {
+        $sentTs = !empty($item['ticket_sent_at']) ? strtotime($item['ticket_sent_at']) : false;
+        $validProbClose = false;
+        if ($sentTs !== false && $sentTs > 0 && !empty($item['prob_close_at'])) {
+            $pTs = strtotime($item['prob_close_at']);
+            $validProbClose = ($pTs !== false && $pTs >= $sentTs);
+        }
+        if ((int)($item['tg_acknowledged'] ?? 0) === 1 || (int)($item['was_deleted'] ?? 0) === 1 || $item['ready_pressed_at'] !== null || !empty($item['ready_chass_at']) || $validProbClose || (int)$item['status'] > 1) {
             $shouldDelete = true;
         } else {
             // Дополнительная проверка через API для надежности
@@ -470,7 +485,7 @@ try {
     $query = "SELECT * FROM kitchen_stats 
               WHERE ready_pressed_at IS NULL 
               AND ready_chass_at IS NULL
-              AND prob_close_at IS NULL
+              AND (prob_close_at IS NULL OR prob_close_at < ticket_sent_at)
               AND ticket_sent_at IS NOT NULL 
               AND transaction_date = ?
               AND status = 1
