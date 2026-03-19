@@ -231,7 +231,8 @@ try {
         .range-hint { font-size: 0.75em; color: #777; min-height: 16px; margin-top: 4px; }
         .filters button[type="submit"] { padding: 10px 25px; background: #1a73e8; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
         .filters button[type="submit"]:hover { background: #1557b0; }
-        .last-sync { text-align: center; color: #546e7a; font-size: 0.95em; margin: -25px 0 20px; }
+        .last-sync { text-align: center; color: #546e7a; font-size: 0.95em; margin: -25px 0 20px; display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .resync-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9em; color: #546e7a; }
     </style>
 </head>
 <body>
@@ -243,9 +244,14 @@ try {
             <a href="logout.php">Выйти (<?= htmlspecialchars($_SESSION['user_email']) ?>)</a>
         </div>
         <h1>Kitchen Service Dashboard</h1>
-        <div class="last-sync">Последнее обновление из Poster: <?= htmlspecialchars($lastSyncLabel) ?></div>
+        <div class="last-sync">
+            <span>Последнее обновление из Poster: <?= htmlspecialchars($lastSyncLabel) ?></span>
+            <label class="resync-toggle">
+                <input type="checkbox" name="resync" value="1" form="dashboardFilters"> Resync
+            </label>
+        </div>
 
-        <form class="filters" method="GET">
+        <form class="filters" method="GET" id="dashboardFilters">
             <div class="filter-group">
                 <label>Период</label>
                 <div class="dp-range" data-date-range-picker data-from-input="dateFromInput" data-to-input="dateToInput">
@@ -291,11 +297,6 @@ try {
                 </div>
             </div>
             
-            <label style="display:flex; align-items:center; gap:6px;">
-                <input type="hidden" name="resync" value="0">
-                <input type="checkbox" name="resync" value="1"> Resync
-            </label>
-
             <button type="submit">Обновить</button>
         </form>
 

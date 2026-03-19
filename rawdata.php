@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
+date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 // Получаем фильтры из GET
 $selectedStatus = $_GET['status'] ?? 'all';
@@ -108,6 +109,16 @@ try {
     }
 
     $isAjax = (($_GET['ajax'] ?? '') === '1');
+    $doResync = (($_GET['resync'] ?? '') === '1');
+    if ($doResync && !$isAjax) {
+        require_once __DIR__ . '/scripts/kitchen/resync_lib.php';
+        veranda_resync_range_period($dateFrom, $dateTo);
+        $redirectQuery = $_GET;
+        unset($redirectQuery['resync']);
+        $qs = http_build_query($redirectQuery);
+        header('Location: rawdata.php' . ($qs ? ('?' . $qs) : ''));
+        exit;
+    }
 
     // Получаем данные из БД
     $query = "SELECT * FROM kitchen_stats";
@@ -365,7 +376,8 @@ try {
         .nav-links a:hover { text-decoration: underline; }
         
         .error { color: #d32f2f; background: #fdecea; padding: 15px; border-radius: 8px; border: 1px solid #f5c2c7; margin-bottom: 20px; }
-        .last-sync { text-align: center; color: #546e7a; font-size: 0.95em; margin: -18px 0 20px; }
+        .last-sync { text-align: center; color: #546e7a; font-size: 0.95em; margin: -18px 0 20px; display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .resync-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9em; color: #546e7a; }
     </style>
 </head>
 <body>
@@ -377,9 +389,14 @@ try {
             <a href="logout.php">Выйти (<?= htmlspecialchars($_SESSION['user_email']) ?>)</a>
         </div>
         <h1>Raw Data: Kitchen Transactions</h1>
-        <div class="last-sync">Последнее обновление из Poster: <?= htmlspecialchars($lastSyncLabel) ?></div>
+        <div class="last-sync">
+            <span>Последнее обновление из Poster: <?= htmlspecialchars($lastSyncLabel) ?></span>
+            <label class="resync-toggle">
+                <input type="checkbox" name="resync" value="1" form="rawdataFilters"> Resync
+            </label>
+        </div>
 
-        <form class="filter-section" method="GET">
+        <form class="filter-section" method="GET" id="rawdataFilters">
             <div class="filter-group">
                 <label>Период</label>
                 <div class="dp-range" data-date-range-picker data-from-input="dateFromInput" data-to-input="dateToInput">
@@ -453,7 +470,7 @@ try {
             <div data-sort="wait">Макс. ожидание <span class="sort-icon"></span></div>
         </div>
 
-        <div id="lazyStatus" style="text-align:center; color:#65676b; margin:16px 0;">Загрузка…</div>
+        <div id="lazyStatus" style="text-align:center; color:#65676b; margin:16px 0; min-height: 18px;">Загрузка…</div>
         <div id="receiptsList"></div>
         <div id="lazySentinel" style="height:1px;"></div>
     </div>
@@ -467,6 +484,7 @@ try {
             const sentinel = document.getElementById('lazySentinel');
             
             let currentSort = { field: 'receipt', order: 'asc' };
+            let userSorted = false;
             const state = { offset: 0, limit: 20, loading: false, done: false, total: null };
 
             const baseParams = new URLSearchParams(window.location.search);
@@ -527,20 +545,16 @@ try {
                 if (!statusEl) return;
                 if (state.loading) {
                     statusEl.textContent = 'Загрузка…';
-                    statusEl.style.display = 'block';
+                    statusEl.style.visibility = 'visible';
                     return;
                 }
                 if (state.total !== null && list.children.length === 0 && state.done) {
                     statusEl.textContent = 'Нет данных';
-                    statusEl.style.display = 'block';
+                    statusEl.style.visibility = 'visible';
                     return;
                 }
-                if (state.done) {
-                    statusEl.style.display = 'none';
-                    return;
-                }
-                statusEl.textContent = 'Прокрутите вниз для подгрузки…';
-                statusEl.style.display = 'block';
+                statusEl.textContent = '';
+                statusEl.style.visibility = 'hidden';
             };
 
             const loadNext = async () => {
@@ -563,7 +577,7 @@ try {
                         const tmp = document.createElement('div');
                         tmp.innerHTML = data.html;
                         while (tmp.firstChild) list.appendChild(tmp.firstChild);
-                        applySort();
+                        if (userSorted) applySort();
                         updateLiveCooking();
                     }
                     state.offset = typeof data.next_offset === 'number' ? data.next_offset : (state.offset + state.limit);
@@ -594,6 +608,7 @@ try {
                 target.classList.add(`sort-${order}`);
 
                 currentSort = { field, order };
+                userSorted = true;
                 applySort();
             });
 
@@ -605,6 +620,26 @@ try {
             }
             loadNext();
             setInterval(updateLiveCooking, 1000);
+
+            const resync = document.querySelector('input[name="resync"][type="checkbox"]');
+            if (resync) {
+                resync.checked = false;
+                resync.addEventListener('change', () => {
+                    if (resync.checked) {
+                        const ok = confirm('Resync делает полную пересинхронизацию данных из Poster за выбранный период и может сильно нагрузить систему. Используй редко. Продолжить?');
+                        if (!ok) resync.checked = false;
+                    }
+                });
+            }
+            const form = document.getElementById('rawdataFilters');
+            if (form && resync) {
+                form.addEventListener('submit', (e) => {
+                    if (resync.checked) {
+                        const ok = confirm('Подтвердить Resync? Это может занять время и нагрузить систему.');
+                        if (!ok) e.preventDefault();
+                    }
+                });
+            }
 
             list.addEventListener('change', async (e) => {
                 const checkbox = e.target.closest('input[name="exclude_from_dashboard"]');
