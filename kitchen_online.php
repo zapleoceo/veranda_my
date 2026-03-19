@@ -158,6 +158,28 @@ if ($isAjax) {
                 $txIds = array_slice($txIds, 0, 40);
             }
 
+            $employeesById = null;
+            $getEmployeeNameById = function (int $userId) use (&$employeesById, $api): string {
+                if ($userId <= 0) return '';
+                if ($employeesById === null) {
+                    $employeesById = [];
+                    try {
+                        $employees = $api->request('access.getEmployees');
+                        if (!is_array($employees)) $employees = [];
+                        foreach ($employees as $employee) {
+                            $id = (int)($employee['user_id'] ?? 0);
+                            $name = trim((string)($employee['name'] ?? ''));
+                            if ($id > 0 && $name !== '') {
+                                $employeesById[$id] = $name;
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        $employeesById = [];
+                    }
+                }
+                return (string)($employeesById[$userId] ?? '');
+            };
+
             $isDishDeletedFromHistory = function (array $history, int $dishId): bool {
                 $lastStateTime = 0;
                 $isDeleted = false;
@@ -214,6 +236,40 @@ if ($isAjax) {
                     if (!is_array($history)) $history = [];
                 } catch (\Exception $e) {
                     $history = [];
+                }
+
+                $waiterName = '';
+                if (is_array($tx)) {
+                    $empName = trim((string)($tx['employee_name'] ?? ''));
+                    if ($empName !== '') {
+                        $waiterName = $empName;
+                    } else {
+                        $name = trim((string)($tx['name'] ?? ''));
+                        if ($name !== '' && !is_numeric($name)) {
+                            $waiterName = $name;
+                        } else {
+                            $userId = (int)($tx['user_id'] ?? 0);
+                            if ($userId <= 0) {
+                                foreach ($history as $event) {
+                                    $type = $event['type_history'] ?? '';
+                                    if ($type === 'open' || $type === 'print') {
+                                        $candidate = (int)($event['value'] ?? 0);
+                                        if ($candidate > 0) {
+                                            $userId = $candidate;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            $waiterName = $getEmployeeNameById($userId);
+                        }
+                    }
+                }
+                if ($waiterName !== '') {
+                    $db->query(
+                        "UPDATE kitchen_stats SET waiter_name = ? WHERE transaction_date = ? AND transaction_id = ?",
+                        [$waiterName, $today, $txId]
+                    );
                 }
 
                 $items = $db->query(
