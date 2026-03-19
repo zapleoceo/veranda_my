@@ -27,9 +27,9 @@
                     } elseif ($data['max_wait_time'] >= 20) {
                         $waitClass = 'wait-medium';
                     }
-                    $waitIcon = !empty($data['max_wait_prob']) ? '❓' : (!empty($data['max_wait_fallback']) ? '📌' : '⌛');
+                    $waitIcon = !empty($data['max_wait_prob']) ? '❓' : (!empty($data['max_wait_fallback']) ? '📌' : (!empty($data['max_wait_pstr']) ? '' : '⌛'));
                 ?>
-                    <span class="receipt-max-wait <?= $waitClass ?>" title="<?= !empty($data['max_wait_prob']) ? 'Макс. ожидание рассчитано от отправки на станцию до расчетного времени (ProbCloseTime: берется из следующего чека(ов) по цеху).' : (!empty($data['max_wait_fallback']) ? 'Макс. ожидание рассчитано от отправки на станцию до времени закрытия чека (fallback).' : 'Макс. ожидание рассчитано от отправки на станцию до отметки Готово.') ?>"><?= $waitIcon ?> <?= $data['max_wait_time'] ?> мин</span>
+                    <span class="receipt-max-wait <?= $waitClass ?>" title="<?= !empty($data['max_wait_prob']) ? 'Макс. ожидание рассчитано от отправки на станцию до расчетного времени (ProbCloseTime: берется из следующего чека(ов) по цеху).' : (!empty($data['max_wait_fallback']) ? 'Макс. ожидание рассчитано от отправки на станцию до времени закрытия чека (fallback).' : 'Макс. ожидание рассчитано от отправки на станцию до отметки Готово.') ?>"><?= $waitIcon !== '' ? ($waitIcon . ' ') : '' ?><?= $data['max_wait_time'] ?> мин</span>
                 <?php endif; ?>
             </div>
         </summary>
@@ -162,7 +162,7 @@
                                 <?php elseif (!empty($item['ready_pressed_at'])): ?>
                                     <span class="status-ready" title="Время взято из Poster (finishedcooking)."><?= date('H:i:s', strtotime($item['ready_pressed_at'])) ?></span>
                                 <?php else: ?>
-                                    <span class="status-cooking">В процессе</span>
+                                    <span class="status-cooking">готовится</span>
                                 <?php endif; ?>
                             </td>
                             <td><?= $closed ?></td>

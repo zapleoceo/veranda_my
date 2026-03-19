@@ -194,6 +194,7 @@ try {
                         'max_wait_time' => 0,
                         'max_wait_fallback' => false,
                         'max_wait_prob' => false,
+                        'max_wait_pstr' => false,
                         'max_wait_log_close_at' => null,
                         'max_wait_log_close_timestamp' => 0,
                         'has_hookah' => false,
@@ -273,6 +274,7 @@ try {
                             $groupedStats[$receipt]['max_wait_time'] = round($wait, 1);
                             $groupedStats[$receipt]['max_wait_fallback'] = ($logicalSource === 'close');
                             $groupedStats[$receipt]['max_wait_prob'] = ($logicalSource === 'prob');
+                            $groupedStats[$receipt]['max_wait_pstr'] = ($logicalSource === 'pstr');
                             $groupedStats[$receipt]['max_wait_log_close_at'] = $logicalCloseAt;
                             $groupedStats[$receipt]['max_wait_log_close_timestamp'] = $logicalCloseTs;
                         }
