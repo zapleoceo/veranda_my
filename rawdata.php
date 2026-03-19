@@ -390,6 +390,7 @@ try {
         .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
         .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }
         .nav-left a:hover { text-decoration: underline; }
+        .nav-title { font-weight: 800; color: #2c3e50; }
         .user-menu { position: relative; }
         .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
         .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; overflow: hidden; }
@@ -407,7 +408,7 @@ try {
 <body>
     <div class="container">
         <div class="top-nav">
-            <div class="nav-left"></div>
+            <div class="nav-left"><div class="nav-title">Таблица</div></div>
             <div class="user-menu">
                 <?php
                     $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
@@ -427,7 +428,7 @@ try {
                 </div>
             </div>
         </div>
-        <h1>Raw Data: Kitchen Transactions</h1>
+        <h1>Таблица</h1>
         <div class="last-sync">
             <span>Последнее обновление из Poster: <?= htmlspecialchars($lastSyncLabel) ?></span>
             <label class="resync-toggle">
@@ -738,7 +739,7 @@ try {
                 t = setTimeout(() => {
                     menu.classList.remove('open');
                     t = null;
-                }, 1000);
+                }, 700);
             };
             menu.addEventListener('mouseenter', open);
             menu.addEventListener('mouseleave', scheduleClose);

@@ -387,6 +387,7 @@ $dashboardQuery = http_build_query([
         .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
         .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }
         .nav-left a:hover { text-decoration: underline; }
+        .nav-title { font-weight: 800; color: #2c3e50; }
         .user-menu { position: relative; }
         .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
         .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; overflow: hidden; }
@@ -427,7 +428,9 @@ $dashboardQuery = http_build_query([
 <body>
     <div class="container">
         <div class="top-nav">
-            <div class="nav-left"></div>
+            <div class="nav-left">
+                <div class="nav-title"><span class="ko-titlebar">КухняОнлайн <button type="button" class="ko-sound" id="soundToggle" aria-label="Звук">🔊</button></span></div>
+            </div>
             <div class="user-menu">
                 <?php
                     $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
@@ -447,8 +450,6 @@ $dashboardQuery = http_build_query([
                 </div>
             </div>
         </div>
-
-        <h1><span class="ko-titlebar">КухняОнлайн <button type="button" class="ko-sound" id="soundToggle" aria-label="Звук">🔊</button></span></h1>
 
         <div class="topbar">
             <span>Последнее обновление из Poster: <span id="lastSync"><?= htmlspecialchars($lastSyncLabel) ?></span></span>
@@ -484,7 +485,7 @@ $dashboardQuery = http_build_query([
                 t = setTimeout(() => {
                     menu.classList.remove('open');
                     t = null;
-                }, 1000);
+                }, 700);
             };
             menu.addEventListener('mouseenter', open);
             menu.addEventListener('mouseleave', scheduleClose);
