@@ -44,6 +44,8 @@ class Database {
             exclude_from_dashboard TINYINT(1) NOT NULL DEFAULT 0,
             exclude_auto TINYINT(1) NOT NULL DEFAULT 0,
             dish_id INT NOT NULL,
+            dish_category_id BIGINT NULL,
+            dish_sub_category_id BIGINT NULL,
             dish_name VARCHAR(255),
             ticket_sent_at DATETIME,
             ready_pressed_at DATETIME,
@@ -90,14 +92,38 @@ class Database {
         if ((int)($row['c'] ?? 0) === 0) {
             $this->query("ALTER TABLE kitchen_stats ADD COLUMN exclude_auto TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard");
         }
+
+        $row = $this->query(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'kitchen_stats'
+               AND COLUMN_NAME = 'dish_category_id'"
+        )->fetch();
+        if ((int)($row['c'] ?? 0) === 0) {
+            $this->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+        }
+
+        $row = $this->query(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'kitchen_stats'
+               AND COLUMN_NAME = 'dish_sub_category_id'"
+        )->fetch();
+        if ((int)($row['c'] ?? 0) === 0) {
+            $this->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+        }
     }
 
     public function saveStats(array $stats) {
         $sql = "INSERT INTO kitchen_stats 
-                (transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id, table_number, status, pay_type, close_reason, dish_id, dish_name, ticket_sent_at, ready_pressed_at, service_type, total_sum, station) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id, table_number, status, pay_type, close_reason, dish_id, dish_category_id, dish_sub_category_id, dish_name, ticket_sent_at, ready_pressed_at, service_type, total_sum, station, exclude_from_dashboard, exclude_auto) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE 
                 dish_id = VALUES(dish_id),
+                dish_category_id = VALUES(dish_category_id),
+                dish_sub_category_id = VALUES(dish_sub_category_id),
                 dish_name = VALUES(dish_name),
                 transaction_opened_at = VALUES(transaction_opened_at),
                 transaction_closed_at = VALUES(transaction_closed_at),
@@ -109,10 +135,21 @@ class Database {
                 ready_pressed_at = VALUES(ready_pressed_at),
                 service_type = VALUES(service_type),
                 total_sum = VALUES(total_sum),
-                station = VALUES(station);";
+                station = VALUES(station),
+                exclude_from_dashboard = CASE
+                    WHEN (VALUES(dish_category_id) = 47 OR VALUES(dish_sub_category_id) = 47) THEN 1
+                    ELSE exclude_from_dashboard
+                END,
+                exclude_auto = CASE
+                    WHEN (VALUES(dish_category_id) = 47 OR VALUES(dish_sub_category_id) = 47) THEN 1
+                    ELSE exclude_auto
+                END;";
         
         $stmt = $this->pdo->prepare($sql);
         foreach ($stats as $row) {
+            $mainCat = isset($row['dish_category_id']) && $row['dish_category_id'] !== null ? (int)$row['dish_category_id'] : null;
+            $subCat = isset($row['dish_sub_category_id']) && $row['dish_sub_category_id'] !== null ? (int)$row['dish_sub_category_id'] : null;
+            $isHookah = ($mainCat === 47) || ($subCat === 47);
             $stmt->execute([
                 $row['date'],
                 $row['receipt_number'],
@@ -124,12 +161,16 @@ class Database {
                 $row['pay_type'] ?? null,
                 $row['close_reason'] ?? null,
                 $row['dish_id'],
+                $mainCat,
+                $subCat,
                 $row['dish_name'],
                 $row['ticket_sent_at'],
                 $row['ready_pressed_at'],
                 $row['service_type'],
                 $row['total_sum'],
-                $row['station']
+                $row['station'],
+                $isHookah ? 1 : 0,
+                $isHookah ? 1 : 0
             ]);
         }
     }

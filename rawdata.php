@@ -40,6 +40,12 @@ try {
     if (!$columnExists($db, $dbName, 'kitchen_stats', 'prob_close_at')) {
         $db->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
     }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_category_id')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+    }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+    }
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_exclude_item'])) {
         $itemId = (int)($_POST['toggle_exclude_item'] ?? 0);
         $excludeFlag = isset($_POST['exclude_from_dashboard']) ? 1 : 0;
@@ -77,8 +83,14 @@ try {
     // Получаем названия продуктов из API
     $productsRaw = $api->request('menu.getProducts');
     $productNames = [];
+    $productMainCategory = [];
+    $productSubCategory = [];
     foreach ($productsRaw as $p) {
-        $productNames[$p['product_id']] = $p['product_name'];
+        $pid = (int)($p['product_id'] ?? 0);
+        if ($pid <= 0) continue;
+        $productNames[$pid] = $p['product_name'] ?? ('Product #' . $pid);
+        $productMainCategory[$pid] = (int)($p['category_id'] ?? $p['menu_category_id'] ?? $p['main_category_id'] ?? 0);
+        $productSubCategory[$pid] = (int)($p['sub_category_id'] ?? $p['menu_category_id2'] ?? $p['category2_id'] ?? 0);
     }
 
     // Получаем все данные из БД
@@ -126,6 +138,7 @@ try {
                 'exclude_from_dashboard' => isset($row['exclude_from_dashboard']) ? (int)$row['exclude_from_dashboard'] : 0,
                 'max_wait_time' => 0,
                 'max_wait_fallback' => false,
+                'has_hookah' => false,
                 'opened_timestamp' => $row['transaction_opened_at'] ? strtotime($row['transaction_opened_at']) : 0,
                 'closed_timestamp' => $row['transaction_closed_at'] ? strtotime($row['transaction_closed_at']) : 0
             ];
@@ -144,8 +157,21 @@ try {
             $groupedStats[$receipt]['close_reason'] = (int)$row['close_reason'];
         }
         $groupedStats[$receipt]['items'][] = $row;
+
+        $mainCat = isset($row['dish_category_id']) ? (int)$row['dish_category_id'] : 0;
+        $subCat = isset($row['dish_sub_category_id']) ? (int)$row['dish_sub_category_id'] : 0;
+        $dishId = (int)($row['dish_id'] ?? 0);
+        if ($mainCat <= 0 && $dishId > 0) $mainCat = $productMainCategory[$dishId] ?? 0;
+        if ($subCat <= 0 && $dishId > 0) $subCat = $productSubCategory[$dishId] ?? 0;
+        $isHookah = ($mainCat === 47) || ($subCat === 47);
+        if ($isHookah) {
+            $groupedStats[$receipt]['has_hookah'] = true;
+        }
         
         // Считаем макс время ожидания
+        if ($isHookah) {
+            continue;
+        }
         $readyTimeForWait = null;
         $fallbackWait = false;
         $probWait = false;
@@ -231,6 +257,7 @@ try {
         .status-fallback { color: #607d8b; background: #eceff1; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; }
         .wait-time { font-weight: 500; color: #d32f2f; }
         .wait-time-fallback { color: #78909c; }
+        .wait-time-hookah { color: #607d8b; font-weight: 700; }
         .save-indicator { margin-left: 8px; font-size: 0.8em; color: #2e7d32; opacity: 0; transition: opacity 0.2s; }
         .save-indicator.show { opacity: 1; }
         
@@ -383,6 +410,8 @@ try {
                             $waitIcon = !empty($data['max_wait_prob']) ? '❓' : (!empty($data['max_wait_fallback']) ? '📌' : '⌛');
                         ?>
                             <span class="receipt-max-wait <?= $waitClass ?>" title="<?= !empty($data['max_wait_prob']) ? 'Макс. ожидание рассчитано от отправки на станцию до расчетного времени (ProbCloseTime: берется из следующего чека(ов) по цеху).' : (!empty($data['max_wait_fallback']) ? 'Макс. ожидание рассчитано от отправки на станцию до времени закрытия чека (fallback).' : 'Макс. ожидание рассчитано от отправки на станцию до отметки Готово.') ?>"><?= $waitIcon ?> <?= $data['max_wait_time'] ?> мин</span>
+                        <?php elseif (!empty($data['has_hookah'])): ?>
+                            <span class="receipt-max-wait wait-fallback" title="Кальяны: тайминг не считается.">кал</span>
                         <?php endif; ?>
                     </div>
                 </summary>
@@ -408,7 +437,17 @@ try {
                                 $usedFallbackTime = false;
                                 $usedInProgressTime = false;
                                 $usedProbCloseTime = false;
-                                if ($item['ticket_sent_at'] && ($item['ready_pressed_at'] || !empty($item['ready_chass_at']) || !empty($item['prob_close_at']))) {
+                                $mainCat = isset($item['dish_category_id']) ? (int)$item['dish_category_id'] : 0;
+                                $subCat = isset($item['dish_sub_category_id']) ? (int)$item['dish_sub_category_id'] : 0;
+                                $dishId = (int)($item['dish_id'] ?? 0);
+                                if ($mainCat <= 0 && $dishId > 0) $mainCat = $productMainCategory[$dishId] ?? 0;
+                                if ($subCat <= 0 && $dishId > 0) $subCat = $productSubCategory[$dishId] ?? 0;
+                                $isHookah = ($mainCat === 47) || ($subCat === 47);
+                                if ($isHookah) {
+                                    $wait = 'кал';
+                                    $waitClass = 'wait-time wait-time-hookah';
+                                }
+                                if (!$isHookah && $item['ticket_sent_at'] && ($item['ready_pressed_at'] || !empty($item['ready_chass_at']) || !empty($item['prob_close_at']))) {
                                     $candidates = [];
                                     if ($item['ready_pressed_at']) $candidates[] = $item['ready_pressed_at'];
                                     if (!empty($item['ready_chass_at'])) $candidates[] = $item['ready_chass_at'];
@@ -422,6 +461,7 @@ try {
                                         $wait = $icon . ' ' . round($diff / 60, 1) . ' мин';
                                     }
                                 } elseif (
+                                    !$isHookah &&
                                     $item['ticket_sent_at'] &&
                                     $item['transaction_closed_at'] &&
                                     $item['transaction_closed_at'] !== '0000-00-00 00:00:00' &&
@@ -433,6 +473,7 @@ try {
                                     $waitClass = 'wait-time wait-time-fallback';
                                     $usedFallbackTime = true;
                                 } elseif (
+                                    !$isHookah &&
                                     $item['ticket_sent_at'] &&
                                     empty($item['ready_pressed_at']) &&
                                     (int)$item['status'] === 1
@@ -488,13 +529,13 @@ try {
                                     <td><?= $closed ?></td>
                                     <td><?= !empty($item['ready_chass_at']) ? date('H:i:s', strtotime($item['ready_chass_at'])) : '—' ?></td>
                                     <td><?= !empty($item['prob_close_at']) ? date('H:i:s', strtotime($item['prob_close_at'])) : '—' ?></td>
-                                    <td class="<?= $waitClass ?>" title="<?= $usedFallbackTime ? '📌 Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? '❓ Расчет: ЗакРассч (ProbCloseTime) - Отправ. ЗакРассч берется из следующего чека(+1..+3) по тому же цеху.' : '⌛ Расчет: (Готово/ЗакChAss) - Отправ.')) ?>"><?= $wait ?></td>
+                                    <td class="<?= $waitClass ?>" title="<?= $isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? '📌 Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? '❓ Расчет: ЗакРассч (ProbCloseTime) - Отправ. ЗакРассч берется из следующего чека(+1..+3) по тому же цеху.' : '⌛ Расчет: (Готово/ЗакChAss) - Отправ.'))) ?>"><?= $wait ?></td>
                                     <td>
                                         <form method="POST" class="exclude-item-form">
                                             <input type="hidden" name="toggle_exclude_item" value="<?= (int)$item['id'] ?>">
                                             <input type="hidden" name="return_query" value="<?= htmlspecialchars(http_build_query($_GET), ENT_QUOTES) ?>">
                                             <label class="exclude-toggle">
-                                                <input type="checkbox" name="exclude_from_dashboard" value="1" <?= (!empty($item['exclude_from_dashboard']) || !empty($item['was_deleted'])) ? 'checked' : '' ?>>
+                                                <input type="checkbox" name="exclude_from_dashboard" value="1" <?= (!empty($item['exclude_from_dashboard']) || !empty($item['was_deleted']) || $isHookah) ? 'checked' : '' ?> <?= $isHookah ? 'disabled' : '' ?>>
                                                 не учитывать
                                             </label>
                                             <span class="save-indicator">сохранено</span>

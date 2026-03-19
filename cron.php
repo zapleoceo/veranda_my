@@ -54,6 +54,12 @@ try {
     if (!$columnExists($db, $dbName, 'kitchen_stats', 'prob_close_at')) {
         $db->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
     }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_category_id')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+    }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+    }
 
     // Берем интервал: с начала сегодняшнего дня
     $dateFrom = date('Y-m-d');
@@ -234,6 +240,7 @@ try {
              WHERE transaction_date = ?
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
             [$date]
         )->fetchAll();
@@ -272,6 +279,7 @@ try {
                AND status = 1
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ticket_sent_at IS NOT NULL
                AND ready_pressed_at IS NULL
                AND ready_chass_at IS NULL",
@@ -325,6 +333,15 @@ try {
     }
 
     $autoExclude = function (string $date) use ($db): array {
+        $setHookah = $db->query(
+            "UPDATE kitchen_stats
+             SET exclude_from_dashboard = 1,
+                 exclude_auto = 1
+             WHERE transaction_date = ?
+               AND (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
+            [$date]
+        )->rowCount();
+
         $set1 = $db->query(
             "UPDATE kitchen_stats
              SET exclude_from_dashboard = 1,
@@ -332,6 +349,7 @@ try {
              WHERE transaction_date = ?
                AND COALESCE(was_deleted, 0) = 0
                AND COALESCE(exclude_from_dashboard, 0) = 0
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ready_pressed_at IS NULL
                AND ready_chass_at IS NULL
                AND prob_close_at IS NOT NULL",
@@ -345,6 +363,7 @@ try {
              WHERE transaction_date = ?
                AND COALESCE(was_deleted, 0) = 0
                AND COALESCE(exclude_from_dashboard, 0) = 0
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ready_pressed_at IS NULL
                AND ready_chass_at IS NULL
                AND prob_close_at IS NULL
@@ -361,6 +380,7 @@ try {
                  exclude_auto = 0
              WHERE transaction_date = ?
                AND exclude_auto = 1
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
             [$date]
         )->rowCount();
@@ -371,6 +391,7 @@ try {
                  exclude_auto = 0
              WHERE transaction_date = ?
                AND exclude_auto = 1
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ready_pressed_at IS NULL
                AND ready_chass_at IS NULL
                AND prob_close_at IS NULL
@@ -383,7 +404,7 @@ try {
             [$date]
         )->rowCount();
 
-        return ['set_prob' => (int)$set1, 'set_close' => (int)$set2, 'unset_fact' => (int)$unset1, 'unset_lost' => (int)$unset2];
+        return ['set_hookah' => (int)$setHookah, 'set_prob' => (int)$set1, 'set_close' => (int)$set2, 'unset_fact' => (int)$unset1, 'unset_lost' => (int)$unset2];
     };
 
     $auto = $autoExclude($dateFrom);

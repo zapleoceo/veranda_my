@@ -5,6 +5,8 @@ namespace App\Classes;
 class KitchenAnalytics {
     private PosterAPI $api;
     private array $productNames = [];
+    private array $productMainCategories = [];
+    private array $productSubCategories = [];
 
     public function __construct(PosterAPI $api) {
         $this->api = $api;
@@ -25,8 +27,14 @@ class KitchenAnalytics {
         try {
             $products = $this->api->request('menu.getProducts');
             foreach ($products as $p) {
-                $this->productNames[$p['product_id']] = $p['product_name'];
-                $this->productWorkshops[$p['product_id']] = $p['workshop'];
+                $productId = (int)($p['product_id'] ?? 0);
+                if ($productId <= 0) {
+                    continue;
+                }
+                $this->productNames[$productId] = $p['product_name'] ?? ('Product #' . $productId);
+                $this->productWorkshops[$productId] = $p['workshop'] ?? null;
+                $this->productMainCategories[$productId] = (int)($p['category_id'] ?? $p['menu_category_id'] ?? $p['main_category_id'] ?? 0);
+                $this->productSubCategories[$productId] = (int)($p['sub_category_id'] ?? $p['menu_category_id2'] ?? $p['category2_id'] ?? 0);
             }
 
             $workshops = $this->api->request('menu.getWorkshops');
@@ -137,6 +145,8 @@ class KitchenAnalytics {
                     'pay_type' => isset($tx['pay_type']) ? (int)$tx['pay_type'] : null,
                     'close_reason' => isset($tx['reason']) && $tx['reason'] !== '' ? (int)$tx['reason'] : null,
                     'dish_id' => $pId,
+                    'dish_category_id' => $this->productMainCategories[$pId] ?? null,
+                    'dish_sub_category_id' => $this->productSubCategories[$pId] ?? null,
                     'dish_name' => $this->productNames[$pId] ?? ($product['product_name'] ?? ('Product #' . $pId)),
                     'ticket_sent_at' => $times['sent'] ?? null,
                     'ready_pressed_at' => $times['ready'] ?? null,

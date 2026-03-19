@@ -26,6 +26,12 @@ $columnExists = function (\App\Classes\Database $db, string $dbName, string $tab
 if (!$columnExists($db, $dbName, 'kitchen_stats', 'prob_close_at')) {
     $db->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
 }
+if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_category_id')) {
+    $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+}
+if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
+    $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+}
 
 $dates = $db->query("SELECT DISTINCT transaction_date AS d FROM kitchen_stats WHERE transaction_date IS NOT NULL ORDER BY d ASC")->fetchAll();
 $totalDates = count($dates);
@@ -48,6 +54,7 @@ foreach ($dates as $row) {
          WHERE transaction_date = ?
            AND receipt_number REGEXP '^[0-9]+$'
            AND COALESCE(was_deleted, 0) = 0
+           AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
            AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
         [$date]
     )->fetchAll();
@@ -92,6 +99,7 @@ foreach ($dates as $row) {
          WHERE transaction_date = ?
            AND receipt_number REGEXP '^[0-9]+$'
            AND COALESCE(was_deleted, 0) = 0
+           AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
            AND ticket_sent_at IS NOT NULL
            AND ready_pressed_at IS NULL
            AND ready_chass_at IS NULL",
@@ -126,4 +134,3 @@ foreach ($dates as $row) {
 }
 
 echo "[" . date('Y-m-d H:i:s') . "] Done. set_total={$setTotal}\n";
-

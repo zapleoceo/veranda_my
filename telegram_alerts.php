@@ -163,6 +163,12 @@ try {
     if (!$columnExists($db, $dbName, 'kitchen_stats', 'prob_close_at')) {
         $db->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
     }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_category_id')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+    }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+    }
 
     $db->query("CREATE TABLE IF NOT EXISTS system_meta (
         meta_key VARCHAR(100) PRIMARY KEY,
@@ -247,6 +253,7 @@ try {
              WHERE transaction_date = ?
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
             [$date]
         )->fetchAll();
@@ -285,6 +292,7 @@ try {
                AND status = 1
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ticket_sent_at IS NOT NULL
                AND ready_pressed_at IS NULL
                AND ready_chass_at IS NULL",
@@ -440,6 +448,21 @@ try {
 
     echo "[" . date('Y-m-d H:i:s') . "] Open checks: $openChecksDisplay. Using wait limit: $waitLimit min.\n";
 
+    $hookahAlerts = $db->query(
+        "SELECT id, tg_message_id
+         FROM kitchen_stats
+         WHERE transaction_date = ?
+           AND tg_message_id IS NOT NULL
+           AND (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
+        [$today]
+    )->fetchAll();
+    foreach ($hookahAlerts as $item) {
+        if (!empty($item['tg_message_id'])) {
+            $bot->deleteMessage((int)$item['tg_message_id']);
+        }
+        $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [(int)$item['id']]);
+    }
+
     // 3. Теперь ищем актуальные задержки
     $cutoffTime = date('Y-m-d H:i:s', strtotime("-$waitLimit minutes"));
     $ackSnooze = (int)($settings['alert_ack_snooze_minutes'] ?? 0);
@@ -451,6 +474,7 @@ try {
               AND ticket_sent_at IS NOT NULL 
               AND transaction_date = ?
               AND status = 1
+              AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
               AND (
                     COALESCE(tg_acknowledged, 0) = 0
                  OR (tg_acknowledged_at IS NOT NULL AND tg_acknowledged_at < ?)
