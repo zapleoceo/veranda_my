@@ -9,6 +9,7 @@ $hourStart = (int)($_GET['hourStart'] ?? 10);
 $hourEnd = (int)($_GET['hourEnd'] ?? 24);
 $excludeZero = isset($_GET['excludeZero']) ? (bool)$_GET['excludeZero'] : false;
 $excludeCloseBased = isset($_GET['excludeCloseBased']) ? (bool)$_GET['excludeCloseBased'] : true;
+$doResync = isset($_GET['resync']) && $_GET['resync'] === '1';
 $lastSyncLabel = '—';
 if ($hourEnd <= $hourStart) {
     $hourEnd = min(24, $hourStart + 1);
@@ -60,6 +61,11 @@ try {
         }
     }
     
+    // По запросу: предварительно сделать ресинк выбранного периода
+    if ($doResync) {
+        require_once __DIR__ . '/scripts/kitchen/resync_lib.php';
+        veranda_resync_range_period($dateFrom, $dateTo);
+    }
     // Получаем данные за период
     $query = "SELECT * FROM kitchen_stats 
               WHERE COALESCE(exclude_from_dashboard, 0) = 0
@@ -314,6 +320,10 @@ try {
                     </label>
                 </div>
             </div>
+            <label style="display:flex; align-items:center; gap:6px;">
+                <input type="hidden" name="resync" value="0">
+                <input type="checkbox" name="resync" value="1" <?= $doResync ? 'checked' : '' ?>> Resync
+            </label>
 
             <button type="submit">Обновить</button>
         </form>
