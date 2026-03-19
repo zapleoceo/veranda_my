@@ -832,8 +832,6 @@ if ($tab === 'menu') {
                 </div>
             </div>
         </div>
-        <h1>Управление</h1>
-
         <?php if ($message): ?><div class="success"><?= $message ?></div><?php endif; ?>
         <?php if ($error): ?><div class="error"><?= $error ?></div><?php endif; ?>
 

@@ -269,7 +269,6 @@ try {
                 </div>
             </div>
         </div>
-        <h1>Дашборд</h1>
         <div class="last-sync">
             <span>Последнее обновление из Poster: <?= htmlspecialchars($lastSyncLabel) ?></span>
             <label class="resync-toggle">
