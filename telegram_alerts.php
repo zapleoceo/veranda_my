@@ -417,6 +417,7 @@ try {
                 $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
                 echo "[" . date('Y-m-d H:i:s') . "] Removed outdated alert for: {$item['dish_name']} (Table: {$item['table_number']})\n";
             } else {
+                $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
                 echo "[" . date('Y-m-d H:i:s') . "] Failed to remove outdated alert for: {$item['dish_name']} (Table: {$item['table_number']})\n";
             }
         }
@@ -594,7 +595,10 @@ try {
 
             // Если уведомление уже есть, удаляем старое, чтобы прислать новое с актуальным временем
             if ($item['tg_message_id']) {
-                $bot->deleteMessage((int)$item['tg_message_id']);
+                $deleted = $bot->deleteMessage((int)$item['tg_message_id']);
+                if (!$deleted) {
+                    $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [(int)$item['id']]);
+                }
             }
 
             $sentTime = strtotime($item['ticket_sent_at']);
