@@ -1,0 +1,49 @@
+name: Deploy to veranda.my
+
+on:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: deploy-veranda-my
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install rsync
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy files
+        shell: bash
+        run: |
+          rsync -az \
+            --exclude ".env" \
+            --exclude ".env.*" \
+            --exclude "*.log" \
+            --exclude "telegram.log" \
+            --exclude "prob_close_backfill.log" \
+            --exclude ".git/" \
+            --exclude ".github/" \
+            -e "ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+
+      - name: Verify PHP syntax (server)
+        shell: bash
+        run: |
+          ssh -p "${{ secrets.SSH_PORT }}" -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "cd '${{ secrets.DEPLOY_PATH }}' && php -l rawdata.php && php -l dashboard.php && php -l cron.php && php -l telegram_alerts.php"
+

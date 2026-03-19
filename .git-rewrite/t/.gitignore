@@ -1,0 +1,8 @@
+/.env
+/.env.*
+*.log
+/telegram.log
+/prob_close_backfill.log
+/.idea/
+/.vscode/
+Thumbs.db

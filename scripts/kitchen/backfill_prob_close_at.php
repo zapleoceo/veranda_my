@@ -1,0 +1,129 @@
+<?php
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
+require_once __DIR__ . '/../../src/classes/Database.php';
+
+if (file_exists(__DIR__ . '/../../.env')) {
+    $lines = file(__DIR__ . '/../../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0) continue;
+        if (strpos($line, '=') === false) continue;
+        [$name, $value] = explode('=', $line, 2);
+        $_ENV[$name] = trim($value);
+    }
+}
+
+$db = new \App\Classes\Database($_ENV['DB_HOST'] ?? 'localhost', $_ENV['DB_NAME'] ?? 'veranda_my', $_ENV['DB_USER'] ?? 'veranda_my', $_ENV['DB_PASS'] ?? '');
+
+$dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
+$columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
+    $row = $db->query(
+        "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+        [$dbName, $table, $column]
+    )->fetch();
+    return (int)($row['c'] ?? 0) > 0;
+};
+if (!$columnExists($db, $dbName, 'kitchen_stats', 'prob_close_at')) {
+    $db->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
+}
+
+$dates = $db->query("SELECT DISTINCT transaction_date AS d FROM kitchen_stats WHERE transaction_date IS NOT NULL ORDER BY d ASC")->fetchAll();
+$totalDates = count($dates);
+echo "[" . date('Y-m-d H:i:s') . "] Dates: {$totalDates}\n";
+
+$db->query("UPDATE kitchen_stats SET prob_close_at = NULL WHERE prob_close_at IS NOT NULL");
+
+$upd = $db->getPdo()->prepare("UPDATE kitchen_stats SET prob_close_at = ? WHERE id = ?");
+
+$i = 0;
+$setTotal = 0;
+foreach ($dates as $row) {
+    $i++;
+    $date = (string)($row['d'] ?? '');
+    if ($date === '' || $date === '0000-00-00') continue;
+
+    $readyRows = $db->query(
+        "SELECT receipt_number, station, ready_pressed_at, ready_chass_at
+         FROM kitchen_stats
+         WHERE transaction_date = ?
+           AND receipt_number REGEXP '^[0-9]+$'
+           AND COALESCE(was_deleted, 0) = 0
+           AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
+        [$date]
+    )->fetchAll();
+
+    $byReceiptStation = [];
+    foreach ($readyRows as $r) {
+        $receipt = (int)($r['receipt_number'] ?? 0);
+        $station = (string)($r['station'] ?? '');
+        if ($receipt <= 0 || $station === '') continue;
+
+        $t1 = $r['ready_pressed_at'] ?? null;
+        $t2 = $r['ready_chass_at'] ?? null;
+        $end = null;
+        if ($t1 && $t2) {
+            $end = strtotime($t1) <= strtotime($t2) ? $t1 : $t2;
+        } elseif ($t1) {
+            $end = $t1;
+        } elseif ($t2) {
+            $end = $t2;
+        }
+        if ($end === null) continue;
+
+        if (!isset($byReceiptStation[$receipt][$station])) {
+            $byReceiptStation[$receipt][$station] = $end;
+        } else {
+            if (strtotime($end) < strtotime($byReceiptStation[$receipt][$station])) {
+                $byReceiptStation[$receipt][$station] = $end;
+            }
+        }
+    }
+
+    if (empty($byReceiptStation)) {
+        if ($i % 10 === 0) {
+            echo "[" . date('Y-m-d H:i:s') . "] {$i}/{$totalDates} {$date}: no ready rows\n";
+        }
+        continue;
+    }
+
+    $targets = $db->query(
+        "SELECT id, receipt_number, station
+         FROM kitchen_stats
+         WHERE transaction_date = ?
+           AND receipt_number REGEXP '^[0-9]+$'
+           AND COALESCE(was_deleted, 0) = 0
+           AND ticket_sent_at IS NOT NULL
+           AND ready_pressed_at IS NULL
+           AND ready_chass_at IS NULL",
+        [$date]
+    )->fetchAll();
+
+    $set = 0;
+    foreach ($targets as $t) {
+        $id = (int)($t['id'] ?? 0);
+        $receipt = (int)($t['receipt_number'] ?? 0);
+        $station = (string)($t['station'] ?? '');
+        if ($id <= 0 || $receipt <= 0 || $station === '') continue;
+
+        $candidate = null;
+        for ($d = 1; $d <= 3; $d++) {
+            $next = $receipt + $d;
+            if (isset($byReceiptStation[$next][$station])) {
+                $candidate = $byReceiptStation[$next][$station];
+                break;
+            }
+        }
+        if ($candidate === null) continue;
+
+        $upd->execute([$candidate, $id]);
+        $set++;
+    }
+    $setTotal += $set;
+
+    if ($i % 10 === 0) {
+        echo "[" . date('Y-m-d H:i:s') . "] {$i}/{$totalDates} {$date}: set={$set}\n";
+    }
+}
+
+echo "[" . date('Y-m-d H:i:s') . "] Done. set_total={$setTotal}\n";
+

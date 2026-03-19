@@ -1,0 +1,29 @@
+ .dp-range { position: relative; }
+ .dp-field { display: flex; align-items: center; gap: 8px; }
+ .dp-display { padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; min-width: 190px; cursor: pointer; }
+ .dp-open { height: 36px; width: 42px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; cursor: pointer; font-size: 18px; line-height: 1; }
+ .dp-open:hover { background: #f6f8fb; }
+ .dp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 10000; }
+ .dp-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(320px, calc(100vw - 24px)); background: #fff; border: 1px solid #d0d5dd; border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.25); z-index: 10001; padding: 12px; box-sizing: border-box; }
+ .dp-dialog button { appearance: none; -webkit-appearance: none; background: transparent; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; line-height: normal; }
+ .dp-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+ .dp-month-year { font-weight: 700; color: #1f2937; text-align: center; flex: 1; }
+ .dp-nav { border: 1px solid #d0d5dd; background: #fff; border-radius: 8px; width: 36px; height: 34px; cursor: pointer; font-size: 18px; }
+ .dp-nav:hover { background: #f6f8fb; }
+ .dp-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+ .dp-grid thead th { font-size: 12px; color: #65676b; font-weight: 700; text-transform: uppercase; padding: 6px 0; }
+ .dp-grid tbody td { padding: 0; }
+ .dp-cell { width: calc(100% - 4px); height: 28px; border: 0; background: transparent; cursor: pointer; border-radius: 6px; margin: 2px; display: block; font-weight: 600; font-size: 13px; color: #1f2937; }
+ .dp-cell:hover { background: #f6f8fb; }
+ .dp-cell:focus { outline: 2px solid #1a73e8; outline-offset: 1px; }
+ .dp-cell[disabled] { cursor: default; color: #c4c7c5; }
+ .dp-cell[disabled]:hover { background: transparent; }
+ .dp-cell.in-range { background: #eef1f4; }
+ .dp-cell.range-start, .dp-cell.range-end { background: transparent; color: #1f2937; outline: 2px solid #1a73e8; outline-offset: -2px; }
+ .dp-footer { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+ .dp-hint { font-size: 12px; color: #65676b; flex: 1; min-height: 16px; }
+ .dp-actions { display: flex; gap: 8px; }
+ .dp-action { border: 1px solid #d0d5dd; background: #fff; border-radius: 8px; padding: 7px 10px; cursor: pointer; font-weight: 700; }
+ .dp-action:hover { background: #f6f8fb; }
+ .dp-action.primary { background: #fff; border-color: #d0d5dd; color: #1f2937; }
+ .dp-action.primary:hover { background: #f6f8fb; border-color: #d0d5dd; }

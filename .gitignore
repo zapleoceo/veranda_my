@@ -1,0 +1,12 @@
+/.env
+/.env.*
+*.log
+/telegram.log
+/prob_close_backfill.log
+/DEPLOY_TEST.txt
+/docs/
+/debug_*.php
+/get_open_count.php
+/.idea/
+/.vscode/
+Thumbs.db
