@@ -100,6 +100,12 @@ class Auth {
         if ($user) {
             $_SESSION['user_email'] = $email;
             $_SESSION['user_name'] = $userData['name'] ?? $email;
+            $pic = (string)($userData['picture'] ?? '');
+            if ($pic !== '' && preg_match('/^https:\\/\\//i', $pic)) {
+                $_SESSION['user_avatar'] = $pic;
+            } else {
+                unset($_SESSION['user_avatar']);
+            }
             return true;
         }
 

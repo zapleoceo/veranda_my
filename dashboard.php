@@ -225,7 +225,8 @@ try {
         .nav-left a:hover { text-decoration: underline; }
         .user-menu { position: relative; }
         .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
-        .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; }
+        .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; overflow: hidden; }
+        .user-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.12); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
         .user-menu:hover .user-dropdown { display: block; }
         .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: #37474f; text-decoration: none; font-weight: 600; }
@@ -257,9 +258,10 @@ try {
                 <?php
                     $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
                     $initial = mb_strtoupper(mb_substr($userLabel !== '' ? $userLabel : 'U', 0, 1));
+                    $avatar = (string)($_SESSION['user_avatar'] ?? '');
                 ?>
                 <div class="user-chip">
-                    <span class="user-icon"><?= htmlspecialchars($initial) ?></span>
+                    <span class="user-icon"><?php if ($avatar !== ''): ?><img src="<?= htmlspecialchars($avatar) ?>" alt=""><?php else: ?><?= htmlspecialchars($initial) ?><?php endif; ?></span>
                     <span><?= htmlspecialchars($userLabel) ?></span>
                 </div>
                 <div class="user-dropdown">
