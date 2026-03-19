@@ -98,7 +98,7 @@ $renderCards = function (array $rows): string {
         $waiter = trim((string)$c['waiter_name']);
         if ($waiter === '') $waiter = '—';
         ?>
-        <div class="ko-card">
+        <div class="ko-card" data-tx-id="<?= (int)$c['transaction_id'] ?>">
             <div class="ko-card-header">
                 <div class="ko-title">Чек <?= htmlspecialchars($receiptLabel) ?></div>
                 <div class="ko-meta">
@@ -138,6 +138,7 @@ if ($isAjax) {
     header('Content-Type: application/json; charset=utf-8');
     try {
         $db = $db ?? new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+        $api = $api ?? new \App\Classes\PosterAPI($token);
         if ($action === 'exclude' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $itemId = (int)($_POST['toggle_exclude_item'] ?? 0);
             if ($itemId > 0) {
@@ -146,12 +147,111 @@ if ($isAjax) {
             echo json_encode(['ok' => true, 'item_id' => $itemId], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        if ($action === 'sync') {
-            require_once __DIR__ . '/scripts/kitchen/resync_lib.php';
-            veranda_resync_range_period($today, $today);
-            $meta = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = 'poster_last_sync_at' LIMIT 1")->fetch();
-            if (!empty($meta['meta_value'])) {
-                $lastSyncLabel = date('d.m.Y H:i:s', strtotime($meta['meta_value']));
+        if ($action === 'refresh' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            $txIds = $_POST['tx_ids'] ?? [];
+            if (!is_array($txIds)) $txIds = [];
+            $txIds = array_values(array_unique(array_filter(array_map(function ($v) {
+                $i = (int)$v;
+                return $i > 0 ? $i : null;
+            }, $txIds))));
+            if (count($txIds) > 40) {
+                $txIds = array_slice($txIds, 0, 40);
+            }
+
+            $isDishDeletedFromHistory = function (array $history, int $dishId): bool {
+                $lastStateTime = 0;
+                $isDeleted = false;
+                foreach ($history as $event) {
+                    $type = $event['type_history'] ?? '';
+                    $value = (int)($event['value'] ?? 0);
+                    if ($value !== $dishId) continue;
+                    $t = (int)($event['time'] ?? 0);
+                    if ($type === 'changeitemcount') {
+                        $count = (int)($event['value2'] ?? 0);
+                        if ($t >= $lastStateTime) {
+                            $lastStateTime = $t;
+                            $isDeleted = $count <= 0;
+                        }
+                    } elseif ($type === 'deleteitem' || $type === 'delete') {
+                        if ($t >= $lastStateTime) {
+                            $lastStateTime = $t;
+                            $isDeleted = true;
+                        }
+                    }
+                }
+                return $isDeleted;
+            };
+
+            foreach ($txIds as $txId) {
+                $txId = (int)$txId;
+                if ($txId <= 0) continue;
+
+                $tx = null;
+                try {
+                    $res = $api->request('dash.getTransaction', ['transaction_id' => $txId]);
+                    $tx = $res[0] ?? $res;
+                } catch (\Exception $e) {
+                    $tx = null;
+                }
+
+                if (is_array($tx)) {
+                    $apiStatus = (int)($tx['status'] ?? 1);
+                    $apiReason = isset($tx['reason']) && $tx['reason'] !== '' ? (int)$tx['reason'] : null;
+                    $apiPayType = isset($tx['pay_type']) ? (int)$tx['pay_type'] : null;
+                    if ($apiStatus > 1 || $apiReason !== null) {
+                        if ($apiStatus <= 1) $apiStatus = 2;
+                        $db->query(
+                            "UPDATE kitchen_stats SET status = ?, pay_type = ?, close_reason = ? WHERE transaction_date = ? AND transaction_id = ?",
+                            [$apiStatus, $apiPayType, $apiReason, $today, $txId]
+                        );
+                        continue;
+                    }
+                }
+
+                $history = [];
+                try {
+                    $history = $api->request('dash.getTransactionHistory', ['transaction_id' => $txId]);
+                    if (!is_array($history)) $history = [];
+                } catch (\Exception $e) {
+                    $history = [];
+                }
+
+                $items = $db->query(
+                    "SELECT id, dish_id, was_deleted, ticket_sent_at
+                     FROM kitchen_stats
+                     WHERE transaction_date = ?
+                       AND transaction_id = ?
+                       AND status = 1
+                       AND ready_pressed_at IS NULL
+                       AND ready_chass_at IS NULL
+                       AND ticket_sent_at IS NOT NULL
+                       AND COALESCE(exclude_from_dashboard, 0) = 0
+                       AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
+                    [$today, $txId]
+                )->fetchAll();
+
+                foreach ($items as $it) {
+                    $id = (int)($it['id'] ?? 0);
+                    $dishId = (int)($it['dish_id'] ?? 0);
+                    if ($id <= 0 || $dishId <= 0) continue;
+
+                    $readyTime = null;
+                    foreach ($history as $event) {
+                        if (($event['type_history'] ?? '') === 'finishedcooking' && (int)($event['value'] ?? 0) === $dishId) {
+                            $readyTime = date('Y-m-d H:i:s', ((int)($event['time'] ?? 0)) / 1000);
+                            break;
+                        }
+                    }
+                    if ($readyTime !== null) {
+                        $db->query("UPDATE kitchen_stats SET ready_pressed_at = ? WHERE id = ?", [$readyTime, $id]);
+                        continue;
+                    }
+
+                    $deleted = $isDishDeletedFromHistory($history, $dishId);
+                    if ($deleted) {
+                        $db->query("UPDATE kitchen_stats SET was_deleted = 1 WHERE id = ?", [$id]);
+                    }
+                }
             }
         }
 
@@ -216,6 +316,7 @@ $dashboardQuery = http_build_query([
         .ko-ack:hover { color: #5f6368; }
         .ko-ack:disabled { opacity: 0.4; cursor: default; }
         .empty { text-align: center; color: #65676b; margin-top: 18px; }
+        .ko-footer { margin-top: 18px; text-align: center; color: #607d8b; font-size: 13px; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -245,6 +346,9 @@ $dashboardQuery = http_build_query([
 
         <div id="cards" class="cards"></div>
         <div id="empty" class="empty" style="display:none;">Нет активных блюд</div>
+        <div class="ko-footer">
+            Табло обновляется автоматически каждые 10 секунд. Если блюдо приготовили или убрали из чека — оно исчезнет из списка. Крестик «✕» рядом с блюдом означает «Принято»: блюдо больше не будет показываться в табло и не будет учитываться в аналитике задержек.
+        </div>
     </div>
 
     <script>
@@ -281,6 +385,36 @@ $dashboardQuery = http_build_query([
                 params.set('action', action);
                 params.set('station', stationEl.value);
                 const res = await fetch(`kitchen_online.php?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const data = await res.json();
+                if (!data || !data.ok) throw new Error('bad');
+                cardsEl.innerHTML = data.html || '';
+                emptyEl.style.display = (cardsEl.children.length === 0) ? 'block' : 'none';
+                if (data.last_sync) lastSyncEl.textContent = data.last_sync;
+                updateLive();
+            } catch (e) {
+            } finally {
+                loading = false;
+            }
+        };
+
+        const refreshVisible = async () => {
+            if (loading) return;
+            const txIds = Array.from(cardsEl.querySelectorAll('.ko-card'))
+                .map(el => parseInt(el.dataset.txId || '0', 10))
+                .filter(n => n > 0);
+            if (txIds.length === 0) {
+                await loadCards('list');
+                return;
+            }
+            loading = true;
+            try {
+                const params = new URLSearchParams();
+                params.set('ajax', '1');
+                params.set('action', 'refresh');
+                params.set('station', stationEl.value);
+                const payload = new FormData();
+                for (const id of txIds) payload.append('tx_ids[]', String(id));
+                const res = await fetch(`kitchen_online.php?${params.toString()}`, { method: 'POST', body: payload, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 const data = await res.json();
                 if (!data || !data.ok) throw new Error('bad');
                 cardsEl.innerHTML = data.html || '';
@@ -333,7 +467,7 @@ $dashboardQuery = http_build_query([
         setInterval(() => {
             refreshRemaining = refreshIntervalSec;
             if (refreshInEl) refreshInEl.textContent = String(refreshRemaining);
-            loadCards('list');
+            refreshVisible();
         }, refreshIntervalSec * 1000);
     </script>
 </body>
