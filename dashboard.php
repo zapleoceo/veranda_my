@@ -76,17 +76,50 @@ try {
     if (empty($stats)) {
         $error = "Нет данных для построения дашборда за выбранный период.";
     } else {
-        // Генерируем интервалы
         $hours = [];
-        for ($h = $hourStart; $h < $hourEnd; $h++) {
-            $hours[] = sprintf("%02d:00", $h);
+        $slotDates = [];
+        $slotHours = [];
+        $dateRangeSingleDay = $dateFrom === $dateTo;
+
+        if ($dateRangeSingleDay) {
+            for ($h = $hourStart; $h < $hourEnd; $h++) {
+                $hours[] = sprintf("%02d:00", $h);
+                $slotDates[] = $dateFrom;
+                $slotHours[] = $h;
+            }
+        } else {
+            $dt = new DateTime($dateFrom);
+            $dtEnd = new DateTime($dateTo);
+            $dtEnd->setTime(0, 0, 0);
+            $dt->setTime(0, 0, 0);
+
+            while ($dt <= $dtEnd) {
+                $dIso = $dt->format('Y-m-d');
+                $dLabel = $dt->format('d.m');
+                for ($h = $hourStart; $h < $hourEnd; $h++) {
+                    $hours[] = $dLabel . ' ' . sprintf("%02d:00", $h);
+                    $slotDates[] = $dIso;
+                    $slotHours[] = $h;
+                }
+                $dt->modify('+1 day');
+            }
         }
 
         // Подготавливаем данные для графиков (ID 2 = Kitchen, ID 3 = Bar)
+        $slotCount = count($hours);
         $chartData = [
-            '2' => ['label' => 'KITCHEN', 'avg' => array_fill(0, count($hours), 0), 'max' => array_fill(0, count($hours), 0), 'counts' => array_fill(0, count($hours), 0)],
-            '3' => ['label' => 'BAR VERANDA', 'avg' => array_fill(0, count($hours), 0), 'max' => array_fill(0, count($hours), 0), 'counts' => array_fill(0, count($hours), 0)]
+            '2' => ['label' => 'KITCHEN', 'avg' => array_fill(0, $slotCount, 0), 'max' => array_fill(0, $slotCount, 0), 'counts' => array_fill(0, $slotCount, 0)],
+            '3' => ['label' => 'BAR VERANDA', 'avg' => array_fill(0, $slotCount, 0), 'max' => array_fill(0, $slotCount, 0), 'counts' => array_fill(0, $slotCount, 0)]
         ];
+
+        $slotIndex = [];
+        for ($i = 0; $i < $slotCount; $i++) {
+            $d = $slotDates[$i] ?? null;
+            $h = $slotHours[$i] ?? null;
+            if ($d === null || $h === null) continue;
+            if (!isset($slotIndex[$d])) $slotIndex[$d] = [];
+            $slotIndex[$d][(int)$h] = $i;
+        }
 
         foreach ($stats as $row) {
             $stationName = $row['station'];
@@ -103,14 +136,16 @@ try {
                 continue;
             }
 
-            $hour = (int)date('H', strtotime($row['transaction_opened_at']));
-            
-            // Проверяем, попадает ли в выбранный диапазон часов
+            $openedAt = $row['transaction_opened_at'] ?? null;
+            if (empty($openedAt)) continue;
+            $openedTs = strtotime($openedAt);
+            if ($openedTs === false || $openedTs <= 0) continue;
+            $hour = (int)date('H', $openedTs);
             if ($hour < $hourStart || $hour >= $hourEnd) continue;
-            
-            $hourIdx = $hour - $hourStart;
-            
-            if ($hourIdx < 0 || $hourIdx >= count($hours)) continue;
+
+            $dIso = date('Y-m-d', $openedTs);
+            if (!isset($slotIndex[$dIso][$hour])) continue;
+            $hourIdx = (int)$slotIndex[$dIso][$hour];
 
             if (empty($row['ticket_sent_at'])) continue;
             $sentTs = strtotime($row['ticket_sent_at']);
@@ -192,8 +227,8 @@ try {
         .filters input.range-btn { min-width: 220px; cursor: pointer; background: #fff; }
         .range-btn { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; background: #fff; min-width: 220px; text-align: left; cursor: pointer; }
         .range-hint { font-size: 0.75em; color: #777; min-height: 16px; margin-top: 4px; }
-        .filters button { padding: 10px 25px; background: #1a73e8; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
-        .filters button:hover { background: #1557b0; }
+        .filters button[type="submit"] { padding: 10px 25px; background: #1a73e8; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .filters button[type="submit"]:hover { background: #1557b0; }
         
         .settings-btn { background: #6c757d; color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 500; }
         .settings-btn:hover { background: #5a6268; }
@@ -302,6 +337,8 @@ try {
     <script>
     <?php if (!isset($error)): ?>
     const labels = <?= json_encode($hours) ?>;
+    const slotDates = <?= json_encode($slotDates) ?>;
+    const slotHours = <?= json_encode($slotHours) ?>;
     const dateFrom = <?= json_encode($dateFrom) ?>;
     const dateTo = <?= json_encode($dateTo) ?>;
     
@@ -310,12 +347,12 @@ try {
         onClick: (event, elements, chart) => {
             if (elements.length > 0) {
                 const index = elements[0].index;
-                const hour = labels[index];
-                const hourInt = parseInt(hour.split(':')[0], 10);
+                const day = slotDates[index] || dateFrom;
+                const hourInt = slotHours[index] != null ? parseInt(slotHours[index], 10) : parseInt(String(labels[index] || '').split(':')[0], 10);
                 const stationId = chart.canvas.id === 'chartKitchen' ? 2 : 3;
                 
                 // Переход на rawdata.php с фильтрами
-                const url = `rawdata.php?dateFrom=${dateFrom}&dateTo=${dateTo}&hourStart=${hourInt}&hourEnd=${hourInt}&station=${stationId}`;
+                const url = `rawdata.php?dateFrom=${day}&dateTo=${day}&hourStart=${hourInt}&hourEnd=${hourInt}&station=${stationId}`;
                 window.location.href = url;
             }
         },
@@ -325,7 +362,12 @@ try {
                 title: { display: true, text: 'Минуты ожидания' }
             },
             x: {
-                title: { display: true, text: 'Время суток' }
+                title: { display: true, text: 'Дата и время' },
+                ticks: {
+                    maxRotation: 0,
+                    autoSkip: true,
+                    maxTicksLimit: 18
+                }
             }
         },
         plugins: {

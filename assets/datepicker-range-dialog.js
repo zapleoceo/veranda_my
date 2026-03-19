@@ -95,17 +95,23 @@
        this.openBtn.addEventListener('click', function () { self.open(); });
      }
  
-     this.overlay.addEventListener('click', function () { self.close(false); });
+     this.overlay.addEventListener('click', function (e) {
+       if (e.target === self.overlay) self.close(false);
+     });
  
-     this.cancelBtn.addEventListener('click', function () { self.close(false); });
-     this.okBtn.addEventListener('click', function () { self.applyAndClose(); });
+     this.cancelBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); self.close(false); });
+     this.okBtn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); self.applyAndClose(); });
  
-     this.prevBtn.addEventListener('click', function () {
+     this.prevBtn.addEventListener('click', function (e) {
+       e.preventDefault();
+       e.stopPropagation();
        self.viewDate = new Date(self.viewDate.getFullYear(), self.viewDate.getMonth() - 1, 1);
        self.render();
        self.focusBestCell();
      });
-     this.nextBtn.addEventListener('click', function () {
+     this.nextBtn.addEventListener('click', function (e) {
+       e.preventDefault();
+       e.stopPropagation();
        self.viewDate = new Date(self.viewDate.getFullYear(), self.viewDate.getMonth() + 1, 1);
        self.render();
        self.focusBestCell();
