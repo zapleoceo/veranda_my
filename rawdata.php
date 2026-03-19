@@ -290,8 +290,8 @@ try {
         .filter-section input.range-btn { border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; min-width: 190px; cursor: pointer; }
         .range-btn { padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; min-width: 190px; text-align: left; cursor: pointer; }
         .range-hint { display: none; }
-        .filter-section button { padding: 9px 18px; background: #1a73e8; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; height: 36px; }
-        .filter-section button:hover { background: #1557b0; }
+        .filter-section button[type="submit"] { padding: 9px 18px; background: #1a73e8; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; height: 36px; }
+        .filter-section button[type="submit"]:hover { background: #1557b0; }
         .filter-section .spacer { flex: 1; }
         
         .nav-links { text-align: center; margin-bottom: 20px; }
