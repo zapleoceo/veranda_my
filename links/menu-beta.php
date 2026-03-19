@@ -61,6 +61,14 @@ $dbPass = $_ENV['DB_PASS'] ?? '';
 $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
 $db->createMenuTables();
 
+$lastMenuSyncAt = null;
+try {
+    $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = 'menu_last_sync_at' LIMIT 1")->fetch();
+    if (!empty($row['meta_value'])) {
+        $lastMenuSyncAt = $row['meta_value'];
+    }
+} catch (\Exception $e) {
+}
 $langTable = $lang === 'ru'
     ? 'menu_items_ru'
     : ($lang === 'en' ? 'menu_items_en' : ($lang === 'ko' ? 'menu_items_ko' : 'menu_items_vn'));
@@ -348,6 +356,12 @@ $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg'
                     <?php endforeach; ?>
                 </div>
             <?php endforeach; ?>
+        <?php endif; ?>
+        <?php if ($lastMenuSyncAt !== null): ?>
+            <div class="muted" style="margin-top:14px; text-align:center;">
+                <?= htmlspecialchars($lang === 'ru' ? 'Последнее обновление меню:' : ($lang === 'vi' ? 'Cập nhật thực đơn lần cuối:' : ($lang === 'ko' ? '마지막 메뉴 동기화:' : 'Last menu sync:'))) ?>
+                <?= htmlspecialchars(date('d.m.Y H:i', strtotime($lastMenuSyncAt))) ?>
+            </div>
         <?php endif; ?>
     </div>
     <script>
