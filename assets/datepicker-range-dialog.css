@@ -18,7 +18,8 @@
  .dp-cell:focus { outline: 2px solid #1a73e8; outline-offset: 1px; }
  .dp-cell[disabled] { cursor: default; color: #c4c7c5; }
  .dp-cell[disabled]:hover { background: transparent; }
- .dp-cell.in-range { background: #eef1f4; }
+.dp-cell.in-range { background: rgba(26, 115, 232, 0.14); }
+.dp-cell.in-range.range-start, .dp-cell.in-range.range-end { background: transparent; }
  .dp-cell.range-start, .dp-cell.range-end { background: transparent; color: #1f2937; outline: 2px solid #1a73e8; outline-offset: -2px; }
  .dp-footer { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
  .dp-hint { font-size: 12px; color: #65676b; flex: 1; min-height: 16px; }

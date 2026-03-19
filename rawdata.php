@@ -100,6 +100,8 @@ try {
 
     if ($selectedStatus === 'closed') {
         $where[] = "status = 2";
+    } elseif ($selectedStatus === 'open') {
+        $where[] = "status = 1";
     }
 
     // Фильтр по дате
@@ -317,7 +319,6 @@ try {
                 <div class="dp-range" data-date-range-picker data-from-input="dateFromInput" data-to-input="dateToInput">
                     <div class="dp-field">
                         <input type="text" id="dateRangeBtn" class="dp-display range-btn" readonly>
-                        <button type="button" class="dp-open" aria-label="Выбрать период">📅</button>
                     </div>
                     <input type="hidden" name="dateFrom" id="dateFromInput" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" id="dateToInput" value="<?= htmlspecialchars($dateTo) ?>">
@@ -363,6 +364,7 @@ try {
                 <label for="status">Статус:</label>
                 <select name="status" id="status">
                     <option value="all" <?= $selectedStatus === 'all' ? 'selected' : '' ?>>Все чеки</option>
+                    <option value="open" <?= $selectedStatus === 'open' ? 'selected' : '' ?>>Только открытые</option>
                     <option value="closed" <?= $selectedStatus === 'closed' ? 'selected' : '' ?>>Только закрытые</option>
                 </select>
             </div>
