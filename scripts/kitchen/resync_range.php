@@ -226,6 +226,55 @@ for ($d = $fromTs; $d <= $toTs; $d = strtotime('+1 day', $d)) {
         } else {
             echo "  No rows\n";
         }
+        // Refresh close metadata from Poster for all closed transactions of the day
+        $txRows = $db->query(
+            "SELECT DISTINCT transaction_id
+             FROM kitchen_stats
+             WHERE transaction_date = ?
+               AND status > 1",
+            [$date]
+        )->fetchAll();
+        $refreshed = 0;
+        foreach ($txRows as $row) {
+            $txId = (int)$row['transaction_id'];
+            if ($txId <= 0) continue;
+            try {
+                $txRes = $api->request('dash.getTransaction', ['transaction_id' => $txId]);
+                $tx = $txRes[0] ?? $txRes;
+                $status = (int)($tx['status'] ?? 2);
+                if ($status <= 1) {
+                    continue;
+                }
+                $payType = isset($tx['pay_type']) ? (int)$tx['pay_type'] : null;
+                $closeReason = isset($tx['reason']) && $tx['reason'] !== '' ? (int)$tx['reason'] : null;
+                $closedAt = null;
+                if (!empty($tx['date_close']) && (int)$tx['date_close'] > 0) {
+                    $candidate = new DateTime('@' . round(((int)$tx['date_close']) / 1000));
+                    $candidate->setTimezone(new DateTimeZone('Asia/Ho_Chi_Minh'));
+                    if ((int)$candidate->format('Y') >= 2000) {
+                        $closedAt = $candidate->format('Y-m-d H:i:s');
+                    }
+                }
+                if ($closedAt === null && !empty($tx['date_close_date']) && $tx['date_close_date'] !== '0000-00-00 00:00:00') {
+                    $ts = strtotime($tx['date_close_date']);
+                    if ($ts !== false && $ts > 0 && (int)date('Y', $ts) >= 2000) {
+                        $closedAt = date('Y-m-d H:i:s', $ts);
+                    }
+                }
+                $db->query(
+                    "UPDATE kitchen_stats
+                     SET status = ?, pay_type = ?, close_reason = ?, transaction_closed_at = ?
+                     WHERE transaction_id = ?",
+                    [$status, $payType, $closeReason, $closedAt, $txId]
+                );
+                $refreshed++;
+            } catch (\Exception $e) {
+                // ignore per-transaction errors
+            }
+        }
+        if ($refreshed > 0) {
+            echo "  Refreshed close metadata for {$refreshed} transactions\n";
+        }
         $prob = computeProbCloseAt($db, $date);
         echo "  ProbCloseTime: set {$prob['set']}, cleared {$prob['cleared']}\n";
         $auto = autoExclude($db, $date);
