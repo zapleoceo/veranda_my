@@ -439,7 +439,7 @@ $dashboardQuery = http_build_query([
                     <span><?= htmlspecialchars($userLabel) ?></span>
                 </div>
                 <div class="user-dropdown">
-                    <?php if (veranda_can('dashboard')): ?><a href="dashboard.php?<?= htmlspecialchars($dashboardQuery) ?>">Дашюорд</a><?php endif; ?>
+                    <?php if (veranda_can('dashboard')): ?><a href="dashboard.php?<?= htmlspecialchars($dashboardQuery) ?>">Дашборд</a><?php endif; ?>
                     <?php if (veranda_can('rawdata')): ?><a href="rawdata.php?<?= htmlspecialchars($dashboardQuery) ?>">Таблица</a><?php endif; ?>
                     <?php if (veranda_can('kitchen_online')): ?><a href="kitchen_online.php">КухняОнлайн</a><?php endif; ?>
                     <?php if (veranda_can('admin')): ?><a href="admin.php">Управление</a><?php endif; ?>
