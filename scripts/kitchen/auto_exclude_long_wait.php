@@ -95,6 +95,12 @@ foreach ($rows as $r) {
             }
         }
     }
+    if ($end === null && (int)($r['status'] ?? 1) === 1) {
+        $endTs = time();
+        if ($endTs >= $sentTs) {
+            $end = date('Y-m-d H:i:s', $endTs);
+        }
+    }
     if ($end === null) continue;
 
     $waitMin = ($endTs - $sentTs) / 60.0;
