@@ -450,7 +450,7 @@ $dashboardQuery = http_build_query([
                     </span>
                 </span>
                 <label>
-                    Станция:
+                    Цех:
                     <select id="station">
                         <option value="all">Все</option>
                         <option value="kitchen">Кухня</option>
