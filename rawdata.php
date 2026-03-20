@@ -323,6 +323,7 @@ try {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" href="favicon.png">
     <title>Raw Data - Kitchen Analytics</title>
     <link rel="stylesheet" href="assets/datepicker-range-dialog.css">
@@ -386,8 +387,8 @@ try {
         .filter-section button[type="submit"]:hover { background: #1557b0; }
         .filter-section .spacer { flex: 1; }
         
-        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; }
-        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
+        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; min-width: 0; }
         .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }
         .nav-left a:hover { text-decoration: underline; }
         .nav-title { font-weight: 800; color: #2c3e50; }

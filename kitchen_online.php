@@ -379,15 +379,17 @@ $dashboardQuery = http_build_query([
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>КухняOnline</title>
     <style>
         body { font-family: Arial, sans-serif; background: #f5f6fa; margin: 0; padding: 20px; }
         .container { max-width: 1400px; margin: 0 auto; }
-        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; }
-        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
+        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; min-width: 0; }
         .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }
         .nav-left a:hover { text-decoration: underline; }
         .nav-title { font-weight: 800; color: #2c3e50; }
+        .nav-mid { display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; color: #546e7a; font-size: 0.95em; flex: 1 1 360px; min-width: 260px; }
         .user-menu { position: relative; }
         .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
         .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; overflow: hidden; }
@@ -400,8 +402,7 @@ $dashboardQuery = http_build_query([
         .ko-titlebar { display: inline-flex; align-items: center; gap: 10px; }
         .ko-sound { border: 0; background: transparent; cursor: pointer; font-size: 18px; line-height: 1; padding: 4px 6px; color: #546e7a; }
         .ko-sound:hover { color: #1a73e8; }
-        .topbar { display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; color: #546e7a; }
-        .topbar select { padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; }
+        .nav-mid select { padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; }
         .wait-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(245, 124, 0, 0.3); border-top-color: #f57c00; border-radius: 50%; margin-right: 6px; animation: waitSpin 0.9s linear infinite; vertical-align: -1px; }
         @keyframes waitSpin { to { transform: rotate(360deg); } }
         .cards { display: flex; flex-wrap: nowrap; gap: 14px; align-items: flex-start; overflow-x: auto; overflow-y: hidden; padding-bottom: 10px; }
@@ -431,6 +432,18 @@ $dashboardQuery = http_build_query([
             <div class="nav-left">
                 <div class="nav-title"><span class="ko-titlebar">КухняОнлайн <button type="button" class="ko-sound" id="soundToggle" aria-label="Звук">🔊</button></span></div>
             </div>
+            <div class="nav-mid">
+                <span>Последнее обновление из Poster: <span id="lastSync"><?= htmlspecialchars($lastSyncLabel) ?></span></span>
+                <span>Следующее обновление: <span id="refreshIn">10</span> сек</span>
+                <label>
+                    Станция:
+                    <select id="station">
+                        <option value="all">Все</option>
+                        <option value="kitchen">Кухня</option>
+                        <option value="bar">Бар</option>
+                    </select>
+                </label>
+            </div>
             <div class="user-menu">
                 <?php
                     $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
@@ -449,19 +462,6 @@ $dashboardQuery = http_build_query([
                     <a href="logout.php">Выход</a>
                 </div>
             </div>
-        </div>
-
-        <div class="topbar">
-            <span>Последнее обновление из Poster: <span id="lastSync"><?= htmlspecialchars($lastSyncLabel) ?></span></span>
-            <span>Следующее обновление: <span id="refreshIn">10</span> сек</span>
-            <label>
-                Станция:
-                <select id="station">
-                    <option value="all">Все</option>
-                    <option value="kitchen">Кухня</option>
-                    <option value="bar">Бар</option>
-                </select>
-            </label>
         </div>
 
         <div id="cards" class="cards"></div>

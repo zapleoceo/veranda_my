@@ -734,6 +734,7 @@ if ($tab === 'menu') {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" href="favicon.png">
     <title>УПРАВЛЕНИЕ - Kitchen Analytics</title>
     <style>
@@ -763,8 +764,8 @@ if ($tab === 'menu') {
         .perm-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 10px; }
         .perm-actions { display: flex; justify-content: flex-end; gap: 10px; }
         .perm-cancel { background: #eceff1; color: #37474f; }
-        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; }
-        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
+        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; min-width: 0; }
         .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }
         .nav-left a:hover { text-decoration: underline; }
         .nav-title { font-weight: 800; color: #2c3e50; }
