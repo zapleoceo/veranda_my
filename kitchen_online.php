@@ -390,6 +390,12 @@ $dashboardQuery = http_build_query([
         .nav-left a:hover { text-decoration: underline; }
         .nav-title { font-weight: 800; color: #2c3e50; }
         .nav-mid { display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; color: #546e7a; font-size: 0.95em; flex: 1 1 360px; min-width: 260px; }
+        .ko-refresh { display: inline-flex; align-items: center; gap: 10px; }
+        .ko-refresh-ring { width: 34px; height: 34px; position: relative; display: inline-flex; align-items: center; justify-content: center; }
+        .ko-refresh-ring svg { position: absolute; inset: 0; width: 34px; height: 34px; transform: rotate(-90deg); }
+        .ko-refresh-text { position: relative; z-index: 1; width: 34px; height: 34px; border-radius: 50%; background: #fff; border: 1px solid #e5e7eb; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; color: #37474f; font-size: 12px; box-sizing: border-box; }
+        .ko-refresh-track { stroke: #e5e7eb; stroke-width: 4; fill: none; }
+        .ko-refresh-progress { stroke: #1a73e8; stroke-width: 4; fill: none; stroke-linecap: round; transition: stroke-dashoffset 0.1s linear; }
         .user-menu { position: relative; }
         .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
         .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; overflow: hidden; }
@@ -434,7 +440,15 @@ $dashboardQuery = http_build_query([
             </div>
             <div class="nav-mid">
                 <span>Последнее обновление из Poster: <span id="lastSync"><?= htmlspecialchars($lastSyncLabel) ?></span></span>
-                <span>Следующее обновление: <span id="refreshIn">10</span> сек</span>
+                <span class="ko-refresh" title="Следующее обновление">
+                    <span class="ko-refresh-ring" aria-label="Следующее обновление">
+                        <svg viewBox="0 0 36 36" aria-hidden="true">
+                            <circle class="ko-refresh-track" cx="18" cy="18" r="15"></circle>
+                            <circle class="ko-refresh-progress" id="refreshProgress" cx="18" cy="18" r="15"></circle>
+                        </svg>
+                        <span class="ko-refresh-text" id="refreshIn">10</span>
+                    </span>
+                </span>
                 <label>
                     Станция:
                     <select id="station">
@@ -496,10 +510,12 @@ $dashboardQuery = http_build_query([
         const stationEl = document.getElementById('station');
         const lastSyncEl = document.getElementById('lastSync');
         const refreshInEl = document.getElementById('refreshIn');
+        const refreshProgressEl = document.getElementById('refreshProgress');
         const soundBtn = document.getElementById('soundToggle');
         let loading = false;
         const refreshIntervalSec = 10;
-        let refreshRemaining = refreshIntervalSec;
+        let refreshCycleStartedAt = Date.now();
+        let refreshCircleLen = 0;
         let waitLimitSec = 0;
         let seenIds = null;
         let soundMuted = false;
@@ -694,13 +710,35 @@ $dashboardQuery = http_build_query([
 
         loadCards('list');
         setInterval(updateLive, 1000);
+        if (refreshProgressEl) {
+            try {
+                refreshCircleLen = refreshProgressEl.getTotalLength();
+                refreshProgressEl.style.strokeDasharray = String(refreshCircleLen);
+                refreshProgressEl.style.strokeDashoffset = String(refreshCircleLen);
+            } catch (_) {
+                refreshCircleLen = 0;
+            }
+        }
+        const renderRefreshCountdown = () => {
+            const now = Date.now();
+            const durMs = refreshIntervalSec * 1000;
+            const elapsed = Math.max(0, Math.min(durMs, now - refreshCycleStartedAt));
+            const remainingMs = Math.max(0, durMs - elapsed);
+            const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+            if (refreshInEl) refreshInEl.textContent = String(remainingSec);
+            if (refreshProgressEl && refreshCircleLen > 0) {
+                const progress = elapsed / durMs;
+                refreshProgressEl.style.strokeDashoffset = String(refreshCircleLen * (1 - progress));
+            }
+        };
+        renderRefreshCountdown();
+        setInterval(renderRefreshCountdown, 100);
         setInterval(() => {
-            refreshRemaining = Math.max(0, refreshRemaining - 1);
-            if (refreshInEl) refreshInEl.textContent = String(refreshRemaining);
-        }, 1000);
-        setInterval(() => {
-            refreshRemaining = refreshIntervalSec;
-            if (refreshInEl) refreshInEl.textContent = String(refreshRemaining);
+            refreshCycleStartedAt = Date.now();
+            if (refreshProgressEl && refreshCircleLen > 0) {
+                refreshProgressEl.style.strokeDashoffset = String(refreshCircleLen);
+            }
+            renderRefreshCountdown();
             refreshVisible();
         }, refreshIntervalSec * 1000);
     </script>
