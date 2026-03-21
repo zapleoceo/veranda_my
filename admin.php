@@ -747,7 +747,7 @@ if ($tab === 'menu' || $tab === 'categories') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>УПРАВЛЕНИЕ - Kitchen Analytics</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; color: #1c1e21; }

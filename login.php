@@ -35,7 +35,7 @@ $loginUrl = $auth->getGoogleLoginUrl();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>Вход - Kitchen Analytics</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; min-height: 100svh; margin: 0; padding: 16px; box-sizing: border-box; }
