@@ -7,6 +7,7 @@ require_once __DIR__ . '/src/classes/KitchenAnalytics.php';
 require_once __DIR__ . '/src/classes/CodemealAPI.php';
 require_once __DIR__ . '/src/classes/ChefAssistantSync.php';
 require_once __DIR__ . '/src/classes/MetaRepository.php';
+require_once __DIR__ . '/src/classes/EventLogger.php';
 
 // Load .env
 if (file_exists(__DIR__ . '/.env')) {
@@ -29,6 +30,7 @@ try {
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
     $ksTable = $db->t('kitchen_stats');
     $metaTable = $db->t('system_meta');
+    $logger = new \App\Classes\EventLogger($db, 'cron');
     $api = new \App\Classes\PosterAPI($token);
     $analytics = new \App\Classes\KitchenAnalytics($api);
 
@@ -37,14 +39,17 @@ try {
     $dateTo = date('Y-m-d');
 
     echo "[" . date('Y-m-d H:i:s') . "] Starting sync for $dateFrom...\n";
+    $logger->info('start', ['date_from' => $dateFrom, 'date_to' => $dateTo, 'suffix' => $tableSuffix]);
 
     $stats = $analytics->getStatsForPeriod($dateFrom, $dateTo);
     
     if (!empty($stats)) {
         $db->saveStats($stats);
         echo "[" . date('Y-m-d H:i:s') . "] Successfully synced " . count($stats) . " records.\n";
+        $logger->info('poster_stats_saved', ['count' => count($stats), 'date' => $dateFrom]);
     } else {
         echo "[" . date('Y-m-d H:i:s') . "] No records found for the period.\n";
+        $logger->info('poster_stats_empty', ['date' => $dateFrom]);
     }
 
     $needsCloseRefresh = $db->query(
@@ -96,6 +101,7 @@ try {
     }
     if ($refreshed > 0) {
         echo "[" . date('Y-m-d H:i:s') . "] Refreshed close metadata for {$refreshed} transactions.\n";
+        $logger->info('close_refreshed', ['count' => $refreshed, 'date' => $dateFrom]);
     }
 
     $metaRepo = new \App\Classes\MetaRepository($db);
@@ -394,6 +400,7 @@ try {
     $autoAny = array_sum($auto);
     if ($autoAny > 0) {
         echo "[" . date('Y-m-d H:i:s') . "] AutoExclude: set_prob=" . (int)$auto['set_prob'] . ", set_close=" . (int)$auto['set_close'] . ", unset_fact=" . (int)$auto['unset_fact'] . ", unset_lost=" . (int)$auto['unset_lost'] . ".\n";
+        $logger->info('auto_exclude', array_merge(['date' => $dateFrom], $auto));
     }
 
     $db->query(
@@ -402,8 +409,16 @@ try {
         ['poster_last_sync_at', date('Y-m-d H:i:s')]
     );
     echo "[" . date('Y-m-d H:i:s') . "] Updated sync marker.\n";
+    $logger->info('done', ['date' => $dateFrom]);
 
 } catch (\Exception $e) {
     echo "[" . date('Y-m-d H:i:s') . "] ERROR: " . $e->getMessage() . "\n";
     error_log("Cron sync error: " . $e->getMessage());
+    try {
+        if (isset($db) && $db instanceof \App\Classes\Database) {
+            $logger = new \App\Classes\EventLogger($db, 'cron');
+            $logger->error('fatal', ['error' => $e->getMessage()]);
+        }
+    } catch (\Exception $e2) {
+    }
 }

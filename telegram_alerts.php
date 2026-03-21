@@ -8,6 +8,7 @@ require_once __DIR__ . '/src/classes/TelegramBot.php';
 require_once __DIR__ . '/src/classes/CodemealAPI.php';
 require_once __DIR__ . '/src/classes/ChefAssistantSync.php';
 require_once __DIR__ . '/src/classes/MetaRepository.php';
+require_once __DIR__ . '/src/classes/EventLogger.php';
 
 // Load .env
 if (file_exists(__DIR__ . '/.env')) {
@@ -165,6 +166,7 @@ try {
     $ks = $db->t('kitchen_stats');
     $metaTable = $db->t('system_meta');
     $tgm = $db->t('tg_alert_messages');
+    $logger = new \App\Classes\EventLogger($db, 'telegram_alerts');
     $api = new \App\Classes\PosterAPI($token);
     $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
     $metaRepo = new \App\Classes\MetaRepository($db);
@@ -294,7 +296,13 @@ try {
     }
     $cleanupFrom = date('Y-m-d H:i:s', time() - 2 * 60 * 60);
     $activeAlerts = $db->query(
-        "SELECT * FROM {$ks}
+        "SELECT id, transaction_id, receipt_number, table_number, waiter_name,
+                dish_id, item_seq, dish_name, station,
+                ticket_sent_at, ready_pressed_at, ready_chass_at,
+                status, pay_type, close_reason,
+                was_deleted, exclude_from_dashboard,
+                tg_message_id, tg_acknowledged, tg_acknowledged_at
+         FROM {$ks}
          WHERE tg_message_id IS NOT NULL
            AND ticket_sent_at IS NOT NULL
            AND ticket_sent_at >= ?",
@@ -369,7 +377,7 @@ try {
                     $db->query("UPDATE {$ks} SET status = ?, pay_type = ?, close_reason = ? WHERE transaction_id = ?", [$apiStatus, $apiPayType, $apiReason, $item['transaction_id']]);
                 }
             } catch (\Exception $e) {
-                error_log("API Check failed for TX {$item['transaction_id']}: " . $e->getMessage());
+                $logger->warn('api_check_failed', ['error' => $e->getMessage()], (int)$item['transaction_id'], (int)($item['dish_id'] ?? 0), (int)($item['item_seq'] ?? 1));
             }
         }
 
@@ -397,12 +405,12 @@ try {
     'exclude_partners_from_load' => 0
     ];
     $settings = [];
+    $settingValues = $metaRepo->getMany(array_keys($settingKeys));
     foreach ($settingKeys as $key => $default) {
-        $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
-    $settings[$key] = $row ? $row['meta_value'] : $default;
-    if (is_numeric($default)) {
-        $settings[$key] = (int)$settings[$key];
-    }
+        $settings[$key] = array_key_exists($key, $settingValues) ? $settingValues[$key] : $default;
+        if (is_numeric($default)) {
+            $settings[$key] = (int)$settings[$key];
+        }
     }
 
     // Считаем количество открытых чеков
@@ -449,7 +457,12 @@ try {
     $cutoffTime = date('Y-m-d H:i:s', strtotime("-$waitLimit minutes"));
     $ackSnooze = (int)($settings['alert_ack_snooze_minutes'] ?? 0);
     $ackCutoffTime = $ackSnooze > 0 ? date('Y-m-d H:i:s', strtotime("-$ackSnooze minutes")) : null;
-    $query = "SELECT * FROM {$ks} 
+    $query = "SELECT id, transaction_id, receipt_number, table_number, waiter_name,
+                     dish_id, item_seq, dish_name, station,
+                     ticket_sent_at,
+                     tg_message_id, tg_acknowledged, tg_acknowledged_at,
+                     was_deleted, exclude_from_dashboard
+              FROM {$ks} 
               WHERE ready_pressed_at IS NULL 
               AND ready_chass_at IS NULL
               AND ticket_sent_at IS NOT NULL 
@@ -585,7 +598,7 @@ try {
                     continue;
                 }
             } catch (\Exception $e) {
-                error_log("API Check failed for delayed TX {$item['transaction_id']}: " . $e->getMessage());
+                $logger->warn('api_check_delayed_failed', ['error' => $e->getMessage()], (int)$item['transaction_id'], (int)($item['dish_id'] ?? 0), (int)($item['item_seq'] ?? 1));
                 continue;
             }
 
@@ -694,4 +707,11 @@ try {
 
 } catch (\Exception $e) {
     echo "[" . date('Y-m-d H:i:s') . "] ERROR: " . $e->getMessage() . "\n";
+    try {
+        if (isset($db) && $db instanceof \App\Classes\Database) {
+            $logger = new \App\Classes\EventLogger($db, 'telegram_alerts');
+            $logger->error('fatal', ['error' => $e->getMessage()]);
+        }
+    } catch (\Exception $e2) {
+    }
 }

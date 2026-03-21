@@ -3,6 +3,7 @@ require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/Database.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 require_once __DIR__ . '/src/classes/MetaRepository.php';
+require_once __DIR__ . '/src/classes/EventLogger.php';
 veranda_require('kitchen_online');
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
@@ -173,10 +174,12 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
 if ($isAjax) {
     header('Content-Type: application/json; charset=utf-8');
     try {
+        $logger = new \App\Classes\EventLogger($db, 'kitchen_online', null, $_SESSION['user_email'] ?? null);
         $api = $api ?? new \App\Classes\PosterAPI($token);
         if ($action === 'exclude' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!veranda_can('exclude_toggle')) {
                 http_response_code(403);
+                $logger->warn('forbidden_exclude', ['item_id' => (int)($_POST['toggle_exclude_item'] ?? 0)]);
                 echo json_encode(['ok' => false], JSON_UNESCAPED_UNICODE);
                 exit;
             }
@@ -184,6 +187,7 @@ if ($isAjax) {
             if ($itemId > 0) {
                 $db->query("UPDATE {$ks} SET exclude_from_dashboard = 1, exclude_auto = 0 WHERE id = ?", [$itemId]);
             }
+            $logger->info('exclude', ['item_id' => $itemId]);
             echo json_encode(['ok' => true, 'item_id' => $itemId], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -396,6 +400,11 @@ if ($isAjax) {
         $html = $renderCards($rows, $waitLimitMinutes);
         echo json_encode(['ok' => true, 'html' => $html, 'last_sync' => $lastSyncLabel, 'wait_limit_minutes' => $waitLimitMinutes], JSON_UNESCAPED_UNICODE);
     } catch (\Exception $e) {
+        try {
+            $logger = isset($logger) ? $logger : new \App\Classes\EventLogger($db, 'kitchen_online', null, $_SESSION['user_email'] ?? null);
+            $logger->error('ajax_error', ['error' => $e->getMessage(), 'action' => (string)($_GET['action'] ?? '')]);
+        } catch (\Exception $e2) {
+        }
         echo json_encode(['ok' => false, 'error' => 'error'], JSON_UNESCAPED_UNICODE);
     }
     exit;

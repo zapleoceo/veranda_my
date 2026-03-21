@@ -3,6 +3,7 @@
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 require_once __DIR__ . '/../src/classes/Database.php';
+require_once __DIR__ . '/../src/classes/EventLogger.php';
 
 if (file_exists(__DIR__ . '/../.env')) {
     $lines = file(__DIR__ . '/../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -21,6 +22,7 @@ $dbPass = $_ENV['DB_PASS'] ?? '';
 $suffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
 $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $suffix);
+$logger = new \App\Classes\EventLogger($db, 'migrate');
 
 $ks = $db->t('kitchen_stats');
 $meta = $db->t('system_meta');
@@ -146,6 +148,8 @@ $ensureIndex($ks, 'idx_ks_date_tx', 'transaction_date, transaction_id');
 $ensureIndex($ks, 'idx_ks_date_exclude', 'transaction_date, exclude_from_dashboard');
 $ensureIndex($ks, 'idx_ks_tg_msg', 'tg_message_id');
 $ensureIndex($ks, 'idx_ks_tg_ack', 'tg_acknowledged, tg_acknowledged_at');
+
+$logger->info('ok', ['tables' => [$ks, $meta, $users, $tgm, $chefItems, $eventLog]]);
 
 echo json_encode([
     'ok' => true,
