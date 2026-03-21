@@ -33,34 +33,43 @@ $tailFile = function (string $filePath, int $maxLines): string {
 
 $content = $tailFile($path, $lines);
 
+$cronHuman = function (string $expr): string {
+    $expr = trim($expr);
+    if ($expr === '*/5 * * * *') return 'каждые 5 минут';
+    if ($expr === '*/1 * * * *') return 'каждую минуту';
+    if ($expr === '0 * * * *') return 'каждый час (в :00)';
+    if ($expr === '5 * * * *') return 'каждый час (в :05)';
+    return 'по расписанию cron';
+};
+
 $syncJobs = [
     [
         'key' => 'kitchen',
         'label' => 'Kitchen sync',
         'cron' => '*/5 * * * *',
         'log' => basename($logMap['kitchen']),
-        'desc' => 'Синхронизация чеков/позиций из Poster в kitchen_stats. Строит данные для Дашборда/Таблицы/КухняОнлайн, рассчитывает ProbCloseTime (ВрЛогЗакр) и auto-exclude.',
+        'desc' => 'Обновляет данные кухни: забирает открытые/закрытые чеки и позиции из Poster, записывает в базу для Дашборда/Таблицы/КухняОнлайн, рассчитывает ВрЛогЗакр (логическое закрытие) и авто-игнор.',
     ],
     [
         'key' => 'telegram',
         'label' => 'Telegram alerts',
         'cron' => '*/1 * * * *',
         'log' => basename($logMap['telegram']),
-        'desc' => 'Отправляет уведомления в Telegram по “зависшим” позициям. Учитывает whitelist для ✅ Принято и чистит устаревшие сообщения.',
+        'desc' => 'Отправляет и обновляет сообщения в Telegram, если блюдо готовится дольше лимита. Удаляет сообщения, когда чек закрыт/блюдо готово/позиция в игноре.',
     ],
     [
         'key' => 'menu',
         'label' => 'Menu sync',
         'cron' => '0 * * * *',
         'log' => basename($logMap['menu']),
-        'desc' => 'Синхронизация меню из Poster в poster_menu_items и menu_items_*; обновляет цены/станции/категории, фиксирует результат в system_meta.',
+        'desc' => 'Обновляет меню: подтягивает блюда и категории из Poster, обновляет цены/станции/категории, сохраняет результат синка.',
     ],
     [
         'key' => 'codemeal',
         'label' => 'Codemeal sync',
         'cron' => '5 * * * *',
         'log' => basename($logMap['codemeal']),
-        'desc' => 'Забирает заказы Codemeal за последние дни и сохраняет в codemeal_orders + обновляет настройки таблицы заказов.',
+        'desc' => 'Обновляет заказы Codemeal: забирает новые заказы и сохраняет их в базе для просмотра/аналитики.',
     ],
 ];
 
@@ -168,7 +177,7 @@ $fileInfo = function (string $filePath): array {
                     <?php $fi = $fileInfo($logMap[$job['key']] ?? ''); ?>
                     <tr>
                         <td style="font-weight:700;"><?= htmlspecialchars($job['label']) ?></td>
-                        <td><span class="pill ok"><?= htmlspecialchars($job['cron']) ?></span></td>
+                        <td><span class="pill ok" title="<?= htmlspecialchars($cronHuman($job['cron']) . ' (' . $job['cron'] . ')', ENT_QUOTES) ?>"><?= htmlspecialchars($job['cron']) ?></span></td>
                         <td><a href="logs.php?view=<?= urlencode($job['key']) ?>&lines=<?= (int)$lines ?>" style="text-decoration:none; color:#1a73e8; font-weight:600;"><?= htmlspecialchars($job['log']) ?></a></td>
                         <td>
                             <?php if (!empty($fi['exists'])): ?>
@@ -178,7 +187,7 @@ $fileInfo = function (string $filePath): array {
                                 <span class="pill bad">нет</span>
                             <?php endif; ?>
                         </td>
-                        <td><span class="info-icon" title="<?= htmlspecialchars($job['desc'], ENT_QUOTES) ?>">i</span></td>
+                        <td><span class="info-icon" title="<?= htmlspecialchars($cronHuman($job['cron']) . ': ' . $job['desc'], ENT_QUOTES) ?>">i</span></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

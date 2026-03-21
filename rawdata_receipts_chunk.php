@@ -56,7 +56,7 @@
                         <th title="Расчетное время (ProbCloseTime): берется из ближайшего следующего чека (+1..+3) с тем же цехом, где есть готовые позиции.">ЗакРассч</th>
                         <th title="Время, которое реально используется в расчете ожидания. Приоритет: ВрГотPSTR → ЗакChAss → ЗакРассч → ЗакЧкPoster.">ВрЛогЗакр</th>
                         <th title="ВрЛогЗакр - ВрОтпр. Если чек открыт и нет ВрЛогЗакр: текущее время - ВрОтпр.">Ожидание</th>
-                        <th title="Исключить позицию из дашборда и алертов.">Не учитывать</th>
+                        <th title="Исключить позицию из дашборда и алертов.">Игнор</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -196,7 +196,7 @@
                                     <label class="exclude-toggle">
                                         <?php $shouldExclude = !empty($item['exclude_from_dashboard']) || !empty($item['was_deleted']) || $isHookah || !empty($autoExclude); ?>
                                         <input type="checkbox" name="exclude_from_dashboard" value="1" <?= $shouldExclude ? 'checked' : '' ?> <?= ($isHookah || !veranda_can('exclude_toggle')) ? 'disabled' : '' ?>>
-                                        не учитывать
+                                        игнор
                                     </label>
                                     <span class="save-indicator">сохранено</span>
                                 </form>

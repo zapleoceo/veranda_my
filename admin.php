@@ -27,13 +27,16 @@ if (!$columnExists($db, $dbName, 'users', 'permissions_json')) {
 if (!$columnExists($db, $dbName, 'users', 'is_active')) {
     $db->query("ALTER TABLE users ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1");
 }
+if (!$columnExists($db, $dbName, 'users', 'telegram_username')) {
+    $db->query("ALTER TABLE users ADD COLUMN telegram_username VARCHAR(64) NULL AFTER email");
+}
 
 $permissionKeys = [
     'dashboard' => 'Дашборд',
     'rawdata' => 'Сырые данные',
     'kitchen_online' => 'КухняOnline',
     'admin' => 'УПРАВЛЕНИЕ',
-    'exclude_toggle' => 'Кнопка «Не учитывать»',
+    'exclude_toggle' => 'Кнопка «Игнор»',
 ];
 
 if (isset($_POST['save_user_permissions'])) {
@@ -43,7 +46,12 @@ if (isset($_POST['save_user_permissions'])) {
         foreach ($permissionKeys as $k => $_label) {
             $perms[$k] = isset($_POST['perm_' . $k]) ? 1 : 0;
         }
-        $db->query("UPDATE users SET permissions_json = ? WHERE email = ? LIMIT 1", [json_encode($perms, JSON_UNESCAPED_UNICODE), $targetEmail]);
+        $tgUsername = strtolower(trim((string)($_POST['perm_tg_username'] ?? '')));
+        $tgUsername = ltrim($tgUsername, '@');
+        if ($tgUsername === '') {
+            $tgUsername = null;
+        }
+        $db->query("UPDATE users SET permissions_json = ?, telegram_username = ? WHERE email = ? LIMIT 1", [json_encode($perms, JSON_UNESCAPED_UNICODE), $tgUsername, $targetEmail]);
         $message = "Права для $targetEmail сохранены.";
     }
 }
@@ -1078,6 +1086,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 <thead>
                     <tr>
                         <th>Email</th>
+                        <th>Telegram</th>
                         <th>Дата добавления</th>
                         <th>Действие</th>
                     </tr>
@@ -1086,6 +1095,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <?php foreach ($users as $user): ?>
                     <tr>
                         <td><?= htmlspecialchars($user['email']) ?></td>
+                        <td><?= htmlspecialchars((string)($user['telegram_username'] ?? '')) ?></td>
                         <td><?= date('d.m.Y H:i', strtotime($user['created_at'])) ?></td>
                         <td>
                             <?php
@@ -1093,7 +1103,11 @@ if ($tab === 'menu' || $tab === 'categories') {
                                 $perms = $rawPerms !== '' ? json_decode($rawPerms, true) : null;
                                 if (!is_array($perms)) $perms = null;
                             ?>
-                            <button type="button" class="perm-gear" data-email="<?= htmlspecialchars($user['email'], ENT_QUOTES) ?>" data-perms="<?= htmlspecialchars(json_encode($perms, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>">⚙</button>
+                            <button type="button" class="perm-gear"
+                                data-email="<?= htmlspecialchars($user['email'], ENT_QUOTES) ?>"
+                                data-perms="<?= htmlspecialchars(json_encode($perms, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>"
+                                data-tg="<?= htmlspecialchars((string)($user['telegram_username'] ?? ''), ENT_QUOTES) ?>"
+                            >⚙</button>
                             <?php if ($user['email'] !== $_SESSION['user_email']): ?>
                                 <a href="?delete=<?= urlencode($user['email']) ?>" class="delete-btn" onclick="return confirm('Удалить доступ для <?= $user['email'] ?>?')">Удалить</a>
                             <?php else: ?>
@@ -1111,6 +1125,11 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <form method="POST" id="permForm">
                         <input type="hidden" name="save_user_permissions" value="1">
                         <input type="hidden" name="perm_email" id="permEmail" value="">
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label style="font-size:12px; font-weight:800; text-transform:uppercase; color:#6b7280;">Telegram username</label>
+                            <input type="text" name="perm_tg_username" id="permTgUsername" placeholder="например: zapleosoft">
+                            <div class="muted" style="margin-top:6px;">Нужен для кнопки «ПРИНЯТО» в Telegram. Пиши без @.</div>
+                        </div>
                         <div class="perm-list">
                             <?php foreach ($permissionKeys as $k => $label): ?>
                                 <label class="perm-row">
@@ -1932,8 +1951,9 @@ if ($tab === 'menu' || $tab === 'categories') {
             const modal = document.getElementById('permModal');
             const form = document.getElementById('permForm');
             const emailEl = document.getElementById('permEmail');
+            const tgEl = document.getElementById('permTgUsername');
             const cancel = document.getElementById('permCancel');
-            if (!modal || !form || !emailEl || !cancel) return;
+            if (!modal || !form || !emailEl || !tgEl || !cancel) return;
 
             const defaultPerms = {
                 dashboard: true,
@@ -1944,8 +1964,9 @@ if ($tab === 'menu' || $tab === 'categories') {
             };
 
             const close = () => { modal.style.display = 'none'; };
-            const open = (email, perms) => {
+            const open = (email, perms, tg) => {
                 emailEl.value = email;
+                tgEl.value = (tg || '').trim();
                 const p = Object.assign({}, defaultPerms, perms || {});
                 Object.keys(defaultPerms).forEach((k) => {
                     const cb = document.getElementById('perm_' + k);
@@ -1958,9 +1979,10 @@ if ($tab === 'menu' || $tab === 'categories') {
                 const btn = e.target.closest('.perm-gear');
                 if (!btn) return;
                 const email = btn.getAttribute('data-email') || '';
+                const tg = btn.getAttribute('data-tg') || '';
                 let perms = null;
                 try { perms = JSON.parse(btn.getAttribute('data-perms') || 'null'); } catch (_) { perms = null; }
-                open(email, perms);
+                open(email, perms, tg);
             });
             modal.addEventListener('click', (e) => {
                 if (e.target.classList.contains('perm-modal-backdrop')) close();

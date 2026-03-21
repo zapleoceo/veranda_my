@@ -663,7 +663,7 @@ try {
             $message .= "Процесс <b>{$processLabel}</b>\n";
 
             $ackButton = [[[
-                'text' => '✅ Принято',
+                'text' => 'ПРИНЯТО',
                 'callback_data' => 'ack_alert:' . (int)$item['id']
             ]]];
 
