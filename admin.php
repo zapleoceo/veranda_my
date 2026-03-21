@@ -300,6 +300,108 @@ if ($tab === 'menu' || $tab === 'categories') {
     $menuItemsTable = $db->t('menu_items');
     $menuItemsTrTable = $db->t('menu_item_tr');
 
+    if (($_GET['export'] ?? '') === 'categories_csv') {
+        ignore_user_abort(true);
+        @set_time_limit(300);
+        header('Content-Type: text/csv; charset=utf-8');
+        $file = 'menu_categories_' . (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Ymd_His') . '.csv';
+        header('Content-Disposition: attachment; filename="' . $file . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        $out = fopen('php://output', 'w');
+        if ($out === false) {
+            http_response_code(500);
+            echo 'Cannot open output';
+            exit;
+        }
+        fwrite($out, "\xEF\xBB\xBF");
+
+        fputcsv($out, [
+            'Тип',
+            'Poster ID',
+            'Parent Poster ID',
+            'Raw',
+            'RU',
+            'EN',
+            'VN',
+            'KO',
+            'Отображать',
+            'Sort',
+        ], ';');
+
+        $wRows = $db->query(
+            "SELECT
+                w.poster_id,
+                w.name_raw,
+                w.sort_order,
+                w.show_on_site,
+                COALESCE(wtr_ru.name, '') name_ru,
+                COALESCE(wtr_en.name, '') name_en,
+                COALESCE(wtr_vn.name, '') name_vn,
+                COALESCE(wtr_ko.name, '') name_ko
+             FROM {$menuWorkshopsTable} w
+             LEFT JOIN {$menuWorkshopsTrTable} wtr_ru ON wtr_ru.workshop_id = w.id AND wtr_ru.lang = 'ru'
+             LEFT JOIN {$menuWorkshopsTrTable} wtr_en ON wtr_en.workshop_id = w.id AND wtr_en.lang = 'en'
+             LEFT JOIN {$menuWorkshopsTrTable} wtr_vn ON wtr_vn.workshop_id = w.id AND wtr_vn.lang = 'vn'
+             LEFT JOIN {$menuWorkshopsTrTable} wtr_ko ON wtr_ko.workshop_id = w.id AND wtr_ko.lang = 'ko'
+             ORDER BY w.sort_order ASC, w.poster_id ASC"
+        )->fetchAll();
+
+        foreach ($wRows as $r) {
+            fputcsv($out, [
+                'workshop',
+                (string)($r['poster_id'] ?? ''),
+                '',
+                (string)($r['name_raw'] ?? ''),
+                (string)($r['name_ru'] ?? ''),
+                (string)($r['name_en'] ?? ''),
+                (string)($r['name_vn'] ?? ''),
+                (string)($r['name_ko'] ?? ''),
+                !empty($r['show_on_site']) ? '1' : '0',
+                (string)($r['sort_order'] ?? '0'),
+            ], ';');
+        }
+
+        $cRows = $db->query(
+            "SELECT
+                c.poster_id,
+                w.poster_id workshop_poster_id,
+                c.name_raw,
+                c.sort_order,
+                c.show_on_site,
+                COALESCE(ctr_ru.name, '') name_ru,
+                COALESCE(ctr_en.name, '') name_en,
+                COALESCE(ctr_vn.name, '') name_vn,
+                COALESCE(ctr_ko.name, '') name_ko
+             FROM {$menuCategoriesTable} c
+             LEFT JOIN {$menuWorkshopsTable} w ON w.id = c.workshop_id
+             LEFT JOIN {$menuCategoriesTrTable} ctr_ru ON ctr_ru.category_id = c.id AND ctr_ru.lang = 'ru'
+             LEFT JOIN {$menuCategoriesTrTable} ctr_en ON ctr_en.category_id = c.id AND ctr_en.lang = 'en'
+             LEFT JOIN {$menuCategoriesTrTable} ctr_vn ON ctr_vn.category_id = c.id AND ctr_vn.lang = 'vn'
+             LEFT JOIN {$menuCategoriesTrTable} ctr_ko ON ctr_ko.category_id = c.id AND ctr_ko.lang = 'ko'
+             ORDER BY COALESCE(w.sort_order, 255) ASC, COALESCE(w.poster_id, 0) ASC, c.sort_order ASC, c.poster_id ASC"
+        )->fetchAll();
+
+        foreach ($cRows as $r) {
+            fputcsv($out, [
+                'category',
+                (string)($r['poster_id'] ?? ''),
+                (string)($r['workshop_poster_id'] ?? ''),
+                (string)($r['name_raw'] ?? ''),
+                (string)($r['name_ru'] ?? ''),
+                (string)($r['name_en'] ?? ''),
+                (string)($r['name_vn'] ?? ''),
+                (string)($r['name_ko'] ?? ''),
+                !empty($r['show_on_site']) ? '1' : '0',
+                (string)($r['sort_order'] ?? '0'),
+            ], ';');
+        }
+
+        fclose($out);
+        exit;
+    }
+
     if (($_GET['export'] ?? '') === 'csv') {
         ignore_user_abort(true);
         @set_time_limit(300);
@@ -1555,6 +1657,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                         <button type="submit" name="autofill_menu" title="Разовая привязка по ID: связывает menu_items.category_id и menu_categories.workshop_id из данных Poster там, где сейчас пусто. Не трогает переводы и ручные значения.">Привязать ID (разово)</button>
                     </form>
                     <a href="admin.php?tab=menu&export=csv" style="text-decoration:none; font-weight:600; color:#1a73e8;" title="Выгрузка CSV со всеми активными позициями и текущими переводами/категориями.">Экспорт CSV</a>
+                    <a href="admin.php?tab=menu&export=categories_csv" style="text-decoration:none; font-weight:600; color:#1a73e8;" title="Выгрузка CSV справочников цехов и категорий с переводами.">CSV категорий</a>
                     <?php if (!empty($menuSyncMeta['last_sync_at'])): ?>
                         <span class="muted">Последняя синхронизация: <span class="js-local-dt" data-iso="<?= htmlspecialchars($menuSyncAtIso) ?>"><?= htmlspecialchars($menuSyncMeta['last_sync_at']) ?></span></span>
                     <?php endif; ?>
