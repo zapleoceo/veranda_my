@@ -125,6 +125,15 @@ try {
     $codemealTz = $getMeta('codemeal_timezone');
     if ($codemealTz === '') $codemealTz = 'Asia/Ho_Chi_Minh';
 
+    $envCodemealAuth = trim((string)($_ENV['CODEMEAL_AUTH'] ?? ''));
+    $envCodemealClient = trim((string)($_ENV['CODEMEAL_CLIENT_NUMBER'] ?? ''));
+    $envCodemealLocale = trim((string)($_ENV['CODEMEAL_LOCALE'] ?? ''));
+    $envCodemealTz = trim((string)($_ENV['CODEMEAL_TIMEZONE'] ?? ''));
+    if ($codemealAuth === '' && $envCodemealAuth !== '') $codemealAuth = $envCodemealAuth;
+    if ($codemealClient === '' && $envCodemealClient !== '') $codemealClient = $envCodemealClient;
+    if ($envCodemealLocale !== '') $codemealLocale = $envCodemealLocale;
+    if ($envCodemealTz !== '') $codemealTz = $envCodemealTz;
+
     if ($codemealAuth !== '' && $codemealClient !== '') {
         try {
             $bootstrapDone = $getMeta('chefassistant_bootstrap_done') === '1';
