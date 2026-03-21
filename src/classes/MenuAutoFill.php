@@ -83,11 +83,20 @@ class MenuAutoFill {
             )->rowCount();
         }
 
+        $published = (int)$this->db->query(
+            "UPDATE {$mi} i
+             JOIN {$pmi} p ON p.id = i.poster_item_id
+             SET i.is_published = 1
+             WHERE p.is_active = 1
+               AND (i.category_id IS NOT NULL AND i.category_id <> 0)"
+        )->rowCount();
+
         return [
             'ok' => true,
             'inserted_menu_items' => $insertedMenuItems,
             'linked_items' => $linkedItems,
             'linked_categories' => $linkedCategories,
+            'published' => $published,
             'workshop_id_nullable' => $canNullWorkshopId,
             'category_id_nullable' => $canNullCategoryId,
         ];
