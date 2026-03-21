@@ -88,6 +88,7 @@ $fileInfo = function (string $filePath): array {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>Kitchen Analytics</title>
+    <link rel="stylesheet" href="assets/app.css">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; color: #1c1e21; }
         .container { max-width: 1300px; margin: 0 auto; }
@@ -130,23 +131,7 @@ $fileInfo = function (string $filePath): array {
     <div class="top-nav">
         <div class="nav-left"><div class="nav-title">Логи</div></div>
         <div class="nav-right">
-        <div class="user-menu">
-            <?php
-            $userLabel = (string)($_SESSION['user_email'] ?? '');
-            $initial = mb_strtoupper(mb_substr($userLabel !== '' ? $userLabel : 'U', 0, 1));
-            ?>
-            <div class="user-chip">
-                <span class="user-icon"><?= htmlspecialchars($initial) ?></span>
-                <span><?= htmlspecialchars($userLabel) ?></span>
-            </div>
-            <div class="user-dropdown">
-                <a href="dashboard.php">Дашборд</a>
-                <a href="rawdata.php">Таблица</a>
-                <a href="kitchen_online.php">КухняОнлайн</a>
-                <a href="admin.php">Управление</a>
-                <a href="logout.php">Выход</a>
-            </div>
-        </div>
+        <?php require __DIR__ . '/partials/user_menu.php'; ?>
         </div>
     </div>
 
@@ -219,19 +204,6 @@ $fileInfo = function (string $filePath): array {
         <pre><?= htmlspecialchars($content !== '' ? $content : '—') ?></pre>
     </div>
 </div>
-<script>
-    (() => {
-        requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 200);
-        setTimeout(() => window.dispatchEvent(new Event('resize')), 800);
-        const menu = document.querySelector('.user-menu');
-        if (!menu) return;
-        let t = null;
-        const open = () => { if (t) { clearTimeout(t); t = null; } menu.classList.add('open'); };
-        const scheduleClose = () => { if (t) clearTimeout(t); t = setTimeout(() => { menu.classList.remove('open'); t = null; }, 700); };
-        menu.addEventListener('mouseenter', open);
-        menu.addEventListener('mouseleave', scheduleClose);
-    })();
-</script>
+<script src="assets/app.js" defer></script>
 </body>
 </html>

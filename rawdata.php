@@ -411,6 +411,7 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>Raw Data - Kitchen Analytics</title>
+    <link rel="stylesheet" href="assets/app.css">
     <link rel="stylesheet" href="assets/datepicker-range-dialog.css">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; color: #1c1e21; }
@@ -495,24 +496,7 @@ try {
     <div class="container">
         <div class="top-nav">
             <div class="nav-left"><div class="nav-title">Таблица</div></div>
-            <div class="user-menu">
-                <?php
-                    $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
-                    $initial = mb_strtoupper(mb_substr($userLabel !== '' ? $userLabel : 'U', 0, 1));
-                    $avatar = (string)($_SESSION['user_avatar'] ?? '');
-                ?>
-                <div class="user-chip">
-                    <span class="user-icon"><?php if ($avatar !== ''): ?><img src="<?= htmlspecialchars($avatar) ?>" alt=""><?php else: ?><?= htmlspecialchars($initial) ?><?php endif; ?></span>
-                    <span><?= htmlspecialchars($userLabel) ?></span>
-                </div>
-                <div class="user-dropdown">
-                    <?php if (veranda_can('dashboard')): ?><a href="dashboard.php?<?= htmlspecialchars($dashboardQuery) ?>">Дашборд</a><?php endif; ?>
-                    <?php if (veranda_can('rawdata')): ?><a href="rawdata.php">Таблица</a><?php endif; ?>
-                    <?php if (veranda_can('kitchen_online')): ?><a href="kitchen_online.php">КухняОнлайн</a><?php endif; ?>
-                    <?php if (veranda_can('admin')): ?><a href="admin.php">Управление</a><?php endif; ?>
-                    <a href="logout.php">Выход</a>
-                </div>
-            </div>
+            <?php require __DIR__ . '/partials/user_menu.php'; ?>
         </div>
         <div class="last-sync">
             <span>Последнее обновление из Poster: <?= htmlspecialchars($lastSyncLabel) ?></span>
@@ -609,6 +593,7 @@ try {
         <div id="lazySentinel" style="height:1px;"></div>
     </div>
 
+    <script src="assets/app.js" defer></script>
     <script src="assets/datepicker-range-dialog.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -820,45 +805,6 @@ try {
             });
         });
 
-        (() => {
-            const fire = () => window.dispatchEvent(new Event('resize'));
-            const kick = () => {
-                requestAnimationFrame(() => {
-                    fire();
-                    requestAnimationFrame(fire);
-                });
-                setTimeout(fire, 200);
-                setTimeout(fire, 800);
-            };
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', kick, { once: true });
-            } else {
-                kick();
-            }
-            window.addEventListener('load', () => {
-                fire();
-                setTimeout(fire, 300);
-            });
-        })();
-
-        (() => {
-            const menu = document.querySelector('.user-menu');
-            if (!menu) return;
-            let t = null;
-            const open = () => {
-                if (t) { clearTimeout(t); t = null; }
-                menu.classList.add('open');
-            };
-            const scheduleClose = () => {
-                if (t) clearTimeout(t);
-                t = setTimeout(() => {
-                    menu.classList.remove('open');
-                    t = null;
-                }, 700);
-            };
-            menu.addEventListener('mouseenter', open);
-            menu.addEventListener('mouseleave', scheduleClose);
-        })();
     </script>
 </body>
 </html>
