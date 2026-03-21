@@ -18,6 +18,21 @@ class PosterMenuSync {
         $mw = $this->db->t('menu_workshops');
         $mc = $this->db->t('menu_categories');
         $mi = $this->db->t('menu_items');
+        $dbName = (string)$this->db->query('SELECT DATABASE()')->fetchColumn();
+        $isNullable = function (string $table, string $column) use ($dbName): bool {
+            $row = $this->db->query(
+                "SELECT IS_NULLABLE
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = ?
+                   AND TABLE_NAME = ?
+                   AND COLUMN_NAME = ?
+                 LIMIT 1",
+                [$dbName, $table, $column]
+            )->fetch();
+            return (string)($row['IS_NULLABLE'] ?? '') === 'YES';
+        };
+        $canInsertUnlinkedCategories = $isNullable($mc, 'workshop_id');
+        $canInsertUnlinkedItems = $isNullable($mi, 'category_id');
 
         $workshops = $this->fetchWorkshops();
         $products = $this->fetchProducts();
@@ -28,7 +43,7 @@ class PosterMenuSync {
             $usedFallbackCategories = true;
         }
         $workshopMap = $this->upsertWorkshops($categories['main']);
-        $categoryMap = $this->upsertCategories($categories['sub'], $workshopMap);
+        $categoryMap = $this->upsertCategories($categories['sub'], $workshopMap, $canInsertUnlinkedCategories);
 
         $workshopPosterIds = [];
         foreach ($categories['main'] as $row) {
@@ -109,12 +124,17 @@ class PosterMenuSync {
                 continue;
             }
 
-            $this->db->query(
-                "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
-                 VALUES (?, NULL, NULL, 0, 0)
-                 ON DUPLICATE KEY UPDATE poster_item_id = {$mi}.poster_item_id",
-                [$posterItemId]
-            );
+            if ($canInsertUnlinkedItems) {
+                try {
+                    $this->db->query(
+                        "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
+                         VALUES (?, NULL, NULL, 0, 0)
+                         ON DUPLICATE KEY UPDATE poster_item_id = {$mi}.poster_item_id",
+                        [$posterItemId]
+                    );
+                } catch (\Throwable $e) {
+                }
+            }
         }
 
         $this->markMissingItemsInactive(array_keys($seenPosterIds));
@@ -385,7 +405,7 @@ class PosterMenuSync {
         return $map;
     }
 
-    private function upsertCategories(array $items, array $workshopMap): array {
+    private function upsertCategories(array $items, array $workshopMap, bool $allowNullWorkshopId): array {
         $mc = $this->db->t('menu_categories');
         $map = [];
         foreach ($items as $item) {
@@ -396,13 +416,17 @@ class PosterMenuSync {
                 continue;
             }
             $sort = $this->extractLeadingSortNumber($name);
+            $workshopId = (int)($workshopMap[$parent] ?? 0);
+            if (!$allowNullWorkshopId && $workshopId <= 0) {
+                continue;
+            }
             $this->db->query(
                 "INSERT INTO {$mc} (poster_id, workshop_id, name_raw, sort_order, show_on_site)
                  VALUES (?, ?, ?, ?, 1)
                  ON DUPLICATE KEY UPDATE
                     name_raw=VALUES(name_raw),
                     sort_order=IF({$mc}.sort_order=0, VALUES(sort_order), {$mc}.sort_order)",
-                [$id, (int)($workshopMap[$parent] ?? 0) > 0 ? (int)$workshopMap[$parent] : null, $name, $sort]
+                [$id, $workshopId > 0 ? $workshopId : null, $name, $sort]
             );
         }
         $rows = $this->db->query("SELECT id, poster_id FROM {$mc}")->fetchAll();

@@ -16,6 +16,23 @@ class MenuAutoFill {
         $mc = $this->db->t('menu_categories');
         $mi = $this->db->t('menu_items');
 
+        $dbName = (string)$this->db->query('SELECT DATABASE()')->fetchColumn();
+        $isNullable = function (string $table, string $column) use ($dbName): bool {
+            $row = $this->db->query(
+                "SELECT IS_NULLABLE
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = ?
+                   AND TABLE_NAME = ?
+                   AND COLUMN_NAME = ?
+                 LIMIT 1",
+                [$dbName, $table, $column]
+            )->fetch();
+            return (string)($row['IS_NULLABLE'] ?? '') === 'YES';
+        };
+        if (!$isNullable($mc, 'workshop_id') || !$isNullable($mi, 'category_id')) {
+            throw new \Exception('Нужно выполнить scripts/migrate.php: menu_categories.workshop_id и menu_items.category_id должны быть NULLABLE');
+        }
+
         $insertedMenuItems = (int)$this->db->query(
             "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
              SELECT p.id, NULL, NULL, 0, 0
