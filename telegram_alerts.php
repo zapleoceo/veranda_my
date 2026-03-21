@@ -18,6 +18,11 @@ if (file_exists(__DIR__ . '/.env')) {
     }
 }
 
+if (php_sapi_name() !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+
 $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
 $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
