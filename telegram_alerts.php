@@ -24,8 +24,13 @@ $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
 $tgToken = $_ENV['TELEGRAM_BOT_TOKEN'] ?? '';
-$tgChatId = $_ENV['TELEGRAM_CHAT_ID'] ?? '';
-$tgThreadId = isset($_ENV['TELEGRAM_THREAD_ID']) && $_ENV['TELEGRAM_THREAD_ID'] !== '' ? (int)$_ENV['TELEGRAM_THREAD_ID'] : null;
+$tgChatId = $_ENV['TELEGRAM_ALERT_CHAT_ID'] ?? ($_ENV['TELEGRAM_CHAT_ID'] ?? '');
+if ($tgChatId === '') {
+    $tgChatId = '-1003397075474';
+}
+$tgThreadId = isset($_ENV['TELEGRAM_ALERT_THREAD_ID']) && $_ENV['TELEGRAM_ALERT_THREAD_ID'] !== ''
+    ? (int)$_ENV['TELEGRAM_ALERT_THREAD_ID']
+    : (isset($_ENV['TELEGRAM_THREAD_ID']) && $_ENV['TELEGRAM_THREAD_ID'] !== '' ? (int)$_ENV['TELEGRAM_THREAD_ID'] : null);
 
 if (empty($tgToken) || empty($tgChatId)) {
     echo "[" . date('Y-m-d H:i:s') . "] Telegram alerts skipped: TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not configured.\n";
@@ -35,6 +40,18 @@ if (empty($tgToken) || empty($tgChatId)) {
     }
     exit(0);
 }
+
+$lockPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'veranda_telegram_alerts.lock';
+$lockFp = @fopen($lockPath, 'c');
+if (!$lockFp || !@flock($lockFp, LOCK_EX | LOCK_NB)) {
+    exit(0);
+}
+register_shutdown_function(function () use ($lockFp) {
+    if (is_resource($lockFp)) {
+        @flock($lockFp, LOCK_UN);
+        @fclose($lockFp);
+    }
+});
 
 $employeesById = [];
 $historyByTxId = [];
@@ -150,6 +167,9 @@ try {
     if (!$columnExists($db, $dbName, 'kitchen_stats', 'waiter_name')) {
         $db->query("ALTER TABLE kitchen_stats ADD COLUMN waiter_name VARCHAR(255) NULL AFTER table_number");
     }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'tg_message_id')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN tg_message_id BIGINT NULL AFTER prob_close_at");
+    }
     if (!$columnExists($db, $dbName, 'kitchen_stats', 'tg_acknowledged')) {
         $db->query("ALTER TABLE kitchen_stats ADD COLUMN tg_acknowledged TINYINT(1) NOT NULL DEFAULT 0 AFTER tg_message_id");
     }
@@ -171,11 +191,31 @@ try {
     if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
         $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
     }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'item_seq')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN item_seq INT NOT NULL DEFAULT 1 AFTER dish_id");
+    }
 
     $db->query("CREATE TABLE IF NOT EXISTS system_meta (
         meta_key VARCHAR(100) PRIMARY KEY,
         meta_value VARCHAR(255) NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $db->query("CREATE TABLE IF NOT EXISTS tg_alert_messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        kitchen_stats_id INT NOT NULL,
+        transaction_date DATE NOT NULL,
+        transaction_id BIGINT NOT NULL,
+        dish_id BIGINT NOT NULL,
+        item_seq INT NOT NULL DEFAULT 1,
+        message_id BIGINT NOT NULL,
+        last_text_hash CHAR(40) NOT NULL,
+        last_seen_at DATETIME NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_kitchen_stats_id (kitchen_stats_id),
+        KEY idx_tx (transaction_date, transaction_id),
+        KEY idx_seen (last_seen_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $getMeta = function (string $key) use ($db): string {
@@ -203,8 +243,7 @@ try {
         $setMeta('chefassistant_auth_notified_at', date('Y-m-d H:i:s'));
     };
 
-    $shouldSync = false;
-
+    $process = function (int $cycle) use ($db, $api, $bot, &$employeesById, &$historyByTxId, $getTxHistory, $isDishDeletedFromHistory, $resolveWaiterName, $tgThreadId, $maybeSendAuthAlert): void {
     // 1. Сначала находим все записи, у которых есть tg_message_id (т.е. уведомление было отправлено)
     $today = date('Y-m-d');
     $computeProbCloseAt = function (string $date) use ($db): void {
@@ -292,7 +331,9 @@ try {
             $upd->execute([$candidate, $id]);
         }
     };
-    $computeProbCloseAt($today);
+    if ($cycle === 0) {
+        $computeProbCloseAt($today);
+    }
     $cleanupFrom = date('Y-m-d H:i:s', time() - 2 * 60 * 60);
     $activeAlerts = $db->query(
         "SELECT * FROM kitchen_stats
@@ -379,9 +420,11 @@ try {
             $deleted = $bot->deleteMessage((int)$item['tg_message_id']);
             if ($deleted) {
                 $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
+                $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [(int)$item['id']]);
                 echo "[" . date('Y-m-d H:i:s') . "] Removed outdated alert for: {$item['dish_name']} (Table: {$item['table_number']})\n";
             } else {
                 $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
+                $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [(int)$item['id']]);
                 echo "[" . date('Y-m-d H:i:s') . "] Failed to remove outdated alert for: {$item['dish_name']} (Table: {$item['table_number']})\n";
             }
         }
@@ -441,6 +484,7 @@ try {
             $bot->deleteMessage((int)$item['tg_message_id']);
         }
         $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [(int)$item['id']]);
+        $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [(int)$item['id']]);
     }
 
     // 3. Теперь ищем актуальные задержки
@@ -534,6 +578,7 @@ try {
                     if (!empty($item['tg_message_id'])) {
                         $bot->deleteMessage((int)$item['tg_message_id']);
                         $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
+                        $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [(int)$item['id']]);
                     }
                     continue;
                 }
@@ -543,6 +588,7 @@ try {
                     if (!empty($item['tg_message_id'])) {
                         $bot->deleteMessage((int)$item['tg_message_id']);
                         $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
+                        $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [(int)$item['id']]);
                     }
                     continue;
                 }
@@ -577,6 +623,7 @@ try {
                         $apiStatus = 2;
                     }
                     $db->query("UPDATE kitchen_stats SET status = ?, pay_type = ?, close_reason = ?, tg_message_id = NULL WHERE transaction_id = ?", [$apiStatus, $apiPayType, $apiReason, $item['transaction_id']]);
+                    $db->query("DELETE FROM tg_alert_messages WHERE transaction_date = ? AND transaction_id = ?", [$today, (int)$item['transaction_id']]);
                     continue;
                 }
             } catch (\Exception $e) {
@@ -588,48 +635,100 @@ try {
                 continue;
             }
 
-            // Если уведомление уже есть, удаляем старое, чтобы прислать новое с актуальным временем
-            if ($item['tg_message_id']) {
-                $deleted = $bot->deleteMessage((int)$item['tg_message_id']);
-                if (!$deleted) {
-                    $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [(int)$item['id']]);
+            $sentTime = strtotime((string)$item['ticket_sent_at']);
+            if ($sentTime === false) {
+                continue;
+            }
+
+            $now = time();
+            $processSec = max(0, $now - $sentTime);
+            $processLabel = floor($processSec / 60) . ':' . str_pad((string)($processSec % 60), 2, '0', STR_PAD_LEFT);
+            $startLabel = date('H:i:s', $sentTime);
+
+            $receipt = trim((string)($item['receipt_number'] ?? ''));
+            $receiptLabel = $receipt !== '' ? $receipt : (string)((int)$item['transaction_id']);
+            $waiter = trim((string)($item['waiter_name'] ?? ''));
+            if ($waiter === '') $waiter = '—';
+
+            $message = "<b>Открытых чеков {$openChecksDisplay} Лимит {$waitLimit} мин</b>\n";
+            $message .= "Чек <b>" . htmlspecialchars($receiptLabel, ENT_QUOTES) . "</b>\n";
+            $message .= "Официант <b>" . htmlspecialchars($waiter, ENT_QUOTES) . "</b>\n";
+            $message .= "Блюдо <b>" . htmlspecialchars((string)$item['dish_name'], ENT_QUOTES) . "</b>\n";
+            $message .= "Старт <b>{$startLabel}</b>\n";
+            $message .= "Процесс <b>{$processLabel}</b>\n";
+
+            $ackButton = [[[
+                'text' => '✅ Принято',
+                'callback_data' => 'ack_alert:' . (int)$item['id']
+            ]]];
+
+            $textHash = sha1($message);
+            $existing = $db->query("SELECT message_id, last_text_hash FROM tg_alert_messages WHERE kitchen_stats_id = ? LIMIT 1", [(int)$item['id']])->fetch();
+            $existingMsgId = $existing ? (int)($existing['message_id'] ?? 0) : 0;
+            $existingHash = $existing ? (string)($existing['last_text_hash'] ?? '') : '';
+
+            $currentMsgId = !empty($item['tg_message_id']) ? (int)$item['tg_message_id'] : 0;
+            if ($currentMsgId > 0 && $existingMsgId > 0 && $existingMsgId !== $currentMsgId) {
+                $existingMsgId = $currentMsgId;
+            }
+
+            $edited = false;
+            if ($existingMsgId > 0) {
+                if ($existingHash === $textHash) {
+                    $db->query("UPDATE tg_alert_messages SET last_seen_at = ? WHERE kitchen_stats_id = ?", [date('Y-m-d H:i:s'), (int)$item['id']]);
+                    $edited = true;
+                } else {
+                    $edited = $bot->editMessageText($existingMsgId, $message, $ackButton);
+                    if ($edited) {
+                        $db->query(
+                            "UPDATE tg_alert_messages SET last_text_hash = ?, last_seen_at = ? WHERE kitchen_stats_id = ?",
+                            [$textHash, date('Y-m-d H:i:s'), (int)$item['id']]
+                        );
+                    }
                 }
             }
 
-            $sentTime = strtotime($item['ticket_sent_at']);
-            $waitMinutes = round((time() - $sentTime) / 60);
-            $table = $item['table_number'] ?: ($item['receipt_number'] ?: "Чек #" . $item['transaction_id']);
-            $waiter = trim((string)($item['waiter_name'] ?? '')) ?: 'Не указан';
-            $txId = (int)$item['transaction_id'];
-
-            $message = "⚠️ <b>Открытых чеков {$openChecksDisplay} Лимит ожидания {$waitLimit} мин</b>\n\n";
-            $message .= "📍 <b>Стол:</b> {$table}\n";
-            $message .= "🧾 <b>Чек:</b> {$txId}\n";
-            $message .= "👤 <b>Официант:</b> {$waiter}\n";
-            $message .= "🍽 <b>Блюдо:</b> {$item['dish_name']}\n";
-            $message .= "🏢 <b>Станция:</b> {$item['station']}\n";
-            $message .= "🕒 <b>Время заказа:</b> " . date('H:i', $sentTime) . "\n";
-            $message .= "⏳ <b>Ожидает уже:</b> {$waitMinutes} мин\n";
-            $ackButton = [[
-                [
-                    'text' => '✅ Принято',
-                    'callback_data' => 'ack_alert:' . (int)$item['id']
-                ]
-            ]];
-            $newMessageId = $bot->sendMessageGetIdWithKeyboard($message, $ackButton, $tgThreadId);
-            
-            if ($newMessageId) {
-                $db->query(
-                    "UPDATE kitchen_stats
-                     SET tg_message_id = ?,
-                         tg_acknowledged = 0,
-                         tg_acknowledged_at = NULL,
-                         tg_acknowledged_by = NULL
-                     WHERE id = ?",
-                    [$newMessageId, $item['id']]
-                );
-                echo "[" . date('Y-m-d H:i:s') . "] Updated alert for: {$item['dish_name']} (Wait: {$waitMinutes} min)\n";
+            if (!$edited) {
+                if ($existingMsgId > 0) {
+                    $bot->deleteMessage($existingMsgId);
+                }
+                $newMessageId = $bot->sendMessageGetIdWithKeyboard($message, $ackButton, $tgThreadId);
+                if ($newMessageId) {
+                    $db->query(
+                        "UPDATE kitchen_stats
+                         SET tg_message_id = ?,
+                             tg_acknowledged = 0,
+                             tg_acknowledged_at = NULL,
+                             tg_acknowledged_by = NULL
+                         WHERE id = ?",
+                        [$newMessageId, $item['id']]
+                    );
+                    $db->query(
+                        "INSERT INTO tg_alert_messages (kitchen_stats_id, transaction_date, transaction_id, dish_id, item_seq, message_id, last_text_hash, last_seen_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE message_id = VALUES(message_id), last_text_hash = VALUES(last_text_hash), last_seen_at = VALUES(last_seen_at), updated_at = CURRENT_TIMESTAMP",
+                        [
+                            (int)$item['id'],
+                            $today,
+                            (int)$item['transaction_id'],
+                            (int)$item['dish_id'],
+                            (int)($item['item_seq'] ?? 1),
+                            (int)$newMessageId,
+                            $textHash,
+                            date('Y-m-d H:i:s')
+                        ]
+                    );
+                }
             }
+        }
+    }
+    };
+
+    $runs = 6;
+    for ($cycle = 0; $cycle < $runs; $cycle++) {
+        $process($cycle);
+        if ($cycle < $runs - 1) {
+            sleep(10);
         }
     }
 

@@ -140,4 +140,37 @@ class TelegramBot {
 
         return null;
     }
+
+    public function editMessageText(int $messageId, string $text, ?array $keyboard = null): bool {
+        if (empty($this->chatId)) return false;
+
+        $url = "https://api.telegram.org/bot{$this->token}/editMessageText";
+        $params = [
+            'chat_id' => $this->chatId,
+            'message_id' => $messageId,
+            'text' => $text,
+            'parse_mode' => 'HTML'
+        ];
+        if ($keyboard !== null) {
+            $params['reply_markup'] = json_encode(['inline_keyboard' => $keyboard], JSON_UNESCAPED_UNICODE);
+        }
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        if ($response === false) {
+            return false;
+        }
+        $data = json_decode($response, true);
+        if (is_array($data) && array_key_exists('ok', $data)) {
+            return (bool)$data['ok'];
+        }
+        return true;
+    }
 }
