@@ -95,7 +95,8 @@ class Auth {
         $email = $userData['email'];
 
         // 3. Check if email is allowed in database
-        $user = $this->db->query("SELECT * FROM users WHERE email = ? AND is_active = 1", [$email])->fetch();
+        $users = $this->db->t('users');
+        $user = $this->db->query("SELECT * FROM {$users} WHERE email = ? AND is_active = 1", [$email])->fetch();
 
         if ($user) {
             $_SESSION['user_email'] = $email;
