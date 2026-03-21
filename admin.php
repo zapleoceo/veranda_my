@@ -287,7 +287,7 @@ if ($tab === 'menu' || $tab === 'categories') {
             }
             $api = new \App\Classes\PosterAPI($posterToken);
             $sync = new \App\Classes\PosterMenuSync($api, $db);
-            $result = $sync->sync();
+            $result = $sync->sync(false);
             $db->query(
                 "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
                 ['menu_last_sync_at', (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s')]

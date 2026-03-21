@@ -11,7 +11,7 @@ class PosterMenuSync {
         $this->db = $db;
     }
 
-    public function sync(): array {
+    public function sync(bool $forceCategoryIds = false): array {
         $startedAt = microtime(true);
         $this->db->createMenuTables();
         $pmi = $this->db->t('poster_menu_items');
@@ -98,39 +98,47 @@ class PosterMenuSync {
             $mainId = $mainPosterCatId > 0 ? ($catMainMap[$mainPosterCatId] ?? null) : null;
             $subId = $subPosterCatId > 0 ? ($catSubMap[$subPosterCatId] ?? null) : null;
 
+            $onDupMainRu = $forceCategoryIds ? "main_category_id = VALUES(main_category_id)" : "main_category_id = COALESCE({$miRu}.main_category_id, VALUES(main_category_id))";
+            $onDupSubRu = $forceCategoryIds ? "sub_category_id = VALUES(sub_category_id)" : "sub_category_id = COALESCE({$miRu}.sub_category_id, VALUES(sub_category_id))";
             $this->db->query(
                 "INSERT INTO {$miRu} (poster_item_id, title, main_category_id, sub_category_id, sub_category, description, image_url, is_published, sort_order)
                  VALUES (?, NULL, ?, ?, NULL, NULL, NULL, 0, 0)
                  ON DUPLICATE KEY UPDATE
-                    main_category_id = COALESCE({$miRu}.main_category_id, VALUES(main_category_id)),
-                    sub_category_id = COALESCE({$miRu}.sub_category_id, VALUES(sub_category_id))",
+                    {$onDupMainRu},
+                    {$onDupSubRu}",
                 [$posterItemId, $mainId, $subId]
             );
 
+            $onDupMainEn = $forceCategoryIds ? "main_category_id = VALUES(main_category_id)" : "main_category_id = COALESCE({$miEn}.main_category_id, VALUES(main_category_id))";
+            $onDupSubEn = $forceCategoryIds ? "sub_category_id = VALUES(sub_category_id)" : "sub_category_id = COALESCE({$miEn}.sub_category_id, VALUES(sub_category_id))";
             $this->db->query(
                 "INSERT INTO {$miEn} (poster_item_id, title, main_category_id, sub_category_id, sub_category, description)
                  VALUES (?, NULL, ?, ?, NULL, NULL)
                  ON DUPLICATE KEY UPDATE
-                    main_category_id = COALESCE({$miEn}.main_category_id, VALUES(main_category_id)),
-                    sub_category_id = COALESCE({$miEn}.sub_category_id, VALUES(sub_category_id))",
+                    {$onDupMainEn},
+                    {$onDupSubEn}",
                 [$posterItemId, $mainId, $subId]
             );
 
+            $onDupMainVn = $forceCategoryIds ? "main_category_id = VALUES(main_category_id)" : "main_category_id = COALESCE({$miVn}.main_category_id, VALUES(main_category_id))";
+            $onDupSubVn = $forceCategoryIds ? "sub_category_id = VALUES(sub_category_id)" : "sub_category_id = COALESCE({$miVn}.sub_category_id, VALUES(sub_category_id))";
             $this->db->query(
                 "INSERT INTO {$miVn} (poster_item_id, title, main_category_id, sub_category_id, sub_category, description)
                  VALUES (?, NULL, ?, ?, NULL, NULL)
                  ON DUPLICATE KEY UPDATE
-                    main_category_id = COALESCE({$miVn}.main_category_id, VALUES(main_category_id)),
-                    sub_category_id = COALESCE({$miVn}.sub_category_id, VALUES(sub_category_id))",
+                    {$onDupMainVn},
+                    {$onDupSubVn}",
                 [$posterItemId, $mainId, $subId]
             );
 
+            $onDupMainKo = $forceCategoryIds ? "main_category_id = VALUES(main_category_id)" : "main_category_id = COALESCE({$miKo}.main_category_id, VALUES(main_category_id))";
+            $onDupSubKo = $forceCategoryIds ? "sub_category_id = VALUES(sub_category_id)" : "sub_category_id = COALESCE({$miKo}.sub_category_id, VALUES(sub_category_id))";
             $this->db->query(
                 "INSERT INTO {$miKo} (poster_item_id, title, main_category_id, sub_category_id, sub_category, description)
                  VALUES (?, NULL, ?, ?, NULL, NULL)
                  ON DUPLICATE KEY UPDATE
-                    main_category_id = COALESCE({$miKo}.main_category_id, VALUES(main_category_id)),
-                    sub_category_id = COALESCE({$miKo}.sub_category_id, VALUES(sub_category_id))",
+                    {$onDupMainKo},
+                    {$onDupSubKo}",
                 [$posterItemId, $mainId, $subId]
             );
         }

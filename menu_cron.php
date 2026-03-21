@@ -21,6 +21,10 @@ $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
 $tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
+$forceCategories = false;
+if (isset($argv) && is_array($argv) && in_array('--force-categories', $argv, true)) {
+    $forceCategories = true;
+}
 
 $now = date('Y-m-d H:i:s');
 
@@ -36,7 +40,7 @@ try {
     $sync = new \App\Classes\PosterMenuSync($api, $db);
 
     echo "[{$now}] Starting menu sync...\n";
-    $result = $sync->sync();
+    $result = $sync->sync($forceCategories);
     $now2 = date('Y-m-d H:i:s');
 
     $summary = 'ok=1';

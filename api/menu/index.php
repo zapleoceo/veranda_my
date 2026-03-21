@@ -55,10 +55,10 @@ try {
         FROM {$pmi} p
         JOIN {$ruTable} ru ON ru.poster_item_id = p.id
         LEFT JOIN {$langTable} mi ON mi.poster_item_id = p.id
-        LEFT JOIN {$mcm} mm ON mm.id = COALESCE(mi.main_category_id, ru.main_category_id)
-        LEFT JOIN {$mcmTr} mit_main ON mit_main.main_category_id = mm.id AND mit_main.lang = ?
         LEFT JOIN {$mcs} ms ON ms.id = COALESCE(mi.sub_category_id, ru.sub_category_id)
         LEFT JOIN {$mcsTr} mit_sub ON mit_sub.sub_category_id = ms.id AND mit_sub.lang = ?
+        LEFT JOIN {$mcm} mm ON mm.id = COALESCE(ms.main_category_id_override, mi.main_category_id, ru.main_category_id)
+        LEFT JOIN {$mcmTr} mit_main ON mit_main.main_category_id = mm.id AND mit_main.lang = ?
         WHERE p.is_active = 1
           AND ru.is_published = 1
           AND (mm.id IS NULL OR mm.show_in_menu = 1)
