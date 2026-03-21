@@ -557,14 +557,39 @@ if ($tab === 'menu' || $tab === 'categories') {
                     throw new \Exception('Разрешены только https ссылки.');
                 }
                 $ctx = stream_context_create([
-                    'http' => ['timeout' => 20],
-                    'https' => ['timeout' => 20],
+                    'http' => ['timeout' => 30],
+                    'https' => ['timeout' => 30],
                 ]);
                 $rawCsv = (string)@file_get_contents($rawUrl, false, $ctx);
+                if (trim($rawCsv) === '' && function_exists('curl_init')) {
+                    $ch = curl_init($rawUrl);
+                    curl_setopt_array($ch, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_FOLLOWLOCATION => true,
+                        CURLOPT_MAXREDIRS => 5,
+                        CURLOPT_CONNECTTIMEOUT => 15,
+                        CURLOPT_TIMEOUT => 30,
+                        CURLOPT_USERAGENT => 'VerandaMenuImporter/1.0',
+                    ]);
+                    $raw = curl_exec($ch);
+                    $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+                    $err = curl_error($ch);
+                    curl_close($ch);
+                    if (is_string($raw) && $code >= 200 && $code < 300) {
+                        $rawCsv = $raw;
+                    } elseif ($err !== '') {
+                        throw new \Exception('Не удалось скачать CSV: ' . $err);
+                    } else {
+                        throw new \Exception('Не удалось скачать CSV: HTTP ' . $code);
+                    }
+                }
                 $rawCsv = trim($rawCsv);
             }
             if ($rawCsv === '') {
                 throw new \Exception('Вставьте CSV или укажите ссылку на CSV.');
+            }
+            if (strncmp($rawCsv, "\xEF\xBB\xBF", 3) === 0) {
+                $rawCsv = substr($rawCsv, 3);
             }
 
             $lines = preg_split("/\r\n|\n|\r/", $rawCsv) ?: [];
