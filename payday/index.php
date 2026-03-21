@@ -582,6 +582,10 @@ $sepayWebhookMeta = [
     'last_ok' => '',
     'last_error' => '',
     'last_sepay_id' => '',
+    'last_method' => '',
+    'last_body_sha256' => '',
+    'last_body_truncated' => '',
+    'last_body' => '',
     'hits_total' => '',
     'hits_day' => '',
 ];
@@ -593,6 +597,10 @@ try {
         'sepay_webhook_last_ok',
         'sepay_webhook_last_error',
         'sepay_webhook_last_sepay_id',
+        'sepay_webhook_last_method',
+        'sepay_webhook_last_body_sha256',
+        'sepay_webhook_last_body_truncated',
+        'sepay_webhook_last_body',
         'sepay_webhook_hits_total',
         $dayKey,
     ];
@@ -609,6 +617,10 @@ try {
     $sepayWebhookMeta['last_ok'] = (string)($map['sepay_webhook_last_ok'] ?? '');
     $sepayWebhookMeta['last_error'] = (string)($map['sepay_webhook_last_error'] ?? '');
     $sepayWebhookMeta['last_sepay_id'] = (string)($map['sepay_webhook_last_sepay_id'] ?? '');
+    $sepayWebhookMeta['last_method'] = (string)($map['sepay_webhook_last_method'] ?? '');
+    $sepayWebhookMeta['last_body_sha256'] = (string)($map['sepay_webhook_last_body_sha256'] ?? '');
+    $sepayWebhookMeta['last_body_truncated'] = (string)($map['sepay_webhook_last_body_truncated'] ?? '');
+    $sepayWebhookMeta['last_body'] = (string)($map['sepay_webhook_last_body'] ?? '');
     $sepayWebhookMeta['hits_total'] = (string)($map['sepay_webhook_hits_total'] ?? '');
     $sepayWebhookMeta['hits_day'] = (string)($map[$dayKey] ?? '');
 } catch (\Throwable $e) {
@@ -725,6 +737,7 @@ $fmtVnd = function (int $v): string {
     <div class="muted" style="margin: 0 0 10px;">
         SePay webhook: last=<?= htmlspecialchars($sepayWebhookMeta['last_at'] !== '' ? $sepayWebhookMeta['last_at'] : '—') ?>
         <?= $sepayWebhookMeta['last_ip'] !== '' ? (' • ip=' . htmlspecialchars($sepayWebhookMeta['last_ip'])) : '' ?>
+        <?= $sepayWebhookMeta['last_method'] !== '' ? (' • method=' . htmlspecialchars($sepayWebhookMeta['last_method'])) : '' ?>
         <?= $sepayWebhookMeta['last_ok'] !== '' ? (' • ok=' . htmlspecialchars($sepayWebhookMeta['last_ok'])) : '' ?>
         <?= $sepayWebhookMeta['last_sepay_id'] !== '' ? (' • id=' . htmlspecialchars($sepayWebhookMeta['last_sepay_id'])) : '' ?>
         <?= $sepayWebhookMeta['hits_day'] !== '' ? (' • hits_day=' . htmlspecialchars($sepayWebhookMeta['hits_day'])) : '' ?>
@@ -732,6 +745,17 @@ $fmtVnd = function (int $v): string {
         <?= $sepayWebhookMeta['last_error'] !== '' ? (' • err=' . htmlspecialchars($sepayWebhookMeta['last_error'])) : '' ?>
         • rows: SePay=<?= (int)$sepayTxCount ?>, Poster=<?= (int)$posterTxCount ?>
     </div>
+
+    <?php if ($sepayWebhookMeta['last_body'] !== ''): ?>
+        <details class="card" style="padding: 10px 12px; margin: 0 0 10px;">
+            <summary style="font-weight: 900; cursor: pointer;">Последнее тело запроса (SePay)</summary>
+            <div class="muted" style="margin-top: 8px;">
+                <?= $sepayWebhookMeta['last_body_sha256'] !== '' ? ('sha256=' . htmlspecialchars($sepayWebhookMeta['last_body_sha256'])) : '' ?>
+                <?= $sepayWebhookMeta['last_body_truncated'] === '1' ? ' • truncated=1' : '' ?>
+            </div>
+            <pre style="white-space: pre-wrap; word-break: break-word; margin: 10px 0 0; padding: 10px; background: #0b1220; color: #e5e7eb; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);"><?= htmlspecialchars($sepayWebhookMeta['last_body']) ?></pre>
+        </details>
+    <?php endif; ?>
 
     <div class="card">
         <form method="GET" class="toolbar" style="margin-bottom: 10px;">

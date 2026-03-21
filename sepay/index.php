@@ -32,6 +32,10 @@ try {
     $methodNow = (string)($_SERVER['REQUEST_METHOD'] ?? '');
     $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
     $ua = mb_substr($ua, 0, 200, 'UTF-8');
+    $rawSha = hash('sha256', $raw);
+    $rawMax = 4000;
+    $rawTrunc = mb_substr($raw, 0, $rawMax, 'UTF-8');
+    $rawWasTruncated = (strlen($raw) > strlen($rawTrunc));
 
     try {
         $db->query("INSERT INTO {$meta} (meta_key, meta_value) VALUES ('sepay_webhook_hits_total', '1')
@@ -66,6 +70,21 @@ try {
             "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
             ['sepay_webhook_last_method', $methodNow]
+        );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_body_sha256', $rawSha]
+        );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_body_truncated', $rawWasTruncated ? '1' : '0']
+        );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_body', $rawTrunc]
         );
     } catch (\Throwable $e) {
     }
