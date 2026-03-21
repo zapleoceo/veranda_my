@@ -16,11 +16,8 @@ class PosterMenuSync {
         $this->db->createMenuTables();
         $pmi = $this->db->t('poster_menu_items');
         $mw = $this->db->t('menu_workshops');
-        $mwTr = $this->db->t('menu_workshop_tr');
         $mc = $this->db->t('menu_categories');
-        $mcTr = $this->db->t('menu_category_tr');
         $mi = $this->db->t('menu_items');
-        $miTr = $this->db->t('menu_item_tr');
 
         $workshops = $this->fetchWorkshops();
         $products = $this->fetchProducts();
@@ -112,36 +109,13 @@ class PosterMenuSync {
                 continue;
             }
 
-            $categoryId = $subPosterCatId > 0 ? ($categoryMap[$subPosterCatId] ?? null) : null;
-            if ($categoryId === null) {
-                continue;
-            }
-
-            $onDupCategory = "category_id = VALUES(category_id)";
             $this->db->query(
                 "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
-                 VALUES (?, ?, NULL, 0, 0)
-                 ON DUPLICATE KEY UPDATE
-                    {$onDupCategory}",
-                [$posterItemId, (int)$categoryId]
+                 VALUES (?, NULL, NULL, 0, 0)
+                 ON DUPLICATE KEY UPDATE poster_item_id = {$mi}.poster_item_id",
+                [$posterItemId]
             );
         }
-
-        $this->db->query(
-            "UPDATE {$mi} i
-             JOIN {$pmi} p ON p.id = i.poster_item_id
-             JOIN {$mc} c ON c.poster_id = p.sub_category_id
-             SET i.category_id = c.id
-             WHERE p.sub_category_id IS NOT NULL
-               AND i.category_id <> c.id"
-        );
-
-        $this->applyWorkshopTranslations($mwTr, $workshopMap);
-        $this->applyCategoryTranslations($mcTr, $categoryMap);
-        $this->applyItemTranslations($pmi, $mi, $miTr);
-
-        $this->cleanupStaleCategories($mc, $mi, array_keys($categoryPosterIds));
-        $this->cleanupStaleWorkshops($mw, $mc, array_keys($workshopPosterIds));
 
         $this->markMissingItemsInactive(array_keys($seenPosterIds));
         $durationMs = (int)round((microtime(true) - $startedAt) * 1000);
@@ -154,118 +128,6 @@ class PosterMenuSync {
             'categories' => (int)$this->db->query("SELECT COUNT(*) FROM {$mc}")->fetchColumn(),
             'used_categories_fallback' => $usedFallbackCategories,
         ];
-    }
-
-    private function cleanupStaleCategories(string $mc, string $mi, array $alivePosterIds): void {
-        if (empty($alivePosterIds)) {
-            return;
-        }
-        $placeholders = implode(',', array_fill(0, count($alivePosterIds), '?'));
-        $this->db->query(
-            "DELETE c
-             FROM {$mc} c
-             LEFT JOIN {$mi} i ON i.category_id = c.id
-             WHERE c.poster_id NOT IN ({$placeholders})
-               AND i.id IS NULL",
-            $alivePosterIds
-        );
-    }
-
-    private function cleanupStaleWorkshops(string $mw, string $mc, array $alivePosterIds): void {
-        if (empty($alivePosterIds)) {
-            return;
-        }
-        $placeholders = implode(',', array_fill(0, count($alivePosterIds), '?'));
-        $this->db->query(
-            "DELETE w
-             FROM {$mw} w
-             LEFT JOIN {$mc} c ON c.workshop_id = w.id
-             WHERE w.poster_id NOT IN ({$placeholders})
-               AND c.id IS NULL",
-            $alivePosterIds
-        );
-    }
-
-    private function applyWorkshopTranslations(string $mwTr, array $workshopMap): void {
-        $fixed = $this->getFixedWorkshopTranslations();
-        if (empty($fixed)) {
-            return;
-        }
-        foreach ($fixed as $posterId => $langs) {
-            $workshopId = (int)($workshopMap[(int)$posterId] ?? 0);
-            if ($workshopId <= 0) continue;
-            foreach (['ru', 'en', 'vn', 'ko'] as $lang) {
-                $val = trim((string)($langs[$lang] ?? ''));
-                if ($val === '') continue;
-                $this->db->query(
-                    "INSERT INTO {$mwTr} (workshop_id, lang, name) VALUES (?, ?, ?)
-                     ON DUPLICATE KEY UPDATE name=VALUES(name)",
-                    [$workshopId, $lang, $val]
-                );
-            }
-        }
-    }
-
-    private function applyCategoryTranslations(string $mcTr, array $categoryMap): void {
-        $fixed = $this->getFixedCategoryTranslations();
-        if (empty($fixed)) {
-            return;
-        }
-        foreach ($fixed as $posterId => $langs) {
-            $categoryId = (int)($categoryMap[(int)$posterId] ?? 0);
-            if ($categoryId <= 0) continue;
-            foreach (['ru', 'en', 'vn', 'ko'] as $lang) {
-                $val = trim((string)($langs[$lang] ?? ''));
-                if ($val === '') continue;
-                $this->db->query(
-                    "INSERT INTO {$mcTr} (category_id, lang, name) VALUES (?, ?, ?)
-                     ON DUPLICATE KEY UPDATE name=VALUES(name)",
-                    [$categoryId, $lang, $val]
-                );
-            }
-        }
-    }
-
-    private function applyItemTranslations(string $pmi, string $mi, string $miTr): void {
-        $fixed = $this->getFixedItemTranslations();
-        if (empty($fixed)) {
-            return;
-        }
-        $posterIds = array_keys($fixed);
-        $placeholders = implode(',', array_fill(0, count($posterIds), '?'));
-        $rows = $this->db->query(
-            "SELECT p.poster_id, i.id item_id
-             FROM {$pmi} p
-             JOIN {$mi} i ON i.poster_item_id = p.id
-             WHERE p.poster_id IN ({$placeholders})",
-            $posterIds
-        )->fetchAll();
-
-        $itemIdByPosterId = [];
-        foreach ($rows as $r) {
-            $pid = (int)($r['poster_id'] ?? 0);
-            $iid = (int)($r['item_id'] ?? 0);
-            if ($pid > 0 && $iid > 0) {
-                $itemIdByPosterId[$pid] = $iid;
-            }
-        }
-
-        foreach ($fixed as $posterId => $data) {
-            $itemId = (int)($itemIdByPosterId[(int)$posterId] ?? 0);
-            if ($itemId <= 0) continue;
-            foreach (['ru', 'en', 'vn', 'ko'] as $lang) {
-                $titleKey = $lang . '_title';
-                $descKey = $lang . '_desc';
-                $title = trim((string)($data[$titleKey] ?? ''));
-                $desc = trim((string)($data[$descKey] ?? ''));
-                if ($title === '' && $desc === '') continue;
-                $this->db->query(
-                    "INSERT INTO {$miTr} (item_id, lang, title, description) VALUES (?, ?, ?, ?)
-                     ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
-                    [$itemId, $lang, $title !== '' ? $title : null, $desc !== '' ? $desc : null]
-                );
-            }
-        }
     }
 
     private function getFixedWorkshopTranslations(): array {
@@ -533,10 +395,6 @@ class PosterMenuSync {
             if ($id <= 0 || $name === '' || $parent <= 0) {
                 continue;
             }
-            $workshopId = (int)($workshopMap[$parent] ?? 0);
-            if ($workshopId <= 0) {
-                continue;
-            }
             $sort = $this->extractLeadingSortNumber($name);
             $this->db->query(
                 "INSERT INTO {$mc} (poster_id, workshop_id, name_raw, sort_order, show_on_site)
@@ -544,7 +402,7 @@ class PosterMenuSync {
                  ON DUPLICATE KEY UPDATE
                     name_raw=VALUES(name_raw),
                     sort_order=IF({$mc}.sort_order=0, VALUES(sort_order), {$mc}.sort_order)",
-                [$id, $workshopId, $name, $sort]
+                [$id, (int)($workshopMap[$parent] ?? 0) > 0 ? (int)$workshopMap[$parent] : null, $name, $sort]
             );
         }
         $rows = $this->db->query("SELECT id, poster_id FROM {$mc}")->fetchAll();
@@ -565,22 +423,13 @@ class PosterMenuSync {
 
     private function markMissingItemsInactive(array $activePosterIds): void {
         $pmi = $this->db->t('poster_menu_items');
-        $mi = $this->db->t('menu_items');
         if (empty($activePosterIds)) {
             $this->db->query("UPDATE {$pmi} SET is_active = 0 WHERE is_active = 1");
-            $this->db->query("UPDATE {$mi} SET is_published = 0 WHERE is_published = 1");
             return;
         }
 
         $placeholders = implode(',', array_fill(0, count($activePosterIds), '?'));
         $this->db->query("UPDATE {$pmi} SET is_active = 0 WHERE is_active = 1 AND poster_id NOT IN ($placeholders)", $activePosterIds);
-
-        $this->db->query(
-            "UPDATE {$mi} i
-             JOIN {$pmi} p ON p.id = i.poster_item_id
-             SET i.is_published = 0
-             WHERE p.is_active = 0 AND i.is_published = 1"
-        );
     }
 
     private function normalizePrice($price): ?float {

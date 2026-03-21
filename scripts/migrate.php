@@ -88,6 +88,27 @@ $db->query("CREATE TABLE IF NOT EXISTS {$eventLog} (
 
 $db->createMenuTables();
 
+$ensureNullable = function (string $table, string $column, string $typeSql) use ($db, $dbName): void {
+    try {
+        $row = $db->query(
+            "SELECT IS_NULLABLE
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = ?
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = ?
+             LIMIT 1",
+            [$dbName, $table, $column]
+        )->fetch();
+        if (!$row) return;
+        if ((string)($row['IS_NULLABLE'] ?? '') === 'YES') return;
+        $db->query("ALTER TABLE {$table} MODIFY {$column} {$typeSql} NULL");
+    } catch (\Exception $e) {
+    }
+};
+
+$ensureNullable($db->t('menu_categories'), 'workshop_id', 'INT UNSIGNED');
+$ensureNullable($db->t('menu_items'), 'category_id', 'INT UNSIGNED');
+
 $tableExists = function (string $table) use ($db, $dbName): bool {
     $row = $db->query(
         "SELECT COUNT(*) AS c

@@ -211,7 +211,7 @@ class Database {
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mc} (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             poster_id INT UNSIGNED NOT NULL,
-            workshop_id INT UNSIGNED NOT NULL,
+            workshop_id INT UNSIGNED NULL,
             name_raw VARCHAR(255) NOT NULL,
             sort_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
             show_on_site TINYINT(1) NOT NULL DEFAULT 1,
@@ -235,7 +235,7 @@ class Database {
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mi} (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             poster_item_id INT NOT NULL,
-            category_id INT UNSIGNED NOT NULL,
+            category_id INT UNSIGNED NULL,
             image_url VARCHAR(512) NULL,
             is_published TINYINT(1) NOT NULL DEFAULT 0,
             sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,

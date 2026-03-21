@@ -12,193 +12,42 @@ class MenuAutoFill {
     public function run(): array {
         $this->db->createMenuTables();
         $pmi = $this->db->t('poster_menu_items');
+        $mw = $this->db->t('menu_workshops');
+        $mc = $this->db->t('menu_categories');
         $mi = $this->db->t('menu_items');
-        $miTr = $this->db->t('menu_item_tr');
 
-        $barMap = $this->getBarTranslations();
-        $kitchenMap = $this->getKitchenTranslations();
-        $barIndex = [];
-        foreach ($barMap as $r) {
-            foreach ([$r['ru_title'], $r['en_title'], $r['vn_title']] as $key) {
-                $k = $this->norm($key);
-                if ($k !== '') {
-                    $barIndex[$k] = $r;
-                }
-            }
-        }
-
-        $rows = $this->db->query(
-            "SELECT
-                p.id poster_item_id,
-                p.poster_id,
-                p.name_raw,
-                p.main_category_name,
-                p.sub_category_name,
-                p.station_name,
-                mi.id menu_item_id,
-                ru.title ru_title,
-                ru.description ru_description,
-                en.title en_title,
-                en.description en_description,
-                vn.title vn_title,
-                vn.description vn_description
+        $insertedMenuItems = (int)$this->db->query(
+            "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
+             SELECT p.id, NULL, NULL, 0, 0
              FROM {$pmi} p
-             JOIN {$mi} mi ON mi.poster_item_id = p.id
-             LEFT JOIN {$miTr} ru ON ru.item_id = mi.id AND ru.lang = 'ru'
-             LEFT JOIN {$miTr} en ON en.item_id = mi.id AND en.lang = 'en'
-             LEFT JOIN {$miTr} vn ON vn.item_id = mi.id AND vn.lang = 'vn'",
-            []
-        )->fetchAll();
+             LEFT JOIN {$mi} i ON i.poster_item_id = p.id
+             WHERE i.id IS NULL"
+        )->rowCount();
 
-        $updated = 0;
-        $titlesFilled = 0;
-        $descriptionsFilled = 0;
+        $linkedItems = (int)$this->db->query(
+            "UPDATE {$mi} i
+             JOIN {$pmi} p ON p.id = i.poster_item_id
+             JOIN {$mc} c ON c.poster_id = p.sub_category_id
+             SET i.category_id = c.id
+             WHERE i.category_id IS NULL
+               AND p.sub_category_id IS NOT NULL"
+        )->rowCount();
 
-        foreach ($rows as $row) {
-            $posterItemId = (int)($row['poster_item_id'] ?? 0);
-            if ($posterItemId <= 0) {
-                continue;
-            }
-            $menuItemId = (int)($row['menu_item_id'] ?? 0);
-            if ($menuItemId <= 0) {
-                continue;
-            }
-
-            $nameRaw = (string)($row['name_raw'] ?? '');
-            $stationName = strtolower(trim((string)($row['station_name'] ?? '')));
-            $posterCategory = $this->stripCategoryNumbering((string)($row['main_category_name'] ?? ''));
-            $posterId = (int)($row['poster_id'] ?? 0);
-
-            $ruTitle = trim((string)($row['ru_title'] ?? ''));
-            $enTitle = trim((string)($row['en_title'] ?? ''));
-            $vnTitle = trim((string)($row['vn_title'] ?? ''));
-
-            $ruDesc = trim((string)($row['ru_description'] ?? ''));
-            $enDesc = trim((string)($row['en_description'] ?? ''));
-            $vnDesc = trim((string)($row['vn_description'] ?? ''));
-
-            $mapped = null;
-            if ($stationName !== '' && str_contains($stationName, 'bar')) {
-                $k = $this->norm($nameRaw);
-                if (isset($barIndex[$k])) {
-                    $mapped = $barIndex[$k];
-                } else {
-                    foreach ($barIndex as $bk => $br) {
-                        if ($bk !== '' && str_contains($k, $bk)) {
-                            $mapped = $br;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            $ruNew = $ruTitle;
-            $enNew = $enTitle;
-            $vnNew = $vnTitle;
-            $ruDescNew = $ruDesc;
-            $enDescNew = $enDesc;
-            $vnDescNew = $vnDesc;
-
-            $split = $this->splitRuEn($nameRaw);
-            $ruCandidate = (string)($split['ru'] ?? '');
-            $enCandidate = (string)($split['en'] ?? '');
-            $vnCandidate = $enCandidate;
-
-            $hasSep = function (string $s): bool {
-                return str_contains($s, '/') || str_contains($s, '|');
-            };
-            $hasRu = function (string $s): bool {
-                return (bool)preg_match('/\p{Cyrillic}/u', $s);
-            };
-            $hasEn = function (string $s): bool {
-                return (bool)preg_match('/[A-Za-z]/', $s);
-            };
-            $isMixed = function (string $s) use ($hasRu, $hasEn): bool {
-                return $hasRu($s) && $hasEn($s);
-            };
-
-            if ($ruNew === '' || $hasSep($ruNew) || $isMixed($ruNew) || $ruNew === $nameRaw) {
-                $ruNew = $ruCandidate;
-            }
-            if ($enNew === '' || $hasSep($enNew) || $hasRu($enNew) || $enNew === $nameRaw) {
-                $enNew = $enCandidate;
-            }
-            if ($vnNew === '' || $hasSep($vnNew) || $hasRu($vnNew) || $vnNew === $nameRaw) {
-                $vnNew = $vnCandidate;
-            }
-
-            if ($stationName === 'kitchen' && $posterId > 0 && array_key_exists($posterId, $kitchenMap)) {
-                $ruFromMap = trim((string)($kitchenMap[$posterId]['ru'] ?? ''));
-                $enFromMap = trim((string)($kitchenMap[$posterId]['en'] ?? ''));
-                $vnFromMap = trim((string)($kitchenMap[$posterId]['vn'] ?? ''));
-                if ($ruFromMap !== '') $ruNew = $ruFromMap;
-                if ($enFromMap !== '') $enNew = $enFromMap;
-                if ($vnFromMap !== '') $vnNew = $vnFromMap;
-            }
-
-            if ($mapped) {
-                $ruFromMap = trim((string)($mapped['ru_title'] ?? ''));
-                $enFromMap = trim((string)($mapped['en_title'] ?? ''));
-                $vnFromMap = trim((string)($mapped['vn_title'] ?? ''));
-                if ($ruFromMap !== '') $ruNew = $ruFromMap;
-                if ($enFromMap !== '') $enNew = $enFromMap;
-                if ($vnFromMap !== '') $vnNew = $vnFromMap;
-                if ($ruDescNew === '' && $mapped['ru_description'] !== '') $ruDescNew = $mapped['ru_description'];
-                if ($enDescNew === '' && $mapped['en_description'] !== '') $enDescNew = $mapped['en_description'];
-                if ($vnDescNew === '' && $mapped['vn_description'] !== '') $vnDescNew = $mapped['vn_description'];
-            }
-
-            $ruNew = $this->stripLeadingNumberingExcept7up($ruNew);
-            $enNew = $this->stripLeadingNumberingExcept7up($enNew);
-            $vnNew = $this->stripLeadingNumberingExcept7up($vnNew);
-
-            if ($ruDescNew === '') $ruDescNew = $this->generateDescription('ru', $stationName, $ruNew, $posterCategory);
-            if ($enDescNew === '') $enDescNew = $this->generateDescription('en', $stationName, $enNew, $posterCategory);
-            if ($vnDescNew === '') $vnDescNew = $this->generateDescription('vn', $stationName, $vnNew, $posterCategory);
-
-            $needRu = ($ruTitle !== $ruNew) || ($ruDesc !== $ruDescNew);
-            $needEn = ($enTitle !== $enNew) || ($enDesc !== $enDescNew);
-            $needVn = ($vnTitle !== $vnNew) || ($vnDesc !== $vnDescNew);
-
-            if ($needRu) {
-                $this->db->query(
-                    "INSERT INTO {$miTr} (item_id, lang, title, description) VALUES (?, 'ru', ?, ?)
-                     ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
-                    [$menuItemId, $ruNew !== '' ? $ruNew : null, $ruDescNew !== '' ? $ruDescNew : null]
-                );
-            }
-            if ($needEn) {
-                $this->db->query(
-                    "INSERT INTO {$miTr} (item_id, lang, title, description) VALUES (?, 'en', ?, ?)
-                     ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
-                    [$menuItemId, $enNew !== '' ? $enNew : null, $enDescNew !== '' ? $enDescNew : null]
-                );
-            }
-            if ($needVn) {
-                $this->db->query(
-                    "INSERT INTO {$miTr} (item_id, lang, title, description) VALUES (?, 'vn', ?, ?)
-                     ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
-                    [$menuItemId, $vnNew !== '' ? $vnNew : null, $vnDescNew !== '' ? $vnDescNew : null]
-                );
-            }
-
-            if ($needRu || $needEn || $needVn) {
-                $updated++;
-            }
-            if ($ruTitle === '' && $ruNew !== '' || $enTitle === '' && $enNew !== '' || $vnTitle === '' && $vnNew !== '') {
-                $titlesFilled++;
-            }
-            if ($ruDesc === '' && $ruDescNew !== '' || $enDesc === '' && $enDescNew !== '' || $vnDesc === '' && $vnDescNew !== '') {
-                $descriptionsFilled++;
-            }
-        }
+        $linkedCategories = (int)$this->db->query(
+            "UPDATE {$mc} c
+             JOIN {$pmi} p ON p.sub_category_id = c.poster_id
+             JOIN {$mw} w ON w.poster_id = p.main_category_id
+             SET c.workshop_id = w.id
+             WHERE c.workshop_id IS NULL
+               AND p.sub_category_id IS NOT NULL
+               AND p.main_category_id IS NOT NULL"
+        )->rowCount();
 
         return [
             'ok' => true,
-            'rows' => count($rows),
-            'updated' => $updated,
-            'titles_filled' => $titlesFilled,
-            'descriptions_filled' => $descriptionsFilled
+            'inserted_menu_items' => $insertedMenuItems,
+            'linked_items' => $linkedItems,
+            'linked_categories' => $linkedCategories,
         ];
     }
 

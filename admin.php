@@ -357,7 +357,7 @@ if ($tab === 'menu' || $tab === 'categories') {
         try {
             $autofill = new \App\Classes\MenuAutoFill($db);
             $result = $autofill->run();
-            $message = 'Автозаполнение меню выполнено: ' . json_encode($result, JSON_UNESCAPED_UNICODE);
+            $message = 'Привязка ID выполнена: ' . json_encode($result, JSON_UNESCAPED_UNICODE);
         } catch (\Throwable $e) {
             $error = 'Ошибка автозаполнения меню: ' . $e->getMessage();
         }
@@ -1115,10 +1115,10 @@ if ($tab === 'menu' || $tab === 'categories') {
                 <div class="left">
                     <h3 style="margin:0;">Меню</h3>
                     <form method="POST" style="margin:0;">
-                        <button type="submit" name="sync_menu" title="Загружает блюда и категории из Poster, обновляет цены/станции/категории и помечает отсутствующие позиции как неактивные.">Обновить меню из Poster</button>
+                        <button type="submit" name="sync_menu" title="Синк из Poster: только обновляет слепок poster_menu_items и справочники по poster_id. Не трогает переводы и ручные привязки/публикацию.">Обновить меню из Poster</button>
                     </form>
                     <form method="POST" style="margin:0;">
-                        <button type="submit" name="autofill_menu" title="Автоматически заполняет/исправляет названия и описания RU/EN/VN по правилам и шаблонам. Не меняет данные Poster.">Автозаполнить названия/описания</button>
+                        <button type="submit" name="autofill_menu" title="Разовая привязка по ID: связывает menu_items.category_id и menu_categories.workshop_id из данных Poster там, где сейчас пусто. Не трогает переводы и ручные значения.">Привязать ID (разово)</button>
                     </form>
                     <?php if (!empty($menuSyncMeta['last_sync_at'])): ?>
                         <span class="muted">Последняя синхронизация: <span class="js-local-dt" data-iso="<?= htmlspecialchars($menuSyncAtIso) ?>"><?= htmlspecialchars($menuSyncMeta['last_sync_at']) ?></span></span>
