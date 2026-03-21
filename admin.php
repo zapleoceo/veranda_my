@@ -1088,7 +1088,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                         <th>Email</th>
                         <th>Telegram</th>
                         <th>Дата добавления</th>
-                        <th>Действие</th>
+                        <th>Действия</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1107,7 +1107,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                                 data-email="<?= htmlspecialchars($user['email'], ENT_QUOTES) ?>"
                                 data-perms="<?= htmlspecialchars(json_encode($perms, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>"
                                 data-tg="<?= htmlspecialchars((string)($user['telegram_username'] ?? ''), ENT_QUOTES) ?>"
-                            >⚙</button>
+                            >Редактировать</button>
                             <?php if ($user['email'] !== $_SESSION['user_email']): ?>
                                 <a href="?delete=<?= urlencode($user['email']) ?>" class="delete-btn" onclick="return confirm('Удалить доступ для <?= $user['email'] ?>?')">Удалить</a>
                             <?php else: ?>
