@@ -44,6 +44,7 @@ class Database {
             exclude_from_dashboard TINYINT(1) NOT NULL DEFAULT 0,
             exclude_auto TINYINT(1) NOT NULL DEFAULT 0,
             dish_id INT NOT NULL,
+            item_seq INT NOT NULL DEFAULT 1,
             dish_category_id BIGINT NULL,
             dish_sub_category_id BIGINT NULL,
             dish_name VARCHAR(255),
@@ -55,10 +56,24 @@ class Database {
             total_sum DECIMAL(10,2),
             station VARCHAR(100),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY unique_dish_tx (transaction_id, dish_id)
+            UNIQUE KEY unique_dish_tx (transaction_id, dish_id, item_seq)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
         
         $this->pdo->exec($sql);
+
+        $row = $this->query(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'kitchen_stats'
+               AND COLUMN_NAME = 'item_seq'"
+        )->fetch();
+        if ((int)($row['c'] ?? 0) === 0) {
+            $this->query("ALTER TABLE kitchen_stats ADD COLUMN item_seq INT NOT NULL DEFAULT 1 AFTER dish_id");
+        }
+
+        try { $this->query("ALTER TABLE kitchen_stats DROP INDEX unique_dish_tx"); } catch (\Exception $e) {}
+        try { $this->query("ALTER TABLE kitchen_stats ADD UNIQUE KEY unique_dish_tx (transaction_id, dish_id, item_seq)"); } catch (\Exception $e) {}
 
         $row = $this->query(
             "SELECT COUNT(*) AS c
@@ -118,10 +133,11 @@ class Database {
 
     public function saveStats(array $stats) {
         $sql = "INSERT INTO kitchen_stats 
-                (transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id, table_number, status, pay_type, close_reason, dish_id, dish_category_id, dish_sub_category_id, dish_name, ticket_sent_at, ready_pressed_at, service_type, total_sum, station, exclude_from_dashboard, exclude_auto) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id, table_number, status, pay_type, close_reason, dish_id, item_seq, dish_category_id, dish_sub_category_id, dish_name, ticket_sent_at, ready_pressed_at, service_type, total_sum, station, exclude_from_dashboard, exclude_auto) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE 
                 dish_id = VALUES(dish_id),
+                item_seq = VALUES(item_seq),
                 dish_category_id = VALUES(dish_category_id),
                 dish_sub_category_id = VALUES(dish_sub_category_id),
                 dish_name = VALUES(dish_name),
@@ -161,6 +177,7 @@ class Database {
                 $row['pay_type'] ?? null,
                 $row['close_reason'] ?? null,
                 $row['dish_id'],
+                isset($row['item_seq']) && (int)$row['item_seq'] > 0 ? (int)$row['item_seq'] : 1,
                 $mainCat,
                 $subCat,
                 $row['dish_name'],

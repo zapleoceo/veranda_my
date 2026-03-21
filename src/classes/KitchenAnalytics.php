@@ -7,6 +7,7 @@ class KitchenAnalytics {
     private array $productNames = [];
     private array $productMainCategories = [];
     private array $productSubCategories = [];
+    private array $employeesById = [];
 
     public function __construct(PosterAPI $api) {
         $this->api = $api;
@@ -74,6 +75,81 @@ class KitchenAnalytics {
         return null;
     }
 
+    private function resolveWaiterName(int $transactionId, array $tx): string {
+        $name = trim((string)($tx['name'] ?? ''));
+        if ($name !== '' && !is_numeric($name)) {
+            return $name;
+        }
+
+        $empName = trim((string)($tx['employee_name'] ?? ''));
+        if ($empName !== '') {
+            return $empName;
+        }
+
+        $txUserId = isset($tx['user_id']) ? (int)$tx['user_id'] : 0;
+        if ($txUserId > 0) {
+            if (empty($this->employeesById)) {
+                try {
+                    $employees = $this->api->request('access.getEmployees');
+                    if (is_array($employees)) {
+                        foreach ($employees as $employee) {
+                            $id = (int)($employee['user_id'] ?? 0);
+                            $employeeName = trim((string)($employee['name'] ?? ''));
+                            if ($id > 0 && $employeeName !== '') {
+                                $this->employeesById[$id] = $employeeName;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+            if (isset($this->employeesById[$txUserId])) {
+                return $this->employeesById[$txUserId];
+            }
+        }
+
+        $historyUserId = 0;
+        try {
+            $history = $this->api->request('dash.getTransactionHistory', ['transaction_id' => $transactionId]);
+            if (is_array($history)) {
+                foreach ($history as $event) {
+                    $type = $event['type_history'] ?? '';
+                    if ($type === 'open' || $type === 'print') {
+                        $candidate = (int)($event['value'] ?? 0);
+                        if ($candidate > 0) {
+                            $historyUserId = $candidate;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        if ($historyUserId > 0) {
+            if (empty($this->employeesById)) {
+                try {
+                    $employees = $this->api->request('access.getEmployees');
+                    if (is_array($employees)) {
+                        foreach ($employees as $employee) {
+                            $id = (int)($employee['user_id'] ?? 0);
+                            $employeeName = trim((string)($employee['name'] ?? ''));
+                            if ($id > 0 && $employeeName !== '') {
+                                $this->employeesById[$id] = $employeeName;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+            if (isset($this->employeesById[$historyUserId])) {
+                return $this->employeesById[$historyUserId];
+            }
+        }
+
+        return '';
+    }
+
     /**
      * Анализ Kitchen Kit событий для периода дат
      */
@@ -128,33 +204,51 @@ class KitchenAnalytics {
                 }
             }
 
-            $productTimes = $this->extractProductKitchenTimes($history);
+            $waiterName = $this->resolveWaiterName((int)$txId, $tx);
+            $productQty = [];
+            foreach ($products as $p) {
+                $pid = (int)($p['product_id'] ?? 0);
+                if ($pid <= 0) continue;
+                $cntRaw = $p['count'] ?? ($p['quantity'] ?? null);
+                $cnt = is_numeric($cntRaw) ? (int)$cntRaw : 0;
+                if ($cnt < 0) $cnt = 0;
+                $productQty[$pid] = max($productQty[$pid] ?? 0, $cnt);
+            }
 
-            foreach ($products as $product) {
-                $pId = $product['product_id'];
-                $times = $productTimes[$pId] ?? ['sent' => null, 'ready' => null];
+            $productInstances = $this->extractProductKitchenInstances($history, $productQty);
 
-                $results[] = [
+            foreach ($productInstances as $pId => $instances) {
+                $pId = (int)$pId;
+                if ($pId <= 0) continue;
+                if (!is_array($instances) || count($instances) === 0) continue;
+
+                $seq = 1;
+                foreach ($instances as $inst) {
+                    $results[] = [
                     'date' => date('Y-m-d', ($tx['date_start'] ?? time()*1000) / 1000),
                     'receipt_number' => $tx['receipt_number'] ?? ($tx['transaction_id'] ?? 'N/A'),
                     'transaction_opened_at' => isset($tx['date_start']) ? $this->formatTimestamp($tx['date_start']) : null,
                     'transaction_closed_at' => $this->resolveClosedAt($tx),
                     'transaction_id' => $txId,
                     'table_number' => $tx['table_name'] ?? ($tx['table_id'] ?? null),
+                    'waiter_name' => $waiterName !== '' ? $waiterName : null,
                     'status' => $tx['status'] ?? 1,
                     'pay_type' => isset($tx['pay_type']) ? (int)$tx['pay_type'] : null,
                     'close_reason' => isset($tx['reason']) && $tx['reason'] !== '' ? (int)$tx['reason'] : null,
                     'dish_id' => $pId,
+                    'item_seq' => $seq,
                     'dish_category_id' => $this->productMainCategories[$pId] ?? null,
                     'dish_sub_category_id' => $this->productSubCategories[$pId] ?? null,
-                    'dish_name' => $this->productNames[$pId] ?? ($product['product_name'] ?? ('Product #' . $pId)),
-                    'ticket_sent_at' => $times['sent'] ?? null,
-                    'ready_pressed_at' => $times['ready'] ?? null,
-                    'was_deleted' => $times['was_deleted'] ?? false,
+                    'dish_name' => $this->productNames[$pId] ?? ('Product #' . $pId),
+                    'ticket_sent_at' => $inst['sent'] ?? null,
+                    'ready_pressed_at' => $inst['ready'] ?? null,
+                    'was_deleted' => $inst['was_deleted'] ?? false,
                     'service_type' => $tx['service_mode'] ?? 1,
                     'total_sum' => ($tx['payed_sum'] ?? 0) / 100,
                     'station' => $this->workshopNames[$this->productWorkshops[$pId] ?? 0] ?? ($this->productWorkshops[$pId] ?? 'N/A')
                 ];
+                    $seq++;
+                }
             }
         }
 
@@ -171,46 +265,101 @@ class KitchenAnalytics {
     /**
      * Извлечение времени из истории событий по каждому продукту
      */
-    private function extractProductKitchenTimes(array $history): array {
-        $productEvents = [];
-        $productCounts = [];
+    private function extractProductKitchenInstances(array $history, array $productQtyById): array {
+        $sendTimesById = [];
+        $firstSendById = [];
+        $finishTimesById = [];
+        $deletedCount = [];
+        $sendTotalById = [];
+        $maxCountById = [];
 
         foreach ($history as $event) {
             $type = $event['type_history'] ?? null;
-            $time = isset($event['time']) ? $this->formatTimestamp($event['time']) : null;
+            $time = isset($event['time']) ? $this->formatTimestamp((int)$event['time']) : null;
 
             if ($type === 'sendtokitchen') {
                 $items = $event['value_text'] ?? [];
-                if (is_array($items)) {
-                    foreach ($items as $item) {
-                        $pId = $item['product_id'] ?? null;
-                        $count = (int)($item['count'] ?? 0);
-                        if ($pId) {
-                            if (!isset($productCounts[$pId])) $productCounts[$pId] = 0;
-                            $productCounts[$pId] += $count;
-
-                            if ($count > 0 && !isset($productEvents[$pId]['sent'])) {
-                                $productEvents[$pId]['sent'] = $time;
-                            }
-                        }
-                    }
+                if (!is_array($items)) continue;
+                foreach ($items as $item) {
+                    $pId = (int)($item['product_id'] ?? 0);
+                    if ($pId <= 0) continue;
+                    $count = array_key_exists('count', $item) ? (int)$item['count'] : 1;
+                    if ($count <= 0) continue;
+                    if (!isset($sendTimesById[$pId])) $sendTimesById[$pId] = [];
+                    if (!isset($firstSendById[$pId]) && $time) $firstSendById[$pId] = $time;
+                    $sendTotalById[$pId] = ($sendTotalById[$pId] ?? 0) + $count;
+                    for ($i = 0; $i < $count; $i++) $sendTimesById[$pId][] = $time;
                 }
+                continue;
             }
 
             if ($type === 'finishedcooking') {
-                $pId = $event['value'] ?? null;
-                if ($pId) {
-                    $productEvents[$pId]['ready'] = $time;
+                $pId = (int)($event['value'] ?? 0);
+                if ($pId <= 0) continue;
+                if (!isset($finishTimesById[$pId])) $finishTimesById[$pId] = [];
+                $finishTimesById[$pId][] = $time;
+                continue;
+            }
+
+            if ($type === 'deleteitem' || $type === 'delete') {
+                $pId = (int)($event['value'] ?? 0);
+                if ($pId <= 0) continue;
+                $deletedCount[$pId] = ($deletedCount[$pId] ?? 0) + 1;
+                continue;
+            }
+
+            if ($type === 'changeitemcount') {
+                $pId = (int)($event['value'] ?? 0);
+                if ($pId <= 0) continue;
+                $count = (int)($event['value2'] ?? 0);
+                if ($count > 0) {
+                    $maxCountById[$pId] = max($maxCountById[$pId] ?? 0, $count);
+                } else {
+                    $deletedCount[$pId] = ($deletedCount[$pId] ?? 0) + 1;
                 }
+                continue;
             }
         }
 
-        foreach ($productCounts as $pId => $count) {
-            if (isset($productEvents[$pId])) {
-                 $productEvents[$pId]['was_deleted'] = ($count <= 0);
+        $instances = [];
+        $pids = array_unique(array_merge(
+            array_map('intval', array_keys($productQtyById)),
+            array_map('intval', array_keys($sendTotalById)),
+            array_map('intval', array_keys($maxCountById))
+        ));
+        foreach ($pids as $pId) {
+            if ($pId <= 0) continue;
+            $qty = max(
+                (int)($productQtyById[$pId] ?? 0),
+                (int)($sendTotalById[$pId] ?? 0),
+                (int)($maxCountById[$pId] ?? 0)
+            );
+            if ($qty <= 0) $qty = 1;
+            $instances[$pId] = [];
+            $sendList = $sendTimesById[$pId] ?? [];
+            $finishList = $finishTimesById[$pId] ?? [];
+            $fallbackSent = $firstSendById[$pId] ?? null;
+            for ($i = 0; $i < $qty; $i++) {
+                $instances[$pId][] = [
+                    'sent' => $sendList[$i] ?? $fallbackSent,
+                    'ready' => $finishList[$i] ?? null,
+                    'was_deleted' => false
+                ];
             }
         }
 
-        return $productEvents;
+        foreach ($deletedCount as $pId => $del) {
+            $del = (int)$del;
+            if ($del <= 0) continue;
+            if (!isset($instances[$pId])) continue;
+            for ($i = count($instances[$pId]) - 1; $i >= 0 && $del > 0; $i--) {
+                if (!empty($instances[$pId][$i]['ready'])) continue;
+                if (($instances[$pId][$i]['was_deleted'] ?? false) === true) continue;
+                $instances[$pId][$i]['was_deleted'] = true;
+                $del--;
+            }
+        }
+
+        return $instances;
     }
 }

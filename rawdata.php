@@ -10,6 +10,7 @@ $dateFrom = $_GET['dateFrom'] ?? date('Y-m-d');
 $dateTo = $_GET['dateTo'] ?? date('Y-m-d');
 $hourStart = (int)($_GET['hourStart'] ?? 0);
 $hourEnd = (int)($_GET['hourEnd'] ?? 23);
+$stationFilter = (string)($_GET['station'] ?? 'all');
 $lastSyncLabel = '—';
 $closeReasonMap = [1 => 'Гость ушел', 2 => 'За счёт заведения', 3 => 'Ошибка официанта'];
 $payTypeMap = [0 => 'Без оплаты', 1 => 'Наличные', 2 => 'Безнал', 3 => 'Смешанная'];
@@ -17,7 +18,8 @@ $dashboardQuery = http_build_query([
     'dateFrom' => $dateFrom,
     'dateTo' => $dateTo,
     'hourStart' => $hourStart,
-    'hourEnd' => $hourEnd
+    'hourEnd' => $hourEnd,
+    'station' => $stationFilter
 ]);
 
 try {
@@ -47,6 +49,9 @@ try {
     }
     if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
         $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+    }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'waiter_name')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN waiter_name VARCHAR(255) NULL AFTER table_number");
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_exclude_item'])) {
         if (!veranda_can('exclude_toggle')) {
@@ -149,6 +154,17 @@ try {
     $params[] = $dateFrom;
     $params[] = $dateTo;
 
+    if ($stationFilter !== 'all' && $stationFilter !== '') {
+        if ($stationFilter === '2') {
+            $where[] = "(station = '2' OR station = 2 OR station = 'Kitchen' OR station = 'Main')";
+        } elseif ($stationFilter === '3') {
+            $where[] = "(station = '3' OR station = 3 OR station = 'Bar Veranda')";
+        } else {
+            $where[] = "station = ?";
+            $params[] = $stationFilter;
+        }
+    }
+
     // Фильтр по времени (часам)
     if ($hourStart > 0 || $hourEnd < 23) {
         $where[] = "HOUR(transaction_opened_at) BETWEEN ? AND ?";
@@ -200,16 +216,26 @@ try {
                         'tx_id' => $row['transaction_id'],
                         'opened_at' => $row['transaction_opened_at'],
                         'closed_at' => $row['transaction_closed_at'],
+                        'table_number' => $row['table_number'] ?? null,
+                        'waiter_name' => $row['waiter_name'] ?? null,
                         'status' => (int)$row['status'],
                         'pay_type' => isset($row['pay_type']) ? (int)$row['pay_type'] : null,
                         'close_reason' => isset($row['close_reason']) ? (int)$row['close_reason'] : null,
                         'exclude_from_dashboard' => isset($row['exclude_from_dashboard']) ? (int)$row['exclude_from_dashboard'] : 0,
                         'max_wait_time' => 0,
+                        'max_wait_is_uncertain' => false,
                         'max_wait_fallback' => false,
                         'max_wait_prob' => false,
                         'max_wait_pstr' => false,
                         'max_wait_log_close_at' => null,
                         'max_wait_log_close_timestamp' => 0,
+                        'max_wait_time_reliable' => 0,
+                        'max_wait_reliable_log_close_at' => null,
+                        'max_wait_reliable_log_close_timestamp' => 0,
+                        'max_wait_time_uncertain' => 0,
+                        'max_wait_uncertain_source' => '',
+                        'max_wait_uncertain_log_close_at' => null,
+                        'max_wait_uncertain_log_close_timestamp' => 0,
                         'has_hookah' => false,
                         'opened_timestamp' => $row['transaction_opened_at'] ? strtotime($row['transaction_opened_at']) : 0,
                         'closed_timestamp' => $row['transaction_closed_at'] ? strtotime($row['transaction_closed_at']) : 0
@@ -218,6 +244,12 @@ try {
                 if (empty($groupedStats[$receipt]['closed_at']) && !empty($row['transaction_closed_at'])) {
                     $groupedStats[$receipt]['closed_at'] = $row['transaction_closed_at'];
                     $groupedStats[$receipt]['closed_timestamp'] = strtotime($row['transaction_closed_at']);
+                }
+                if (empty($groupedStats[$receipt]['table_number']) && !empty($row['table_number'])) {
+                    $groupedStats[$receipt]['table_number'] = $row['table_number'];
+                }
+                if (empty($groupedStats[$receipt]['waiter_name']) && !empty($row['waiter_name'])) {
+                    $groupedStats[$receipt]['waiter_name'] = $row['waiter_name'];
                 }
                 if ((int)$row['status'] > $groupedStats[$receipt]['status']) {
                     $groupedStats[$receipt]['status'] = (int)$row['status'];
@@ -283,18 +315,71 @@ try {
                     }
                     if ($logicalCloseAt !== null) {
                         $wait = ($logicalCloseTs - $sentTs) / 60;
-                        if ($wait > $groupedStats[$receipt]['max_wait_time']) {
-                            $groupedStats[$receipt]['max_wait_time'] = round($wait, 1);
-                            $groupedStats[$receipt]['max_wait_fallback'] = ($logicalSource === 'close');
-                            $groupedStats[$receipt]['max_wait_prob'] = ($logicalSource === 'prob');
-                            $groupedStats[$receipt]['max_wait_pstr'] = ($logicalSource === 'pstr');
-                            $groupedStats[$receipt]['max_wait_log_close_at'] = $logicalCloseAt;
-                            $groupedStats[$receipt]['max_wait_log_close_timestamp'] = $logicalCloseTs;
+                        $waitRounded = round($wait, 1);
+                        $isUncertain = ($logicalSource !== 'pstr');
+
+                        if ($isUncertain && empty($row['exclude_from_dashboard']) && !empty($row['id'])) {
+                            try {
+                                $db->query(
+                                    "UPDATE kitchen_stats SET exclude_from_dashboard = 1, exclude_auto = 1 WHERE id = ?",
+                                    [(int)$row['id']]
+                                );
+                                $row['exclude_from_dashboard'] = 1;
+                                $row['exclude_auto'] = 1;
+                            } catch (\Exception $e) {
+                            }
+                        }
+
+                        if ($isUncertain) {
+                            if ($waitRounded > (float)$groupedStats[$receipt]['max_wait_time_uncertain']) {
+                                $groupedStats[$receipt]['max_wait_time_uncertain'] = $waitRounded;
+                                $groupedStats[$receipt]['max_wait_uncertain_source'] = (string)$logicalSource;
+                                $groupedStats[$receipt]['max_wait_uncertain_log_close_at'] = $logicalCloseAt;
+                                $groupedStats[$receipt]['max_wait_uncertain_log_close_timestamp'] = $logicalCloseTs;
+                            }
+                        } else {
+                            if (empty($row['exclude_from_dashboard']) && $waitRounded > (float)$groupedStats[$receipt]['max_wait_time_reliable']) {
+                                $groupedStats[$receipt]['max_wait_time_reliable'] = $waitRounded;
+                                $groupedStats[$receipt]['max_wait_reliable_log_close_at'] = $logicalCloseAt;
+                                $groupedStats[$receipt]['max_wait_reliable_log_close_timestamp'] = $logicalCloseTs;
+                            }
                         }
                     }
                 }
             }
         }
+
+        foreach ($groupedStats as &$g) {
+            $reliable = (float)($g['max_wait_time_reliable'] ?? 0);
+            $uncertain = (float)($g['max_wait_time_uncertain'] ?? 0);
+            if ($reliable > 0) {
+                $g['max_wait_time'] = $reliable;
+                $g['max_wait_is_uncertain'] = false;
+                $g['max_wait_fallback'] = false;
+                $g['max_wait_prob'] = false;
+                $g['max_wait_pstr'] = true;
+                $g['max_wait_log_close_at'] = $g['max_wait_reliable_log_close_at'] ?? null;
+                $g['max_wait_log_close_timestamp'] = (int)($g['max_wait_reliable_log_close_timestamp'] ?? 0);
+            } elseif ($uncertain > 0) {
+                $src = (string)($g['max_wait_uncertain_source'] ?? '');
+                $g['max_wait_time'] = $uncertain;
+                $g['max_wait_is_uncertain'] = true;
+                $g['max_wait_fallback'] = ($src === 'close');
+                $g['max_wait_prob'] = ($src === 'prob');
+                $g['max_wait_pstr'] = false;
+                $g['max_wait_log_close_at'] = $g['max_wait_uncertain_log_close_at'] ?? null;
+                $g['max_wait_log_close_timestamp'] = (int)($g['max_wait_uncertain_log_close_timestamp'] ?? 0);
+            } else {
+                $g['max_wait_time'] = 0;
+                $g['max_wait_is_uncertain'] = false;
+                $g['max_wait_fallback'] = false;
+                $g['max_wait_prob'] = false;
+                $g['max_wait_pstr'] = false;
+                $g['max_wait_log_close_at'] = null;
+                $g['max_wait_log_close_timestamp'] = 0;
+            }
+        }
+        unset($g);
 
         ob_start();
         if (!empty($groupedStats)) {
@@ -484,6 +569,15 @@ try {
             </div>
 
             <div class="filter-group">
+                <label for="station">Цех:</label>
+                <select name="station" id="station">
+                    <option value="all" <?= $stationFilter === 'all' ? 'selected' : '' ?>>Все</option>
+                    <option value="2" <?= $stationFilter === '2' ? 'selected' : '' ?>>Kitchen (2)</option>
+                    <option value="3" <?= $stationFilter === '3' ? 'selected' : '' ?>>Bar (3)</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
                 <label for="status">Статус:</label>
                 <select name="status" id="status">
                     <option value="all" <?= $selectedStatus === 'all' ? 'selected' : '' ?>>Все чеки</option>
@@ -494,7 +588,7 @@ try {
 
             <div class="spacer"></div>
             <button type="submit">Применить</button>
-            <?php if ($selectedStatus !== 'all' || $dateFrom !== date('Y-m-d') || $dateTo !== date('Y-m-d')): ?>
+            <?php if ($selectedStatus !== 'all' || $dateFrom !== date('Y-m-d') || $dateTo !== date('Y-m-d') || $hourStart !== 0 || $hourEnd !== 23 || $stationFilter !== 'all'): ?>
                 <a href="rawdata.php" style="font-size: 0.9em; color: #666; margin-left: 10px;">Сбросить</a>
             <?php endif; ?>
         </form>
@@ -725,6 +819,27 @@ try {
                 }
             });
         });
+
+        (() => {
+            const fire = () => window.dispatchEvent(new Event('resize'));
+            const kick = () => {
+                requestAnimationFrame(() => {
+                    fire();
+                    requestAnimationFrame(fire);
+                });
+                setTimeout(fire, 200);
+                setTimeout(fire, 800);
+            };
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', kick, { once: true });
+            } else {
+                kick();
+            }
+            window.addEventListener('load', () => {
+                fire();
+                setTimeout(fire, 300);
+            });
+        })();
 
         (() => {
             const menu = document.querySelector('.user-menu');

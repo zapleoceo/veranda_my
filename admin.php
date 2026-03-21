@@ -8,9 +8,10 @@ veranda_require('admin');
 $message = '';
 $error = '';
 
-$tab = $_GET['tab'] ?? 'main';
-if (!in_array($tab, ['main', 'menu'], true)) {
-    $tab = 'main';
+$tab = (string)($_GET['tab'] ?? 'sync');
+if ($tab === 'main') $tab = 'access';
+if (!in_array($tab, ['sync', 'access', 'telegram', 'menu', 'categories'], true)) {
+    $tab = 'sync';
 }
 
 $columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
@@ -302,6 +303,9 @@ $menuView = $_GET['view'] ?? 'list';
 if (!in_array($menuView, ['list', 'edit', 'categories'], true)) {
     $menuView = 'list';
 }
+if ($tab === 'categories') {
+    $menuView = 'categories';
+}
 $menuItems = [];
 $menuTotal = 0;
 $menuPerPage = 50;
@@ -312,7 +316,7 @@ $menuCategoriesSub = [];
 $menuSyncMeta = ['last_sync_at' => null, 'last_sync_result' => null, 'last_sync_error' => null];
 $menuSyncAtIso = '';
 
-if ($tab === 'menu') {
+if ($tab === 'menu' || $tab === 'categories') {
     $db->createMenuTables();
 
     $metaKeys = ['menu_last_sync_at', 'menu_last_sync_result', 'menu_last_sync_error'];
@@ -808,6 +812,7 @@ if ($tab === 'menu') {
         .sort-link:hover { text-decoration: underline; }
         .sort-arrow { color: #1a73e8; font-size: 12px; }
         .muted { color: #777; font-size: 12px; }
+        .info-icon { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid #cbd5e1; color:#1a73e8; font-weight:800; font-size:12px; cursor:help; background:#fff; }
     </style>
 </head>
 <body>
@@ -837,11 +842,140 @@ if ($tab === 'menu') {
         <?php if ($error): ?><div class="error"><?= $error ?></div><?php endif; ?>
 
         <div class="tab-links">
-            <a href="admin.php?tab=main" class="<?= $tab === 'main' ? 'active' : '' ?>">Основное</a>
+            <a href="admin.php?tab=sync" class="<?= $tab === 'sync' ? 'active' : '' ?>">Синки</a>
+            <a href="admin.php?tab=access" class="<?= $tab === 'access' ? 'active' : '' ?>">Доступы</a>
+            <a href="admin.php?tab=telegram" class="<?= $tab === 'telegram' ? 'active' : '' ?>">Telegram</a>
             <a href="admin.php?tab=menu" class="<?= $tab === 'menu' ? 'active' : '' ?>">Меню</a>
+            <a href="admin.php?tab=categories" class="<?= $tab === 'categories' ? 'active' : '' ?>">Категории</a>
+            <a href="logs.php">Логи</a>
         </div>
+        <?php if ($tab === 'sync'): ?>
+            <?php
+                $metaKeys = [
+                    'chefassistant_last_sync_at',
+                    'chefassistant_last_sync_info',
+                    'chefassistant_last_sync_error',
+                    'menu_last_sync_at',
+                    'menu_last_sync_result',
+                    'menu_last_sync_error',
+                ];
+                $meta = [];
+                foreach ($metaKeys as $k) {
+                    $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$k])->fetch();
+                    $meta[$k] = $row ? (string)$row['meta_value'] : '';
+                }
+            ?>
+            <div class="card description-card">
+                <h4>Синки: что это</h4>
+                <ul>
+                    <li><strong>Kitchen:</strong> синхронизация данных чеков/позиций из Poster в <code>kitchen_stats</code> (для Дашборда/Таблицы/КухняОнлайн).</li>
+                    <li><strong>ChefAssistant:</strong> подтягивание отметок готовности (ChAss) и исправление готовности по истории.</li>
+                    <li><strong>ProbCloseTime:</strong> расчёт логического времени закрытия позиций (по следующим чекам) — это ВрЛогЗакр.</li>
+                    <li><strong>Menu:</strong> синхронизация меню из Poster в таблицы <code>poster_menu_items</code>, <code>menu_items_*</code>.</li>
+                </ul>
+            </div>
 
-        <?php if ($tab === 'main'): ?>
+            <div class="card">
+                <h3>Статус</h3>
+                <table>
+                    <tr>
+                        <th>Параметр</th>
+                        <th>Значение</th>
+                        <th style="width: 40px;">i</th>
+                    </tr>
+                    <tr>
+                        <td>ChefAssistant: последняя синхронизация</td>
+                        <td><?= htmlspecialchars($meta['chefassistant_last_sync_at'] ?: '—') ?></td>
+                        <td><span class="info-icon" title="Синхронизация ChefAssistant (Codemeal): подтягивает отметки готовности (ready_chass_at) и исправляет готовность по истории.">i</span></td>
+                    </tr>
+                    <tr>
+                        <td>ChefAssistant: результат</td>
+                        <td><?= htmlspecialchars($meta['chefassistant_last_sync_info'] ?: '—') ?></td>
+                        <td><span class="info-icon" title="Сводка по последнему запуску ChefAssistant: сколько страниц/заказов/строк обновлено.">i</span></td>
+                    </tr>
+                    <tr>
+                        <td>ChefAssistant: ошибка</td>
+                        <td><?= htmlspecialchars($meta['chefassistant_last_sync_error'] ?: '—') ?></td>
+                        <td><span class="info-icon" title="Текст последней ошибки ChefAssistant, если синк упал.">i</span></td>
+                    </tr>
+                    <tr>
+                        <td>Menu sync: последняя синхронизация</td>
+                        <td><?= htmlspecialchars($meta['menu_last_sync_at'] ?: '—') ?></td>
+                        <td><span class="info-icon" title="Синхронизация меню из Poster в poster_menu_items и menu_items_*. Используется для страницы Меню/Категории.">i</span></td>
+                    </tr>
+                    <tr>
+                        <td>Menu sync: результат</td>
+                        <td><?= htmlspecialchars($meta['menu_last_sync_result'] ?: '—') ?></td>
+                        <td><span class="info-icon" title="Сводка по синку меню: длительность, сколько позиций/категорий обработано.">i</span></td>
+                    </tr>
+                    <tr>
+                        <td>Menu sync: ошибка</td>
+                        <td><?= htmlspecialchars($meta['menu_last_sync_error'] ?: '—') ?></td>
+                        <td><span class="info-icon" title="Текст последней ошибки синка меню, если синк упал.">i</span></td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3>Запуск руками</h3>
+                <div class="muted">Запускает серверные скрипты. Рекомендуется использовать редко и осознанно.</div>
+                <form method="post" style="margin-top: 12px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                    <input type="hidden" name="run_script" value="1">
+                    <div class="form-group" style="flex:1; min-width:220px; margin-bottom:0;">
+                        <label for="script_name">Скрипт</label>
+                        <select name="script_name" id="script_name">
+                            <option value="kitchen_cron">Kitchen cron (сегодня)</option>
+                            <option value="kitchen_resync_range">Kitchen resync range</option>
+                            <option value="kitchen_prob_close">Backfill ProbCloseTime (все даты)</option>
+                            <option value="menu_cron">Menu cron</option>
+                            <option value="tg_alerts">Telegram alerts</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="date_from">От</label>
+                        <input type="date" name="date_from" id="date_from" value="<?= htmlspecialchars(date('Y-m-d')) ?>">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="date_to">До</label>
+                        <input type="date" name="date_to" id="date_to" value="<?= htmlspecialchars(date('Y-m-d')) ?>">
+                    </div>
+                    <button type="submit">Запустить</button>
+                </form>
+                <?php
+                    if (isset($_POST['run_script'])) {
+                        $script = (string)($_POST['script_name'] ?? '');
+                        $dateFrom = (string)($_POST['date_from'] ?? date('Y-m-d'));
+                        $dateTo = (string)($_POST['date_to'] ?? date('Y-m-d'));
+                        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-d');
+                        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d');
+
+                        $cmd = null;
+                        if ($script === 'kitchen_cron') {
+                            $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/cron.php');
+                        } elseif ($script === 'kitchen_resync_range') {
+                            $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/scripts/kitchen/resync_range.php') . ' ' . escapeshellarg($dateFrom) . ' ' . escapeshellarg($dateTo);
+                        } elseif ($script === 'kitchen_prob_close') {
+                            $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/scripts/kitchen/backfill_prob_close_at.php');
+                        } elseif ($script === 'menu_cron') {
+                            $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/menu_cron.php');
+                        } elseif ($script === 'tg_alerts') {
+                            $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/telegram_alerts.php');
+                        }
+
+                        if ($cmd) {
+                            $out = [];
+                            $code = 0;
+                            exec($cmd . ' 2>&1', $out, $code);
+                            if (count($out) > 200) $out = array_slice($out, -200);
+                            echo '<pre style="margin-top:12px; white-space:pre-wrap; word-break:break-word; background:#0b1020; color:#e5e7eb; padding:12px; border-radius:12px; overflow:auto; max-height:360px;">' . htmlspecialchars("exit={$code}\n" . implode("\n", $out)) . '</pre>';
+                        } else {
+                            echo '<div class="error">Неизвестный скрипт</div>';
+                        }
+                    }
+                ?>
+            </div>
+
+        <?php elseif ($tab === 'telegram'): ?>
         <div class="card">
             <h3>Настройки уведомлений (Telegram)</h3>
             <form method="POST">
@@ -913,6 +1047,23 @@ if ($tab === 'menu') {
             </form>
         </div>
 
+        <div class="description-card">
+            <h4>Логика работы уведомлений в Telegram:</h4>
+            <ul>
+                <li><strong>Каждые 5 минут (cron):</strong> Скрипт сначала очищает старые алерты, затем отправляет актуальные.</li>
+                <li><strong>ChefAssistant:</strong> Синхронизация временно отключена, данные по нему не используются.</li>
+                <li><strong>Очистка:</strong> Для всех сообщений с tg_message_id за последние 2 часа (по ticket_sent_at) проверяется актуальность. Если блюдо готово/удалено/позиция исключена/чек закрыт/✅ Принято — бот удаляет сообщение и очищает tg_message_id.</li>
+                <li><strong>Динамический тайминг:</strong> Лимит ожидания зависит от нагрузки. Если открыто меньше <b><?= $settings['alert_load_threshold'] ?></b> чеков — <b><?= $settings['alert_timing_low_load'] ?> мин</b>, иначе — <b><?= $settings['alert_timing_high_load'] ?> мин</b>. Если включено "ИСКЛЮЧИТЬ СТОЛ PARTNERS", он не влияет на нагрузку, но отображается в заголовке отдельно (напр. 9+4).</li>
+                <li><strong>Кандидаты на алерт:</strong> Берутся только позиции с ticket_sent_at, которые старше лимита, status=1, ready_pressed_at IS NULL и tg_acknowledged=0.</li>
+                <li><strong>Проверка через Poster:</strong> Перед отправкой по каждой позиции проверяется, что чек всё ещё открыт, и по истории чека определяется готовность (finishedcooking) и удаление позиции (delete/deleteitem или changeitemcount=0).</li>
+                <li><strong>Обновление текста:</strong> Если по позиции уже было сообщение, бот удаляет старое и отправляет новое с актуальным временем ожидания.</li>
+                <li><strong>Подтверждение (✅ Принято):</strong> Нажатие временно отключает алерты на <b><?= (int)$settings['alert_ack_snooze_minutes'] ?></b> минут. Подтверждение применяется ко всем дублям этой позиции в чеке (transaction_date + transaction_id + dish_id + station).</li>
+                <li><strong>Контроль доступа к ✅ Принято:</strong> Нажатия обрабатываются только от Telegram username из whitelist выше. Если username не в списке — показывается ответ "Эта кнопка только для уважаемых людей" и ничего в БД не меняется.</li>
+                <li><strong>Надёжность удаления:</strong> tg_message_id очищается только если Telegram подтвердил удаление (ok=true). Если удалить не удалось — будет повторная попытка в следующих запусках.</li>
+            </ul>
+        </div>
+
+        <?php elseif ($tab === 'access'): ?>
         <div class="card">
             <h3>Управление доступом</h3>
             <form method="POST" class="form-group">
@@ -977,21 +1128,6 @@ if ($tab === 'menu') {
             </div>
         </div>
 
-        <div class="description-card">
-            <h4>Логика работы уведомлений в Telegram:</h4>
-            <ul>
-                <li><strong>Каждые 5 минут (cron):</strong> Скрипт сначала очищает старые алерты, затем отправляет актуальные.</li>
-                <li><strong>ChefAssistant:</strong> Синхронизация временно отключена, данные по нему не используются.</li>
-                <li><strong>Очистка:</strong> Для всех сообщений с tg_message_id за последние 2 часа (по ticket_sent_at) проверяется актуальность. Если блюдо готово/удалено/позиция исключена/чек закрыт/✅ Принято — бот удаляет сообщение и очищает tg_message_id.</li>
-                <li><strong>Динамический тайминг:</strong> Лимит ожидания зависит от нагрузки. Если открыто меньше <b><?= $settings['alert_load_threshold'] ?></b> чеков — <b><?= $settings['alert_timing_low_load'] ?> мин</b>, иначе — <b><?= $settings['alert_timing_high_load'] ?> мин</b>. Если включено "ИСКЛЮЧИТЬ СТОЛ PARTNERS", он не влияет на нагрузку, но отображается в заголовке отдельно (напр. 9+4).</li>
-                <li><strong>Кандидаты на алерт:</strong> Берутся только позиции с ticket_sent_at, которые старше лимита, status=1, ready_pressed_at IS NULL и tg_acknowledged=0.</li>
-                <li><strong>Проверка через Poster:</strong> Перед отправкой по каждой позиции проверяется, что чек всё ещё открыт, и по истории чека определяется готовность (finishedcooking) и удаление позиции (delete/deleteitem или changeitemcount=0).</li>
-                <li><strong>Обновление текста:</strong> Если по позиции уже было сообщение, бот удаляет старое и отправляет новое с актуальным временем ожидания.</li>
-                <li><strong>Подтверждение (✅ Принято):</strong> Нажатие временно отключает алерты на <b><?= (int)$settings['alert_ack_snooze_minutes'] ?></b> минут. Подтверждение применяется ко всем дублям этой позиции в чеке (transaction_date + transaction_id + dish_id + station).</li>
-                <li><strong>Контроль доступа к ✅ Принято:</strong> Нажатия обрабатываются только от Telegram username из whitelist выше. Если username не в списке — показывается ответ "Эта кнопка только для уважаемых людей" и ничего в БД не меняется.</li>
-                <li><strong>Надёжность удаления:</strong> tg_message_id очищается только если Telegram подтвердил удаление (ok=true). Если удалить не удалось — будет повторная попытка в следующих запусках.</li>
-            </ul>
-        </div>
         <?php else: ?>
         <div class="card">
             <div class="menu-actions">
@@ -1657,6 +1793,27 @@ if ($tab === 'menu') {
         <?php endif; ?>
     </div>
     <script>
+        (() => {
+            const fire = () => window.dispatchEvent(new Event('resize'));
+            const kick = () => {
+                requestAnimationFrame(() => {
+                    fire();
+                    requestAnimationFrame(fire);
+                });
+                setTimeout(fire, 200);
+                setTimeout(fire, 800);
+            };
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', kick, { once: true });
+            } else {
+                kick();
+            }
+            window.addEventListener('load', () => {
+                fire();
+                setTimeout(fire, 300);
+            });
+        })();
+
         (() => {
             const bar = document.createElement('div');
             bar.className = 'sticky-hscroll-bar';

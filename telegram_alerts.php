@@ -27,11 +27,13 @@ $tgToken = $_ENV['TELEGRAM_BOT_TOKEN'] ?? '';
 $tgChatId = $_ENV['TELEGRAM_CHAT_ID'] ?? '';
 $tgThreadId = isset($_ENV['TELEGRAM_THREAD_ID']) && $_ENV['TELEGRAM_THREAD_ID'] !== '' ? (int)$_ENV['TELEGRAM_THREAD_ID'] : null;
 
-if (empty($tgToken)) {
-    die("Error: TELEGRAM_BOT_TOKEN is not set in .env\n");
-}
-if (empty($tgChatId)) {
-    die("Error: TELEGRAM_CHAT_ID is not set in .env\n");
+if (empty($tgToken) || empty($tgChatId)) {
+    echo "[" . date('Y-m-d H:i:s') . "] Telegram alerts skipped: TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not configured.\n";
+    $scriptFile = realpath($_SERVER['SCRIPT_FILENAME'] ?? '') ?: '';
+    if ($scriptFile !== '' && realpath(__FILE__) !== false && realpath(__FILE__) !== $scriptFile) {
+        return;
+    }
+    exit(0);
 }
 
 $employeesById = [];
@@ -478,12 +480,16 @@ try {
                 $apiReason = isset($tx['reason']) && $tx['reason'] !== '' ? (int)$tx['reason'] : null;
                 $apiPayType = isset($tx['pay_type']) ? (int)$tx['pay_type'] : null;
                 
-                // Проверяем историю на предмет готовности
+                // Проверяем историю на предмет готовности/удаления и количества (с учетом экземпляров)
                 $history = $getTxHistory($api, (int)$item['transaction_id'], $historyByTxId);
                 $dishId = (int)$item['dish_id'];
-                $readyTime = null;
+                $itemSeq = (int)($item['item_seq'] ?? 1);
+                if ($itemSeq <= 0) $itemSeq = 1;
+                $readyTimes = [];
                 $sentCount = null;
                 $isDeletedInTx = $isDishDeletedFromHistory($history, $dishId);
+                $lastCountAt = 0;
+                $currentCount = null;
                 foreach ($history as $event) {
                     if (($event['type_history'] ?? '') === 'sendtokitchen') {
                         $valText = $event['value_text'] ?? null;
@@ -505,7 +511,21 @@ try {
                         }
                     }
                     if (($event['type_history'] ?? '') === 'finishedcooking' && (int)($event['value'] ?? 0) === $dishId) {
-                        $readyTime = date('Y-m-d H:i:s', ($event['time'] ?? 0) / 1000);
+                        $readyTimes[] = date('Y-m-d H:i:s', ((int)($event['time'] ?? 0)) / 1000);
+                    }
+                    if (($event['type_history'] ?? '') === 'changeitemcount' && (int)($event['value'] ?? 0) === $dishId) {
+                        $t = (int)($event['time'] ?? 0);
+                        if ($t >= $lastCountAt) {
+                            $lastCountAt = $t;
+                            $currentCount = (int)($event['value2'] ?? 0);
+                        }
+                    }
+                    if ((($event['type_history'] ?? '') === 'deleteitem' || ($event['type_history'] ?? '') === 'delete') && (int)($event['value'] ?? 0) === $dishId) {
+                        $t = (int)($event['time'] ?? 0);
+                        if ($t >= $lastCountAt) {
+                            $lastCountAt = $t;
+                            $currentCount = 0;
+                        }
                     }
                 }
 
@@ -517,9 +537,21 @@ try {
                     }
                     continue;
                 }
-                if ($readyTime !== null) {
-                    $db->query("UPDATE kitchen_stats SET ready_pressed_at = ? WHERE id = ?", [$readyTime, $item['id']]);
-                    continue; // Блюдо готово, пропускаем алерт
+
+                if ($currentCount !== null && $currentCount > 0 && $itemSeq > $currentCount) {
+                    $db->query("UPDATE kitchen_stats SET was_deleted = 1 WHERE id = ?", [$item['id']]);
+                    if (!empty($item['tg_message_id'])) {
+                        $bot->deleteMessage((int)$item['tg_message_id']);
+                        $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
+                    }
+                    continue;
+                }
+
+                sort($readyTimes);
+                $instanceReadyTime = $readyTimes[$itemSeq - 1] ?? null;
+                if ($instanceReadyTime !== null) {
+                    $db->query("UPDATE kitchen_stats SET ready_pressed_at = ? WHERE id = ?", [$instanceReadyTime, $item['id']]);
+                    continue;
                 }
                 if ((int)($item['was_deleted'] ?? 0) === 1 && $sentCount !== null && $sentCount > 0) {
                     $db->query("UPDATE kitchen_stats SET was_deleted = 0 WHERE id = ?", [$item['id']]);
@@ -528,7 +560,7 @@ try {
                 if ($sentCount === null && !empty($item['ticket_sent_at'])) {
                     $sentCount = 1;
                 }
-                if ($sentCount !== null && $sentCount <= 0) {
+                if ($sentCount !== null && ($sentCount <= 0 || $itemSeq > $sentCount)) {
                     $db->query("UPDATE kitchen_stats SET was_deleted = 1 WHERE id = ?", [$item['id']]);
                     continue;
                 }

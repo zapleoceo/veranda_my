@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/src/classes/Database.php';
 require_once __DIR__ . '/src/classes/Auth.php';
+require_once __DIR__ . '/src/classes/PosterAPI.php';
 
 // Load .env
 if (file_exists(__DIR__ . '/.env')) {
@@ -52,6 +53,97 @@ if (!function_exists('veranda_get_user_permissions')) {
         } catch (\Exception $e) {
             return $defaults;
         }
+    }
+}
+
+$ensureSystemMeta = function (\App\Classes\Database $db): void {
+    try {
+        $db->query("CREATE TABLE IF NOT EXISTS system_meta (
+            meta_key VARCHAR(255) PRIMARY KEY,
+            meta_value TEXT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (\Exception $e) {
+    }
+};
+
+if (!function_exists('veranda_get_workshops')) {
+    function veranda_get_workshops(\App\Classes\Database $db, string $token, string $dbName): array {
+        $ensure = function () use ($db) {
+            try {
+                $db->query("CREATE TABLE IF NOT EXISTS system_meta (
+                    meta_key VARCHAR(255) PRIMARY KEY,
+                    meta_value TEXT
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            } catch (\Exception $e) {
+            }
+        };
+        $ensure();
+
+        $ttlSec = 3600;
+        $now = time();
+        $cached = null;
+        $cachedAt = 0;
+        try {
+            $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = 'poster_workshops_json' LIMIT 1")->fetch();
+            $cached = (string)($row['meta_value'] ?? '');
+            $row2 = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = 'poster_workshops_updated_at' LIMIT 1")->fetch();
+            $cachedAt = (int)($row2['meta_value'] ?? 0);
+        } catch (\Exception $e) {
+        }
+
+        $decoded = null;
+        if ($cached !== '' && ($cachedAt > 0 && ($now - $cachedAt) < $ttlSec)) {
+            $decoded = json_decode($cached, true);
+            if (!is_array($decoded)) $decoded = null;
+        }
+
+        if ($decoded === null && $token !== '') {
+            try {
+                $api = new \App\Classes\PosterAPI($token);
+                $workshops = $api->request('menu.getWorkshops');
+                $out = [];
+                if (is_array($workshops)) {
+                    foreach ($workshops as $w) {
+                        $id = (string)($w['workshop_id'] ?? '');
+                        $name = (string)($w['workshop_name'] ?? '');
+                        if ($id === '' || $name === '') continue;
+                        $out[] = ['id' => $id, 'name' => $name];
+                    }
+                }
+                $decoded = $out;
+                try {
+                    $db->query(
+                        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                        ['poster_workshops_json', json_encode($decoded, JSON_UNESCAPED_UNICODE)]
+                    );
+                    $db->query(
+                        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                        ['poster_workshops_updated_at', (string)$now]
+                    );
+                } catch (\Exception $e) {
+                }
+            } catch (\Exception $e) {
+            }
+        }
+
+        if (!is_array($decoded)) $decoded = [];
+        if (count($decoded) === 0) {
+            try {
+                $row = $db->query(
+                    "SELECT DISTINCT station AS s FROM kitchen_stats WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND station IS NOT NULL AND station <> '' ORDER BY station ASC"
+                )->fetchAll();
+                $out = [];
+                foreach ($row as $r) {
+                    $s = (string)($r['s'] ?? '');
+                    if ($s === '') continue;
+                    $out[] = ['id' => 's:' . $s, 'name' => $s];
+                }
+                $decoded = $out;
+            } catch (\Exception $e) {
+                $decoded = [];
+            }
+        }
+        return $decoded;
     }
 }
 

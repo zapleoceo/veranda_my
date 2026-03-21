@@ -8,6 +8,16 @@
         <summary>
             <div class="receipt-info">
                 <span class="receipt-number">Чек <?= htmlspecialchars($receiptNum) ?></span>
+                <?php
+                    $table = trim((string)($data['table_number'] ?? ''));
+                    $waiter = trim((string)($data['waiter_name'] ?? ''));
+                ?>
+                <?php if ($table !== '' || $waiter !== ''): ?>
+                    <div class="receipt-times">
+                        <?php if ($table !== ''): ?><span>Стол: <?= htmlspecialchars($table) ?></span><?php endif; ?>
+                        <?php if ($waiter !== ''): ?><span>Официант: <?= htmlspecialchars($waiter) ?></span><?php endif; ?>
+                    </div>
+                <?php endif; ?>
                 <div class="receipt-times">
                     <span>ВрОткр: <?= ($data['opened_at'] && $data['opened_at'] !== '0000-00-00 00:00:00' && date('Y', strtotime($data['opened_at'])) > 1970) ? date('H:i:s', strtotime($data['opened_at'])) : '—' ?></span>
                     <span>ВрЛогЗакр: <?php
@@ -27,9 +37,9 @@
                     } elseif ($data['max_wait_time'] >= 20) {
                         $waitClass = 'wait-medium';
                     }
-                    $waitIcon = !empty($data['max_wait_prob']) ? '❓' : (!empty($data['max_wait_fallback']) ? '📌' : (!empty($data['max_wait_pstr']) ? '' : '⌛'));
+                    $waitIcon = !empty($data['max_wait_is_uncertain']) ? '?' : '';
                 ?>
-                    <span class="receipt-max-wait <?= $waitClass ?>" title="<?= !empty($data['max_wait_prob']) ? 'Макс. ожидание рассчитано от отправки на станцию до расчетного времени (ProbCloseTime: берется из следующего чека(ов) по цеху).' : (!empty($data['max_wait_fallback']) ? 'Макс. ожидание рассчитано от отправки на станцию до времени закрытия чека (fallback).' : 'Макс. ожидание рассчитано от отправки на станцию до отметки Готово.') ?>"><?= $waitIcon !== '' ? ($waitIcon . ' ') : '' ?><?= $data['max_wait_time'] ?> мин</span>
+                    <span class="receipt-max-wait <?= $waitClass ?>" title="<?= !empty($data['max_wait_is_uncertain']) ? 'Макс. ожидание рассчитано по ВрЛогЗакр (без ВрГотPSTR). Не используется в расчётах.' : 'Макс. ожидание рассчитано от отправки на станцию до отметки Готово (PSTR).' ?>"><?= $waitIcon !== '' ? ($waitIcon . ' ') : '' ?><?= $data['max_wait_time'] ?> мин</span>
                 <?php endif; ?>
             </div>
         </summary>
@@ -56,6 +66,7 @@
                         $usedFallbackTime = false;
                         $usedInProgressTime = false;
                         $usedProbCloseTime = false;
+                        $autoExclude = false;
                         $isDeleted = !empty($item['was_deleted']);
                         $mainCat = isset($item['dish_category_id']) ? (int)$item['dish_category_id'] : 0;
                         $subCat = isset($item['dish_sub_category_id']) ? (int)$item['dish_sub_category_id'] : 0;
@@ -85,9 +96,9 @@
                                     $ts = strtotime($t);
                                     if ($ts === false || $ts <= 0) continue;
                                     if ($ts < $sentTs) continue;
-                                    $endTime = $t;
-                                    $endTs = $ts;
-                                    $endSource = $src;
+                                $endTime = $t;
+                                $endTs = $ts;
+                                $endSource = $src;
                                     break;
                                 }
                                 if ($endTime === null) {
@@ -112,6 +123,7 @@
                                     $diff = $endTs - $sentTs;
                                     $usedFallbackTime = ($endSource === 'close');
                                     $usedProbCloseTime = ($endSource === 'prob');
+                                    $autoExclude = ($endSource !== 'pstr');
                                     $wait = round($diff / 60, 1) . ' мин';
                                     if ($endSource !== 'pstr') {
                                         $wait .= '*';
@@ -182,7 +194,8 @@
                                     <input type="hidden" name="toggle_exclude_item" value="<?= (int)$item['id'] ?>">
                                     <input type="hidden" name="return_query" value="<?= htmlspecialchars(http_build_query($_GET), ENT_QUOTES) ?>">
                                     <label class="exclude-toggle">
-                                        <input type="checkbox" name="exclude_from_dashboard" value="1" <?= (!empty($item['exclude_from_dashboard']) || !empty($item['was_deleted']) || $isHookah) ? 'checked' : '' ?> <?= ($isHookah || !veranda_can('exclude_toggle')) ? 'disabled' : '' ?>>
+                                        <?php $shouldExclude = !empty($item['exclude_from_dashboard']) || !empty($item['was_deleted']) || $isHookah || !empty($autoExclude); ?>
+                                        <input type="checkbox" name="exclude_from_dashboard" value="1" <?= $shouldExclude ? 'checked' : '' ?> <?= ($isHookah || !veranda_can('exclude_toggle')) ? 'disabled' : '' ?>>
                                         не учитывать
                                     </label>
                                     <span class="save-indicator">сохранено</span>

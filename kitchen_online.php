@@ -82,12 +82,19 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
     }
 
     usort($cards, function ($a, $b) {
-        $aTs = (int)($a['min_sent_ts'] ?? 0);
-        $bTs = (int)($b['min_sent_ts'] ?? 0);
-        if ($aTs === $bTs) {
-            return ($a['transaction_id'] ?? 0) <=> ($b['transaction_id'] ?? 0);
+        $aReceipt = trim((string)($a['receipt_number'] ?? ''));
+        $bReceipt = trim((string)($b['receipt_number'] ?? ''));
+        $aNum = ctype_digit($aReceipt) ? (int)$aReceipt : 0;
+        $bNum = ctype_digit($bReceipt) ? (int)$bReceipt : 0;
+        if ($aNum > 0 && $bNum > 0 && $aNum !== $bNum) {
+            return $aNum <=> $bNum;
         }
-        return $aTs <=> $bTs;
+        if ($aNum > 0 && $bNum === 0) return -1;
+        if ($aNum === 0 && $bNum > 0) return 1;
+        if ($aReceipt !== '' && $bReceipt !== '' && $aReceipt !== $bReceipt) {
+            return $aReceipt <=> $bReceipt;
+        }
+        return ((int)($a['transaction_id'] ?? 0)) <=> ((int)($b['transaction_id'] ?? 0));
     });
 
     ob_start();
@@ -486,6 +493,27 @@ $dashboardQuery = http_build_query([
     </div>
 
     <script>
+        (() => {
+            const fire = () => window.dispatchEvent(new Event('resize'));
+            const kick = () => {
+                requestAnimationFrame(() => {
+                    fire();
+                    requestAnimationFrame(fire);
+                });
+                setTimeout(fire, 200);
+                setTimeout(fire, 800);
+            };
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', kick, { once: true });
+            } else {
+                kick();
+            }
+            window.addEventListener('load', () => {
+                fire();
+                setTimeout(fire, 300);
+            });
+        })();
+
         (() => {
             const menu = document.querySelector('.user-menu');
             if (!menu) return;
