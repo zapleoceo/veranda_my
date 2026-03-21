@@ -180,8 +180,11 @@ try {
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f7f6; padding: 0; color: #333; }
         .container { width: 100%; max-width: 1800px; margin: 0 auto; padding: 12px; box-sizing: border-box; }
         h1 { text-align: center; color: #1a73e8; margin-bottom: 40px; }
-        .chart-container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 30px; border: 1px solid #e0e0e0; }
-        h2 { margin-top: 0; color: #444; font-size: 1.2em; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 20px; }
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
+        @media (max-width: 980px) { .charts-grid { grid-template-columns: 1fr; } }
+        .chart-container { background: white; padding: 14px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 0; border: 1px solid #e0e0e0; }
+        h2 { margin: 0 0 10px; color: #444; font-size: 1.05em; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; }
+        .chart-canvas { width: 100% !important; height: 280px !important; }
         .error { color: #d32f2f; background: #fdecea; padding: 15px; border-radius: 8px; border: 1px solid #f5c2c7; text-align: center; }
         .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
         .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; min-width: 0; }
@@ -287,14 +290,16 @@ try {
         <?php if (isset($error)): ?>
             <div class="error"><?= htmlspecialchars($error) ?></div>
         <?php else: ?>
-            <div class="chart-container">
-                <h2>СТАНЦИЯ: KITCHEN</h2>
-                <canvas id="chartKitchen"></canvas>
-            </div>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h2>СТАНЦИЯ: KITCHEN</h2>
+                    <canvas id="chartKitchen" class="chart-canvas"></canvas>
+                </div>
 
-            <div class="chart-container">
-                <h2>СТАНЦИЯ: BAR VERANDA</h2>
-                <canvas id="chartBar"></canvas>
+                <div class="chart-container">
+                    <h2>СТАНЦИЯ: BAR VERANDA</h2>
+                    <canvas id="chartBar" class="chart-canvas"></canvas>
+                </div>
             </div>
         <?php endif; ?>
     </div>
@@ -333,6 +338,7 @@ try {
     const canRawData = <?= json_encode(veranda_can('rawdata')) ?>;
     const options = {
         responsive: true,
+        maintainAspectRatio: false,
         onClick: (event, elements, chart) => {
             if (elements.length > 0) {
                 if (!canRawData) return;
