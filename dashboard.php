@@ -208,6 +208,10 @@ try {
         .filters button[type="submit"] { padding: 10px 25px; background: #1a73e8; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
         .filters button[type="submit"]:hover { background: #1557b0; }
         .resync-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9em; color: #546e7a; }
+        .chart-type-switch { display: inline-flex; border: 1px solid #d0d5dd; border-radius: 999px; overflow: hidden; background: #fff; }
+        .chart-type-btn { appearance: none; border: 0; background: transparent; padding: 8px 12px; font-weight: 700; color: #546e7a; cursor: pointer; }
+        .chart-type-btn[aria-pressed="true"] { background: rgba(26,115,232,0.12); color: #1a73e8; }
+        .chart-type-btn:focus { outline: 2px solid rgba(26,115,232,0.35); outline-offset: 2px; }
     </style>
 </head>
 <body>
@@ -271,10 +275,10 @@ try {
 
             <div class="filter-group">
                 <label>График</label>
-                <select id="chartType" style="min-width: 180px;">
-                    <option value="bar">Столбики</option>
-                    <option value="line">Линия</option>
-                </select>
+                <div class="chart-type-switch" id="chartTypeSwitch" role="group" aria-label="Тип графика">
+                    <button type="button" class="chart-type-btn" data-type="bar" aria-pressed="false">Столбики</button>
+                    <button type="button" class="chart-type-btn" data-type="line" aria-pressed="false">Линия</button>
+                </div>
             </div>
             
             <button type="submit">Обновить</button>
@@ -367,7 +371,7 @@ try {
         }
     };
 
-    const chartTypeEl = document.getElementById('chartType');
+    const chartTypeSwitch = document.getElementById('chartTypeSwitch');
     const storageKey = 'dashboard_chart_type';
     const getType = () => {
         const t = (localStorage.getItem(storageKey) || '').trim();
@@ -381,6 +385,15 @@ try {
 
     let kitchenChart = null;
     let barChart = null;
+
+    const setSwitchState = (type) => {
+        if (!chartTypeSwitch) return;
+        const btns = Array.from(chartTypeSwitch.querySelectorAll('button.chart-type-btn'));
+        btns.forEach((b) => {
+            const t = (b.getAttribute('data-type') || '').trim();
+            b.setAttribute('aria-pressed', t === type ? 'true' : 'false');
+        });
+    };
 
     const buildDataset = (type, label, data, colors) => {
         const base = {
@@ -458,11 +471,15 @@ try {
     };
 
     const initialType = getType();
-    if (chartTypeEl) {
-        chartTypeEl.value = initialType;
-        chartTypeEl.addEventListener('change', () => {
-            const t = chartTypeEl.value;
+    if (chartTypeSwitch) {
+        setSwitchState(initialType);
+        chartTypeSwitch.addEventListener('click', (e) => {
+            const btn = e.target.closest('button.chart-type-btn');
+            if (!btn) return;
+            const t = (btn.getAttribute('data-type') || '').trim();
+            if (t !== 'line' && t !== 'bar') return;
             setType(t);
+            setSwitchState(t);
             renderCharts(t);
         });
     }
