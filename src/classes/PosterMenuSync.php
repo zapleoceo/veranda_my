@@ -14,6 +14,11 @@ class PosterMenuSync {
     public function sync(): array {
         $startedAt = microtime(true);
         $this->db->createMenuTables();
+        $pmi = $this->db->t('poster_menu_items');
+        $miRu = $this->db->t('menu_items_ru');
+        $miEn = $this->db->t('menu_items_en');
+        $miVn = $this->db->t('menu_items_vn');
+        $miKo = $this->db->t('menu_items_ko');
 
         $categories = $this->fetchCategories();
         $catMainMap = $this->upsertMainCategories($categories['main']);
@@ -54,7 +59,7 @@ class PosterMenuSync {
             $rawJson = json_encode($p, JSON_UNESCAPED_UNICODE);
 
             $this->db->query(
-                "INSERT INTO poster_menu_items
+                "INSERT INTO {$pmi}
                     (poster_id, name_raw, price_raw, cost_raw, station_id, station_name, main_category_id, main_category_name, sub_category_id, sub_category_name, raw_json, is_active)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                  ON DUPLICATE KEY UPDATE
@@ -84,7 +89,7 @@ class PosterMenuSync {
                 ]
             );
 
-            $posterRow = $this->db->query("SELECT id FROM poster_menu_items WHERE poster_id = ? LIMIT 1", [$posterId])->fetch();
+            $posterRow = $this->db->query("SELECT id FROM {$pmi} WHERE poster_id = ? LIMIT 1", [$posterId])->fetch();
             $posterItemId = (int)($posterRow['id'] ?? 0);
             if ($posterItemId <= 0) {
                 continue;
@@ -94,38 +99,38 @@ class PosterMenuSync {
             $subId = $subPosterCatId > 0 ? ($catSubMap[$subPosterCatId] ?? null) : null;
 
             $this->db->query(
-                "INSERT INTO menu_items_ru (poster_item_id, title, main_category_id, sub_category_id, sub_category, description, image_url, is_published, sort_order)
+                "INSERT INTO {$miRu} (poster_item_id, title, main_category_id, sub_category_id, sub_category, description, image_url, is_published, sort_order)
                  VALUES (?, NULL, ?, ?, NULL, NULL, NULL, 0, 0)
                  ON DUPLICATE KEY UPDATE
-                    main_category_id = COALESCE(menu_items_ru.main_category_id, VALUES(main_category_id)),
-                    sub_category_id = COALESCE(menu_items_ru.sub_category_id, VALUES(sub_category_id))",
+                    main_category_id = COALESCE({$miRu}.main_category_id, VALUES(main_category_id)),
+                    sub_category_id = COALESCE({$miRu}.sub_category_id, VALUES(sub_category_id))",
                 [$posterItemId, $mainId, $subId]
             );
 
             $this->db->query(
-                "INSERT INTO menu_items_en (poster_item_id, title, main_category_id, sub_category_id, sub_category, description)
+                "INSERT INTO {$miEn} (poster_item_id, title, main_category_id, sub_category_id, sub_category, description)
                  VALUES (?, NULL, ?, ?, NULL, NULL)
                  ON DUPLICATE KEY UPDATE
-                    main_category_id = COALESCE(menu_items_en.main_category_id, VALUES(main_category_id)),
-                    sub_category_id = COALESCE(menu_items_en.sub_category_id, VALUES(sub_category_id))",
+                    main_category_id = COALESCE({$miEn}.main_category_id, VALUES(main_category_id)),
+                    sub_category_id = COALESCE({$miEn}.sub_category_id, VALUES(sub_category_id))",
                 [$posterItemId, $mainId, $subId]
             );
 
             $this->db->query(
-                "INSERT INTO menu_items_vn (poster_item_id, title, main_category_id, sub_category_id, sub_category, description)
+                "INSERT INTO {$miVn} (poster_item_id, title, main_category_id, sub_category_id, sub_category, description)
                  VALUES (?, NULL, ?, ?, NULL, NULL)
                  ON DUPLICATE KEY UPDATE
-                    main_category_id = COALESCE(menu_items_vn.main_category_id, VALUES(main_category_id)),
-                    sub_category_id = COALESCE(menu_items_vn.sub_category_id, VALUES(sub_category_id))",
+                    main_category_id = COALESCE({$miVn}.main_category_id, VALUES(main_category_id)),
+                    sub_category_id = COALESCE({$miVn}.sub_category_id, VALUES(sub_category_id))",
                 [$posterItemId, $mainId, $subId]
             );
 
             $this->db->query(
-                "INSERT INTO menu_items_ko (poster_item_id, title, main_category_id, sub_category_id, sub_category, description)
+                "INSERT INTO {$miKo} (poster_item_id, title, main_category_id, sub_category_id, sub_category, description)
                  VALUES (?, NULL, ?, ?, NULL, NULL)
                  ON DUPLICATE KEY UPDATE
-                    main_category_id = COALESCE(menu_items_ko.main_category_id, VALUES(main_category_id)),
-                    sub_category_id = COALESCE(menu_items_ko.sub_category_id, VALUES(sub_category_id))",
+                    main_category_id = COALESCE({$miKo}.main_category_id, VALUES(main_category_id)),
+                    sub_category_id = COALESCE({$miKo}.sub_category_id, VALUES(sub_category_id))",
                 [$posterItemId, $mainId, $subId]
             );
         }
@@ -238,6 +243,7 @@ class PosterMenuSync {
     }
 
     private function upsertMainCategories(array $items): array {
+        $mcm = $this->db->t('menu_categories_main');
         $map = [];
         foreach ($items as $item) {
             $id = (int)($item['id'] ?? 0);
@@ -247,15 +253,15 @@ class PosterMenuSync {
             }
             $sort = $this->extractLeadingSortNumber($name);
             $this->db->query(
-                "INSERT INTO menu_categories_main (poster_main_category_id, name_raw, sort_order)
+                "INSERT INTO {$mcm} (poster_main_category_id, name_raw, sort_order)
                  VALUES (?, ?, ?)
                  ON DUPLICATE KEY UPDATE
                     name_raw=VALUES(name_raw),
-                    sort_order=IF(menu_categories_main.sort_order=0, VALUES(sort_order), menu_categories_main.sort_order)",
+                    sort_order=IF({$mcm}.sort_order=0, VALUES(sort_order), {$mcm}.sort_order)",
                 [$id, $name, $sort]
             );
         }
-        $rows = $this->db->query("SELECT id, poster_main_category_id FROM menu_categories_main")->fetchAll();
+        $rows = $this->db->query("SELECT id, poster_main_category_id FROM {$mcm}")->fetchAll();
         foreach ($rows as $r) {
             $map[(int)$r['poster_main_category_id']] = (int)$r['id'];
         }
@@ -263,6 +269,7 @@ class PosterMenuSync {
     }
 
     private function upsertSubCategories(array $items, array $mainMap): array {
+        $mcs = $this->db->t('menu_categories_sub');
         $map = [];
         foreach ($items as $item) {
             $id = (int)($item['id'] ?? 0);
@@ -274,16 +281,16 @@ class PosterMenuSync {
             $mainId = $parent > 0 ? ($mainMap[$parent] ?? null) : null;
             $sort = $this->extractLeadingSortNumber($name);
             $this->db->query(
-                "INSERT INTO menu_categories_sub (poster_sub_category_id, main_category_id, name_raw, sort_order)
+                "INSERT INTO {$mcs} (poster_sub_category_id, main_category_id, name_raw, sort_order)
                  VALUES (?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE
                     name_raw=VALUES(name_raw),
                     main_category_id=VALUES(main_category_id),
-                    sort_order=IF(menu_categories_sub.sort_order=0, VALUES(sort_order), menu_categories_sub.sort_order)",
+                    sort_order=IF({$mcs}.sort_order=0, VALUES(sort_order), {$mcs}.sort_order)",
                 [$id, $mainId, $name, $sort]
             );
         }
-        $rows = $this->db->query("SELECT id, poster_sub_category_id FROM menu_categories_sub")->fetchAll();
+        $rows = $this->db->query("SELECT id, poster_sub_category_id FROM {$mcs}")->fetchAll();
         foreach ($rows as $r) {
             $map[(int)$r['poster_sub_category_id']] = (int)$r['id'];
         }
@@ -300,25 +307,27 @@ class PosterMenuSync {
     }
 
     private function markMissingItemsInactive(array $activePosterIds): void {
+        $pmi = $this->db->t('poster_menu_items');
+        $miRu = $this->db->t('menu_items_ru');
         if (empty($activePosterIds)) {
-            $this->db->query("UPDATE poster_menu_items SET is_active = 0 WHERE is_active = 1");
-            $this->db->query("UPDATE menu_items_ru SET is_published = 0 WHERE is_published = 1");
+            $this->db->query("UPDATE {$pmi} SET is_active = 0 WHERE is_active = 1");
+            $this->db->query("UPDATE {$miRu} SET is_published = 0 WHERE is_published = 1");
             return;
         }
 
         $placeholders = implode(',', array_fill(0, count($activePosterIds), '?'));
-        $this->db->query("UPDATE poster_menu_items SET is_active = 0 WHERE is_active = 1 AND poster_id NOT IN ($placeholders)", $activePosterIds);
+        $this->db->query("UPDATE {$pmi} SET is_active = 0 WHERE is_active = 1 AND poster_id NOT IN ($placeholders)", $activePosterIds);
 
         $inactive = $this->db->query(
             "SELECT r.id
-             FROM menu_items_ru r
-             JOIN poster_menu_items p ON p.id = r.poster_item_id
+             FROM {$miRu} r
+             JOIN {$pmi} p ON p.id = r.poster_item_id
              WHERE p.is_active = 0 AND r.is_published = 1"
         )->fetchAll();
         if (!empty($inactive)) {
             $ids = array_map(fn($r) => (int)$r['id'], $inactive);
             $ph = implode(',', array_fill(0, count($ids), '?'));
-            $this->db->query("UPDATE menu_items_ru SET is_published = 0 WHERE id IN ($ph)", $ids);
+            $this->db->query("UPDATE {$miRu} SET is_published = 0 WHERE id IN ($ph)", $ids);
         }
     }
 

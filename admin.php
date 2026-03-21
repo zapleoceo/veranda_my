@@ -335,6 +335,12 @@ $menuSyncAtIso = '';
 if ($tab === 'menu' || $tab === 'categories') {
     $db->createMenuTables();
     $posterMenuItemsTable = $db->t('poster_menu_items');
+    $menuCategoriesMainTable = $db->t('menu_categories_main');
+    $menuCategoriesSubTable = $db->t('menu_categories_sub');
+    $menuItemsRuTable = $db->t('menu_items_ru');
+    $menuItemsEnTable = $db->t('menu_items_en');
+    $menuItemsVnTable = $db->t('menu_items_vn');
+    $menuItemsKoTable = $db->t('menu_items_ko');
 
     $metaKeys = ['menu_last_sync_at', 'menu_last_sync_result', 'menu_last_sync_error'];
     foreach ($metaKeys as $k) {
@@ -399,7 +405,7 @@ if ($tab === 'menu' || $tab === 'categories') {
 
     if (isset($_POST['save_menu_item'])) {
         $posterId = (int)($_POST['poster_id'] ?? 0);
-        $posterRow = $db->query("SELECT id, is_active FROM poster_menu_items WHERE poster_id=? LIMIT 1", [$posterId])->fetch();
+        $posterRow = $db->query("SELECT id, is_active FROM {$posterMenuItemsTable} WHERE poster_id=? LIMIT 1", [$posterId])->fetch();
         $posterItemId = (int)($posterRow['id'] ?? 0);
         if ($posterItemId <= 0) {
             $error = 'Позиция не найдена в Poster-таблице.';
@@ -434,7 +440,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 $error = 'Для публикации заполните названия RU/EN/VN.';
             } else {
                 $db->query(
-                    "INSERT INTO menu_items_ru
+                    "INSERT INTO {$menuItemsRuTable}
                         (poster_item_id, title, main_category_id, sub_category_id, description, image_url, is_published, sort_order)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                      ON DUPLICATE KEY UPDATE
@@ -449,7 +455,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 );
 
                 $db->query(
-                    "INSERT INTO menu_items_en
+                    "INSERT INTO {$menuItemsEnTable}
                         (poster_item_id, title, main_category_id, sub_category_id, description)
                      VALUES (?, ?, ?, ?, ?)
                      ON DUPLICATE KEY UPDATE
@@ -461,7 +467,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 );
 
                 $db->query(
-                    "INSERT INTO menu_items_vn
+                    "INSERT INTO {$menuItemsVnTable}
                         (poster_item_id, title, main_category_id, sub_category_id, description)
                      VALUES (?, ?, ?, ?, ?)
                      ON DUPLICATE KEY UPDATE
@@ -473,7 +479,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 );
 
                 $db->query(
-                    "INSERT INTO menu_items_ko
+                    "INSERT INTO {$menuItemsKoTable}
                         (poster_item_id, title, main_category_id, sub_category_id, description)
                      VALUES (?, ?, ?, ?, ?)
                      ON DUPLICATE KEY UPDATE
@@ -496,7 +502,7 @@ if ($tab === 'menu' || $tab === 'categories') {
         if (is_array($mainSort)) {
             foreach ($mainSort as $id => $sort) {
                 $show = isset($_POST['main_show'][(int)$id]) ? 1 : 0;
-                $db->query("UPDATE menu_categories_main SET sort_order=?, show_in_menu=? WHERE id=?", [(int)$sort, $show, (int)$id]);
+                $db->query("UPDATE {$menuCategoriesMainTable} SET sort_order=?, show_in_menu=? WHERE id=?", [(int)$sort, $show, (int)$id]);
             }
         }
         $subSort = $_POST['sub_sort'] ?? [];
@@ -505,11 +511,12 @@ if ($tab === 'menu' || $tab === 'categories') {
                 $show = isset($_POST['sub_show'][(int)$id]) ? 1 : 0;
                 $parent = $_POST['sub_parent'][(int)$id] ?? null;
                 $parent = $parent !== null && $parent !== '' ? (int)$parent : null;
-                $db->query("UPDATE menu_categories_sub SET sort_order=?, show_in_menu=?, main_category_id_override=? WHERE id=?", [(int)$sort, $show, $parent, (int)$id]);
+                $db->query("UPDATE {$menuCategoriesSubTable} SET sort_order=?, show_in_menu=?, main_category_id_override=? WHERE id=?", [(int)$sort, $show, $parent, (int)$id]);
             }
         }
         $mainTr = $_POST['main_tr'] ?? [];
         if (is_array($mainTr)) {
+            $menuCategoriesMainTrTable = $db->t('menu_categories_main_tr');
             foreach ($mainTr as $id => $langs) {
                 if (!is_array($langs)) continue;
                 foreach ($langs as $lang => $name) {
@@ -519,7 +526,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                         continue;
                     }
                     $db->query(
-                        "INSERT INTO menu_categories_main_tr (main_category_id, lang, name) VALUES (?, ?, ?)
+                        "INSERT INTO {$menuCategoriesMainTrTable} (main_category_id, lang, name) VALUES (?, ?, ?)
                          ON DUPLICATE KEY UPDATE name=VALUES(name)",
                         [(int)$id, $lang, $name]
                     );
@@ -528,6 +535,7 @@ if ($tab === 'menu' || $tab === 'categories') {
         }
         $subTr = $_POST['sub_tr'] ?? [];
         if (is_array($subTr)) {
+            $menuCategoriesSubTrTable = $db->t('menu_categories_sub_tr');
             foreach ($subTr as $id => $langs) {
                 if (!is_array($langs)) continue;
                 foreach ($langs as $lang => $name) {
@@ -537,7 +545,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                         continue;
                     }
                     $db->query(
-                        "INSERT INTO menu_categories_sub_tr (sub_category_id, lang, name) VALUES (?, ?, ?)
+                        "INSERT INTO {$menuCategoriesSubTrTable} (sub_category_id, lang, name) VALUES (?, ?, ?)
                          ON DUPLICATE KEY UPDATE name=VALUES(name)",
                         [(int)$id, $lang, $name]
                     );
@@ -548,15 +556,18 @@ if ($tab === 'menu' || $tab === 'categories') {
         $menuView = 'categories';
     }
 
+    $menuCategoriesMainTrTable = $db->t('menu_categories_main_tr');
+    $menuCategoriesSubTrTable2 = $db->t('menu_categories_sub_tr');
+
     $menuCategoriesMain = $db->query(
         "SELECT m.id, m.poster_main_category_id, m.name_raw, m.sort_order,
                 m.show_in_menu,
                 tr_ru.name name_ru, tr_en.name name_en, tr_vn.name name_vn, tr_ko.name name_ko
-         FROM menu_categories_main m
-         LEFT JOIN menu_categories_main_tr tr_ru ON tr_ru.main_category_id=m.id AND tr_ru.lang='ru'
-         LEFT JOIN menu_categories_main_tr tr_en ON tr_en.main_category_id=m.id AND tr_en.lang='en'
-         LEFT JOIN menu_categories_main_tr tr_vn ON tr_vn.main_category_id=m.id AND tr_vn.lang='vn'
-         LEFT JOIN menu_categories_main_tr tr_ko ON tr_ko.main_category_id=m.id AND tr_ko.lang='ko'
+         FROM {$menuCategoriesMainTable} m
+         LEFT JOIN {$menuCategoriesMainTrTable} tr_ru ON tr_ru.main_category_id=m.id AND tr_ru.lang='ru'
+         LEFT JOIN {$menuCategoriesMainTrTable} tr_en ON tr_en.main_category_id=m.id AND tr_en.lang='en'
+         LEFT JOIN {$menuCategoriesMainTrTable} tr_vn ON tr_vn.main_category_id=m.id AND tr_vn.lang='vn'
+         LEFT JOIN {$menuCategoriesMainTrTable} tr_ko ON tr_ko.main_category_id=m.id AND tr_ko.lang='ko'
          ORDER BY m.sort_order ASC, m.name_raw ASC"
     )->fetchAll();
 
@@ -564,19 +575,19 @@ if ($tab === 'menu' || $tab === 'categories') {
         "SELECT s.id, s.poster_sub_category_id, s.main_category_id, s.main_category_id_override, s.name_raw, s.sort_order,
                 s.show_in_menu,
                 tr_ru.name name_ru, tr_en.name name_en, tr_vn.name name_vn, tr_ko.name name_ko
-         FROM menu_categories_sub s
-         LEFT JOIN menu_categories_sub_tr tr_ru ON tr_ru.sub_category_id=s.id AND tr_ru.lang='ru'
-         LEFT JOIN menu_categories_sub_tr tr_en ON tr_en.sub_category_id=s.id AND tr_en.lang='en'
-         LEFT JOIN menu_categories_sub_tr tr_vn ON tr_vn.sub_category_id=s.id AND tr_vn.lang='vn'
-         LEFT JOIN menu_categories_sub_tr tr_ko ON tr_ko.sub_category_id=s.id AND tr_ko.lang='ko'
+         FROM {$menuCategoriesSubTable} s
+         LEFT JOIN {$menuCategoriesSubTrTable2} tr_ru ON tr_ru.sub_category_id=s.id AND tr_ru.lang='ru'
+         LEFT JOIN {$menuCategoriesSubTrTable2} tr_en ON tr_en.sub_category_id=s.id AND tr_en.lang='en'
+         LEFT JOIN {$menuCategoriesSubTrTable2} tr_vn ON tr_vn.sub_category_id=s.id AND tr_vn.lang='vn'
+         LEFT JOIN {$menuCategoriesSubTrTable2} tr_ko ON tr_ko.sub_category_id=s.id AND tr_ko.lang='ko'
          ORDER BY s.sort_order ASC, s.name_raw ASC"
     )->fetchAll();
 
     $mainItemCounts = [];
     $rows = $db->query(
         "SELECT ru.main_category_id id, COUNT(*) c
-         FROM menu_items_ru ru
-         JOIN poster_menu_items p ON p.id = ru.poster_item_id
+         FROM {$menuItemsRuTable} ru
+         JOIN {$posterMenuItemsTable} p ON p.id = ru.poster_item_id
          WHERE p.is_active = 1 AND ru.main_category_id IS NOT NULL
          GROUP BY ru.main_category_id"
     )->fetchAll();
@@ -602,11 +613,11 @@ if ($tab === 'menu' || $tab === 'categories') {
                         en.title en_title, en.description en_description, en.main_category_id en_main_category_id, en.sub_category_id en_sub_category_id,
                         vn.title vn_title, vn.description vn_description, vn.main_category_id vn_main_category_id, vn.sub_category_id vn_sub_category_id,
                         ko.title ko_title, ko.description ko_description, ko.main_category_id ko_main_category_id, ko.sub_category_id ko_sub_category_id
-                 FROM poster_menu_items p
-                 LEFT JOIN menu_items_ru ru ON ru.poster_item_id = p.id
-                 LEFT JOIN menu_items_en en ON en.poster_item_id = p.id
-                 LEFT JOIN menu_items_vn vn ON vn.poster_item_id = p.id
-                 LEFT JOIN menu_items_ko ko ON ko.poster_item_id = p.id
+                 FROM {$posterMenuItemsTable} p
+                 LEFT JOIN {$menuItemsRuTable} ru ON ru.poster_item_id = p.id
+                 LEFT JOIN {$menuItemsEnTable} en ON en.poster_item_id = p.id
+                 LEFT JOIN {$menuItemsVnTable} vn ON vn.poster_item_id = p.id
+                 LEFT JOIN {$menuItemsKoTable} ko ON ko.poster_item_id = p.id
                  WHERE p.poster_id = ?
                  LIMIT 1",
                 [$posterId]
@@ -660,11 +671,11 @@ if ($tab === 'menu' || $tab === 'categories') {
         $whereSql = !empty($where) ? ('WHERE ' . implode(' AND ', $where)) : '';
         $countRow = $db->query(
             "SELECT COUNT(1) c
-             FROM poster_menu_items p
-             LEFT JOIN menu_items_ru ru ON ru.poster_item_id = p.id
-             LEFT JOIN menu_items_en en ON en.poster_item_id = p.id
-             LEFT JOIN menu_items_vn vn ON vn.poster_item_id = p.id
-             LEFT JOIN menu_items_ko ko ON ko.poster_item_id = p.id
+             FROM {$posterMenuItemsTable} p
+             LEFT JOIN {$menuItemsRuTable} ru ON ru.poster_item_id = p.id
+             LEFT JOIN {$menuItemsEnTable} en ON en.poster_item_id = p.id
+             LEFT JOIN {$menuItemsVnTable} vn ON vn.poster_item_id = p.id
+             LEFT JOIN {$menuItemsKoTable} ko ON ko.poster_item_id = p.id
              $whereSql",
             $params
         )->fetch();
@@ -728,21 +739,21 @@ if ($tab === 'menu' || $tab === 'categories') {
                 COALESCE(str_en.name, sc.name_raw, p.sub_category_name) adapted_subcategory_en,
                 COALESCE(str_vn.name, sc.name_raw, p.sub_category_name) adapted_subcategory_vn
                 ,COALESCE(str_ko.name, sc.name_raw, p.sub_category_name) adapted_subcategory_ko
-            FROM poster_menu_items p
-            LEFT JOIN menu_items_ru ru ON ru.poster_item_id = p.id
-            LEFT JOIN menu_items_en en ON en.poster_item_id = p.id
-            LEFT JOIN menu_items_vn vn ON vn.poster_item_id = p.id
-            LEFT JOIN menu_items_ko ko ON ko.poster_item_id = p.id
-            LEFT JOIN menu_categories_main mc ON mc.id = ru.main_category_id
-            LEFT JOIN menu_categories_main_tr mtr_ru ON mtr_ru.main_category_id = mc.id AND mtr_ru.lang='ru'
-            LEFT JOIN menu_categories_main_tr mtr_en ON mtr_en.main_category_id = mc.id AND mtr_en.lang='en'
-            LEFT JOIN menu_categories_main_tr mtr_vn ON mtr_vn.main_category_id = mc.id AND mtr_vn.lang='vn'
-            LEFT JOIN menu_categories_main_tr mtr_ko ON mtr_ko.main_category_id = mc.id AND mtr_ko.lang='ko'
-            LEFT JOIN menu_categories_sub sc ON sc.id = ru.sub_category_id
-            LEFT JOIN menu_categories_sub_tr str_ru ON str_ru.sub_category_id = sc.id AND str_ru.lang='ru'
-            LEFT JOIN menu_categories_sub_tr str_en ON str_en.sub_category_id = sc.id AND str_en.lang='en'
-            LEFT JOIN menu_categories_sub_tr str_vn ON str_vn.sub_category_id = sc.id AND str_vn.lang='vn'
-            LEFT JOIN menu_categories_sub_tr str_ko ON str_ko.sub_category_id = sc.id AND str_ko.lang='ko'
+            FROM {$posterMenuItemsTable} p
+            LEFT JOIN {$menuItemsRuTable} ru ON ru.poster_item_id = p.id
+            LEFT JOIN {$menuItemsEnTable} en ON en.poster_item_id = p.id
+            LEFT JOIN {$menuItemsVnTable} vn ON vn.poster_item_id = p.id
+            LEFT JOIN {$menuItemsKoTable} ko ON ko.poster_item_id = p.id
+            LEFT JOIN {$menuCategoriesMainTable} mc ON mc.id = ru.main_category_id
+            LEFT JOIN {$menuCategoriesMainTrTable} mtr_ru ON mtr_ru.main_category_id = mc.id AND mtr_ru.lang='ru'
+            LEFT JOIN {$menuCategoriesMainTrTable} mtr_en ON mtr_en.main_category_id = mc.id AND mtr_en.lang='en'
+            LEFT JOIN {$menuCategoriesMainTrTable} mtr_vn ON mtr_vn.main_category_id = mc.id AND mtr_vn.lang='vn'
+            LEFT JOIN {$menuCategoriesMainTrTable} mtr_ko ON mtr_ko.main_category_id = mc.id AND mtr_ko.lang='ko'
+            LEFT JOIN {$menuCategoriesSubTable} sc ON sc.id = ru.sub_category_id
+            LEFT JOIN {$menuCategoriesSubTrTable2} str_ru ON str_ru.sub_category_id = sc.id AND str_ru.lang='ru'
+            LEFT JOIN {$menuCategoriesSubTrTable2} str_en ON str_en.sub_category_id = sc.id AND str_en.lang='en'
+            LEFT JOIN {$menuCategoriesSubTrTable2} str_vn ON str_vn.sub_category_id = sc.id AND str_vn.lang='vn'
+            LEFT JOIN {$menuCategoriesSubTrTable2} str_ko ON str_ko.sub_category_id = sc.id AND str_ko.lang='ko'
             $whereSql
             ORDER BY {$orderBySql}
             LIMIT {$menuPerPage} OFFSET {$offset}
@@ -879,7 +890,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 ];
                 $meta = [];
                 foreach ($metaKeys as $k) {
-                    $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$k])->fetch();
+                    $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$k])->fetch();
                     $meta[$k] = $row ? (string)$row['meta_value'] : '';
                 }
             ?>

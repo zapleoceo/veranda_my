@@ -20,6 +20,7 @@ $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
 $now = date('Y-m-d H:i:s');
 
@@ -28,8 +29,9 @@ try {
         throw new Exception('POSTER_API_TOKEN is empty');
     }
 
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
-    $db->query("CREATE TABLE IF NOT EXISTS system_meta (
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+    $meta = $db->t('system_meta');
+    $db->query("CREATE TABLE IF NOT EXISTS {$meta} (
         meta_key VARCHAR(100) PRIMARY KEY,
         meta_value VARCHAR(255) NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -56,17 +58,17 @@ try {
     }
 
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",
         ['menu_last_sync_at', $now2]
     );
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",
         ['menu_last_sync_result', $summary]
     );
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",
         ['menu_last_sync_error', '']
     );
@@ -77,19 +79,20 @@ try {
     $now3 = date('Y-m-d H:i:s');
     echo "[{$now3}] ERROR: {$err}\n";
     try {
-        $db = isset($db) ? $db : new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+        $db = isset($db) ? $db : new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+        $meta = $db->t('system_meta');
         $db->query(
-            "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",
             ['menu_last_sync_error', mb_substr($err, 0, 250, 'UTF-8')]
         );
         $db->query(
-            "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",
             ['menu_last_sync_at', $now3]
         );
         $db->query(
-            "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",
             ['menu_last_sync_result', 'ok=0']
         );
@@ -97,4 +100,3 @@ try {
     }
     exit(1);
 }
-

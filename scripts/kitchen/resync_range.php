@@ -35,7 +35,9 @@ if ($fromTs === false || $toTs === false || $fromTs > $toTs) {
     exit(2);
 }
 
-$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
+$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+$ks = $db->t('kitchen_stats');
 $api = new \App\Classes\PosterAPI($token);
 $analytics = new \App\Classes\KitchenAnalytics($api);
 
@@ -55,15 +57,16 @@ foreach (['pay_type' => "TINYINT NULL AFTER status",
           'prob_close_at' => "DATETIME NULL AFTER ready_chass_at",
           'dish_category_id' => "BIGINT NULL AFTER dish_id",
           'dish_sub_category_id' => "BIGINT NULL AFTER dish_category_id"] as $col => $ddl) {
-    if (!$columnExists($db, $dbName, 'kitchen_stats', $col)) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN {$col} {$ddl}");
+    if (!$columnExists($db, $dbName, $ks, $col)) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN {$col} {$ddl}");
     }
 }
 
 function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
+    $ks = $db->t('kitchen_stats');
     $readyRows = $db->query(
         "SELECT receipt_number, station, ready_pressed_at, ready_chass_at
-         FROM kitchen_stats
+         FROM {$ks}
          WHERE transaction_date = ?
            AND receipt_number REGEXP '^[0-9]+$'
            AND COALESCE(was_deleted, 0) = 0
@@ -99,7 +102,7 @@ function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
 
     $targets = $db->query(
         "SELECT id, receipt_number, station, prob_close_at, ticket_sent_at
-         FROM kitchen_stats
+         FROM {$ks}
          WHERE transaction_date = ?
            AND status = 1
            AND receipt_number REGEXP '^[0-9]+$'
@@ -111,7 +114,7 @@ function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
         [$date]
     )->fetchAll();
 
-    $upd = $db->getPdo()->prepare("UPDATE kitchen_stats SET prob_close_at = ? WHERE id = ?");
+    $upd = $db->getPdo()->prepare("UPDATE {$ks} SET prob_close_at = ? WHERE id = ?");
     $setCount = 0; $clearCount = 0;
     foreach ($targets as $t) {
         $id = (int)($t['id'] ?? 0);
@@ -146,8 +149,9 @@ function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
 }
 
 function autoExclude(\App\Classes\Database $db, string $date): array {
+    $ks = $db->t('kitchen_stats');
     $setHookah = $db->query(
-        "UPDATE kitchen_stats
+        "UPDATE {$ks}
          SET exclude_from_dashboard = 1,
              exclude_auto = 1
          WHERE transaction_date = ?
@@ -155,7 +159,7 @@ function autoExclude(\App\Classes\Database $db, string $date): array {
         [$date]
     )->rowCount();
     $set1 = $db->query(
-        "UPDATE kitchen_stats
+        "UPDATE {$ks}
          SET exclude_from_dashboard = 1,
              exclude_auto = 1
          WHERE transaction_date = ?
@@ -168,7 +172,7 @@ function autoExclude(\App\Classes\Database $db, string $date): array {
         [$date]
     )->rowCount();
     $set2 = $db->query(
-        "UPDATE kitchen_stats
+        "UPDATE {$ks}
          SET exclude_from_dashboard = 1,
              exclude_auto = 1
          WHERE transaction_date = ?
@@ -185,7 +189,7 @@ function autoExclude(\App\Classes\Database $db, string $date): array {
         [$date]
     )->rowCount();
     $unset1 = $db->query(
-        "UPDATE kitchen_stats
+        "UPDATE {$ks}
          SET exclude_from_dashboard = 0,
              exclude_auto = 0
          WHERE transaction_date = ?
@@ -195,7 +199,7 @@ function autoExclude(\App\Classes\Database $db, string $date): array {
         [$date]
     )->rowCount();
     $unset2 = $db->query(
-        "UPDATE kitchen_stats
+        "UPDATE {$ks}
          SET exclude_from_dashboard = 0,
              exclude_auto = 0
          WHERE transaction_date = ?
@@ -229,7 +233,7 @@ for ($d = $fromTs; $d <= $toTs; $d = strtotime('+1 day', $d)) {
         // Refresh close metadata from Poster for all closed transactions of the day
         $txRows = $db->query(
             "SELECT DISTINCT transaction_id
-             FROM kitchen_stats
+             FROM {$ks}
              WHERE transaction_date = ?
                AND status > 1",
             [$date]
@@ -262,7 +266,7 @@ for ($d = $fromTs; $d <= $toTs; $d = strtotime('+1 day', $d)) {
                     }
                 }
                 $db->query(
-                    "UPDATE kitchen_stats
+                    "UPDATE {$ks}
                      SET status = ?, pay_type = ?, close_reason = ?, transaction_closed_at = ?
                      WHERE transaction_id = ?",
                     [$status, $payType, $closeReason, $closedAt, $txId]

@@ -18,6 +18,7 @@ $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
 $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
 $baseUrl = $_ENV['CODEMEAL_BASE_URL'] ?? 'https://codemeal.pro';
 $auth = $_ENV['CODEMEAL_AUTH'] ?? '';
@@ -26,33 +27,36 @@ $locale = $_ENV['CODEMEAL_LOCALE'] ?? '';
 $timezone = $_ENV['CODEMEAL_TIMEZONE'] ?? '';
 
 try {
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
-    $db->query("CREATE TABLE IF NOT EXISTS system_meta (
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+    $meta = $db->t('system_meta');
+    $ordersTable = $db->t('codemeal_orders');
+    $settingsTable = $db->t('codemeal_order_table_settings');
+    $db->query("CREATE TABLE IF NOT EXISTS {$meta} (
         meta_key VARCHAR(255) PRIMARY KEY,
         meta_value TEXT
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     if ($auth === '') {
-        $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key='codemeal_auth' LIMIT 1")->fetch();
+        $row = $db->query("SELECT meta_value FROM {$meta} WHERE meta_key='codemeal_auth' LIMIT 1")->fetch();
         $auth = $row ? (string)$row['meta_value'] : '';
     }
     if ($clientNumber === '') {
-        $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key='codemeal_client_number' LIMIT 1")->fetch();
+        $row = $db->query("SELECT meta_value FROM {$meta} WHERE meta_key='codemeal_client_number' LIMIT 1")->fetch();
         $clientNumber = $row ? (string)$row['meta_value'] : '';
     }
     if ($locale === '') {
-        $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key='codemeal_locale' LIMIT 1")->fetch();
+        $row = $db->query("SELECT meta_value FROM {$meta} WHERE meta_key='codemeal_locale' LIMIT 1")->fetch();
         $locale = $row ? (string)$row['meta_value'] : 'en';
     }
     if ($timezone === '') {
-        $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key='codemeal_timezone' LIMIT 1")->fetch();
+        $row = $db->query("SELECT meta_value FROM {$meta} WHERE meta_key='codemeal_timezone' LIMIT 1")->fetch();
         $timezone = $row ? (string)$row['meta_value'] : 'Asia/Ho_Chi_Minh';
     }
 
     if ($auth === '' || $clientNumber === '') {
         throw new Exception('Codemeal credentials are not set');
     }
-    $db->query("CREATE TABLE IF NOT EXISTS codemeal_orders (
+    $db->query("CREATE TABLE IF NOT EXISTS {$ordersTable} (
         id INT AUTO_INCREMENT PRIMARY KEY,
         external_id VARCHAR(128) NOT NULL,
         created_at DATETIME NULL,
@@ -64,7 +68,7 @@ try {
         KEY idx_codemeal_state (state)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    $db->query("CREATE TABLE IF NOT EXISTS codemeal_order_table_settings (
+    $db->query("CREATE TABLE IF NOT EXISTS {$settingsTable} (
         id INT PRIMARY KEY,
         payload JSON NOT NULL,
         fetched_at DATETIME NOT NULL,
@@ -75,7 +79,7 @@ try {
 
     $settings = $api->getOrderTableSettings();
     $db->query(
-        "INSERT INTO codemeal_order_table_settings (id, payload, fetched_at)
+        "INSERT INTO {$settingsTable} (id, payload, fetched_at)
          VALUES (1, ?, ?)
          ON DUPLICATE KEY UPDATE payload=VALUES(payload), fetched_at=VALUES(fetched_at)",
         [json_encode($settings, JSON_UNESCAPED_UNICODE), date('Y-m-d H:i:s')]
@@ -120,11 +124,11 @@ try {
                 if (isset($item[$k]) && $item[$k] !== '') { $stateVal = (string)$item[$k]; break; }
             }
             $db->query(
-                "INSERT INTO codemeal_orders (external_id, created_at, state, payload)
+                "INSERT INTO {$ordersTable} (external_id, created_at, state, payload)
                  VALUES (?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE
-                    created_at = COALESCE(VALUES(created_at), codemeal_orders.created_at),
-                    state = COALESCE(VALUES(state), codemeal_orders.state),
+                    created_at = COALESCE(VALUES(created_at), {$ordersTable}.created_at),
+                    state = COALESCE(VALUES(state), {$ordersTable}.state),
                     payload = VALUES(payload)",
                 [$eid, $created, $stateVal, json_encode($item, JSON_UNESCAPED_UNICODE)]
             );
@@ -133,12 +137,12 @@ try {
     }
 
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
         ['codemeal_last_sync_at', date('Y-m-d H:i:s')]
     );
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
         ['codemeal_last_sync_info', "pages={$pages}, saved={$total}"]
     );

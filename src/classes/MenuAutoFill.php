@@ -11,6 +11,10 @@ class MenuAutoFill {
 
     public function run(): array {
         $this->db->createMenuTables();
+        $pmi = $this->db->t('poster_menu_items');
+        $miRu = $this->db->t('menu_items_ru');
+        $miEn = $this->db->t('menu_items_en');
+        $miVn = $this->db->t('menu_items_vn');
 
         $barMap = $this->getBarTranslations();
         $kitchenMap = $this->getKitchenTranslations();
@@ -41,10 +45,10 @@ class MenuAutoFill {
                 vn.title vn_title,
                 vn.sub_category vn_sub_category,
                 vn.description vn_description
-             FROM poster_menu_items p
-             LEFT JOIN menu_items_ru ru ON ru.poster_item_id = p.id
-             LEFT JOIN menu_items_en en ON en.poster_item_id = p.id
-             LEFT JOIN menu_items_vn vn ON vn.poster_item_id = p.id",
+             FROM {$pmi} p
+             LEFT JOIN {$miRu} ru ON ru.poster_item_id = p.id
+             LEFT JOIN {$miEn} en ON en.poster_item_id = p.id
+             LEFT JOIN {$miVn} vn ON vn.poster_item_id = p.id",
             []
         )->fetchAll();
 
@@ -164,19 +168,19 @@ class MenuAutoFill {
 
             if ($needRu) {
                 $this->db->query(
-                    "UPDATE menu_items_ru SET title=?, sub_category=NULL, description=? WHERE poster_item_id=?",
+                    "UPDATE {$miRu} SET title=?, sub_category=NULL, description=? WHERE poster_item_id=?",
                     [$ruNew !== '' ? $ruNew : null, $ruDescNew !== '' ? $ruDescNew : null, $posterItemId]
                 );
             }
             if ($needEn) {
                 $this->db->query(
-                    "UPDATE menu_items_en SET title=?, sub_category=NULL, description=? WHERE poster_item_id=?",
+                    "UPDATE {$miEn} SET title=?, sub_category=NULL, description=? WHERE poster_item_id=?",
                     [$enNew !== '' ? $enNew : null, $enDescNew !== '' ? $enDescNew : null, $posterItemId]
                 );
             }
             if ($needVn) {
                 $this->db->query(
-                    "UPDATE menu_items_vn SET title=?, sub_category=NULL, description=? WHERE poster_item_id=?",
+                    "UPDATE {$miVn} SET title=?, sub_category=NULL, description=? WHERE poster_item_id=?",
                     [$vnNew !== '' ? $vnNew : null, $vnDescNew !== '' ? $vnDescNew : null, $posterItemId]
                 );
             }

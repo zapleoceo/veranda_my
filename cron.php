@@ -22,9 +22,12 @@ $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
 try {
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+    $ksTable = $db->t('kitchen_stats');
+    $metaTable = $db->t('system_meta');
     $api = new \App\Classes\PosterAPI($token);
     $analytics = new \App\Classes\KitchenAnalytics($api);
 
@@ -36,29 +39,29 @@ try {
         return (int)($row['c'] ?? 0) > 0;
     };
 
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'pay_type')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN pay_type TINYINT NULL AFTER status");
+    if (!$columnExists($db, $dbName, $ksTable, 'pay_type')) {
+        $db->query("ALTER TABLE {$ksTable} ADD COLUMN pay_type TINYINT NULL AFTER status");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'close_reason')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN close_reason TINYINT NULL AFTER pay_type");
+    if (!$columnExists($db, $dbName, $ksTable, 'close_reason')) {
+        $db->query("ALTER TABLE {$ksTable} ADD COLUMN close_reason TINYINT NULL AFTER pay_type");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'exclude_from_dashboard')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN exclude_from_dashboard TINYINT(1) NOT NULL DEFAULT 0 AFTER close_reason");
+    if (!$columnExists($db, $dbName, $ksTable, 'exclude_from_dashboard')) {
+        $db->query("ALTER TABLE {$ksTable} ADD COLUMN exclude_from_dashboard TINYINT(1) NOT NULL DEFAULT 0 AFTER close_reason");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'exclude_auto')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN exclude_auto TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard");
+    if (!$columnExists($db, $dbName, $ksTable, 'exclude_auto')) {
+        $db->query("ALTER TABLE {$ksTable} ADD COLUMN exclude_auto TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'ready_chass_at')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
+    if (!$columnExists($db, $dbName, $ksTable, 'ready_chass_at')) {
+        $db->query("ALTER TABLE {$ksTable} ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'prob_close_at')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
+    if (!$columnExists($db, $dbName, $ksTable, 'prob_close_at')) {
+        $db->query("ALTER TABLE {$ksTable} ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_category_id')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+    if (!$columnExists($db, $dbName, $ksTable, 'dish_category_id')) {
+        $db->query("ALTER TABLE {$ksTable} ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+    if (!$columnExists($db, $dbName, $ksTable, 'dish_sub_category_id')) {
+        $db->query("ALTER TABLE {$ksTable} ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
     }
 
     // Берем интервал: с начала сегодняшнего дня
@@ -78,7 +81,7 @@ try {
 
     $needsCloseRefresh = $db->query(
         "SELECT DISTINCT transaction_id
-         FROM kitchen_stats
+         FROM {$ksTable}
          WHERE transaction_date = ?
            AND status > 1
            AND (transaction_closed_at IS NULL OR transaction_closed_at < '2000-01-01 00:00:00')
@@ -113,7 +116,7 @@ try {
                 }
             }
             $db->query(
-                "UPDATE kitchen_stats
+                "UPDATE {$ksTable}
                  SET status = ?, pay_type = ?, close_reason = ?, transaction_closed_at = ?
                  WHERE transaction_id = ?",
                 [$status, $payType, $closeReason, $closedAt, $txId]
@@ -127,14 +130,14 @@ try {
         echo "[" . date('Y-m-d H:i:s') . "] Refreshed close metadata for {$refreshed} transactions.\n";
     }
 
-    $db->query("CREATE TABLE IF NOT EXISTS system_meta (
+    $db->query("CREATE TABLE IF NOT EXISTS {$metaTable} (
         meta_key VARCHAR(100) PRIMARY KEY,
         meta_value VARCHAR(255) NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    $getMeta = function (string $key) use ($db): string {
-        $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$key])->fetch();
+    $getMeta = function (string $key) use ($db, $metaTable): string {
+        $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
         return $row ? (string)$row['meta_value'] : '';
     };
 
@@ -155,7 +158,7 @@ try {
                 if ($savedFrom !== '') {
                     $bootstrapFrom = $savedFrom;
                 } else {
-                    $min = $db->query("SELECT MIN(transaction_date) AS d FROM kitchen_stats")->fetch();
+                    $min = $db->query("SELECT MIN(transaction_date) AS d FROM {$ksTable}")->fetch();
                     $minDate = !empty($min['d']) ? (string)$min['d'] : '';
                     if ($minDate !== '' && $minDate !== '0000-00-00') {
                         $bootstrapFrom = date('Y/m/d 00:00:00', strtotime($minDate . ' -1 day'));
@@ -173,33 +176,33 @@ try {
                 $updateFrom = $bootstrapFrom !== null ? date('Y-m-d', strtotime(str_replace('/', '-', substr($bootstrapFrom, 0, 10)))) : date('Y-m-d', strtotime('-1 day'));
                 $updated = $chass->updateKitchenStatsReadyChAss($updateFrom, date('Y-m-d'), $res['order_ids'] ?? []);
                 $db->query(
-                    "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+                    "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
                      ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
                     ['chefassistant_last_sync_at', date('Y-m-d H:i:s')]
                 );
                 $db->query(
-                    "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+                    "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
                      ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
                     ['chefassistant_last_sync_info', 'saved=' . (int)($res['saved'] ?? 0) . ', pages=' . (int)($res['pages'] ?? 0) . ', updated=' . $updated]
                 );
                 if ($bootstrapFrom !== null) {
                     $db->query(
-                        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+                        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
                          ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
                         ['chefassistant_bootstrap_done', '1']
                     );
                     $db->query(
-                        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+                        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
                          ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
                         ['chefassistant_bootstrap_done_at', date('Y-m-d H:i:s')]
                     );
                     $db->query(
-                        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+                        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
                          ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
                         ['chefassistant_bootstrap_from', $bootstrapFrom]
                     );
                     $db->query(
-                        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+                        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
                          ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
                         ['chefassistant_readytime_fix_done', '1']
                     );
@@ -210,13 +213,13 @@ try {
             } else {
                 $err = (string)($res['error'] ?? 'ChefAssistant error');
                 $db->query(
-                    "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+                    "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
                      ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
                     ['chefassistant_last_sync_error', $err]
                 );
                 if (!empty($res['auth_error'])) {
                     $db->query(
-                        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+                        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
                          ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
                         ['chefassistant_auth_problem_at', date('Y-m-d H:i:s')]
                     );
@@ -225,7 +228,7 @@ try {
             }
         } catch (\Exception $e) {
             $db->query(
-                "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
                  ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
                 ['chefassistant_last_sync_error', $e->getMessage()]
             );
@@ -233,10 +236,10 @@ try {
         }
     }
 
-    $computeProbCloseAt = function (string $date) use ($db): array {
+    $computeProbCloseAt = function (string $date) use ($db, $ksTable): array {
         $readyRows = $db->query(
             "SELECT receipt_number, station, ready_pressed_at, ready_chass_at
-             FROM kitchen_stats
+             FROM {$ksTable}
              WHERE transaction_date = ?
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
@@ -274,7 +277,7 @@ try {
 
         $targets = $db->query(
             "SELECT id, receipt_number, station, prob_close_at, ticket_sent_at
-             FROM kitchen_stats
+             FROM {$ksTable}
              WHERE transaction_date = ?
                AND status = 1
                AND receipt_number REGEXP '^[0-9]+$'
@@ -286,7 +289,7 @@ try {
             [$date]
         )->fetchAll();
 
-        $upd = $db->getPdo()->prepare("UPDATE kitchen_stats SET prob_close_at = ? WHERE id = ?");
+        $upd = $db->getPdo()->prepare("UPDATE {$ksTable} SET prob_close_at = ? WHERE id = ?");
         $setCount = 0;
         $clearCount = 0;
 
@@ -341,9 +344,9 @@ try {
         echo "[" . date('Y-m-d H:i:s') . "] ProbCloseTime: set " . (int)($prob['set'] ?? 0) . ", cleared " . (int)($prob['cleared'] ?? 0) . ".\n";
     }
 
-    $autoExclude = function (string $date) use ($db): array {
+    $autoExclude = function (string $date) use ($db, $ksTable): array {
         $setHookah = $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ksTable}
              SET exclude_from_dashboard = 1,
                  exclude_auto = 1
              WHERE transaction_date = ?
@@ -352,7 +355,7 @@ try {
         )->rowCount();
 
         $set1 = $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ksTable}
              SET exclude_from_dashboard = 1,
                  exclude_auto = 1
              WHERE transaction_date = ?
@@ -366,7 +369,7 @@ try {
         )->rowCount();
 
         $set2 = $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ksTable}
              SET exclude_from_dashboard = 1,
                  exclude_auto = 1
              WHERE transaction_date = ?
@@ -384,7 +387,7 @@ try {
         )->rowCount();
 
         $unset1 = $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ksTable}
              SET exclude_from_dashboard = 0,
                  exclude_auto = 0
              WHERE transaction_date = ?
@@ -395,7 +398,7 @@ try {
         )->rowCount();
 
         $unset2 = $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ksTable}
              SET exclude_from_dashboard = 0,
                  exclude_auto = 0
              WHERE transaction_date = ?
@@ -423,7 +426,7 @@ try {
     }
 
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
         ['poster_last_sync_at', date('Y-m-d H:i:s')]
     );

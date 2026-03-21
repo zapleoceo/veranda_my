@@ -156,14 +156,15 @@ class ChefAssistantSync {
         if (empty($items)) return 0;
 
         $updated = 0;
-        $updatePrepared = $this->db->getPdo()->prepare("UPDATE kitchen_stats SET ready_chass_at = ? WHERE id = ?");
+        $ks = $this->db->t('kitchen_stats');
+        $updatePrepared = $this->db->getPdo()->prepare("UPDATE {$ks} SET ready_chass_at = ? WHERE id = ?");
 
         foreach ($chunks as $chunk) {
             $in = implode(',', array_fill(0, count($chunk), '?'));
             $params = array_merge([$dateFrom, $dateTo], $chunk);
             $rows = $this->db->query(
                 "SELECT id, receipt_number, dish_name
-                 FROM kitchen_stats
+                 FROM {$ks}
                  WHERE transaction_date BETWEEN ? AND ?
                    AND receipt_number IN ($in)",
                 $params
