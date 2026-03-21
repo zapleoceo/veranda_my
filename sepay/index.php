@@ -32,8 +32,59 @@ try {
     $db->createPaydayTables();
 
     $raw = file_get_contents('php://input') ?: '';
+    $meta = $db->t('system_meta');
+    $nowStr = (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s');
+    $remoteIp = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+    $ua = mb_substr($ua, 0, 200, 'UTF-8');
+
+    try {
+        $db->query("INSERT INTO {$meta} (meta_key, meta_value) VALUES ('sepay_webhook_hits_total', '1')
+                    ON DUPLICATE KEY UPDATE meta_value = meta_value + 1");
+        $dayKey = 'sepay_webhook_hits_' . date('Ymd');
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, '1')
+             ON DUPLICATE KEY UPDATE meta_value = meta_value + 1",
+            [$dayKey]
+        );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_at', $nowStr]
+        );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_ip', $remoteIp]
+        );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_ua', $ua]
+        );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_bytes', (string)strlen($raw)]
+        );
+    } catch (\Throwable $e) {
+    }
+
     $payload = json_decode($raw, true);
     if (!is_array($payload)) {
+        try {
+            $db->query(
+                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                ['sepay_webhook_last_ok', '0']
+            );
+            $db->query(
+                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                ['sepay_webhook_last_error', 'Invalid JSON']
+            );
+        } catch (\Throwable $e) {
+        }
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid JSON'], JSON_UNESCAPED_UNICODE);
         exit;
@@ -41,6 +92,19 @@ try {
 
     $sepayId = (int)($payload['id'] ?? $payload['sepay_id'] ?? 0);
     if ($sepayId <= 0) {
+        try {
+            $db->query(
+                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                ['sepay_webhook_last_ok', '0']
+            );
+            $db->query(
+                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                ['sepay_webhook_last_error', 'Missing id']
+            );
+        } catch (\Throwable $e) {
+        }
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Missing id'], JSON_UNESCAPED_UNICODE);
         exit;
@@ -126,6 +190,25 @@ try {
         ]
     );
 
+    try {
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_ok', '1']
+        );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_error', '']
+        );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_sepay_id', (string)$sepayId]
+        );
+    } catch (\Throwable $e) {
+    }
+
     echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
 } catch (\PDOException $e) {
     $dup = false;
@@ -133,12 +216,56 @@ try {
         $dup = ((int)($e->errorInfo[1] ?? 0) === 1062);
     }
     if ($dup) {
+        try {
+            $db->query(
+                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                ['sepay_webhook_last_ok', '1']
+            );
+            $db->query(
+                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                ['sepay_webhook_last_error', '']
+            );
+            $db->query(
+                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                ['sepay_webhook_last_sepay_id', (string)$sepayId]
+            );
+        } catch (\Throwable $e2) {
+        }
         echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
     } else {
+        try {
+            $db->query(
+                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                ['sepay_webhook_last_ok', '0']
+            );
+            $db->query(
+                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                ['sepay_webhook_last_error', mb_substr($e->getMessage(), 0, 220, 'UTF-8')]
+            );
+        } catch (\Throwable $e2) {
+        }
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
 } catch (\Throwable $e) {
+    try {
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_ok', '0']
+        );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_error', mb_substr($e->getMessage(), 0, 220, 'UTF-8')]
+        );
+    } catch (\Throwable $e2) {
+    }
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }

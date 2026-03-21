@@ -575,6 +575,70 @@ $financeDisplay = [
     'tips' => null,
 ];
 
+$metaTable = $db->t('system_meta');
+$sepayWebhookMeta = [
+    'last_at' => '',
+    'last_ip' => '',
+    'last_ok' => '',
+    'last_error' => '',
+    'last_sepay_id' => '',
+    'hits_total' => '',
+    'hits_day' => '',
+];
+try {
+    $dayKey = 'sepay_webhook_hits_' . date('Ymd', strtotime($date));
+    $keys = [
+        'sepay_webhook_last_at',
+        'sepay_webhook_last_ip',
+        'sepay_webhook_last_ok',
+        'sepay_webhook_last_error',
+        'sepay_webhook_last_sepay_id',
+        'sepay_webhook_hits_total',
+        $dayKey,
+    ];
+    $placeholders = implode(',', array_fill(0, count($keys), '?'));
+    $rows = $db->query("SELECT meta_key, meta_value FROM {$metaTable} WHERE meta_key IN ({$placeholders})", $keys)->fetchAll();
+    $map = [];
+    foreach ($rows as $r) {
+        $k = (string)($r['meta_key'] ?? '');
+        $v = (string)($r['meta_value'] ?? '');
+        if ($k !== '') $map[$k] = $v;
+    }
+    $sepayWebhookMeta['last_at'] = (string)($map['sepay_webhook_last_at'] ?? '');
+    $sepayWebhookMeta['last_ip'] = (string)($map['sepay_webhook_last_ip'] ?? '');
+    $sepayWebhookMeta['last_ok'] = (string)($map['sepay_webhook_last_ok'] ?? '');
+    $sepayWebhookMeta['last_error'] = (string)($map['sepay_webhook_last_error'] ?? '');
+    $sepayWebhookMeta['last_sepay_id'] = (string)($map['sepay_webhook_last_sepay_id'] ?? '');
+    $sepayWebhookMeta['hits_total'] = (string)($map['sepay_webhook_hits_total'] ?? '');
+    $sepayWebhookMeta['hits_day'] = (string)($map[$dayKey] ?? '');
+} catch (\Throwable $e) {
+}
+
+$sepayTxCount = 0;
+try {
+    $sepayTxCount = (int)$db->query(
+        "SELECT COUNT(*) AS c FROM {$st}
+         WHERE DATE(transaction_date) = ?
+           AND transfer_type = 'in'
+           AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))",
+        [$date]
+    )->fetchColumn();
+} catch (\Throwable $e) {
+    $sepayTxCount = 0;
+}
+
+$posterTxCount = 0;
+try {
+    $posterTxCount = (int)$db->query(
+        "SELECT COUNT(*) AS c FROM {$pc}
+         WHERE day_date = ?
+           AND pay_type IN (2,3)",
+        [$date]
+    )->fetchColumn();
+} catch (\Throwable $e) {
+    $posterTxCount = 0;
+}
+
 try {
     $api2 = new \App\Classes\PosterAPI((string)$token);
     $financeRows = $api2->request('finance.getTransactions', [
@@ -657,6 +721,17 @@ $fmtVnd = function (int $v): string {
 
     <?php if ($message !== ''): ?><div class="success"><?= htmlspecialchars($message) ?></div><?php endif; ?>
     <?php if ($error !== ''): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+
+    <div class="muted" style="margin: 0 0 10px;">
+        SePay webhook: last=<?= htmlspecialchars($sepayWebhookMeta['last_at'] !== '' ? $sepayWebhookMeta['last_at'] : '—') ?>
+        <?= $sepayWebhookMeta['last_ip'] !== '' ? (' • ip=' . htmlspecialchars($sepayWebhookMeta['last_ip'])) : '' ?>
+        <?= $sepayWebhookMeta['last_ok'] !== '' ? (' • ok=' . htmlspecialchars($sepayWebhookMeta['last_ok'])) : '' ?>
+        <?= $sepayWebhookMeta['last_sepay_id'] !== '' ? (' • id=' . htmlspecialchars($sepayWebhookMeta['last_sepay_id'])) : '' ?>
+        <?= $sepayWebhookMeta['hits_day'] !== '' ? (' • hits_day=' . htmlspecialchars($sepayWebhookMeta['hits_day'])) : '' ?>
+        <?= $sepayWebhookMeta['hits_total'] !== '' ? (' • hits_total=' . htmlspecialchars($sepayWebhookMeta['hits_total'])) : '' ?>
+        <?= $sepayWebhookMeta['last_error'] !== '' ? (' • err=' . htmlspecialchars($sepayWebhookMeta['last_error'])) : '' ?>
+        • rows: SePay=<?= (int)$sepayTxCount ?>, Poster=<?= (int)$posterTxCount ?>
+    </div>
 
     <div class="card">
         <form method="GET" class="toolbar" style="margin-bottom: 10px;">
