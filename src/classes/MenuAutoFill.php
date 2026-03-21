@@ -29,42 +29,67 @@ class MenuAutoFill {
             )->fetch();
             return (string)($row['IS_NULLABLE'] ?? '') === 'YES';
         };
-        if (!$isNullable($mc, 'workshop_id') || !$isNullable($mi, 'category_id')) {
-            throw new \Exception('Нужно выполнить scripts/migrate.php: menu_categories.workshop_id и menu_items.category_id должны быть NULLABLE');
-        }
+        $canNullWorkshopId = $isNullable($mc, 'workshop_id');
+        $canNullCategoryId = $isNullable($mi, 'category_id');
 
-        $insertedMenuItems = (int)$this->db->query(
-            "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
-             SELECT p.id, NULL, NULL, 0, 0
-             FROM {$pmi} p
-             LEFT JOIN {$mi} i ON i.poster_item_id = p.id
-             WHERE i.id IS NULL"
-        )->rowCount();
+        if ($canNullCategoryId) {
+            $insertedMenuItems = (int)$this->db->query(
+                "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
+                 SELECT p.id, NULL, NULL, 0, 0
+                 FROM {$pmi} p
+                 LEFT JOIN {$mi} i ON i.poster_item_id = p.id
+                 WHERE i.id IS NULL"
+            )->rowCount();
+        } else {
+            $insertedMenuItems = (int)$this->db->query(
+                "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
+                 SELECT p.id, c.id, NULL, 0, 0
+                 FROM {$pmi} p
+                 JOIN {$mc} c ON c.poster_id = p.sub_category_id
+                 LEFT JOIN {$mi} i ON i.poster_item_id = p.id
+                 WHERE i.id IS NULL
+                   AND p.sub_category_id IS NOT NULL"
+            )->rowCount();
+        }
 
         $linkedItems = (int)$this->db->query(
             "UPDATE {$mi} i
              JOIN {$pmi} p ON p.id = i.poster_item_id
              JOIN {$mc} c ON c.poster_id = p.sub_category_id
              SET i.category_id = c.id
-             WHERE i.category_id IS NULL
+             WHERE (i.category_id IS NULL OR i.category_id = 0)
                AND p.sub_category_id IS NOT NULL"
         )->rowCount();
 
-        $linkedCategories = (int)$this->db->query(
-            "UPDATE {$mc} c
-             JOIN {$pmi} p ON p.sub_category_id = c.poster_id
-             JOIN {$mw} w ON w.poster_id = p.main_category_id
-             SET c.workshop_id = w.id
-             WHERE c.workshop_id IS NULL
-               AND p.sub_category_id IS NOT NULL
-               AND p.main_category_id IS NOT NULL"
-        )->rowCount();
+        if ($canNullWorkshopId) {
+            $linkedCategories = (int)$this->db->query(
+                "UPDATE {$mc} c
+                 JOIN {$pmi} p ON p.sub_category_id = c.poster_id
+                 JOIN {$mw} w ON w.poster_id = p.main_category_id
+                 SET c.workshop_id = w.id
+                 WHERE (c.workshop_id IS NULL OR c.workshop_id = 0)
+                   AND p.sub_category_id IS NOT NULL
+                   AND p.main_category_id IS NOT NULL"
+            )->rowCount();
+        } else {
+            $linkedCategories = (int)$this->db->query(
+                "UPDATE {$mc} c
+                 JOIN {$pmi} p ON p.sub_category_id = c.poster_id
+                 JOIN {$mw} w ON w.poster_id = p.main_category_id
+                 SET c.workshop_id = w.id
+                 WHERE c.workshop_id = 0
+                   AND p.sub_category_id IS NOT NULL
+                   AND p.main_category_id IS NOT NULL"
+            )->rowCount();
+        }
 
         return [
             'ok' => true,
             'inserted_menu_items' => $insertedMenuItems,
             'linked_items' => $linkedItems,
             'linked_categories' => $linkedCategories,
+            'workshop_id_nullable' => $canNullWorkshopId,
+            'category_id_nullable' => $canNullCategoryId,
         ];
     }
 
