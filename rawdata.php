@@ -112,7 +112,14 @@ try {
     }
 
     // Получаем данные из БД
-    $query = "SELECT * FROM {$ks}";
+    $query = "SELECT id, transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id,
+                     table_number, waiter_name, status, pay_type, close_reason,
+                     dish_id, item_seq, dish_category_id, dish_sub_category_id, dish_name,
+                     ticket_sent_at, ready_pressed_at, ready_chass_at, prob_close_at,
+                     was_deleted, service_type, total_sum, station,
+                     exclude_from_dashboard, exclude_auto,
+                     tg_message_id, tg_acknowledged, tg_acknowledged_at, tg_acknowledged_by
+              FROM {$ks}";
     $where = [];
     $params = [];
 
