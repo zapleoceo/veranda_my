@@ -215,6 +215,7 @@ try {
         item_seq INT NOT NULL DEFAULT 1,
         message_id BIGINT NOT NULL,
         last_text_hash CHAR(40) NOT NULL,
+        last_edited_at DATETIME NULL,
         last_seen_at DATETIME NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -222,6 +223,11 @@ try {
         KEY idx_tx (transaction_date, transaction_id),
         KEY idx_seen (last_seen_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    if (!$columnExists($db, $dbName, 'tg_alert_messages', 'last_edited_at')) {
+        $db->query("ALTER TABLE tg_alert_messages ADD COLUMN last_edited_at DATETIME NULL AFTER last_text_hash");
+    }
+    $db->query("UPDATE tg_alert_messages SET last_edited_at = created_at WHERE last_edited_at IS NULL");
 
     $getMeta = function (string $key) use ($db): string {
         $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$key])->fetch();
@@ -671,6 +677,7 @@ try {
             $existing = $db->query("SELECT message_id, last_text_hash FROM tg_alert_messages WHERE kitchen_stats_id = ? LIMIT 1", [(int)$item['id']])->fetch();
             $existingMsgId = $existing ? (int)($existing['message_id'] ?? 0) : 0;
             $existingHash = $existing ? (string)($existing['last_text_hash'] ?? '') : '';
+            $nowDt = date('Y-m-d H:i:s');
 
             $currentMsgId = !empty($item['tg_message_id']) ? (int)$item['tg_message_id'] : 0;
             if ($currentMsgId > 0 && $existingMsgId > 0 && $existingMsgId !== $currentMsgId) {
@@ -680,14 +687,14 @@ try {
             $edited = false;
             if ($existingMsgId > 0) {
                 if ($existingHash === $textHash) {
-                    $db->query("UPDATE tg_alert_messages SET last_seen_at = ? WHERE kitchen_stats_id = ?", [date('Y-m-d H:i:s'), (int)$item['id']]);
+                    $db->query("UPDATE tg_alert_messages SET last_seen_at = ? WHERE kitchen_stats_id = ?", [$nowDt, (int)$item['id']]);
                     $edited = true;
                 } else {
                     $edited = $bot->editMessageText($existingMsgId, $message, $ackButton);
                     if ($edited) {
                         $db->query(
-                            "UPDATE tg_alert_messages SET last_text_hash = ?, last_seen_at = ? WHERE kitchen_stats_id = ?",
-                            [$textHash, date('Y-m-d H:i:s'), (int)$item['id']]
+                            "UPDATE tg_alert_messages SET last_text_hash = ?, last_seen_at = ?, last_edited_at = ? WHERE kitchen_stats_id = ?",
+                            [$textHash, $nowDt, $nowDt, (int)$item['id']]
                         );
                     }
                 }
@@ -709,9 +716,9 @@ try {
                         [$newMessageId, $item['id']]
                     );
                     $db->query(
-                        "INSERT INTO tg_alert_messages (kitchen_stats_id, transaction_date, transaction_id, dish_id, item_seq, message_id, last_text_hash, last_seen_at)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                         ON DUPLICATE KEY UPDATE message_id = VALUES(message_id), last_text_hash = VALUES(last_text_hash), last_seen_at = VALUES(last_seen_at), updated_at = CURRENT_TIMESTAMP",
+                        "INSERT INTO tg_alert_messages (kitchen_stats_id, transaction_date, transaction_id, dish_id, item_seq, message_id, last_text_hash, last_edited_at, last_seen_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE message_id = VALUES(message_id), last_text_hash = VALUES(last_text_hash), last_edited_at = VALUES(last_edited_at), last_seen_at = VALUES(last_seen_at), updated_at = CURRENT_TIMESTAMP",
                         [
                             (int)$item['id'],
                             $today,
@@ -720,7 +727,8 @@ try {
                             (int)($item['item_seq'] ?? 1),
                             (int)$newMessageId,
                             $textHash,
-                            date('Y-m-d H:i:s')
+                            $nowDt,
+                            $nowDt
                         ]
                     );
                 }

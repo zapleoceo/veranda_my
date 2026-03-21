@@ -60,19 +60,12 @@ try {
 
     $username = strtolower(trim((string)($from['username'] ?? '')));
     $username = ltrim($username, '@');
-    $isAllowed = false;
-    if ($username !== '') {
-        try {
-            $row = $db->query("SELECT is_active, permissions_json FROM users WHERE telegram_username = ? LIMIT 1", [$username])->fetch();
-            $isActive = (int)($row['is_active'] ?? 0) === 1;
-            $rawPerms = (string)($row['permissions_json'] ?? '');
-            $perms = $rawPerms !== '' ? json_decode($rawPerms, true) : null;
-            $canIgnore = is_array($perms) && !empty($perms['exclude_toggle']);
-            $isAllowed = $isActive && $canIgnore;
-        } catch (\Exception $e) {
-            $isAllowed = false;
-        }
+    $whitelistRow = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", ['telegram_ack_whitelist'])->fetch();
+    $whitelist = json_decode((string)($whitelistRow['meta_value'] ?? '{}'), true);
+    if (!is_array($whitelist)) {
+        $whitelist = [];
     }
+    $isAllowed = $username !== '' && array_key_exists($username, $whitelist);
     if (!$isAllowed) {
         if ($callbackId !== '') {
             $apiBase = "https://api.telegram.org/bot{$tgToken}";
@@ -97,7 +90,7 @@ try {
     }
 
     $row = $db->query(
-        "SELECT transaction_date, transaction_id, dish_id, station, item_seq
+        "SELECT transaction_date, transaction_id, dish_id, station
          FROM kitchen_stats
          WHERE id = ?
          LIMIT 1",
@@ -105,40 +98,26 @@ try {
     )->fetch();
 
     if (!empty($row['transaction_id']) && !empty($row['dish_id']) && !empty($row['transaction_date']) && !empty($row['station'])) {
-        $itemSeq = (int)($row['item_seq'] ?? 1);
-        if ($itemSeq <= 0) $itemSeq = 1;
         $db->query(
             "UPDATE kitchen_stats
-             SET exclude_from_dashboard = 1,
-                 exclude_auto = 0,
-                 tg_message_id = NULL,
-                 tg_acknowledged = 1,
+             SET tg_acknowledged = 1,
                  tg_acknowledged_at = ?,
                  tg_acknowledged_by = ?
              WHERE transaction_date = ?
                AND transaction_id = ?
                AND dish_id = ?
-               AND station = ?
-               AND item_seq = ?",
-            [$ackAt, $ackBy, $row['transaction_date'], $row['transaction_id'], $row['dish_id'], $row['station'], $itemSeq]
-        );
-        $db->query(
-            "DELETE FROM tg_alert_messages WHERE transaction_date = ? AND transaction_id = ? AND dish_id = ? AND station = ? AND item_seq = ?",
-            [$row['transaction_date'], $row['transaction_id'], $row['dish_id'], $row['station'], $itemSeq]
+               AND station = ?",
+            [$ackAt, $ackBy, $row['transaction_date'], $row['transaction_id'], $row['dish_id'], $row['station']]
         );
     } else {
         $db->query(
             "UPDATE kitchen_stats
-             SET exclude_from_dashboard = 1,
-                 exclude_auto = 0,
-                 tg_message_id = NULL,
-                 tg_acknowledged = 1,
+             SET tg_acknowledged = 1,
                  tg_acknowledged_at = ?,
                  tg_acknowledged_by = ?
              WHERE id = ?",
             [$ackAt, $ackBy, $itemId]
         );
-        $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [$itemId]);
     }
 } catch (\Exception $e) {
 }
@@ -157,16 +136,17 @@ $postJson = function (string $method, array $payload) use ($apiBase): void {
 };
 
 if ($chatId !== '' && $messageId > 0) {
-    $postJson('deleteMessage', [
+    $postJson('editMessageReplyMarkup', [
         'chat_id' => $chatId,
-        'message_id' => $messageId
+        'message_id' => $messageId,
+        'reply_markup' => ['inline_keyboard' => []]
     ]);
 }
 
 if ($callbackId !== '') {
     $postJson('answerCallbackQuery', [
         'callback_query_id' => $callbackId,
-        'text' => 'Игнорировано.',
+        'text' => 'Принято.',
         'show_alert' => false
     ]);
 }

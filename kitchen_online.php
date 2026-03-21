@@ -78,6 +78,8 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
             'sent_at' => $sentAt,
             'sent_ts' => $sentTs,
             'station' => (string)($r['station'] ?? ''),
+            'tg_sent_at' => (string)($r['tg_sent_at'] ?? ''),
+            'tg_last_edit_at' => (string)($r['tg_last_edit_at'] ?? ''),
         ];
     }
 
@@ -133,8 +135,27 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                             <?php else: ?>
                                 <span class="ko-item-wait">—</span>
                             <?php endif; ?>
+                            <?php
+                                $tgSentAt = trim((string)($it['tg_sent_at'] ?? ''));
+                                $tgLastEditAt = trim((string)($it['tg_last_edit_at'] ?? ''));
+                                $tgTitle = 'Telegram: уведомление не отправлено';
+                                $tgClass = '';
+                                if ($tgSentAt !== '') {
+                                    $tgClass = ' sent';
+                                    $tgSentLabel = date('H:i:s', strtotime($tgSentAt));
+                                    $tgTitle = 'Telegram: отправлено ' . $tgSentLabel;
+                                    if ($tgLastEditAt !== '' && strtotime($tgLastEditAt) > strtotime($tgSentAt)) {
+                                        $tgTitle .= '; обновлено ' . date('H:i:s', strtotime($tgLastEditAt));
+                                    }
+                                }
+                            ?>
+                            <span class="tg-indicator<?= $tgClass ?>" title="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>" aria-label="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>">
+                                <svg viewBox="0 0 240 240" aria-hidden="true" focusable="false">
+                                    <path d="M120 0C53.7 0 0 53.7 0 120s53.7 120 120 120 120-53.7 120-120S186.3 0 120 0zm58.9 82.2-19.7 93.1c-1.5 6.6-5.5 8.2-11.1 5.1l-30.7-22.6-14.8 14.2c-1.6 1.6-3 3-6.1 3l2.2-31.6 57.5-51.9c2.5-2.2-.5-3.4-3.9-1.2l-71.1 44.8-30.6-9.6c-6.6-2.1-6.8-6.6 1.4-9.8l119.6-46.1c5.5-2 10.3 1.3 8.6 9.6z"/>
+                                </svg>
+                            </span>
                             <?php if (!empty($it['item_id']) && veranda_can('exclude_toggle')): ?>
-                                <button type="button" class="ko-ack" title="Принято" aria-label="Принято" data-item-id="<?= (int)$it['item_id'] ?>">✕</button>
+                                <button type="button" class="ko-ack" title="Игнор" aria-label="Игнор" data-item-id="<?= (int)$it['item_id'] ?>">✕</button>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -351,9 +372,39 @@ if ($isAjax) {
             ? (int)$settings['alert_timing_low_load']
             : (int)$settings['alert_timing_high_load'];
 
+        $columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
+            $row = $db->query(
+                "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                [$dbName, $table, $column]
+            )->fetch();
+            return (int)($row['c'] ?? 0) > 0;
+        };
+        $db->query("CREATE TABLE IF NOT EXISTS tg_alert_messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            kitchen_stats_id INT NOT NULL,
+            transaction_date DATE NOT NULL,
+            transaction_id BIGINT NOT NULL,
+            dish_id BIGINT NOT NULL,
+            item_seq INT NOT NULL DEFAULT 1,
+            message_id BIGINT NOT NULL,
+            last_text_hash CHAR(40) NOT NULL,
+            last_edited_at DATETIME NULL,
+            last_seen_at DATETIME NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_kitchen_stats_id (kitchen_stats_id),
+            KEY idx_tx (transaction_date, transaction_id),
+            KEY idx_seen (last_seen_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        if (!$columnExists($db, $dbName, 'tg_alert_messages', 'last_edited_at')) {
+            $db->query("ALTER TABLE tg_alert_messages ADD COLUMN last_edited_at DATETIME NULL AFTER last_text_hash");
+        }
+
         $rows = $db->query(
-            "SELECT id, transaction_id, receipt_number, table_number, waiter_name, dish_id, dish_name, station, ticket_sent_at
-             FROM kitchen_stats
+            "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
+                    tgm.created_at AS tg_sent_at, tgm.last_edited_at AS tg_last_edit_at
+             FROM kitchen_stats ks
+             LEFT JOIN tg_alert_messages tgm ON tgm.kitchen_stats_id = ks.id
              WHERE transaction_date = ?
                AND status = 1
                AND ready_pressed_at IS NULL
@@ -387,6 +438,7 @@ $dashboardQuery = http_build_query([
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>КухняOnline</title>
     <style>
         body { font-family: Arial, sans-serif; background: #f5f6fa; margin: 0; padding: 20px; }
@@ -435,6 +487,10 @@ $dashboardQuery = http_build_query([
         .ko-ack { border: 0; background: transparent; color: #9aa0a6; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
         .ko-ack:hover { color: #5f6368; }
         .ko-ack:disabled { opacity: 0.4; cursor: default; }
+        .tg-indicator { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; }
+        .tg-indicator svg { width:16px; height:16px; }
+        .tg-indicator svg path { fill: #b0b7c3; }
+        .tg-indicator.sent svg path { fill: #26a5e4; }
         .empty { text-align: center; color: #65676b; margin-top: 18px; }
         .ko-footer { margin-top: 18px; text-align: center; color: #607d8b; font-size: 13px; line-height: 1.5; }
     </style>
