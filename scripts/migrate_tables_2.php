@@ -35,8 +35,24 @@ $db->createTables();
 
 $db->query("CREATE TABLE IF NOT EXISTS {$meta} (
     meta_key VARCHAR(255) PRIMARY KEY,
-    meta_value TEXT
+    meta_value TEXT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+$columnExists = function (string $table, string $column) use ($db, $dbName): bool {
+    $row = $db->query(
+        "SELECT COUNT(*) AS c
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = ?
+           AND TABLE_NAME = ?
+           AND COLUMN_NAME = ?",
+        [$dbName, $table, $column]
+    )->fetch();
+    return (int)($row['c'] ?? 0) > 0;
+};
+if (!$columnExists($meta, 'updated_at')) {
+    $db->query("ALTER TABLE {$meta} ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+}
 
 $db->query("CREATE TABLE IF NOT EXISTS {$users} (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -115,4 +131,3 @@ echo json_encode([
     'suffix' => $suffix,
     'tables' => [$ks, $meta, $users, $tgm]
 ], JSON_UNESCAPED_UNICODE) . PHP_EOL;
-
