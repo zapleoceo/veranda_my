@@ -303,6 +303,7 @@ class Database {
         $miEn = $this->t('menu_items_en');
         $miVn = $this->t('menu_items_vn');
         $miKo = $this->t('menu_items_ko');
+        $fkTag = $this->tableSuffix !== '' ? substr(sha1($this->tableSuffix), 0, 6) : 'base';
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$pmi} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             poster_id BIGINT NOT NULL,
@@ -371,7 +372,7 @@ class Database {
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_menu_categories_main_tr (main_category_id, lang),
-            CONSTRAINT fk_menu_categories_main_tr_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE CASCADE
+            CONSTRAINT fk_menu_categories_main_tr_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mcs} (
@@ -387,7 +388,7 @@ class Database {
             UNIQUE KEY uq_menu_categories_sub_poster_id (poster_sub_category_id),
             KEY idx_menu_categories_sub_main (main_category_id),
             KEY idx_menu_categories_sub_sort (sort_order),
-            CONSTRAINT fk_menu_categories_sub_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL
+            CONSTRAINT fk_menu_categories_sub_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
         if (!$columnExists($mcm, 'show_in_menu')) {
@@ -408,7 +409,7 @@ class Database {
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_menu_categories_sub_tr (sub_category_id, lang),
-            CONSTRAINT fk_menu_categories_sub_tr_sub FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE CASCADE
+            CONSTRAINT fk_menu_categories_sub_tr_sub_{$fkTag} FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miRu} (
@@ -429,9 +430,9 @@ class Database {
             KEY idx_menu_items_ru_main_cat (main_category_id),
             KEY idx_menu_items_ru_sub_cat (sub_category_id),
             KEY idx_menu_items_ru_sort (sort_order),
-            CONSTRAINT fk_menu_items_ru_poster FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_ru_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_ru_sub FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
+            CONSTRAINT fk_menu_items_ru_poster_{$fkTag} FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
+            CONSTRAINT fk_menu_items_ru_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
+            CONSTRAINT fk_menu_items_ru_sub_{$fkTag} FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miEn} (
@@ -447,9 +448,9 @@ class Database {
             UNIQUE KEY uq_menu_items_en_poster_item_id (poster_item_id),
             KEY idx_menu_items_en_main_cat (main_category_id),
             KEY idx_menu_items_en_sub_cat (sub_category_id),
-            CONSTRAINT fk_menu_items_en_poster FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_en_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_en_sub FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
+            CONSTRAINT fk_menu_items_en_poster_{$fkTag} FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
+            CONSTRAINT fk_menu_items_en_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
+            CONSTRAINT fk_menu_items_en_sub_{$fkTag} FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miVn} (
@@ -465,9 +466,9 @@ class Database {
             UNIQUE KEY uq_menu_items_vn_poster_item_id (poster_item_id),
             KEY idx_menu_items_vn_main_cat (main_category_id),
             KEY idx_menu_items_vn_sub_cat (sub_category_id),
-            CONSTRAINT fk_menu_items_vn_poster FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_vn_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_vn_sub FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
+            CONSTRAINT fk_menu_items_vn_poster_{$fkTag} FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
+            CONSTRAINT fk_menu_items_vn_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
+            CONSTRAINT fk_menu_items_vn_sub_{$fkTag} FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miKo} (
@@ -483,9 +484,9 @@ class Database {
             UNIQUE KEY uq_menu_items_ko_poster_item_id (poster_item_id),
             KEY idx_menu_items_ko_main_cat (main_category_id),
             KEY idx_menu_items_ko_sub_cat (sub_category_id),
-            CONSTRAINT fk_menu_items_ko_poster FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_ko_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_ko_sub FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
+            CONSTRAINT fk_menu_items_ko_poster_{$fkTag} FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
+            CONSTRAINT fk_menu_items_ko_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
+            CONSTRAINT fk_menu_items_ko_sub_{$fkTag} FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     }
 }
