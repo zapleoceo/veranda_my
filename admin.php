@@ -648,6 +648,171 @@ if ($tab === 'menu' || $tab === 'categories') {
         }
     }
 
+    if (isset($_POST['import_categories_csv'])) {
+        try {
+            $raw = trim((string)($_POST['categories_csv'] ?? ''));
+            if ($raw === '') {
+                throw new \Exception('Вставьте CSV категорий.');
+            }
+
+            $lines = preg_split("/\r\n|\n|\r/", $raw) ?: [];
+            $header = null;
+            $idx = [];
+            $badLines = 0;
+            $workshopsUpserted = 0;
+            $categoriesUpserted = 0;
+            $trUpserts = 0;
+            $skipped = 0;
+
+            $norm = static function (string $s): string {
+                $s = trim(mb_strtolower($s));
+                $s = preg_replace('/\s+/u', ' ', $s) ?? $s;
+                return $s;
+            };
+
+            foreach ($lines as $line) {
+                $line = trim((string)$line);
+                if ($line === '') continue;
+                $cols = str_getcsv($line, ';');
+                if (!$cols || count($cols) < 4) {
+                    $badLines++;
+                    continue;
+                }
+
+                if ($header === null) {
+                    $first = $norm((string)($cols[0] ?? ''));
+                    if ($first === 'тип') {
+                        $header = array_map(static fn($v) => $norm((string)$v), $cols);
+                        $find = static function (array $header, string $name): ?int {
+                            $i = array_search($name, $header, true);
+                            return $i === false ? null : (int)$i;
+                        };
+                        $idx = [
+                            'type' => $find($header, 'тип') ?? 0,
+                            'poster_id' => $find($header, 'poster id') ?? 1,
+                            'parent_poster_id' => $find($header, 'parent poster id') ?? 2,
+                            'raw' => $find($header, 'raw') ?? 3,
+                            'ru' => $find($header, 'ru') ?? 4,
+                            'en' => $find($header, 'en') ?? 5,
+                            'vn' => $find($header, 'vn') ?? 6,
+                            'ko' => $find($header, 'ko') ?? 7,
+                            'show' => $find($header, 'отображать') ?? 8,
+                            'sort' => $find($header, 'sort') ?? 9,
+                        ];
+                        continue;
+                    }
+                }
+
+                $type = strtolower(trim((string)($cols[$idx['type']] ?? '')));
+                $posterId = (int)($cols[$idx['poster_id']] ?? 0);
+                if (!in_array($type, ['workshop', 'category'], true) || $posterId <= 0) {
+                    $badLines++;
+                    continue;
+                }
+
+                $parentPosterId = (int)($cols[$idx['parent_poster_id']] ?? 0);
+                $rawName = trim((string)($cols[$idx['raw']] ?? ''));
+                $ru = trim((string)($cols[$idx['ru']] ?? ''));
+                $en = trim((string)($cols[$idx['en']] ?? ''));
+                $vn = trim((string)($cols[$idx['vn']] ?? ''));
+                $ko = trim((string)($cols[$idx['ko']] ?? ''));
+                $show = (int)trim((string)($cols[$idx['show']] ?? '1')) ? 1 : 0;
+                $sort = (int)trim((string)($cols[$idx['sort']] ?? '0'));
+
+                if ($type === 'workshop') {
+                    $db->query(
+                        "INSERT INTO {$menuWorkshopsTable} (poster_id, name_raw, sort_order, show_on_site)
+                         VALUES (?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE
+                            name_raw = VALUES(name_raw),
+                            sort_order = VALUES(sort_order),
+                            show_on_site = VALUES(show_on_site)",
+                        [$posterId, $rawName !== '' ? $rawName : ('workshop ' . $posterId), $sort, $show]
+                    );
+                    $workshopsUpserted++;
+
+                    $workshopId = (int)$db->query("SELECT id FROM {$menuWorkshopsTable} WHERE poster_id = ? LIMIT 1", [$posterId])->fetchColumn();
+                    if ($workshopId > 0) {
+                        foreach (['ru' => $ru, 'en' => $en, 'vn' => $vn, 'ko' => $ko] as $lang => $name) {
+                            if ($name === '') continue;
+                            $db->query(
+                                "INSERT INTO {$menuWorkshopsTrTable} (workshop_id, lang, name)
+                                 VALUES (?, ?, ?)
+                                 ON DUPLICATE KEY UPDATE name = VALUES(name)",
+                                [$workshopId, $lang, $name]
+                            );
+                            $trUpserts++;
+                        }
+                    }
+                    continue;
+                }
+
+                $workshopId = $parentPosterId > 0
+                    ? (int)$db->query("SELECT id FROM {$menuWorkshopsTable} WHERE poster_id = ? LIMIT 1", [$parentPosterId])->fetchColumn()
+                    : 0;
+
+                $categoryId = (int)$db->query("SELECT id FROM {$menuCategoriesTable} WHERE poster_id = ? LIMIT 1", [$posterId])->fetchColumn();
+                if ($categoryId <= 0) {
+                    if ($workshopId <= 0) {
+                        $skipped++;
+                        continue;
+                    }
+                    $db->query(
+                        "INSERT INTO {$menuCategoriesTable} (poster_id, workshop_id, name_raw, sort_order, show_on_site)
+                         VALUES (?, ?, ?, ?, ?)",
+                        [$posterId, $workshopId, $rawName !== '' ? $rawName : ('category ' . $posterId), $sort, $show]
+                    );
+                    $categoriesUpserted++;
+                    $categoryId = (int)$db->query("SELECT id FROM {$menuCategoriesTable} WHERE poster_id = ? LIMIT 1", [$posterId])->fetchColumn();
+                } else {
+                    if ($workshopId > 0) {
+                        $db->query(
+                            "UPDATE {$menuCategoriesTable}
+                             SET workshop_id = ?, name_raw = ?, sort_order = ?, show_on_site = ?
+                             WHERE id = ?
+                             LIMIT 1",
+                            [$workshopId, $rawName !== '' ? $rawName : ('category ' . $posterId), $sort, $show, $categoryId]
+                        );
+                    } else {
+                        $db->query(
+                            "UPDATE {$menuCategoriesTable}
+                             SET name_raw = ?, sort_order = ?, show_on_site = ?
+                             WHERE id = ?
+                             LIMIT 1",
+                            [$rawName !== '' ? $rawName : ('category ' . $posterId), $sort, $show, $categoryId]
+                        );
+                    }
+                    $categoriesUpserted++;
+                }
+
+                if ($categoryId > 0) {
+                    foreach (['ru' => $ru, 'en' => $en, 'vn' => $vn, 'ko' => $ko] as $lang => $name) {
+                        if ($name === '') continue;
+                        $db->query(
+                            "INSERT INTO {$menuCategoriesTrTable} (category_id, lang, name)
+                             VALUES (?, ?, ?)
+                             ON DUPLICATE KEY UPDATE name = VALUES(name)",
+                            [$categoryId, $lang, $name]
+                        );
+                        $trUpserts++;
+                    }
+                }
+            }
+
+            $message = 'Категории/цехи импортированы: ' . json_encode([
+                'workshops_upserted' => $workshopsUpserted,
+                'categories_upserted' => $categoriesUpserted,
+                'tr_upserts' => $trUpserts,
+                'skipped' => $skipped,
+                'bad_lines' => $badLines,
+            ], JSON_UNESCAPED_UNICODE);
+            $menuView = 'categories';
+        } catch (\Throwable $e) {
+            $error = 'Ошибка импорта категорий: ' . $e->getMessage();
+            $menuView = 'categories';
+        }
+    }
+
     if (isset($_POST['import_translations_full'])) {
         try {
             $rawUrl = trim((string)($_POST['csv_url'] ?? ''));
@@ -1701,6 +1866,16 @@ if ($tab === 'menu' || $tab === 'categories') {
                     </form>
                 </div>
             <?php elseif ($menuView === 'categories'): ?>
+                <div style="margin-top: 18px;">
+                    <h4 style="margin: 0 0 10px;">Импорт цехов/категорий (CSV)</h4>
+                    <div class="muted" style="margin-bottom: 10px;">Формат: Тип;Poster ID;Parent Poster ID;Raw;RU;EN;VN;KO;Отображать;Sort</div>
+                    <form method="POST">
+                        <textarea name="categories_csv" rows="8" style="width:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"><?= htmlspecialchars((string)($_POST['categories_csv'] ?? '')) ?></textarea>
+                        <div style="margin-top: 10px;">
+                            <button type="submit" name="import_categories_csv">Импортировать категории</button>
+                        </div>
+                    </form>
+                </div>
                 <form method="POST" style="margin-top: 18px;">
                     <h4 style="margin: 0 0 10px;">Цехи</h4>
                     <div class="table-wrap">
