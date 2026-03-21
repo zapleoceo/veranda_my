@@ -6,13 +6,16 @@ veranda_require('dashboard');
 // Фильтры
 $dateFrom = $_GET['dateFrom'] ?? date('Y-m-d');
 $dateTo = $_GET['dateTo'] ?? date('Y-m-d');
-$hourStart = (int)($_GET['hourStart'] ?? 10);
-$hourEnd = (int)($_GET['hourEnd'] ?? 24);
+$hourStart = (int)($_GET['hourStart'] ?? 0);
+$hourEnd = (int)($_GET['hourEnd'] ?? 23);
 $doResync = isset($_GET['resync']) && $_GET['resync'] === '1';
 $lastSyncLabel = '—';
-if ($hourEnd <= $hourStart) {
-    $hourEnd = min(24, $hourStart + 1);
-}
+if ($hourStart < 0) $hourStart = 0;
+if ($hourStart > 23) $hourStart = 23;
+if ($hourEnd === 24) $hourEnd = 23;
+if ($hourEnd < 0) $hourEnd = 0;
+if ($hourEnd > 23) $hourEnd = 23;
+if ($hourEnd < $hourStart) $hourEnd = $hourStart;
 $rawParams = [
     'dateFrom' => $dateFrom,
     'dateTo' => $dateTo,
@@ -53,6 +56,12 @@ try {
     if (!$columnExists($db, $dbName, 'kitchen_stats', 'prob_close_at')) {
         $db->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
     }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_category_id')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+    }
+    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
+        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+    }
     try {
         $meta = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = 'poster_last_sync_at' LIMIT 1")->fetch();
         if (!empty($meta['meta_value'])) {
@@ -67,136 +76,107 @@ try {
         }
     }
     
-    // Получаем данные за период
-    $query = "SELECT * FROM kitchen_stats 
-              WHERE COALESCE(exclude_from_dashboard, 0) = 0
-              AND COALESCE(was_deleted, 0) = 0
-              AND transaction_date BETWEEN ? AND ?";
-    $params = [$dateFrom, $dateTo];
-    $query .= " ORDER BY ticket_sent_at ASC";
-    $stats = $db->query($query, $params)->fetchAll();
-    
-    if (empty($stats)) {
-        $error = "Нет данных для построения дашборда за выбранный период.";
-    } else {
-        $hours = [];
-        $slotDates = [];
-        $slotHours = [];
-        $dateRangeSingleDay = $dateFrom === $dateTo;
+    $hours = [];
+    $slotDates = [];
+    $slotHours = [];
+    $dateRangeSingleDay = $dateFrom === $dateTo;
 
-        if ($dateRangeSingleDay) {
-            for ($h = $hourStart; $h < $hourEnd; $h++) {
-                $hours[] = sprintf("%02d:00", $h);
-                $slotDates[] = $dateFrom;
+    if ($dateRangeSingleDay) {
+        for ($h = $hourStart; $h <= $hourEnd; $h++) {
+            $hours[] = sprintf("%02d:00", $h);
+            $slotDates[] = $dateFrom;
+            $slotHours[] = $h;
+        }
+    } else {
+        $dt = new DateTime($dateFrom);
+        $dtEnd = new DateTime($dateTo);
+        $dtEnd->setTime(0, 0, 0);
+        $dt->setTime(0, 0, 0);
+
+        while ($dt <= $dtEnd) {
+            $dIso = $dt->format('Y-m-d');
+            $dLabel = $dt->format('d.m');
+            for ($h = $hourStart; $h <= $hourEnd; $h++) {
+                $hours[] = $dLabel . ' ' . sprintf("%02d:00", $h);
+                $slotDates[] = $dIso;
                 $slotHours[] = $h;
             }
-        } else {
-            $dt = new DateTime($dateFrom);
-            $dtEnd = new DateTime($dateTo);
-            $dtEnd->setTime(0, 0, 0);
-            $dt->setTime(0, 0, 0);
-
-            while ($dt <= $dtEnd) {
-                $dIso = $dt->format('Y-m-d');
-                $dLabel = $dt->format('d.m');
-                for ($h = $hourStart; $h < $hourEnd; $h++) {
-                    $hours[] = $dLabel . ' ' . sprintf("%02d:00", $h);
-                    $slotDates[] = $dIso;
-                    $slotHours[] = $h;
-                }
-                $dt->modify('+1 day');
-            }
+            $dt->modify('+1 day');
         }
+    }
 
-        // Подготавливаем данные для графиков (ID 2 = Kitchen, ID 3 = Bar)
-        $slotCount = count($hours);
-        $chartData = [
-            '2' => ['label' => 'KITCHEN', 'avg' => array_fill(0, $slotCount, 0), 'max' => array_fill(0, $slotCount, 0), 'counts' => array_fill(0, $slotCount, 0)],
-            '3' => ['label' => 'BAR VERANDA', 'avg' => array_fill(0, $slotCount, 0), 'max' => array_fill(0, $slotCount, 0), 'counts' => array_fill(0, $slotCount, 0)]
-        ];
+    $slotCount = count($hours);
+    $chartData = [
+        '2' => ['label' => 'KITCHEN', 'avg' => array_fill(0, $slotCount, 0), 'max' => array_fill(0, $slotCount, 0), 'counts' => array_fill(0, $slotCount, 0)],
+        '3' => ['label' => 'BAR VERANDA', 'avg' => array_fill(0, $slotCount, 0), 'max' => array_fill(0, $slotCount, 0), 'counts' => array_fill(0, $slotCount, 0)]
+    ];
 
-        $slotIndex = [];
-        for ($i = 0; $i < $slotCount; $i++) {
-            $d = $slotDates[$i] ?? null;
-            $h = $slotHours[$i] ?? null;
-            if ($d === null || $h === null) continue;
-            if (!isset($slotIndex[$d])) $slotIndex[$d] = [];
-            $slotIndex[$d][(int)$h] = $i;
-        }
+    $slotIndex = [];
+    for ($i = 0; $i < $slotCount; $i++) {
+        $d = $slotDates[$i] ?? null;
+        $h = $slotHours[$i] ?? null;
+        if ($d === null || $h === null) continue;
+        if (!isset($slotIndex[$d])) $slotIndex[$d] = [];
+        $slotIndex[$d][(int)$h] = $i;
+    }
 
-        foreach ($stats as $row) {
-            $stationName = $row['station'];
-            $targetStationId = null;
+    $rows = $db->query(
+        "SELECT sid, d_iso, h_int,
+                ROUND(AVG(wait_min), 1) AS avg_wait,
+                ROUND(MAX(wait_min), 1) AS max_wait,
+                COUNT(*) AS cnt
+         FROM (
+              SELECT
+                CASE
+                  WHEN station = '2' OR station = 2 OR station = 'Kitchen' OR station = 'Main' THEN '2'
+                  WHEN station = '3' OR station = 3 OR station = 'Bar Veranda' THEN '3'
+                  ELSE NULL
+                END AS sid,
+                DATE(transaction_opened_at) AS d_iso,
+                HOUR(transaction_opened_at) AS h_int,
+                (TIMESTAMPDIFF(SECOND, ticket_sent_at,
+                    CASE
+                      WHEN ready_pressed_at IS NOT NULL THEN ready_pressed_at
+                      WHEN ready_chass_at IS NOT NULL THEN ready_chass_at
+                      WHEN prob_close_at IS NOT NULL THEN prob_close_at
+                      WHEN status > 1 AND transaction_closed_at IS NOT NULL AND transaction_closed_at <> '0000-00-00 00:00:00' THEN transaction_closed_at
+                      ELSE NULL
+                    END
+                ) / 60) AS wait_min
+              FROM kitchen_stats
+              WHERE transaction_date BETWEEN ? AND ?
+                AND COALESCE(exclude_from_dashboard, 0) = 0
+                AND COALESCE(was_deleted, 0) = 0
+                AND ticket_sent_at IS NOT NULL
+                AND transaction_opened_at IS NOT NULL
+                AND HOUR(transaction_opened_at) BETWEEN ? AND ?
+                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
+                AND (
+                    ready_pressed_at IS NOT NULL
+                 OR ready_chass_at IS NOT NULL
+                 OR prob_close_at IS NOT NULL
+                 OR (status > 1 AND transaction_closed_at IS NOT NULL AND transaction_closed_at <> '0000-00-00 00:00:00')
+                )
+         ) x
+         WHERE sid IS NOT NULL AND wait_min IS NOT NULL AND wait_min >= 0
+         GROUP BY sid, d_iso, h_int",
+        [$dateFrom, $dateTo, $hourStart, $hourEnd]
+    )->fetchAll();
 
-            // Сопоставляем названия станций с ID для графиков
-            if ($stationName === '2' || $stationName === 2 || $stationName === 'Kitchen' || $stationName === 'Main') { // 'Main' для обратной совместимости
-                $targetStationId = '2';
-            } elseif ($stationName === '3' || $stationName === 3 || $stationName === 'Bar Veranda') {
-                $targetStationId = '3';
-            }
-
-            if ($targetStationId === null || !isset($chartData[$targetStationId])) {
-                continue;
-            }
-
-            $openedAt = $row['transaction_opened_at'] ?? null;
-            if (empty($openedAt)) continue;
-            $openedTs = strtotime($openedAt);
-            if ($openedTs === false || $openedTs <= 0) continue;
-            $hour = (int)date('H', $openedTs);
-            if ($hour < $hourStart || $hour >= $hourEnd) continue;
-
-            $dIso = date('Y-m-d', $openedTs);
-            if (!isset($slotIndex[$dIso][$hour])) continue;
-            $hourIdx = (int)$slotIndex[$dIso][$hour];
-
-            if (empty($row['ticket_sent_at'])) continue;
-            $sentTs = strtotime($row['ticket_sent_at']);
-            if ($sentTs === false || $sentTs <= 0) continue;
-
-            $endTime = null;
-            foreach ([$row['ready_pressed_at'] ?? null, $row['ready_chass_at'] ?? null, $row['prob_close_at'] ?? null] as $t) {
-                if (empty($t)) continue;
-                $ts = strtotime($t);
-                if ($ts === false || $ts <= 0) continue;
-                if ($ts < $sentTs) continue;
-                $endTime = $t;
-                break;
-            }
-            if ($endTime === null) {
-                $closedAt = $row['transaction_closed_at'] ?? null;
-                if (
-                    !empty($closedAt) &&
-                    $closedAt !== '0000-00-00 00:00:00' &&
-                    (int)date('Y', strtotime($closedAt)) > 1970 &&
-                    (int)$row['status'] > 1
-                ) {
-                    $ts = strtotime($closedAt);
-                    if ($ts !== false && $ts >= $sentTs) {
-                        $endTime = $closedAt;
-                    }
-                }
-            }
-            if ($endTime === null) continue;
-
-            $waitTime = (strtotime($endTime) - $sentTs) / 60;
-            
-            $chartData[$targetStationId]['avg'][$hourIdx] += $waitTime;
-            $chartData[$targetStationId]['counts'][$hourIdx]++;
-            
-            if ($waitTime > $chartData[$targetStationId]['max'][$hourIdx]) {
-                $chartData[$targetStationId]['max'][$hourIdx] = $waitTime;
-            }
-        }
-
-        // Вычисляем среднее
-        foreach (['2', '3'] as $sid) {
-            foreach ($hours as $idx => $h) {
-                if ($chartData[$sid]['counts'][$idx] > 0) {
-                    $chartData[$sid]['avg'][$idx] = round($chartData[$sid]['avg'][$idx] / $chartData[$sid]['counts'][$idx], 1);
-                    $chartData[$sid]['max'][$idx] = round($chartData[$sid]['max'][$idx], 1);
-                }
-            }
+    if (empty($rows)) {
+        $error = "Нет данных для построения дашборда за выбранный период.";
+    } else {
+        foreach ($rows as $r) {
+            $sid = (string)($r['sid'] ?? '');
+            $dIso = (string)($r['d_iso'] ?? '');
+            $hInt = (int)($r['h_int'] ?? -1);
+            if ($sid === '' || $dIso === '' || $hInt < 0) continue;
+            if (!isset($slotIndex[$dIso][$hInt])) continue;
+            $idx = (int)$slotIndex[$dIso][$hInt];
+            if (!isset($chartData[$sid])) continue;
+            $chartData[$sid]['avg'][$idx] = (float)($r['avg_wait'] ?? 0);
+            $chartData[$sid]['max'][$idx] = (float)($r['max_wait'] ?? 0);
+            $chartData[$sid]['counts'][$idx] = (int)($r['cnt'] ?? 0);
         }
     }
 
@@ -316,8 +296,8 @@ try {
                         <?php endfor; ?>
                     </select>
                     <select name="hourEnd">
-                        <?php for($h=1; $h<=24; $h++): ?>
-                            <option value="<?= $h ?>" <?= $hourEnd == $h ? 'selected' : '' ?>><?= sprintf("%02d:00", $h) ?></option>
+                        <?php for($h=0; $h<24; $h++): ?>
+                            <option value="<?= $h ?>" <?= $hourEnd == $h ? 'selected' : '' ?>><?= sprintf("%02d:59", $h) ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
