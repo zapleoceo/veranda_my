@@ -912,233 +912,28 @@ if ($tab === 'menu' || $tab === 'categories') {
                     sort($out);
                     return $out;
                 };
-
                 $tables = $listTables($db);
-                $v2Tables = array_values(array_filter($tables, fn($t) => preg_match('/_2$/', $t)));
-                $v2Pairs = [];
-                foreach ($v2Tables as $t2) {
-                    $base = preg_replace('/_2$/', '', $t2);
-                    if ($base === null || $base === '') continue;
-                    $v2Pairs[$base] = $t2;
-                }
-
-                $legacySuffix = '_legacy_' . date('Ymd_His');
-                $dbActionOut = '';
-                $dbActionErr = '';
-
-                if (isset($_POST['db_promote_v2'])) {
-                    $confirm = trim((string)($_POST['db_confirm'] ?? ''));
-                    if ($confirm !== 'PROMOTE_V2') {
-                        $dbActionErr = 'Для выполнения нужно ввести PROMOTE_V2.';
-                    } elseif (empty($v2Pairs)) {
-                        $dbActionErr = 'Таблицы *_2 не найдены.';
-                    } else {
-                        try {
-                            $ops = [];
-                            foreach ($v2Pairs as $base => $t2) {
-                                $hasBase = in_array($base, $tables, true);
-                                if ($hasBase) {
-                                    $ops[] = "`{$base}` TO `{$base}{$legacySuffix}`";
-                                }
-                                $ops[] = "`{$t2}` TO `{$base}`";
-                            }
-                            if (!empty($ops)) {
-                                $sql = "RENAME TABLE " . implode(', ', $ops);
-                                $db->query($sql);
-                                $dbActionOut = "Готово: *_2 повышены до основных. Старые таблицы сохранены с суффиксом {$legacySuffix}.";
-                                $tables = $listTables($db);
-                            }
-                        } catch (\Exception $e) {
-                            $dbActionErr = "Ошибка: " . $e->getMessage();
-                        }
-                    }
-                }
-
-                if (isset($_POST['db_drop_legacy'])) {
-                    $confirm = trim((string)($_POST['db_confirm'] ?? ''));
-                    if ($confirm !== 'DROP_LEGACY') {
-                        $dbActionErr = 'Для удаления нужно ввести DROP_LEGACY.';
-                    } elseif (empty($v2Pairs)) {
-                        $dbActionErr = 'Таблицы *_2 не найдены.';
-                    } else {
-                        try {
-                            $toDrop = [];
-                            foreach (array_keys($v2Pairs) as $base) {
-                                foreach ($tables as $t) {
-                                    if (preg_match('/^' . preg_quote($base, '/') . '_legacy_\\d{8}_\\d{6}$/', $t)) {
-                                        $toDrop[] = $t;
-                                    }
-                                }
-                            }
-                            $toDrop = array_values(array_unique($toDrop));
-                            if (empty($toDrop)) {
-                                $dbActionErr = 'Legacy-таблицы не найдены.';
-                            } else {
-                                $sql = "DROP TABLE " . implode(', ', array_map(fn($t) => "`{$t}`", $toDrop));
-                                $db->query($sql);
-                                $dbActionOut = 'Удалено legacy-таблиц: ' . count($toDrop);
-                                $tables = $listTables($db);
-                            }
-                        } catch (\Exception $e) {
-                            $dbActionErr = "Ошибка: " . $e->getMessage();
-                        }
-                    }
-                }
-
-                $v2Dir = __DIR__ . DIRECTORY_SEPARATOR . 'v2';
-                $v2Scan = [];
-                $v2Exists = is_dir($v2Dir);
-                if ($v2Exists) {
-                    $queue = [[$v2Dir, 'v2']];
-                    $limit = 250;
-                    while (!empty($queue) && count($v2Scan) < $limit) {
-                        [$abs, $rel] = array_shift($queue);
-                        $it = @scandir($abs);
-                        if (!is_array($it)) continue;
-                        foreach ($it as $name) {
-                            if ($name === '.' || $name === '..') continue;
-                            $p = $abs . DIRECTORY_SEPARATOR . $name;
-                            $r = $rel . '/' . $name;
-                            if (is_dir($p)) {
-                                $queue[] = [$p, $r];
-                            } else {
-                                $v2Scan[] = [
-                                    'path' => $r,
-                                    'size' => @filesize($p) ?: 0,
-                                    'mtime' => @filemtime($p) ?: 0
-                                ];
-                                if (count($v2Scan) >= $limit) break;
-                            }
-                        }
-                    }
-                }
-
-                $fsActionOut = '';
-                $fsActionErr = '';
-                if (isset($_POST['fs_delete_v2'])) {
-                    $confirm = trim((string)($_POST['fs_confirm'] ?? ''));
-                    if ($confirm !== 'DELETE_V2_FOLDER') {
-                        $fsActionErr = 'Для удаления нужно ввести DELETE_V2_FOLDER.';
-                    } elseif (!$v2Exists) {
-                        $fsActionErr = 'Папка v2 не найдена.';
-                    } else {
-                        $baseReal = realpath(__DIR__);
-                        $dirReal = realpath($v2Dir);
-                        if ($baseReal === false || $dirReal === false || strpos($dirReal, $baseReal . DIRECTORY_SEPARATOR) !== 0) {
-                            $fsActionErr = 'Путь v2 не прошёл проверку безопасности.';
-                        } else {
-                            $rmTree = function (string $path) use (&$rmTree): bool {
-                                if (!file_exists($path)) return true;
-                                if (is_link($path) || is_file($path)) {
-                                    return @unlink($path);
-                                }
-                                $items = @scandir($path);
-                                if (!is_array($items)) return false;
-                                foreach ($items as $name) {
-                                    if ($name === '.' || $name === '..') continue;
-                                    if (!$rmTree($path . DIRECTORY_SEPARATOR . $name)) return false;
-                                }
-                                return @rmdir($path);
-                            };
-                            if ($rmTree($v2Dir)) {
-                                $fsActionOut = 'Папка v2 удалена.';
-                            } else {
-                                $fsActionErr = 'Не удалось удалить папку v2.';
-                            }
-                        }
-                    }
-                }
             ?>
 
             <div class="card">
                 <h3>Диагностика БД</h3>
-                <div class="muted">Показывает, какие таблицы реально есть в БД на сервере. Кнопка PROMOTE_V2 переименует *_2 в основные.</div>
-                <?php if ($dbActionOut !== ''): ?><div class="success"><?= htmlspecialchars($dbActionOut) ?></div><?php endif; ?>
-                <?php if ($dbActionErr !== ''): ?><div class="error"><?= htmlspecialchars($dbActionErr) ?></div><?php endif; ?>
-                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top: 10px;">
-                    <form method="post" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-                        <input type="hidden" name="db_promote_v2" value="1">
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label>Подтверждение</label>
-                            <input name="db_confirm" placeholder="PROMOTE_V2">
-                        </div>
-                        <button type="submit">PROMOTE_V2</button>
-                    </form>
-                    <form method="post" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-                        <input type="hidden" name="db_drop_legacy" value="1">
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label>Подтверждение</label>
-                            <input name="db_confirm" placeholder="DROP_LEGACY">
-                        </div>
-                        <button type="submit">DROP_LEGACY</button>
-                    </form>
-                </div>
+                <div class="muted">Список таблиц в текущей базе данных.</div>
                 <div class="table-wrap" style="margin-top: 12px;">
                     <table class="menu-table">
                         <thead>
                             <tr>
                                 <th>Таблица</th>
-                                <th>Тип</th>
-                                <th>Связь</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($tables as $t): ?>
-                                <?php
-                                    $isV2 = (bool)preg_match('/_2$/', $t);
-                                    $base = $isV2 ? preg_replace('/_2$/', '', $t) : $t;
-                                    $pair = $isV2 ? $base : (($v2Pairs[$t] ?? '') ?: '');
-                                ?>
                                 <tr>
-                                    <td style="<?= $isV2 ? 'font-weight:800; color:#1a73e8;' : '' ?>"><?= htmlspecialchars($t) ?></td>
-                                    <td><?= $isV2 ? 'v2 (_2)' : 'base' ?></td>
-                                    <td><?= $pair !== '' ? htmlspecialchars($isV2 ? ('base: ' . $pair) : ('v2: ' . $pair)) : '—' ?></td>
+                                    <td><?= htmlspecialchars($t) ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-            </div>
-
-            <div class="card">
-                <h3>Диагностика сервера: папка v2</h3>
-                <div class="muted">Это текущие файлы на сервере в /v2 (первые 250 файлов). После миграции можно удалить папку.</div>
-                <?php if ($fsActionOut !== ''): ?><div class="success"><?= htmlspecialchars($fsActionOut) ?></div><?php endif; ?>
-                <?php if ($fsActionErr !== ''): ?><div class="error"><?= htmlspecialchars($fsActionErr) ?></div><?php endif; ?>
-                <div class="muted" style="margin-top:6px;">Путь: <?= htmlspecialchars($v2Dir) ?> — <?= $v2Exists ? 'есть' : 'нет' ?></div>
-                <?php if ($v2Exists && !empty($v2Scan)): ?>
-                    <div class="table-wrap" style="margin-top: 12px;">
-                        <table class="menu-table">
-                            <thead>
-                                <tr>
-                                    <th>Файл</th>
-                                    <th>Размер</th>
-                                    <th>Изменён</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($v2Scan as $f): ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars((string)$f['path']) ?></td>
-                                        <td><?= (int)$f['size'] ?></td>
-                                        <td><?= $f['mtime'] ? htmlspecialchars(date('d.m.Y H:i:s', (int)$f['mtime'])) : '—' ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php elseif ($v2Exists): ?>
-                    <div class="muted" style="margin-top: 10px;">Файлы не найдены или нет доступа.</div>
-                <?php endif; ?>
-
-                <form method="post" style="margin-top: 12px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-                    <input type="hidden" name="fs_delete_v2" value="1">
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label>Подтверждение</label>
-                        <input name="fs_confirm" placeholder="DELETE_V2_FOLDER">
-                    </div>
-                    <button type="submit">Удалить папку v2</button>
-                </form>
             </div>
 
         <?php elseif ($tab === 'telegram'): ?>
