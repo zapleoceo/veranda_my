@@ -6,6 +6,7 @@ require_once __DIR__ . '/src/classes/PosterAPI.php';
 require_once __DIR__ . '/src/classes/KitchenAnalytics.php';
 require_once __DIR__ . '/src/classes/CodemealAPI.php';
 require_once __DIR__ . '/src/classes/ChefAssistantSync.php';
+require_once __DIR__ . '/src/classes/MetaRepository.php';
 
 // Load .env
 if (file_exists(__DIR__ . '/.env')) {
@@ -30,39 +31,6 @@ try {
     $metaTable = $db->t('system_meta');
     $api = new \App\Classes\PosterAPI($token);
     $analytics = new \App\Classes\KitchenAnalytics($api);
-
-    $columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
-        $row = $db->query(
-            "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
-            [$dbName, $table, $column]
-        )->fetch();
-        return (int)($row['c'] ?? 0) > 0;
-    };
-
-    if (!$columnExists($db, $dbName, $ksTable, 'pay_type')) {
-        $db->query("ALTER TABLE {$ksTable} ADD COLUMN pay_type TINYINT NULL AFTER status");
-    }
-    if (!$columnExists($db, $dbName, $ksTable, 'close_reason')) {
-        $db->query("ALTER TABLE {$ksTable} ADD COLUMN close_reason TINYINT NULL AFTER pay_type");
-    }
-    if (!$columnExists($db, $dbName, $ksTable, 'exclude_from_dashboard')) {
-        $db->query("ALTER TABLE {$ksTable} ADD COLUMN exclude_from_dashboard TINYINT(1) NOT NULL DEFAULT 0 AFTER close_reason");
-    }
-    if (!$columnExists($db, $dbName, $ksTable, 'exclude_auto')) {
-        $db->query("ALTER TABLE {$ksTable} ADD COLUMN exclude_auto TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard");
-    }
-    if (!$columnExists($db, $dbName, $ksTable, 'ready_chass_at')) {
-        $db->query("ALTER TABLE {$ksTable} ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
-    }
-    if (!$columnExists($db, $dbName, $ksTable, 'prob_close_at')) {
-        $db->query("ALTER TABLE {$ksTable} ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
-    }
-    if (!$columnExists($db, $dbName, $ksTable, 'dish_category_id')) {
-        $db->query("ALTER TABLE {$ksTable} ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
-    }
-    if (!$columnExists($db, $dbName, $ksTable, 'dish_sub_category_id')) {
-        $db->query("ALTER TABLE {$ksTable} ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
-    }
 
     // Берем интервал: с начала сегодняшнего дня
     $dateFrom = date('Y-m-d');
@@ -130,15 +98,18 @@ try {
         echo "[" . date('Y-m-d H:i:s') . "] Refreshed close metadata for {$refreshed} transactions.\n";
     }
 
-    $db->query("CREATE TABLE IF NOT EXISTS {$metaTable} (
-        meta_key VARCHAR(100) PRIMARY KEY,
-        meta_value VARCHAR(255) NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-    $getMeta = function (string $key) use ($db, $metaTable): string {
-        $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
-        return $row ? (string)$row['meta_value'] : '';
+    $metaRepo = new \App\Classes\MetaRepository($db);
+    $metaCache = $metaRepo->getMany([
+        'codemeal_auth',
+        'codemeal_client_number',
+        'codemeal_locale',
+        'codemeal_timezone',
+        'chefassistant_bootstrap_done',
+        'chefassistant_readytime_fix_done',
+        'chefassistant_bootstrap_from'
+    ]);
+    $getMeta = function (string $key) use (&$metaCache): string {
+        return array_key_exists($key, $metaCache) ? (string)$metaCache[$key] : '';
     };
 
     $codemealAuth = $getMeta('codemeal_auth');

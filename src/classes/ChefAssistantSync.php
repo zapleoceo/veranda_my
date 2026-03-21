@@ -14,28 +14,11 @@ class ChefAssistantSync {
     }
 
     public function ensureTables(): void {
-        $this->db->query("CREATE TABLE IF NOT EXISTS chef_assistant_items (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            order_id INT NOT NULL,
-            dish_name_raw VARCHAR(255) NOT NULL,
-            dish_name_norm VARCHAR(255) NOT NULL,
-            send_at DATETIME NULL,
-            start_at DATETIME NULL,
-            end_at DATETIME NULL,
-            ready_at DATETIME NULL,
-            cooking_time_sec INT NULL,
-            status_desc VARCHAR(64) NULL,
-            status_css VARCHAR(64) NULL,
-            fetched_at DATETIME NOT NULL,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_chef_assistant_order_dish (order_id, dish_name_norm),
-            KEY idx_chef_assistant_ready (ready_at),
-            KEY idx_chef_assistant_order (order_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
     public function syncOrders(string $from, ?string $to = null, ?int $maxPages = 50): array {
         $this->ensureTables();
+        $table = $this->db->t('chef_assistant_items');
 
         $saved = 0;
         $orderIds = [];
@@ -92,18 +75,18 @@ class ChefAssistantSync {
                 }
 
                 $this->db->query(
-                    "INSERT INTO chef_assistant_items
+                    "INSERT INTO {$table}
                         (order_id, dish_name_raw, dish_name_norm, send_at, start_at, end_at, ready_at, cooking_time_sec, status_desc, status_css, fetched_at)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                      ON DUPLICATE KEY UPDATE
                         dish_name_raw = VALUES(dish_name_raw),
-                        send_at = IF(VALUES(send_at) IS NULL, chef_assistant_items.send_at, VALUES(send_at)),
-                        start_at = IF(VALUES(start_at) IS NULL, chef_assistant_items.start_at, VALUES(start_at)),
-                        end_at = IF(VALUES(end_at) IS NULL, chef_assistant_items.end_at, VALUES(end_at)),
-                        ready_at = IF(VALUES(ready_at) IS NULL, chef_assistant_items.ready_at, VALUES(ready_at)),
-                        cooking_time_sec = IF(VALUES(cooking_time_sec) IS NULL, chef_assistant_items.cooking_time_sec, VALUES(cooking_time_sec)),
-                        status_desc = IF(VALUES(status_desc) IS NULL OR VALUES(status_desc) = '', chef_assistant_items.status_desc, VALUES(status_desc)),
-                        status_css = IF(VALUES(status_css) IS NULL OR VALUES(status_css) = '', chef_assistant_items.status_css, VALUES(status_css)),
+                        send_at = IF(VALUES(send_at) IS NULL, {$table}.send_at, VALUES(send_at)),
+                        start_at = IF(VALUES(start_at) IS NULL, {$table}.start_at, VALUES(start_at)),
+                        end_at = IF(VALUES(end_at) IS NULL, {$table}.end_at, VALUES(end_at)),
+                        ready_at = IF(VALUES(ready_at) IS NULL, {$table}.ready_at, VALUES(ready_at)),
+                        cooking_time_sec = IF(VALUES(cooking_time_sec) IS NULL, {$table}.cooking_time_sec, VALUES(cooking_time_sec)),
+                        status_desc = IF(VALUES(status_desc) IS NULL OR VALUES(status_desc) = '', {$table}.status_desc, VALUES(status_desc)),
+                        status_css = IF(VALUES(status_css) IS NULL OR VALUES(status_css) = '', {$table}.status_css, VALUES(status_css)),
                         fetched_at = VALUES(fetched_at)",
                     [
                         $orderId,
@@ -128,6 +111,7 @@ class ChefAssistantSync {
 
     public function updateKitchenStatsReadyChAss(string $dateFrom, string $dateTo, array $orderIds): int {
         if (empty($orderIds)) return 0;
+        $table = $this->db->t('chef_assistant_items');
 
         $items = [];
         $chunks = array_chunk($orderIds, 200);
@@ -135,7 +119,7 @@ class ChefAssistantSync {
             $in = implode(',', array_fill(0, count($chunk), '?'));
             $rows = $this->db->query(
                 "SELECT order_id, dish_name_raw, ready_at
-                 FROM chef_assistant_items
+                 FROM {$table}
                  WHERE order_id IN ($in)
                    AND ready_at IS NOT NULL",
                 $chunk

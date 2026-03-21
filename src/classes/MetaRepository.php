@@ -20,8 +20,9 @@ class MetaRepository {
         $placeholders = implode(',', array_fill(0, count($keys), '?'));
         $rows = [];
         try {
+            $meta = $this->db->t('system_meta');
             $rows = $this->db->query(
-                "SELECT meta_key, meta_value FROM system_meta WHERE meta_key IN ({$placeholders})",
+                "SELECT meta_key, meta_value FROM {$meta} WHERE meta_key IN ({$placeholders})",
                 $keys
             )->fetchAll();
         } catch (\Exception $e) {
@@ -37,4 +38,3 @@ class MetaRepository {
         return $out;
     }
 }
-

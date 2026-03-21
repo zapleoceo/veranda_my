@@ -41,27 +41,6 @@ $ks = $db->t('kitchen_stats');
 $api = new \App\Classes\PosterAPI($token);
 $analytics = new \App\Classes\KitchenAnalytics($api);
 
-$columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
-    $row = $db->query(
-        "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
-        [$dbName, $table, $column]
-    )->fetch();
-    return (int)($row['c'] ?? 0) > 0;
-};
-
-foreach (['pay_type' => "TINYINT NULL AFTER status",
-          'close_reason' => "TINYINT NULL AFTER pay_type",
-          'exclude_from_dashboard' => "TINYINT(1) NOT NULL DEFAULT 0 AFTER close_reason",
-          'exclude_auto' => "TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard",
-          'ready_chass_at' => "DATETIME NULL AFTER ready_pressed_at",
-          'prob_close_at' => "DATETIME NULL AFTER ready_chass_at",
-          'dish_category_id' => "BIGINT NULL AFTER dish_id",
-          'dish_sub_category_id' => "BIGINT NULL AFTER dish_category_id"] as $col => $ddl) {
-    if (!$columnExists($db, $dbName, $ks, $col)) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN {$col} {$ddl}");
-    }
-}
-
 function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
     $ks = $db->t('kitchen_stats');
     $readyRows = $db->query(

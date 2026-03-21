@@ -31,10 +31,6 @@ try {
     $meta = $db->t('system_meta');
     $ordersTable = $db->t('codemeal_orders');
     $settingsTable = $db->t('codemeal_order_table_settings');
-    $db->query("CREATE TABLE IF NOT EXISTS {$meta} (
-        meta_key VARCHAR(255) PRIMARY KEY,
-        meta_value TEXT
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     if ($auth === '') {
         $row = $db->query("SELECT meta_value FROM {$meta} WHERE meta_key='codemeal_auth' LIMIT 1")->fetch();
@@ -56,24 +52,6 @@ try {
     if ($auth === '' || $clientNumber === '') {
         throw new Exception('Codemeal credentials are not set');
     }
-    $db->query("CREATE TABLE IF NOT EXISTS {$ordersTable} (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        external_id VARCHAR(128) NOT NULL,
-        created_at DATETIME NULL,
-        state VARCHAR(64) NULL,
-        payload JSON NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_codemeal_external_id (external_id),
-        KEY idx_codemeal_created (created_at),
-        KEY idx_codemeal_state (state)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-    $db->query("CREATE TABLE IF NOT EXISTS {$settingsTable} (
-        id INT PRIMARY KEY,
-        payload JSON NOT NULL,
-        fetched_at DATETIME NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $api = new \App\Classes\CodemealAPI($baseUrl, $auth, $clientNumber, $locale, $timezone);
 

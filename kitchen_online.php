@@ -2,6 +2,7 @@
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/Database.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
+require_once __DIR__ . '/src/classes/MetaRepository.php';
 veranda_require('kitchen_online');
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
@@ -356,9 +357,10 @@ if ($isAjax) {
             'alert_timing_high_load' => 30,
             'exclude_partners_from_load' => 0
         ];
+        $metaRepo = new \App\Classes\MetaRepository($db);
+        $metaValues = $metaRepo->getMany(array_keys($settings));
         foreach ($settings as $key => $default) {
-            $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
-            $val = $row ? $row['meta_value'] : $default;
+            $val = array_key_exists($key, $metaValues) ? $metaValues[$key] : $default;
             $settings[$key] = is_numeric($default) ? (int)$val : $val;
         }
         $loadCalculationCount = 0;
@@ -372,34 +374,6 @@ if ($isAjax) {
         $waitLimitMinutes = ($loadCalculationCount < (int)$settings['alert_load_threshold'])
             ? (int)$settings['alert_timing_low_load']
             : (int)$settings['alert_timing_high_load'];
-
-        $columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
-            $row = $db->query(
-                "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
-                [$dbName, $table, $column]
-            )->fetch();
-            return (int)($row['c'] ?? 0) > 0;
-        };
-        $db->query("CREATE TABLE IF NOT EXISTS {$tgm} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            kitchen_stats_id INT NOT NULL,
-            transaction_date DATE NOT NULL,
-            transaction_id BIGINT NOT NULL,
-            dish_id BIGINT NOT NULL,
-            item_seq INT NOT NULL DEFAULT 1,
-            message_id BIGINT NOT NULL,
-            last_text_hash CHAR(40) NOT NULL,
-            last_edited_at DATETIME NULL,
-            last_seen_at DATETIME NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_kitchen_stats_id (kitchen_stats_id),
-            KEY idx_tx (transaction_date, transaction_id),
-            KEY idx_seen (last_seen_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        if (!$columnExists($db, $dbName, $tgm, 'last_edited_at')) {
-            $db->query("ALTER TABLE {$tgm} ADD COLUMN last_edited_at DATETIME NULL AFTER last_text_hash");
-        }
 
         $rows = $db->query(
             "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,

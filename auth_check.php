@@ -58,31 +58,10 @@ if (!function_exists('veranda_get_user_permissions')) {
     }
 }
 
-$ensureSystemMeta = function (\App\Classes\Database $db): void {
-    try {
-        $meta = $db->t('system_meta');
-        $db->query("CREATE TABLE IF NOT EXISTS {$meta} (
-            meta_key VARCHAR(255) PRIMARY KEY,
-            meta_value TEXT
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    } catch (\Exception $e) {
-    }
-};
+$ensureSystemMeta = function (\App\Classes\Database $db): void {};
 
 if (!function_exists('veranda_get_workshops')) {
     function veranda_get_workshops(\App\Classes\Database $db, string $token, string $dbName): array {
-        $ensure = function () use ($db) {
-            try {
-                $meta = $db->t('system_meta');
-                $db->query("CREATE TABLE IF NOT EXISTS {$meta} (
-                    meta_key VARCHAR(255) PRIMARY KEY,
-                    meta_value TEXT
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-            } catch (\Exception $e) {
-            }
-        };
-        $ensure();
-
         $ttlSec = 3600;
         $now = time();
         $cached = null;

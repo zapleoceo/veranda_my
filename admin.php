@@ -14,26 +14,8 @@ if (!in_array($tab, ['sync', 'access', 'telegram', 'menu', 'categories'], true))
     $tab = 'sync';
 }
 
-$columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
-    $row = $db->query(
-        "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
-        [$dbName, $table, $column]
-    )->fetch();
-    return (int)($row['c'] ?? 0) > 0;
-};
-
 $usersTable = $db->t('users');
 $metaTable = $db->t('system_meta');
-
-if (!$columnExists($db, $dbName, $usersTable, 'permissions_json')) {
-    $db->query("ALTER TABLE {$usersTable} ADD COLUMN permissions_json TEXT NULL AFTER is_active");
-}
-if (!$columnExists($db, $dbName, $usersTable, 'is_active')) {
-    $db->query("ALTER TABLE {$usersTable} ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1");
-}
-if (!$columnExists($db, $dbName, $usersTable, 'telegram_username')) {
-    $db->query("ALTER TABLE {$usersTable} ADD COLUMN telegram_username VARCHAR(64) NULL AFTER email");
-}
 
 $permissionKeys = [
     'dashboard' => 'Дашборд',
@@ -239,7 +221,6 @@ $telegramAckWhitelistText = implode("\n", $whitelistTextLines);
 
 $isMenuAjax = ($_GET['ajax'] ?? '') === 'menu_publish';
 if ($isMenuAjax) {
-    $db->createMenuTables();
     $pmi = $db->t('poster_menu_items');
     $miRu = $db->t('menu_items_ru');
     $miEn = $db->t('menu_items_en');
@@ -333,7 +314,6 @@ $menuSyncMeta = ['last_sync_at' => null, 'last_sync_result' => null, 'last_sync_
 $menuSyncAtIso = '';
 
 if ($tab === 'menu' || $tab === 'categories') {
-    $db->createMenuTables();
     $posterMenuItemsTable = $db->t('poster_menu_items');
     $menuCategoriesMainTable = $db->t('menu_categories_main');
     $menuCategoriesSubTable = $db->t('menu_categories_sub');

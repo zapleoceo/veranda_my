@@ -31,11 +31,6 @@ try {
 
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
     $meta = $db->t('system_meta');
-    $db->query("CREATE TABLE IF NOT EXISTS {$meta} (
-        meta_key VARCHAR(100) PRIMARY KEY,
-        meta_value VARCHAR(255) NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $api = new \App\Classes\PosterAPI($token);
     $sync = new \App\Classes\PosterMenuSync($api, $db);

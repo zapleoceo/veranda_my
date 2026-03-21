@@ -7,6 +7,7 @@ require_once __DIR__ . '/src/classes/KitchenAnalytics.php';
 require_once __DIR__ . '/src/classes/TelegramBot.php';
 require_once __DIR__ . '/src/classes/CodemealAPI.php';
 require_once __DIR__ . '/src/classes/ChefAssistantSync.php';
+require_once __DIR__ . '/src/classes/MetaRepository.php';
 
 // Load .env
 if (file_exists(__DIR__ . '/.env')) {
@@ -166,84 +167,22 @@ try {
     $tgm = $db->t('tg_alert_messages');
     $api = new \App\Classes\PosterAPI($token);
     $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-    $columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
-        $row = $db->query(
-            "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
-            [$dbName, $table, $column]
-        )->fetch();
-        return (int)($row['c'] ?? 0) > 0;
-    };
-    if (!$columnExists($db, $dbName, $ks, 'waiter_name')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN waiter_name VARCHAR(255) NULL AFTER table_number");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'tg_message_id')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN tg_message_id BIGINT NULL AFTER prob_close_at");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'tg_acknowledged')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN tg_acknowledged TINYINT(1) NOT NULL DEFAULT 0 AFTER tg_message_id");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'tg_acknowledged_at')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN tg_acknowledged_at DATETIME NULL AFTER tg_acknowledged");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'tg_acknowledged_by')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN tg_acknowledged_by VARCHAR(255) NULL AFTER tg_acknowledged_at");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'ready_chass_at')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'prob_close_at')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'dish_category_id')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'dish_sub_category_id')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'item_seq')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN item_seq INT NOT NULL DEFAULT 1 AFTER dish_id");
-    }
-
-    $db->query("CREATE TABLE IF NOT EXISTS {$metaTable} (
-        meta_key VARCHAR(100) PRIMARY KEY,
-        meta_value VARCHAR(255) NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-    $db->query("CREATE TABLE IF NOT EXISTS {$tgm} (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        kitchen_stats_id INT NOT NULL,
-        transaction_date DATE NOT NULL,
-        transaction_id BIGINT NOT NULL,
-        dish_id BIGINT NOT NULL,
-        item_seq INT NOT NULL DEFAULT 1,
-        message_id BIGINT NOT NULL,
-        last_text_hash CHAR(40) NOT NULL,
-        last_edited_at DATETIME NULL,
-        last_seen_at DATETIME NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_kitchen_stats_id (kitchen_stats_id),
-        KEY idx_tx (transaction_date, transaction_id),
-        KEY idx_seen (last_seen_at)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-    if (!$columnExists($db, $dbName, $tgm, 'last_edited_at')) {
-        $db->query("ALTER TABLE {$tgm} ADD COLUMN last_edited_at DATETIME NULL AFTER last_text_hash");
-    }
-    $db->query("UPDATE {$tgm} SET last_edited_at = created_at WHERE last_edited_at IS NULL");
-
-    $getMeta = function (string $key) use ($db): string {
-        $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
-        return $row ? (string)$row['meta_value'] : '';
+    $metaRepo = new \App\Classes\MetaRepository($db);
+    $metaCache = [];
+    $getMeta = function (string $key) use ($metaRepo, &$metaCache): string {
+        if (array_key_exists($key, $metaCache)) return (string)$metaCache[$key];
+        $vals = $metaRepo->getMany([$key]);
+        $metaCache[$key] = array_key_exists($key, $vals) ? (string)$vals[$key] : '';
+        return (string)$metaCache[$key];
     };
 
-    $setMeta = function (string $key, string $value) use ($db): void {
+    $setMeta = function (string $key, string $value) use ($db, $metaTable, &$metaCache): void {
         $db->query(
             "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
             [$key, $value]
         );
+        $metaCache[$key] = $value;
     };
 
     $maybeSendAuthAlert = function () use ($getMeta, $setMeta, $bot, $tgThreadId): void {

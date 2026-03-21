@@ -26,34 +26,6 @@ try {
     $ks = $db->t('kitchen_stats');
     $metaTable = $db->t('system_meta');
     $api = new \App\Classes\PosterAPI($token);
-    $columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
-        $row = $db->query(
-            "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
-            [$dbName, $table, $column]
-        )->fetch();
-        return (int)($row['c'] ?? 0) > 0;
-    };
-    if (!$columnExists($db, $dbName, $ks, 'exclude_from_dashboard')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN exclude_from_dashboard TINYINT(1) NOT NULL DEFAULT 0 AFTER close_reason");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'exclude_auto')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN exclude_auto TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'ready_chass_at')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'prob_close_at')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'dish_category_id')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'dish_sub_category_id')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
-    }
-    if (!$columnExists($db, $dbName, $ks, 'waiter_name')) {
-        $db->query("ALTER TABLE {$ks} ADD COLUMN waiter_name VARCHAR(255) NULL AFTER table_number");
-    }
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_exclude_item'])) {
         if (!veranda_can('exclude_toggle')) {
             $isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
