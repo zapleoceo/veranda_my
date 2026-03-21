@@ -5,8 +5,6 @@ require_once __DIR__ . '/src/classes/Database.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 require_once __DIR__ . '/src/classes/KitchenAnalytics.php';
 require_once __DIR__ . '/src/classes/TelegramBot.php';
-require_once __DIR__ . '/src/classes/CodemealAPI.php';
-require_once __DIR__ . '/src/classes/ChefAssistantSync.php';
 require_once __DIR__ . '/src/classes/MetaRepository.php';
 require_once __DIR__ . '/src/classes/EventLogger.php';
 
@@ -187,19 +185,7 @@ try {
         $metaCache[$key] = $value;
     };
 
-    $maybeSendAuthAlert = function () use ($getMeta, $setMeta, $bot, $tgThreadId): void {
-        $last = $getMeta('chefassistant_auth_notified_at');
-        if ($last !== '') {
-            $ts = strtotime($last);
-            if ($ts !== false && $ts > time() - 1800) {
-                return;
-            }
-        }
-        $bot->sendMessage("@zapleosoft we have problem with authorisation", $tgThreadId);
-        $setMeta('chefassistant_auth_notified_at', date('Y-m-d H:i:s'));
-    };
-
-    $process = function (int $cycle) use ($db, $api, $bot, &$employeesById, &$historyByTxId, $getTxHistory, $isDishDeletedFromHistory, $resolveWaiterName, $tgThreadId, $maybeSendAuthAlert): void {
+    $process = function (int $cycle) use ($db, $api, $bot, &$employeesById, &$historyByTxId, $getTxHistory, $isDishDeletedFromHistory, $resolveWaiterName, $tgThreadId): void {
     $ks = $db->t('kitchen_stats');
     $metaTable = $db->t('system_meta');
     $tgm = $db->t('tg_alert_messages');

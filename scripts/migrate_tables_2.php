@@ -28,8 +28,6 @@ $ks = $db->t('kitchen_stats');
 $meta = $db->t('system_meta');
 $users = $db->t('users');
 $tgm = $db->t('tg_alert_messages');
-$codemealOrders = $db->t('codemeal_orders');
-$codemealSettings = $db->t('codemeal_order_table_settings');
 
 $db->createTables();
 
@@ -82,25 +80,6 @@ $db->query("CREATE TABLE IF NOT EXISTS {$tgm} (
     UNIQUE KEY uq_kitchen_stats_id (kitchen_stats_id),
     KEY idx_tx (transaction_date, transaction_id),
     KEY idx_seen (last_seen_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-$db->query("CREATE TABLE IF NOT EXISTS {$codemealOrders} (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    external_id VARCHAR(128) NOT NULL,
-    created_at DATETIME NULL,
-    state VARCHAR(64) NULL,
-    payload JSON NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_codemeal_external_id (external_id),
-    KEY idx_codemeal_created (created_at),
-    KEY idx_codemeal_state (state)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-$db->query("CREATE TABLE IF NOT EXISTS {$codemealSettings} (
-    id INT PRIMARY KEY,
-    payload JSON NOT NULL,
-    fetched_at DATETIME NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
 $db->createMenuTables();

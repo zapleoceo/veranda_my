@@ -28,9 +28,6 @@ $ks = $db->t('kitchen_stats');
 $meta = $db->t('system_meta');
 $users = $db->t('users');
 $tgm = $db->t('tg_alert_messages');
-$codemealOrders = $db->t('codemeal_orders');
-$codemealSettings = $db->t('codemeal_order_table_settings');
-$chefItems = $db->t('chef_assistant_items');
 $eventLog = $db->t('event_log');
 
 $db->createTables();
@@ -69,44 +66,6 @@ $db->query("CREATE TABLE IF NOT EXISTS {$tgm} (
     UNIQUE KEY uq_kitchen_stats_id (kitchen_stats_id),
     KEY idx_tx (transaction_date, transaction_id),
     KEY idx_seen (last_seen_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-$db->query("CREATE TABLE IF NOT EXISTS {$codemealOrders} (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    external_id VARCHAR(128) NOT NULL,
-    created_at DATETIME NULL,
-    state VARCHAR(64) NULL,
-    payload JSON NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_codemeal_external_id (external_id),
-    KEY idx_codemeal_created (created_at),
-    KEY idx_codemeal_state (state)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-$db->query("CREATE TABLE IF NOT EXISTS {$codemealSettings} (
-    id INT PRIMARY KEY,
-    payload JSON NOT NULL,
-    fetched_at DATETIME NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-$db->query("CREATE TABLE IF NOT EXISTS {$chefItems} (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    order_id INT NOT NULL,
-    dish_name_raw VARCHAR(255) NOT NULL,
-    dish_name_norm VARCHAR(255) NOT NULL,
-    send_at DATETIME NULL,
-    start_at DATETIME NULL,
-    end_at DATETIME NULL,
-    ready_at DATETIME NULL,
-    cooking_time_sec INT NULL,
-    status_desc VARCHAR(64) NULL,
-    status_css VARCHAR(64) NULL,
-    fetched_at DATETIME NOT NULL,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_chef_assistant_order_dish (order_id, dish_name_norm),
-    KEY idx_chef_assistant_ready (ready_at),
-    KEY idx_chef_assistant_order (order_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
 $db->query("CREATE TABLE IF NOT EXISTS {$eventLog} (
@@ -149,11 +108,11 @@ $ensureIndex($ks, 'idx_ks_date_exclude', 'transaction_date, exclude_from_dashboa
 $ensureIndex($ks, 'idx_ks_tg_msg', 'tg_message_id');
 $ensureIndex($ks, 'idx_ks_tg_ack', 'tg_acknowledged, tg_acknowledged_at');
 
-$logger->info('ok', ['tables' => [$ks, $meta, $users, $tgm, $chefItems, $eventLog]]);
+$logger->info('ok', ['tables' => [$ks, $meta, $users, $tgm, $eventLog]]);
 
 echo json_encode([
     'ok' => true,
     'db' => $dbName,
     'suffix' => $suffix,
-    'tables' => [$ks, $meta, $users, $tgm, $chefItems, $eventLog]
+    'tables' => [$ks, $meta, $users, $tgm, $eventLog]
 ], JSON_UNESCAPED_UNICODE) . PHP_EOL;

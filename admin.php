@@ -129,56 +129,6 @@ if (isset($_POST['save_tg_whitelist'])) {
     $message = "Whitelist Telegram успешно сохранён.";
 }
 
-$codemealDefaults = [
-    'codemeal_client_number' => '',
-    'codemeal_auth' => '',
-    'codemeal_locale' => 'en',
-    'codemeal_timezone' => 'Asia/Ho_Chi_Minh',
-];
-
-if (isset($_POST['save_codemeal'])) {
-    $client = trim((string)($_POST['codemeal_client_number'] ?? ''));
-    $authNew = trim((string)($_POST['codemeal_auth'] ?? ''));
-    $locale = strtolower(trim((string)($_POST['codemeal_locale'] ?? 'en')));
-    $timezone = trim((string)($_POST['codemeal_timezone'] ?? 'Asia/Ho_Chi_Minh'));
-
-    if ($locale === '') {
-        $locale = 'en';
-    }
-    if ($timezone === '') {
-        $timezone = 'Asia/Ho_Chi_Minh';
-    }
-
-    $existingAuthRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key=? LIMIT 1", ['codemeal_auth'])->fetch();
-    $existingAuth = $existingAuthRow ? (string)$existingAuthRow['meta_value'] : '';
-    $authToSave = $authNew !== '' ? $authNew : $existingAuth;
-
-    $db->query(
-        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
-        ['codemeal_client_number', $client]
-    );
-    $db->query(
-        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
-        ['codemeal_locale', $locale]
-    );
-    $db->query(
-        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
-        ['codemeal_timezone', $timezone]
-    );
-    if ($authToSave !== '') {
-        $db->query(
-            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
-            ['codemeal_auth', $authToSave]
-        );
-    }
-
-    $message = "Настройки Codemeal сохранены.";
-}
-
 $settings = [];
 foreach ($settingKeys as $key => $default) {
     $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
@@ -186,19 +136,6 @@ foreach ($settingKeys as $key => $default) {
     if (is_numeric($default)) {
         $settings[$key] = (int)$settings[$key];
     }
-}
-
-$codemealSettings = [];
-foreach ($codemealDefaults as $key => $default) {
-    $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
-    $codemealSettings[$key] = $row ? (string)$row['meta_value'] : (string)$default;
-}
-$codemealAuthMasked = '';
-$rawAuth = trim((string)($codemealSettings['codemeal_auth'] ?? ''));
-if ($rawAuth !== '') {
-    $prefix = mb_substr($rawAuth, 0, 6);
-    $suffix = mb_substr($rawAuth, max(0, mb_strlen($rawAuth) - 4));
-    $codemealAuthMasked = $prefix . '…' . $suffix;
 }
 
 $whitelistRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$telegramAckWhitelistKey])->fetch();
@@ -861,9 +798,6 @@ if ($tab === 'menu' || $tab === 'categories') {
         <?php if ($tab === 'sync'): ?>
             <?php
                 $metaKeys = [
-                    'chefassistant_last_sync_at',
-                    'chefassistant_last_sync_info',
-                    'chefassistant_last_sync_error',
                     'menu_last_sync_at',
                     'menu_last_sync_result',
                     'menu_last_sync_error',
@@ -878,7 +812,6 @@ if ($tab === 'menu' || $tab === 'categories') {
                 <h4>Синки: что это</h4>
                 <ul>
                     <li><strong>Kitchen:</strong> синхронизация данных чеков/позиций из Poster в <code>kitchen_stats</code> (для Дашборда/Таблицы/КухняОнлайн).</li>
-                    <li><strong>ChefAssistant:</strong> подтягивание отметок готовности (ChAss) и исправление готовности по истории.</li>
                     <li><strong>ProbCloseTime:</strong> расчёт логического времени закрытия позиций (по следующим чекам) — это ВрЛогЗакр.</li>
                     <li><strong>Menu:</strong> синхронизация меню из Poster в таблицы <code>poster_menu_items</code>, <code>menu_items_*</code>.</li>
                 </ul>
@@ -891,21 +824,6 @@ if ($tab === 'menu' || $tab === 'categories') {
                         <th>Параметр</th>
                         <th>Значение</th>
                         <th style="width: 40px;">i</th>
-                    </tr>
-                    <tr>
-                        <td>ChefAssistant: последняя синхронизация</td>
-                        <td><?= htmlspecialchars($meta['chefassistant_last_sync_at'] ?: '—') ?></td>
-                        <td><span class="info-icon" title="Синхронизация ChefAssistant (Codemeal): подтягивает отметки готовности (ready_chass_at) и исправляет готовность по истории.">i</span></td>
-                    </tr>
-                    <tr>
-                        <td>ChefAssistant: результат</td>
-                        <td><?= htmlspecialchars($meta['chefassistant_last_sync_info'] ?: '—') ?></td>
-                        <td><span class="info-icon" title="Сводка по последнему запуску ChefAssistant: сколько страниц/заказов/строк обновлено.">i</span></td>
-                    </tr>
-                    <tr>
-                        <td>ChefAssistant: ошибка</td>
-                        <td><?= htmlspecialchars($meta['chefassistant_last_sync_error'] ?: '—') ?></td>
-                        <td><span class="info-icon" title="Текст последней ошибки ChefAssistant, если синк упал.">i</span></td>
                     </tr>
                     <tr>
                         <td>Menu sync: последняя синхронизация</td>
@@ -1267,39 +1185,10 @@ if ($tab === 'menu' || $tab === 'categories') {
             </form>
         </div>
 
-        <div class="card">
-            <h3>Codemeal: доступ к заказам</h3>
-            <form method="POST">
-                <div class="settings-grid" style="grid-template-columns: 1fr 1fr;">
-                    <div class="form-group">
-                        <label>Client number</label>
-                        <input name="codemeal_client_number" value="<?= htmlspecialchars((string)($codemealSettings['codemeal_client_number'] ?? '')) ?>" placeholder="922371">
-                    </div>
-                    <div class="form-group">
-                        <label>Authorization</label>
-                        <input type="password" name="codemeal_auth" value="" placeholder="<?= htmlspecialchars($codemealAuthMasked !== '' ? 'сохранено: ' . $codemealAuthMasked : '922371:...') ?>">
-                        <div class="muted" style="margin-top:6px;">Если оставить пустым — сохранённое значение не изменится.</div>
-                    </div>
-                </div>
-                <div class="settings-grid" style="grid-template-columns: 1fr 1fr; margin-top: 10px;">
-                    <div class="form-group">
-                        <label>Locale</label>
-                        <input name="codemeal_locale" value="<?= htmlspecialchars((string)($codemealSettings['codemeal_locale'] ?? 'en')) ?>" placeholder="en">
-                    </div>
-                    <div class="form-group">
-                        <label>Timezone</label>
-                        <input name="codemeal_timezone" value="<?= htmlspecialchars((string)($codemealSettings['codemeal_timezone'] ?? 'Asia/Ho_Chi_Minh')) ?>" placeholder="Asia/Ho_Chi_Minh">
-                    </div>
-                </div>
-                <button type="submit" name="save_codemeal">Сохранить Codemeal</button>
-            </form>
-        </div>
-
         <div class="description-card">
             <h4>Логика работы уведомлений в Telegram:</h4>
             <ul>
                 <li><strong>Каждые 5 минут (cron):</strong> Скрипт сначала очищает старые алерты, затем отправляет актуальные.</li>
-                <li><strong>ChefAssistant:</strong> Синхронизация временно отключена, данные по нему не используются.</li>
                 <li><strong>Очистка:</strong> Для всех сообщений с tg_message_id за последние 2 часа (по ticket_sent_at) проверяется актуальность. Если блюдо готово/удалено/позиция исключена/чек закрыт/✅ Принято — бот удаляет сообщение и очищает tg_message_id.</li>
                 <li><strong>Динамический тайминг:</strong> Лимит ожидания зависит от нагрузки. Если открыто меньше <b><?= $settings['alert_load_threshold'] ?></b> чеков — <b><?= $settings['alert_timing_low_load'] ?> мин</b>, иначе — <b><?= $settings['alert_timing_high_load'] ?> мин</b>. Если включено "ИСКЛЮЧИТЬ СТОЛ PARTNERS", он не влияет на нагрузку, но отображается в заголовке отдельно (напр. 9+4).</li>
                 <li><strong>Кандидаты на алерт:</strong> Берутся только позиции с ticket_sent_at, которые старше лимита, status=1, ready_pressed_at IS NULL и tg_acknowledged=0.</li>

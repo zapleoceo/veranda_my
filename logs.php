@@ -13,7 +13,6 @@ $logMap = [
     'kitchen' => $baseDir . '/cron.log',
     'telegram' => $baseDir . '/telegram.log',
     'menu' => $baseDir . '/menu_sync.log',
-    'codemeal' => $baseDir . '/codemeal.log',
     'php' => $baseDir . '/php_errors.log',
 ];
 if (!array_key_exists($view, $logMap)) {
@@ -63,13 +62,6 @@ $syncJobs = [
         'cron' => '0 * * * *',
         'log' => basename($logMap['menu']),
         'desc' => 'Обновляет меню: подтягивает блюда и категории из Poster, обновляет цены/станции/категории, сохраняет результат синка.',
-    ],
-    [
-        'key' => 'codemeal',
-        'label' => 'Codemeal sync',
-        'cron' => '5 * * * *',
-        'log' => basename($logMap['codemeal']),
-        'desc' => 'Обновляет заказы Codemeal: забирает новые заказы и сохраняет их в базе для просмотра/аналитики.',
     ],
 ];
 

@@ -4,9 +4,6 @@ date_default_timezone_set('Asia/Ho_Chi_Minh');
 require_once __DIR__ . '/src/classes/Database.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 require_once __DIR__ . '/src/classes/KitchenAnalytics.php';
-require_once __DIR__ . '/src/classes/CodemealAPI.php';
-require_once __DIR__ . '/src/classes/ChefAssistantSync.php';
-require_once __DIR__ . '/src/classes/MetaRepository.php';
 require_once __DIR__ . '/src/classes/EventLogger.php';
 
 // Load .env
@@ -102,124 +99,6 @@ try {
     if ($refreshed > 0) {
         echo "[" . date('Y-m-d H:i:s') . "] Refreshed close metadata for {$refreshed} transactions.\n";
         $logger->info('close_refreshed', ['count' => $refreshed, 'date' => $dateFrom]);
-    }
-
-    $metaRepo = new \App\Classes\MetaRepository($db);
-    $metaCache = $metaRepo->getMany([
-        'codemeal_auth',
-        'codemeal_client_number',
-        'codemeal_locale',
-        'codemeal_timezone',
-        'chefassistant_bootstrap_done',
-        'chefassistant_readytime_fix_done',
-        'chefassistant_bootstrap_from'
-    ]);
-    $getMeta = function (string $key) use (&$metaCache): string {
-        return array_key_exists($key, $metaCache) ? (string)$metaCache[$key] : '';
-    };
-
-    $codemealAuth = $getMeta('codemeal_auth');
-    $codemealClient = $getMeta('codemeal_client_number');
-    $codemealLocale = $getMeta('codemeal_locale');
-    if ($codemealLocale === '') $codemealLocale = 'en';
-    $codemealTz = $getMeta('codemeal_timezone');
-    if ($codemealTz === '') $codemealTz = 'Asia/Ho_Chi_Minh';
-
-    $envCodemealAuth = trim((string)($_ENV['CODEMEAL_AUTH'] ?? ''));
-    $envCodemealClient = trim((string)($_ENV['CODEMEAL_CLIENT_NUMBER'] ?? ''));
-    $envCodemealLocale = trim((string)($_ENV['CODEMEAL_LOCALE'] ?? ''));
-    $envCodemealTz = trim((string)($_ENV['CODEMEAL_TIMEZONE'] ?? ''));
-    if ($codemealAuth === '' && $envCodemealAuth !== '') $codemealAuth = $envCodemealAuth;
-    if ($codemealClient === '' && $envCodemealClient !== '') $codemealClient = $envCodemealClient;
-    if ($envCodemealLocale !== '') $codemealLocale = $envCodemealLocale;
-    if ($envCodemealTz !== '') $codemealTz = $envCodemealTz;
-
-    if ($codemealAuth !== '' && $codemealClient !== '') {
-        try {
-            $bootstrapDone = $getMeta('chefassistant_bootstrap_done') === '1';
-            $parserFixDone = $getMeta('chefassistant_readytime_fix_done') === '1';
-            $bootstrapFrom = null;
-            if (!$bootstrapDone || !$parserFixDone) {
-                $savedFrom = $getMeta('chefassistant_bootstrap_from');
-                if ($savedFrom !== '') {
-                    $bootstrapFrom = $savedFrom;
-                } else {
-                    $min = $db->query("SELECT MIN(transaction_date) AS d FROM {$ksTable}")->fetch();
-                    $minDate = !empty($min['d']) ? (string)$min['d'] : '';
-                    if ($minDate !== '' && $minDate !== '0000-00-00') {
-                        $bootstrapFrom = date('Y/m/d 00:00:00', strtotime($minDate . ' -1 day'));
-                    } else {
-                        $bootstrapFrom = date('Y/m/d 00:00:00', strtotime('-14 days'));
-                    }
-                }
-            }
-
-            $chassFrom = $bootstrapFrom ?? date('Y/m/d 00:00:00', strtotime('-1 day'));
-            $apiCh = new \App\Classes\CodemealAPI('https://codemeal.pro', $codemealAuth, $codemealClient, $codemealLocale, $codemealTz);
-            $chass = new \App\Classes\ChefAssistantSync($db, $apiCh, $codemealTz);
-            $res = $chass->syncOrders($chassFrom, null, $bootstrapFrom !== null ? null : 20);
-            if (!empty($res['ok'])) {
-                $updateFrom = $bootstrapFrom !== null ? date('Y-m-d', strtotime(str_replace('/', '-', substr($bootstrapFrom, 0, 10)))) : date('Y-m-d', strtotime('-1 day'));
-                $updated = $chass->updateKitchenStatsReadyChAss($updateFrom, date('Y-m-d'), $res['order_ids'] ?? []);
-                $db->query(
-                    "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-                     ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-                    ['chefassistant_last_sync_at', date('Y-m-d H:i:s')]
-                );
-                $db->query(
-                    "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-                     ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-                    ['chefassistant_last_sync_info', 'saved=' . (int)($res['saved'] ?? 0) . ', pages=' . (int)($res['pages'] ?? 0) . ', updated=' . $updated]
-                );
-                if ($bootstrapFrom !== null) {
-                    $db->query(
-                        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-                         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-                        ['chefassistant_bootstrap_done', '1']
-                    );
-                    $db->query(
-                        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-                         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-                        ['chefassistant_bootstrap_done_at', date('Y-m-d H:i:s')]
-                    );
-                    $db->query(
-                        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-                         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-                        ['chefassistant_bootstrap_from', $bootstrapFrom]
-                    );
-                    $db->query(
-                        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-                         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-                        ['chefassistant_readytime_fix_done', '1']
-                    );
-                    echo "[" . date('Y-m-d H:i:s') . "] ChefAssistant BOOTSTRAP from {$bootstrapFrom}: saved " . (int)($res['saved'] ?? 0) . ", pages " . (int)($res['pages'] ?? 0) . ", updated {$updated} rows.\n";
-                } else {
-                    echo "[" . date('Y-m-d H:i:s') . "] ChefAssistant: saved " . (int)($res['saved'] ?? 0) . ", pages " . (int)($res['pages'] ?? 0) . ", updated {$updated} rows.\n";
-                }
-            } else {
-                $err = (string)($res['error'] ?? 'ChefAssistant error');
-                $db->query(
-                    "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-                     ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-                    ['chefassistant_last_sync_error', $err]
-                );
-                if (!empty($res['auth_error'])) {
-                    $db->query(
-                        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-                         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-                        ['chefassistant_auth_problem_at', date('Y-m-d H:i:s')]
-                    );
-                }
-                echo "[" . date('Y-m-d H:i:s') . "] ChefAssistant ERROR: {$err}\n";
-            }
-        } catch (\Exception $e) {
-            $db->query(
-                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-                ['chefassistant_last_sync_error', $e->getMessage()]
-            );
-            echo "[" . date('Y-m-d H:i:s') . "] ChefAssistant ERROR: " . $e->getMessage() . "\n";
-        }
     }
 
     $computeProbCloseAt = function (string $date) use ($db, $ksTable): array {
