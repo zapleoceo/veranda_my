@@ -648,6 +648,70 @@ if ($tab === 'menu' || $tab === 'categories') {
         }
     }
 
+    if (isset($_POST['import_categories_preset_v2'])) {
+        $_POST['categories_csv'] = "Тип;Poster ID;Parent Poster ID;Raw;RU;EN;VN;KO;Отображать;Sort\n"
+            . "workshop;32;;1-10 KITCHEN КУХНЯ;Кухня;Kitchen;Nhà bếp;키친 메뉴;1;1\n"
+            . "workshop;33;;VERANDA ВЕРНАДА;Веранда;Veranda;Bar;바 메뉴;1;255\n"
+            . "workshop;47;;Кальян / Shisha;Кальян;Shisha;Shisha;시샤;1;255\n"
+            . "workshop;49;;Блины;Блины;Blini;Blini;블리니;1;255\n"
+            . "workshop;50;;ХОР;ХОР;Live Music;Live Music;라이브 공연;1;255\n"
+            . "category;8;32;1. Сold appetizers;Холодные закуски;Cold Appetizers;Khai vị lạnh;차가운 에피타이저;1;1\n"
+            . "category;9;32;2. Hot appetizers;Горячие закуски;Hot Appetizers;Khai vị nóng;따뜻한 에피타이저;1;2\n"
+            . "category;10;32;3. Salads;Салаты;Salads;Salad;샐러드;1;3\n"
+            . "category;11;32;4. Main menu;Основные блюда;Main Courses;Món chính;메인 요리;1;4\n"
+            . "category;12;32;5. Burgers;Бургеры;Burgers;Burger;버거;1;5\n"
+            . "category;13;32;6. Shawarma;Шаурма;Shawarma;Shawarma;샤와르마;1;6\n"
+            . "category;14;32;7. Breakfasts;Завтраки (до 15:00);Breakfast (before 15:00);Bữa sáng (trước 15:00);모닝 메뉴 (15시 이전);1;7\n"
+            . "category;15;32;8. Bowls;Боулы;Bowls;Bowl;볼 요리;1;8\n"
+            . "category;16;32;9. Soups;Супы;Soups;Súp;수프;1;9\n"
+            . "category;17;32;10. Desserts;Десерты;Desserts;Tráng miệng;디저트;1;10\n"
+            . "category;43;32;24 Увкуснитель Extras;Дополнительно;Extras;Extras;추가 토핑;1;24\n"
+            . "category;44;32;Детское меню;Детское меню;Kids Menu;Thực đơn trẻ em;키즈 메뉴;1;255\n"
+            . "category;18;33;11. Coffee;Кофе;Coffee;Cà phê;커피;1;11\n"
+            . "category;19;33;12. Tea;Чай;Tea;Trà;차;1;12\n"
+            . "category;20;33;13. Fresh juices;Свежевыжатые соки;Fresh Juices;Nước ép tươi;생과일 주스;1;13\n"
+            . "category;21;33;14. Smoothies;Смузи;Smoothies;Sinh tố;스무디;1;14\n"
+            . "category;22;33;15. Milkshakes;Милкшейки;Milkshakes;Sữa lắc;밀크셰이크;1;15\n"
+            . "category;23;33;16. Mocktails;Моктейли;Mocktails;Mocktail;논알코올 칵테일;1;16\n"
+            . "category;24;33;17. Cocktails;Коктейли;Cocktails;Cocktail;칵테일;1;17\n"
+            . "category;25;33;18. Strong alcohol;Крепкий алкоголь;Strong Alcohol;Rượu mạnh;도수 높은 주류;1;18\n"
+            . "category;26;33;19. Beer;Пиво;Beer;Bia;맥주;1;19\n"
+            . "category;27;33;20. Wine;Вино;Wine;Rượu vang;와인;1;20\n"
+            . "category;28;33;21. Liquers;Ликеры;Liqueurs;Rượu mùi;리큐르;1;21\n"
+            . "category;31;33;22. Infusions;Настойки;Infusions;Rượu ngâm;인퓨전 주류;1;22\n"
+            . "category;29;33;23. Soft drinks;Безалкогольные напитки;Soft Drinks;Nước ngọt;탄산/청량 음료;1;23\n"
+            . "category;45;33;New coctails;Новые коктейли;New Cocktails;Cocktail mới;신상 칵테일;1;255\n";
+        $_POST['import_categories_csv'] = '1';
+    }
+
+    if (isset($_POST['fix_new_cocktails_to_24'])) {
+        try {
+            $fromPosterCategoryId = 45;
+            $toPosterCategoryId = 24;
+            $fromCategoryId = (int)$db->query("SELECT id FROM {$menuCategoriesTable} WHERE poster_id = ? LIMIT 1", [$fromPosterCategoryId])->fetchColumn();
+            $toCategoryId = (int)$db->query("SELECT id FROM {$menuCategoriesTable} WHERE poster_id = ? LIMIT 1", [$toPosterCategoryId])->fetchColumn();
+            if ($fromCategoryId <= 0) {
+                throw new \Exception('Не найдена категория Poster ID=' . $fromPosterCategoryId);
+            }
+            if ($toCategoryId <= 0) {
+                throw new \Exception('Не найдена категория Poster ID=' . $toPosterCategoryId);
+            }
+            $updated = (int)$db->query(
+                "UPDATE {$menuItemsTable} SET category_id = ? WHERE category_id = ?",
+                [$toCategoryId, $fromCategoryId]
+            )->rowCount();
+            $message = 'Перенос блюд выполнен: ' . json_encode([
+                'from_poster_category_id' => $fromPosterCategoryId,
+                'to_poster_category_id' => $toPosterCategoryId,
+                'updated_items' => $updated
+            ], JSON_UNESCAPED_UNICODE);
+            $menuView = 'categories';
+        } catch (\Throwable $e) {
+            $error = 'Ошибка переноса блюд: ' . $e->getMessage();
+            $menuView = 'categories';
+        }
+    }
+
     if (isset($_POST['import_categories_csv'])) {
         try {
             $raw = trim((string)($_POST['categories_csv'] ?? ''));
@@ -1873,7 +1937,11 @@ if ($tab === 'menu' || $tab === 'categories') {
                         <textarea name="categories_csv" rows="8" style="width:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"><?= htmlspecialchars((string)($_POST['categories_csv'] ?? '')) ?></textarea>
                         <div style="margin-top: 10px;">
                             <button type="submit" name="import_categories_csv">Импортировать категории</button>
+                            <button type="submit" name="import_categories_preset_v2">Импортировать пресет</button>
                         </div>
+                    </form>
+                    <form method="POST" style="margin-top: 10px;">
+                        <button type="submit" name="fix_new_cocktails_to_24">New Cocktails → категория 24</button>
                     </form>
                 </div>
                 <form method="POST" style="margin-top: 18px;">
