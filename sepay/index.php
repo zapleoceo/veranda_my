@@ -5,12 +5,6 @@ require_once __DIR__ . '/../src/classes/Database.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
 if (file_exists(__DIR__ . '/../.env')) {
     $lines = file(__DIR__ . '/../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
@@ -35,6 +29,7 @@ try {
     $meta = $db->t('system_meta');
     $nowStr = (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s');
     $remoteIp = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    $methodNow = (string)($_SERVER['REQUEST_METHOD'] ?? '');
     $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
     $ua = mb_substr($ua, 0, 200, 'UTF-8');
 
@@ -67,7 +62,28 @@ try {
              ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
             ['sepay_webhook_last_bytes', (string)strlen($raw)]
         );
+        $db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+            ['sepay_webhook_last_method', $methodNow]
+        );
     } catch (\Throwable $e) {
+    }
+
+    if ($methodNow !== 'POST') {
+        try {
+            $db->query("INSERT INTO {$meta} (meta_key, meta_value) VALUES ('sepay_webhook_nonpost_hits_total', '1')
+                        ON DUPLICATE KEY UPDATE meta_value = meta_value + 1");
+            $db->query(
+                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, '1')
+                 ON DUPLICATE KEY UPDATE meta_value = meta_value + 1",
+                ['sepay_webhook_nonpost_hits_' . date('Ymd')]
+            );
+        } catch (\Throwable $e) {
+        }
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     $payload = json_decode($raw, true);
