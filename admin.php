@@ -300,6 +300,97 @@ if ($tab === 'menu' || $tab === 'categories') {
     $menuItemsTable = $db->t('menu_items');
     $menuItemsTrTable = $db->t('menu_item_tr');
 
+    if (($_GET['export'] ?? '') === 'csv') {
+        ignore_user_abort(true);
+        @set_time_limit(300);
+        header('Content-Type: text/csv; charset=utf-8');
+        $file = 'menu_export_' . (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Ymd_His') . '.csv';
+        header('Content-Disposition: attachment; filename="' . $file . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        $out = fopen('php://output', 'w');
+        if ($out === false) {
+            http_response_code(500);
+            echo 'Cannot open output';
+            exit;
+        }
+        fwrite($out, "\xEF\xBB\xBF");
+
+        fputcsv($out, [
+            'Poster ID',
+            'Название RU',
+            'Описание RU',
+            'Название EN',
+            'Описание EN',
+            'Название VN',
+            'Описание VN',
+            'Название KO',
+            'Описание KO',
+            'Цена',
+            'Категория Poster',
+            'Категория адапт. RU',
+            'Категория адапт. EN',
+            'Категория адапт. VN',
+            'Категория адапт. KO',
+        ], ';');
+
+        $rows = $db->query(
+            "SELECT
+                p.poster_id,
+                COALESCE(ru.title, '') ru_title,
+                COALESCE(ru.description, '') ru_desc,
+                COALESCE(en.title, '') en_title,
+                COALESCE(en.description, '') en_desc,
+                COALESCE(vn.title, '') vn_title,
+                COALESCE(vn.description, '') vn_desc,
+                COALESCE(ko.title, '') ko_title,
+                COALESCE(ko.description, '') ko_desc,
+                p.price_raw,
+                COALESCE(p.sub_category_name, '') poster_category,
+                COALESCE(ctr_ru.name, c.name_raw, '') adapted_category_ru,
+                COALESCE(ctr_en.name, c.name_raw, '') adapted_category_en,
+                COALESCE(ctr_vn.name, c.name_raw, '') adapted_category_vn,
+                COALESCE(ctr_ko.name, c.name_raw, '') adapted_category_ko
+             FROM {$posterMenuItemsTable} p
+             LEFT JOIN {$menuItemsTable} mi ON mi.poster_item_id = p.id
+             LEFT JOIN {$menuItemsTrTable} ru ON ru.item_id = mi.id AND ru.lang = 'ru'
+             LEFT JOIN {$menuItemsTrTable} en ON en.item_id = mi.id AND en.lang = 'en'
+             LEFT JOIN {$menuItemsTrTable} vn ON vn.item_id = mi.id AND vn.lang = 'vn'
+             LEFT JOIN {$menuItemsTrTable} ko ON ko.item_id = mi.id AND ko.lang = 'ko'
+             LEFT JOIN {$menuCategoriesTable} c ON c.id = mi.category_id
+             LEFT JOIN {$menuCategoriesTrTable} ctr_ru ON ctr_ru.category_id = c.id AND ctr_ru.lang = 'ru'
+             LEFT JOIN {$menuCategoriesTrTable} ctr_en ON ctr_en.category_id = c.id AND ctr_en.lang = 'en'
+             LEFT JOIN {$menuCategoriesTrTable} ctr_vn ON ctr_vn.category_id = c.id AND ctr_vn.lang = 'vn'
+             LEFT JOIN {$menuCategoriesTrTable} ctr_ko ON ctr_ko.category_id = c.id AND ctr_ko.lang = 'ko'
+             WHERE p.is_active = 1
+             ORDER BY p.poster_id ASC"
+        )->fetchAll();
+
+        foreach ($rows as $r) {
+            fputcsv($out, [
+                (string)($r['poster_id'] ?? ''),
+                (string)($r['ru_title'] ?? ''),
+                (string)($r['ru_desc'] ?? ''),
+                (string)($r['en_title'] ?? ''),
+                (string)($r['en_desc'] ?? ''),
+                (string)($r['vn_title'] ?? ''),
+                (string)($r['vn_desc'] ?? ''),
+                (string)($r['ko_title'] ?? ''),
+                (string)($r['ko_desc'] ?? ''),
+                (string)($r['price_raw'] ?? ''),
+                (string)($r['poster_category'] ?? ''),
+                (string)($r['adapted_category_ru'] ?? ''),
+                (string)($r['adapted_category_en'] ?? ''),
+                (string)($r['adapted_category_vn'] ?? ''),
+                (string)($r['adapted_category_ko'] ?? ''),
+            ], ';');
+        }
+
+        fclose($out);
+        exit;
+    }
+
     $metaKeys = ['menu_last_sync_at', 'menu_last_sync_result', 'menu_last_sync_error'];
     foreach ($metaKeys as $k) {
         $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key=? LIMIT 1", [$k])->fetch();
@@ -1212,6 +1303,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <form method="POST" style="margin:0;">
                         <button type="submit" name="autofill_menu" title="Разовая привязка по ID: связывает menu_items.category_id и menu_categories.workshop_id из данных Poster там, где сейчас пусто. Не трогает переводы и ручные значения.">Привязать ID (разово)</button>
                     </form>
+                    <a href="admin.php?tab=menu&export=csv" style="text-decoration:none; font-weight:600; color:#1a73e8;" title="Выгрузка CSV со всеми активными позициями и текущими переводами/категориями.">Экспорт CSV</a>
                     <?php if (!empty($menuSyncMeta['last_sync_at'])): ?>
                         <span class="muted">Последняя синхронизация: <span class="js-local-dt" data-iso="<?= htmlspecialchars($menuSyncAtIso) ?>"><?= htmlspecialchars($menuSyncMeta['last_sync_at']) ?></span></span>
                     <?php endif; ?>
