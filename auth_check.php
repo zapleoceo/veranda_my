@@ -36,6 +36,8 @@ if (!function_exists('veranda_get_user_permissions')) {
             'kitchen_online' => true,
             'admin' => true,
             'exclude_toggle' => true,
+            'telegram_ack' => false,
+            'payday' => false,
         ];
         if ($email === '') return $defaults;
         try {

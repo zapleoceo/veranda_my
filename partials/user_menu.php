@@ -14,6 +14,7 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
         <?php if (function_exists('veranda_can') && veranda_can('dashboard')): ?><a href="dashboard.php<?= $dashboardQuery !== '' ? ('?' . htmlspecialchars($dashboardQuery)) : '' ?>">Дашборд</a><?php endif; ?>
         <?php if (function_exists('veranda_can') && veranda_can('rawdata')): ?><a href="rawdata.php<?= $rawDataQuery !== '' ? ('?' . htmlspecialchars($rawDataQuery)) : '' ?>">Таблица</a><?php endif; ?>
         <?php if (function_exists('veranda_can') && veranda_can('kitchen_online')): ?><a href="kitchen_online.php">КухняОнлайн</a><?php endif; ?>
+        <?php if (function_exists('veranda_can') && veranda_can('payday')): ?><a href="/payday">Payday</a><?php endif; ?>
         <?php if (function_exists('veranda_can') && veranda_can('admin')): ?><a href="admin.php">Управление</a><?php endif; ?>
         <a href="logout.php">Выход</a>
     </div>
