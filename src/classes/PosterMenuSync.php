@@ -22,12 +22,16 @@ class PosterMenuSync {
         $mi = $this->db->t('menu_items');
         $miTr = $this->db->t('menu_item_tr');
 
+        $workshops = $this->fetchWorkshops();
+        $products = $this->fetchProducts();
         $categories = $this->fetchCategories();
+        $usedFallbackCategories = false;
+        if (empty($categories['main']) || empty($categories['sub'])) {
+            $categories = $this->buildCategoriesFromProducts($products, $categories);
+            $usedFallbackCategories = true;
+        }
         $workshopMap = $this->upsertWorkshops($categories['main']);
         $categoryMap = $this->upsertCategories($categories['sub'], $workshopMap);
-        $workshops = $this->fetchWorkshops();
-
-        $products = $this->fetchProducts();
 
         $workshopPosterIds = [];
         foreach ($categories['main'] as $row) {
@@ -148,6 +152,7 @@ class PosterMenuSync {
             'items_seen' => count($seenPosterIds),
             'workshops' => (int)$this->db->query("SELECT COUNT(*) FROM {$mw}")->fetchColumn(),
             'categories' => (int)$this->db->query("SELECT COUNT(*) FROM {$mc}")->fetchColumn(),
+            'used_categories_fallback' => $usedFallbackCategories,
         ];
     }
 
@@ -441,6 +446,54 @@ class PosterMenuSync {
             'main_names' => $mainNames,
             'sub_names' => $subNames,
             'sub_parent' => $subParent
+        ];
+    }
+
+    private function buildCategoriesFromProducts(array $products, array $base): array {
+        $main = [];
+        $sub = [];
+        $mainNames = $base['main_names'] ?? [];
+        $subNames = $base['sub_names'] ?? [];
+        $subParent = $base['sub_parent'] ?? [];
+        $mainSeen = [];
+        $subSeen = [];
+
+        foreach ($products as $p) {
+            if (!is_array($p)) continue;
+            if (!$this->isProductVisible($p)) continue;
+
+            $mainPosterCatId = (int)($p['category_id'] ?? $p['menu_category_id'] ?? $p['main_category_id'] ?? 0);
+            $subPosterCatId = (int)($p['sub_category_id'] ?? $p['menu_category_id2'] ?? $p['category2_id'] ?? 0);
+
+            $mainName = trim((string)($p['category_name'] ?? $p['main_category_name'] ?? ''));
+            $subName = trim((string)($p['sub_category_name'] ?? $p['category2_name'] ?? ''));
+
+            if ($mainPosterCatId > 0 && !isset($mainSeen[$mainPosterCatId])) {
+                $mainSeen[$mainPosterCatId] = true;
+                $main[] = ['id' => $mainPosterCatId, 'name' => $mainName];
+            }
+            if ($mainPosterCatId > 0 && $mainName !== '' && !isset($mainNames[$mainPosterCatId])) {
+                $mainNames[$mainPosterCatId] = $mainName;
+            }
+
+            if ($subPosterCatId > 0 && !isset($subSeen[$subPosterCatId])) {
+                $subSeen[$subPosterCatId] = true;
+                $sub[] = ['id' => $subPosterCatId, 'name' => $subName, 'parent' => $mainPosterCatId];
+            }
+            if ($subPosterCatId > 0 && $subName !== '' && !isset($subNames[$subPosterCatId])) {
+                $subNames[$subPosterCatId] = $subName;
+            }
+            if ($subPosterCatId > 0 && $mainPosterCatId > 0 && !isset($subParent[$subPosterCatId])) {
+                $subParent[$subPosterCatId] = $mainPosterCatId;
+            }
+        }
+
+        return [
+            'main' => !empty($main) ? $main : ($base['main'] ?? []),
+            'sub' => !empty($sub) ? $sub : ($base['sub'] ?? []),
+            'main_names' => $mainNames,
+            'sub_names' => $subNames,
+            'sub_parent' => $subParent,
         ];
     }
 
