@@ -21,8 +21,9 @@ $token = $_ENV['POSTER_API_TOKEN'] ?? '';
 $googleClientId = $_ENV['GOOGLE_CLIENT_ID'] ?? '';
 $googleClientSecret = $_ENV['GOOGLE_CLIENT_SECRET'] ?? '';
 $googleRedirectUri = $_ENV['GOOGLE_REDIRECT_URI'] ?? 'https://veranda.my/auth_callback.php';
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
-$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
 $auth = new \App\Classes\Auth($db, $googleClientId, $googleClientSecret, $googleRedirectUri);
 
 $auth->requireAuth();
@@ -38,7 +39,8 @@ if (!function_exists('veranda_get_user_permissions')) {
         ];
         if ($email === '') return $defaults;
         try {
-            $row = $db->query("SELECT permissions_json FROM users WHERE email = ? LIMIT 1", [$email])->fetch();
+            $users = $db->t('users');
+            $row = $db->query("SELECT permissions_json FROM {$users} WHERE email = ? LIMIT 1", [$email])->fetch();
             $raw = (string)($row['permissions_json'] ?? '');
             if ($raw === '') return $defaults;
             $decoded = json_decode($raw, true);
@@ -58,7 +60,8 @@ if (!function_exists('veranda_get_user_permissions')) {
 
 $ensureSystemMeta = function (\App\Classes\Database $db): void {
     try {
-        $db->query("CREATE TABLE IF NOT EXISTS system_meta (
+        $meta = $db->t('system_meta');
+        $db->query("CREATE TABLE IF NOT EXISTS {$meta} (
             meta_key VARCHAR(255) PRIMARY KEY,
             meta_value TEXT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -70,7 +73,8 @@ if (!function_exists('veranda_get_workshops')) {
     function veranda_get_workshops(\App\Classes\Database $db, string $token, string $dbName): array {
         $ensure = function () use ($db) {
             try {
-                $db->query("CREATE TABLE IF NOT EXISTS system_meta (
+                $meta = $db->t('system_meta');
+                $db->query("CREATE TABLE IF NOT EXISTS {$meta} (
                     meta_key VARCHAR(255) PRIMARY KEY,
                     meta_value TEXT
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -84,9 +88,10 @@ if (!function_exists('veranda_get_workshops')) {
         $cached = null;
         $cachedAt = 0;
         try {
-            $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = 'poster_workshops_json' LIMIT 1")->fetch();
+            $meta = $db->t('system_meta');
+            $row = $db->query("SELECT meta_value FROM {$meta} WHERE meta_key = 'poster_workshops_json' LIMIT 1")->fetch();
             $cached = (string)($row['meta_value'] ?? '');
-            $row2 = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = 'poster_workshops_updated_at' LIMIT 1")->fetch();
+            $row2 = $db->query("SELECT meta_value FROM {$meta} WHERE meta_key = 'poster_workshops_updated_at' LIMIT 1")->fetch();
             $cachedAt = (int)($row2['meta_value'] ?? 0);
         } catch (\Exception $e) {
         }
@@ -112,12 +117,13 @@ if (!function_exists('veranda_get_workshops')) {
                 }
                 $decoded = $out;
                 try {
+                    $meta = $db->t('system_meta');
                     $db->query(
-                        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                        "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
                         ['poster_workshops_json', json_encode($decoded, JSON_UNESCAPED_UNICODE)]
                     );
                     $db->query(
-                        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                        "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
                         ['poster_workshops_updated_at', (string)$now]
                     );
                 } catch (\Exception $e) {
@@ -129,8 +135,9 @@ if (!function_exists('veranda_get_workshops')) {
         if (!is_array($decoded)) $decoded = [];
         if (count($decoded) === 0) {
             try {
+                $ks = $db->t('kitchen_stats');
                 $row = $db->query(
-                    "SELECT DISTINCT station AS s FROM kitchen_stats WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND station IS NOT NULL AND station <> '' ORDER BY station ASC"
+                    "SELECT DISTINCT station AS s FROM {$ks} WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND station IS NOT NULL AND station <> '' ORDER BY station ASC"
                 )->fetchAll();
                 $out = [];
                 foreach ($row as $r) {

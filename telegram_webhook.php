@@ -19,6 +19,7 @@ $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
 $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
 $tgTokenMissing = empty($tgToken);
 $raw = file_get_contents('php://input');
@@ -55,12 +56,14 @@ if ($ackBy === '') {
 }
 
 try {
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+    $metaTable = $db->t('system_meta');
+    $ks = $db->t('kitchen_stats');
     $ackAt = date('Y-m-d H:i:s');
 
     $username = strtolower(trim((string)($from['username'] ?? '')));
     $username = ltrim($username, '@');
-    $whitelistRow = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", ['telegram_ack_whitelist'])->fetch();
+    $whitelistRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", ['telegram_ack_whitelist'])->fetch();
     $whitelist = json_decode((string)($whitelistRow['meta_value'] ?? '{}'), true);
     if (!is_array($whitelist)) {
         $whitelist = [];
@@ -91,7 +94,7 @@ try {
 
     $row = $db->query(
         "SELECT transaction_date, transaction_id, dish_id, station
-         FROM kitchen_stats
+         FROM {$ks}
          WHERE id = ?
          LIMIT 1",
         [$itemId]
@@ -99,7 +102,7 @@ try {
 
     if (!empty($row['transaction_id']) && !empty($row['dish_id']) && !empty($row['transaction_date']) && !empty($row['station'])) {
         $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ks}
              SET tg_acknowledged = 1,
                  tg_acknowledged_at = ?,
                  tg_acknowledged_by = ?
@@ -111,7 +114,7 @@ try {
         );
     } else {
         $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ks}
              SET tg_acknowledged = 1,
                  tg_acknowledged_at = ?,
                  tg_acknowledged_by = ?

@@ -159,7 +159,11 @@ $resolveWaiterName = function (\App\Classes\PosterAPI $api, int $transactionId, 
 };
 
 try {
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+    $tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+    $ks = $db->t('kitchen_stats');
+    $metaTable = $db->t('system_meta');
+    $tgm = $db->t('tg_alert_messages');
     $api = new \App\Classes\PosterAPI($token);
     $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
     $columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
@@ -169,44 +173,44 @@ try {
         )->fetch();
         return (int)($row['c'] ?? 0) > 0;
     };
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'waiter_name')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN waiter_name VARCHAR(255) NULL AFTER table_number");
+    if (!$columnExists($db, $dbName, $ks, 'waiter_name')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN waiter_name VARCHAR(255) NULL AFTER table_number");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'tg_message_id')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN tg_message_id BIGINT NULL AFTER prob_close_at");
+    if (!$columnExists($db, $dbName, $ks, 'tg_message_id')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN tg_message_id BIGINT NULL AFTER prob_close_at");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'tg_acknowledged')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN tg_acknowledged TINYINT(1) NOT NULL DEFAULT 0 AFTER tg_message_id");
+    if (!$columnExists($db, $dbName, $ks, 'tg_acknowledged')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN tg_acknowledged TINYINT(1) NOT NULL DEFAULT 0 AFTER tg_message_id");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'tg_acknowledged_at')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN tg_acknowledged_at DATETIME NULL AFTER tg_acknowledged");
+    if (!$columnExists($db, $dbName, $ks, 'tg_acknowledged_at')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN tg_acknowledged_at DATETIME NULL AFTER tg_acknowledged");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'tg_acknowledged_by')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN tg_acknowledged_by VARCHAR(255) NULL AFTER tg_acknowledged_at");
+    if (!$columnExists($db, $dbName, $ks, 'tg_acknowledged_by')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN tg_acknowledged_by VARCHAR(255) NULL AFTER tg_acknowledged_at");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'ready_chass_at')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
+    if (!$columnExists($db, $dbName, $ks, 'ready_chass_at')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'prob_close_at')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
+    if (!$columnExists($db, $dbName, $ks, 'prob_close_at')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_category_id')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+    if (!$columnExists($db, $dbName, $ks, 'dish_category_id')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+    if (!$columnExists($db, $dbName, $ks, 'dish_sub_category_id')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'item_seq')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN item_seq INT NOT NULL DEFAULT 1 AFTER dish_id");
+    if (!$columnExists($db, $dbName, $ks, 'item_seq')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN item_seq INT NOT NULL DEFAULT 1 AFTER dish_id");
     }
 
-    $db->query("CREATE TABLE IF NOT EXISTS system_meta (
+    $db->query("CREATE TABLE IF NOT EXISTS {$metaTable} (
         meta_key VARCHAR(100) PRIMARY KEY,
         meta_value VARCHAR(255) NOT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    $db->query("CREATE TABLE IF NOT EXISTS tg_alert_messages (
+    $db->query("CREATE TABLE IF NOT EXISTS {$tgm} (
         id INT AUTO_INCREMENT PRIMARY KEY,
         kitchen_stats_id INT NOT NULL,
         transaction_date DATE NOT NULL,
@@ -224,19 +228,19 @@ try {
         KEY idx_seen (last_seen_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    if (!$columnExists($db, $dbName, 'tg_alert_messages', 'last_edited_at')) {
-        $db->query("ALTER TABLE tg_alert_messages ADD COLUMN last_edited_at DATETIME NULL AFTER last_text_hash");
+    if (!$columnExists($db, $dbName, $tgm, 'last_edited_at')) {
+        $db->query("ALTER TABLE {$tgm} ADD COLUMN last_edited_at DATETIME NULL AFTER last_text_hash");
     }
-    $db->query("UPDATE tg_alert_messages SET last_edited_at = created_at WHERE last_edited_at IS NULL");
+    $db->query("UPDATE {$tgm} SET last_edited_at = created_at WHERE last_edited_at IS NULL");
 
     $getMeta = function (string $key) use ($db): string {
-        $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$key])->fetch();
+        $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
         return $row ? (string)$row['meta_value'] : '';
     };
 
     $setMeta = function (string $key, string $value) use ($db): void {
         $db->query(
-            "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
             [$key, $value]
         );
@@ -255,12 +259,16 @@ try {
     };
 
     $process = function (int $cycle) use ($db, $api, $bot, &$employeesById, &$historyByTxId, $getTxHistory, $isDishDeletedFromHistory, $resolveWaiterName, $tgThreadId, $maybeSendAuthAlert): void {
+    $ks = $db->t('kitchen_stats');
+    $metaTable = $db->t('system_meta');
+    $tgm = $db->t('tg_alert_messages');
     // 1. Сначала находим все записи, у которых есть tg_message_id (т.е. уведомление было отправлено)
     $today = date('Y-m-d');
     $computeProbCloseAt = function (string $date) use ($db): void {
+        $ks = $db->t('kitchen_stats');
         $readyRows = $db->query(
             "SELECT receipt_number, station, ready_pressed_at, ready_chass_at
-             FROM kitchen_stats
+             FROM {$ks}
              WHERE transaction_date = ?
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
@@ -298,7 +306,7 @@ try {
 
         $targets = $db->query(
             "SELECT id, receipt_number, station, prob_close_at, ticket_sent_at
-             FROM kitchen_stats
+             FROM {$ks}
              WHERE transaction_date = ?
                AND status = 1
                AND receipt_number REGEXP '^[0-9]+$'
@@ -310,7 +318,7 @@ try {
             [$date]
         )->fetchAll();
 
-        $upd = $db->getPdo()->prepare("UPDATE kitchen_stats SET prob_close_at = ? WHERE id = ?");
+        $upd = $db->getPdo()->prepare("UPDATE {$ks} SET prob_close_at = ? WHERE id = ?");
         foreach ($targets as $t) {
             $id = (int)($t['id'] ?? 0);
             $receipt = (int)($t['receipt_number'] ?? 0);
@@ -347,7 +355,7 @@ try {
     }
     $cleanupFrom = date('Y-m-d H:i:s', time() - 2 * 60 * 60);
     $activeAlerts = $db->query(
-        "SELECT * FROM kitchen_stats
+        "SELECT * FROM {$ks}
          WHERE tg_message_id IS NOT NULL
            AND ticket_sent_at IS NOT NULL
            AND ticket_sent_at >= ?",
@@ -407,19 +415,19 @@ try {
 
                 if ($isDeletedInTx) {
                     $shouldDelete = true;
-                    $db->query("UPDATE kitchen_stats SET was_deleted = 1 WHERE id = ?", [$item['id']]);
+                    $db->query("UPDATE {$ks} SET was_deleted = 1 WHERE id = ?", [$item['id']]);
                 } elseif ($currentCount <= 0) {
                     $shouldDelete = true;
-                    $db->query("UPDATE kitchen_stats SET was_deleted = 1 WHERE id = ?", [$item['id']]);
+                    $db->query("UPDATE {$ks} SET was_deleted = 1 WHERE id = ?", [$item['id']]);
                 } elseif ($readyTime !== null) {
                     $shouldDelete = true;
-                    $db->query("UPDATE kitchen_stats SET ready_pressed_at = ? WHERE id = ?", [$readyTime, $item['id']]);
+                    $db->query("UPDATE {$ks} SET ready_pressed_at = ? WHERE id = ?", [$readyTime, $item['id']]);
                 } elseif ($apiStatus > 1 || $apiReason !== null) {
                     $shouldDelete = true;
                     if ($apiStatus <= 1) {
                         $apiStatus = 2;
                     }
-                    $db->query("UPDATE kitchen_stats SET status = ?, pay_type = ?, close_reason = ? WHERE transaction_id = ?", [$apiStatus, $apiPayType, $apiReason, $item['transaction_id']]);
+                    $db->query("UPDATE {$ks} SET status = ?, pay_type = ?, close_reason = ? WHERE transaction_id = ?", [$apiStatus, $apiPayType, $apiReason, $item['transaction_id']]);
                 }
             } catch (\Exception $e) {
                 error_log("API Check failed for TX {$item['transaction_id']}: " . $e->getMessage());
@@ -430,12 +438,12 @@ try {
         if ($shouldDelete) {
             $deleted = $bot->deleteMessage((int)$item['tg_message_id']);
             if ($deleted) {
-                $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
-                $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [(int)$item['id']]);
+                $db->query("UPDATE {$ks} SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
+                $db->query("DELETE FROM {$tgm} WHERE kitchen_stats_id = ?", [(int)$item['id']]);
                 echo "[" . date('Y-m-d H:i:s') . "] Removed outdated alert for: {$item['dish_name']} (Table: {$item['table_number']})\n";
             } else {
-                $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
-                $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [(int)$item['id']]);
+                $db->query("UPDATE {$ks} SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
+                $db->query("DELETE FROM {$tgm} WHERE kitchen_stats_id = ?", [(int)$item['id']]);
                 echo "[" . date('Y-m-d H:i:s') . "] Failed to remove outdated alert for: {$item['dish_name']} (Table: {$item['table_number']})\n";
             }
         }
@@ -451,7 +459,7 @@ try {
     ];
     $settings = [];
     foreach ($settingKeys as $key => $default) {
-        $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$key])->fetch();
+        $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
     $settings[$key] = $row ? $row['meta_value'] : $default;
     if (is_numeric($default)) {
         $settings[$key] = (int)$settings[$key];
@@ -462,14 +470,14 @@ try {
     $partnersCount = 0;
     $otherCount = 0;
     if (!empty($settings['exclude_partners_from_load'])) {
-        $partnersCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM kitchen_stats WHERE status = 1 AND transaction_date = ? AND table_number = 'Partners'", [$today])->fetch();
+        $partnersCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date = ? AND table_number = 'Partners'", [$today])->fetch();
         $partnersCount = (int)($partnersCountRow['c'] ?? 0);
-        $otherCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM kitchen_stats WHERE status = 1 AND transaction_date = ? AND table_number != 'Partners'", [$today])->fetch();
+        $otherCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date = ? AND table_number != 'Partners'", [$today])->fetch();
         $otherCount = (int)($otherCountRow['c'] ?? 0);
         $loadCalculationCount = $otherCount;
         $openChecksDisplay = "{$otherCount}+{$partnersCount}";
     } else {
-        $openCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM kitchen_stats WHERE status = 1 AND transaction_date = ?", [$today])->fetch();
+        $openCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date = ?", [$today])->fetch();
         $openCount = (int)($openCountRow['c'] ?? 0);
         $loadCalculationCount = $openCount;
         $openChecksDisplay = $openCount;
@@ -484,7 +492,7 @@ try {
 
     $hookahAlerts = $db->query(
         "SELECT id, tg_message_id
-         FROM kitchen_stats
+         FROM {$ks}
          WHERE transaction_date = ?
            AND tg_message_id IS NOT NULL
            AND (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
@@ -494,15 +502,15 @@ try {
         if (!empty($item['tg_message_id'])) {
             $bot->deleteMessage((int)$item['tg_message_id']);
         }
-        $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [(int)$item['id']]);
-        $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [(int)$item['id']]);
+        $db->query("UPDATE {$ks} SET tg_message_id = NULL WHERE id = ?", [(int)$item['id']]);
+        $db->query("DELETE FROM {$tgm} WHERE kitchen_stats_id = ?", [(int)$item['id']]);
     }
 
     // 3. Теперь ищем актуальные задержки
     $cutoffTime = date('Y-m-d H:i:s', strtotime("-$waitLimit minutes"));
     $ackSnooze = (int)($settings['alert_ack_snooze_minutes'] ?? 0);
     $ackCutoffTime = $ackSnooze > 0 ? date('Y-m-d H:i:s', strtotime("-$ackSnooze minutes")) : null;
-    $query = "SELECT * FROM kitchen_stats 
+    $query = "SELECT * FROM {$ks} 
               WHERE ready_pressed_at IS NULL 
               AND ready_chass_at IS NULL
               AND ticket_sent_at IS NOT NULL 
@@ -585,21 +593,21 @@ try {
                 }
 
                 if ($isDeletedInTx) {
-                    $db->query("UPDATE kitchen_stats SET was_deleted = 1 WHERE id = ?", [$item['id']]);
+                    $db->query("UPDATE {$ks} SET was_deleted = 1 WHERE id = ?", [$item['id']]);
                     if (!empty($item['tg_message_id'])) {
                         $bot->deleteMessage((int)$item['tg_message_id']);
-                        $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
-                        $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [(int)$item['id']]);
+                        $db->query("UPDATE {$ks} SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
+                        $db->query("DELETE FROM {$tgm} WHERE kitchen_stats_id = ?", [(int)$item['id']]);
                     }
                     continue;
                 }
 
                 if ($currentCount !== null && $currentCount > 0 && $itemSeq > $currentCount) {
-                    $db->query("UPDATE kitchen_stats SET was_deleted = 1 WHERE id = ?", [$item['id']]);
+                    $db->query("UPDATE {$ks} SET was_deleted = 1 WHERE id = ?", [$item['id']]);
                     if (!empty($item['tg_message_id'])) {
                         $bot->deleteMessage((int)$item['tg_message_id']);
-                        $db->query("UPDATE kitchen_stats SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
-                        $db->query("DELETE FROM tg_alert_messages WHERE kitchen_stats_id = ?", [(int)$item['id']]);
+                        $db->query("UPDATE {$ks} SET tg_message_id = NULL WHERE id = ?", [$item['id']]);
+                        $db->query("DELETE FROM {$tgm} WHERE kitchen_stats_id = ?", [(int)$item['id']]);
                     }
                     continue;
                 }
@@ -607,18 +615,18 @@ try {
                 sort($readyTimes);
                 $instanceReadyTime = $readyTimes[$itemSeq - 1] ?? null;
                 if ($instanceReadyTime !== null) {
-                    $db->query("UPDATE kitchen_stats SET ready_pressed_at = ? WHERE id = ?", [$instanceReadyTime, $item['id']]);
+                    $db->query("UPDATE {$ks} SET ready_pressed_at = ? WHERE id = ?", [$instanceReadyTime, $item['id']]);
                     continue;
                 }
                 if ((int)($item['was_deleted'] ?? 0) === 1 && $sentCount !== null && $sentCount > 0) {
-                    $db->query("UPDATE kitchen_stats SET was_deleted = 0 WHERE id = ?", [$item['id']]);
+                    $db->query("UPDATE {$ks} SET was_deleted = 0 WHERE id = ?", [$item['id']]);
                     $item['was_deleted'] = 0;
                 }
                 if ($sentCount === null && !empty($item['ticket_sent_at'])) {
                     $sentCount = 1;
                 }
                 if ($sentCount !== null && ($sentCount <= 0 || $itemSeq > $sentCount)) {
-                    $db->query("UPDATE kitchen_stats SET was_deleted = 1 WHERE id = ?", [$item['id']]);
+                    $db->query("UPDATE {$ks} SET was_deleted = 1 WHERE id = ?", [$item['id']]);
                     continue;
                 }
 
@@ -626,15 +634,15 @@ try {
                 if ($apiStatus === 1 && $apiReason === null) {
                     $canSendAlert = true;
                     if ($waiterName !== '') {
-                        $db->query("UPDATE kitchen_stats SET waiter_name = ? WHERE transaction_id = ?", [$waiterName, $item['transaction_id']]);
+                        $db->query("UPDATE {$ks} SET waiter_name = ? WHERE transaction_id = ?", [$waiterName, $item['transaction_id']]);
                         $item['waiter_name'] = $waiterName; // Обновляем локально для текущего сообщения
                     }
                 } else {
                     if ($apiStatus <= 1) {
                         $apiStatus = 2;
                     }
-                    $db->query("UPDATE kitchen_stats SET status = ?, pay_type = ?, close_reason = ?, tg_message_id = NULL WHERE transaction_id = ?", [$apiStatus, $apiPayType, $apiReason, $item['transaction_id']]);
-                    $db->query("DELETE FROM tg_alert_messages WHERE transaction_date = ? AND transaction_id = ?", [$today, (int)$item['transaction_id']]);
+                    $db->query("UPDATE {$ks} SET status = ?, pay_type = ?, close_reason = ?, tg_message_id = NULL WHERE transaction_id = ?", [$apiStatus, $apiPayType, $apiReason, $item['transaction_id']]);
+                    $db->query("DELETE FROM {$tgm} WHERE transaction_date = ? AND transaction_id = ?", [$today, (int)$item['transaction_id']]);
                     continue;
                 }
             } catch (\Exception $e) {
@@ -674,7 +682,7 @@ try {
             ]]];
 
             $textHash = sha1($message);
-            $existing = $db->query("SELECT message_id, last_text_hash FROM tg_alert_messages WHERE kitchen_stats_id = ? LIMIT 1", [(int)$item['id']])->fetch();
+            $existing = $db->query("SELECT message_id, last_text_hash FROM {$tgm} WHERE kitchen_stats_id = ? LIMIT 1", [(int)$item['id']])->fetch();
             $existingMsgId = $existing ? (int)($existing['message_id'] ?? 0) : 0;
             $existingHash = $existing ? (string)($existing['last_text_hash'] ?? '') : '';
             $nowDt = date('Y-m-d H:i:s');
@@ -687,13 +695,13 @@ try {
             $edited = false;
             if ($existingMsgId > 0) {
                 if ($existingHash === $textHash) {
-                    $db->query("UPDATE tg_alert_messages SET last_seen_at = ? WHERE kitchen_stats_id = ?", [$nowDt, (int)$item['id']]);
+                    $db->query("UPDATE {$tgm} SET last_seen_at = ? WHERE kitchen_stats_id = ?", [$nowDt, (int)$item['id']]);
                     $edited = true;
                 } else {
                     $edited = $bot->editMessageText($existingMsgId, $message, $ackButton);
                     if ($edited) {
                         $db->query(
-                            "UPDATE tg_alert_messages SET last_text_hash = ?, last_seen_at = ?, last_edited_at = ? WHERE kitchen_stats_id = ?",
+                            "UPDATE {$tgm} SET last_text_hash = ?, last_seen_at = ?, last_edited_at = ? WHERE kitchen_stats_id = ?",
                             [$textHash, $nowDt, $nowDt, (int)$item['id']]
                         );
                     }
@@ -707,7 +715,7 @@ try {
                 $newMessageId = $bot->sendMessageGetIdWithKeyboard($message, $ackButton, $tgThreadId);
                 if ($newMessageId) {
                     $db->query(
-                        "UPDATE kitchen_stats
+                        "UPDATE {$ks}
                          SET tg_message_id = ?,
                              tg_acknowledged = 0,
                              tg_acknowledged_at = NULL,
@@ -716,7 +724,7 @@ try {
                         [$newMessageId, $item['id']]
                     );
                     $db->query(
-                        "INSERT INTO tg_alert_messages (kitchen_stats_id, transaction_date, transaction_id, dish_id, item_seq, message_id, last_text_hash, last_edited_at, last_seen_at)
+                        "INSERT INTO {$tgm} (kitchen_stats_id, transaction_date, transaction_id, dish_id, item_seq, message_id, last_text_hash, last_edited_at, last_seen_at)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                          ON DUPLICATE KEY UPDATE message_id = VALUES(message_id), last_text_hash = VALUES(last_text_hash), last_edited_at = VALUES(last_edited_at), last_seen_at = VALUES(last_seen_at), updated_at = CURRENT_TIMESTAMP",
                         [

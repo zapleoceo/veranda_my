@@ -4,8 +4,9 @@ namespace App\Classes;
 
 class Database {
     private \PDO $pdo;
+    private string $tableSuffix;
 
-    public function __construct(string $host, string $db, string $user, string $pass) {
+    public function __construct(string $host, string $db, string $user, string $pass, string $tableSuffix = '') {
         $dsn = "mysql:host=$host;dbname=$db;charset=utf8mb4";
         $options = [
             \PDO::ATTR_ERRMODE            => \PDO::ERRMODE_EXCEPTION,
@@ -14,6 +15,7 @@ class Database {
         ];
         try {
             $this->pdo = new \PDO($dsn, $user, $pass, $options);
+            $this->tableSuffix = $tableSuffix;
         } catch (\PDOException $e) {
             throw new \Exception("Database Connection Error: " . $e->getMessage());
         }
@@ -29,8 +31,13 @@ class Database {
         return $this->pdo;
     }
 
+    public function t(string $baseName): string {
+        return $baseName . $this->tableSuffix;
+    }
+
     public function createTables() {
-        $sql = "CREATE TABLE IF NOT EXISTS kitchen_stats (
+        $ks = $this->t('kitchen_stats');
+        $sql = "CREATE TABLE IF NOT EXISTS {$ks} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             transaction_date DATE NOT NULL,
             receipt_number VARCHAR(50),
@@ -38,6 +45,7 @@ class Database {
             transaction_closed_at DATETIME,
             transaction_id INT NOT NULL,
             table_number VARCHAR(50),
+            waiter_name VARCHAR(255) NULL,
             status INT DEFAULT 1,
             pay_type TINYINT NULL,
             close_reason TINYINT NULL,
@@ -52,6 +60,11 @@ class Database {
             ready_pressed_at DATETIME,
             ready_chass_at DATETIME NULL,
             prob_close_at DATETIME NULL,
+            was_deleted TINYINT(1) NOT NULL DEFAULT 0,
+            tg_message_id BIGINT NULL,
+            tg_acknowledged TINYINT(1) NOT NULL DEFAULT 0,
+            tg_acknowledged_at DATETIME NULL,
+            tg_acknowledged_by VARCHAR(255) NULL,
             service_type INT,
             total_sum DECIMAL(10,2),
             station VARCHAR(100),
@@ -65,76 +78,155 @@ class Database {
             "SELECT COUNT(*) AS c
              FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = 'kitchen_stats'
-               AND COLUMN_NAME = 'item_seq'"
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'item_seq'",
+            [$ks]
         )->fetch();
         if ((int)($row['c'] ?? 0) === 0) {
-            $this->query("ALTER TABLE kitchen_stats ADD COLUMN item_seq INT NOT NULL DEFAULT 1 AFTER dish_id");
-        }
-
-        try { $this->query("ALTER TABLE kitchen_stats DROP INDEX unique_dish_tx"); } catch (\Exception $e) {}
-        try { $this->query("ALTER TABLE kitchen_stats ADD UNIQUE KEY unique_dish_tx (transaction_id, dish_id, item_seq)"); } catch (\Exception $e) {}
-
-        $row = $this->query(
-            "SELECT COUNT(*) AS c
-             FROM information_schema.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = 'kitchen_stats'
-               AND COLUMN_NAME = 'ready_chass_at'"
-        )->fetch();
-        if ((int)($row['c'] ?? 0) === 0) {
-            $this->query("ALTER TABLE kitchen_stats ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
+            $this->query("ALTER TABLE {$ks} ADD COLUMN item_seq INT NOT NULL DEFAULT 1 AFTER dish_id");
         }
 
         $row = $this->query(
             "SELECT COUNT(*) AS c
              FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = 'kitchen_stats'
-               AND COLUMN_NAME = 'prob_close_at'"
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'waiter_name'",
+            [$ks]
         )->fetch();
         if ((int)($row['c'] ?? 0) === 0) {
-            $this->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
+            $this->query("ALTER TABLE {$ks} ADD COLUMN waiter_name VARCHAR(255) NULL AFTER table_number");
+        }
+
+        try { $this->query("ALTER TABLE {$ks} DROP INDEX unique_dish_tx"); } catch (\Exception $e) {}
+        try { $this->query("ALTER TABLE {$ks} ADD UNIQUE KEY unique_dish_tx (transaction_id, dish_id, item_seq)"); } catch (\Exception $e) {}
+
+        $row = $this->query(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'ready_chass_at'",
+            [$ks]
+        )->fetch();
+        if ((int)($row['c'] ?? 0) === 0) {
+            $this->query("ALTER TABLE {$ks} ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
         }
 
         $row = $this->query(
             "SELECT COUNT(*) AS c
              FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = 'kitchen_stats'
-               AND COLUMN_NAME = 'exclude_auto'"
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'prob_close_at'",
+            [$ks]
         )->fetch();
         if ((int)($row['c'] ?? 0) === 0) {
-            $this->query("ALTER TABLE kitchen_stats ADD COLUMN exclude_auto TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard");
+            $this->query("ALTER TABLE {$ks} ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
         }
 
         $row = $this->query(
             "SELECT COUNT(*) AS c
              FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = 'kitchen_stats'
-               AND COLUMN_NAME = 'dish_category_id'"
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'was_deleted'",
+            [$ks]
         )->fetch();
         if ((int)($row['c'] ?? 0) === 0) {
-            $this->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+            $this->query("ALTER TABLE {$ks} ADD COLUMN was_deleted TINYINT(1) NOT NULL DEFAULT 0 AFTER prob_close_at");
         }
 
         $row = $this->query(
             "SELECT COUNT(*) AS c
              FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = 'kitchen_stats'
-               AND COLUMN_NAME = 'dish_sub_category_id'"
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'tg_message_id'",
+            [$ks]
         )->fetch();
         if ((int)($row['c'] ?? 0) === 0) {
-            $this->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+            $this->query("ALTER TABLE {$ks} ADD COLUMN tg_message_id BIGINT NULL AFTER prob_close_at");
+        }
+
+        $row = $this->query(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'tg_acknowledged'",
+            [$ks]
+        )->fetch();
+        if ((int)($row['c'] ?? 0) === 0) {
+            $this->query("ALTER TABLE {$ks} ADD COLUMN tg_acknowledged TINYINT(1) NOT NULL DEFAULT 0 AFTER tg_message_id");
+        }
+
+        $row = $this->query(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'tg_acknowledged_at'",
+            [$ks]
+        )->fetch();
+        if ((int)($row['c'] ?? 0) === 0) {
+            $this->query("ALTER TABLE {$ks} ADD COLUMN tg_acknowledged_at DATETIME NULL AFTER tg_acknowledged");
+        }
+
+        $row = $this->query(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'tg_acknowledged_by'",
+            [$ks]
+        )->fetch();
+        if ((int)($row['c'] ?? 0) === 0) {
+            $this->query("ALTER TABLE {$ks} ADD COLUMN tg_acknowledged_by VARCHAR(255) NULL AFTER tg_acknowledged_at");
+        }
+
+        $row = $this->query(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'exclude_auto'",
+            [$ks]
+        )->fetch();
+        if ((int)($row['c'] ?? 0) === 0) {
+            $this->query("ALTER TABLE {$ks} ADD COLUMN exclude_auto TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard");
+        }
+
+        $row = $this->query(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'dish_category_id'",
+            [$ks]
+        )->fetch();
+        if ((int)($row['c'] ?? 0) === 0) {
+            $this->query("ALTER TABLE {$ks} ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+        }
+
+        $row = $this->query(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'dish_sub_category_id'",
+            [$ks]
+        )->fetch();
+        if ((int)($row['c'] ?? 0) === 0) {
+            $this->query("ALTER TABLE {$ks} ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
         }
     }
 
     public function saveStats(array $stats) {
-        $sql = "INSERT INTO kitchen_stats 
-                (transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id, table_number, status, pay_type, close_reason, dish_id, item_seq, dish_category_id, dish_sub_category_id, dish_name, ticket_sent_at, ready_pressed_at, service_type, total_sum, station, exclude_from_dashboard, exclude_auto) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        $ks = $this->t('kitchen_stats');
+        $sql = "INSERT INTO {$ks} 
+                (transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id, table_number, waiter_name, status, pay_type, close_reason, dish_id, item_seq, dish_category_id, dish_sub_category_id, dish_name, ticket_sent_at, ready_pressed_at, was_deleted, service_type, total_sum, station, exclude_from_dashboard, exclude_auto) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE 
                 dish_id = VALUES(dish_id),
                 item_seq = VALUES(item_seq),
@@ -144,11 +236,13 @@ class Database {
                 transaction_opened_at = VALUES(transaction_opened_at),
                 transaction_closed_at = VALUES(transaction_closed_at),
                 table_number = VALUES(table_number),
+                waiter_name = VALUES(waiter_name),
                 status = VALUES(status),
                 pay_type = VALUES(pay_type),
                 close_reason = VALUES(close_reason),
                 ticket_sent_at = VALUES(ticket_sent_at),
                 ready_pressed_at = VALUES(ready_pressed_at),
+                was_deleted = VALUES(was_deleted),
                 service_type = VALUES(service_type),
                 total_sum = VALUES(total_sum),
                 station = VALUES(station),
@@ -173,6 +267,7 @@ class Database {
                 $row['transaction_closed_at'],
                 $row['transaction_id'],
                 $row['table_number'] ?? null,
+                $row['waiter_name'] ?? null,
                 $row['status'],
                 $row['pay_type'] ?? null,
                 $row['close_reason'] ?? null,
@@ -183,6 +278,7 @@ class Database {
                 $row['dish_name'],
                 $row['ticket_sent_at'],
                 $row['ready_pressed_at'],
+                !empty($row['was_deleted']) ? 1 : 0,
                 $row['service_type'],
                 $row['total_sum'],
                 $row['station'],
@@ -193,11 +289,21 @@ class Database {
     }
 
     public function getLatestStats(int $limit = 50) {
-        return $this->query("SELECT * FROM kitchen_stats ORDER BY ticket_sent_at DESC LIMIT ?", [$limit])->fetchAll();
+        $ks = $this->t('kitchen_stats');
+        return $this->query("SELECT * FROM {$ks} ORDER BY ticket_sent_at DESC LIMIT ?", [$limit])->fetchAll();
     }
 
     public function createMenuTables() {
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS poster_menu_items (
+        $pmi = $this->t('poster_menu_items');
+        $mcm = $this->t('menu_categories_main');
+        $mcmTr = $this->t('menu_categories_main_tr');
+        $mcs = $this->t('menu_categories_sub');
+        $mcsTr = $this->t('menu_categories_sub_tr');
+        $miRu = $this->t('menu_items_ru');
+        $miEn = $this->t('menu_items_en');
+        $miVn = $this->t('menu_items_vn');
+        $miKo = $this->t('menu_items_ko');
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$pmi} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             poster_id BIGINT NOT NULL,
             name_raw VARCHAR(255) NOT NULL,
@@ -232,20 +338,20 @@ class Database {
             return (int)($row['c'] ?? 0) > 0;
         };
 
-        if (!$columnExists('poster_menu_items', 'station_id')) {
-            $this->pdo->exec("ALTER TABLE poster_menu_items ADD COLUMN station_id BIGINT NULL AFTER price_raw");
+        if (!$columnExists($pmi, 'station_id')) {
+            $this->pdo->exec("ALTER TABLE {$pmi} ADD COLUMN station_id BIGINT NULL AFTER price_raw");
         }
-        if (!$columnExists('poster_menu_items', 'cost_raw')) {
-            $this->pdo->exec("ALTER TABLE poster_menu_items ADD COLUMN cost_raw DECIMAL(10,2) NULL AFTER price_raw");
+        if (!$columnExists($pmi, 'cost_raw')) {
+            $this->pdo->exec("ALTER TABLE {$pmi} ADD COLUMN cost_raw DECIMAL(10,2) NULL AFTER price_raw");
         }
-        if (!$columnExists('poster_menu_items', 'station_name')) {
-            $this->pdo->exec("ALTER TABLE poster_menu_items ADD COLUMN station_name VARCHAR(255) NULL AFTER station_id");
+        if (!$columnExists($pmi, 'station_name')) {
+            $this->pdo->exec("ALTER TABLE {$pmi} ADD COLUMN station_name VARCHAR(255) NULL AFTER station_id");
         }
-        if (!$columnExists('poster_menu_items', 'raw_json')) {
-            $this->pdo->exec("ALTER TABLE poster_menu_items ADD COLUMN raw_json JSON NULL AFTER sub_category_name");
+        if (!$columnExists($pmi, 'raw_json')) {
+            $this->pdo->exec("ALTER TABLE {$pmi} ADD COLUMN raw_json JSON NULL AFTER sub_category_name");
         }
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS menu_categories_main (
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mcm} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             poster_main_category_id BIGINT NOT NULL,
             name_raw VARCHAR(255) NOT NULL,
@@ -257,7 +363,7 @@ class Database {
             KEY idx_menu_categories_main_sort (sort_order)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS menu_categories_main_tr (
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mcmTr} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             main_category_id INT NOT NULL,
             lang VARCHAR(8) NOT NULL,
@@ -265,10 +371,10 @@ class Database {
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_menu_categories_main_tr (main_category_id, lang),
-            CONSTRAINT fk_menu_categories_main_tr_main FOREIGN KEY (main_category_id) REFERENCES menu_categories_main(id) ON DELETE CASCADE
+            CONSTRAINT fk_menu_categories_main_tr_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS menu_categories_sub (
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mcs} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             poster_sub_category_id BIGINT NOT NULL,
             main_category_id INT NULL,
@@ -281,20 +387,20 @@ class Database {
             UNIQUE KEY uq_menu_categories_sub_poster_id (poster_sub_category_id),
             KEY idx_menu_categories_sub_main (main_category_id),
             KEY idx_menu_categories_sub_sort (sort_order),
-            CONSTRAINT fk_menu_categories_sub_main FOREIGN KEY (main_category_id) REFERENCES menu_categories_main(id) ON DELETE SET NULL
+            CONSTRAINT fk_menu_categories_sub_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        if (!$columnExists('menu_categories_main', 'show_in_menu')) {
-            $this->pdo->exec("ALTER TABLE menu_categories_main ADD COLUMN show_in_menu TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order");
+        if (!$columnExists($mcm, 'show_in_menu')) {
+            $this->pdo->exec("ALTER TABLE {$mcm} ADD COLUMN show_in_menu TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order");
         }
-        if (!$columnExists('menu_categories_sub', 'main_category_id_override')) {
-            $this->pdo->exec("ALTER TABLE menu_categories_sub ADD COLUMN main_category_id_override INT NULL AFTER main_category_id");
+        if (!$columnExists($mcs, 'main_category_id_override')) {
+            $this->pdo->exec("ALTER TABLE {$mcs} ADD COLUMN main_category_id_override INT NULL AFTER main_category_id");
         }
-        if (!$columnExists('menu_categories_sub', 'show_in_menu')) {
-            $this->pdo->exec("ALTER TABLE menu_categories_sub ADD COLUMN show_in_menu TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order");
+        if (!$columnExists($mcs, 'show_in_menu')) {
+            $this->pdo->exec("ALTER TABLE {$mcs} ADD COLUMN show_in_menu TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order");
         }
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS menu_categories_sub_tr (
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mcsTr} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             sub_category_id INT NOT NULL,
             lang VARCHAR(8) NOT NULL,
@@ -302,10 +408,10 @@ class Database {
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_menu_categories_sub_tr (sub_category_id, lang),
-            CONSTRAINT fk_menu_categories_sub_tr_sub FOREIGN KEY (sub_category_id) REFERENCES menu_categories_sub(id) ON DELETE CASCADE
+            CONSTRAINT fk_menu_categories_sub_tr_sub FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS menu_items_ru (
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miRu} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             poster_item_id INT NOT NULL,
             title VARCHAR(255) NULL,
@@ -323,12 +429,12 @@ class Database {
             KEY idx_menu_items_ru_main_cat (main_category_id),
             KEY idx_menu_items_ru_sub_cat (sub_category_id),
             KEY idx_menu_items_ru_sort (sort_order),
-            CONSTRAINT fk_menu_items_ru_poster FOREIGN KEY (poster_item_id) REFERENCES poster_menu_items(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_ru_main FOREIGN KEY (main_category_id) REFERENCES menu_categories_main(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_ru_sub FOREIGN KEY (sub_category_id) REFERENCES menu_categories_sub(id) ON DELETE SET NULL
+            CONSTRAINT fk_menu_items_ru_poster FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
+            CONSTRAINT fk_menu_items_ru_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
+            CONSTRAINT fk_menu_items_ru_sub FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS menu_items_en (
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miEn} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             poster_item_id INT NOT NULL,
             title VARCHAR(255) NULL,
@@ -341,12 +447,12 @@ class Database {
             UNIQUE KEY uq_menu_items_en_poster_item_id (poster_item_id),
             KEY idx_menu_items_en_main_cat (main_category_id),
             KEY idx_menu_items_en_sub_cat (sub_category_id),
-            CONSTRAINT fk_menu_items_en_poster FOREIGN KEY (poster_item_id) REFERENCES poster_menu_items(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_en_main FOREIGN KEY (main_category_id) REFERENCES menu_categories_main(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_en_sub FOREIGN KEY (sub_category_id) REFERENCES menu_categories_sub(id) ON DELETE SET NULL
+            CONSTRAINT fk_menu_items_en_poster FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
+            CONSTRAINT fk_menu_items_en_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
+            CONSTRAINT fk_menu_items_en_sub FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS menu_items_vn (
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miVn} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             poster_item_id INT NOT NULL,
             title VARCHAR(255) NULL,
@@ -359,12 +465,12 @@ class Database {
             UNIQUE KEY uq_menu_items_vn_poster_item_id (poster_item_id),
             KEY idx_menu_items_vn_main_cat (main_category_id),
             KEY idx_menu_items_vn_sub_cat (sub_category_id),
-            CONSTRAINT fk_menu_items_vn_poster FOREIGN KEY (poster_item_id) REFERENCES poster_menu_items(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_vn_main FOREIGN KEY (main_category_id) REFERENCES menu_categories_main(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_vn_sub FOREIGN KEY (sub_category_id) REFERENCES menu_categories_sub(id) ON DELETE SET NULL
+            CONSTRAINT fk_menu_items_vn_poster FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
+            CONSTRAINT fk_menu_items_vn_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
+            CONSTRAINT fk_menu_items_vn_sub FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS menu_items_ko (
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miKo} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             poster_item_id INT NOT NULL,
             title VARCHAR(255) NULL,
@@ -377,9 +483,9 @@ class Database {
             UNIQUE KEY uq_menu_items_ko_poster_item_id (poster_item_id),
             KEY idx_menu_items_ko_main_cat (main_category_id),
             KEY idx_menu_items_ko_sub_cat (sub_category_id),
-            CONSTRAINT fk_menu_items_ko_poster FOREIGN KEY (poster_item_id) REFERENCES poster_menu_items(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_ko_main FOREIGN KEY (main_category_id) REFERENCES menu_categories_main(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_ko_sub FOREIGN KEY (sub_category_id) REFERENCES menu_categories_sub(id) ON DELETE SET NULL
+            CONSTRAINT fk_menu_items_ko_poster FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
+            CONSTRAINT fk_menu_items_ko_main FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
+            CONSTRAINT fk_menu_items_ko_sub FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     }
 }

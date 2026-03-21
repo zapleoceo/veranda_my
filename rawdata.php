@@ -23,7 +23,8 @@ $dashboardQuery = http_build_query([
 ]);
 
 try {
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+    $ks = $db->t('kitchen_stats');
+    $metaTable = $db->t('system_meta');
     $api = new \App\Classes\PosterAPI($token);
     $columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
         $row = $db->query(
@@ -32,26 +33,26 @@ try {
         )->fetch();
         return (int)($row['c'] ?? 0) > 0;
     };
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'exclude_from_dashboard')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN exclude_from_dashboard TINYINT(1) NOT NULL DEFAULT 0 AFTER close_reason");
+    if (!$columnExists($db, $dbName, $ks, 'exclude_from_dashboard')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN exclude_from_dashboard TINYINT(1) NOT NULL DEFAULT 0 AFTER close_reason");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'exclude_auto')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN exclude_auto TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard");
+    if (!$columnExists($db, $dbName, $ks, 'exclude_auto')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN exclude_auto TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'ready_chass_at')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
+    if (!$columnExists($db, $dbName, $ks, 'ready_chass_at')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN ready_chass_at DATETIME NULL AFTER ready_pressed_at");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'prob_close_at')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
+    if (!$columnExists($db, $dbName, $ks, 'prob_close_at')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_category_id')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
+    if (!$columnExists($db, $dbName, $ks, 'dish_category_id')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
+    if (!$columnExists($db, $dbName, $ks, 'dish_sub_category_id')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
     }
-    if (!$columnExists($db, $dbName, 'kitchen_stats', 'waiter_name')) {
-        $db->query("ALTER TABLE kitchen_stats ADD COLUMN waiter_name VARCHAR(255) NULL AFTER table_number");
+    if (!$columnExists($db, $dbName, $ks, 'waiter_name')) {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN waiter_name VARCHAR(255) NULL AFTER table_number");
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_exclude_item'])) {
         if (!veranda_can('exclude_toggle')) {
@@ -69,7 +70,7 @@ try {
         $itemId = (int)($_POST['toggle_exclude_item'] ?? 0);
         $excludeFlag = isset($_POST['exclude_from_dashboard']) ? 1 : 0;
         if ($itemId > 0) {
-            $db->query("UPDATE kitchen_stats SET exclude_from_dashboard = ?, exclude_auto = 0 WHERE id = ?", [$excludeFlag, $itemId]);
+            $db->query("UPDATE {$ks} SET exclude_from_dashboard = ?, exclude_auto = 0 WHERE id = ?", [$excludeFlag, $itemId]);
         }
         $isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
         if ($isAjax) {
@@ -86,14 +87,14 @@ try {
         exit;
     }
     try {
-        $meta = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = 'poster_last_sync_at' LIMIT 1")->fetch();
+        $meta = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = 'poster_last_sync_at' LIMIT 1")->fetch();
         if (!empty($meta['meta_value'])) {
             $lastSyncLabel = date('d.m.Y H:i:s', strtotime($meta['meta_value']));
         }
     } catch (\Exception $e) {
     }
     if ($lastSyncLabel === '—') {
-        $fallback = $db->query("SELECT MAX(created_at) AS last_sync_at FROM kitchen_stats")->fetch();
+        $fallback = $db->query("SELECT MAX(created_at) AS last_sync_at FROM {$ks}")->fetch();
         if (!empty($fallback['last_sync_at'])) {
             $lastSyncLabel = date('d.m.Y H:i:s', strtotime($fallback['last_sync_at']));
         }
@@ -139,7 +140,7 @@ try {
     }
 
     // Получаем данные из БД
-    $query = "SELECT * FROM kitchen_stats";
+    $query = "SELECT * FROM {$ks}";
     $where = [];
     $params = [];
 
@@ -176,7 +177,7 @@ try {
         $query .= " WHERE " . implode(" AND ", $where);
     }
 
-    $countQuery = "SELECT COUNT(DISTINCT transaction_id) AS c FROM kitchen_stats" . (!empty($where) ? (" WHERE " . implode(" AND ", $where)) : "");
+    $countQuery = "SELECT COUNT(DISTINCT transaction_id) AS c FROM {$ks}" . (!empty($where) ? (" WHERE " . implode(" AND ", $where)) : "");
     $countRow = $db->query($countQuery, $params)->fetch();
     $totalReceipts = (int)($countRow['c'] ?? 0);
 
@@ -189,7 +190,7 @@ try {
         if ($limit > 50) $limit = 50;
 
         $txSql = "SELECT transaction_id, receipt_number, MAX(ticket_sent_at) AS last_sent_at
-                  FROM kitchen_stats" . (!empty($where) ? (" WHERE " . implode(" AND ", $where)) : "") . "
+                  FROM {$ks}" . (!empty($where) ? (" WHERE " . implode(" AND ", $where)) : "") . "
                   GROUP BY transaction_id, receipt_number
                   ORDER BY last_sent_at DESC
                   LIMIT {$limit} OFFSET {$offset}";
@@ -203,7 +204,7 @@ try {
         if (!empty($txIds)) {
             $placeholders = implode(',', array_fill(0, count($txIds), '?'));
             $allStats = $db->query(
-                "SELECT * FROM kitchen_stats WHERE transaction_id IN ({$placeholders}) ORDER BY ticket_sent_at DESC",
+                "SELECT * FROM {$ks} WHERE transaction_id IN ({$placeholders}) ORDER BY ticket_sent_at DESC",
                 $txIds
             )->fetchAll();
 
@@ -321,7 +322,7 @@ try {
                         if ($isUncertain && empty($row['exclude_from_dashboard']) && !empty($row['id'])) {
                             try {
                                 $db->query(
-                                    "UPDATE kitchen_stats SET exclude_from_dashboard = 1, exclude_auto = 1 WHERE id = ?",
+                                    "UPDATE {$ks} SET exclude_from_dashboard = 1, exclude_auto = 1 WHERE id = ?",
                                     [(int)$row['id']]
                                 );
                                 $row['exclude_from_dashboard'] = 1;

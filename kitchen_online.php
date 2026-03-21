@@ -27,15 +27,17 @@ $action = $_GET['action'] ?? 'list'; // list|sync
 
 $today = date('Y-m-d');
 $lastSyncLabel = '—';
+$ks = $db->t('kitchen_stats');
+$metaTable = $db->t('system_meta');
+$tgm = $db->t('tg_alert_messages');
 
 try {
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
     $api = new \App\Classes\PosterAPI($token);
-    $meta = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = 'poster_last_sync_at' LIMIT 1")->fetch();
+    $meta = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = 'poster_last_sync_at' LIMIT 1")->fetch();
     if (!empty($meta['meta_value'])) {
         $lastSyncLabel = date('d.m.Y H:i:s', strtotime($meta['meta_value']));
     } else {
-        $fallback = $db->query("SELECT MAX(created_at) AS last_sync_at FROM kitchen_stats")->fetch();
+        $fallback = $db->query("SELECT MAX(created_at) AS last_sync_at FROM {$ks}")->fetch();
         if (!empty($fallback['last_sync_at'])) {
             $lastSyncLabel = date('d.m.Y H:i:s', strtotime($fallback['last_sync_at']));
         }
@@ -170,7 +172,6 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
 if ($isAjax) {
     header('Content-Type: application/json; charset=utf-8');
     try {
-        $db = $db ?? new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
         $api = $api ?? new \App\Classes\PosterAPI($token);
         if ($action === 'exclude' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!veranda_can('exclude_toggle')) {
@@ -180,7 +181,7 @@ if ($isAjax) {
             }
             $itemId = (int)($_POST['toggle_exclude_item'] ?? 0);
             if ($itemId > 0) {
-                $db->query("UPDATE kitchen_stats SET exclude_from_dashboard = 1, exclude_auto = 0 WHERE id = ?", [$itemId]);
+                $db->query("UPDATE {$ks} SET exclude_from_dashboard = 1, exclude_auto = 0 WHERE id = ?", [$itemId]);
             }
             echo json_encode(['ok' => true, 'item_id' => $itemId], JSON_UNESCAPED_UNICODE);
             exit;
@@ -261,7 +262,7 @@ if ($isAjax) {
                     if ($apiStatus > 1 || $apiReason !== null) {
                         if ($apiStatus <= 1) $apiStatus = 2;
                         $db->query(
-                            "UPDATE kitchen_stats SET status = ?, pay_type = ?, close_reason = ? WHERE transaction_date = ? AND transaction_id = ?",
+                            "UPDATE {$ks} SET status = ?, pay_type = ?, close_reason = ? WHERE transaction_date = ? AND transaction_id = ?",
                             [$apiStatus, $apiPayType, $apiReason, $today, $txId]
                         );
                         continue;
@@ -305,14 +306,14 @@ if ($isAjax) {
                 }
                 if ($waiterName !== '') {
                     $db->query(
-                        "UPDATE kitchen_stats SET waiter_name = ? WHERE transaction_date = ? AND transaction_id = ?",
+                        "UPDATE {$ks} SET waiter_name = ? WHERE transaction_date = ? AND transaction_id = ?",
                         [$waiterName, $today, $txId]
                     );
                 }
 
                 $items = $db->query(
                     "SELECT id, dish_id, was_deleted, ticket_sent_at
-                     FROM kitchen_stats
+                     FROM {$ks}
                      WHERE transaction_date = ?
                        AND transaction_id = ?
                        AND status = 1
@@ -337,13 +338,13 @@ if ($isAjax) {
                         }
                     }
                     if ($readyTime !== null) {
-                        $db->query("UPDATE kitchen_stats SET ready_pressed_at = ? WHERE id = ?", [$readyTime, $id]);
+                        $db->query("UPDATE {$ks} SET ready_pressed_at = ? WHERE id = ?", [$readyTime, $id]);
                         continue;
                     }
 
                     $deleted = $isDishDeletedFromHistory($history, $dishId);
                     if ($deleted) {
-                        $db->query("UPDATE kitchen_stats SET was_deleted = 1 WHERE id = ?", [$id]);
+                        $db->query("UPDATE {$ks} SET was_deleted = 1 WHERE id = ?", [$id]);
                     }
                 }
             }
@@ -356,16 +357,16 @@ if ($isAjax) {
             'exclude_partners_from_load' => 0
         ];
         foreach ($settings as $key => $default) {
-            $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$key])->fetch();
+            $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
             $val = $row ? $row['meta_value'] : $default;
             $settings[$key] = is_numeric($default) ? (int)$val : $val;
         }
         $loadCalculationCount = 0;
         if (!empty($settings['exclude_partners_from_load'])) {
-            $otherCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM kitchen_stats WHERE status = 1 AND transaction_date = ? AND table_number != 'Partners'", [$today])->fetch();
+            $otherCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date = ? AND table_number != 'Partners'", [$today])->fetch();
             $loadCalculationCount = (int)($otherCountRow['c'] ?? 0);
         } else {
-            $openCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM kitchen_stats WHERE status = 1 AND transaction_date = ?", [$today])->fetch();
+            $openCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date = ?", [$today])->fetch();
             $loadCalculationCount = (int)($openCountRow['c'] ?? 0);
         }
         $waitLimitMinutes = ($loadCalculationCount < (int)$settings['alert_load_threshold'])
@@ -379,7 +380,7 @@ if ($isAjax) {
             )->fetch();
             return (int)($row['c'] ?? 0) > 0;
         };
-        $db->query("CREATE TABLE IF NOT EXISTS tg_alert_messages (
+        $db->query("CREATE TABLE IF NOT EXISTS {$tgm} (
             id INT AUTO_INCREMENT PRIMARY KEY,
             kitchen_stats_id INT NOT NULL,
             transaction_date DATE NOT NULL,
@@ -396,15 +397,15 @@ if ($isAjax) {
             KEY idx_tx (transaction_date, transaction_id),
             KEY idx_seen (last_seen_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        if (!$columnExists($db, $dbName, 'tg_alert_messages', 'last_edited_at')) {
-            $db->query("ALTER TABLE tg_alert_messages ADD COLUMN last_edited_at DATETIME NULL AFTER last_text_hash");
+        if (!$columnExists($db, $dbName, $tgm, 'last_edited_at')) {
+            $db->query("ALTER TABLE {$tgm} ADD COLUMN last_edited_at DATETIME NULL AFTER last_text_hash");
         }
 
         $rows = $db->query(
             "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
                     tgm.created_at AS tg_sent_at, tgm.last_edited_at AS tg_last_edit_at
-             FROM kitchen_stats ks
-             LEFT JOIN tg_alert_messages tgm ON tgm.kitchen_stats_id = ks.id
+             FROM {$ks} ks
+             LEFT JOIN {$tgm} tgm ON tgm.kitchen_stats_id = ks.id
              WHERE transaction_date = ?
                AND status = 1
                AND ready_pressed_at IS NULL

@@ -21,14 +21,18 @@ $columnExists = function (\App\Classes\Database $db, string $dbName, string $tab
     )->fetch();
     return (int)($row['c'] ?? 0) > 0;
 };
-if (!$columnExists($db, $dbName, 'users', 'permissions_json')) {
-    $db->query("ALTER TABLE users ADD COLUMN permissions_json TEXT NULL AFTER is_active");
+
+$usersTable = $db->t('users');
+$metaTable = $db->t('system_meta');
+
+if (!$columnExists($db, $dbName, $usersTable, 'permissions_json')) {
+    $db->query("ALTER TABLE {$usersTable} ADD COLUMN permissions_json TEXT NULL AFTER is_active");
 }
-if (!$columnExists($db, $dbName, 'users', 'is_active')) {
-    $db->query("ALTER TABLE users ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1");
+if (!$columnExists($db, $dbName, $usersTable, 'is_active')) {
+    $db->query("ALTER TABLE {$usersTable} ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1");
 }
-if (!$columnExists($db, $dbName, 'users', 'telegram_username')) {
-    $db->query("ALTER TABLE users ADD COLUMN telegram_username VARCHAR(64) NULL AFTER email");
+if (!$columnExists($db, $dbName, $usersTable, 'telegram_username')) {
+    $db->query("ALTER TABLE {$usersTable} ADD COLUMN telegram_username VARCHAR(64) NULL AFTER email");
 }
 
 $permissionKeys = [
@@ -51,7 +55,7 @@ if (isset($_POST['save_user_permissions'])) {
         if ($tgUsername === '') {
             $tgUsername = null;
         }
-        $db->query("UPDATE users SET permissions_json = ?, telegram_username = ? WHERE email = ? LIMIT 1", [json_encode($perms, JSON_UNESCAPED_UNICODE), $tgUsername, $targetEmail]);
+        $db->query("UPDATE {$usersTable} SET permissions_json = ?, telegram_username = ? WHERE email = ? LIMIT 1", [json_encode($perms, JSON_UNESCAPED_UNICODE), $tgUsername, $targetEmail]);
         $message = "Права для $targetEmail сохранены.";
     }
 }
@@ -61,7 +65,7 @@ if (isset($_POST['add_email'])) {
     $email = trim($_POST['email']);
     if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
         try {
-            $db->query("INSERT INTO users (email) VALUES (?)", [$email]);
+            $db->query("INSERT INTO {$usersTable} (email) VALUES (?)", [$email]);
             $message = "Пользователь $email успешно добавлен.";
         } catch (\Exception $e) {
             $error = "Ошибка при добавлении: " . $e->getMessage();
@@ -76,14 +80,14 @@ if (isset($_GET['delete'])) {
     $emailToDelete = $_GET['delete'];
     // Prevent deleting own email
     if ($emailToDelete !== $_SESSION['user_email']) {
-        $db->query("DELETE FROM users WHERE email = ?", [$emailToDelete]);
+        $db->query("DELETE FROM {$usersTable} WHERE email = ?", [$emailToDelete]);
         $message = "Пользователь $emailToDelete удален.";
     } else {
         $error = "Вы не можете удалить свой собственный email.";
     }
 }
 
-$users = $db->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll();
+$users = $db->query("SELECT * FROM {$usersTable} ORDER BY created_at DESC")->fetchAll();
 
 // Settings logic
 $settingKeys = [
@@ -100,7 +104,7 @@ if (isset($_POST['save_settings']) || array_key_exists('exclude_partners_from_lo
         if (is_numeric($default)) {
             $val = (int)$val;
         }
-        $db->query("INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?) 
+        $db->query("INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) 
                     ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)", [$key, $val]);
     }
     $message = "Настройки успешно сохранены.";
@@ -136,7 +140,7 @@ if (isset($_POST['save_tg_whitelist'])) {
     }
     $encoded = json_encode($entries, JSON_UNESCAPED_UNICODE);
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
         [$telegramAckWhitelistKey, $encoded]
     );
@@ -163,28 +167,28 @@ if (isset($_POST['save_codemeal'])) {
         $timezone = 'Asia/Ho_Chi_Minh';
     }
 
-    $existingAuthRow = $db->query("SELECT meta_value FROM system_meta WHERE meta_key=? LIMIT 1", ['codemeal_auth'])->fetch();
+    $existingAuthRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key=? LIMIT 1", ['codemeal_auth'])->fetch();
     $existingAuth = $existingAuthRow ? (string)$existingAuthRow['meta_value'] : '';
     $authToSave = $authNew !== '' ? $authNew : $existingAuth;
 
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
         ['codemeal_client_number', $client]
     );
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
         ['codemeal_locale', $locale]
     );
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
         ['codemeal_timezone', $timezone]
     );
     if ($authToSave !== '') {
         $db->query(
-            "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
             ['codemeal_auth', $authToSave]
         );
@@ -195,7 +199,7 @@ if (isset($_POST['save_codemeal'])) {
 
 $settings = [];
 foreach ($settingKeys as $key => $default) {
-    $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$key])->fetch();
+    $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
     $settings[$key] = $row ? $row['meta_value'] : $default;
     if (is_numeric($default)) {
         $settings[$key] = (int)$settings[$key];
@@ -204,7 +208,7 @@ foreach ($settingKeys as $key => $default) {
 
 $codemealSettings = [];
 foreach ($codemealDefaults as $key => $default) {
-    $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$key])->fetch();
+    $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
     $codemealSettings[$key] = $row ? (string)$row['meta_value'] : (string)$default;
 }
 $codemealAuthMasked = '';
@@ -215,7 +219,7 @@ if ($rawAuth !== '') {
     $codemealAuthMasked = $prefix . '…' . $suffix;
 }
 
-$whitelistRow = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = ? LIMIT 1", [$telegramAckWhitelistKey])->fetch();
+$whitelistRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$telegramAckWhitelistKey])->fetch();
 $whitelistJson = $whitelistRow ? (string)$whitelistRow['meta_value'] : '{}';
 $whitelist = json_decode($whitelistJson, true);
 if (!is_array($whitelist)) {
@@ -236,6 +240,10 @@ $telegramAckWhitelistText = implode("\n", $whitelistTextLines);
 $isMenuAjax = ($_GET['ajax'] ?? '') === 'menu_publish';
 if ($isMenuAjax) {
     $db->createMenuTables();
+    $pmi = $db->t('poster_menu_items');
+    $miRu = $db->t('menu_items_ru');
+    $miEn = $db->t('menu_items_en');
+    $miVn = $db->t('menu_items_vn');
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
@@ -258,10 +266,10 @@ if ($isMenuAjax) {
         "SELECT p.id poster_item_id, p.is_active,
                 ru.title ru_title, ru.is_published ru_is_published,
                 en.title en_title, vn.title vn_title
-         FROM poster_menu_items p
-         LEFT JOIN menu_items_ru ru ON ru.poster_item_id = p.id
-         LEFT JOIN menu_items_en en ON en.poster_item_id = p.id
-         LEFT JOIN menu_items_vn vn ON vn.poster_item_id = p.id
+         FROM {$pmi} p
+         LEFT JOIN {$miRu} ru ON ru.poster_item_id = p.id
+         LEFT JOIN {$miEn} en ON en.poster_item_id = p.id
+         LEFT JOIN {$miVn} vn ON vn.poster_item_id = p.id
          WHERE p.poster_id = ?
          LIMIT 1",
         [$posterId]
@@ -275,8 +283,8 @@ if ($isMenuAjax) {
 
     if ((int)$row['is_active'] === 0) {
         $db->query(
-            "UPDATE menu_items_ru ru
-             JOIN poster_menu_items p ON p.id = ru.poster_item_id
+            "UPDATE {$miRu} ru
+             JOIN {$pmi} p ON p.id = ru.poster_item_id
              SET ru.is_published = 0
              WHERE p.poster_id = ?",
             [$posterId]
@@ -297,8 +305,8 @@ if ($isMenuAjax) {
     }
 
     $db->query(
-        "UPDATE menu_items_ru ru
-         JOIN poster_menu_items p ON p.id = ru.poster_item_id
+        "UPDATE {$miRu} ru
+         JOIN {$pmi} p ON p.id = ru.poster_item_id
          SET ru.is_published = ?
          WHERE p.poster_id = ?",
         [$isPublished ? 1 : 0, $posterId]
@@ -326,10 +334,11 @@ $menuSyncAtIso = '';
 
 if ($tab === 'menu' || $tab === 'categories') {
     $db->createMenuTables();
+    $posterMenuItemsTable = $db->t('poster_menu_items');
 
     $metaKeys = ['menu_last_sync_at', 'menu_last_sync_result', 'menu_last_sync_error'];
     foreach ($metaKeys as $k) {
-        $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key=? LIMIT 1", [$k])->fetch();
+        $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key=? LIMIT 1", [$k])->fetch();
         $menuSyncMeta[str_replace('menu_', '', $k)] = $row ? (string)$row['meta_value'] : null;
     }
     if (!empty($menuSyncMeta['last_sync_at'])) {
@@ -357,21 +366,21 @@ if ($tab === 'menu' || $tab === 'categories') {
             $sync = new \App\Classes\PosterMenuSync($api, $db);
             $result = $sync->sync();
             $db->query(
-                "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
+                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
                 ['menu_last_sync_at', (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s')]
             );
             $db->query(
-                "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
+                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
                 ['menu_last_sync_result', json_encode($result, JSON_UNESCAPED_UNICODE)]
             );
             $db->query(
-                "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
+                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
                 ['menu_last_sync_error', '']
             );
             $message = 'Меню обновлено из Poster.';
         } catch (\Exception $e) {
             $db->query(
-                "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
+                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
                 ['menu_last_sync_error', $e->getMessage()]
             );
             $error = 'Ошибка обновления меню: ' . $e->getMessage();
