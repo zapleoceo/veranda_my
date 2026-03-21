@@ -47,13 +47,7 @@ $permissionKeys = [
     'dashboard' => 'Дашборд',
     'rawdata' => 'Сырые данные',
     'kitchen_online' => 'КухняOnline',
-    'logs' => 'Логи',
     'admin' => 'УПРАВЛЕНИЕ',
-    'admin_sync' => 'Управление: синки',
-    'admin_access' => 'Управление: доступы',
-    'admin_telegram' => 'Управление: Telegram',
-    'admin_menu' => 'Управление: меню',
-    'admin_categories' => 'Управление: категории',
     'exclude_toggle' => 'Кнопка «Игнор»',
     'telegram_ack' => '✅ Принято (Telegram)',
 ];
@@ -105,6 +99,28 @@ if (isset($_POST['add_email'])) {
     }
 }
 
+if (isset($_POST['add_self'])) {
+    $email = trim((string)($_SESSION['user_email'] ?? ''));
+    if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        try {
+            if (!empty($usersCols['is_active'])) {
+                $db->query(
+                    "INSERT INTO {$usersTable} (email, is_active) VALUES (?, 1)
+                     ON DUPLICATE KEY UPDATE is_active = 1",
+                    [$email]
+                );
+            } else {
+                $db->query("INSERT INTO {$usersTable} (email) VALUES (?)", [$email]);
+            }
+            $message = "Пользователь $email успешно добавлен.";
+        } catch (\Exception $e) {
+            $error = "Ошибка при добавлении: " . $e->getMessage();
+        }
+    } else {
+        $error = "Некорректный email.";
+    }
+}
+
 // Delete user
 if (isset($_GET['delete'])) {
     $emailToDelete = $_GET['delete'];
@@ -131,6 +147,9 @@ try {
     $users = $db->query("SELECT " . implode(', ', $select) . " FROM {$usersTable} ORDER BY {$orderBy}")->fetchAll();
 } catch (\Throwable $e) {
     $users = [];
+    if ($error === '') {
+        $error = 'Ошибка чтения списка пользователей: ' . $e->getMessage();
+    }
 }
 
 // Settings logic
@@ -1388,6 +1407,16 @@ if ($tab === 'menu' || $tab === 'categories') {
                 </div>
             </form>
 
+            <?php if (empty($users)): ?>
+                <div class="error" style="margin: 14px 0;">
+                    Список пользователей пуст. Нажмите «Добавить себя», чтобы восстановить доступы.
+                    <div class="muted" style="margin-top:6px;">Текущий пользователь: <?= htmlspecialchars((string)($_SESSION['user_email'] ?? '—')) ?></div>
+                    <form method="POST" style="margin-top: 10px;">
+                        <button type="submit" name="add_self" value="1">Добавить себя</button>
+                    </form>
+                </div>
+            <?php endif; ?>
+
             <table>
                 <thead>
                     <tr>
@@ -2245,13 +2274,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 dashboard: true,
                 rawdata: true,
                 kitchen_online: true,
-                logs: false,
                 admin: true,
-                admin_sync: false,
-                admin_access: false,
-                admin_telegram: false,
-                admin_menu: false,
-                admin_categories: false,
                 exclude_toggle: true,
                 telegram_ack: false,
             };

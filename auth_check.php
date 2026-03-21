@@ -36,13 +36,6 @@ if (!function_exists('veranda_get_user_permissions')) {
             'kitchen_online' => true,
             'admin' => true,
             'exclude_toggle' => true,
-            'telegram_ack' => false,
-            'logs' => false,
-            'admin_sync' => false,
-            'admin_access' => false,
-            'admin_telegram' => false,
-            'admin_menu' => false,
-            'admin_categories' => false,
         ];
         if ($email === '') return $defaults;
         try {
