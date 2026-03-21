@@ -13,33 +13,17 @@ if (file_exists(__DIR__ . '/../../.env')) {
     }
 }
 
-$db = new \App\Classes\Database($_ENV['DB_HOST'] ?? 'localhost', $_ENV['DB_NAME'] ?? 'veranda_my', $_ENV['DB_USER'] ?? 'veranda_my', $_ENV['DB_PASS'] ?? '');
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
+$db = new \App\Classes\Database($_ENV['DB_HOST'] ?? 'localhost', $_ENV['DB_NAME'] ?? 'veranda_my', $_ENV['DB_USER'] ?? 'veranda_my', $_ENV['DB_PASS'] ?? '', $tableSuffix);
+$ks = $db->t('kitchen_stats');
 
-$dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
-$columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
-    $row = $db->query(
-        "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
-        [$dbName, $table, $column]
-    )->fetch();
-    return (int)($row['c'] ?? 0) > 0;
-};
-if (!$columnExists($db, $dbName, 'kitchen_stats', 'prob_close_at')) {
-    $db->query("ALTER TABLE kitchen_stats ADD COLUMN prob_close_at DATETIME NULL AFTER ready_chass_at");
-}
-if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_category_id')) {
-    $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_category_id BIGINT NULL AFTER dish_id");
-}
-if (!$columnExists($db, $dbName, 'kitchen_stats', 'dish_sub_category_id')) {
-    $db->query("ALTER TABLE kitchen_stats ADD COLUMN dish_sub_category_id BIGINT NULL AFTER dish_category_id");
-}
-
-$dates = $db->query("SELECT DISTINCT transaction_date AS d FROM kitchen_stats WHERE transaction_date IS NOT NULL ORDER BY d ASC")->fetchAll();
+$dates = $db->query("SELECT DISTINCT transaction_date AS d FROM {$ks} WHERE transaction_date IS NOT NULL ORDER BY d ASC")->fetchAll();
 $totalDates = count($dates);
 echo "[" . date('Y-m-d H:i:s') . "] Dates: {$totalDates}\n";
 
-$db->query("UPDATE kitchen_stats SET prob_close_at = NULL WHERE prob_close_at IS NOT NULL");
+$db->query("UPDATE {$ks} SET prob_close_at = NULL WHERE prob_close_at IS NOT NULL");
 
-$upd = $db->getPdo()->prepare("UPDATE kitchen_stats SET prob_close_at = ? WHERE id = ?");
+$upd = $db->getPdo()->prepare("UPDATE {$ks} SET prob_close_at = ? WHERE id = ?");
 
 $i = 0;
 $setTotal = 0;
@@ -50,7 +34,7 @@ foreach ($dates as $row) {
 
     $readyRows = $db->query(
         "SELECT receipt_number, station, ready_pressed_at, ready_chass_at
-         FROM kitchen_stats
+         FROM {$ks}
          WHERE transaction_date = ?
            AND receipt_number REGEXP '^[0-9]+$'
            AND COALESCE(was_deleted, 0) = 0
@@ -95,7 +79,7 @@ foreach ($dates as $row) {
 
     $targets = $db->query(
         "SELECT id, receipt_number, station, ticket_sent_at
-         FROM kitchen_stats
+         FROM {$ks}
          WHERE transaction_date = ?
            AND receipt_number REGEXP '^[0-9]+$'
            AND COALESCE(was_deleted, 0) = 0

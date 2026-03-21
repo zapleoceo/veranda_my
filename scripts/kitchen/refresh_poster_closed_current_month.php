@@ -19,6 +19,7 @@ $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
 $start = date('Y-m-01');
 $end = date('Y-m-d');
@@ -27,17 +28,13 @@ try {
     if ($token === '') {
         throw new Exception('POSTER_API_TOKEN is empty');
     }
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+    $ks = $db->t('kitchen_stats');
+    $meta = $db->t('system_meta');
     $api = new \App\Classes\PosterAPI($token);
 
-    $db->query("CREATE TABLE IF NOT EXISTS system_meta (
-        meta_key VARCHAR(100) PRIMARY KEY,
-        meta_value VARCHAR(255) NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
     $db->query(
-        "UPDATE kitchen_stats
+        "UPDATE {$ks}
          SET transaction_closed_at = NULL,
              pay_type = NULL,
              close_reason = NULL
@@ -48,7 +45,7 @@ try {
 
     $txIds = $db->query(
         "SELECT DISTINCT transaction_id
-         FROM kitchen_stats
+         FROM {$ks}
          WHERE transaction_date BETWEEN ? AND ?
            AND status > 1
          ORDER BY transaction_id ASC",
@@ -97,7 +94,7 @@ try {
             $closedAt = $parseClosedAt(is_array($tx) ? $tx : []);
 
             $db->query(
-                "UPDATE kitchen_stats
+                "UPDATE {$ks}
                  SET status = ?, pay_type = ?, close_reason = ?, transaction_closed_at = ?
                  WHERE transaction_id = ?
                    AND transaction_date BETWEEN ? AND ?",
@@ -115,12 +112,12 @@ try {
     }
 
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",
         ['poster_close_refresh_month_at', date('Y-m-d H:i:s')]
     );
     $db->query(
-        "INSERT INTO system_meta (meta_key, meta_value) VALUES (?, ?)
+        "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=CURRENT_TIMESTAMP",
         ['poster_close_refresh_month_info', "range={$start}..{$end}, tx={$updatedTx}, errors={$errors}"]
     );
@@ -130,4 +127,3 @@ try {
     echo "[" . date('Y-m-d H:i:s') . "] ERROR: " . $e->getMessage() . "\n";
     exit(1);
 }
-

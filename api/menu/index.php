@@ -25,12 +25,21 @@ $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
 $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
 try {
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
-    $db->createMenuTables();
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
 
-    $langTable = $lang === 'ru' ? 'menu_items_ru' : ($lang === 'en' ? 'menu_items_en' : 'menu_items_vn');
+    $pmi = $db->t('poster_menu_items');
+    $ruTable = $db->t('menu_items_ru');
+    $enTable = $db->t('menu_items_en');
+    $vnTable = $db->t('menu_items_vn');
+    $mcm = $db->t('menu_categories_main');
+    $mcmTr = $db->t('menu_categories_main_tr');
+    $mcs = $db->t('menu_categories_sub');
+    $mcsTr = $db->t('menu_categories_sub_tr');
+
+    $langTable = $lang === 'ru' ? $ruTable : ($lang === 'en' ? $enTable : $vnTable);
 
     $sql = "
         SELECT
@@ -43,13 +52,13 @@ try {
             ru.image_url AS image_url,
             ru.sort_order AS sort_order,
             mm.sort_order AS main_sort
-        FROM poster_menu_items p
-        JOIN menu_items_ru ru ON ru.poster_item_id = p.id
+        FROM {$pmi} p
+        JOIN {$ruTable} ru ON ru.poster_item_id = p.id
         LEFT JOIN {$langTable} mi ON mi.poster_item_id = p.id
-        LEFT JOIN menu_categories_main mm ON mm.id = COALESCE(mi.main_category_id, ru.main_category_id)
-        LEFT JOIN menu_categories_main_tr mit_main ON mit_main.main_category_id = mm.id AND mit_main.lang = ?
-        LEFT JOIN menu_categories_sub ms ON ms.id = COALESCE(mi.sub_category_id, ru.sub_category_id)
-        LEFT JOIN menu_categories_sub_tr mit_sub ON mit_sub.sub_category_id = ms.id AND mit_sub.lang = ?
+        LEFT JOIN {$mcm} mm ON mm.id = COALESCE(mi.main_category_id, ru.main_category_id)
+        LEFT JOIN {$mcmTr} mit_main ON mit_main.main_category_id = mm.id AND mit_main.lang = ?
+        LEFT JOIN {$mcs} ms ON ms.id = COALESCE(mi.sub_category_id, ru.sub_category_id)
+        LEFT JOIN {$mcsTr} mit_sub ON mit_sub.sub_category_id = ms.id AND mit_sub.lang = ?
         WHERE p.is_active = 1
           AND ru.is_published = 1
           AND (mm.id IS NULL OR mm.show_in_menu = 1)

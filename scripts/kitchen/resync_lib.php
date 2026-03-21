@@ -23,6 +23,7 @@ function veranda_resync_range_period(string $from, string $to): void {
     $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
     $dbPass = $_ENV['DB_PASS'] ?? '';
     $token  = $_ENV['POSTER_API_TOKEN'] ?? '';
+    $tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
     $fromTs = strtotime($from);
     $toTs   = strtotime($to);
@@ -30,38 +31,15 @@ function veranda_resync_range_period(string $from, string $to): void {
         return;
     }
 
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+    $ks = $db->t('kitchen_stats');
     $api = new \App\Classes\PosterAPI($token);
     $analytics = new \App\Classes\KitchenAnalytics($api);
 
-    $columnExists = function (\App\Classes\Database $db, string $dbName, string $table, string $column): bool {
-        $row = $db->query(
-            "SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?",
-            [$dbName, $table, $column]
-        )->fetch();
-        return (int)($row['c'] ?? 0) > 0;
-    };
-
-    $cols = [
-        'pay_type' => "TINYINT NULL AFTER status",
-        'close_reason' => "TINYINT NULL AFTER pay_type",
-        'exclude_from_dashboard' => "TINYINT(1) NOT NULL DEFAULT 0 AFTER close_reason",
-        'exclude_auto' => "TINYINT(1) NOT NULL DEFAULT 0 AFTER exclude_from_dashboard",
-        'ready_chass_at' => "DATETIME NULL AFTER ready_pressed_at",
-        'prob_close_at' => "DATETIME NULL AFTER ready_chass_at",
-        'dish_category_id' => "BIGINT NULL AFTER dish_id",
-        'dish_sub_category_id' => "BIGINT NULL AFTER dish_category_id"
-    ];
-    foreach ($cols as $col => $ddl) {
-        if (!$columnExists($db, $dbName, 'kitchen_stats', $col)) {
-            $db->query("ALTER TABLE kitchen_stats ADD COLUMN {$col} {$ddl}");
-        }
-    }
-
-    $computeProbCloseAt = function (string $date) use ($db): array {
+    $computeProbCloseAt = function (string $date) use ($db, $ks): array {
         $readyRows = $db->query(
             "SELECT receipt_number, station, ready_pressed_at, ready_chass_at
-             FROM kitchen_stats
+             FROM {$ks}
              WHERE transaction_date = ?
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
@@ -97,7 +75,7 @@ function veranda_resync_range_period(string $from, string $to): void {
 
         $targets = $db->query(
             "SELECT id, receipt_number, station, prob_close_at, ticket_sent_at
-             FROM kitchen_stats
+             FROM {$ks}
              WHERE transaction_date = ?
                AND status = 1
                AND receipt_number REGEXP '^[0-9]+$'
@@ -109,7 +87,7 @@ function veranda_resync_range_period(string $from, string $to): void {
             [$date]
         )->fetchAll();
 
-        $upd = $db->getPdo()->prepare("UPDATE kitchen_stats SET prob_close_at = ? WHERE id = ?");
+        $upd = $db->getPdo()->prepare("UPDATE {$ks} SET prob_close_at = ? WHERE id = ?");
         $setCount = 0; $clearCount = 0;
         foreach ($targets as $t) {
             $id = (int)($t['id'] ?? 0);
@@ -145,9 +123,9 @@ function veranda_resync_range_period(string $from, string $to): void {
         return ['set' => $setCount, 'cleared' => $clearCount];
     };
 
-    $autoExclude = function (string $date) use ($db): array {
+    $autoExclude = function (string $date) use ($db, $ks): array {
         $setHookah = $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ks}
              SET exclude_from_dashboard = 1,
                  exclude_auto = 1
              WHERE transaction_date = ?
@@ -155,7 +133,7 @@ function veranda_resync_range_period(string $from, string $to): void {
             [$date]
         )->rowCount();
         $set1 = $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ks}
              SET exclude_from_dashboard = 1,
                  exclude_auto = 1
              WHERE transaction_date = ?
@@ -168,7 +146,7 @@ function veranda_resync_range_period(string $from, string $to): void {
             [$date]
         )->rowCount();
         $set2 = $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ks}
              SET exclude_from_dashboard = 1,
                  exclude_auto = 1
              WHERE transaction_date = ?
@@ -185,7 +163,7 @@ function veranda_resync_range_period(string $from, string $to): void {
             [$date]
         )->rowCount();
         $unset1 = $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ks}
              SET exclude_from_dashboard = 0,
                  exclude_auto = 0
              WHERE transaction_date = ?
@@ -195,7 +173,7 @@ function veranda_resync_range_period(string $from, string $to): void {
             [$date]
         )->rowCount();
         $unset2 = $db->query(
-            "UPDATE kitchen_stats
+            "UPDATE {$ks}
              SET exclude_from_dashboard = 0,
                  exclude_auto = 0
              WHERE transaction_date = ?
@@ -224,7 +202,7 @@ function veranda_resync_range_period(string $from, string $to): void {
 
         $txRows = $db->query(
             "SELECT DISTINCT transaction_id
-             FROM kitchen_stats
+             FROM {$ks}
              WHERE transaction_date = ?
                AND status > 1",
             [$date]
@@ -256,7 +234,7 @@ function veranda_resync_range_period(string $from, string $to): void {
                     }
                 }
                 $db->query(
-                    "UPDATE kitchen_stats
+                    "UPDATE {$ks}
                      SET status = ?, pay_type = ?, close_reason = ?, transaction_closed_at = ?
                      WHERE transaction_id = ?",
                     [$status, $payType, $closeReason, $closedAt, $txId]

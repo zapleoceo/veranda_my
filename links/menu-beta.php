@@ -57,21 +57,31 @@ $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
 $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
-$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
+$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
 $db->createMenuTables();
+
+$metaTable = $db->t('system_meta');
+$pmi = $db->t('poster_menu_items');
+$ruTable = $db->t('menu_items_ru');
+$enTable = $db->t('menu_items_en');
+$vnTable = $db->t('menu_items_vn');
+$koTable = $db->t('menu_items_ko');
+$mcm = $db->t('menu_categories_main');
+$mcmTr = $db->t('menu_categories_main_tr');
+$mcs = $db->t('menu_categories_sub');
+$mcsTr = $db->t('menu_categories_sub_tr');
 
 $lastMenuSyncAt = null;
 try {
-    $row = $db->query("SELECT meta_value FROM system_meta WHERE meta_key = 'menu_last_sync_at' LIMIT 1")->fetch();
+    $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = 'menu_last_sync_at' LIMIT 1")->fetch();
     if (!empty($row['meta_value'])) {
         $lastMenuSyncAt = $row['meta_value'];
     }
 } catch (\Exception $e) {
 }
-$langTable = $lang === 'ru'
-    ? 'menu_items_ru'
-    : ($lang === 'en' ? 'menu_items_en' : ($lang === 'ko' ? 'menu_items_ko' : 'menu_items_vn'));
+$langTable = $lang === 'ru' ? $ruTable : ($lang === 'en' ? $enTable : ($lang === 'ko' ? $koTable : $vnTable));
 $trLang = $lang === 'vi' ? 'vn' : $lang;
 
 $items = $db->query(
@@ -86,14 +96,14 @@ $items = $db->query(
         COALESCE(NULLIF(mit_sub.name, ''), NULLIF(ms.name_raw, ''), '') AS sub_label,
         COALESCE(mm.sort_order, 0) AS main_sort,
         COALESCE(ms.sort_order, 0) AS sub_sort
-     FROM poster_menu_items p
-     JOIN menu_items_ru ru ON ru.poster_item_id = p.id
-     LEFT JOIN menu_items_en en ON en.poster_item_id = p.id
+     FROM {$pmi} p
+     JOIN {$ruTable} ru ON ru.poster_item_id = p.id
+     LEFT JOIN {$enTable} en ON en.poster_item_id = p.id
      LEFT JOIN {$langTable} mi ON mi.poster_item_id = p.id
-     LEFT JOIN menu_categories_main mm ON mm.id = COALESCE(mi.main_category_id, ru.main_category_id)
-     LEFT JOIN menu_categories_main_tr mit_main ON mit_main.main_category_id = mm.id AND mit_main.lang = ?
-     LEFT JOIN menu_categories_sub ms ON ms.id = COALESCE(mi.sub_category_id, ru.sub_category_id)
-     LEFT JOIN menu_categories_sub_tr mit_sub ON mit_sub.sub_category_id = ms.id AND mit_sub.lang = ?
+     LEFT JOIN {$mcm} mm ON mm.id = COALESCE(mi.main_category_id, ru.main_category_id)
+     LEFT JOIN {$mcmTr} mit_main ON mit_main.main_category_id = mm.id AND mit_main.lang = ?
+     LEFT JOIN {$mcs} ms ON ms.id = COALESCE(mi.sub_category_id, ru.sub_category_id)
+     LEFT JOIN {$mcsTr} mit_sub ON mit_sub.sub_category_id = ms.id AND mit_sub.lang = ?
      WHERE p.is_active = 1
        AND ru.is_published = 1
        AND (mm.id IS NULL OR mm.show_in_menu = 1)
