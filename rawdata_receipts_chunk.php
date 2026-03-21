@@ -52,9 +52,8 @@
                         <th title="Время отправки позиции на станцию/цех (Poster TransactionHistory sendtokitchen).">ВрОтпр</th>
                         <th title="Время готовности из Poster (finishedcooking).">ВрГотPSTR</th>
                         <th title="Время закрытия чека в Poster (date_close/date_close_date), только для закрытых чеков.">ЗакЧкPoster</th>
-                        <th title="Время готовности из Chef Assistant (readyTime).">ЗакChAss</th>
                         <th title="Расчетное время (ProbCloseTime): берется из ближайшего следующего чека (+1..+3) с тем же цехом, где есть готовые позиции.">ЗакРассч</th>
-                        <th title="Время, которое реально используется в расчете ожидания. Приоритет: ВрГотPSTR → ЗакChAss → ЗакРассч → ЗакЧкPoster.">ВрЛогЗакр</th>
+                        <th title="Время, которое реально используется в расчете ожидания. Приоритет: ВрГотPSTR → min(ЗакРассч, ЗакЧкPoster).">ВрЛогЗакр</th>
                         <th title="ВрЛогЗакр - ВрОтпр. Если чек открыт и нет ВрЛогЗакр: текущее время - ВрОтпр.">Ожидание</th>
                         <th title="Исключить позицию из дашборда и алертов.">Игнор</th>
                     </tr>
@@ -87,21 +86,24 @@
                                 $endTime = null;
                                 $endTs = 0;
                                 $endSource = '';
-                                foreach ([
-                                    'pstr' => ($item['ready_pressed_at'] ?? null),
-                                    'chass' => ($item['ready_chass_at'] ?? null),
-                                    'prob' => ($item['prob_close_at'] ?? null),
-                                ] as $src => $t) {
-                                    if (empty($t)) continue;
-                                    $ts = strtotime($t);
-                                    if ($ts === false || $ts <= 0) continue;
-                                    if ($ts < $sentTs) continue;
-                                $endTime = $t;
-                                $endTs = $ts;
-                                $endSource = $src;
-                                    break;
+                                $pstrAt = $item['ready_pressed_at'] ?? null;
+                                if (!empty($pstrAt)) {
+                                    $ts = strtotime($pstrAt);
+                                    if ($ts !== false && $ts >= $sentTs) {
+                                        $endTime = $pstrAt;
+                                        $endTs = $ts;
+                                        $endSource = 'pstr';
+                                    }
                                 }
                                 if ($endTime === null) {
+                                    $candidates = [];
+                                    $probAt = $item['prob_close_at'] ?? null;
+                                    if (!empty($probAt)) {
+                                        $ts = strtotime($probAt);
+                                        if ($ts !== false && $ts >= $sentTs) {
+                                            $candidates['prob'] = ['ts' => $ts, 'at' => $probAt];
+                                        }
+                                    }
                                     $closedAt = $item['transaction_closed_at'] ?? null;
                                     if (
                                         !empty($closedAt) &&
@@ -111,9 +113,25 @@
                                     ) {
                                         $ts = strtotime($closedAt);
                                         if ($ts !== false && $ts >= $sentTs) {
-                                            $endTime = $closedAt;
-                                            $endTs = $ts;
-                                            $endSource = 'close';
+                                            $candidates['close'] = ['ts' => $ts, 'at' => $closedAt];
+                                        }
+                                    }
+                                    if (!empty($candidates)) {
+                                        $bestSrc = null;
+                                        $bestTs = 0;
+                                        $bestAt = null;
+                                        foreach ($candidates as $src => $c) {
+                                            $ts = (int)$c['ts'];
+                                            if ($bestSrc === null || $ts < $bestTs) {
+                                                $bestSrc = (string)$src;
+                                                $bestTs = $ts;
+                                                $bestAt = (string)$c['at'];
+                                            }
+                                        }
+                                        if ($bestSrc !== null && $bestAt !== null) {
+                                            $endTime = $bestAt;
+                                            $endTs = $bestTs;
+                                            $endSource = $bestSrc;
                                         }
                                     }
                                 }
@@ -124,10 +142,7 @@
                                     $usedFallbackTime = ($endSource === 'close');
                                     $usedProbCloseTime = ($endSource === 'prob');
                                     $autoExclude = ($endSource !== 'pstr');
-                                    $wait = round($diff / 60, 1) . ' мин';
-                                    if ($endSource !== 'pstr') {
-                                        $wait .= '*';
-                                    }
+                                    $wait = ($endSource !== 'pstr' ? '? ' : '') . round($diff / 60, 1) . ' мин';
                                     if ($endSource === 'close') {
                                         $waitClass = 'wait-time wait-time-fallback';
                                     }
@@ -136,7 +151,7 @@
                                     if ($diff >= 0) {
                                         $logicalCloseAt = date('Y-m-d H:i:s');
                                         $logicalCloseLabel = date('H:i:s');
-                                        $wait = round($diff / 60, 1) . ' мин…*';
+                                        $wait = round($diff / 60, 1) . ' мин…';
                                         $waitClass = 'wait-time wait-time-fallback';
                                         $usedInProgressTime = true;
                                     }
@@ -178,13 +193,12 @@
                                 <?php endif; ?>
                             </td>
                             <td><?= $closed ?></td>
-                            <td><?= !empty($item['ready_chass_at']) ? date('H:i:s', strtotime($item['ready_chass_at'])) : '—' ?></td>
                             <td><?= !empty($item['prob_close_at']) ? date('H:i:s', strtotime($item['prob_close_at'])) : '—' ?></td>
                             <td><?= $logicalCloseLabel ?></td>
                             <?php $sentTsForTimer = !empty($item['ticket_sent_at']) ? strtotime($item['ticket_sent_at']) : 0; ?>
-                            <td class="<?= $waitClass ?>" title="<?= $isDeleted ? 'Удалено: тайминг не считается.' : ($isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? 'Расчет: ЗакPoster - Отправ.' : ($usedInProgressTime ? 'Расчет: текущее время - Отправ.' : ($usedProbCloseTime ? 'Расчет: ЗакРассч (ProbCloseTime) - Отправ.' : 'Расчет: (Готово/ЗакChAss) - Отправ.')))) ?>">
+                            <td class="<?= $waitClass ?>" title="<?= $isDeleted ? 'Удалено: тайминг не считается.' : ($isHookah ? 'Кальяны: тайминг не считается.' : ($usedFallbackTime ? 'Расчет: ЗакЧкPoster - ВрОтпр.' : ($usedInProgressTime ? 'Расчет: текущее время - ВрОтпр.' : ($usedProbCloseTime ? 'Расчет: ЗакРассч (ProbCloseTime) - ВрОтпр.' : 'Расчет: ВрГотPSTR - ВрОтпр.')))) ?>">
                                 <?php if (!$isDeleted && $usedInProgressTime && $sentTsForTimer > 0): ?>
-                                    <span class="live-wait" data-sent-ts="<?= (int)$sentTsForTimer ?>"><span class="wait-spinner" aria-hidden="true"></span><span class="live-time">00:00</span></span>*
+                                    <span class="live-wait" data-sent-ts="<?= (int)$sentTsForTimer ?>"><span class="wait-spinner" aria-hidden="true"></span><span class="live-time">00:00</span></span>
                                 <?php else: ?>
                                     <?= htmlspecialchars($isDeleted ? '—' : $wait) ?>
                                 <?php endif; ?>

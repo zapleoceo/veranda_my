@@ -159,6 +159,7 @@ $resolveWaiterName = function (\App\Classes\PosterAPI $api, int $transactionId, 
 };
 
 try {
+    $startedAt = microtime(true);
     $tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
     $ks = $db->t('kitchen_stats');
@@ -194,13 +195,13 @@ try {
     $computeProbCloseAt = function (string $date) use ($db): void {
         $ks = $db->t('kitchen_stats');
         $readyRows = $db->query(
-            "SELECT receipt_number, station, ready_pressed_at, ready_chass_at
+            "SELECT receipt_number, station, ready_pressed_at
              FROM {$ks}
              WHERE transaction_date = ?
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-               AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
+               AND ready_pressed_at IS NOT NULL",
             [$date]
         )->fetchAll();
 
@@ -210,16 +211,7 @@ try {
             $station = (string)($r['station'] ?? '');
             if ($receipt <= 0 || $station === '') continue;
 
-            $t1 = $r['ready_pressed_at'] ?? null;
-            $t2 = $r['ready_chass_at'] ?? null;
-            $end = null;
-            if ($t1 && $t2) {
-                $end = strtotime($t1) <= strtotime($t2) ? $t1 : $t2;
-            } elseif ($t1) {
-                $end = $t1;
-            } elseif ($t2) {
-                $end = $t2;
-            }
+            $end = $r['ready_pressed_at'] ?? null;
             if ($end === null) continue;
 
             if (!isset($byReceiptStation[$receipt][$station])) {
@@ -235,13 +227,11 @@ try {
             "SELECT id, receipt_number, station, prob_close_at, ticket_sent_at
              FROM {$ks}
              WHERE transaction_date = ?
-               AND status = 1
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ticket_sent_at IS NOT NULL
-               AND ready_pressed_at IS NULL
-               AND ready_chass_at IS NULL",
+               AND ready_pressed_at IS NULL",
             [$date]
         )->fetchAll();
 
@@ -284,7 +274,7 @@ try {
     $activeAlerts = $db->query(
         "SELECT id, transaction_id, receipt_number, table_number, waiter_name,
                 dish_id, item_seq, dish_name, station,
-                ticket_sent_at, ready_pressed_at, ready_chass_at,
+                ticket_sent_at, ready_pressed_at,
                 status, pay_type, close_reason,
                 was_deleted, exclude_from_dashboard,
                 tg_message_id, tg_acknowledged, tg_acknowledged_at
@@ -305,7 +295,6 @@ try {
             || (int)($item['was_deleted'] ?? 0) === 1
             || (int)($item['exclude_from_dashboard'] ?? 0) === 1
             || $item['ready_pressed_at'] !== null
-            || !empty($item['ready_chass_at'])
             || (int)$item['status'] > 1
         ) {
             $shouldDelete = true;
@@ -450,7 +439,6 @@ try {
                      was_deleted, exclude_from_dashboard
               FROM {$ks} 
               WHERE ready_pressed_at IS NULL 
-              AND ready_chass_at IS NULL
               AND ticket_sent_at IS NOT NULL 
               AND transaction_date = ?
               AND status = 1
@@ -691,12 +679,31 @@ try {
         }
     }
 
+    $durationMs = (int)round((microtime(true) - $startedAt) * 1000);
+    $setMeta('telegram_last_run_at', date('Y-m-d H:i:s'));
+    $setMeta('telegram_last_run_result', 'duration_ms=' . $durationMs);
+    $setMeta('telegram_last_run_error', '');
+
 } catch (\Exception $e) {
     echo "[" . date('Y-m-d H:i:s') . "] ERROR: " . $e->getMessage() . "\n";
     try {
         if (isset($db) && $db instanceof \App\Classes\Database) {
             $logger = new \App\Classes\EventLogger($db, 'telegram_alerts');
             $logger->error('fatal', ['error' => $e->getMessage()]);
+            try {
+                $metaTable = $db->t('system_meta');
+                $db->query(
+                    "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+                     ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+                    ['telegram_last_run_at', date('Y-m-d H:i:s')]
+                );
+                $db->query(
+                    "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+                     ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+                    ['telegram_last_run_error', $e->getMessage()]
+                );
+            } catch (\Exception $e3) {
+            }
         }
     } catch (\Exception $e2) {
     }

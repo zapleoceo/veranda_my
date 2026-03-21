@@ -32,12 +32,24 @@ if (!in_array($tab, ['sync', 'access', 'telegram', 'menu', 'categories'], true))
 $usersTable = $db->t('users');
 $metaTable = $db->t('system_meta');
 
+$usersCols = [];
+try {
+    $cols = $db->query("SHOW COLUMNS FROM {$usersTable}")->fetchAll();
+    foreach ($cols as $c) {
+        $f = strtolower((string)($c['Field'] ?? ''));
+        if ($f !== '') $usersCols[$f] = true;
+    }
+} catch (\Throwable $e) {
+    $usersCols = [];
+}
+
 $permissionKeys = [
     'dashboard' => 'Дашборд',
     'rawdata' => 'Сырые данные',
     'kitchen_online' => 'КухняOnline',
     'admin' => 'УПРАВЛЕНИЕ',
     'exclude_toggle' => 'Кнопка «Игнор»',
+    'telegram_ack' => '✅ Принято (Telegram)',
 ];
 
 if (isset($_POST['save_user_permissions'])) {
@@ -52,8 +64,23 @@ if (isset($_POST['save_user_permissions'])) {
         if ($tgUsername === '') {
             $tgUsername = null;
         }
-        $db->query("UPDATE {$usersTable} SET permissions_json = ?, telegram_username = ? WHERE email = ? LIMIT 1", [json_encode($perms, JSON_UNESCAPED_UNICODE), $tgUsername, $targetEmail]);
-        $message = "Права для $targetEmail сохранены.";
+        $setParts = [];
+        $params = [];
+        if (!empty($usersCols['permissions_json'])) {
+            $setParts[] = "permissions_json = ?";
+            $params[] = json_encode($perms, JSON_UNESCAPED_UNICODE);
+        }
+        if (!empty($usersCols['telegram_username'])) {
+            $setParts[] = "telegram_username = ?";
+            $params[] = $tgUsername;
+        }
+        if (!empty($setParts)) {
+            $params[] = $targetEmail;
+            $db->query("UPDATE {$usersTable} SET " . implode(', ', $setParts) . " WHERE email = ? LIMIT 1", $params);
+            $message = "Права для $targetEmail сохранены.";
+        } else {
+            $error = 'В таблице users нет колонок для сохранения прав (permissions_json/telegram_username).';
+        }
     }
 }
 
@@ -84,7 +111,21 @@ if (isset($_GET['delete'])) {
     }
 }
 
-$users = $db->query("SELECT * FROM {$usersTable} ORDER BY created_at DESC")->fetchAll();
+$users = [];
+try {
+    $select = ['email'];
+    if (!empty($usersCols['telegram_username'])) $select[] = 'telegram_username';
+    if (!empty($usersCols['permissions_json'])) $select[] = 'permissions_json';
+    if (!empty($usersCols['created_at'])) {
+        $select[] = 'created_at';
+    } else {
+        $select[] = 'NULL AS created_at';
+    }
+    $orderBy = !empty($usersCols['created_at']) ? 'created_at DESC' : 'email ASC';
+    $users = $db->query("SELECT " . implode(', ', $select) . " FROM {$usersTable} ORDER BY {$orderBy}")->fetchAll();
+} catch (\Throwable $e) {
+    $users = [];
+}
 
 // Settings logic
 $settingKeys = [
@@ -107,43 +148,6 @@ if (isset($_POST['save_settings']) || array_key_exists('exclude_partners_from_lo
     $message = "Настройки успешно сохранены.";
 }
 
-$telegramAckWhitelistKey = 'telegram_ack_whitelist';
-if (isset($_POST['save_tg_whitelist'])) {
-    $raw = (string)($_POST['telegram_ack_whitelist_text'] ?? '');
-    $lines = preg_split('/\R/u', $raw);
-    $entries = [];
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if ($line === '') {
-            continue;
-        }
-        $username = $line;
-        $comment = '';
-        if (strpos($line, ' - ') !== false) {
-            [$username, $comment] = explode(' - ', $line, 2);
-        } elseif (strpos($line, "\t") !== false) {
-            [$username, $comment] = explode("\t", $line, 2);
-        } elseif (strpos($line, '|') !== false) {
-            [$username, $comment] = explode('|', $line, 2);
-        }
-        $username = trim($username);
-        $comment = trim($comment);
-        $username = ltrim($username, '@');
-        $username = strtolower($username);
-        if ($username === '') {
-            continue;
-        }
-        $entries[$username] = $comment;
-    }
-    $encoded = json_encode($entries, JSON_UNESCAPED_UNICODE);
-    $db->query(
-        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
-        [$telegramAckWhitelistKey, $encoded]
-    );
-    $message = "Whitelist Telegram успешно сохранён.";
-}
-
 $settings = [];
 foreach ($settingKeys as $key => $default) {
     $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
@@ -152,24 +156,6 @@ foreach ($settingKeys as $key => $default) {
         $settings[$key] = (int)$settings[$key];
     }
 }
-
-$whitelistRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$telegramAckWhitelistKey])->fetch();
-$whitelistJson = $whitelistRow ? (string)$whitelistRow['meta_value'] : '{}';
-$whitelist = json_decode($whitelistJson, true);
-if (!is_array($whitelist)) {
-    $whitelist = [];
-}
-$whitelistTextLines = [];
-foreach ($whitelist as $username => $comment) {
-    $username = ltrim((string)$username, '@');
-    $username = strtolower($username);
-    if ($username === '') {
-        continue;
-    }
-    $comment = trim((string)$comment);
-    $whitelistTextLines[] = $comment !== '' ? "{$username} - {$comment}" : $username;
-}
-$telegramAckWhitelistText = implode("\n", $whitelistTextLines);
 
 $isMenuAjax = ($_GET['ajax'] ?? '') === 'menu_publish';
 if ($isMenuAjax) {
@@ -275,7 +261,7 @@ if ($isMenuAjax) {
 }
 
 $menuView = $_GET['view'] ?? 'list';
-if (!in_array($menuView, ['list', 'edit', 'categories', 'ko_import', 'tr_import'], true)) {
+if (!in_array($menuView, ['list', 'edit', 'categories'], true)) {
     $menuView = 'list';
 }
 if ($tab === 'categories') {
@@ -299,17 +285,6 @@ if ($tab === 'menu' || $tab === 'categories') {
     $menuCategoriesTrTable = $db->t('menu_category_tr');
     $menuItemsTable = $db->t('menu_items');
     $menuItemsTrTable = $db->t('menu_item_tr');
-
-    if ($tab === 'categories' && empty($_POST)) {
-        $appliedAt = (string)$db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", ['menu_categories_preset_v2_applied_at'])->fetchColumn();
-        if ($appliedAt === '') {
-            $_POST['import_categories_preset_v2'] = '1';
-        }
-        $fixedAt = (string)$db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", ['menu_fix_new_cocktails_to_24_applied_at'])->fetchColumn();
-        if ($fixedAt === '') {
-            $_POST['fix_new_cocktails_to_24'] = '1';
-        }
-    }
 
     if (($_GET['export'] ?? '') === 'categories_csv') {
         ignore_user_abort(true);
@@ -567,166 +542,6 @@ if ($tab === 'menu' || $tab === 'categories') {
         }
     }
 
-    if (isset($_POST['import_ko_translations'])) {
-        try {
-            $raw = (string)($_POST['ko_csv'] ?? '');
-            $raw = trim($raw);
-            if ($raw === '') {
-                throw new \Exception('Вставьте CSV с переводами.');
-            }
-
-            $lines = preg_split("/\r\n|\n|\r/", $raw) ?: [];
-            $header = null;
-            $idIdx = 0;
-            $koTitleIdx = 4;
-            $koDescIdx = 8;
-
-            $upserted = 0;
-            $missingItems = 0;
-            $skipped = 0;
-            $badLines = 0;
-
-            foreach ($lines as $line) {
-                $line = trim((string)$line);
-                if ($line === '') continue;
-                $cols = str_getcsv($line);
-                if (!$cols || count($cols) < 2) {
-                    $badLines++;
-                    continue;
-                }
-
-                if ($header === null) {
-                    $first = strtolower(trim((string)($cols[0] ?? '')));
-                    if ($first === 'id' || $first === 'poster_id') {
-                        $header = array_map(static fn($v) => strtolower(trim((string)$v)), $cols);
-                        $idIdx = array_search('id', $header, true);
-                        if ($idIdx === false) $idIdx = array_search('poster_id', $header, true);
-                        if ($idIdx === false) $idIdx = 0;
-                        $koTitleIdx = array_search('ko_title', $header, true);
-                        if ($koTitleIdx === false) $koTitleIdx = 4;
-                        $koDescIdx = array_search('ko_desc', $header, true);
-                        if ($koDescIdx === false) $koDescIdx = 8;
-                        continue;
-                    }
-                }
-
-                $posterId = (int)($cols[$idIdx] ?? 0);
-                if ($posterId <= 0) {
-                    $badLines++;
-                    continue;
-                }
-
-                $koTitle = trim((string)($cols[$koTitleIdx] ?? ''));
-                $koDesc = trim((string)($cols[$koDescIdx] ?? ''));
-                if ($koTitle === '' && $koDesc === '') {
-                    $skipped++;
-                    continue;
-                }
-
-                $menuItemId = (int)$db->query(
-                    "SELECT mi.id
-                     FROM {$posterMenuItemsTable} p
-                     JOIN {$menuItemsTable} mi ON mi.poster_item_id = p.id
-                     WHERE p.poster_id = ?
-                     LIMIT 1",
-                    [$posterId]
-                )->fetchColumn();
-
-                if ($menuItemId <= 0) {
-                    $missingItems++;
-                    continue;
-                }
-
-                $db->query(
-                    "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description)
-                     VALUES (?, 'ko', ?, ?)
-                     ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
-                    [$menuItemId, $koTitle !== '' ? $koTitle : null, $koDesc !== '' ? $koDesc : null]
-                );
-                $upserted++;
-            }
-
-            $message = 'KO переводы импортированы: ' . json_encode([
-                'upserted' => $upserted,
-                'missing_items' => $missingItems,
-                'skipped_empty' => $skipped,
-                'bad_lines' => $badLines
-            ], JSON_UNESCAPED_UNICODE);
-            $menuView = 'ko_import';
-        } catch (\Throwable $e) {
-            $error = 'Ошибка импорта KO переводов: ' . $e->getMessage();
-            $menuView = 'ko_import';
-        }
-    }
-
-    if (isset($_POST['import_categories_preset_v2'])) {
-        $_POST['categories_csv'] = "Тип;Poster ID;Parent Poster ID;Raw;RU;EN;VN;KO;Отображать;Sort\n"
-            . "workshop;32;;1-10 KITCHEN КУХНЯ;Кухня;Kitchen;Nhà bếp;키친 메뉴;1;1\n"
-            . "workshop;33;;VERANDA ВЕРНАДА;Веранда;Veranda;Bar;바 메뉴;1;255\n"
-            . "workshop;47;;Кальян / Shisha;Кальян;Shisha;Shisha;시샤;1;255\n"
-            . "workshop;49;;Блины;Блины;Blini;Blini;블리니;1;255\n"
-            . "workshop;50;;ХОР;ХОР;Live Music;Live Music;라이브 공연;1;255\n"
-            . "category;8;32;1. Сold appetizers;Холодные закуски;Cold Appetizers;Khai vị lạnh;차가운 에피타이저;1;1\n"
-            . "category;9;32;2. Hot appetizers;Горячие закуски;Hot Appetizers;Khai vị nóng;따뜻한 에피타이저;1;2\n"
-            . "category;10;32;3. Salads;Салаты;Salads;Salad;샐러드;1;3\n"
-            . "category;11;32;4. Main menu;Основные блюда;Main Courses;Món chính;메인 요리;1;4\n"
-            . "category;12;32;5. Burgers;Бургеры;Burgers;Burger;버거;1;5\n"
-            . "category;13;32;6. Shawarma;Шаурма;Shawarma;Shawarma;샤와르마;1;6\n"
-            . "category;14;32;7. Breakfasts;Завтраки (до 15:00);Breakfast (before 15:00);Bữa sáng (trước 15:00);모닝 메뉴 (15시 이전);1;7\n"
-            . "category;15;32;8. Bowls;Боулы;Bowls;Bowl;볼 요리;1;8\n"
-            . "category;16;32;9. Soups;Супы;Soups;Súp;수프;1;9\n"
-            . "category;17;32;10. Desserts;Десерты;Desserts;Tráng miệng;디저트;1;10\n"
-            . "category;43;32;24 Увкуснитель Extras;Дополнительно;Extras;Extras;추가 토핑;1;24\n"
-            . "category;44;32;Детское меню;Детское меню;Kids Menu;Thực đơn trẻ em;키즈 메뉴;1;255\n"
-            . "category;18;33;11. Coffee;Кофе;Coffee;Cà phê;커피;1;11\n"
-            . "category;19;33;12. Tea;Чай;Tea;Trà;차;1;12\n"
-            . "category;20;33;13. Fresh juices;Свежевыжатые соки;Fresh Juices;Nước ép tươi;생과일 주스;1;13\n"
-            . "category;21;33;14. Smoothies;Смузи;Smoothies;Sinh tố;스무디;1;14\n"
-            . "category;22;33;15. Milkshakes;Милкшейки;Milkshakes;Sữa lắc;밀크셰이크;1;15\n"
-            . "category;23;33;16. Mocktails;Моктейли;Mocktails;Mocktail;논알코올 칵테일;1;16\n"
-            . "category;24;33;17. Cocktails;Коктейли;Cocktails;Cocktail;칵테일;1;17\n"
-            . "category;25;33;18. Strong alcohol;Крепкий алкоголь;Strong Alcohol;Rượu mạnh;도수 높은 주류;1;18\n"
-            . "category;26;33;19. Beer;Пиво;Beer;Bia;맥주;1;19\n"
-            . "category;27;33;20. Wine;Вино;Wine;Rượu vang;와인;1;20\n"
-            . "category;28;33;21. Liquers;Ликеры;Liqueurs;Rượu mùi;리큐르;1;21\n"
-            . "category;31;33;22. Infusions;Настойки;Infusions;Rượu ngâm;인퓨전 주류;1;22\n"
-            . "category;29;33;23. Soft drinks;Безалкогольные напитки;Soft Drinks;Nước ngọt;탄산/청량 음료;1;23\n"
-            . "category;45;33;New coctails;Новые коктейли;New Cocktails;Cocktail mới;신상 칵테일;1;255\n";
-        $_POST['import_categories_csv'] = '1';
-    }
-
-    if (isset($_POST['fix_new_cocktails_to_24'])) {
-        try {
-            $fromPosterCategoryId = 45;
-            $toPosterCategoryId = 24;
-            $fromCategoryId = (int)$db->query("SELECT id FROM {$menuCategoriesTable} WHERE poster_id = ? LIMIT 1", [$fromPosterCategoryId])->fetchColumn();
-            $toCategoryId = (int)$db->query("SELECT id FROM {$menuCategoriesTable} WHERE poster_id = ? LIMIT 1", [$toPosterCategoryId])->fetchColumn();
-            if ($fromCategoryId <= 0) {
-                throw new \Exception('Не найдена категория Poster ID=' . $fromPosterCategoryId);
-            }
-            if ($toCategoryId <= 0) {
-                throw new \Exception('Не найдена категория Poster ID=' . $toPosterCategoryId);
-            }
-            $updated = (int)$db->query(
-                "UPDATE {$menuItemsTable} SET category_id = ? WHERE category_id = ?",
-                [$toCategoryId, $fromCategoryId]
-            )->rowCount();
-            $message = 'Перенос блюд выполнен: ' . json_encode([
-                'from_poster_category_id' => $fromPosterCategoryId,
-                'to_poster_category_id' => $toPosterCategoryId,
-                'updated_items' => $updated
-            ], JSON_UNESCAPED_UNICODE);
-            $db->query(
-                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
-                ['menu_fix_new_cocktails_to_24_applied_at', (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s')]
-            );
-            $menuView = 'categories';
-        } catch (\Throwable $e) {
-            $error = 'Ошибка переноса блюд: ' . $e->getMessage();
-            $menuView = 'categories';
-        }
-    }
-
     if (isset($_POST['import_categories_csv'])) {
         try {
             $raw = trim((string)($_POST['categories_csv'] ?? ''));
@@ -885,267 +700,10 @@ if ($tab === 'menu' || $tab === 'categories') {
                 'skipped' => $skipped,
                 'bad_lines' => $badLines,
             ], JSON_UNESCAPED_UNICODE);
-            if (isset($_POST['import_categories_preset_v2'])) {
-                $db->query(
-                    "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
-                    ['menu_categories_preset_v2_applied_at', (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s')]
-                );
-            }
             $menuView = 'categories';
         } catch (\Throwable $e) {
             $error = 'Ошибка импорта категорий: ' . $e->getMessage();
             $menuView = 'categories';
-        }
-    }
-
-    if (isset($_POST['import_translations_full'])) {
-        try {
-            $rawUrl = trim((string)($_POST['csv_url'] ?? ''));
-            $rawCsv = trim((string)($_POST['csv_text'] ?? ''));
-            if ($rawUrl !== '') {
-                $u = parse_url($rawUrl);
-                $scheme = strtolower((string)($u['scheme'] ?? ''));
-                if (!in_array($scheme, ['https'], true)) {
-                    throw new \Exception('Разрешены только https ссылки.');
-                }
-                $ctx = stream_context_create([
-                    'http' => ['timeout' => 30],
-                    'https' => ['timeout' => 30],
-                ]);
-                $rawCsv = (string)@file_get_contents($rawUrl, false, $ctx);
-                if (trim($rawCsv) === '' && function_exists('curl_init')) {
-                    $ch = curl_init($rawUrl);
-                    curl_setopt_array($ch, [
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_FOLLOWLOCATION => true,
-                        CURLOPT_MAXREDIRS => 5,
-                        CURLOPT_CONNECTTIMEOUT => 15,
-                        CURLOPT_TIMEOUT => 30,
-                        CURLOPT_USERAGENT => 'VerandaMenuImporter/1.0',
-                    ]);
-                    $raw = curl_exec($ch);
-                    $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-                    $err = curl_error($ch);
-                    curl_close($ch);
-                    if (is_string($raw) && $code >= 200 && $code < 300) {
-                        $rawCsv = $raw;
-                    } elseif ($err !== '') {
-                        throw new \Exception('Не удалось скачать CSV: ' . $err);
-                    } else {
-                        throw new \Exception('Не удалось скачать CSV: HTTP ' . $code);
-                    }
-                }
-                $rawCsv = trim($rawCsv);
-            }
-            if ($rawCsv === '') {
-                throw new \Exception('Вставьте CSV или укажите ссылку на CSV.');
-            }
-            if (strncmp($rawCsv, "\xEF\xBB\xBF", 3) === 0) {
-                $rawCsv = substr($rawCsv, 3);
-            }
-
-            $lines = preg_split("/\r\n|\n|\r/", $rawCsv) ?: [];
-            $firstLine = '';
-            foreach ($lines as $l) {
-                $l = trim((string)$l);
-                if ($l !== '') {
-                    $firstLine = $l;
-                    break;
-                }
-            }
-            $delimiter = ';';
-            if ($firstLine !== '') {
-                $semi = substr_count($firstLine, ';');
-                $comma = substr_count($firstLine, ',');
-                if ($comma > $semi) {
-                    $delimiter = ',';
-                }
-            }
-
-            $header = null;
-            $idx = [];
-            $rows = [];
-            $badLines = 0;
-
-            $norm = static function (string $s): string {
-                $s = trim(mb_strtolower($s));
-                $s = preg_replace('/\s+/u', ' ', $s) ?? $s;
-                return $s;
-            };
-
-            foreach ($lines as $line) {
-                $line = trim((string)$line);
-                if ($line === '') continue;
-                $cols = str_getcsv($line, $delimiter);
-                if (!$cols || count($cols) < 2) {
-                    $badLines++;
-                    continue;
-                }
-                if ($header === null) {
-                    $header = array_map(static fn($v) => $norm((string)$v), $cols);
-                    $find = static function (array $header, array $names) {
-                        foreach ($names as $n) {
-                            $i = array_search($n, $header, true);
-                            if ($i !== false) return (int)$i;
-                        }
-                        return null;
-                    };
-                    $idx = [
-                        'poster_id' => $find($header, ['poster id', 'poster_id', 'id']),
-                        'ru_title' => $find($header, ['название ru', 'ru_title']),
-                        'ru_desc' => $find($header, ['описание ru', 'ru_desc']),
-                        'en_title' => $find($header, ['название en', 'en_title']),
-                        'en_desc' => $find($header, ['описание en', 'en_desc']),
-                        'vn_title' => $find($header, ['название vn', 'название vi', 'vn_title', 'vi_title']),
-                        'vn_desc' => $find($header, ['описание vn', 'описание vi', 'vn_desc', 'vi_desc']),
-                        'ko_title' => $find($header, ['название ko', 'ko_title']),
-                        'ko_desc' => $find($header, ['описание ko', 'ko_desc']),
-                        'cat_ru' => $find($header, ['категория адапт. ru', 'category adapted ru', 'adapted_category_ru']),
-                        'cat_en' => $find($header, ['категория адапт. en', 'category adapted en', 'adapted_category_en']),
-                        'cat_vn' => $find($header, ['категория адапт. vn', 'категория адапт. vi', 'category adapted vn', 'adapted_category_vn']),
-                        'cat_ko' => $find($header, ['категория адапт. ko', 'category adapted ko', 'adapted_category_ko']),
-                    ];
-                    if ($idx['poster_id'] === null) {
-                        throw new \Exception('Не нашёл колонку Poster ID в CSV.');
-                    }
-                    continue;
-                }
-
-                $posterId = (int)($cols[$idx['poster_id']] ?? 0);
-                if ($posterId <= 0) {
-                    $badLines++;
-                    continue;
-                }
-
-                $get = static function (array $cols, ?int $i): string {
-                    if ($i === null) return '';
-                    return trim((string)($cols[$i] ?? ''));
-                };
-
-                $rows[] = [
-                    'poster_id' => $posterId,
-                    'ru_title' => $get($cols, $idx['ru_title']),
-                    'ru_desc' => $get($cols, $idx['ru_desc']),
-                    'en_title' => $get($cols, $idx['en_title']),
-                    'en_desc' => $get($cols, $idx['en_desc']),
-                    'vn_title' => $get($cols, $idx['vn_title']),
-                    'vn_desc' => $get($cols, $idx['vn_desc']),
-                    'ko_title' => $get($cols, $idx['ko_title']),
-                    'ko_desc' => $get($cols, $idx['ko_desc']),
-                    'cat_ru' => $get($cols, $idx['cat_ru']),
-                    'cat_en' => $get($cols, $idx['cat_en']),
-                    'cat_vn' => $get($cols, $idx['cat_vn']),
-                    'cat_ko' => $get($cols, $idx['cat_ko']),
-                ];
-            }
-
-            if (empty($rows)) {
-                throw new \Exception('CSV не содержит строк с данными.');
-            }
-
-            $posterIds = [];
-            foreach ($rows as $r) {
-                $posterIds[(int)$r['poster_id']] = true;
-            }
-            $posterIds = array_keys($posterIds);
-
-            $map = [];
-            $chunkSize = 500;
-            for ($o = 0; $o < count($posterIds); $o += $chunkSize) {
-                $chunk = array_slice($posterIds, $o, $chunkSize);
-                $ph = implode(',', array_fill(0, count($chunk), '?'));
-                $dbRows = $db->query(
-                    "SELECT p.poster_id, mi.id item_id, mi.category_id
-                     FROM {$posterMenuItemsTable} p
-                     LEFT JOIN {$menuItemsTable} mi ON mi.poster_item_id = p.id
-                     WHERE p.poster_id IN ({$ph})",
-                    $chunk
-                )->fetchAll();
-                foreach ($dbRows as $dr) {
-                    $pid = (int)($dr['poster_id'] ?? 0);
-                    if ($pid <= 0) continue;
-                    $map[$pid] = [
-                        'item_id' => (int)($dr['item_id'] ?? 0),
-                        'category_id' => (int)($dr['category_id'] ?? 0),
-                    ];
-                }
-            }
-
-            $itemUpserts = 0;
-            $categoryUpserts = 0;
-            $missingItems = 0;
-            $missingCategoryLinks = 0;
-
-            $db->query('START TRANSACTION');
-            foreach ($rows as $r) {
-                $pid = (int)$r['poster_id'];
-                $m = $map[$pid] ?? ['item_id' => 0, 'category_id' => 0];
-                $itemId = (int)($m['item_id'] ?? 0);
-                $categoryId = (int)($m['category_id'] ?? 0);
-
-                if ($itemId <= 0) {
-                    $missingItems++;
-                } else {
-                    foreach (['ru', 'en', 'vn', 'ko'] as $lang) {
-                        $tKey = $lang . '_title';
-                        $dKey = $lang . '_desc';
-                        $title = trim((string)($r[$tKey] ?? ''));
-                        $desc = trim((string)($r[$dKey] ?? ''));
-                        if ($title === '' && $desc === '') {
-                            continue;
-                        }
-                        $db->query(
-                            "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description)
-                             VALUES (?, ?, ?, ?)
-                             ON DUPLICATE KEY UPDATE
-                                title = COALESCE(VALUES(title), title),
-                                description = COALESCE(VALUES(description), description)",
-                            [$itemId, $lang, $title !== '' ? $title : null, $desc !== '' ? $desc : null]
-                        );
-                        $itemUpserts++;
-                    }
-                }
-
-                if ($categoryId <= 0) {
-                    $missingCategoryLinks++;
-                } else {
-                    $catByLang = [
-                        'ru' => (string)($r['cat_ru'] ?? ''),
-                        'en' => (string)($r['cat_en'] ?? ''),
-                        'vn' => (string)($r['cat_vn'] ?? ''),
-                        'ko' => (string)($r['cat_ko'] ?? ''),
-                    ];
-                    foreach ($catByLang as $lang => $name) {
-                        $name = trim($name);
-                        if ($name === '') continue;
-                        $db->query(
-                            "INSERT INTO {$menuCategoriesTrTable} (category_id, lang, name)
-                             VALUES (?, ?, ?)
-                             ON DUPLICATE KEY UPDATE name = COALESCE(VALUES(name), name)",
-                            [$categoryId, $lang, $name !== '' ? $name : null]
-                        );
-                        $categoryUpserts++;
-                    }
-                }
-            }
-            $db->query('COMMIT');
-
-            $message = 'Импорт переводов выполнен: ' . json_encode([
-                'rows' => count($rows),
-                'item_tr_upserts' => $itemUpserts,
-                'category_tr_upserts' => $categoryUpserts,
-                'missing_items' => $missingItems,
-                'missing_category_links' => $missingCategoryLinks,
-                'bad_lines' => $badLines,
-            ], JSON_UNESCAPED_UNICODE);
-            $menuView = 'tr_import';
-        } catch (\Throwable $e) {
-            try {
-                $db->query('ROLLBACK');
-            } catch (\Throwable $e2) {
-            }
-            $error = 'Ошибка импорта переводов: ' . $e->getMessage();
-            $menuView = 'tr_import';
         }
     }
 
@@ -1370,7 +928,11 @@ if ($tab === 'menu' || $tab === 'categories') {
         $filterWorkshop = ($_GET['workshop_id'] ?? '') !== '' ? (int)$_GET['workshop_id'] : null;
         $filterCategory = ($_GET['category_id'] ?? '') !== '' ? (int)$_GET['category_id'] : null;
         $filterQ = trim((string)($_GET['q'] ?? ''));
-        $filterStatus = trim((string)($_GET['status'] ?? ''));
+        if (array_key_exists('status', $_GET)) {
+            $filterStatus = trim((string)($_GET['status'] ?? ''));
+        } else {
+            $filterStatus = 'published';
+        }
         $menuSort = strtolower(trim((string)($_GET['sort'] ?? '')));
         $menuDir = strtolower(trim((string)($_GET['dir'] ?? '')));
         if (!in_array($menuDir, ['asc', 'desc'], true)) {
@@ -1621,65 +1183,80 @@ if ($tab === 'menu' || $tab === 'categories') {
         </div>
         <?php if ($tab === 'sync'): ?>
             <?php
-                $metaKeys = [
-                    'menu_last_sync_at',
-                    'menu_last_sync_result',
-                    'menu_last_sync_error',
+                $syncDefs = [
+                    [
+                        'label' => 'Kitchen sync',
+                        'at_key' => 'kitchen_last_sync_at',
+                        'result_key' => 'kitchen_last_sync_result',
+                        'error_key' => 'kitchen_last_sync_error',
+                        'desc' => 'Синхронизирует чеки/позиции кухни из Poster в kitchen_stats. Используется для Kitchen Online, Rawdata и Dashboard.',
+                    ],
+                    [
+                        'label' => 'Telegram alerts',
+                        'at_key' => 'telegram_last_run_at',
+                        'result_key' => 'telegram_last_run_result',
+                        'error_key' => 'telegram_last_run_error',
+                        'desc' => 'Отправляет/обновляет уведомления в Telegram по долгим позициям. Снимает уведомления после готовности/закрытия/игнора.',
+                    ],
+                    [
+                        'label' => 'Menu sync',
+                        'at_key' => 'menu_last_sync_at',
+                        'result_key' => 'menu_last_sync_result',
+                        'error_key' => 'menu_last_sync_error',
+                        'desc' => 'Синхронизирует меню из Poster в poster_menu_items и справочники (цехи/категории/позиции) для сайта и админки.',
+                    ],
                 ];
+                $needKeys = [];
+                foreach ($syncDefs as $d) {
+                    $needKeys[$d['at_key']] = true;
+                    $needKeys[$d['result_key']] = true;
+                    $needKeys[$d['error_key']] = true;
+                }
                 $meta = [];
-                foreach ($metaKeys as $k) {
+                foreach (array_keys($needKeys) as $k) {
                     $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$k])->fetch();
                     $meta[$k] = $row ? (string)$row['meta_value'] : '';
                 }
             ?>
-            <div class="card description-card">
-                <h4>Синки: что это</h4>
-                <ul>
-                    <li><strong>Kitchen:</strong> синхронизация данных чеков/позиций из Poster в <code>kitchen_stats</code> (для Дашборда/Таблицы/КухняОнлайн).</li>
-                    <li><strong>ProbCloseTime:</strong> расчёт логического времени закрытия позиций (по следующим чекам) — это ВрЛогЗакр.</li>
-                    <li><strong>Menu:</strong> синхронизация меню из Poster в таблицы <code>poster_menu_items</code>, <code>menu_items_*</code>.</li>
-                </ul>
-            </div>
-
             <div class="card">
-                <h3>Статус</h3>
-                <table>
+                <h3>Статус синков</h3>
+                <table class="menu-table">
                     <tr>
-                        <th>Параметр</th>
-                        <th>Значение</th>
-                        <th style="width: 40px;">i</th>
+                        <th>Синк</th>
+                        <th>Последний запуск</th>
+                        <th>Результат</th>
+                        <th>Ошибка</th>
+                        <th>Описание</th>
                     </tr>
-                    <tr>
-                        <td>Menu sync: последняя синхронизация</td>
-                        <td><?= htmlspecialchars($meta['menu_last_sync_at'] ?: '—') ?></td>
-                        <td><span class="info-icon" title="Синхронизация меню из Poster в poster_menu_items и menu_items_*. Используется для страницы Меню/Категории.">i</span></td>
-                    </tr>
-                    <tr>
-                        <td>Menu sync: результат</td>
-                        <td><?= htmlspecialchars($meta['menu_last_sync_result'] ?: '—') ?></td>
-                        <td><span class="info-icon" title="Сводка по синку меню: длительность, сколько позиций/категорий обработано.">i</span></td>
-                    </tr>
-                    <tr>
-                        <td>Menu sync: ошибка</td>
-                        <td><?= htmlspecialchars($meta['menu_last_sync_error'] ?: '—') ?></td>
-                        <td><span class="info-icon" title="Текст последней ошибки синка меню, если синк упал.">i</span></td>
-                    </tr>
+                    <?php foreach ($syncDefs as $d): ?>
+                        <tr>
+                            <td style="font-weight:700;"><?= htmlspecialchars($d['label']) ?></td>
+                            <td><?= htmlspecialchars($meta[$d['at_key']] !== '' ? $meta[$d['at_key']] : '—') ?></td>
+                            <td><?= htmlspecialchars($meta[$d['result_key']] !== '' ? $meta[$d['result_key']] : '—') ?></td>
+                            <td><?= htmlspecialchars($meta[$d['error_key']] !== '' ? $meta[$d['error_key']] : '—') ?></td>
+                            <td class="muted"><?= htmlspecialchars($d['desc']) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
                 </table>
             </div>
 
             <div class="card">
                 <h3>Запуск руками</h3>
                 <div class="muted">Запускает серверные скрипты. Рекомендуется использовать редко и осознанно.</div>
+                <?php
+                    $disabled = strtolower((string)ini_get('disable_functions'));
+                    $canExec = function_exists('exec') && ($disabled === '' || strpos($disabled, 'exec') === false);
+                ?>
                 <form method="post" style="margin-top: 12px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
                     <input type="hidden" name="run_script" value="1">
                     <div class="form-group" style="flex:1; min-width:220px; margin-bottom:0;">
                         <label for="script_name">Скрипт</label>
                         <select name="script_name" id="script_name">
-                            <option value="kitchen_cron">Kitchen cron (сегодня)</option>
-                            <option value="kitchen_resync_range">Kitchen resync range</option>
-                            <option value="kitchen_prob_close">Backfill ProbCloseTime (все даты)</option>
-                            <option value="menu_cron">Menu cron</option>
-                            <option value="tg_alerts">Telegram alerts</option>
+                            <option value="kitchen_cron" data-desc="cron.php — синк кухни за сегодня (kitchen_stats), обновляет Kitchen Online / Dashboard / Rawdata.">Кухня: синк за сегодня</option>
+                            <option value="kitchen_resync_range" data-desc="scripts/kitchen/resync_range.php — пересинк кухни за диапазон дат (аккуратно).">Кухня: пересинк диапазон</option>
+                            <option value="kitchen_prob_close" data-desc="scripts/kitchen/backfill_prob_close_at.php — пересчёт логического закрытия (ProbCloseTime).">Пересчёт ВрЛогЗакр</option>
+                            <option value="menu_cron" data-desc="menu_cron.php — синк меню из Poster (poster_menu_items + справочники).">Меню: синк из Poster</option>
+                            <option value="tg_alerts" data-desc="telegram_alerts.php — отправка/обновление Telegram уведомлений.">Telegram: уведомления</option>
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
@@ -1690,8 +1267,12 @@ if ($tab === 'menu' || $tab === 'categories') {
                         <label for="date_to">До</label>
                         <input type="date" name="date_to" id="date_to" value="<?= htmlspecialchars(date('Y-m-d')) ?>">
                     </div>
-                    <button type="submit">Запустить</button>
+                    <button type="submit" <?= $canExec ? '' : 'disabled' ?>>Запустить</button>
                 </form>
+                <?php if (!$canExec): ?>
+                    <div class="error" style="margin-top:12px;">Запуск недоступен: на сервере отключена функция exec().</div>
+                <?php endif; ?>
+                <div id="script_desc" class="muted" style="margin-top:10px;"></div>
                 <?php
                     if (isset($_POST['run_script'])) {
                         $script = (string)($_POST['script_name'] ?? '');
@@ -1713,7 +1294,9 @@ if ($tab === 'menu' || $tab === 'categories') {
                             $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/telegram_alerts.php');
                         }
 
-                        if ($cmd) {
+                        if (!$canExec) {
+                            echo '<div class="error" style="margin-top:12px;">exec() отключён — запустить нельзя.</div>';
+                        } elseif ($cmd) {
                             $out = [];
                             $code = 0;
                             exec($cmd . ' 2>&1', $out, $code);
@@ -1724,62 +1307,41 @@ if ($tab === 'menu' || $tab === 'categories') {
                         }
                     }
                 ?>
-            </div>
-
-            <?php
-                $listTables = function (\App\Classes\Database $db): array {
-                    $rows = $db->query("SHOW TABLES")->fetchAll(\PDO::FETCH_NUM);
-                    $out = [];
-                    foreach ($rows as $r) {
-                        if (!empty($r[0])) $out[] = (string)$r[0];
-                    }
-                    sort($out);
-                    return $out;
-                };
-                $tables = $listTables($db);
-            ?>
-
-            <div class="card">
-                <h3>Диагностика БД</h3>
-                <div class="muted">Список таблиц в текущей базе данных.</div>
-                <div class="table-wrap" style="margin-top: 12px;">
-                    <table class="menu-table">
-                        <thead>
-                            <tr>
-                                <th>Таблица</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($tables as $t): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($t) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+                <script>
+                    (() => {
+                        const sel = document.getElementById('script_name');
+                        const out = document.getElementById('script_desc');
+                        const upd = () => {
+                            if (!sel || !out) return;
+                            const opt = sel.options[sel.selectedIndex];
+                            out.textContent = opt && opt.dataset && opt.dataset.desc ? opt.dataset.desc : '';
+                        };
+                        if (sel) sel.addEventListener('change', upd);
+                        upd();
+                    })();
+                </script>
             </div>
 
         <?php elseif ($tab === 'telegram'): ?>
         <div class="card">
             <h3>Настройки уведомлений (Telegram)</h3>
             <form method="POST">
-                <div class="settings-grid">
+                <div class="settings-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); max-width: 760px;">
                     <div class="form-group">
                         <label>Тайминг до выс. нагрузки (мин)</label>
-                        <input type="number" name="alert_timing_low_load" value="<?= $settings['alert_timing_low_load'] ?>" required>
+                        <input type="number" name="alert_timing_low_load" value="<?= $settings['alert_timing_low_load'] ?>" required style="max-width: 220px;">
                     </div>
                     <div class="form-group">
                         <label>Порог чеков для выс. нагрузки</label>
-                        <input type="number" name="alert_load_threshold" value="<?= $settings['alert_load_threshold'] ?>" required>
+                        <input type="number" name="alert_load_threshold" value="<?= $settings['alert_load_threshold'] ?>" required style="max-width: 220px;">
                     </div>
                     <div class="form-group">
                         <label>Тайминг при выс. нагрузке (мин)</label>
-                        <input type="number" name="alert_timing_high_load" value="<?= $settings['alert_timing_high_load'] ?>" required>
+                        <input type="number" name="alert_timing_high_load" value="<?= $settings['alert_timing_high_load'] ?>" required style="max-width: 220px;">
                     </div>
                     <div class="form-group">
                         <label>Повтор после "✅ Принято" (мин)</label>
-                        <input type="number" name="alert_ack_snooze_minutes" value="<?= $settings['alert_ack_snooze_minutes'] ?>" required>
+                        <input type="number" name="alert_ack_snooze_minutes" value="<?= $settings['alert_ack_snooze_minutes'] ?>" required style="max-width: 220px;">
                     </div>
                 </div>
                 <button type="submit" name="save_settings">Сохранить настройки</button>
@@ -1791,16 +1353,6 @@ if ($tab === 'menu' || $tab === 'categories') {
                      <input type="checkbox" name="exclude_partners_from_load" value="1" <?= !empty($settings['exclude_partners_from_load']) ? 'checked' : '' ?> onchange="this.form.submit()">
                      ИСКЛЮЧИТЬ СТОЛ "PARTNERS" ИЗ РАСЧЕТА НАГРУЗКИ
                  </label>
-            </form>
-            <form method="POST" style="margin-top: 18px;">
-                <div class="form-group">
-                    <label>Whitelist Telegram для кнопки "✅ Принято"</label>
-                    <textarea name="telegram_ack_whitelist_text" rows="6" placeholder="username - комментарий"><?= htmlspecialchars($telegramAckWhitelistText) ?></textarea>
-                    <div style="color:#65676b; font-size: 13px; margin-top: 8px;">
-                        Формат: <b>username - комментарий</b>. Можно без комментария. Без @.
-                    </div>
-                </div>
-                <button type="submit" name="save_tg_whitelist">Сохранить whitelist</button>
             </form>
         </div>
 
@@ -1814,7 +1366,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 <li><strong>Проверка через Poster:</strong> Перед отправкой по каждой позиции проверяется, что чек всё ещё открыт, и по истории чека определяется готовность (finishedcooking) и удаление позиции (delete/deleteitem или changeitemcount=0).</li>
                 <li><strong>Обновление текста:</strong> Если по позиции уже было сообщение, бот удаляет старое и отправляет новое с актуальным временем ожидания.</li>
                 <li><strong>Подтверждение (✅ Принято):</strong> Нажатие временно отключает алерты на <b><?= (int)$settings['alert_ack_snooze_minutes'] ?></b> минут. Подтверждение применяется ко всем дублям этой позиции в чеке (transaction_date + transaction_id + dish_id + station).</li>
-                <li><strong>Контроль доступа к ✅ Принято:</strong> Нажатия обрабатываются только от Telegram username из whitelist выше. Если username не в списке — показывается ответ "Эта кнопка только для уважаемых людей" и ничего в БД не меняется.</li>
+                <li><strong>Контроль доступа к ✅ Принято:</strong> Обрабатываются только от пользователей, у которых Telegram username указан в разделе "Доступы" и включено право "✅ Принято (Telegram)".</li>
                 <li><strong>Надёжность удаления:</strong> tg_message_id очищается только если Telegram подтвердил удаление (ok=true). Если удалить не удалось — будет повторная попытка в следующих запусках.</li>
             </ul>
         </div>
@@ -1844,7 +1396,15 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <tr>
                         <td><?= htmlspecialchars($user['email']) ?></td>
                         <td><?= htmlspecialchars((string)($user['telegram_username'] ?? '')) ?></td>
-                        <td><?= date('d.m.Y H:i', strtotime($user['created_at'])) ?></td>
+                        <td><?php
+                            $ca = (string)($user['created_at'] ?? '');
+                            if ($ca !== '' && $ca !== '0000-00-00 00:00:00') {
+                                $ts = strtotime($ca);
+                                echo $ts !== false ? date('d.m.Y H:i', $ts) : '—';
+                            } else {
+                                echo '—';
+                            }
+                        ?></td>
                         <td>
                             <?php
                                 $rawPerms = (string)($user['permissions_json'] ?? '');
@@ -1906,51 +1466,18 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <form method="POST" style="margin:0;">
                         <button type="submit" name="autofill_menu" title="Разовая привязка по ID: связывает menu_items.category_id и menu_categories.workshop_id из данных Poster там, где сейчас пусто. Не трогает переводы и ручные значения.">Привязать ID (разово)</button>
                     </form>
-                    <a href="admin.php?tab=menu&export=csv" style="text-decoration:none; font-weight:600; color:#1a73e8;" title="Выгрузка CSV со всеми активными позициями и текущими переводами/категориями.">Экспорт CSV</a>
+                    <a href="admin.php?tab=menu&export=csv" style="text-decoration:none; font-weight:600; color:#1a73e8;" title="Выгрузка CSV со всеми активными позициями и текущими переводами/категориями.">CSV меню</a>
                     <a href="admin.php?tab=menu&export=categories_csv" style="text-decoration:none; font-weight:600; color:#1a73e8;" title="Выгрузка CSV справочников цехов и категорий с переводами.">CSV категорий</a>
                     <?php if (!empty($menuSyncMeta['last_sync_at'])): ?>
                         <span class="muted">Последняя синхронизация: <span class="js-local-dt" data-iso="<?= htmlspecialchars($menuSyncAtIso) ?>"><?= htmlspecialchars($menuSyncMeta['last_sync_at']) ?></span></span>
                     <?php endif; ?>
-                </div>
-                <div class="right">
-                    <a href="admin.php?tab=menu&view=list" style="text-decoration:none; font-weight:600; color:#1a73e8;">Список блюд</a>
-                    <a href="admin.php?tab=menu&view=categories" style="text-decoration:none; font-weight:600; color:#1a73e8;">Категории</a>
-                    <a href="admin.php?tab=menu&view=ko_import" style="text-decoration:none; font-weight:600; color:#1a73e8;">KO импорт</a>
-                    <a href="admin.php?tab=menu&view=tr_import" style="text-decoration:none; font-weight:600; color:#1a73e8;">Импорт переводов</a>
                 </div>
             </div>
             <?php if (!empty($menuSyncMeta['last_sync_error'])): ?>
                 <div style="margin-top:12px;" class="error"><?= htmlspecialchars($menuSyncMeta['last_sync_error']) ?></div>
             <?php endif; ?>
 
-            <?php if ($menuView === 'tr_import'): ?>
-                <div style="margin-top: 18px;">
-                    <h4 style="margin: 0 0 10px;">Импорт переводов блюд и категорий (CSV)</h4>
-                    <div class="muted" style="margin-bottom: 10px;">Поддерживает файл из «Экспорт CSV». Обновляет menu_item_tr (ru/en/vn/ko) и menu_category_tr (ru/en/vn/ko) по Poster ID.</div>
-                    <form method="POST">
-                        <div class="form-group">
-                            <label>Ссылка на CSV (https)</label>
-                            <input name="csv_url" value="<?= htmlspecialchars((string)($_POST['csv_url'] ?? '')) ?>" placeholder="https://..." />
-                        </div>
-                        <div class="muted" style="margin: 8px 0;">или вставьте CSV текстом:</div>
-                        <textarea name="csv_text" rows="10" style="width:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"><?= htmlspecialchars((string)($_POST['csv_text'] ?? '')) ?></textarea>
-                        <div style="margin-top: 10px;">
-                            <button type="submit" name="import_translations_full">Импортировать переводы</button>
-                        </div>
-                    </form>
-                </div>
-            <?php elseif ($menuView === 'ko_import'): ?>
-                <div style="margin-top: 18px;">
-                    <h4 style="margin: 0 0 10px;">Импорт корейских переводов блюд (KO)</h4>
-                    <div class="muted" style="margin-bottom: 10px;">Вставьте CSV в формате: id,ru_title,en_title,vi_title,ko_title,ru_desc,en_desc,vi_desc,ko_desc</div>
-                    <form method="POST">
-                        <textarea name="ko_csv" rows="12" style="width:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"><?= htmlspecialchars((string)($_POST['ko_csv'] ?? '')) ?></textarea>
-                        <div style="margin-top: 10px;">
-                            <button type="submit" name="import_ko_translations">Импортировать KO переводы</button>
-                        </div>
-                    </form>
-                </div>
-            <?php elseif ($menuView === 'categories'): ?>
+            <?php if ($menuView === 'categories'): ?>
                 <div style="margin-top: 18px;">
                     <h4 style="margin: 0 0 10px;">Импорт цехов/категорий (CSV)</h4>
                     <div class="muted" style="margin-bottom: 10px;">Формат: Тип;Poster ID;Parent Poster ID;Raw;RU;EN;VN;KO;Отображать;Sort</div>
@@ -1958,11 +1485,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                         <textarea name="categories_csv" rows="8" style="width:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"><?= htmlspecialchars((string)($_POST['categories_csv'] ?? '')) ?></textarea>
                         <div style="margin-top: 10px;">
                             <button type="submit" name="import_categories_csv">Импортировать категории</button>
-                            <button type="submit" name="import_categories_preset_v2">Импортировать пресет</button>
                         </div>
-                    </form>
-                    <form method="POST" style="margin-top: 10px;">
-                        <button type="submit" name="fix_new_cocktails_to_24">New Cocktails → категория 24</button>
                     </form>
                 </div>
                 <form method="POST" style="margin-top: 18px;">
@@ -2223,17 +1746,46 @@ if ($tab === 'menu' || $tab === 'categories') {
                     $filterWorkshop = ($_GET['workshop_id'] ?? '') !== '' ? (int)$_GET['workshop_id'] : null;
                     $filterCategory = ($_GET['category_id'] ?? '') !== '' ? (int)$_GET['category_id'] : null;
                     $filterQ = trim((string)($_GET['q'] ?? ''));
-                    $filterStatus = trim((string)($_GET['status'] ?? ''));
+                    if (array_key_exists('status', $_GET)) {
+                        $filterStatus = trim((string)($_GET['status'] ?? ''));
+                    } else {
+                        $filterStatus = 'published';
+                    }
                     $sort = strtolower(trim((string)($_GET['sort'] ?? 'main_sort')));
                     if ($sort === 'station') {
                         $sort = 'poster_station';
+                    }
+                    if ($sort === 'poster_category') {
+                        $sort = 'poster_station';
+                    }
+                    if ($sort === 'poster_subcategory') {
+                        $sort = 'poster_category';
+                    }
+                    if (preg_match('/^adapted_category_(ru|en|vn|ko)$/', $sort, $m)) {
+                        $sort = 'adapted_workshop_' . $m[1];
+                    }
+                    if (preg_match('/^adapted_subcategory_(ru|en|vn|ko)$/', $sort, $m)) {
+                        $sort = 'adapted_category_' . $m[1];
                     }
                     $dir = strtolower(trim((string)($_GET['dir'] ?? 'asc')));
                     if (!in_array($dir, ['asc', 'desc'], true)) {
                         $dir = 'asc';
                     }
                     $colsParam = trim((string)($_GET['cols'] ?? ''));
-                    $colsHidden = $colsParam !== '' ? $colsParam : '';
+                    if ($colsParam !== '') {
+                        $parts = array_filter(array_map('trim', explode(',', $colsParam)), static fn($v) => $v !== '');
+                        $mapped = [];
+                        foreach ($parts as $c) {
+                            if ($c === 'poster_category') $c = 'poster_station';
+                            if ($c === 'poster_subcategory') $c = 'poster_category';
+                            if (preg_match('/^adapted_category_(ru|en|vn|ko)$/', $c, $m)) $c = 'adapted_workshop_' . $m[1];
+                            if (preg_match('/^adapted_subcategory_(ru|en|vn|ko)$/', $c, $m)) $c = 'adapted_category_' . $m[1];
+                            $mapped[$c] = true;
+                        }
+                        $colsHidden = implode(',', array_keys($mapped));
+                    } else {
+                        $colsHidden = '';
+                    }
                     $buildSortHref = function (string $key) use ($sort, $dir): string {
                         $qs = $_GET;
                         $qs['tab'] = 'menu';
@@ -2423,7 +1975,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                                            <?= !$isActive ? 'disabled' : '' ?>>
                                 </td>
                                 <td>
-                                    <a href="admin.php?tab=menu&view=edit&poster_id=<?= (int)$it['poster_id'] ?>" style="text-decoration:none; color:#1a73e8; font-weight:600;">Редактировать</a>
+                                    <a href="admin.php?tab=menu&view=edit&poster_id=<?= (int)$it['poster_id'] ?>" style="text-decoration:none; color:#1a73e8; font-weight:800;" title="Редактировать">&#9998;</a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -2689,6 +2241,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 kitchen_online: true,
                 admin: true,
                 exclude_toggle: true,
+                telegram_ack: false,
             };
 
             const close = () => { modal.style.display = 'none'; };

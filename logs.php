@@ -61,7 +61,7 @@ $syncJobs = [
         'label' => 'Menu sync',
         'cron' => '0 * * * *',
         'log' => basename($logMap['menu']),
-        'desc' => 'Обновляет меню: подтягивает блюда и категории из Poster, обновляет цены/станции/категории, сохраняет результат синка.',
+        'desc' => 'Синхронизирует меню из Poster: обновляет слепок poster_menu_items и справочники (цехи/категории/позиции) по poster_id. Не трогает переводы и ручные привязки/публикацию.',
     ],
 ];
 
@@ -115,7 +115,9 @@ $fileInfo = function (string $filePath): array {
         .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
         .pill.ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
         .pill.bad { background: #fdecea; color: #d32f2f; border: 1px solid #f5c2c7; }
-        .info-icon { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid #cbd5e1; color:#1a73e8; font-weight:800; font-size:12px; cursor:help; background:#fff; }
+        .info-icon { position: relative; display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid #cbd5e1; color:#1a73e8; font-weight:800; font-size:12px; cursor:help; background:#fff; }
+        .info-icon::after { content: attr(data-tip); position:absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); min-width: 280px; max-width: 520px; width: max-content; padding: 10px 12px; border-radius: 12px; background: rgba(17, 24, 39, 0.96); color: #fff; font-size: 12px; line-height: 1.35; font-weight: 600; text-transform: none; box-shadow: 0 16px 32px rgba(0,0,0,0.22); opacity: 0; pointer-events: none; transition: opacity 0.12s ease-out; z-index: 2000; }
+        .info-icon:hover::after { opacity: 1; }
     </style>
 </head>
 <body>
@@ -164,7 +166,7 @@ $fileInfo = function (string $filePath): array {
                                 <span class="pill bad">нет</span>
                             <?php endif; ?>
                         </td>
-                        <td><span class="info-icon" title="<?= htmlspecialchars($cronHuman($job['cron']) . ': ' . $job['desc'], ENT_QUOTES) ?>">i</span></td>
+                        <td><span class="info-icon" data-tip="<?= htmlspecialchars($cronHuman($job['cron']) . ': ' . $job['desc'], ENT_QUOTES) ?>">i</span></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -179,7 +181,6 @@ $fileInfo = function (string $filePath): array {
                     <option value="kitchen" <?= $view === 'kitchen' ? 'selected' : '' ?>>Kitchen cron</option>
                     <option value="telegram" <?= $view === 'telegram' ? 'selected' : '' ?>>Telegram alerts</option>
                     <option value="menu" <?= $view === 'menu' ? 'selected' : '' ?>>Menu cron</option>
-                    <option value="codemeal" <?= $view === 'codemeal' ? 'selected' : '' ?>>Codemeal cron</option>
                     <option value="php" <?= $view === 'php' ? 'selected' : '' ?>>PHP errors</option>
                 </select>
             </div>

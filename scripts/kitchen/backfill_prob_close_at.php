@@ -33,13 +33,13 @@ foreach ($dates as $row) {
     if ($date === '' || $date === '0000-00-00') continue;
 
     $readyRows = $db->query(
-        "SELECT receipt_number, station, ready_pressed_at, ready_chass_at
+        "SELECT receipt_number, station, ready_pressed_at
          FROM {$ks}
          WHERE transaction_date = ?
            AND receipt_number REGEXP '^[0-9]+$'
            AND COALESCE(was_deleted, 0) = 0
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
+           AND ready_pressed_at IS NOT NULL",
         [$date]
     )->fetchAll();
 
@@ -49,16 +49,7 @@ foreach ($dates as $row) {
         $station = (string)($r['station'] ?? '');
         if ($receipt <= 0 || $station === '') continue;
 
-        $t1 = $r['ready_pressed_at'] ?? null;
-        $t2 = $r['ready_chass_at'] ?? null;
-        $end = null;
-        if ($t1 && $t2) {
-            $end = strtotime($t1) <= strtotime($t2) ? $t1 : $t2;
-        } elseif ($t1) {
-            $end = $t1;
-        } elseif ($t2) {
-            $end = $t2;
-        }
+        $end = $r['ready_pressed_at'] ?? null;
         if ($end === null) continue;
 
         if (!isset($byReceiptStation[$receipt][$station])) {
@@ -85,8 +76,7 @@ foreach ($dates as $row) {
            AND COALESCE(was_deleted, 0) = 0
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
            AND ticket_sent_at IS NOT NULL
-           AND ready_pressed_at IS NULL
-           AND ready_chass_at IS NULL",
+           AND ready_pressed_at IS NULL",
         [$date]
     )->fetchAll();
 

@@ -57,18 +57,26 @@ if ($ackBy === '') {
 
 try {
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
-    $metaTable = $db->t('system_meta');
+    $usersTable = $db->t('users');
     $ks = $db->t('kitchen_stats');
     $ackAt = date('Y-m-d H:i:s');
 
     $username = strtolower(trim((string)($from['username'] ?? '')));
     $username = ltrim($username, '@');
-    $whitelistRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", ['telegram_ack_whitelist'])->fetch();
-    $whitelist = json_decode((string)($whitelistRow['meta_value'] ?? '{}'), true);
-    if (!is_array($whitelist)) {
-        $whitelist = [];
+    $isAllowed = false;
+    if ($username !== '') {
+        $uRow = $db->query(
+            "SELECT permissions_json
+             FROM {$usersTable}
+             WHERE telegram_username = ?
+             LIMIT 1",
+            [$username]
+        )->fetch();
+        $perms = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
+        if (is_array($perms) && (!empty($perms['telegram_ack']) || !empty($perms['admin']))) {
+            $isAllowed = true;
+        }
     }
-    $isAllowed = $username !== '' && array_key_exists($username, $whitelist);
     if (!$isAllowed) {
         if ($callbackId !== '') {
             $apiBase = "https://api.telegram.org/bot{$tgToken}";

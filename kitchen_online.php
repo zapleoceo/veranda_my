@@ -323,7 +323,6 @@ if ($isAjax) {
                        AND transaction_id = ?
                        AND status = 1
                        AND ready_pressed_at IS NULL
-                       AND ready_chass_at IS NULL
                        AND ticket_sent_at IS NOT NULL
                        AND COALESCE(exclude_from_dashboard, 0) = 0
                        AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
@@ -379,23 +378,40 @@ if ($isAjax) {
             ? (int)$settings['alert_timing_low_load']
             : (int)$settings['alert_timing_high_load'];
 
-        $rows = $db->query(
-            "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
-                    tgm.created_at AS tg_sent_at, tgm.last_edited_at AS tg_last_edit_at
-             FROM {$ks} ks
-             LEFT JOIN {$tgm} tgm ON tgm.kitchen_stats_id = ks.id
-             WHERE transaction_date = ?
-               AND status = 1
-               AND ready_pressed_at IS NULL
-               AND ready_chass_at IS NULL
-               AND ticket_sent_at IS NOT NULL
-               AND COALESCE(was_deleted, 0) = 0
-               AND COALESCE(exclude_from_dashboard, 0) = 0
-               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-               {$stationSql}
-             ORDER BY ticket_sent_at ASC",
-            array_merge([$today], $stationParams)
-        )->fetchAll();
+        try {
+            $rows = $db->query(
+                "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
+                        tgm.created_at AS tg_sent_at, tgm.last_edited_at AS tg_last_edit_at
+                 FROM {$ks} ks
+                 LEFT JOIN {$tgm} tgm ON tgm.kitchen_stats_id = ks.id
+                 WHERE transaction_date = ?
+                   AND status = 1
+                   AND ready_pressed_at IS NULL
+                   AND ticket_sent_at IS NOT NULL
+                   AND COALESCE(was_deleted, 0) = 0
+                   AND COALESCE(exclude_from_dashboard, 0) = 0
+                   AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
+                   {$stationSql}
+                 ORDER BY ticket_sent_at ASC",
+                array_merge([$today], $stationParams)
+            )->fetchAll();
+        } catch (\Throwable $e) {
+            $rows = $db->query(
+                "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
+                        NULL AS tg_sent_at, NULL AS tg_last_edit_at
+                 FROM {$ks} ks
+                 WHERE transaction_date = ?
+                   AND status = 1
+                   AND ready_pressed_at IS NULL
+                   AND ticket_sent_at IS NOT NULL
+                   AND COALESCE(was_deleted, 0) = 0
+                   AND COALESCE(exclude_from_dashboard, 0) = 0
+                   AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
+                   {$stationSql}
+                 ORDER BY ticket_sent_at ASC",
+                array_merge([$today], $stationParams)
+            )->fetchAll();
+        }
 
         $html = $renderCards($rows, $waitLimitMinutes);
         echo json_encode(['ok' => true, 'html' => $html, 'last_sync' => $lastSyncLabel, 'wait_limit_minutes' => $waitLimitMinutes], JSON_UNESCAPED_UNICODE);

@@ -23,6 +23,8 @@ $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
 $tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
+$startedAt = microtime(true);
+
 try {
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
     $ksTable = $db->t('kitchen_stats');
@@ -103,13 +105,13 @@ try {
 
     $computeProbCloseAt = function (string $date) use ($db, $ksTable): array {
         $readyRows = $db->query(
-            "SELECT receipt_number, station, ready_pressed_at, ready_chass_at
+            "SELECT receipt_number, station, ready_pressed_at
              FROM {$ksTable}
              WHERE transaction_date = ?
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-               AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
+               AND ready_pressed_at IS NOT NULL",
             [$date]
         )->fetchAll();
 
@@ -119,16 +121,7 @@ try {
             $station = (string)($r['station'] ?? '');
             if ($receipt <= 0 || $station === '') continue;
 
-            $t1 = $r['ready_pressed_at'] ?? null;
-            $t2 = $r['ready_chass_at'] ?? null;
-            $end = null;
-            if ($t1 && $t2) {
-                $end = strtotime($t1) <= strtotime($t2) ? $t1 : $t2;
-            } elseif ($t1) {
-                $end = $t1;
-            } elseif ($t2) {
-                $end = $t2;
-            }
+            $end = $r['ready_pressed_at'] ?? null;
             if ($end === null) continue;
 
             if (!isset($byReceiptStation[$receipt][$station])) {
@@ -144,13 +137,11 @@ try {
             "SELECT id, receipt_number, station, prob_close_at, ticket_sent_at
              FROM {$ksTable}
              WHERE transaction_date = ?
-               AND status = 1
                AND receipt_number REGEXP '^[0-9]+$'
                AND COALESCE(was_deleted, 0) = 0
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ticket_sent_at IS NOT NULL
-               AND ready_pressed_at IS NULL
-               AND ready_chass_at IS NULL",
+               AND ready_pressed_at IS NULL",
             [$date]
         )->fetchAll();
 
@@ -228,7 +219,6 @@ try {
                AND COALESCE(exclude_from_dashboard, 0) = 0
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ready_pressed_at IS NULL
-               AND ready_chass_at IS NULL
                AND prob_close_at IS NOT NULL",
             [$date]
         )->rowCount();
@@ -242,7 +232,6 @@ try {
                AND COALESCE(exclude_from_dashboard, 0) = 0
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ready_pressed_at IS NULL
-               AND ready_chass_at IS NULL
                AND prob_close_at IS NULL
                AND ticket_sent_at IS NOT NULL
                AND status > 1
@@ -258,7 +247,7 @@ try {
              WHERE transaction_date = ?
                AND exclude_auto = 1
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-               AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
+               AND ready_pressed_at IS NOT NULL",
             [$date]
         )->rowCount();
 
@@ -270,7 +259,6 @@ try {
                AND exclude_auto = 1
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ready_pressed_at IS NULL
-               AND ready_chass_at IS NULL
                AND prob_close_at IS NULL
                AND NOT (
                     ticket_sent_at IS NOT NULL
@@ -299,6 +287,32 @@ try {
     echo "[" . date('Y-m-d H:i:s') . "] Updated sync marker.\n";
     $logger->info('done', ['date' => $dateFrom]);
 
+    $durationMs = (int)round((microtime(true) - $startedAt) * 1000);
+    $resultParts = [];
+    $resultParts[] = 'duration_ms=' . $durationMs;
+    $resultParts[] = 'stats=' . (is_array($stats) ? count($stats) : 0);
+    $resultParts[] = 'close_refreshed=' . (int)$refreshed;
+    $resultParts[] = 'prob_set=' . (int)($prob['set'] ?? 0);
+    $resultParts[] = 'prob_cleared=' . (int)($prob['cleared'] ?? 0);
+    $resultParts[] = 'auto_exclude=' . (int)($autoAny ?? 0);
+
+    $now = date('Y-m-d H:i:s');
+    $db->query(
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+        ['kitchen_last_sync_at', $now]
+    );
+    $db->query(
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+        ['kitchen_last_sync_result', implode(', ', $resultParts)]
+    );
+    $db->query(
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+        ['kitchen_last_sync_error', '']
+    );
+
 } catch (\Exception $e) {
     echo "[" . date('Y-m-d H:i:s') . "] ERROR: " . $e->getMessage() . "\n";
     error_log("Cron sync error: " . $e->getMessage());
@@ -306,6 +320,19 @@ try {
         if (isset($db) && $db instanceof \App\Classes\Database) {
             $logger = new \App\Classes\EventLogger($db, 'cron');
             $logger->error('fatal', ['error' => $e->getMessage()]);
+
+            $metaTable = $db->t('system_meta');
+            $now = date('Y-m-d H:i:s');
+            $db->query(
+                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+                ['kitchen_last_sync_at', $now]
+            );
+            $db->query(
+                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+                ['kitchen_last_sync_error', $e->getMessage()]
+            );
         }
     } catch (\Exception $e2) {
     }

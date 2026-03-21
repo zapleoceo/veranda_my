@@ -116,7 +116,11 @@ try {
                 (TIMESTAMPDIFF(SECOND, ticket_sent_at,
                     CASE
                       WHEN ready_pressed_at IS NOT NULL THEN ready_pressed_at
-                      WHEN ready_chass_at IS NOT NULL THEN ready_chass_at
+                      WHEN prob_close_at IS NOT NULL
+                       AND status > 1
+                       AND transaction_closed_at IS NOT NULL
+                       AND transaction_closed_at <> '0000-00-00 00:00:00'
+                        THEN CASE WHEN prob_close_at < transaction_closed_at THEN prob_close_at ELSE transaction_closed_at END
                       WHEN prob_close_at IS NOT NULL THEN prob_close_at
                       WHEN status > 1 AND transaction_closed_at IS NOT NULL AND transaction_closed_at <> '0000-00-00 00:00:00' THEN transaction_closed_at
                       ELSE NULL
@@ -132,7 +136,6 @@ try {
                 AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                 AND (
                     ready_pressed_at IS NOT NULL
-                 OR ready_chass_at IS NOT NULL
                  OR prob_close_at IS NOT NULL
                  OR (status > 1 AND transaction_closed_at IS NOT NULL AND transaction_closed_at <> '0000-00-00 00:00:00')
                 )
@@ -265,6 +268,14 @@ try {
                     </select>
                 </div>
             </div>
+
+            <div class="filter-group">
+                <label>График</label>
+                <select id="chartType" style="min-width: 180px;">
+                    <option value="bar">Столбики</option>
+                    <option value="line">Линия</option>
+                </select>
+            </div>
             
             <button type="submit">Обновить</button>
         </form>
@@ -356,55 +367,106 @@ try {
         }
     };
 
-    // Chart Kitchen
-    new Chart(document.getElementById('chartKitchen'), {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Среднее время (мин)',
-                    data: <?= json_encode($chartData['2']['avg']) ?>,
-                    backgroundColor: 'rgba(26, 115, 232, 0.6)',
-                    borderColor: 'rgb(26, 115, 232)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Макс. время (мин)',
-                    data: <?= json_encode($chartData['2']['max']) ?>,
-                    backgroundColor: 'rgba(211, 47, 47, 0.4)',
-                    borderColor: 'rgb(211, 47, 47)',
-                    borderWidth: 1
-                }
-            ]
-        },
-        options: options
-    });
+    const chartTypeEl = document.getElementById('chartType');
+    const storageKey = 'dashboard_chart_type';
+    const getType = () => {
+        const t = (localStorage.getItem(storageKey) || '').trim();
+        if (t === 'line' || t === 'bar') return t;
+        return 'bar';
+    };
+    const setType = (t) => {
+        if (t !== 'line' && t !== 'bar') return;
+        localStorage.setItem(storageKey, t);
+    };
 
-    // Chart Bar
-    new Chart(document.getElementById('chartBar'), {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Среднее время (мин)',
-                    data: <?= json_encode($chartData['3']['avg']) ?>,
-                    backgroundColor: 'rgba(46, 125, 50, 0.6)',
-                    borderColor: 'rgb(46, 125, 50)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Макс. время (мин)',
-                    data: <?= json_encode($chartData['3']['max']) ?>,
-                    backgroundColor: 'rgba(211, 47, 47, 0.4)',
-                    borderColor: 'rgb(211, 47, 47)',
-                    borderWidth: 1
-                }
-            ]
-        },
-        options: options
-    });
+    let kitchenChart = null;
+    let barChart = null;
+
+    const buildDataset = (type, label, data, colors) => {
+        const base = {
+            label,
+            data,
+            borderWidth: 2,
+        };
+        if (type === 'line') {
+            return Object.assign(base, {
+                backgroundColor: colors.lineFill,
+                borderColor: colors.lineStroke,
+                pointRadius: 2,
+                tension: 0.25,
+                fill: false,
+            });
+        }
+        return Object.assign(base, {
+            backgroundColor: colors.barFill,
+            borderColor: colors.barStroke,
+            borderWidth: 1,
+        });
+    };
+
+    const renderCharts = (type) => {
+        const kitchenEl = document.getElementById('chartKitchen');
+        const barEl = document.getElementById('chartBar');
+        if (!kitchenEl || !barEl) return;
+
+        if (kitchenChart) { kitchenChart.destroy(); kitchenChart = null; }
+        if (barChart) { barChart.destroy(); barChart = null; }
+
+        kitchenChart = new Chart(kitchenEl, {
+            type,
+            data: {
+                labels,
+                datasets: [
+                    buildDataset(type, 'Среднее время (мин)', <?= json_encode($chartData['2']['avg']) ?>, {
+                        barFill: 'rgba(26, 115, 232, 0.6)',
+                        barStroke: 'rgb(26, 115, 232)',
+                        lineFill: 'rgba(26, 115, 232, 0)',
+                        lineStroke: 'rgb(26, 115, 232)',
+                    }),
+                    buildDataset(type, 'Макс. время (мин)', <?= json_encode($chartData['2']['max']) ?>, {
+                        barFill: 'rgba(211, 47, 47, 0.4)',
+                        barStroke: 'rgb(211, 47, 47)',
+                        lineFill: 'rgba(211, 47, 47, 0)',
+                        lineStroke: 'rgb(211, 47, 47)',
+                    }),
+                ],
+            },
+            options,
+        });
+
+        barChart = new Chart(barEl, {
+            type,
+            data: {
+                labels,
+                datasets: [
+                    buildDataset(type, 'Среднее время (мин)', <?= json_encode($chartData['3']['avg']) ?>, {
+                        barFill: 'rgba(46, 125, 50, 0.6)',
+                        barStroke: 'rgb(46, 125, 50)',
+                        lineFill: 'rgba(46, 125, 50, 0)',
+                        lineStroke: 'rgb(46, 125, 50)',
+                    }),
+                    buildDataset(type, 'Макс. время (мин)', <?= json_encode($chartData['3']['max']) ?>, {
+                        barFill: 'rgba(211, 47, 47, 0.4)',
+                        barStroke: 'rgb(211, 47, 47)',
+                        lineFill: 'rgba(211, 47, 47, 0)',
+                        lineStroke: 'rgb(211, 47, 47)',
+                    }),
+                ],
+            },
+            options,
+        });
+    };
+
+    const initialType = getType();
+    if (chartTypeEl) {
+        chartTypeEl.value = initialType;
+        chartTypeEl.addEventListener('change', () => {
+            const t = chartTypeEl.value;
+            setType(t);
+            renderCharts(t);
+        });
+    }
+    renderCharts(initialType);
     <?php endif; ?>
 
     </script>

@@ -115,7 +115,7 @@ try {
     $query = "SELECT id, transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id,
                      table_number, waiter_name, status, pay_type, close_reason,
                      dish_id, item_seq, dish_category_id, dish_sub_category_id, dish_name,
-                     ticket_sent_at, ready_pressed_at, ready_chass_at, prob_close_at,
+                     ticket_sent_at, ready_pressed_at, prob_close_at,
                      was_deleted, service_type, total_sum, station,
                      exclude_from_dashboard, exclude_auto,
                      tg_message_id, tg_acknowledged, tg_acknowledged_at, tg_acknowledged_by
@@ -263,21 +263,24 @@ try {
                     $logicalCloseAt = null;
                     $logicalCloseTs = 0;
                     $logicalSource = '';
-                    foreach ([
-                        'pstr' => ($row['ready_pressed_at'] ?? null),
-                        'chass' => ($row['ready_chass_at'] ?? null),
-                        'prob' => ($row['prob_close_at'] ?? null),
-                    ] as $src => $t) {
-                        if (empty($t)) continue;
-                        $ts = strtotime($t);
-                        if ($ts === false || $ts <= 0) continue;
-                        if ($ts < $sentTs) continue;
-                        $logicalCloseAt = $t;
-                        $logicalCloseTs = $ts;
-                        $logicalSource = $src;
-                        break;
+                    $pstrAt = $row['ready_pressed_at'] ?? null;
+                    if (!empty($pstrAt)) {
+                        $ts = strtotime($pstrAt);
+                        if ($ts !== false && $ts >= $sentTs) {
+                            $logicalCloseAt = $pstrAt;
+                            $logicalCloseTs = $ts;
+                            $logicalSource = 'pstr';
+                        }
                     }
                     if ($logicalCloseAt === null) {
+                        $candidates = [];
+                        $probAt = $row['prob_close_at'] ?? null;
+                        if (!empty($probAt)) {
+                            $ts = strtotime($probAt);
+                            if ($ts !== false && $ts >= $sentTs) {
+                                $candidates['prob'] = ['ts' => $ts, 'at' => $probAt];
+                            }
+                        }
                         $closedAt = $row['transaction_closed_at'] ?? null;
                         if (
                             !empty($closedAt) &&
@@ -287,9 +290,25 @@ try {
                         ) {
                             $ts = strtotime($closedAt);
                             if ($ts !== false && $ts >= $sentTs) {
-                                $logicalCloseAt = $closedAt;
-                                $logicalCloseTs = $ts;
-                                $logicalSource = 'close';
+                                $candidates['close'] = ['ts' => $ts, 'at' => $closedAt];
+                            }
+                        }
+                        if (!empty($candidates)) {
+                            $bestSrc = null;
+                            $bestTs = 0;
+                            $bestAt = null;
+                            foreach ($candidates as $src => $c) {
+                                $ts = (int)$c['ts'];
+                                if ($bestSrc === null || $ts < $bestTs) {
+                                    $bestSrc = (string)$src;
+                                    $bestTs = $ts;
+                                    $bestAt = (string)$c['at'];
+                                }
+                            }
+                            if ($bestSrc !== null && $bestAt !== null) {
+                                $logicalCloseAt = $bestAt;
+                                $logicalCloseTs = $bestTs;
+                                $logicalSource = $bestSrc;
                             }
                         }
                     }

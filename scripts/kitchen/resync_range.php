@@ -44,13 +44,13 @@ $analytics = new \App\Classes\KitchenAnalytics($api);
 function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
     $ks = $db->t('kitchen_stats');
     $readyRows = $db->query(
-        "SELECT receipt_number, station, ready_pressed_at, ready_chass_at
+        "SELECT receipt_number, station, ready_pressed_at
          FROM {$ks}
          WHERE transaction_date = ?
            AND receipt_number REGEXP '^[0-9]+$'
            AND COALESCE(was_deleted, 0) = 0
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
+           AND ready_pressed_at IS NOT NULL",
         [$date]
     )->fetchAll();
 
@@ -59,16 +59,7 @@ function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
         $receipt = (int)($r['receipt_number'] ?? 0);
         $station = (string)($r['station'] ?? '');
         if ($receipt <= 0 || $station === '') continue;
-        $t1 = $r['ready_pressed_at'] ?? null;
-        $t2 = $r['ready_chass_at'] ?? null;
-        $end = null;
-        if ($t1 && $t2) {
-            $end = strtotime($t1) <= strtotime($t2) ? $t1 : $t2;
-        } elseif ($t1) {
-            $end = $t1;
-        } elseif ($t2) {
-            $end = $t2;
-        }
+        $end = $r['ready_pressed_at'] ?? null;
         if ($end === null) continue;
         if (!isset($byReceiptStation[$receipt][$station])) {
             $byReceiptStation[$receipt][$station] = $end;
@@ -83,13 +74,11 @@ function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
         "SELECT id, receipt_number, station, prob_close_at, ticket_sent_at
          FROM {$ks}
          WHERE transaction_date = ?
-           AND status = 1
            AND receipt_number REGEXP '^[0-9]+$'
            AND COALESCE(was_deleted, 0) = 0
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
            AND ticket_sent_at IS NOT NULL
-           AND ready_pressed_at IS NULL
-           AND ready_chass_at IS NULL",
+           AND ready_pressed_at IS NULL",
         [$date]
     )->fetchAll();
 
@@ -146,7 +135,6 @@ function autoExclude(\App\Classes\Database $db, string $date): array {
            AND COALESCE(exclude_from_dashboard, 0) = 0
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
            AND ready_pressed_at IS NULL
-           AND ready_chass_at IS NULL
            AND prob_close_at IS NOT NULL",
         [$date]
     )->rowCount();
@@ -159,7 +147,6 @@ function autoExclude(\App\Classes\Database $db, string $date): array {
            AND COALESCE(exclude_from_dashboard, 0) = 0
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
            AND ready_pressed_at IS NULL
-           AND ready_chass_at IS NULL
            AND prob_close_at IS NULL
            AND ticket_sent_at IS NOT NULL
            AND status > 1
@@ -174,7 +161,7 @@ function autoExclude(\App\Classes\Database $db, string $date): array {
          WHERE transaction_date = ?
            AND exclude_auto = 1
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND (ready_pressed_at IS NOT NULL OR ready_chass_at IS NOT NULL)",
+           AND ready_pressed_at IS NOT NULL",
         [$date]
     )->rowCount();
     $unset2 = $db->query(
@@ -185,7 +172,6 @@ function autoExclude(\App\Classes\Database $db, string $date): array {
            AND exclude_auto = 1
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
            AND ready_pressed_at IS NULL
-           AND ready_chass_at IS NULL
            AND prob_close_at IS NULL
            AND NOT (
                 ticket_sent_at IS NOT NULL
