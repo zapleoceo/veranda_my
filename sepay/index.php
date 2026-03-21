@@ -47,11 +47,6 @@ try {
     }
 
     $st = $db->t('sepay_transactions');
-    $exists = (int)$db->query("SELECT 1 FROM {$st} WHERE sepay_id = ? LIMIT 1", [$sepayId])->fetchColumn();
-    if ($exists === 1) {
-        echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
 
     $gateway = trim((string)($payload['gateway'] ?? $payload['bank'] ?? ''));
     if ($gateway === '') $gateway = 'Unknown';
@@ -132,8 +127,18 @@ try {
     );
 
     echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
+} catch (\PDOException $e) {
+    $dup = false;
+    if (isset($e->errorInfo) && is_array($e->errorInfo)) {
+        $dup = ((int)($e->errorInfo[1] ?? 0) === 1062);
+    }
+    if ($dup) {
+        echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
+    } else {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
 } catch (\Throwable $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
-

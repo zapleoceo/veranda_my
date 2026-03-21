@@ -10,7 +10,7 @@ $db->createPaydayTables();
 $message = '';
 $error = '';
 
-$date = trim((string)($_GET['date'] ?? ''));
+$date = trim((string)($_GET['date'] ?? ($_POST['date'] ?? '')));
 if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     $date = date('Y-m-d');
 }
@@ -501,19 +501,28 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
         exit;
     }
     try {
-        $db->query("DELETE FROM {$pl} WHERE (poster_transaction_id = ? OR sepay_id = ?) AND is_manual = 1", [$posterId, $sepayId]);
-        if ($mode !== 'delete') {
-            $exists = $db->query("SELECT id FROM {$pl} WHERE poster_transaction_id = ? AND sepay_id = ? AND is_manual = 1 LIMIT 1", [$posterId, $sepayId])->fetch();
-            if (!$exists) {
-                $db->query(
-                    "INSERT INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
-                     VALUES (?, ?, 'manual', 1)
-                     ON DUPLICATE KEY UPDATE link_type = 'manual', is_manual = 1",
-                    [$posterId, $sepayId]
-                );
-            }
+        $existing = $db->query(
+            "SELECT id FROM {$pl} WHERE poster_transaction_id = ? AND sepay_id = ? AND is_manual = 1 LIMIT 1",
+            [$posterId, $sepayId]
+        )->fetch();
+
+        if ($mode === 'delete' || ($mode === 'toggle' && $existing)) {
+            $db->query(
+                "DELETE FROM {$pl} WHERE poster_transaction_id = ? AND sepay_id = ? AND is_manual = 1",
+                [$posterId, $sepayId]
+            );
+            echo json_encode(['ok' => true, 'deleted' => true], JSON_UNESCAPED_UNICODE);
+            exit;
         }
-        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+
+        $db->query("DELETE FROM {$pl} WHERE (poster_transaction_id = ? OR sepay_id = ?) AND is_manual = 1", [$posterId, $sepayId]);
+        $db->query(
+            "INSERT INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
+             VALUES (?, ?, 'manual', 1)
+             ON DUPLICATE KEY UPDATE link_type = 'manual', is_manual = 1",
+            [$posterId, $sepayId]
+        );
+        echo json_encode(['ok' => true, 'created' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -526,7 +535,7 @@ $sepayRows = $db->query(
      FROM {$st}
      WHERE DATE(transaction_date) = ?
        AND transfer_type = 'in'
-       AND (payment_method IS NULL OR payment_method IN ('Card','Bybit','Vietnam Company'))
+       AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))
      ORDER BY transaction_date ASC",
     [$date]
 )->fetchAll();
@@ -618,6 +627,7 @@ $fmtVnd = function (int $v): string {
         tr.row-yellow { background: rgba(255, 193, 7, 0.16); }
         tr.row-red { background: rgba(211, 47, 47, 0.08); }
         tr.row-blue { background: rgba(26, 115, 232, 0.10); }
+        tr.row-gray { background: rgba(107, 114, 128, 0.10); }
         tr.row-selected { outline: 2px solid #1a73e8; outline-offset: -2px; }
         .muted { color: #777; font-size: 12px; }
         .sum { font-weight: 900; white-space: nowrap; }
@@ -627,6 +637,7 @@ $fmtVnd = function (int $v): string {
         tr.row-yellow .anchor { background: #f6c026; }
         tr.row-blue .anchor { background: #1a73e8; }
         tr.row-red .anchor { background: #d32f2f; }
+        tr.row-gray .anchor { background: #6b7280; }
         .actions { display:flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
         .divider { height: 1px; background: #e0e0e0; margin: 12px 0; }
         .finance-row { display:flex; align-items:center; justify-content: space-between; gap: 12px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 12px; }
@@ -686,12 +697,13 @@ $fmtVnd = function (int $v): string {
                                 $link = $linkBySepay[$sid] ?? null;
                                 $cls = 'row-red';
                                 if ($link) {
-                                    $cls = ($link['link_type'] === 'auto_green') ? 'row-green' : (($link['link_type'] === 'auto_yellow') ? 'row-yellow' : 'row-green');
+                                    if (!empty($link['is_manual'])) {
+                                        $cls = 'row-gray';
+                                    } else {
+                                        $cls = ($link['link_type'] === 'auto_green') ? 'row-green' : (($link['link_type'] === 'auto_yellow') ? 'row-yellow' : 'row-green');
+                                    }
                                 }
                                 $pm = (string)($r['payment_method'] ?? '');
-                                if (strtolower($pm) === 'vietnam company') {
-                                    $cls = 'row-blue';
-                                }
                             ?>
                             <tr class="<?= $cls ?>" data-sepay-id="<?= $sid ?>">
                                 <td><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
@@ -733,7 +745,11 @@ $fmtVnd = function (int $v): string {
                                 $link = $linkByPoster[$pid] ?? null;
                                 $cls = 'row-red';
                                 if ($link) {
-                                    $cls = ($link['link_type'] === 'auto_green') ? 'row-green' : (($link['link_type'] === 'auto_yellow') ? 'row-yellow' : 'row-green');
+                                    if (!empty($link['is_manual'])) {
+                                        $cls = 'row-gray';
+                                    } else {
+                                        $cls = ($link['link_type'] === 'auto_green') ? 'row-green' : (($link['link_type'] === 'auto_yellow') ? 'row-yellow' : 'row-green');
+                                    }
                                 }
                                 $pm = (string)($r['payment_method'] ?? '');
                                 if (strtolower($pm) === 'vietnam company') {
@@ -955,4 +971,3 @@ $fmtVnd = function (int $v): string {
 </script>
 </body>
 </html>
-
