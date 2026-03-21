@@ -426,8 +426,8 @@ $dashboardQuery = http_build_query([
     <title>КухняOnline</title>
     <link rel="stylesheet" href="assets/app.css">
     <style>
-        body { font-family: Arial, sans-serif; background: #f5f6fa; margin: 0; padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; }
+        body { font-family: Arial, sans-serif; background: #f5f6fa; margin: 0; padding: 0; }
+        .container { width: 100%; max-width: 1800px; margin: 0 auto; padding: 12px; box-sizing: border-box; }
         .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
         .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; min-width: 0; }
         .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }

@@ -275,7 +275,7 @@ if ($isMenuAjax) {
 }
 
 $menuView = $_GET['view'] ?? 'list';
-if (!in_array($menuView, ['list', 'edit', 'categories', 'ko_import'], true)) {
+if (!in_array($menuView, ['list', 'edit', 'categories', 'ko_import', 'tr_import'], true)) {
     $menuView = 'list';
 }
 if ($tab === 'categories') {
@@ -543,6 +543,232 @@ if ($tab === 'menu' || $tab === 'categories') {
         } catch (\Throwable $e) {
             $error = 'Ошибка импорта KO переводов: ' . $e->getMessage();
             $menuView = 'ko_import';
+        }
+    }
+
+    if (isset($_POST['import_translations_full'])) {
+        try {
+            $rawUrl = trim((string)($_POST['csv_url'] ?? ''));
+            $rawCsv = trim((string)($_POST['csv_text'] ?? ''));
+            if ($rawUrl !== '') {
+                $u = parse_url($rawUrl);
+                $scheme = strtolower((string)($u['scheme'] ?? ''));
+                if (!in_array($scheme, ['https'], true)) {
+                    throw new \Exception('Разрешены только https ссылки.');
+                }
+                $ctx = stream_context_create([
+                    'http' => ['timeout' => 20],
+                    'https' => ['timeout' => 20],
+                ]);
+                $rawCsv = (string)@file_get_contents($rawUrl, false, $ctx);
+                $rawCsv = trim($rawCsv);
+            }
+            if ($rawCsv === '') {
+                throw new \Exception('Вставьте CSV или укажите ссылку на CSV.');
+            }
+
+            $lines = preg_split("/\r\n|\n|\r/", $rawCsv) ?: [];
+            $firstLine = '';
+            foreach ($lines as $l) {
+                $l = trim((string)$l);
+                if ($l !== '') {
+                    $firstLine = $l;
+                    break;
+                }
+            }
+            $delimiter = ';';
+            if ($firstLine !== '') {
+                $semi = substr_count($firstLine, ';');
+                $comma = substr_count($firstLine, ',');
+                if ($comma > $semi) {
+                    $delimiter = ',';
+                }
+            }
+
+            $header = null;
+            $idx = [];
+            $rows = [];
+            $badLines = 0;
+
+            $norm = static function (string $s): string {
+                $s = trim(mb_strtolower($s));
+                $s = preg_replace('/\s+/u', ' ', $s) ?? $s;
+                return $s;
+            };
+
+            foreach ($lines as $line) {
+                $line = trim((string)$line);
+                if ($line === '') continue;
+                $cols = str_getcsv($line, $delimiter);
+                if (!$cols || count($cols) < 2) {
+                    $badLines++;
+                    continue;
+                }
+                if ($header === null) {
+                    $header = array_map(static fn($v) => $norm((string)$v), $cols);
+                    $find = static function (array $header, array $names) {
+                        foreach ($names as $n) {
+                            $i = array_search($n, $header, true);
+                            if ($i !== false) return (int)$i;
+                        }
+                        return null;
+                    };
+                    $idx = [
+                        'poster_id' => $find($header, ['poster id', 'poster_id', 'id']),
+                        'ru_title' => $find($header, ['название ru', 'ru_title']),
+                        'ru_desc' => $find($header, ['описание ru', 'ru_desc']),
+                        'en_title' => $find($header, ['название en', 'en_title']),
+                        'en_desc' => $find($header, ['описание en', 'en_desc']),
+                        'vn_title' => $find($header, ['название vn', 'название vi', 'vn_title', 'vi_title']),
+                        'vn_desc' => $find($header, ['описание vn', 'описание vi', 'vn_desc', 'vi_desc']),
+                        'ko_title' => $find($header, ['название ko', 'ko_title']),
+                        'ko_desc' => $find($header, ['описание ko', 'ko_desc']),
+                        'cat_ru' => $find($header, ['категория адапт. ru', 'category adapted ru', 'adapted_category_ru']),
+                        'cat_en' => $find($header, ['категория адапт. en', 'category adapted en', 'adapted_category_en']),
+                        'cat_vn' => $find($header, ['категория адапт. vn', 'категория адапт. vi', 'category adapted vn', 'adapted_category_vn']),
+                        'cat_ko' => $find($header, ['категория адапт. ko', 'category adapted ko', 'adapted_category_ko']),
+                    ];
+                    if ($idx['poster_id'] === null) {
+                        throw new \Exception('Не нашёл колонку Poster ID в CSV.');
+                    }
+                    continue;
+                }
+
+                $posterId = (int)($cols[$idx['poster_id']] ?? 0);
+                if ($posterId <= 0) {
+                    $badLines++;
+                    continue;
+                }
+
+                $get = static function (array $cols, ?int $i): string {
+                    if ($i === null) return '';
+                    return trim((string)($cols[$i] ?? ''));
+                };
+
+                $rows[] = [
+                    'poster_id' => $posterId,
+                    'ru_title' => $get($cols, $idx['ru_title']),
+                    'ru_desc' => $get($cols, $idx['ru_desc']),
+                    'en_title' => $get($cols, $idx['en_title']),
+                    'en_desc' => $get($cols, $idx['en_desc']),
+                    'vn_title' => $get($cols, $idx['vn_title']),
+                    'vn_desc' => $get($cols, $idx['vn_desc']),
+                    'ko_title' => $get($cols, $idx['ko_title']),
+                    'ko_desc' => $get($cols, $idx['ko_desc']),
+                    'cat_ru' => $get($cols, $idx['cat_ru']),
+                    'cat_en' => $get($cols, $idx['cat_en']),
+                    'cat_vn' => $get($cols, $idx['cat_vn']),
+                    'cat_ko' => $get($cols, $idx['cat_ko']),
+                ];
+            }
+
+            if (empty($rows)) {
+                throw new \Exception('CSV не содержит строк с данными.');
+            }
+
+            $posterIds = [];
+            foreach ($rows as $r) {
+                $posterIds[(int)$r['poster_id']] = true;
+            }
+            $posterIds = array_keys($posterIds);
+
+            $map = [];
+            $chunkSize = 500;
+            for ($o = 0; $o < count($posterIds); $o += $chunkSize) {
+                $chunk = array_slice($posterIds, $o, $chunkSize);
+                $ph = implode(',', array_fill(0, count($chunk), '?'));
+                $dbRows = $db->query(
+                    "SELECT p.poster_id, mi.id item_id, mi.category_id
+                     FROM {$posterMenuItemsTable} p
+                     LEFT JOIN {$menuItemsTable} mi ON mi.poster_item_id = p.id
+                     WHERE p.poster_id IN ({$ph})",
+                    $chunk
+                )->fetchAll();
+                foreach ($dbRows as $dr) {
+                    $pid = (int)($dr['poster_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    $map[$pid] = [
+                        'item_id' => (int)($dr['item_id'] ?? 0),
+                        'category_id' => (int)($dr['category_id'] ?? 0),
+                    ];
+                }
+            }
+
+            $itemUpserts = 0;
+            $categoryUpserts = 0;
+            $missingItems = 0;
+            $missingCategoryLinks = 0;
+
+            $db->query('START TRANSACTION');
+            foreach ($rows as $r) {
+                $pid = (int)$r['poster_id'];
+                $m = $map[$pid] ?? ['item_id' => 0, 'category_id' => 0];
+                $itemId = (int)($m['item_id'] ?? 0);
+                $categoryId = (int)($m['category_id'] ?? 0);
+
+                if ($itemId <= 0) {
+                    $missingItems++;
+                } else {
+                    foreach (['ru', 'en', 'vn', 'ko'] as $lang) {
+                        $tKey = $lang . '_title';
+                        $dKey = $lang . '_desc';
+                        $title = trim((string)($r[$tKey] ?? ''));
+                        $desc = trim((string)($r[$dKey] ?? ''));
+                        if ($title === '' && $desc === '') {
+                            continue;
+                        }
+                        $db->query(
+                            "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description)
+                             VALUES (?, ?, ?, ?)
+                             ON DUPLICATE KEY UPDATE
+                                title = COALESCE(VALUES(title), title),
+                                description = COALESCE(VALUES(description), description)",
+                            [$itemId, $lang, $title !== '' ? $title : null, $desc !== '' ? $desc : null]
+                        );
+                        $itemUpserts++;
+                    }
+                }
+
+                if ($categoryId <= 0) {
+                    $missingCategoryLinks++;
+                } else {
+                    $catByLang = [
+                        'ru' => (string)($r['cat_ru'] ?? ''),
+                        'en' => (string)($r['cat_en'] ?? ''),
+                        'vn' => (string)($r['cat_vn'] ?? ''),
+                        'ko' => (string)($r['cat_ko'] ?? ''),
+                    ];
+                    foreach ($catByLang as $lang => $name) {
+                        $name = trim($name);
+                        if ($name === '') continue;
+                        $db->query(
+                            "INSERT INTO {$menuCategoriesTrTable} (category_id, lang, name)
+                             VALUES (?, ?, ?)
+                             ON DUPLICATE KEY UPDATE name = COALESCE(VALUES(name), name)",
+                            [$categoryId, $lang, $name !== '' ? $name : null]
+                        );
+                        $categoryUpserts++;
+                    }
+                }
+            }
+            $db->query('COMMIT');
+
+            $message = 'Импорт переводов выполнен: ' . json_encode([
+                'rows' => count($rows),
+                'item_tr_upserts' => $itemUpserts,
+                'category_tr_upserts' => $categoryUpserts,
+                'missing_items' => $missingItems,
+                'missing_category_links' => $missingCategoryLinks,
+                'bad_lines' => $badLines,
+            ], JSON_UNESCAPED_UNICODE);
+            $menuView = 'tr_import';
+        } catch (\Throwable $e) {
+            try {
+                $db->query('ROLLBACK');
+            } catch (\Throwable $e2) {
+            }
+            $error = 'Ошибка импорта переводов: ' . $e->getMessage();
+            $menuView = 'tr_import';
         }
     }
 
@@ -909,8 +1135,8 @@ if ($tab === 'menu' || $tab === 'categories') {
     <title>УПРАВЛЕНИЕ - Kitchen Analytics</title>
     <link rel="stylesheet" href="assets/app.css">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; color: #1c1e21; }
-        .container { max-width: 1300px; margin: 0 auto; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 0; color: #1c1e21; }
+        .container { width: 100%; max-width: 1800px; margin: 0 auto; padding: 12px; box-sizing: border-box; }
         h1 { text-align: center; color: #1a73e8; margin-bottom: 30px; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 25px; border: 1px solid #ddd; }
         .form-group { margin-bottom: 20px; }
@@ -1312,13 +1538,30 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <a href="admin.php?tab=menu&view=list" style="text-decoration:none; font-weight:600; color:#1a73e8;">Список блюд</a>
                     <a href="admin.php?tab=menu&view=categories" style="text-decoration:none; font-weight:600; color:#1a73e8;">Категории</a>
                     <a href="admin.php?tab=menu&view=ko_import" style="text-decoration:none; font-weight:600; color:#1a73e8;">KO импорт</a>
+                    <a href="admin.php?tab=menu&view=tr_import" style="text-decoration:none; font-weight:600; color:#1a73e8;">Импорт переводов</a>
                 </div>
             </div>
             <?php if (!empty($menuSyncMeta['last_sync_error'])): ?>
                 <div style="margin-top:12px;" class="error"><?= htmlspecialchars($menuSyncMeta['last_sync_error']) ?></div>
             <?php endif; ?>
 
-            <?php if ($menuView === 'ko_import'): ?>
+            <?php if ($menuView === 'tr_import'): ?>
+                <div style="margin-top: 18px;">
+                    <h4 style="margin: 0 0 10px;">Импорт переводов блюд и категорий (CSV)</h4>
+                    <div class="muted" style="margin-bottom: 10px;">Поддерживает файл из «Экспорт CSV». Обновляет menu_item_tr (ru/en/vn/ko) и menu_category_tr (ru/en/vn/ko) по Poster ID.</div>
+                    <form method="POST">
+                        <div class="form-group">
+                            <label>Ссылка на CSV (https)</label>
+                            <input name="csv_url" value="<?= htmlspecialchars((string)($_POST['csv_url'] ?? '')) ?>" placeholder="https://..." />
+                        </div>
+                        <div class="muted" style="margin: 8px 0;">или вставьте CSV текстом:</div>
+                        <textarea name="csv_text" rows="10" style="width:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"><?= htmlspecialchars((string)($_POST['csv_text'] ?? '')) ?></textarea>
+                        <div style="margin-top: 10px;">
+                            <button type="submit" name="import_translations_full">Импортировать переводы</button>
+                        </div>
+                    </form>
+                </div>
+            <?php elseif ($menuView === 'ko_import'): ?>
                 <div style="margin-top: 18px;">
                     <h4 style="margin: 0 0 10px;">Импорт корейских переводов блюд (KO)</h4>
                     <div class="muted" style="margin-bottom: 10px;">Вставьте CSV в формате: id,ru_title,en_title,vi_title,ko_title,ru_desc,en_desc,vi_desc,ko_desc</div>
