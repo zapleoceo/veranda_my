@@ -275,7 +275,7 @@ if ($isMenuAjax) {
 }
 
 $menuView = $_GET['view'] ?? 'list';
-if (!in_array($menuView, ['list', 'edit', 'categories'], true)) {
+if (!in_array($menuView, ['list', 'edit', 'categories', 'ko_import'], true)) {
     $menuView = 'list';
 }
 if ($tab === 'categories') {
@@ -360,6 +360,98 @@ if ($tab === 'menu' || $tab === 'categories') {
             $message = 'Привязка ID выполнена: ' . json_encode($result, JSON_UNESCAPED_UNICODE);
         } catch (\Throwable $e) {
             $error = 'Ошибка автозаполнения меню: ' . $e->getMessage();
+        }
+    }
+
+    if (isset($_POST['import_ko_translations'])) {
+        try {
+            $raw = (string)($_POST['ko_csv'] ?? '');
+            $raw = trim($raw);
+            if ($raw === '') {
+                throw new \Exception('Вставьте CSV с переводами.');
+            }
+
+            $lines = preg_split("/\r\n|\n|\r/", $raw) ?: [];
+            $header = null;
+            $idIdx = 0;
+            $koTitleIdx = 4;
+            $koDescIdx = 8;
+
+            $upserted = 0;
+            $missingItems = 0;
+            $skipped = 0;
+            $badLines = 0;
+
+            foreach ($lines as $line) {
+                $line = trim((string)$line);
+                if ($line === '') continue;
+                $cols = str_getcsv($line);
+                if (!$cols || count($cols) < 2) {
+                    $badLines++;
+                    continue;
+                }
+
+                if ($header === null) {
+                    $first = strtolower(trim((string)($cols[0] ?? '')));
+                    if ($first === 'id' || $first === 'poster_id') {
+                        $header = array_map(static fn($v) => strtolower(trim((string)$v)), $cols);
+                        $idIdx = array_search('id', $header, true);
+                        if ($idIdx === false) $idIdx = array_search('poster_id', $header, true);
+                        if ($idIdx === false) $idIdx = 0;
+                        $koTitleIdx = array_search('ko_title', $header, true);
+                        if ($koTitleIdx === false) $koTitleIdx = 4;
+                        $koDescIdx = array_search('ko_desc', $header, true);
+                        if ($koDescIdx === false) $koDescIdx = 8;
+                        continue;
+                    }
+                }
+
+                $posterId = (int)($cols[$idIdx] ?? 0);
+                if ($posterId <= 0) {
+                    $badLines++;
+                    continue;
+                }
+
+                $koTitle = trim((string)($cols[$koTitleIdx] ?? ''));
+                $koDesc = trim((string)($cols[$koDescIdx] ?? ''));
+                if ($koTitle === '' && $koDesc === '') {
+                    $skipped++;
+                    continue;
+                }
+
+                $menuItemId = (int)$db->query(
+                    "SELECT mi.id
+                     FROM {$posterMenuItemsTable} p
+                     JOIN {$menuItemsTable} mi ON mi.poster_item_id = p.id
+                     WHERE p.poster_id = ?
+                     LIMIT 1",
+                    [$posterId]
+                )->fetchColumn();
+
+                if ($menuItemId <= 0) {
+                    $missingItems++;
+                    continue;
+                }
+
+                $db->query(
+                    "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description)
+                     VALUES (?, 'ko', ?, ?)
+                     ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
+                    [$menuItemId, $koTitle !== '' ? $koTitle : null, $koDesc !== '' ? $koDesc : null]
+                );
+                $upserted++;
+            }
+
+            $message = 'KO переводы импортированы: ' . json_encode([
+                'upserted' => $upserted,
+                'missing_items' => $missingItems,
+                'skipped_empty' => $skipped,
+                'bad_lines' => $badLines
+            ], JSON_UNESCAPED_UNICODE);
+            $menuView = 'ko_import';
+        } catch (\Throwable $e) {
+            $error = 'Ошибка импорта KO переводов: ' . $e->getMessage();
+            $menuView = 'ko_import';
         }
     }
 
@@ -1127,13 +1219,25 @@ if ($tab === 'menu' || $tab === 'categories') {
                 <div class="right">
                     <a href="admin.php?tab=menu&view=list" style="text-decoration:none; font-weight:600; color:#1a73e8;">Список блюд</a>
                     <a href="admin.php?tab=menu&view=categories" style="text-decoration:none; font-weight:600; color:#1a73e8;">Категории</a>
+                    <a href="admin.php?tab=menu&view=ko_import" style="text-decoration:none; font-weight:600; color:#1a73e8;">KO импорт</a>
                 </div>
             </div>
             <?php if (!empty($menuSyncMeta['last_sync_error'])): ?>
                 <div style="margin-top:12px;" class="error"><?= htmlspecialchars($menuSyncMeta['last_sync_error']) ?></div>
             <?php endif; ?>
 
-            <?php if ($menuView === 'categories'): ?>
+            <?php if ($menuView === 'ko_import'): ?>
+                <div style="margin-top: 18px;">
+                    <h4 style="margin: 0 0 10px;">Импорт корейских переводов блюд (KO)</h4>
+                    <div class="muted" style="margin-bottom: 10px;">Вставьте CSV в формате: id,ru_title,en_title,vi_title,ko_title,ru_desc,en_desc,vi_desc,ko_desc</div>
+                    <form method="POST">
+                        <textarea name="ko_csv" rows="12" style="width:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"><?= htmlspecialchars((string)($_POST['ko_csv'] ?? '')) ?></textarea>
+                        <div style="margin-top: 10px;">
+                            <button type="submit" name="import_ko_translations">Импортировать KO переводы</button>
+                        </div>
+                    </form>
+                </div>
+            <?php elseif ($menuView === 'categories'): ?>
                 <form method="POST" style="margin-top: 18px;">
                     <h4 style="margin: 0 0 10px;">Цехи</h4>
                     <div class="table-wrap">
