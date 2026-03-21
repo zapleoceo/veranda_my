@@ -159,9 +159,9 @@ $telegramAckWhitelistText = implode("\n", $whitelistTextLines);
 $isMenuAjax = ($_GET['ajax'] ?? '') === 'menu_publish';
 if ($isMenuAjax) {
     $pmi = $db->t('poster_menu_items');
-    $miRu = $db->t('menu_items_ru');
-    $miEn = $db->t('menu_items_en');
-    $miVn = $db->t('menu_items_vn');
+    $mi = $db->t('menu_items');
+    $miTr = $db->t('menu_item_tr');
+    $mc = $db->t('menu_categories');
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
@@ -181,13 +181,21 @@ if ($isMenuAjax) {
     }
 
     $row = $db->query(
-        "SELECT p.id poster_item_id, p.is_active,
-                ru.title ru_title, ru.is_published ru_is_published,
-                en.title en_title, vn.title vn_title
+        "SELECT
+                p.id poster_item_id,
+                p.is_active,
+                p.main_category_id,
+                p.sub_category_id,
+                mi.id menu_item_id,
+                mi.is_published,
+                ru.title ru_title,
+                en.title en_title,
+                vn.title vn_title
          FROM {$pmi} p
-         LEFT JOIN {$miRu} ru ON ru.poster_item_id = p.id
-         LEFT JOIN {$miEn} en ON en.poster_item_id = p.id
-         LEFT JOIN {$miVn} vn ON vn.poster_item_id = p.id
+         LEFT JOIN {$mi} mi ON mi.poster_item_id = p.id
+         LEFT JOIN {$miTr} ru ON ru.item_id = mi.id AND ru.lang = 'ru'
+         LEFT JOIN {$miTr} en ON en.item_id = mi.id AND en.lang = 'en'
+         LEFT JOIN {$miTr} vn ON vn.item_id = mi.id AND vn.lang = 'vn'
          WHERE p.poster_id = ?
          LIMIT 1",
         [$posterId]
@@ -200,14 +208,35 @@ if ($isMenuAjax) {
     }
 
     if ((int)$row['is_active'] === 0) {
-        $db->query(
-            "UPDATE {$miRu} ru
-             JOIN {$pmi} p ON p.id = ru.poster_item_id
-             SET ru.is_published = 0
-             WHERE p.poster_id = ?",
-            [$posterId]
-        );
+        $menuItemId = (int)($row['menu_item_id'] ?? 0);
+        if ($menuItemId > 0) {
+            $db->query("UPDATE {$mi} SET is_published = 0 WHERE id = ? LIMIT 1", [$menuItemId]);
+        }
         echo json_encode(['ok' => true, 'is_published' => false, 'disabled' => true, 'reason' => 'not_found'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $menuItemId = (int)($row['menu_item_id'] ?? 0);
+    if ($menuItemId <= 0) {
+        $subPosterCategoryId = (int)($row['sub_category_id'] ?? 0);
+        if ($subPosterCategoryId > 0) {
+            $categoryRow = $db->query("SELECT id FROM {$mc} WHERE poster_id = ? LIMIT 1", [$subPosterCategoryId])->fetch();
+            $categoryId = (int)($categoryRow['id'] ?? 0);
+            if ($categoryId > 0) {
+                $posterItemId = (int)($row['poster_item_id'] ?? 0);
+                $db->query(
+                    "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
+                     VALUES (?, ?, NULL, 0, 0)
+                     ON DUPLICATE KEY UPDATE category_id = VALUES(category_id)",
+                    [$posterItemId, $categoryId]
+                );
+                $menuItemId = (int)$db->query("SELECT id FROM {$mi} WHERE poster_item_id = ? LIMIT 1", [$posterItemId])->fetchColumn();
+            }
+        }
+    }
+    if ($menuItemId <= 0) {
+        http_response_code(409);
+        echo json_encode(['ok' => false, 'error' => 'Нет записи menu_items для этого блюда. Выполните синхронизацию меню из Poster.'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -223,11 +252,8 @@ if ($isMenuAjax) {
     }
 
     $db->query(
-        "UPDATE {$miRu} ru
-         JOIN {$pmi} p ON p.id = ru.poster_item_id
-         SET ru.is_published = ?
-         WHERE p.poster_id = ?",
-        [$isPublished ? 1 : 0, $posterId]
+        "UPDATE {$mi} SET is_published = ? WHERE id = ? LIMIT 1",
+        [$isPublished ? 1 : 0, $menuItemId]
     );
     echo json_encode(['ok' => true, 'is_published' => $isPublished], JSON_UNESCAPED_UNICODE);
     exit;
@@ -245,19 +271,19 @@ $menuTotal = 0;
 $menuPerPage = 50;
 $menuPage = max(1, (int)($_GET['page'] ?? 1));
 $menuEdit = null;
-$menuCategoriesMain = [];
-$menuCategoriesSub = [];
+$menuWorkshops = [];
+$menuCategories = [];
 $menuSyncMeta = ['last_sync_at' => null, 'last_sync_result' => null, 'last_sync_error' => null];
 $menuSyncAtIso = '';
 
 if ($tab === 'menu' || $tab === 'categories') {
     $posterMenuItemsTable = $db->t('poster_menu_items');
-    $menuCategoriesMainTable = $db->t('menu_categories_main');
-    $menuCategoriesSubTable = $db->t('menu_categories_sub');
-    $menuItemsRuTable = $db->t('menu_items_ru');
-    $menuItemsEnTable = $db->t('menu_items_en');
-    $menuItemsVnTable = $db->t('menu_items_vn');
-    $menuItemsKoTable = $db->t('menu_items_ko');
+    $menuWorkshopsTable = $db->t('menu_workshops');
+    $menuWorkshopsTrTable = $db->t('menu_workshop_tr');
+    $menuCategoriesTable = $db->t('menu_categories');
+    $menuCategoriesTrTable = $db->t('menu_category_tr');
+    $menuItemsTable = $db->t('menu_items');
+    $menuItemsTrTable = $db->t('menu_item_tr');
 
     $metaKeys = ['menu_last_sync_at', 'menu_last_sync_result', 'menu_last_sync_error'];
     foreach ($metaKeys as $k) {
@@ -282,6 +308,8 @@ if ($tab === 'menu' || $tab === 'categories') {
 
     if (isset($_POST['sync_menu'])) {
         try {
+            ignore_user_abort(true);
+            @set_time_limit(300);
             if ($posterToken === '') {
                 throw new \Exception('POSTER_API_TOKEN не задан в .env');
             }
@@ -301,10 +329,10 @@ if ($tab === 'menu' || $tab === 'categories') {
                 ['menu_last_sync_error', '']
             );
             $message = 'Меню обновлено из Poster.';
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $db->query(
                 "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
-                ['menu_last_sync_error', $e->getMessage()]
+                ['menu_last_sync_error', $e->getMessage() . ' @ ' . basename((string)$e->getFile()) . ':' . (int)$e->getLine()]
             );
             $error = 'Ошибка обновления меню: ' . $e->getMessage();
         }
@@ -315,7 +343,7 @@ if ($tab === 'menu' || $tab === 'categories') {
             $autofill = new \App\Classes\MenuAutoFill($db);
             $result = $autofill->run();
             $message = 'Автозаполнение меню выполнено: ' . json_encode($result, JSON_UNESCAPED_UNICODE);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $error = 'Ошибка автозаполнения меню: ' . $e->getMessage();
         }
     }
@@ -327,85 +355,67 @@ if ($tab === 'menu' || $tab === 'categories') {
         if ($posterItemId <= 0) {
             $error = 'Позиция не найдена в Poster-таблице.';
         } else {
+            $menuItemRow = $db->query("SELECT id, category_id FROM {$menuItemsTable} WHERE poster_item_id = ? LIMIT 1", [$posterItemId])->fetch();
+            $menuItemId = (int)($menuItemRow['id'] ?? 0);
+            $currentCategoryId = (int)($menuItemRow['category_id'] ?? 0);
+
+            $categoryId = ($_POST['category_id'] ?? '') !== '' ? (int)$_POST['category_id'] : $currentCategoryId;
+            $imageUrl = trim((string)($_POST['image_url'] ?? ''));
+            $sortOrder = (int)($_POST['sort_order'] ?? 0);
+            $isPublished = isset($_POST['is_published']) ? 1 : 0;
+
             $ruTitle = trim((string)($_POST['ru_title'] ?? ''));
-            $ruMainId = ($_POST['ru_main_category_id'] ?? '') !== '' ? (int)$_POST['ru_main_category_id'] : null;
-            $ruSubId = ($_POST['ru_sub_category_id'] ?? '') !== '' ? (int)$_POST['ru_sub_category_id'] : null;
             $ruDescription = trim((string)($_POST['ru_description'] ?? ''));
-            $ruImage = trim((string)($_POST['ru_image_url'] ?? ''));
-            $ruSort = (int)($_POST['ru_sort_order'] ?? 0);
-            $ruPublished = isset($_POST['ru_is_published']) ? 1 : 0;
-
             $enTitle = trim((string)($_POST['en_title'] ?? ''));
-            $enMainId = ($_POST['en_main_category_id'] ?? '') !== '' ? (int)$_POST['en_main_category_id'] : $ruMainId;
-            $enSubId = ($_POST['en_sub_category_id'] ?? '') !== '' ? (int)$_POST['en_sub_category_id'] : $ruSubId;
             $enDescription = trim((string)($_POST['en_description'] ?? ''));
-
             $vnTitle = trim((string)($_POST['vn_title'] ?? ''));
-            $vnMainId = ($_POST['vn_main_category_id'] ?? '') !== '' ? (int)$_POST['vn_main_category_id'] : $ruMainId;
-            $vnSubId = ($_POST['vn_sub_category_id'] ?? '') !== '' ? (int)$_POST['vn_sub_category_id'] : $ruSubId;
             $vnDescription = trim((string)($_POST['vn_description'] ?? ''));
-
             $koTitle = trim((string)($_POST['ko_title'] ?? ''));
-            $koMainId = ($_POST['ko_main_category_id'] ?? '') !== '' ? (int)$_POST['ko_main_category_id'] : $enMainId;
-            $koSubId = ($_POST['ko_sub_category_id'] ?? '') !== '' ? (int)$_POST['ko_sub_category_id'] : $enSubId;
             $koDescription = trim((string)($_POST['ko_description'] ?? ''));
 
             if ((int)($posterRow['is_active'] ?? 1) === 0) {
-                $ruPublished = 0;
+                $isPublished = 0;
             }
-            if ($ruPublished === 1 && ($ruTitle === '' || $enTitle === '' || $vnTitle === '')) {
+            if ($categoryId <= 0) {
+                $error = 'Выберите категорию.';
+            } elseif ($isPublished === 1 && ($ruTitle === '' || $enTitle === '' || $vnTitle === '')) {
                 $error = 'Для публикации заполните названия RU/EN/VN.';
             } else {
                 $db->query(
-                    "INSERT INTO {$menuItemsRuTable}
-                        (poster_item_id, title, main_category_id, sub_category_id, description, image_url, is_published, sort_order)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    "INSERT INTO {$menuItemsTable}
+                        (poster_item_id, category_id, image_url, is_published, sort_order)
+                     VALUES (?, ?, ?, ?, ?)
                      ON DUPLICATE KEY UPDATE
-                        title=VALUES(title),
-                        main_category_id=VALUES(main_category_id),
-                        sub_category_id=VALUES(sub_category_id),
-                        description=VALUES(description),
                         image_url=VALUES(image_url),
                         is_published=VALUES(is_published),
-                        sort_order=VALUES(sort_order)",
-                    [$posterItemId, $ruTitle !== '' ? $ruTitle : null, $ruMainId, $ruSubId, $ruDescription !== '' ? $ruDescription : null, $ruImage !== '' ? $ruImage : null, $ruPublished, $ruSort]
+                        sort_order=VALUES(sort_order),
+                        category_id=VALUES(category_id)",
+                    [$posterItemId, $categoryId, $imageUrl !== '' ? $imageUrl : null, $isPublished, $sortOrder]
                 );
 
-                $db->query(
-                    "INSERT INTO {$menuItemsEnTable}
-                        (poster_item_id, title, main_category_id, sub_category_id, description)
-                     VALUES (?, ?, ?, ?, ?)
-                     ON DUPLICATE KEY UPDATE
-                        title=VALUES(title),
-                        main_category_id=VALUES(main_category_id),
-                        sub_category_id=VALUES(sub_category_id),
-                        description=VALUES(description)",
-                    [$posterItemId, $enTitle !== '' ? $enTitle : null, $enMainId, $enSubId, $enDescription !== '' ? $enDescription : null]
-                );
-
-                $db->query(
-                    "INSERT INTO {$menuItemsVnTable}
-                        (poster_item_id, title, main_category_id, sub_category_id, description)
-                     VALUES (?, ?, ?, ?, ?)
-                     ON DUPLICATE KEY UPDATE
-                        title=VALUES(title),
-                        main_category_id=VALUES(main_category_id),
-                        sub_category_id=VALUES(sub_category_id),
-                        description=VALUES(description)",
-                    [$posterItemId, $vnTitle !== '' ? $vnTitle : null, $vnMainId, $vnSubId, $vnDescription !== '' ? $vnDescription : null]
-                );
-
-                $db->query(
-                    "INSERT INTO {$menuItemsKoTable}
-                        (poster_item_id, title, main_category_id, sub_category_id, description)
-                     VALUES (?, ?, ?, ?, ?)
-                     ON DUPLICATE KEY UPDATE
-                        title=VALUES(title),
-                        main_category_id=VALUES(main_category_id),
-                        sub_category_id=VALUES(sub_category_id),
-                        description=VALUES(description)",
-                    [$posterItemId, $koTitle !== '' ? $koTitle : null, $koMainId, $koSubId, $koDescription !== '' ? $koDescription : null]
-                );
+                $menuItemId = (int)$db->query("SELECT id FROM {$menuItemsTable} WHERE poster_item_id = ? LIMIT 1", [$posterItemId])->fetchColumn();
+                if ($menuItemId > 0) {
+                    $db->query(
+                        "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description) VALUES (?, 'ru', ?, ?)
+                         ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
+                        [$menuItemId, $ruTitle !== '' ? $ruTitle : null, $ruDescription !== '' ? $ruDescription : null]
+                    );
+                    $db->query(
+                        "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description) VALUES (?, 'en', ?, ?)
+                         ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
+                        [$menuItemId, $enTitle !== '' ? $enTitle : null, $enDescription !== '' ? $enDescription : null]
+                    );
+                    $db->query(
+                        "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description) VALUES (?, 'vn', ?, ?)
+                         ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
+                        [$menuItemId, $vnTitle !== '' ? $vnTitle : null, $vnDescription !== '' ? $vnDescription : null]
+                    );
+                    $db->query(
+                        "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description) VALUES (?, 'ko', ?, ?)
+                         ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
+                        [$menuItemId, $koTitle !== '' ? $koTitle : null, $koDescription !== '' ? $koDescription : null]
+                    );
+                }
 
                 $message = 'Блюдо сохранено.';
                 $menuView = 'edit';
@@ -415,26 +425,29 @@ if ($tab === 'menu' || $tab === 'categories') {
     }
 
     if (isset($_POST['save_categories'])) {
-        $mainSort = $_POST['main_sort'] ?? [];
-        if (is_array($mainSort)) {
-            foreach ($mainSort as $id => $sort) {
-                $show = isset($_POST['main_show'][(int)$id]) ? 1 : 0;
-                $db->query("UPDATE {$menuCategoriesMainTable} SET sort_order=?, show_in_menu=? WHERE id=?", [(int)$sort, $show, (int)$id]);
+        $workshopSort = $_POST['workshop_sort'] ?? [];
+        if (is_array($workshopSort)) {
+            foreach ($workshopSort as $id => $sort) {
+                $show = isset($_POST['workshop_show'][(int)$id]) ? 1 : 0;
+                $db->query("UPDATE {$menuWorkshopsTable} SET sort_order=?, show_on_site=? WHERE id=?", [(int)$sort, $show, (int)$id]);
             }
         }
-        $subSort = $_POST['sub_sort'] ?? [];
-        if (is_array($subSort)) {
-            foreach ($subSort as $id => $sort) {
-                $show = isset($_POST['sub_show'][(int)$id]) ? 1 : 0;
-                $parent = $_POST['sub_parent'][(int)$id] ?? null;
+        $categorySort = $_POST['category_sort'] ?? [];
+        if (is_array($categorySort)) {
+            foreach ($categorySort as $id => $sort) {
+                $show = isset($_POST['category_show'][(int)$id]) ? 1 : 0;
+                $parent = $_POST['category_parent'][(int)$id] ?? null;
                 $parent = $parent !== null && $parent !== '' ? (int)$parent : null;
-                $db->query("UPDATE {$menuCategoriesSubTable} SET sort_order=?, show_in_menu=?, main_category_id_override=? WHERE id=?", [(int)$sort, $show, $parent, (int)$id]);
+                if ($parent !== null && $parent > 0) {
+                    $db->query("UPDATE {$menuCategoriesTable} SET workshop_id=?, sort_order=?, show_on_site=? WHERE id=?", [$parent, (int)$sort, $show, (int)$id]);
+                } else {
+                    $db->query("UPDATE {$menuCategoriesTable} SET sort_order=?, show_on_site=? WHERE id=?", [(int)$sort, $show, (int)$id]);
+                }
             }
         }
-        $mainTr = $_POST['main_tr'] ?? [];
-        if (is_array($mainTr)) {
-            $menuCategoriesMainTrTable = $db->t('menu_categories_main_tr');
-            foreach ($mainTr as $id => $langs) {
+        $workshopTr = $_POST['workshop_tr'] ?? [];
+        if (is_array($workshopTr)) {
+            foreach ($workshopTr as $id => $langs) {
                 if (!is_array($langs)) continue;
                 foreach ($langs as $lang => $name) {
                     $lang = strtolower(trim((string)$lang));
@@ -443,17 +456,16 @@ if ($tab === 'menu' || $tab === 'categories') {
                         continue;
                     }
                     $db->query(
-                        "INSERT INTO {$menuCategoriesMainTrTable} (main_category_id, lang, name) VALUES (?, ?, ?)
+                        "INSERT INTO {$menuWorkshopsTrTable} (workshop_id, lang, name) VALUES (?, ?, ?)
                          ON DUPLICATE KEY UPDATE name=VALUES(name)",
                         [(int)$id, $lang, $name]
                     );
                 }
             }
         }
-        $subTr = $_POST['sub_tr'] ?? [];
-        if (is_array($subTr)) {
-            $menuCategoriesSubTrTable = $db->t('menu_categories_sub_tr');
-            foreach ($subTr as $id => $langs) {
+        $categoryTr = $_POST['category_tr'] ?? [];
+        if (is_array($categoryTr)) {
+            foreach ($categoryTr as $id => $langs) {
                 if (!is_array($langs)) continue;
                 foreach ($langs as $lang => $name) {
                     $lang = strtolower(trim((string)$lang));
@@ -462,7 +474,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                         continue;
                     }
                     $db->query(
-                        "INSERT INTO {$menuCategoriesSubTrTable} (sub_category_id, lang, name) VALUES (?, ?, ?)
+                        "INSERT INTO {$menuCategoriesTrTable} (category_id, lang, name) VALUES (?, ?, ?)
                          ON DUPLICATE KEY UPDATE name=VALUES(name)",
                         [(int)$id, $lang, $name]
                     );
@@ -473,40 +485,37 @@ if ($tab === 'menu' || $tab === 'categories') {
         $menuView = 'categories';
     }
 
-    $menuCategoriesMainTrTable = $db->t('menu_categories_main_tr');
-    $menuCategoriesSubTrTable2 = $db->t('menu_categories_sub_tr');
-
-    $menuCategoriesMain = $db->query(
-        "SELECT m.id, m.poster_main_category_id, m.name_raw, m.sort_order,
-                m.show_in_menu,
+    $menuWorkshops = $db->query(
+        "SELECT w.id, w.poster_id, w.name_raw, w.sort_order, w.show_on_site,
                 tr_ru.name name_ru, tr_en.name name_en, tr_vn.name name_vn, tr_ko.name name_ko
-         FROM {$menuCategoriesMainTable} m
-         LEFT JOIN {$menuCategoriesMainTrTable} tr_ru ON tr_ru.main_category_id=m.id AND tr_ru.lang='ru'
-         LEFT JOIN {$menuCategoriesMainTrTable} tr_en ON tr_en.main_category_id=m.id AND tr_en.lang='en'
-         LEFT JOIN {$menuCategoriesMainTrTable} tr_vn ON tr_vn.main_category_id=m.id AND tr_vn.lang='vn'
-         LEFT JOIN {$menuCategoriesMainTrTable} tr_ko ON tr_ko.main_category_id=m.id AND tr_ko.lang='ko'
-         ORDER BY m.sort_order ASC, m.name_raw ASC"
+         FROM {$menuWorkshopsTable} w
+         LEFT JOIN {$menuWorkshopsTrTable} tr_ru ON tr_ru.workshop_id=w.id AND tr_ru.lang='ru'
+         LEFT JOIN {$menuWorkshopsTrTable} tr_en ON tr_en.workshop_id=w.id AND tr_en.lang='en'
+         LEFT JOIN {$menuWorkshopsTrTable} tr_vn ON tr_vn.workshop_id=w.id AND tr_vn.lang='vn'
+         LEFT JOIN {$menuWorkshopsTrTable} tr_ko ON tr_ko.workshop_id=w.id AND tr_ko.lang='ko'
+         ORDER BY w.sort_order ASC, w.name_raw ASC"
     )->fetchAll();
 
-    $menuCategoriesSub = $db->query(
-        "SELECT s.id, s.poster_sub_category_id, s.main_category_id, s.main_category_id_override, s.name_raw, s.sort_order,
-                s.show_in_menu,
+    $menuCategories = $db->query(
+        "SELECT c.id, c.poster_id, c.workshop_id, c.name_raw, c.sort_order, c.show_on_site,
                 tr_ru.name name_ru, tr_en.name name_en, tr_vn.name name_vn, tr_ko.name name_ko
-         FROM {$menuCategoriesSubTable} s
-         LEFT JOIN {$menuCategoriesSubTrTable2} tr_ru ON tr_ru.sub_category_id=s.id AND tr_ru.lang='ru'
-         LEFT JOIN {$menuCategoriesSubTrTable2} tr_en ON tr_en.sub_category_id=s.id AND tr_en.lang='en'
-         LEFT JOIN {$menuCategoriesSubTrTable2} tr_vn ON tr_vn.sub_category_id=s.id AND tr_vn.lang='vn'
-         LEFT JOIN {$menuCategoriesSubTrTable2} tr_ko ON tr_ko.sub_category_id=s.id AND tr_ko.lang='ko'
-         ORDER BY s.sort_order ASC, s.name_raw ASC"
+         FROM {$menuCategoriesTable} c
+         LEFT JOIN {$menuCategoriesTrTable} tr_ru ON tr_ru.category_id=c.id AND tr_ru.lang='ru'
+         LEFT JOIN {$menuCategoriesTrTable} tr_en ON tr_en.category_id=c.id AND tr_en.lang='en'
+         LEFT JOIN {$menuCategoriesTrTable} tr_vn ON tr_vn.category_id=c.id AND tr_vn.lang='vn'
+         LEFT JOIN {$menuCategoriesTrTable} tr_ko ON tr_ko.category_id=c.id AND tr_ko.lang='ko'
+         ORDER BY c.sort_order ASC, c.name_raw ASC"
     )->fetchAll();
 
     $mainItemCounts = [];
     $rows = $db->query(
-        "SELECT ru.main_category_id id, COUNT(*) c
-         FROM {$menuItemsRuTable} ru
-         JOIN {$posterMenuItemsTable} p ON p.id = ru.poster_item_id
-         WHERE p.is_active = 1 AND ru.main_category_id IS NOT NULL
-         GROUP BY ru.main_category_id"
+        "SELECT w.id id, COUNT(*) c
+         FROM {$menuItemsTable} mi
+         JOIN {$posterMenuItemsTable} p ON p.id = mi.poster_item_id
+         JOIN {$menuCategoriesTable} c ON c.id = mi.category_id
+         JOIN {$menuWorkshopsTable} w ON w.id = c.workshop_id
+         WHERE p.is_active = 1
+         GROUP BY w.id"
     )->fetchAll();
     foreach ($rows as $r) {
         $mainItemCounts[(int)$r['id']] = (int)$r['c'];
@@ -525,16 +534,27 @@ if ($tab === 'menu' || $tab === 'categories') {
         $posterId = (int)($_GET['poster_id'] ?? 0);
         if ($posterId > 0) {
             $menuEdit = $db->query(
-                "SELECT p.*, ru.title ru_title, ru.description ru_description, ru.image_url ru_image_url, ru.is_published ru_is_published, ru.sort_order ru_sort_order,
-                        ru.main_category_id ru_main_category_id, ru.sub_category_id ru_sub_category_id,
-                        en.title en_title, en.description en_description, en.main_category_id en_main_category_id, en.sub_category_id en_sub_category_id,
-                        vn.title vn_title, vn.description vn_description, vn.main_category_id vn_main_category_id, vn.sub_category_id vn_sub_category_id,
-                        ko.title ko_title, ko.description ko_description, ko.main_category_id ko_main_category_id, ko.sub_category_id ko_sub_category_id
+                "SELECT
+                        p.*,
+                        mi.id menu_item_id,
+                        mi.category_id,
+                        mi.image_url,
+                        mi.is_published,
+                        mi.sort_order,
+                        ru.title ru_title,
+                        ru.description ru_description,
+                        en.title en_title,
+                        en.description en_description,
+                        vn.title vn_title,
+                        vn.description vn_description,
+                        ko.title ko_title,
+                        ko.description ko_description
                  FROM {$posterMenuItemsTable} p
-                 LEFT JOIN {$menuItemsRuTable} ru ON ru.poster_item_id = p.id
-                 LEFT JOIN {$menuItemsEnTable} en ON en.poster_item_id = p.id
-                 LEFT JOIN {$menuItemsVnTable} vn ON vn.poster_item_id = p.id
-                 LEFT JOIN {$menuItemsKoTable} ko ON ko.poster_item_id = p.id
+                 LEFT JOIN {$menuItemsTable} mi ON mi.poster_item_id = p.id
+                 LEFT JOIN {$menuItemsTrTable} ru ON ru.item_id = mi.id AND ru.lang = 'ru'
+                 LEFT JOIN {$menuItemsTrTable} en ON en.item_id = mi.id AND en.lang = 'en'
+                 LEFT JOIN {$menuItemsTrTable} vn ON vn.item_id = mi.id AND vn.lang = 'vn'
+                 LEFT JOIN {$menuItemsTrTable} ko ON ko.item_id = mi.id AND ko.lang = 'ko'
                  WHERE p.poster_id = ?
                  LIMIT 1",
                 [$posterId]
@@ -546,8 +566,8 @@ if ($tab === 'menu' || $tab === 'categories') {
     }
 
     if ($menuView === 'list') {
-        $filterMain = ($_GET['main_category_id'] ?? '') !== '' ? (int)$_GET['main_category_id'] : null;
-        $filterSub = ($_GET['sub_category_id'] ?? '') !== '' ? (int)$_GET['sub_category_id'] : null;
+        $filterWorkshop = ($_GET['workshop_id'] ?? '') !== '' ? (int)$_GET['workshop_id'] : null;
+        $filterCategory = ($_GET['category_id'] ?? '') !== '' ? (int)$_GET['category_id'] : null;
         $filterQ = trim((string)($_GET['q'] ?? ''));
         $filterStatus = trim((string)($_GET['status'] ?? ''));
         $menuSort = strtolower(trim((string)($_GET['sort'] ?? '')));
@@ -558,13 +578,13 @@ if ($tab === 'menu' || $tab === 'categories') {
         $where = [];
         $params = [];
 
-        if ($filterMain !== null) {
-            $where[] = "COALESCE(ru.main_category_id, en.main_category_id, vn.main_category_id) = ?";
-            $params[] = $filterMain;
+        if ($filterWorkshop !== null) {
+            $where[] = "c.workshop_id = ?";
+            $params[] = $filterWorkshop;
         }
-        if ($filterSub !== null) {
-            $where[] = "COALESCE(ru.sub_category_id, en.sub_category_id, vn.sub_category_id) = ?";
-            $params[] = $filterSub;
+        if ($filterCategory !== null) {
+            $where[] = "mi.category_id = ?";
+            $params[] = $filterCategory;
         }
         if ($filterQ !== '') {
             $where[] = "(p.name_raw LIKE ? OR ru.title LIKE ? OR en.title LIKE ? OR vn.title LIKE ? OR ko.title LIKE ?)";
@@ -576,9 +596,9 @@ if ($tab === 'menu' || $tab === 'categories') {
             $params[] = $like;
         }
         if ($filterStatus === 'published') {
-            $where[] = "ru.is_published = 1 AND p.is_active = 1";
+            $where[] = "COALESCE(mi.is_published, 0) = 1 AND p.is_active = 1";
         } elseif ($filterStatus === 'hidden') {
-            $where[] = "ru.is_published = 0 AND p.is_active = 1";
+            $where[] = "COALESCE(mi.is_published, 0) = 0 AND p.is_active = 1";
         } elseif ($filterStatus === 'not_found') {
             $where[] = "p.is_active = 0";
         } elseif ($filterStatus === 'unadapted') {
@@ -589,10 +609,12 @@ if ($tab === 'menu' || $tab === 'categories') {
         $countRow = $db->query(
             "SELECT COUNT(1) c
              FROM {$posterMenuItemsTable} p
-             LEFT JOIN {$menuItemsRuTable} ru ON ru.poster_item_id = p.id
-             LEFT JOIN {$menuItemsEnTable} en ON en.poster_item_id = p.id
-             LEFT JOIN {$menuItemsVnTable} vn ON vn.poster_item_id = p.id
-             LEFT JOIN {$menuItemsKoTable} ko ON ko.poster_item_id = p.id
+             LEFT JOIN {$menuItemsTable} mi ON mi.poster_item_id = p.id
+             LEFT JOIN {$menuItemsTrTable} ru ON ru.item_id = mi.id AND ru.lang = 'ru'
+             LEFT JOIN {$menuItemsTrTable} en ON en.item_id = mi.id AND en.lang = 'en'
+             LEFT JOIN {$menuItemsTrTable} vn ON vn.item_id = mi.id AND vn.lang = 'vn'
+             LEFT JOIN {$menuItemsTrTable} ko ON ko.item_id = mi.id AND ko.lang = 'ko'
+             LEFT JOIN {$menuCategoriesTable} c ON c.id = mi.category_id
              $whereSql",
             $params
         )->fetch();
@@ -600,7 +622,7 @@ if ($tab === 'menu' || $tab === 'categories') {
 
         $offset = ($menuPage - 1) * $menuPerPage;
         if ($menuSort === 'station') {
-            $menuSort = 'poster_category';
+            $menuSort = 'poster_station';
         }
         $sortMap = [
             'poster_id' => 'p.poster_id',
@@ -609,21 +631,23 @@ if ($tab === 'menu' || $tab === 'categories') {
             'title_vn' => "COALESCE(NULLIF(vn.title,''), p.name_raw)",
             'title_ko' => "COALESCE(NULLIF(ko.title,''), p.name_raw)",
             'price' => 'p.price_raw',
-            'poster_category' => "COALESCE(NULLIF(p.station_name,''), CAST(p.station_id AS CHAR), '')",
-            'poster_subcategory' => "COALESCE(NULLIF(p.main_category_name,''), '')",
-            'adapted_category_ru' => "COALESCE(mtr_ru.name, mc.name_raw, p.main_category_name)",
-            'adapted_category_en' => "COALESCE(mtr_en.name, mc.name_raw, p.main_category_name)",
-            'adapted_category_vn' => "COALESCE(mtr_vn.name, mc.name_raw, p.main_category_name)",
-            'adapted_category_ko' => "COALESCE(mtr_ko.name, mc.name_raw, p.main_category_name)",
-            'adapted_subcategory_ru' => "COALESCE(str_ru.name, sc.name_raw, p.sub_category_name)",
-            'adapted_subcategory_en' => "COALESCE(str_en.name, sc.name_raw, p.sub_category_name)",
-            'adapted_subcategory_vn' => "COALESCE(str_vn.name, sc.name_raw, p.sub_category_name)",
-            'adapted_subcategory_ko' => "COALESCE(str_ko.name, sc.name_raw, p.sub_category_name)",
+            'poster_station' => "COALESCE(NULLIF(p.station_name,''), CAST(p.station_id AS CHAR), '')",
+            'poster_workshop' => "COALESCE(NULLIF(p.main_category_name,''), '')",
+            'poster_category' => "COALESCE(NULLIF(p.sub_category_name,''), '')",
+            'adapted_workshop_ru' => "COALESCE(wtr_ru.name, w.name_raw, p.main_category_name)",
+            'adapted_workshop_en' => "COALESCE(wtr_en.name, w.name_raw, p.main_category_name)",
+            'adapted_workshop_vn' => "COALESCE(wtr_vn.name, w.name_raw, p.main_category_name)",
+            'adapted_workshop_ko' => "COALESCE(wtr_ko.name, w.name_raw, p.main_category_name)",
+            'adapted_category_ru' => "COALESCE(ctr_ru.name, c.name_raw, p.sub_category_name)",
+            'adapted_category_en' => "COALESCE(ctr_en.name, c.name_raw, p.sub_category_name)",
+            'adapted_category_vn' => "COALESCE(ctr_vn.name, c.name_raw, p.sub_category_name)",
+            'adapted_category_ko' => "COALESCE(ctr_ko.name, c.name_raw, p.sub_category_name)",
             'active' => 'p.is_active',
-            'published' => 'ru.is_published',
-            'sort_order' => 'COALESCE(ru.sort_order, 0)',
-            'main_sort' => 'COALESCE(mc.sort_order, 0)',
-            'status' => "CASE WHEN p.is_active = 0 THEN 3 WHEN ru.is_published = 1 THEN 1 ELSE 2 END",
+            'published' => 'COALESCE(mi.is_published, 0)',
+            'sort_order' => 'COALESCE(mi.sort_order, 0)',
+            'main_sort' => 'COALESCE(w.sort_order, 0)',
+            'sub_sort' => 'COALESCE(c.sort_order, 0)',
+            'status' => "CASE WHEN p.is_active = 0 THEN 3 WHEN COALESCE(mi.is_published, 0) = 1 THEN 1 ELSE 2 END",
         ];
         if (!array_key_exists($menuSort, $sortMap)) {
             $menuSort = 'main_sort';
@@ -641,36 +665,35 @@ if ($tab === 'menu' || $tab === 'categories') {
                 p.station_id,
                 p.station_name,
                 ru.title ru_title,
-                ru.is_published,
-                ru.main_category_id ru_main_category_id,
-                ru.sub_category_id ru_sub_category_id,
-                ru.sort_order,
+                COALESCE(mi.is_published, 0) is_published,
+                mi.sort_order,
                 en.title en_title,
                 vn.title vn_title,
                 ko.title ko_title,
-                COALESCE(mtr_ru.name, mc.name_raw, p.main_category_name) adapted_category_ru,
-                COALESCE(mtr_en.name, mc.name_raw, p.main_category_name) adapted_category_en,
-                COALESCE(mtr_vn.name, mc.name_raw, p.main_category_name) adapted_category_vn,
-                COALESCE(mtr_ko.name, mc.name_raw, p.main_category_name) adapted_category_ko,
-                COALESCE(str_ru.name, sc.name_raw, p.sub_category_name) adapted_subcategory_ru,
-                COALESCE(str_en.name, sc.name_raw, p.sub_category_name) adapted_subcategory_en,
-                COALESCE(str_vn.name, sc.name_raw, p.sub_category_name) adapted_subcategory_vn
-                ,COALESCE(str_ko.name, sc.name_raw, p.sub_category_name) adapted_subcategory_ko
+                COALESCE(wtr_ru.name, w.name_raw, p.main_category_name) adapted_workshop_ru,
+                COALESCE(wtr_en.name, w.name_raw, p.main_category_name) adapted_workshop_en,
+                COALESCE(wtr_vn.name, w.name_raw, p.main_category_name) adapted_workshop_vn,
+                COALESCE(wtr_ko.name, w.name_raw, p.main_category_name) adapted_workshop_ko,
+                COALESCE(ctr_ru.name, c.name_raw, p.sub_category_name) adapted_category_ru,
+                COALESCE(ctr_en.name, c.name_raw, p.sub_category_name) adapted_category_en,
+                COALESCE(ctr_vn.name, c.name_raw, p.sub_category_name) adapted_category_vn,
+                COALESCE(ctr_ko.name, c.name_raw, p.sub_category_name) adapted_category_ko
             FROM {$posterMenuItemsTable} p
-            LEFT JOIN {$menuItemsRuTable} ru ON ru.poster_item_id = p.id
-            LEFT JOIN {$menuItemsEnTable} en ON en.poster_item_id = p.id
-            LEFT JOIN {$menuItemsVnTable} vn ON vn.poster_item_id = p.id
-            LEFT JOIN {$menuItemsKoTable} ko ON ko.poster_item_id = p.id
-            LEFT JOIN {$menuCategoriesMainTable} mc ON mc.id = ru.main_category_id
-            LEFT JOIN {$menuCategoriesMainTrTable} mtr_ru ON mtr_ru.main_category_id = mc.id AND mtr_ru.lang='ru'
-            LEFT JOIN {$menuCategoriesMainTrTable} mtr_en ON mtr_en.main_category_id = mc.id AND mtr_en.lang='en'
-            LEFT JOIN {$menuCategoriesMainTrTable} mtr_vn ON mtr_vn.main_category_id = mc.id AND mtr_vn.lang='vn'
-            LEFT JOIN {$menuCategoriesMainTrTable} mtr_ko ON mtr_ko.main_category_id = mc.id AND mtr_ko.lang='ko'
-            LEFT JOIN {$menuCategoriesSubTable} sc ON sc.id = ru.sub_category_id
-            LEFT JOIN {$menuCategoriesSubTrTable2} str_ru ON str_ru.sub_category_id = sc.id AND str_ru.lang='ru'
-            LEFT JOIN {$menuCategoriesSubTrTable2} str_en ON str_en.sub_category_id = sc.id AND str_en.lang='en'
-            LEFT JOIN {$menuCategoriesSubTrTable2} str_vn ON str_vn.sub_category_id = sc.id AND str_vn.lang='vn'
-            LEFT JOIN {$menuCategoriesSubTrTable2} str_ko ON str_ko.sub_category_id = sc.id AND str_ko.lang='ko'
+            LEFT JOIN {$menuItemsTable} mi ON mi.poster_item_id = p.id
+            LEFT JOIN {$menuItemsTrTable} ru ON ru.item_id = mi.id AND ru.lang = 'ru'
+            LEFT JOIN {$menuItemsTrTable} en ON en.item_id = mi.id AND en.lang = 'en'
+            LEFT JOIN {$menuItemsTrTable} vn ON vn.item_id = mi.id AND vn.lang = 'vn'
+            LEFT JOIN {$menuItemsTrTable} ko ON ko.item_id = mi.id AND ko.lang = 'ko'
+            LEFT JOIN {$menuCategoriesTable} c ON c.id = mi.category_id
+            LEFT JOIN {$menuCategoriesTrTable} ctr_ru ON ctr_ru.category_id = c.id AND ctr_ru.lang='ru'
+            LEFT JOIN {$menuCategoriesTrTable} ctr_en ON ctr_en.category_id = c.id AND ctr_en.lang='en'
+            LEFT JOIN {$menuCategoriesTrTable} ctr_vn ON ctr_vn.category_id = c.id AND ctr_vn.lang='vn'
+            LEFT JOIN {$menuCategoriesTrTable} ctr_ko ON ctr_ko.category_id = c.id AND ctr_ko.lang='ko'
+            LEFT JOIN {$menuWorkshopsTable} w ON w.id = c.workshop_id
+            LEFT JOIN {$menuWorkshopsTrTable} wtr_ru ON wtr_ru.workshop_id = w.id AND wtr_ru.lang='ru'
+            LEFT JOIN {$menuWorkshopsTrTable} wtr_en ON wtr_en.workshop_id = w.id AND wtr_en.lang='en'
+            LEFT JOIN {$menuWorkshopsTrTable} wtr_vn ON wtr_vn.workshop_id = w.id AND wtr_vn.lang='vn'
+            LEFT JOIN {$menuWorkshopsTrTable} wtr_ko ON wtr_ko.workshop_id = w.id AND wtr_ko.lang='ko'
             $whereSql
             ORDER BY {$orderBySql}
             LIMIT {$menuPerPage} OFFSET {$offset}
@@ -1097,7 +1120,7 @@ if ($tab === 'menu' || $tab === 'categories') {
 
             <?php if ($menuView === 'categories'): ?>
                 <form method="POST" style="margin-top: 18px;">
-                    <h4 style="margin: 0 0 10px;">Основные категории</h4>
+                    <h4 style="margin: 0 0 10px;">Цехи</h4>
                     <div class="table-wrap">
                     <table class="menu-table">
                         <thead>
@@ -1114,34 +1137,34 @@ if ($tab === 'menu' || $tab === 'categories') {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($menuCategoriesMain as $c): ?>
+                            <?php foreach ($menuWorkshops as $c): ?>
                                 <tr>
-                                    <td><?= (int)$c['poster_main_category_id'] ?></td>
+                                    <td><?= (int)$c['poster_id'] ?></td>
                                     <td><?= htmlspecialchars($c['name_raw']) ?></td>
-                                    <td><input name="main_tr[<?= (int)$c['id'] ?>][ru]" value="<?= htmlspecialchars($c['name_ru'] ?? '') ?>" /></td>
-                                    <td><input name="main_tr[<?= (int)$c['id'] ?>][en]" value="<?= htmlspecialchars($c['name_en'] ?? '') ?>" /></td>
-                                    <td><input name="main_tr[<?= (int)$c['id'] ?>][vn]" value="<?= htmlspecialchars($c['name_vn'] ?? '') ?>" /></td>
-                                    <td><input name="main_tr[<?= (int)$c['id'] ?>][ko]" value="<?= htmlspecialchars($c['name_ko'] ?? '') ?>" /></td>
+                                    <td><input name="workshop_tr[<?= (int)$c['id'] ?>][ru]" value="<?= htmlspecialchars($c['name_ru'] ?? '') ?>" /></td>
+                                    <td><input name="workshop_tr[<?= (int)$c['id'] ?>][en]" value="<?= htmlspecialchars($c['name_en'] ?? '') ?>" /></td>
+                                    <td><input name="workshop_tr[<?= (int)$c['id'] ?>][vn]" value="<?= htmlspecialchars($c['name_vn'] ?? '') ?>" /></td>
+                                    <td><input name="workshop_tr[<?= (int)$c['id'] ?>][ko]" value="<?= htmlspecialchars($c['name_ko'] ?? '') ?>" /></td>
                                     <?php $cnt = (int)($mainItemCounts[(int)$c['id']] ?? 0); ?>
                                     <td style="width:80px; text-align:right;"><?= $cnt ?></td>
                                     <td style="width:110px; text-align:center;">
-                                        <input type="checkbox" name="main_show[<?= (int)$c['id'] ?>]" value="1" <?= !empty($c['show_in_menu']) ? 'checked' : '' ?>>
+                                        <input type="checkbox" name="workshop_show[<?= (int)$c['id'] ?>]" value="1" <?= !empty($c['show_on_site']) ? 'checked' : '' ?>>
                                     </td>
-                                    <td style="width:90px;"><input type="number" name="main_sort[<?= (int)$c['id'] ?>]" value="<?= (int)$c['sort_order'] ?>" /></td>
+                                    <td style="width:90px;"><input type="number" name="workshop_sort[<?= (int)$c['id'] ?>]" value="<?= (int)$c['sort_order'] ?>" /></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                     </div>
 
-                    <h4 style="margin: 18px 0 10px;">Подкатегории</h4>
+                    <h4 style="margin: 18px 0 10px;">Категории</h4>
                     <div class="table-wrap">
                     <table class="menu-table">
                         <thead>
                             <tr>
                                 <th>Poster ID</th>
                                 <th>Raw</th>
-                                <th>Категория</th>
+                                <th>Цех</th>
                                 <th>RU</th>
                                 <th>EN</th>
                                 <th>VN</th>
@@ -1151,30 +1174,30 @@ if ($tab === 'menu' || $tab === 'categories') {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($menuCategoriesSub as $c): ?>
+                            <?php foreach ($menuCategories as $c): ?>
                                 <tr>
-                                    <td><?= (int)$c['poster_sub_category_id'] ?></td>
+                                    <td><?= (int)$c['poster_id'] ?></td>
                                     <td><?= htmlspecialchars($c['name_raw']) ?></td>
                                     <td style="min-width: 220px;">
-                                        <select name="sub_parent[<?= (int)$c['id'] ?>]">
+                                        <select name="category_parent[<?= (int)$c['id'] ?>]">
                                             <option value="">—</option>
-                                            <?php foreach ($menuCategoriesMain as $m): ?>
+                                            <?php foreach ($menuWorkshops as $m): ?>
                                                 <?php
                                                     $mid = (int)$m['id'];
                                                     $mname = $stripNumberPrefix((string)($m['name_ru'] ?? $m['name_raw']));
                                                 ?>
-                                                <option value="<?= $mid ?>" <?= (int)($c['main_category_id_override'] ?? 0) === $mid ? 'selected' : '' ?>><?= htmlspecialchars($mname) ?></option>
+                                                <option value="<?= $mid ?>" <?= (int)($c['workshop_id'] ?? 0) === $mid ? 'selected' : '' ?>><?= htmlspecialchars($mname) ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     </td>
-                                    <td><input name="sub_tr[<?= (int)$c['id'] ?>][ru]" value="<?= htmlspecialchars($c['name_ru'] ?? '') ?>" /></td>
-                                    <td><input name="sub_tr[<?= (int)$c['id'] ?>][en]" value="<?= htmlspecialchars($c['name_en'] ?? '') ?>" /></td>
-                                    <td><input name="sub_tr[<?= (int)$c['id'] ?>][vn]" value="<?= htmlspecialchars($c['name_vn'] ?? '') ?>" /></td>
-                                    <td><input name="sub_tr[<?= (int)$c['id'] ?>][ko]" value="<?= htmlspecialchars($c['name_ko'] ?? '') ?>" /></td>
+                                    <td><input name="category_tr[<?= (int)$c['id'] ?>][ru]" value="<?= htmlspecialchars($c['name_ru'] ?? '') ?>" /></td>
+                                    <td><input name="category_tr[<?= (int)$c['id'] ?>][en]" value="<?= htmlspecialchars($c['name_en'] ?? '') ?>" /></td>
+                                    <td><input name="category_tr[<?= (int)$c['id'] ?>][vn]" value="<?= htmlspecialchars($c['name_vn'] ?? '') ?>" /></td>
+                                    <td><input name="category_tr[<?= (int)$c['id'] ?>][ko]" value="<?= htmlspecialchars($c['name_ko'] ?? '') ?>" /></td>
                                     <td style="width:110px; text-align:center;">
-                                        <input type="checkbox" name="sub_show[<?= (int)$c['id'] ?>]" value="1" <?= !empty($c['show_in_menu']) ? 'checked' : '' ?>>
+                                        <input type="checkbox" name="category_show[<?= (int)$c['id'] ?>]" value="1" <?= !empty($c['show_on_site']) ? 'checked' : '' ?>>
                                     </td>
-                                    <td style="width:90px;"><input type="number" name="sub_sort[<?= (int)$c['id'] ?>]" value="<?= (int)$c['sort_order'] ?>" /></td>
+                                    <td style="width:90px;"><input type="number" name="category_sort[<?= (int)$c['id'] ?>]" value="<?= (int)$c['sort_order'] ?>" /></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -1219,14 +1242,21 @@ if ($tab === 'menu' || $tab === 'categories') {
                             }
                             return (string)$v;
                         };
-                        $ruMainSelected = (int)($menuEdit['ru_main_category_id'] ?? 0);
-                        $ruSubSelected = (int)($menuEdit['ru_sub_category_id'] ?? 0);
-                        $enMainSelected = (int)($menuEdit['en_main_category_id'] ?? $ruMainSelected);
-                        $enSubSelected = (int)($menuEdit['en_sub_category_id'] ?? $ruSubSelected);
-                        $vnMainSelected = (int)($menuEdit['vn_main_category_id'] ?? $ruMainSelected);
-                        $vnSubSelected = (int)($menuEdit['vn_sub_category_id'] ?? $ruSubSelected);
-                        $koMainSelected = (int)($menuEdit['ko_main_category_id'] ?? $enMainSelected);
-                        $koSubSelected = (int)($menuEdit['ko_sub_category_id'] ?? $enSubSelected);
+                        $selectedCategoryId = (int)($menuEdit['category_id'] ?? 0);
+                        $workshopNameById = [];
+                        foreach ($menuWorkshops as $w) {
+                            $wid = (int)($w['id'] ?? 0);
+                            if ($wid <= 0) continue;
+                            $workshopNameById[$wid] = $stripNumberPrefix((string)($w['name_ru'] ?? $w['name_raw']));
+                        }
+                        $categoriesByWorkshop = [];
+                        foreach ($menuCategories as $cat) {
+                            $wid = (int)($cat['workshop_id'] ?? 0);
+                            if (!isset($categoriesByWorkshop[$wid])) {
+                                $categoriesByWorkshop[$wid] = [];
+                            }
+                            $categoriesByWorkshop[$wid][] = $cat;
+                        }
                     ?>
 
                     <div style="border:1px solid #eee; border-radius: 10px; padding: 14px;">
@@ -1248,19 +1278,39 @@ if ($tab === 'menu' || $tab === 'categories') {
 
                     <div style="margin-top: 12px; border:1px solid #eee; border-radius: 10px; padding: 14px;">
                         <div class="muted">Общее (не зависит от языка)</div>
-                        <div class="settings-grid" style="grid-template-columns: 2fr 1fr 1fr; margin-top: 10px;">
+                        <div class="settings-grid" style="grid-template-columns: 2fr 2fr 1fr 1fr; margin-top: 10px;">
+                            <div class="form-group">
+                                <label>Категория</label>
+                                <select name="category_id">
+                                    <option value="">—</option>
+                                    <?php foreach ($menuWorkshops as $w): ?>
+                                        <?php
+                                            $wid = (int)($w['id'] ?? 0);
+                                            $wlabel = $stripNumberPrefix((string)($w['name_ru'] ?? $w['name_raw']));
+                                            $cats = $categoriesByWorkshop[$wid] ?? [];
+                                            if ($wid <= 0 || empty($cats)) continue;
+                                        ?>
+                                        <optgroup label="<?= htmlspecialchars($wlabel !== '' ? $wlabel : ('workshop ' . $wid)) ?>">
+                                            <?php foreach ($cats as $c): ?>
+                                                <?php $cid = (int)($c['id'] ?? 0); $clabel = $stripNumberPrefix((string)($c['name_ru'] ?? $c['name_raw'])); ?>
+                                                <option value="<?= $cid ?>" <?= $selectedCategoryId === $cid ? 'selected' : '' ?>><?= htmlspecialchars($clabel !== '' ? $clabel : ('category ' . $cid)) ?></option>
+                                            <?php endforeach; ?>
+                                        </optgroup>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                             <div class="form-group">
                                 <label>Картинка (Image URL)</label>
-                                <input name="ru_image_url" value="<?= htmlspecialchars((string)($menuEdit['ru_image_url'] ?? '')) ?>" />
+                                <input name="image_url" value="<?= htmlspecialchars((string)($menuEdit['image_url'] ?? '')) ?>" />
                             </div>
                             <div class="form-group">
                                 <label>Порядок сортировки</label>
-                                <input type="number" name="ru_sort_order" value="<?= (int)($menuEdit['ru_sort_order'] ?? 0) ?>" />
+                                <input type="number" name="sort_order" value="<?= (int)($menuEdit['sort_order'] ?? 0) ?>" />
                             </div>
                             <div class="form-group">
                                 <label style="display:block;">Опубликовано</label>
                                 <label style="display:flex; align-items:center; gap:8px; font-size: 14px; margin-top: 10px;">
-                                    <input type="checkbox" name="ru_is_published" value="1" <?= !empty($menuEdit['ru_is_published']) && (int)$menuEdit['is_active'] === 1 ? 'checked' : '' ?> <?= (int)$menuEdit['is_active'] === 1 ? '' : 'disabled' ?>>
+                                    <input type="checkbox" name="is_published" value="1" <?= !empty($menuEdit['is_published']) && (int)$menuEdit['is_active'] === 1 ? 'checked' : '' ?> <?= (int)$menuEdit['is_active'] === 1 ? '' : 'disabled' ?>>
                                 </label>
                                 <?php if ((int)$menuEdit['is_active'] === 0): ?>
                                     <div class="muted" style="margin-top:6px;">Не найдено в Poster: публикация запрещена.</div>
@@ -1277,26 +1327,6 @@ if ($tab === 'menu' || $tab === 'categories') {
                                 <input name="ru_title" value="<?= htmlspecialchars((string)($menuEdit['ru_title'] ?? '')) ?>" />
                             </div>
                             <div class="form-group">
-                                <label>Категория</label>
-                                <select name="ru_main_category_id" class="main-cat" data-lang="ru">
-                                    <option value="">—</option>
-                                    <?php foreach ($menuCategoriesMain as $c): ?>
-                                        <?php $id = (int)$c['id']; $name = $stripNumberPrefix((string)($c['name_ru'] ?? $c['name_raw'])); ?>
-                                        <option value="<?= $id ?>" <?= $ruMainSelected === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Подкатегория</label>
-                                <select name="ru_sub_category_id" class="sub-cat" data-lang="ru">
-                                    <option value="">—</option>
-                                    <?php foreach ($menuCategoriesSub as $c): ?>
-                                        <?php $id = (int)$c['id']; $name = $stripNumberPrefix((string)($c['name_ru'] ?? $c['name_raw'])); $mainId = (int)($c['main_category_id_override'] ?? 0); if ($mainId <= 0) $mainId = (int)($c['main_category_id'] ?? 0); ?>
-                                        <option value="<?= $id ?>" data-main="<?= $mainId ?>" <?= $ruSubSelected === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="form-group">
                                 <label>Описание</label>
                                 <textarea name="ru_description" rows="8"><?= htmlspecialchars((string)($menuEdit['ru_description'] ?? '')) ?></textarea>
                             </div>
@@ -1307,26 +1337,6 @@ if ($tab === 'menu' || $tab === 'categories') {
                             <div class="form-group">
                                 <label>Title</label>
                                 <input name="en_title" value="<?= htmlspecialchars((string)($menuEdit['en_title'] ?? '')) ?>" />
-                            </div>
-                            <div class="form-group">
-                                <label>Category</label>
-                                <select name="en_main_category_id" class="main-cat" data-lang="en">
-                                    <option value="">—</option>
-                                    <?php foreach ($menuCategoriesMain as $c): ?>
-                                        <?php $id = (int)$c['id']; $name = $stripNumberPrefix((string)($c['name_en'] ?? $c['name_raw'])); ?>
-                                        <option value="<?= $id ?>" <?= $enMainSelected === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Subcategory</label>
-                                <select name="en_sub_category_id" class="sub-cat" data-lang="en">
-                                    <option value="">—</option>
-                                    <?php foreach ($menuCategoriesSub as $c): ?>
-                                        <?php $id = (int)$c['id']; $name = $stripNumberPrefix((string)($c['name_en'] ?? $c['name_raw'])); $mainId = (int)($c['main_category_id_override'] ?? 0); if ($mainId <= 0) $mainId = (int)($c['main_category_id'] ?? 0); ?>
-                                        <option value="<?= $id ?>" data-main="<?= $mainId ?>" <?= $enSubSelected === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
                             </div>
                             <div class="form-group">
                                 <label>Description</label>
@@ -1341,26 +1351,6 @@ if ($tab === 'menu' || $tab === 'categories') {
                                 <input name="vn_title" value="<?= htmlspecialchars((string)($menuEdit['vn_title'] ?? '')) ?>" />
                             </div>
                             <div class="form-group">
-                                <label>Danh mục</label>
-                                <select name="vn_main_category_id" class="main-cat" data-lang="vn">
-                                    <option value="">—</option>
-                                    <?php foreach ($menuCategoriesMain as $c): ?>
-                                        <?php $id = (int)$c['id']; $name = $stripNumberPrefix((string)($c['name_vn'] ?? $c['name_raw'])); ?>
-                                        <option value="<?= $id ?>" <?= $vnMainSelected === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Danh mục con</label>
-                                <select name="vn_sub_category_id" class="sub-cat" data-lang="vn">
-                                    <option value="">—</option>
-                                    <?php foreach ($menuCategoriesSub as $c): ?>
-                                        <?php $id = (int)$c['id']; $name = $stripNumberPrefix((string)($c['name_vn'] ?? $c['name_raw'])); $mainId = (int)($c['main_category_id_override'] ?? 0); if ($mainId <= 0) $mainId = (int)($c['main_category_id'] ?? 0); ?>
-                                        <option value="<?= $id ?>" data-main="<?= $mainId ?>" <?= $vnSubSelected === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="form-group">
                                 <label>Mô tả</label>
                                 <textarea name="vn_description" rows="8"><?= htmlspecialchars((string)($menuEdit['vn_description'] ?? '')) ?></textarea>
                             </div>
@@ -1373,72 +1363,24 @@ if ($tab === 'menu' || $tab === 'categories') {
                                 <input name="ko_title" value="<?= htmlspecialchars((string)($menuEdit['ko_title'] ?? '')) ?>" />
                             </div>
                             <div class="form-group">
-                                <label>카테고리</label>
-                                <select name="ko_main_category_id" class="main-cat" data-lang="ko">
-                                    <option value="">—</option>
-                                    <?php foreach ($menuCategoriesMain as $c): ?>
-                                        <?php $id = (int)$c['id']; $name = $stripNumberPrefix((string)($c['name_ko'] ?? $c['name_en'] ?? $c['name_raw'])); ?>
-                                        <option value="<?= $id ?>" <?= $koMainSelected === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>하위 카테고리</label>
-                                <select name="ko_sub_category_id" class="sub-cat" data-lang="ko">
-                                    <option value="">—</option>
-                                    <?php foreach ($menuCategoriesSub as $c): ?>
-                                        <?php $id = (int)$c['id']; $name = $stripNumberPrefix((string)($c['name_ko'] ?? $c['name_en'] ?? $c['name_raw'])); $mainId = (int)($c['main_category_id_override'] ?? 0); if ($mainId <= 0) $mainId = (int)($c['main_category_id'] ?? 0); ?>
-                                        <option value="<?= $id ?>" data-main="<?= $mainId ?>" <?= $koSubSelected === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="form-group">
                                 <label>설명</label>
                                 <textarea name="ko_description" rows="8"><?= htmlspecialchars((string)($menuEdit['ko_description'] ?? '')) ?></textarea>
                             </div>
                         </div>
                     </div>
-
-                    <script>
-                        (() => {
-                            const filterSub = (lang) => {
-                                const main = document.querySelector(`select.main-cat[data-lang="${lang}"]`);
-                                const sub = document.querySelector(`select.sub-cat[data-lang="${lang}"]`);
-                                if (!main || !sub) return;
-                                const mainId = parseInt(main.value || '0', 10);
-                                const prev = sub.value;
-                                let hasPrev = false;
-                                Array.from(sub.options).forEach((opt) => {
-                                    if (!opt.value) return;
-                                    const optMain = parseInt(opt.getAttribute('data-main') || '0', 10);
-                                    const show = mainId === 0 || optMain === 0 || optMain === mainId;
-                                    opt.hidden = !show;
-                                    if (opt.value === prev && show) hasPrev = true;
-                                });
-                                if (prev && !hasPrev) sub.value = '';
-                            };
-                            ['ru','en','vn','ko'].forEach((lang) => {
-                                const main = document.querySelector(`select.main-cat[data-lang="${lang}"]`);
-                                if (main) {
-                                    main.addEventListener('change', () => filterSub(lang));
-                                    filterSub(lang);
-                                }
-                            });
-                        })();
-                    </script>
                     <div style="margin-top: 14px;">
                         <button type="submit" name="save_menu_item">Сохранить блюдо</button>
                     </div>
                 </form>
             <?php else: ?>
                 <?php
-                    $filterMain = ($_GET['main_category_id'] ?? '') !== '' ? (int)$_GET['main_category_id'] : null;
-                    $filterSub = ($_GET['sub_category_id'] ?? '') !== '' ? (int)$_GET['sub_category_id'] : null;
+                    $filterWorkshop = ($_GET['workshop_id'] ?? '') !== '' ? (int)$_GET['workshop_id'] : null;
+                    $filterCategory = ($_GET['category_id'] ?? '') !== '' ? (int)$_GET['category_id'] : null;
                     $filterQ = trim((string)($_GET['q'] ?? ''));
                     $filterStatus = trim((string)($_GET['status'] ?? ''));
                     $sort = strtolower(trim((string)($_GET['sort'] ?? 'main_sort')));
                     if ($sort === 'station') {
-                        $sort = 'poster_category';
+                        $sort = 'poster_station';
                     }
                     $dir = strtolower(trim((string)($_GET['dir'] ?? 'asc')));
                     if (!in_array($dir, ['asc', 'desc'], true)) {
@@ -1470,16 +1412,17 @@ if ($tab === 'menu' || $tab === 'categories') {
                         'title_vn' => ['label' => 'Название VN', 'default' => false],
                         'title_ko' => ['label' => 'Название KO', 'default' => false],
                         'price' => ['label' => 'Цена', 'default' => true],
-                        'poster_category' => ['label' => 'Станция Poster', 'default' => true],
-                        'poster_subcategory' => ['label' => 'Категория Poster', 'default' => true],
+                        'poster_station' => ['label' => 'Станция Poster', 'default' => true],
+                        'poster_workshop' => ['label' => 'Цех Poster', 'default' => false],
+                        'poster_category' => ['label' => 'Категория Poster', 'default' => true],
+                        'adapted_workshop_ru' => ['label' => 'Цех адапт. RU', 'default' => false],
+                        'adapted_workshop_en' => ['label' => 'Цех адапт. EN', 'default' => false],
+                        'adapted_workshop_vn' => ['label' => 'Цех адапт. VN', 'default' => false],
+                        'adapted_workshop_ko' => ['label' => 'Цех адапт. KO', 'default' => false],
                         'adapted_category_ru' => ['label' => 'Категория адапт. RU', 'default' => false],
                         'adapted_category_en' => ['label' => 'Категория адапт. EN', 'default' => false],
                         'adapted_category_vn' => ['label' => 'Категория адапт. VN', 'default' => false],
                         'adapted_category_ko' => ['label' => 'Категория адапт. KO', 'default' => false],
-                        'adapted_subcategory_ru' => ['label' => 'Подкатегория адапт. RU', 'default' => false],
-                        'adapted_subcategory_en' => ['label' => 'Подкатегория адапт. EN', 'default' => false],
-                        'adapted_subcategory_vn' => ['label' => 'Подкатегория адапт. VN', 'default' => false],
-                        'adapted_subcategory_ko' => ['label' => 'Подкатегория адапт. KO', 'default' => false],
                         'status' => ['label' => 'Статус', 'default' => true],
                     ];
                     $pages = max(1, (int)ceil($menuTotal / $menuPerPage));
@@ -1491,22 +1434,34 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <input type="hidden" name="dir" value="<?= htmlspecialchars($dir) ?>">
                     <input type="hidden" name="cols" value="<?= htmlspecialchars($colsHidden) ?>">
                     <div class="form-group">
-                        <label>Категория</label>
-                        <select name="main_category_id">
+                        <label>Цех</label>
+                        <select name="workshop_id">
                             <option value="">Все</option>
-                            <?php foreach ($menuCategoriesMain as $c): ?>
-                                <?php $id = (int)$c['id']; $name = $stripNumberPrefix((string)($c['name_ru'] ?? $c['name_raw'])); ?>
-                                <option value="<?= $id ?>" <?= $filterMain === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                            <?php foreach ($menuWorkshops as $w): ?>
+                                <?php $id = (int)$w['id']; $name = $stripNumberPrefix((string)($w['name_ru'] ?? $w['name_raw'])); ?>
+                                <option value="<?= $id ?>" <?= $filterWorkshop === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Подкатегория</label>
-                        <select name="sub_category_id">
+                        <label>Категория</label>
+                        <select name="category_id">
                             <option value="">Все</option>
-                            <?php foreach ($menuCategoriesSub as $c): ?>
-                                <?php $id = (int)$c['id']; $name = $stripNumberPrefix((string)($c['name_ru'] ?? $c['name_raw'])); ?>
-                                <option value="<?= $id ?>" <?= $filterSub === $id ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
+                            <?php foreach ($menuCategories as $c): ?>
+                                <?php
+                                    $id = (int)$c['id'];
+                                    $catName = $stripNumberPrefix((string)($c['name_ru'] ?? $c['name_raw']));
+                                    $wid = (int)($c['workshop_id'] ?? 0);
+                                    $wName = '';
+                                    foreach ($menuWorkshops as $w) {
+                                        if ((int)($w['id'] ?? 0) === $wid) {
+                                            $wName = $stripNumberPrefix((string)($w['name_ru'] ?? $w['name_raw']));
+                                            break;
+                                        }
+                                    }
+                                    $label = $wName !== '' ? ($wName . ' / ' . $catName) : $catName;
+                                ?>
+                                <option value="<?= $id ?>" <?= $filterCategory === $id ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -1554,16 +1509,17 @@ if ($tab === 'menu' || $tab === 'categories') {
                             <th data-col="title_vn"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('title_vn')) ?>">VN <span class="sort-arrow"><?= $sortArrow('title_vn') ?></span></a></th>
                             <th data-col="title_ko"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('title_ko')) ?>">KO <span class="sort-arrow"><?= $sortArrow('title_ko') ?></span></a></th>
                             <th data-col="price"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('price')) ?>">Цена <span class="sort-arrow"><?= $sortArrow('price') ?></span></a></th>
-                            <th data-col="poster_category"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('poster_category')) ?>">Станция Poster <span class="sort-arrow"><?= $sortArrow('poster_category') ?></span></a></th>
-                            <th data-col="poster_subcategory"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('poster_subcategory')) ?>">Категория Poster <span class="sort-arrow"><?= $sortArrow('poster_subcategory') ?></span></a></th>
+                            <th data-col="poster_station"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('poster_station')) ?>">Станция Poster <span class="sort-arrow"><?= $sortArrow('poster_station') ?></span></a></th>
+                            <th data-col="poster_workshop"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('poster_workshop')) ?>">Цех Poster <span class="sort-arrow"><?= $sortArrow('poster_workshop') ?></span></a></th>
+                            <th data-col="poster_category"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('poster_category')) ?>">Категория Poster <span class="sort-arrow"><?= $sortArrow('poster_category') ?></span></a></th>
+                            <th data-col="adapted_workshop_ru"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_ru')) ?>">Цех адапт. RU <span class="sort-arrow"><?= $sortArrow('adapted_workshop_ru') ?></span></a></th>
+                            <th data-col="adapted_workshop_en"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_en')) ?>">Цех адапт. EN <span class="sort-arrow"><?= $sortArrow('adapted_workshop_en') ?></span></a></th>
+                            <th data-col="adapted_workshop_vn"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_vn')) ?>">Цех адапт. VN <span class="sort-arrow"><?= $sortArrow('adapted_workshop_vn') ?></span></a></th>
+                            <th data-col="adapted_workshop_ko"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_ko')) ?>">Цех адапт. KO <span class="sort-arrow"><?= $sortArrow('adapted_workshop_ko') ?></span></a></th>
                             <th data-col="adapted_category_ru"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_category_ru')) ?>">Категория адапт. RU <span class="sort-arrow"><?= $sortArrow('adapted_category_ru') ?></span></a></th>
                             <th data-col="adapted_category_en"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_category_en')) ?>">Категория адапт. EN <span class="sort-arrow"><?= $sortArrow('adapted_category_en') ?></span></a></th>
                             <th data-col="adapted_category_vn"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_category_vn')) ?>">Категория адапт. VN <span class="sort-arrow"><?= $sortArrow('adapted_category_vn') ?></span></a></th>
                             <th data-col="adapted_category_ko"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_category_ko')) ?>">Категория адапт. KO <span class="sort-arrow"><?= $sortArrow('adapted_category_ko') ?></span></a></th>
-                            <th data-col="adapted_subcategory_ru"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_subcategory_ru')) ?>">Подкатегория адапт. RU <span class="sort-arrow"><?= $sortArrow('adapted_subcategory_ru') ?></span></a></th>
-                            <th data-col="adapted_subcategory_en"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_subcategory_en')) ?>">Подкатегория адапт. EN <span class="sort-arrow"><?= $sortArrow('adapted_subcategory_en') ?></span></a></th>
-                            <th data-col="adapted_subcategory_vn"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_subcategory_vn')) ?>">Подкатегория адапт. VN <span class="sort-arrow"><?= $sortArrow('adapted_subcategory_vn') ?></span></a></th>
-                            <th data-col="adapted_subcategory_ko"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_subcategory_ko')) ?>">Подкатегория адапт. KO <span class="sort-arrow"><?= $sortArrow('adapted_subcategory_ko') ?></span></a></th>
                             <th data-col="status"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('status')) ?>">Статус <span class="sort-arrow"><?= $sortArrow('status') ?></span></a></th>
                             <th>Скрыть</th>
                             <th></th>
@@ -1583,7 +1539,8 @@ if ($tab === 'menu' || $tab === 'categories') {
                                 if ($posterStation === '' && (int)($it['station_id'] ?? 0) > 0) {
                                     $posterStation = 'workshop ' . (int)$it['station_id'];
                                 }
-                                $posterSubCategory = $stripNumberPrefix((string)($it['main_category_name'] ?? ''));
+                                $posterWorkshop = $stripNumberPrefix((string)($it['main_category_name'] ?? ''));
+                                $posterCategory = $stripNumberPrefix((string)($it['sub_category_name'] ?? ''));
                                 $statusPills = [];
                                 $statusPills[] = $isActive ? '<span class="pill ok">Poster</span>' : '<span class="pill bad">Не найдено</span>';
                                 $statusPills[] = $isPublished && $isActive ? '<span class="pill ok">Опублик.</span>' : '<span class="pill warn">Скрыто</span>';
@@ -1600,16 +1557,17 @@ if ($tab === 'menu' || $tab === 'categories') {
                                 <td data-col="title_vn"><?= htmlspecialchars($vnTitle) ?></td>
                                 <td data-col="title_ko"><?= htmlspecialchars($koTitle) ?></td>
                                 <td data-col="price"><?= htmlspecialchars((string)($it['price_raw'] ?? '')) ?></td>
-                                <td data-col="poster_category"><?= htmlspecialchars($posterStation) ?></td>
-                                <td data-col="poster_subcategory"><?= htmlspecialchars($posterSubCategory) ?></td>
+                                <td data-col="poster_station"><?= htmlspecialchars($posterStation) ?></td>
+                                <td data-col="poster_workshop"><?= htmlspecialchars($posterWorkshop) ?></td>
+                                <td data-col="poster_category"><?= htmlspecialchars($posterCategory) ?></td>
+                                <td data-col="adapted_workshop_ru"><?= htmlspecialchars((string)($it['adapted_workshop_ru'] ?? '')) ?></td>
+                                <td data-col="adapted_workshop_en"><?= htmlspecialchars((string)($it['adapted_workshop_en'] ?? '')) ?></td>
+                                <td data-col="adapted_workshop_vn"><?= htmlspecialchars((string)($it['adapted_workshop_vn'] ?? '')) ?></td>
+                                <td data-col="adapted_workshop_ko"><?= htmlspecialchars((string)($it['adapted_workshop_ko'] ?? '')) ?></td>
                                 <td data-col="adapted_category_ru"><?= htmlspecialchars((string)($it['adapted_category_ru'] ?? '')) ?></td>
                                 <td data-col="adapted_category_en"><?= htmlspecialchars((string)($it['adapted_category_en'] ?? '')) ?></td>
                                 <td data-col="adapted_category_vn"><?= htmlspecialchars((string)($it['adapted_category_vn'] ?? '')) ?></td>
                                 <td data-col="adapted_category_ko"><?= htmlspecialchars((string)($it['adapted_category_ko'] ?? '')) ?></td>
-                                <td data-col="adapted_subcategory_ru"><?= htmlspecialchars((string)($it['adapted_subcategory_ru'] ?? '')) ?></td>
-                                <td data-col="adapted_subcategory_en"><?= htmlspecialchars((string)($it['adapted_subcategory_en'] ?? '')) ?></td>
-                                <td data-col="adapted_subcategory_vn"><?= htmlspecialchars((string)($it['adapted_subcategory_vn'] ?? '')) ?></td>
-                                <td data-col="adapted_subcategory_ko"><?= htmlspecialchars((string)($it['adapted_subcategory_ko'] ?? '')) ?></td>
                                 <td data-col="status"><?= implode(' ', $statusPills) ?></td>
                                 <td>
                                     <input type="checkbox"

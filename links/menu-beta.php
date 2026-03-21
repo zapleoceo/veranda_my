@@ -64,14 +64,12 @@ $db->createMenuTables();
 
 $metaTable = $db->t('system_meta');
 $pmi = $db->t('poster_menu_items');
-$ruTable = $db->t('menu_items_ru');
-$enTable = $db->t('menu_items_en');
-$vnTable = $db->t('menu_items_vn');
-$koTable = $db->t('menu_items_ko');
-$mcm = $db->t('menu_categories_main');
-$mcmTr = $db->t('menu_categories_main_tr');
-$mcs = $db->t('menu_categories_sub');
-$mcsTr = $db->t('menu_categories_sub_tr');
+$mw = $db->t('menu_workshops');
+$mwTr = $db->t('menu_workshop_tr');
+$mc = $db->t('menu_categories');
+$mcTr = $db->t('menu_category_tr');
+$mi = $db->t('menu_items');
+$miTr = $db->t('menu_item_tr');
 
 $lastMenuSyncAt = null;
 try {
@@ -81,41 +79,39 @@ try {
     }
 } catch (\Exception $e) {
 }
-$langTable = $lang === 'ru' ? $ruTable : ($lang === 'en' ? $enTable : ($lang === 'ko' ? $koTable : $vnTable));
 $trLang = $lang === 'vi' ? 'vn' : $lang;
 
 $items = $db->query(
     "SELECT
+        w.id AS workshop_id,
+        COALESCE(NULLIF(wtr.name,''), NULLIF(w.name_raw,''), '') AS main_label,
+        c.id AS category_id,
+        COALESCE(NULLIF(ctr.name,''), NULLIF(c.name_raw,''), '') AS sub_label,
         p.poster_id,
         p.price_raw,
-        COALESCE(NULLIF(mi.title,''), NULLIF(en.title,''), NULLIF(ru.title,''), p.name_raw) AS title,
-        COALESCE(NULLIF(mi.description,''), NULLIF(en.description,''), NULLIF(ru.description,''), '') AS description,
-        COALESCE(NULLIF(ru.image_url,''), '') AS image_url,
-        COALESCE(ru.sort_order, 0) AS sort_order,
-        COALESCE(NULLIF(mit_main.name, ''), NULLIF(mm.name_raw, ''), '') AS main_label,
-        COALESCE(NULLIF(mit_sub.name, ''), NULLIF(ms.name_raw, ''), '') AS sub_label,
-        COALESCE(mm.sort_order, 0) AS main_sort,
-        COALESCE(ms.sort_order, 0) AS sub_sort
-     FROM {$pmi} p
-     JOIN {$ruTable} ru ON ru.poster_item_id = p.id
-     LEFT JOIN {$enTable} en ON en.poster_item_id = p.id
-     LEFT JOIN {$langTable} mi ON mi.poster_item_id = p.id
-     LEFT JOIN {$mcs} ms ON ms.id = COALESCE(mi.sub_category_id, ru.sub_category_id)
-     LEFT JOIN {$mcsTr} mit_sub ON mit_sub.sub_category_id = ms.id AND mit_sub.lang = ?
-     LEFT JOIN {$mcm} mm ON mm.id = COALESCE(ms.main_category_id_override, mi.main_category_id, ru.main_category_id)
-     LEFT JOIN {$mcmTr} mit_main ON mit_main.main_category_id = mm.id AND mit_main.lang = ?
-     WHERE p.is_active = 1
-       AND ru.is_published = 1
-       AND (mm.id IS NULL OR mm.show_in_menu = 1)
-       AND (ms.id IS NULL OR ms.show_in_menu = 1)
+        COALESCE(NULLIF(itr.title,''), NULLIF(itr_ru.title,''), NULLIF(p.name_raw,''), '') AS title,
+        COALESCE(NULLIF(itr.description,''), NULLIF(itr_ru.description,''), '') AS description,
+        COALESCE(NULLIF(mi.image_url,''), '') AS image_url,
+        COALESCE(mi.sort_order, 0) AS sort_order,
+        COALESCE(w.sort_order, 0) AS main_sort,
+        COALESCE(c.sort_order, 0) AS sub_sort
+     FROM {$mi} mi
+     JOIN {$pmi} p ON p.id = mi.poster_item_id AND p.is_active = 1
+     JOIN {$mc} c ON c.id = mi.category_id AND c.show_on_site = 1
+     JOIN {$mw} w ON w.id = c.workshop_id AND w.show_on_site = 1
+     LEFT JOIN {$miTr} itr ON itr.item_id = mi.id AND itr.lang = ?
+     LEFT JOIN {$miTr} itr_ru ON itr_ru.item_id = mi.id AND itr_ru.lang = 'ru'
+     LEFT JOIN {$mcTr} ctr ON ctr.category_id = c.id AND ctr.lang = ?
+     LEFT JOIN {$mwTr} wtr ON wtr.workshop_id = w.id AND wtr.lang = ?
+     WHERE mi.is_published = 1
      ORDER BY
-        main_sort ASC,
+        w.sort_order ASC,
         main_label ASC,
-        sub_sort ASC,
+        c.sort_order ASC,
         sub_label ASC,
-        COALESCE(ru.sort_order, 0) ASC,
+        mi.sort_order ASC,
         title ASC",
-    [$trLang, $trLang]
+    [$trLang, $trLang, $trLang]
 )->fetchAll();
 
 $groups = [];

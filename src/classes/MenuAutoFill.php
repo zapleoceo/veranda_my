@@ -12,9 +12,8 @@ class MenuAutoFill {
     public function run(): array {
         $this->db->createMenuTables();
         $pmi = $this->db->t('poster_menu_items');
-        $miRu = $this->db->t('menu_items_ru');
-        $miEn = $this->db->t('menu_items_en');
-        $miVn = $this->db->t('menu_items_vn');
+        $mi = $this->db->t('menu_items');
+        $miTr = $this->db->t('menu_item_tr');
 
         $barMap = $this->getBarTranslations();
         $kitchenMap = $this->getKitchenTranslations();
@@ -36,30 +35,32 @@ class MenuAutoFill {
                 p.main_category_name,
                 p.sub_category_name,
                 p.station_name,
+                mi.id menu_item_id,
                 ru.title ru_title,
-                ru.sub_category ru_sub_category,
                 ru.description ru_description,
                 en.title en_title,
-                en.sub_category en_sub_category,
                 en.description en_description,
                 vn.title vn_title,
-                vn.sub_category vn_sub_category,
                 vn.description vn_description
              FROM {$pmi} p
-             LEFT JOIN {$miRu} ru ON ru.poster_item_id = p.id
-             LEFT JOIN {$miEn} en ON en.poster_item_id = p.id
-             LEFT JOIN {$miVn} vn ON vn.poster_item_id = p.id",
+             JOIN {$mi} mi ON mi.poster_item_id = p.id
+             LEFT JOIN {$miTr} ru ON ru.item_id = mi.id AND ru.lang = 'ru'
+             LEFT JOIN {$miTr} en ON en.item_id = mi.id AND en.lang = 'en'
+             LEFT JOIN {$miTr} vn ON vn.item_id = mi.id AND vn.lang = 'vn'",
             []
         )->fetchAll();
 
         $updated = 0;
         $titlesFilled = 0;
         $descriptionsFilled = 0;
-        $subCategoriesFilled = 0;
 
         foreach ($rows as $row) {
             $posterItemId = (int)($row['poster_item_id'] ?? 0);
             if ($posterItemId <= 0) {
+                continue;
+            }
+            $menuItemId = (int)($row['menu_item_id'] ?? 0);
+            if ($menuItemId <= 0) {
                 continue;
             }
 
@@ -75,10 +76,6 @@ class MenuAutoFill {
             $ruDesc = trim((string)($row['ru_description'] ?? ''));
             $enDesc = trim((string)($row['en_description'] ?? ''));
             $vnDesc = trim((string)($row['vn_description'] ?? ''));
-
-            $ruSub = trim((string)($row['ru_sub_category'] ?? ''));
-            $enSub = trim((string)($row['en_sub_category'] ?? ''));
-            $vnSub = trim((string)($row['vn_sub_category'] ?? ''));
 
             $mapped = null;
             if ($stationName !== '' && str_contains($stationName, 'bar')) {
@@ -98,9 +95,6 @@ class MenuAutoFill {
             $ruNew = $ruTitle;
             $enNew = $enTitle;
             $vnNew = $vnTitle;
-            $ruSubNew = $ruSub;
-            $enSubNew = $enSub;
-            $vnSubNew = $vnSub;
             $ruDescNew = $ruDesc;
             $enDescNew = $enDesc;
             $vnDescNew = $vnDesc;
@@ -162,26 +156,29 @@ class MenuAutoFill {
             if ($enDescNew === '') $enDescNew = $this->generateDescription('en', $stationName, $enNew, $posterCategory);
             if ($vnDescNew === '') $vnDescNew = $this->generateDescription('vn', $stationName, $vnNew, $posterCategory);
 
-            $needRu = ($ruTitle !== $ruNew) || ($ruDesc !== $ruDescNew) || ($ruSub !== '');
-            $needEn = ($enTitle !== $enNew) || ($enDesc !== $enDescNew) || ($enSub !== '');
-            $needVn = ($vnTitle !== $vnNew) || ($vnDesc !== $vnDescNew) || ($vnSub !== '');
+            $needRu = ($ruTitle !== $ruNew) || ($ruDesc !== $ruDescNew);
+            $needEn = ($enTitle !== $enNew) || ($enDesc !== $enDescNew);
+            $needVn = ($vnTitle !== $vnNew) || ($vnDesc !== $vnDescNew);
 
             if ($needRu) {
                 $this->db->query(
-                    "UPDATE {$miRu} SET title=?, sub_category=NULL, description=? WHERE poster_item_id=?",
-                    [$ruNew !== '' ? $ruNew : null, $ruDescNew !== '' ? $ruDescNew : null, $posterItemId]
+                    "INSERT INTO {$miTr} (item_id, lang, title, description) VALUES (?, 'ru', ?, ?)
+                     ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
+                    [$menuItemId, $ruNew !== '' ? $ruNew : null, $ruDescNew !== '' ? $ruDescNew : null]
                 );
             }
             if ($needEn) {
                 $this->db->query(
-                    "UPDATE {$miEn} SET title=?, sub_category=NULL, description=? WHERE poster_item_id=?",
-                    [$enNew !== '' ? $enNew : null, $enDescNew !== '' ? $enDescNew : null, $posterItemId]
+                    "INSERT INTO {$miTr} (item_id, lang, title, description) VALUES (?, 'en', ?, ?)
+                     ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
+                    [$menuItemId, $enNew !== '' ? $enNew : null, $enDescNew !== '' ? $enDescNew : null]
                 );
             }
             if ($needVn) {
                 $this->db->query(
-                    "UPDATE {$miVn} SET title=?, sub_category=NULL, description=? WHERE poster_item_id=?",
-                    [$vnNew !== '' ? $vnNew : null, $vnDescNew !== '' ? $vnDescNew : null, $posterItemId]
+                    "INSERT INTO {$miTr} (item_id, lang, title, description) VALUES (?, 'vn', ?, ?)
+                     ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description)",
+                    [$menuItemId, $vnNew !== '' ? $vnNew : null, $vnDescNew !== '' ? $vnDescNew : null]
                 );
             }
 
@@ -194,9 +191,6 @@ class MenuAutoFill {
             if ($ruDesc === '' && $ruDescNew !== '' || $enDesc === '' && $enDescNew !== '' || $vnDesc === '' && $vnDescNew !== '') {
                 $descriptionsFilled++;
             }
-            if ($ruSub !== '' || $enSub !== '' || $vnSub !== '') {
-                $subCategoriesFilled++;
-            }
         }
 
         return [
@@ -204,7 +198,6 @@ class MenuAutoFill {
             'rows' => count($rows),
             'updated' => $updated,
             'titles_filled' => $titlesFilled,
-            'subcategories_filled' => $subCategoriesFilled,
             'descriptions_filled' => $descriptionsFilled
         ];
     }

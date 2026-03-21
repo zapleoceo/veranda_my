@@ -88,6 +88,150 @@ $db->query("CREATE TABLE IF NOT EXISTS {$eventLog} (
 
 $db->createMenuTables();
 
+$tableExists = function (string $table) use ($db, $dbName): bool {
+    $row = $db->query(
+        "SELECT COUNT(*) AS c
+         FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = ?
+           AND TABLE_NAME = ?",
+        [$dbName, $table]
+    )->fetch();
+    return (int)($row['c'] ?? 0) > 0;
+};
+
+$migrateMenuSchema = function () use ($db, $tableExists): array {
+    $mw = $db->t('menu_workshops');
+    $mwTr = $db->t('menu_workshop_tr');
+    $mc = $db->t('menu_categories');
+    $mcTr = $db->t('menu_category_tr');
+    $mi = $db->t('menu_items');
+    $miTr = $db->t('menu_item_tr');
+
+    $oldMain = $db->t('menu_categories_main');
+    $oldMainTr = $db->t('menu_categories_main_tr');
+    $oldSub = $db->t('menu_categories_sub');
+    $oldSubTr = $db->t('menu_categories_sub_tr');
+    $oldRu = $db->t('menu_items_ru');
+    $oldEn = $db->t('menu_items_en');
+    $oldVn = $db->t('menu_items_vn');
+    $oldKo = $db->t('menu_items_ko');
+
+    $migrated = [
+        'workshops' => 0,
+        'workshop_tr' => 0,
+        'categories' => 0,
+        'category_tr' => 0,
+        'items' => 0,
+        'item_tr' => 0,
+    ];
+
+    if ($tableExists($oldMain) && $tableExists($oldSub) && $tableExists($oldRu)) {
+        try {
+            $migrated['workshops'] = $db->query(
+                "INSERT INTO {$mw} (id, poster_id, name_raw, sort_order, show_on_site, created_at, updated_at)
+                 SELECT id, poster_main_category_id, name_raw, sort_order, show_in_menu, created_at, updated_at
+                 FROM {$oldMain}
+                 ON DUPLICATE KEY UPDATE
+                    poster_id=VALUES(poster_id),
+                    name_raw=VALUES(name_raw),
+                    sort_order=VALUES(sort_order),
+                    show_on_site=VALUES(show_on_site),
+                    updated_at=VALUES(updated_at)"
+            )->rowCount();
+        } catch (\Exception $e) {
+        }
+
+        if ($tableExists($oldMainTr)) {
+            try {
+                $migrated['workshop_tr'] = $db->query(
+                    "INSERT INTO {$mwTr} (workshop_id, lang, name)
+                     SELECT main_category_id, lang, name
+                     FROM {$oldMainTr}
+                     ON DUPLICATE KEY UPDATE name=VALUES(name)"
+                )->rowCount();
+            } catch (\Exception $e) {
+            }
+        }
+
+        try {
+            $migrated['categories'] = $db->query(
+                "INSERT INTO {$mc} (id, poster_id, workshop_id, name_raw, sort_order, show_on_site, created_at, updated_at)
+                 SELECT
+                    id,
+                    poster_sub_category_id,
+                    COALESCE(main_category_id_override, main_category_id),
+                    name_raw,
+                    sort_order,
+                    show_in_menu,
+                    created_at,
+                    updated_at
+                 FROM {$oldSub}
+                 WHERE COALESCE(main_category_id_override, main_category_id) IS NOT NULL
+                 ON DUPLICATE KEY UPDATE
+                    poster_id=VALUES(poster_id),
+                    workshop_id=VALUES(workshop_id),
+                    name_raw=VALUES(name_raw),
+                    sort_order=VALUES(sort_order),
+                    show_on_site=VALUES(show_on_site),
+                    updated_at=VALUES(updated_at)"
+            )->rowCount();
+        } catch (\Exception $e) {
+        }
+
+        if ($tableExists($oldSubTr)) {
+            try {
+                $migrated['category_tr'] = $db->query(
+                    "INSERT INTO {$mcTr} (category_id, lang, name)
+                     SELECT sub_category_id, lang, name
+                     FROM {$oldSubTr}
+                     ON DUPLICATE KEY UPDATE name=VALUES(name)"
+                )->rowCount();
+            } catch (\Exception $e) {
+            }
+        }
+
+        try {
+            $migrated['items'] = $db->query(
+                "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order)
+                 SELECT poster_item_id, sub_category_id, image_url, is_published, sort_order
+                 FROM {$oldRu}
+                 WHERE sub_category_id IS NOT NULL
+                 ON DUPLICATE KEY UPDATE
+                    category_id=VALUES(category_id),
+                    image_url=VALUES(image_url),
+                    is_published=VALUES(is_published),
+                    sort_order=VALUES(sort_order)"
+            )->rowCount();
+        } catch (\Exception $e) {
+        }
+
+        $insertTr = function (string $srcTable, string $lang) use ($db, $mi, $miTr, &$migrated): void {
+            try {
+                $migrated['item_tr'] += (int)$db->query(
+                    "INSERT INTO {$miTr} (item_id, lang, title, description)
+                     SELECT mi.id, ?, s.title, s.description
+                     FROM {$mi} mi
+                     JOIN {$srcTable} s ON s.poster_item_id = mi.poster_item_id
+                     ON DUPLICATE KEY UPDATE
+                        title=VALUES(title),
+                        description=VALUES(description)",
+                    [$lang]
+                )->rowCount();
+            } catch (\Exception $e) {
+            }
+        };
+
+        $insertTr($oldRu, 'ru');
+        if ($tableExists($oldEn)) $insertTr($oldEn, 'en');
+        if ($tableExists($oldVn)) $insertTr($oldVn, 'vn');
+        if ($tableExists($oldKo)) $insertTr($oldKo, 'ko');
+    }
+
+    return $migrated;
+};
+
+$menuMigrated = $migrateMenuSchema();
+
 $ensureIndex = function (string $table, string $indexName, string $columns) use ($db, $dbName): void {
     $row = $db->query(
         "SELECT COUNT(*) AS c
@@ -108,11 +252,12 @@ $ensureIndex($ks, 'idx_ks_date_exclude', 'transaction_date, exclude_from_dashboa
 $ensureIndex($ks, 'idx_ks_tg_msg', 'tg_message_id');
 $ensureIndex($ks, 'idx_ks_tg_ack', 'tg_acknowledged, tg_acknowledged_at');
 
-$logger->info('ok', ['tables' => [$ks, $meta, $users, $tgm, $eventLog]]);
+$logger->info('ok', ['tables' => [$ks, $meta, $users, $tgm, $eventLog], 'menu_migrated' => $menuMigrated]);
 
 echo json_encode([
     'ok' => true,
     'db' => $dbName,
     'suffix' => $suffix,
-    'tables' => [$ks, $meta, $users, $tgm, $eventLog]
+    'tables' => [$ks, $meta, $users, $tgm, $eventLog],
+    'menu_migrated' => $menuMigrated
 ], JSON_UNESCAPED_UNICODE) . PHP_EOL;

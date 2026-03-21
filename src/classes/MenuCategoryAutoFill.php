@@ -12,76 +12,55 @@ class MenuCategoryAutoFill {
     public function run(): array {
         $this->db->createMenuTables();
 
-        $main = $this->db->query("SELECT id, name_raw FROM menu_categories_main ORDER BY id ASC")->fetchAll();
-        $sub = $this->db->query("SELECT id, name_raw FROM menu_categories_sub ORDER BY id ASC")->fetchAll();
+        $mw = $this->db->t('menu_workshops');
+        $mc = $this->db->t('menu_categories');
 
-        $updatedMain = 0;
-        $updatedSub = 0;
+        $workshops = $this->db->query("SELECT id, name_raw FROM {$mw} ORDER BY id ASC")->fetchAll();
+        $categories = $this->db->query("SELECT id, name_raw FROM {$mc} ORDER BY id ASC")->fetchAll();
+
+        $updatedWorkshops = 0;
+        $updatedCategories = 0;
         $updatedTr = 0;
 
-        foreach ($main as $r) {
+        foreach ($workshops as $r) {
             $id = (int)($r['id'] ?? 0);
             $raw = (string)($r['name_raw'] ?? '');
             if ($id <= 0) continue;
             $clean = $this->stripPrefix($raw);
             if ($clean !== $raw && $clean !== '') {
-                $this->db->query("UPDATE menu_categories_main SET name_raw=? WHERE id=?", [$clean, $id]);
-                $updatedMain++;
+                $this->db->query("UPDATE {$mw} SET name_raw=? WHERE id=?", [$clean, $id]);
+                $updatedWorkshops++;
             }
             $tr = $this->translate($clean !== '' ? $clean : $raw);
-            $updatedTr += $this->upsertTr('menu_categories_main_tr', 'main_category_id', $id, $tr);
+            $updatedTr += $this->upsertTr($this->db->t('menu_workshop_tr'), 'workshop_id', $id, $tr);
         }
 
-        foreach ($sub as $r) {
+        foreach ($categories as $r) {
             $id = (int)($r['id'] ?? 0);
             $raw = (string)($r['name_raw'] ?? '');
             if ($id <= 0) continue;
             $clean = $this->stripPrefix($raw);
             if ($clean !== $raw && $clean !== '') {
-                $this->db->query("UPDATE menu_categories_sub SET name_raw=? WHERE id=?", [$clean, $id]);
-                $updatedSub++;
+                $this->db->query("UPDATE {$mc} SET name_raw=? WHERE id=?", [$clean, $id]);
+                $updatedCategories++;
             }
             $tr = $this->translate($clean !== '' ? $clean : $raw);
-            $updatedTr += $this->upsertTr('menu_categories_sub_tr', 'sub_category_id', $id, $tr);
-        }
-
-        $filledMainIds = 0;
-        $filledSubIds = 0;
-        foreach (['menu_items_ru', 'menu_items_en', 'menu_items_vn'] as $table) {
-            $res1 = $this->db->query(
-                "UPDATE {$table} mi
-                 JOIN poster_menu_items p ON p.id = mi.poster_item_id
-                 LEFT JOIN menu_categories_main m ON m.poster_main_category_id = p.main_category_id
-                 SET mi.main_category_id = COALESCE(mi.main_category_id, m.id)
-                 WHERE mi.main_category_id IS NULL"
-            );
-            $filledMainIds += (int)($res1->rowCount() ?? 0);
-
-            $res2 = $this->db->query(
-                "UPDATE {$table} mi
-                 JOIN poster_menu_items p ON p.id = mi.poster_item_id
-                 LEFT JOIN menu_categories_sub s ON s.poster_sub_category_id = p.sub_category_id
-                 SET mi.sub_category_id = COALESCE(mi.sub_category_id, s.id)
-                 WHERE mi.sub_category_id IS NULL"
-            );
-            $filledSubIds += (int)($res2->rowCount() ?? 0);
+            $updatedTr += $this->upsertTr($this->db->t('menu_category_tr'), 'category_id', $id, $tr);
         }
 
         return [
             'ok' => true,
-            'main_count' => count($main),
-            'sub_count' => count($sub),
-            'main_cleaned' => $updatedMain,
-            'sub_cleaned' => $updatedSub,
+            'workshops_count' => count($workshops),
+            'categories_count' => count($categories),
+            'workshops_cleaned' => $updatedWorkshops,
+            'categories_cleaned' => $updatedCategories,
             'translations_upserted' => $updatedTr,
-            'main_ids_filled' => $filledMainIds,
-            'sub_ids_filled' => $filledSubIds,
         ];
     }
 
     private function upsertTr(string $table, string $idCol, int $id, array $tr): int {
         $count = 0;
-        foreach (['ru', 'en', 'vn'] as $lang) {
+        foreach (['ru', 'en', 'vn', 'ko'] as $lang) {
             $name = trim((string)($tr[$lang] ?? ''));
             if ($name === '') continue;
             $this->db->query(

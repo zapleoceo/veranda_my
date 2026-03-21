@@ -156,14 +156,12 @@ class Database {
 
     public function createMenuTables(): void {
         $pmi = $this->t('poster_menu_items');
-        $mcm = $this->t('menu_categories_main');
-        $mcmTr = $this->t('menu_categories_main_tr');
-        $mcs = $this->t('menu_categories_sub');
-        $mcsTr = $this->t('menu_categories_sub_tr');
-        $miRu = $this->t('menu_items_ru');
-        $miEn = $this->t('menu_items_en');
-        $miVn = $this->t('menu_items_vn');
-        $miKo = $this->t('menu_items_ko');
+        $mw = $this->t('menu_workshops');
+        $mwTr = $this->t('menu_workshop_tr');
+        $mc = $this->t('menu_categories');
+        $mcTr = $this->t('menu_category_tr');
+        $mi = $this->t('menu_items');
+        $miTr = $this->t('menu_item_tr');
         $fkTag = $this->tableSuffix !== '' ? substr(sha1($this->tableSuffix), 0, 6) : 'base';
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$pmi} (
@@ -189,131 +187,75 @@ class Database {
             KEY idx_poster_menu_items_sub_cat (sub_category_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mcm} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            poster_main_category_id BIGINT NOT NULL,
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mw} (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            poster_id INT UNSIGNED NOT NULL,
             name_raw VARCHAR(255) NOT NULL,
-            sort_order INT NOT NULL DEFAULT 0,
-            show_in_menu TINYINT(1) NOT NULL DEFAULT 1,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_menu_categories_main_poster_id (poster_main_category_id),
-            KEY idx_menu_categories_main_sort (sort_order)
+            sort_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            show_on_site TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_menu_workshops_poster_id (poster_id),
+            KEY idx_menu_workshops_sort (sort_order),
+            KEY idx_menu_workshops_show (show_on_site)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mcmTr} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            main_category_id INT NOT NULL,
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mwTr} (
+            workshop_id INT UNSIGNED NOT NULL,
             lang VARCHAR(8) NOT NULL,
             name VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_menu_categories_main_tr (main_category_id, lang),
-            CONSTRAINT fk_menu_categories_main_tr_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE CASCADE
+            PRIMARY KEY (workshop_id, lang),
+            CONSTRAINT fk_menu_workshop_tr_workshop_{$fkTag} FOREIGN KEY (workshop_id) REFERENCES {$mw}(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mcs} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            poster_sub_category_id BIGINT NOT NULL,
-            main_category_id INT NULL,
-            main_category_id_override INT NULL,
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mc} (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            poster_id INT UNSIGNED NOT NULL,
+            workshop_id INT UNSIGNED NOT NULL,
             name_raw VARCHAR(255) NOT NULL,
-            sort_order INT NOT NULL DEFAULT 0,
-            show_in_menu TINYINT(1) NOT NULL DEFAULT 1,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_menu_categories_sub_poster_id (poster_sub_category_id),
-            KEY idx_menu_categories_sub_main (main_category_id),
-            KEY idx_menu_categories_sub_sort (sort_order),
-            CONSTRAINT fk_menu_categories_sub_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL
+            sort_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            show_on_site TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_menu_categories_poster_id (poster_id),
+            KEY idx_menu_categories_workshop (workshop_id),
+            KEY idx_menu_categories_sort (sort_order),
+            KEY idx_menu_categories_show (show_on_site),
+            CONSTRAINT fk_menu_categories_workshop_{$fkTag} FOREIGN KEY (workshop_id) REFERENCES {$mw}(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mcsTr} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            sub_category_id INT NOT NULL,
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mcTr} (
+            category_id INT UNSIGNED NOT NULL,
             lang VARCHAR(8) NOT NULL,
             name VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_menu_categories_sub_tr (sub_category_id, lang),
-            CONSTRAINT fk_menu_categories_sub_tr_sub_{$fkTag} FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE CASCADE
+            PRIMARY KEY (category_id, lang),
+            CONSTRAINT fk_menu_category_tr_category_{$fkTag} FOREIGN KEY (category_id) REFERENCES {$mc}(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miRu} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$mi} (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             poster_item_id INT NOT NULL,
-            title VARCHAR(255) NULL,
-            main_category_id INT NULL,
-            sub_category_id INT NULL,
-            sub_category VARCHAR(255) NULL,
-            description TEXT NULL,
-            image_url VARCHAR(2048) NULL,
+            category_id INT UNSIGNED NOT NULL,
+            image_url VARCHAR(512) NULL,
             is_published TINYINT(1) NOT NULL DEFAULT 0,
-            sort_order INT NOT NULL DEFAULT 0,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_menu_items_ru_poster_item_id (poster_item_id),
-            KEY idx_menu_items_ru_published (is_published),
-            KEY idx_menu_items_ru_main_cat (main_category_id),
-            KEY idx_menu_items_ru_sub_cat (sub_category_id),
-            KEY idx_menu_items_ru_sort (sort_order),
-            CONSTRAINT fk_menu_items_ru_poster_{$fkTag} FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_ru_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_ru_sub_{$fkTag} FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
+            sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_menu_items_poster_item_id (poster_item_id),
+            KEY idx_menu_items_published (is_published),
+            KEY idx_menu_items_category (category_id),
+            KEY idx_menu_items_sort (sort_order),
+            CONSTRAINT fk_menu_items_poster_{$fkTag} FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
+            CONSTRAINT fk_menu_items_category_{$fkTag} FOREIGN KEY (category_id) REFERENCES {$mc}(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miEn} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            poster_item_id INT NOT NULL,
-            title VARCHAR(255) NULL,
-            main_category_id INT NULL,
-            sub_category_id INT NULL,
-            sub_category VARCHAR(255) NULL,
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miTr} (
+            item_id INT UNSIGNED NOT NULL,
+            lang VARCHAR(8) NOT NULL,
+            title VARCHAR(512) NULL,
             description TEXT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_menu_items_en_poster_item_id (poster_item_id),
-            KEY idx_menu_items_en_main_cat (main_category_id),
-            KEY idx_menu_items_en_sub_cat (sub_category_id),
-            CONSTRAINT fk_menu_items_en_poster_{$fkTag} FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_en_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_en_sub_{$fkTag} FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miVn} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            poster_item_id INT NOT NULL,
-            title VARCHAR(255) NULL,
-            main_category_id INT NULL,
-            sub_category_id INT NULL,
-            sub_category VARCHAR(255) NULL,
-            description TEXT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_menu_items_vn_poster_item_id (poster_item_id),
-            KEY idx_menu_items_vn_main_cat (main_category_id),
-            KEY idx_menu_items_vn_sub_cat (sub_category_id),
-            CONSTRAINT fk_menu_items_vn_poster_{$fkTag} FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_vn_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_vn_sub_{$fkTag} FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
-        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$miKo} (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            poster_item_id INT NOT NULL,
-            title VARCHAR(255) NULL,
-            main_category_id INT NULL,
-            sub_category_id INT NULL,
-            sub_category VARCHAR(255) NULL,
-            description TEXT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_menu_items_ko_poster_item_id (poster_item_id),
-            KEY idx_menu_items_ko_main_cat (main_category_id),
-            KEY idx_menu_items_ko_sub_cat (sub_category_id),
-            CONSTRAINT fk_menu_items_ko_poster_{$fkTag} FOREIGN KEY (poster_item_id) REFERENCES {$pmi}(id) ON DELETE CASCADE,
-            CONSTRAINT fk_menu_items_ko_main_{$fkTag} FOREIGN KEY (main_category_id) REFERENCES {$mcm}(id) ON DELETE SET NULL,
-            CONSTRAINT fk_menu_items_ko_sub_{$fkTag} FOREIGN KEY (sub_category_id) REFERENCES {$mcs}(id) ON DELETE SET NULL
+            PRIMARY KEY (item_id, lang),
+            CONSTRAINT fk_menu_item_tr_item_{$fkTag} FOREIGN KEY (item_id) REFERENCES {$mi}(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     }
 }

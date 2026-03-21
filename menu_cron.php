@@ -46,7 +46,7 @@ try {
     $summary = 'ok=1';
     if (is_array($result)) {
         $parts = [];
-        foreach (['duration_ms', 'items_seen', 'main_categories', 'sub_categories'] as $k) {
+        foreach (['duration_ms', 'items_seen', 'workshops', 'categories', 'main_categories', 'sub_categories'] as $k) {
             if (isset($result[$k])) {
                 $parts[] = $k . '=' . (string)$result[$k];
             }
