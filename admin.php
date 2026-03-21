@@ -300,6 +300,17 @@ if ($tab === 'menu' || $tab === 'categories') {
     $menuItemsTable = $db->t('menu_items');
     $menuItemsTrTable = $db->t('menu_item_tr');
 
+    if ($tab === 'categories' && empty($_POST)) {
+        $appliedAt = (string)$db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", ['menu_categories_preset_v2_applied_at'])->fetchColumn();
+        if ($appliedAt === '') {
+            $_POST['import_categories_preset_v2'] = '1';
+        }
+        $fixedAt = (string)$db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", ['menu_fix_new_cocktails_to_24_applied_at'])->fetchColumn();
+        if ($fixedAt === '') {
+            $_POST['fix_new_cocktails_to_24'] = '1';
+        }
+    }
+
     if (($_GET['export'] ?? '') === 'categories_csv') {
         ignore_user_abort(true);
         @set_time_limit(300);
@@ -705,6 +716,10 @@ if ($tab === 'menu' || $tab === 'categories') {
                 'to_poster_category_id' => $toPosterCategoryId,
                 'updated_items' => $updated
             ], JSON_UNESCAPED_UNICODE);
+            $db->query(
+                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
+                ['menu_fix_new_cocktails_to_24_applied_at', (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s')]
+            );
             $menuView = 'categories';
         } catch (\Throwable $e) {
             $error = 'Ошибка переноса блюд: ' . $e->getMessage();
@@ -870,6 +885,12 @@ if ($tab === 'menu' || $tab === 'categories') {
                 'skipped' => $skipped,
                 'bad_lines' => $badLines,
             ], JSON_UNESCAPED_UNICODE);
+            if (isset($_POST['import_categories_preset_v2'])) {
+                $db->query(
+                    "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",
+                    ['menu_categories_preset_v2_applied_at', (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d H:i:s')]
+                );
+            }
             $menuView = 'categories';
         } catch (\Throwable $e) {
             $error = 'Ошибка импорта категорий: ' . $e->getMessage();
