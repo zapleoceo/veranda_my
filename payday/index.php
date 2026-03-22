@@ -373,6 +373,28 @@ try {
         ], JSON_UNESCAPED_UNICODE);
     }
 
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'clear_day') {
+        $from = $date . ' 00:00:00';
+        $to = $date . ' 23:59:59';
+        try {
+            $db->query('START TRANSACTION');
+            $db->query(
+                "DELETE l FROM {$pl} l
+                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+                 WHERE p.day_date = ?",
+                [$date]
+            );
+            $db->query("DELETE FROM {$pc} WHERE day_date = ?", [$date]);
+            $db->query("DELETE FROM {$pt} WHERE day_date = ?", [$date]);
+            $db->query("DELETE FROM {$st} WHERE transaction_date BETWEEN ? AND ?", [$from, $to]);
+            $db->query('COMMIT');
+            $message = 'День очищен: ' . $date;
+        } catch (\Throwable $e) {
+            try { $db->query('ROLLBACK'); } catch (\Throwable $e2) {}
+            throw $e;
+        }
+    }
+
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'reload_sepay_api') {
         if ($sepayApiToken === '') {
             throw new \Exception('Не задан SEPAY_API_TOKEN в .env');
@@ -977,6 +999,8 @@ $posterRows = $db->query(
 
 $sepayTotalVnd = 0;
 $posterTotalVnd = 0;
+$posterBybitVnd = 0;
+$posterVietVnd = 0;
 try {
     $sepayTotalVnd = (int)$db->query(
         "SELECT COALESCE(SUM(transfer_amount), 0) FROM {$st}
@@ -1002,6 +1026,36 @@ try {
     $posterTotalVnd = $posterCentsToVnd($posterTotalCents);
 } catch (\Throwable $e) {
     $posterTotalVnd = 0;
+}
+
+try {
+    $bybitCents = (int)$db->query(
+        "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0)
+         FROM {$pc}
+         WHERE day_date = ?
+           AND pay_type IN (2,3)
+           AND (payed_card + payed_third_party) > 0
+           AND poster_payment_method_id = 12",
+        [$date]
+    )->fetchColumn();
+    $posterBybitVnd = $posterCentsToVnd($bybitCents);
+} catch (\Throwable $e) {
+    $posterBybitVnd = 0;
+}
+
+try {
+    $vietCents = (int)$db->query(
+        "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0)
+         FROM {$pc}
+         WHERE day_date = ?
+           AND pay_type IN (2,3)
+           AND (payed_card + payed_third_party) > 0
+           AND poster_payment_method_id = 11",
+        [$date]
+    )->fetchColumn();
+    $posterVietVnd = $posterCentsToVnd($vietCents);
+} catch (\Throwable $e) {
+    $posterVietVnd = 0;
 }
 
 $links = $db->query(
@@ -1152,6 +1206,10 @@ $fmtVnd = function (int $v): string {
         .toolbar { display:flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .toolbar-line { flex-wrap: nowrap; overflow-x: auto; }
         .toolbar-line form { margin: 0; }
+        .btn { position: relative; overflow: hidden; }
+        .btn.loading::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 6px; height: 3px; border-radius: 999px; background: rgba(17, 24, 39, 0.12); }
+        .btn.loading::before { content: ''; position: absolute; left: 10px; bottom: 6px; height: 3px; width: 22px; border-radius: 999px; background: currentColor; opacity: 0.75; animation: btnbar 900ms ease-in-out infinite alternate; }
+        @keyframes btnbar { from { transform: translateX(0); } to { transform: translateX(22px); } }
         .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid #d0d5dd; background: #fff; font-weight: 800; cursor: pointer; }
         .btn.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
         .btn:disabled { opacity: 0.6; cursor: default; }
@@ -1214,16 +1272,22 @@ $fmtVnd = function (int $v): string {
                 <button class="btn" type="submit">Открыть</button>
             </form>
 
-            <form method="POST">
+            <form method="POST" id="posterSyncForm">
                 <input type="hidden" name="action" value="load_poster_checks">
                 <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
-                <button class="btn primary" type="submit">Загрузить чеки из Poster</button>
+                <button class="btn primary" id="posterSyncBtn" type="submit">Загрузить чеки из Poster</button>
             </form>
 
-            <form method="POST">
+            <form method="POST" id="sepaySyncForm">
                 <input type="hidden" name="action" value="reload_sepay_api">
                 <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
-                <button class="btn primary" type="submit" onclick="return confirm('Обновить платежи SePay за выбранную дату по API? Это перезапишет данные за день.')">Обновить платежи</button>
+                <button class="btn primary" id="sepaySyncBtn" type="submit">Обновить платежи</button>
+            </form>
+
+            <form method="POST" id="clearDayForm">
+                <input type="hidden" name="action" value="clear_day">
+                <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
+                <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Очистить день</button>
             </form>
         </div>
 
@@ -1357,6 +1421,8 @@ $fmtVnd = function (int $v): string {
                     Итого: <span id="posterTotal"><?= htmlspecialchars($fmtVnd((int)$posterTotalVnd)) ?></span>
                     • связанные: <span id="posterLinked">—</span>
                     • несвязанные: <span id="posterUnlinked">—</span>
+                    • Bybit: <span><?= htmlspecialchars($fmtVnd((int)$posterBybitVnd)) ?></span>
+                    • VietComp: <span><?= htmlspecialchars($fmtVnd((int)$posterVietVnd)) ?></span>
                 </div>
             </div>
         </div>
@@ -1414,6 +1480,19 @@ $fmtVnd = function (int $v): string {
             'is_manual' => !empty($l['is_manual']),
         ];
     }, $links)), JSON_UNESCAPED_UNICODE) ?>;
+
+    const setFormLoading = (formId, btnId) => {
+        const form = document.getElementById(formId);
+        const btn = document.getElementById(btnId);
+        if (!form || !btn) return;
+        form.addEventListener('submit', () => {
+            btn.classList.add('loading');
+            btn.disabled = true;
+        });
+    };
+    setFormLoading('posterSyncForm', 'posterSyncBtn');
+    setFormLoading('sepaySyncForm', 'sepaySyncBtn');
+    setFormLoading('clearDayForm', 'clearDayBtn');
 
     const widgets = new Map();
     const svgState = { svg: null, defs: null, group: null, markers: new Map() };
