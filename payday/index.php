@@ -15,9 +15,18 @@ if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     $date = date('Y-m-d');
 }
 
-$toVnd = function (int $amount): int {
-    if ($amount > 0 && $amount % 100 === 0) return (int)round($amount / 100);
-    return $amount;
+$moneyToInt = function ($v): int {
+    if (is_int($v)) return $v;
+    if (is_float($v)) return (int)round($v);
+    if (is_string($v)) {
+        $t = trim($v);
+        if ($t === '') return 0;
+        $t = str_replace(',', '.', $t);
+        if (is_numeric($t)) return (int)round((float)$t);
+        return 0;
+    }
+    if (is_numeric($v)) return (int)round((float)$v);
+    return 0;
 };
 
 $parsePosterDateTime = function ($tx): ?string {
@@ -27,6 +36,10 @@ $parsePosterDateTime = function ($tx): ?string {
             $n = (int)$tx['date_close'];
             if ($n > 2000000000000) $n = (int)round($n / 1000);
             if ($n > 0) $ts = $n;
+        }
+        if ($ts === null && !empty($tx['date_close']) && is_string($tx['date_close'])) {
+            $t = strtotime($tx['date_close']);
+            if ($t !== false && $t > 0) $ts = $t;
         }
         if ($ts === null && !empty($tx['date_close_date']) && is_string($tx['date_close_date'])) {
             $t = strtotime($tx['date_close_date']);
@@ -51,15 +64,20 @@ $extractPaymentMethod = function (array $tx): ?string {
 };
 
 $sepayApiToken = trim((string)($_ENV['SEPAY_API_TOKEN'] ?? $_ENV['SEPAY_USER_API_TOKEN'] ?? ''));
+$sepayAccountNumber = trim((string)($_ENV['SEPAY_ACCOUNT_NUMBER'] ?? ''));
 
-$sepayFetchTransactions = function (string $date, string $token): array {
+$sepayFetchTransactions = function (string $date, string $token, string $accountNumber): array {
     $from = $date . ' 00:00:00';
     $to = $date . ' 23:59:59';
-    $qs = http_build_query([
+    $params = [
         'transaction_date_min' => $from,
         'transaction_date_max' => $to,
         'limit' => 5000,
-    ], '', '&', PHP_QUERY_RFC3986);
+    ];
+    if ($accountNumber !== '') {
+        $params['account_number'] = $accountNumber;
+    }
+    $qs = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
     $url = 'https://my.sepay.vn/userapi/transactions/list?' . $qs;
 
     $ch = curl_init($url);
@@ -175,14 +193,14 @@ try {
 
             $paymentMethod = $extractPaymentMethod($tx);
 
-            $sum = (int)($tx['sum'] ?? 0);
-            $payedSum = (int)($tx['payed_sum'] ?? $tx['payedSum'] ?? 0);
-            $payedCash = (int)($tx['payed_cash'] ?? $tx['payedCash'] ?? 0);
-            $payedCard = (int)($tx['payed_card'] ?? $tx['payedCard'] ?? 0);
-            $payedCert = (int)($tx['payed_cert'] ?? $tx['payedCert'] ?? 0);
-            $payedBonus = (int)($tx['payed_bonus'] ?? $tx['payedBonus'] ?? 0);
+            $sum = $moneyToInt($tx['sum'] ?? 0);
+            $payedSum = $moneyToInt($tx['payed_sum'] ?? $tx['payedSum'] ?? 0);
+            $payedCash = $moneyToInt($tx['payed_cash'] ?? $tx['payedCash'] ?? 0);
+            $payedCard = $moneyToInt($tx['payed_card'] ?? $tx['payedCard'] ?? 0);
+            $payedCert = $moneyToInt($tx['payed_cert'] ?? $tx['payedCert'] ?? 0);
+            $payedBonus = $moneyToInt($tx['payed_bonus'] ?? $tx['payedBonus'] ?? 0);
             $reason = isset($tx['reason']) ? (int)$tx['reason'] : null;
-            $tipSum = (int)($tx['tip_sum'] ?? $tx['tipSum'] ?? 0);
+            $tipSum = $moneyToInt($tx['tip_sum'] ?? $tx['tipSum'] ?? 0);
             $discount = (float)($tx['discount'] ?? 0);
             $tableId = isset($tx['table_id']) ? (int)$tx['table_id'] : (isset($tx['tableId']) ? (int)$tx['tableId'] : null);
             $spotId = isset($tx['spot_id']) ? (int)$tx['spot_id'] : (isset($tx['spotId']) ? (int)$tx['spotId'] : null);
@@ -238,7 +256,7 @@ try {
             throw new \Exception('Не задан SEPAY_API_TOKEN в .env');
         }
 
-        $txs = $sepayFetchTransactions($date, $sepayApiToken);
+        $txs = $sepayFetchTransactions($date, $sepayApiToken, $sepayAccountNumber);
 
         $db->query("DELETE FROM {$st} WHERE DATE(transaction_date) = ?", [$date]);
 
@@ -279,7 +297,7 @@ try {
             $sub = $sub !== null ? trim((string)$sub) : null;
             if ($sub === '') $sub = null;
 
-            $accum = (int)round((float)($tx['accumulated'] ?? 0));
+            $accum = $moneyToInt($tx['accumulated'] ?? 0);
 
             $amountIn = (float)($tx['amount_in'] ?? 0);
             $amountOut = (float)($tx['amount_out'] ?? 0);
@@ -293,7 +311,7 @@ try {
                 $transferAmount = (int)round($amountIn);
             }
             if ($transferAmount <= 0 && isset($tx['transferAmount'])) {
-                $transferAmount = (int)$tx['transferAmount'];
+                $transferAmount = $moneyToInt($tx['transferAmount']);
                 $transferType = strtolower(trim((string)($tx['transferType'] ?? 'in')));
                 if ($transferType !== 'in' && $transferType !== 'out') $transferType = 'in';
             }
@@ -352,7 +370,7 @@ try {
             elseif ($affected >= 2) $updated++;
         }
 
-        $message = 'SePay загружен по API за ' . $date . ': ' . json_encode(['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped], JSON_UNESCAPED_UNICODE);
+        $message = 'SePay загружен по API за ' . $date . ': ' . json_encode(['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped, 'api_rows' => count($txs)], JSON_UNESCAPED_UNICODE);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'auto_link') {
@@ -362,7 +380,7 @@ try {
             $db->query(
                 "DELETE l FROM {$pl} l
                  JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE p.day_date = ?
+                 WHERE DATE(p.date_close) = ?
                    AND l.is_manual = 0
                    AND l.link_type IN ('auto_green','auto_yellow')",
                 [$date]
@@ -371,7 +389,7 @@ try {
             $db->query(
                 "DELETE l FROM {$pl} l
                  JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE p.day_date = ?
+                 WHERE DATE(p.date_close) = ?
                    AND l.link_type IN ('auto_green','auto_yellow','manual')",
                 [$date]
             );
@@ -380,7 +398,7 @@ try {
         $checks = $db->query(
             "SELECT transaction_id, date_close, payed_card, tip_sum, payment_method
              FROM {$pc}
-             WHERE day_date = ?
+             WHERE DATE(date_close) = ?
                AND pay_type IN (2,3)
              ORDER BY date_close ASC",
             [$date]
@@ -403,7 +421,7 @@ try {
                 "SELECT l.poster_transaction_id, l.sepay_id
                  FROM {$pl} l
                  JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE p.day_date = ?
+                 WHERE DATE(p.date_close) = ?
                    AND l.is_manual = 1",
                 [$date]
             )->fetchAll();
@@ -431,8 +449,8 @@ try {
             $pm = (string)($c['payment_method'] ?? '');
             if (strtolower($pm) === 'vietnam company') continue;
 
-            $payedCardVnd = $toVnd((int)($c['payed_card'] ?? 0));
-            $tipVnd = $toVnd((int)($c['tip_sum'] ?? 0));
+            $payedCardVnd = (int)($c['payed_card'] ?? 0);
+            $tipVnd = (int)($c['tip_sum'] ?? 0);
             $amounts = array_values(array_unique(array_filter([$payedCardVnd, $payedCardVnd + $tipVnd], fn($v) => (int)$v > 0)));
             $closeTs = strtotime((string)$c['date_close']);
             if ($closeTs === false || $closeTs <= 0) continue;
@@ -477,7 +495,7 @@ try {
             "SELECT l.poster_transaction_id, l.sepay_id
              FROM {$pl} l
              JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-             WHERE p.day_date = ?
+             WHERE DATE(p.date_close) = ?
                AND l.link_type = 'auto_green'",
             [$date]
         )->fetchAll();
@@ -497,8 +515,8 @@ try {
             if ($prevPid <= 0 || $nextPid <= 0) continue;
             if (empty($linkedGreenPoster[$prevPid]) || empty($linkedGreenPoster[$nextPid])) continue;
 
-            $payedCardVnd = $toVnd((int)($checks[$i]['payed_card'] ?? 0));
-            $tipVnd = $toVnd((int)($checks[$i]['tip_sum'] ?? 0));
+            $payedCardVnd = (int)($checks[$i]['payed_card'] ?? 0);
+            $tipVnd = (int)($checks[$i]['tip_sum'] ?? 0);
             $amounts = array_values(array_unique(array_filter([$payedCardVnd, $payedCardVnd + $tipVnd], fn($v) => (int)$v > 0)));
             if (count($amounts) === 0) continue;
 
@@ -539,8 +557,8 @@ try {
             $pm = (string)($c['payment_method'] ?? '');
             if (strtolower($pm) === 'vietnam company') continue;
 
-            $payedCardVnd = $toVnd((int)($c['payed_card'] ?? 0));
-            $tipVnd = $toVnd((int)($c['tip_sum'] ?? 0));
+            $payedCardVnd = (int)($c['payed_card'] ?? 0);
+            $tipVnd = (int)($c['tip_sum'] ?? 0);
             $amounts = array_values(array_unique(array_filter([$payedCardVnd, $payedCardVnd + $tipVnd], fn($v) => (int)$v > 0)));
             $closeTs = strtotime((string)$c['date_close']);
             if ($closeTs === false || $closeTs <= 0) continue;
@@ -725,7 +743,7 @@ $sepayRows = $db->query(
 $posterRows = $db->query(
     "SELECT transaction_id, date_close, payed_card, tip_sum, payment_method, waiter_name, table_id
      FROM {$pc}
-     WHERE day_date = ?
+     WHERE DATE(date_close) = ?
        AND pay_type IN (2,3)
      ORDER BY date_close ASC",
     [$date]
@@ -735,7 +753,7 @@ $links = $db->query(
     "SELECT l.poster_transaction_id, l.sepay_id, l.link_type, l.is_manual
      FROM {$pl} l
      JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-     WHERE p.day_date = ?",
+     WHERE DATE(p.date_close) = ?",
     [$date]
 )->fetchAll();
 
@@ -822,15 +840,17 @@ try {
 }
 
 $posterTxCount = 0;
+$posterTxCountError = '';
 try {
     $posterTxCount = (int)$db->query(
         "SELECT COUNT(*) AS c FROM {$pc}
-         WHERE day_date = ?
+         WHERE DATE(date_close) = ?
            AND pay_type IN (2,3)",
         [$date]
     )->fetchColumn();
 } catch (\Throwable $e) {
     $posterTxCount = 0;
+    $posterTxCountError = $e->getMessage();
 }
 
 try {
@@ -926,6 +946,7 @@ $fmtVnd = function (int $v): string {
         <?= $sepayWebhookMeta['hits_total'] !== '' ? (' • hits_total=' . htmlspecialchars($sepayWebhookMeta['hits_total'])) : '' ?>
         <?= $sepayWebhookMeta['last_error'] !== '' ? (' • err=' . htmlspecialchars($sepayWebhookMeta['last_error'])) : '' ?>
         • rows: SePay=<?= (int)$sepayTxCount ?>, Poster=<?= (int)$posterTxCount ?>
+        <?= $posterTxCountError !== '' ? (' • poster_err=' . htmlspecialchars($posterTxCountError)) : '' ?>
     </div>
 
     <?php if ($sepayWebhookMeta['last_body'] !== ''): ?>
@@ -1049,8 +1070,8 @@ $fmtVnd = function (int $v): string {
                                 if (strtolower($pm) === 'vietnam company') {
                                     $cls = 'row-blue';
                                 }
-                                $cardVnd = $toVnd((int)$r['payed_card']);
-                                $tipVnd = $toVnd((int)$r['tip_sum']);
+                                $cardVnd = (int)$r['payed_card'];
+                                $tipVnd = (int)$r['tip_sum'];
                             ?>
                             <tr class="<?= $cls ?>" data-poster-id="<?= $pid ?>">
                                 <td><span class="anchor" id="poster-<?= $pid ?>"></span></td>
@@ -1087,8 +1108,8 @@ $fmtVnd = function (int $v): string {
             <div style="font-weight: 900; margin-bottom: 10px;">Финансовые транзакции</div>
 
             <?php
-                $vietnamSum = $financeDisplay['vietnam'] ? $toVnd((int)($financeDisplay['vietnam']['sum'] ?? $financeDisplay['vietnam']['amount'] ?? 0)) : null;
-                $tipsSum = $financeDisplay['tips'] ? $toVnd((int)($financeDisplay['tips']['sum'] ?? $financeDisplay['tips']['amount'] ?? 0)) : null;
+            $vietnamSum = $financeDisplay['vietnam'] ? $moneyToInt($financeDisplay['vietnam']['sum'] ?? $financeDisplay['vietnam']['amount'] ?? 0) : null;
+            $tipsSum = $financeDisplay['tips'] ? $moneyToInt($financeDisplay['tips']['sum'] ?? $financeDisplay['tips']['amount'] ?? 0) : null;
             ?>
 
             <div class="finance-row">
