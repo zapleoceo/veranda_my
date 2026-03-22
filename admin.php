@@ -1177,24 +1177,7 @@ if ($tab === 'menu' || $tab === 'categories') {
     <div class="container">
         <div class="top-nav">
             <div class="nav-left"><div class="nav-title">Управление</div></div>
-            <div class="user-menu">
-                <?php
-                    $userLabel = (string)($_SESSION['user_name'] ?? $_SESSION['user_email'] ?? '');
-                    $initial = mb_strtoupper(mb_substr($userLabel !== '' ? $userLabel : 'U', 0, 1));
-                    $avatar = (string)($_SESSION['user_avatar'] ?? '');
-                ?>
-                <div class="user-chip">
-                    <span class="user-icon"><?php if ($avatar !== ''): ?><img src="<?= htmlspecialchars($avatar) ?>" alt=""><?php else: ?><?= htmlspecialchars($initial) ?><?php endif; ?></span>
-                    <span><?= htmlspecialchars($userLabel) ?></span>
-                </div>
-                <div class="user-dropdown">
-                    <?php if (veranda_can('dashboard')): ?><a href="dashboard.php">Дашборд</a><?php endif; ?>
-                    <?php if (veranda_can('rawdata')): ?><a href="rawdata.php">Таблица</a><?php endif; ?>
-                    <?php if (veranda_can('kitchen_online')): ?><a href="kitchen_online.php">КухняОнлайн</a><?php endif; ?>
-                    <?php if (veranda_can('admin')): ?><a href="admin.php">Управление</a><?php endif; ?>
-                    <a href="logout.php">Выход</a>
-                </div>
-            </div>
+            <?php require __DIR__ . '/partials/user_menu.php'; ?>
         </div>
         <?php if ($message): ?><div class="success"><?= $message ?></div><?php endif; ?>
         <?php if ($error): ?><div class="error"><?= $error ?></div><?php endif; ?>
