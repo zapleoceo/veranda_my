@@ -2738,23 +2738,56 @@ $fmtVnd = function (int $v): string {
     const lineLayer = document.getElementById('lineLayer');
     const sepayScroll = document.getElementById('sepayScroll');
     const posterScroll = document.getElementById('posterScroll');
+
+    let relayoutRaf = 0;
+    const scheduleRelayout = () => {
+        if (relayoutRaf) return;
+        relayoutRaf = requestAnimationFrame(() => {
+            relayoutRaf = 0;
+            positionLines();
+            positionWidgets();
+        });
+    };
+    const scheduleRelayoutBurst = () => {
+        scheduleRelayout();
+        setTimeout(scheduleRelayout, 50);
+        setTimeout(scheduleRelayout, 200);
+        setTimeout(scheduleRelayout, 600);
+    };
+
     if (tablesRoot) {
-        tablesRoot.addEventListener('scroll', () => { positionLines(); positionWidgets(); }, { passive: true, capture: true });
+        tablesRoot.addEventListener('scroll', () => scheduleRelayout(), { passive: true, capture: true });
     }
     if (sepayScroll) {
-        sepayScroll.addEventListener('scroll', () => { positionLines(); positionWidgets(); }, { passive: true });
+        sepayScroll.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
     }
     if (posterScroll) {
-        posterScroll.addEventListener('scroll', () => { positionLines(); positionWidgets(); }, { passive: true });
+        posterScroll.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
     }
-    window.addEventListener('resize', () => { positionLines(); positionWidgets(); }, { passive: true });
+    window.addEventListener('resize', () => scheduleRelayoutBurst(), { passive: true });
+    window.addEventListener('pageshow', () => scheduleRelayoutBurst(), { passive: true });
+    try {
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => scheduleRelayoutBurst(), { passive: true });
+            window.visualViewport.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
+        }
+    } catch (_) {}
+
+    try {
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(() => scheduleRelayoutBurst());
+            if (tablesRoot) ro.observe(tablesRoot);
+            if (sepayScroll) ro.observe(sepayScroll);
+            if (posterScroll) ro.observe(posterScroll);
+        }
+    } catch (_) {}
+
     window.addEventListener('load', () => {
         drawLines();
         applyRowClasses();
         updateStats();
         applyHideLinked();
-        setTimeout(() => { positionLines(); positionWidgets(); }, 200);
-        setTimeout(() => { positionLines(); positionWidgets(); }, 800);
+        scheduleRelayoutBurst();
     });
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
@@ -2762,14 +2795,14 @@ $fmtVnd = function (int $v): string {
             applyRowClasses();
             updateStats();
             applyHideLinked();
-            setTimeout(() => { positionLines(); positionWidgets(); }, 200);
+            scheduleRelayoutBurst();
         });
     } else {
         drawLines();
         applyRowClasses();
         updateStats();
         applyHideLinked();
-        setTimeout(() => { positionLines(); positionWidgets(); }, 200);
+        scheduleRelayoutBurst();
     }
 
     const sepayTable = document.getElementById('sepayTable');

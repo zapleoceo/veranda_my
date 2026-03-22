@@ -2,6 +2,7 @@
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/Database.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
+require_once __DIR__ . '/src/classes/KitchenAnalytics.php';
 require_once __DIR__ . '/src/classes/MetaRepository.php';
 require_once __DIR__ . '/src/classes/EventLogger.php';
 veranda_require('kitchen_online');
@@ -176,6 +177,28 @@ if ($isAjax) {
     try {
         $logger = new \App\Classes\EventLogger($db, 'kitchen_online', null, $_SESSION['user_email'] ?? null);
         $api = $api ?? new \App\Classes\PosterAPI($token);
+        if ($action === 'list') {
+            try {
+                $metaRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = 'poster_last_sync_at' LIMIT 1")->fetch();
+                $last = !empty($metaRow['meta_value']) ? strtotime((string)$metaRow['meta_value']) : 0;
+                if ($last <= 0 || (time() - $last) >= 5) {
+                    $analytics = new \App\Classes\KitchenAnalytics($api);
+                    $stats = $analytics->getDailyStats($today);
+                    if (is_array($stats) && count($stats) > 0) {
+                        $db->saveStats($stats);
+                    }
+                    $now = date('Y-m-d H:i:s');
+                    $db->query(
+                        "INSERT INTO {$metaTable} (meta_key, meta_value)
+                         VALUES ('poster_last_sync_at', ?)
+                         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                        [$now]
+                    );
+                    $lastSyncLabel = date('d.m.Y H:i:s', strtotime($now));
+                }
+            } catch (\Throwable $e) {
+            }
+        }
         if ($action === 'exclude' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!veranda_can('exclude_toggle')) {
                 http_response_code(403);
