@@ -50,6 +50,53 @@ $extractPaymentMethod = function (array $tx): ?string {
     return null;
 };
 
+$sepayApiToken = trim((string)($_ENV['SEPAY_API_TOKEN'] ?? $_ENV['SEPAY_USER_API_TOKEN'] ?? ''));
+
+$sepayFetchTransactions = function (string $date, string $token): array {
+    $from = $date . ' 00:00:00';
+    $to = $date . ' 23:59:59';
+    $qs = http_build_query([
+        'transaction_date_min' => $from,
+        'transaction_date_max' => $to,
+        'limit' => 5000,
+    ], '', '&', PHP_QUERY_RFC3986);
+    $url = 'https://my.sepay.vn/userapi/transactions/list?' . $qs;
+
+    $ch = curl_init($url);
+    if ($ch === false) {
+        throw new \Exception('SePay API: curl_init failed');
+    }
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $token,
+    ]);
+
+    $body = curl_exec($ch);
+    $err = curl_error($ch);
+    $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($body === false) {
+        throw new \Exception('SePay API: ' . ($err !== '' ? $err : 'request failed'));
+    }
+    $decoded = json_decode($body, true);
+    if (!is_array($decoded)) {
+        throw new \Exception('SePay API: invalid JSON (http=' . $http . ')');
+    }
+    if ($http < 200 || $http > 299) {
+        $e = $decoded['error'] ?? null;
+        $msg = is_string($e) ? $e : ('http=' . $http);
+        throw new \Exception('SePay API: ' . $msg);
+    }
+
+    $txs = $decoded['transactions'] ?? null;
+    if (!is_array($txs)) $txs = [];
+    return $txs;
+};
+
 $getEmployeesById = function (\App\Classes\PosterAPI $api): array {
     $out = [];
     try {
@@ -184,6 +231,128 @@ try {
             $deleted = (int)$db->query("DELETE FROM {$st} WHERE DATE(transaction_date) = ?", [$date])->rowCount();
             $message = 'SePay очищен за ' . $date . ': удалено строк = ' . $deleted;
         }
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'reload_sepay_api') {
+        if ($sepayApiToken === '') {
+            throw new \Exception('Не задан SEPAY_API_TOKEN в .env');
+        }
+
+        $txs = $sepayFetchTransactions($date, $sepayApiToken);
+
+        $db->query("DELETE FROM {$st} WHERE DATE(transaction_date) = ?", [$date]);
+
+        $inserted = 0;
+        $updated = 0;
+        $skipped = 0;
+
+        foreach ($txs as $tx) {
+            if (!is_array($tx)) continue;
+            $sepayId = (int)($tx['id'] ?? 0);
+            if ($sepayId <= 0) {
+                $skipped++;
+                continue;
+            }
+
+            $gateway = trim((string)($tx['bank_brand_name'] ?? $tx['gateway'] ?? ''));
+            if ($gateway === '') $gateway = 'Unknown';
+
+            $accountNumber = trim((string)($tx['account_number'] ?? $tx['accountNumber'] ?? ''));
+            if ($accountNumber === '') $accountNumber = 'Unknown';
+
+            $transactionDate = trim((string)($tx['transaction_date'] ?? $tx['transactionDate'] ?? ''));
+            $ts = strtotime($transactionDate);
+            if ($ts === false || $ts <= 0) {
+                $skipped++;
+                continue;
+            }
+            $transactionDate = date('Y-m-d H:i:s', $ts);
+
+            $code = $tx['code'] ?? null;
+            $code = $code !== null ? trim((string)$code) : null;
+            if ($code === '') $code = null;
+
+            $content = trim((string)($tx['transaction_content'] ?? $tx['content'] ?? ''));
+            $reference = trim((string)($tx['reference_number'] ?? $tx['referenceCode'] ?? $tx['reference_code'] ?? ''));
+
+            $sub = $tx['sub_account'] ?? $tx['subAccount'] ?? null;
+            $sub = $sub !== null ? trim((string)$sub) : null;
+            if ($sub === '') $sub = null;
+
+            $accum = (int)round((float)($tx['accumulated'] ?? 0));
+
+            $amountIn = (float)($tx['amount_in'] ?? 0);
+            $amountOut = (float)($tx['amount_out'] ?? 0);
+            $transferType = 'in';
+            $transferAmount = 0;
+            if ($amountOut > 0.0001 && $amountIn <= 0.0001) {
+                $transferType = 'out';
+                $transferAmount = (int)round($amountOut);
+            } else {
+                $transferType = 'in';
+                $transferAmount = (int)round($amountIn);
+            }
+            if ($transferAmount <= 0 && isset($tx['transferAmount'])) {
+                $transferAmount = (int)$tx['transferAmount'];
+                $transferType = strtolower(trim((string)($tx['transferType'] ?? 'in')));
+                if ($transferType !== 'in' && $transferType !== 'out') $transferType = 'in';
+            }
+
+            $method = null;
+            $hay = strtolower($content . ' ' . (string)$sub);
+            if (strpos($hay, 'bybit') !== false) {
+                $method = 'Bybit';
+            } elseif (strpos($hay, 'vietnam company') !== false) {
+                $method = 'Vietnam Company';
+            } else {
+                $method = 'Card';
+            }
+
+            $rawTx = json_encode($tx, JSON_UNESCAPED_UNICODE);
+            if (!is_string($rawTx)) $rawTx = null;
+
+            $affected = (int)$db->query(
+                "INSERT INTO {$st}
+                    (sepay_id, gateway, transaction_date, account_number, code, content, transfer_type, transfer_amount, accumulated, sub_account, reference_code, description, payment_method, raw_request_body)
+                 VALUES
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                    gateway = VALUES(gateway),
+                    transaction_date = VALUES(transaction_date),
+                    account_number = VALUES(account_number),
+                    code = VALUES(code),
+                    content = VALUES(content),
+                    transfer_type = VALUES(transfer_type),
+                    transfer_amount = VALUES(transfer_amount),
+                    accumulated = VALUES(accumulated),
+                    sub_account = VALUES(sub_account),
+                    reference_code = VALUES(reference_code),
+                    description = VALUES(description),
+                    payment_method = VALUES(payment_method),
+                    raw_request_body = VALUES(raw_request_body)",
+                [
+                    $sepayId,
+                    $gateway,
+                    $transactionDate,
+                    $accountNumber,
+                    $code,
+                    $content !== '' ? $content : '-',
+                    $transferType,
+                    $transferAmount,
+                    $accum,
+                    $sub,
+                    $reference !== '' ? $reference : '-',
+                    $content !== '' ? $content : '-',
+                    $method,
+                    $rawTx
+                ]
+            )->rowCount();
+
+            if ($affected === 1) $inserted++;
+            elseif ($affected >= 2) $updated++;
+        }
+
+        $message = 'SePay загружен по API за ' . $date . ': ' . json_encode(['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped], JSON_UNESCAPED_UNICODE);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'auto_link') {
@@ -787,6 +956,12 @@ $fmtVnd = function (int $v): string {
             <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
             <button class="btn" type="submit" name="scope" value="day" onclick="return confirm('Очистить SePay за выбранную дату?')">Очистить SePay (дата)</button>
             <button class="btn" type="submit" name="scope" value="all" onclick="return confirm('Очистить SePay полностью?')">Очистить SePay (всё)</button>
+        </form>
+
+        <form method="POST" class="toolbar">
+            <input type="hidden" name="action" value="reload_sepay_api">
+            <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
+            <button class="btn" type="submit" onclick="return confirm('Перезагрузить SePay за выбранную дату по API? Это перезапишет данные за день.')">Перезагрузить SePay (API)</button>
         </form>
 
         <div class="divider"></div>
