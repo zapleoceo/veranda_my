@@ -1518,20 +1518,29 @@ $transferTipsExists = false;
 try {
     $vietnamAmountVnd = $financeVietnamCents !== null ? (int)$posterCentsToVnd((int)$financeVietnamCents) : 0;
     $tipsAmountVnd = $financeTipsCents !== null ? (int)$posterCentsToVnd((int)$financeTipsCents) : 0;
-    $targetTs = strtotime($dateTo . ' 23:55:00');
-    if ($targetTs !== false) {
+    $startTs = strtotime($dateTo . ' 00:00:00');
+    $endTs = strtotime($dateTo . ' 23:59:59');
+    if ($startTs !== false && $endTs !== false) {
         $apiFinance = new \App\Classes\PosterAPI((string)$token);
-        $rows = $apiFinance->request('finance.getTransactions', [
-            'dateFrom' => str_replace('-', '', $dateTo),
-            'dateTo' => str_replace('-', '', $dateTo),
-        ]);
+        $rows = [];
+        try {
+            $rows = $apiFinance->request('finance.getTransactions', [
+                'dateFrom' => str_replace('-', '', $dateTo),
+                'dateTo' => str_replace('-', '', $dateTo),
+            ]);
+        } catch (\Throwable $e) {
+            $rows = $apiFinance->request('finance.getTransactions', [
+                'dateFrom' => date('dmY', $startTs),
+                'dateTo' => date('dmY', $endTs),
+            ]);
+        }
         if (!is_array($rows)) $rows = [];
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
             if ((int)($r['type'] ?? 0) !== 2) continue;
-            $accTo = (int)($r['account_to'] ?? $r['account_to_id'] ?? $r['accountTo'] ?? $r['accountToId'] ?? 0);
-            $sum = (int)($r['amount_from'] ?? $r['amountFrom'] ?? $r['sum'] ?? $r['amount'] ?? 0);
-            $cmt = strtolower((string)($r['comment'] ?? $r['description'] ?? ''));
+            $accTo = (int)($r['account_to_id'] ?? $r['account_to'] ?? $r['accountToId'] ?? $r['accountTo'] ?? $r['account_to'] ?? 0);
+            $sumRaw = $r['amount_from'] ?? $r['amountFrom'] ?? $r['amount_to'] ?? $r['amountTo'] ?? $r['sum'] ?? $r['amount'] ?? 0;
+            $sum = (int)$sumRaw;
 
             $dRaw = $r['date'] ?? $r['created_at'] ?? $r['time'] ?? null;
             $ts = null;
@@ -1544,7 +1553,7 @@ try {
                 if ($t !== false && $t > 0) $ts = $t;
             }
             if ($ts === null) continue;
-            if (abs($ts - $targetTs) > 15 * 60) continue;
+            if ($ts < $startTs || $ts > $endTs) continue;
 
             if (!$transferVietnamExists && $accTo === 9 && $vietnamAmountVnd > 0 && $sum === $vietnamAmountVnd) {
                 $transferVietnamExists = true;
