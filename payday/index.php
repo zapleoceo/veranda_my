@@ -152,6 +152,7 @@ $st = $db->t('sepay_transactions');
 $pc = $db->t('poster_checks');
 $ppm = $db->t('poster_payment_methods');
 $pt = $db->t('poster_transactions');
+$pa = $db->t('poster_accounts');
 $pl = $db->t('check_payment_links');
 
 $action = (string)($_POST['action'] ?? '');
@@ -388,6 +389,49 @@ try {
             'max_close_at' => $maxCloseAt,
             'payment_methods' => count($methodTitleById),
         ], JSON_UNESCAPED_UNICODE);
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'load_poster_accounts') {
+        $rows = $api->request('finance.getAccounts', []);
+        if (!is_array($rows)) $rows = [];
+        try {
+            $db->query("DELETE FROM {$pa}");
+        } catch (\Throwable $e) {
+        }
+        $upserted = 0;
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $accountId = (int)($r['account_id'] ?? $r['accountId'] ?? 0);
+            $name = trim((string)($r['name'] ?? ''));
+            if ($accountId <= 0 || $name === '') continue;
+            $upserted += (int)$db->query(
+                "INSERT INTO {$pa} (account_id, name, type, currency_id, currency_symbol, currency_code_iso, currency_code, balance, balance_start, percent_acquiring)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                    name = VALUES(name),
+                    type = VALUES(type),
+                    currency_id = VALUES(currency_id),
+                    currency_symbol = VALUES(currency_symbol),
+                    currency_code_iso = VALUES(currency_code_iso),
+                    currency_code = VALUES(currency_code),
+                    balance = VALUES(balance),
+                    balance_start = VALUES(balance_start),
+                    percent_acquiring = VALUES(percent_acquiring)",
+                [
+                    $accountId,
+                    $name,
+                    (int)($r['type'] ?? 0),
+                    isset($r['currency_id']) ? (int)$r['currency_id'] : null,
+                    isset($r['currency_symbol']) ? (string)$r['currency_symbol'] : null,
+                    isset($r['currency_code_iso']) ? (string)$r['currency_code_iso'] : null,
+                    isset($r['currency_code']) ? (string)$r['currency_code'] : null,
+                    $moneyToInt($r['balance'] ?? 0),
+                    isset($r['balance_start']) ? $moneyToInt($r['balance_start']) : null,
+                    isset($r['percent_acquiring']) ? (float)$r['percent_acquiring'] : null,
+                ]
+            )->rowCount();
+        }
+        $message = 'Баланс Poster обновлён: ' . $upserted;
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'clear_day') {
@@ -1213,6 +1257,36 @@ try {
     $financeTipsCents = null;
 }
 
+$posterAccounts = [];
+$posterAccountsById = [];
+try {
+    $posterAccounts = $db->query(
+        "SELECT account_id, name, type, balance, currency_symbol
+         FROM {$pa}
+         ORDER BY account_id ASC"
+    )->fetchAll();
+    foreach ($posterAccounts as $r) {
+        $id = (int)($r['account_id'] ?? 0);
+        if ($id > 0) $posterAccountsById[$id] = $r;
+    }
+} catch (\Throwable $e) {
+    $posterAccounts = [];
+    $posterAccountsById = [];
+}
+
+$posterBalanceAndrey = null;
+$posterBalanceVietnam = null;
+$posterBalanceCash = null;
+if (isset($posterAccountsById[1]) || isset($posterAccountsById[8])) {
+    $posterBalanceAndrey = (int)($posterAccountsById[1]['balance'] ?? 0) + (int)($posterAccountsById[8]['balance'] ?? 0);
+}
+if (isset($posterAccountsById[9])) {
+    $posterBalanceVietnam = (int)($posterAccountsById[9]['balance'] ?? 0);
+}
+if (isset($posterAccountsById[2])) {
+    $posterBalanceCash = (int)($posterAccountsById[2]['balance'] ?? 0);
+}
+
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', ',') . ' ₫';
 };
@@ -1530,6 +1604,53 @@ $fmtVnd = function (int $v): string {
                 </form>
             </div>
         </div>
+
+        <div class="divider"></div>
+
+        <div class="card" style="background:#fbfbfd;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; margin-bottom: 10px;">
+                <div style="font-weight: 900;">Обновляем Балансы Poster</div>
+                <form method="POST" id="posterAccountsForm" style="margin:0;">
+                    <input type="hidden" name="action" value="load_poster_accounts">
+                    <button class="btn" id="posterAccountsBtn" type="submit" title="Обновить балансы">🔄</button>
+                </form>
+            </div>
+
+            <div class="muted" style="font-weight: 900; margin-bottom: 10px;">
+                Баланс Счета Андрей = <?= $posterBalanceAndrey !== null ? htmlspecialchars($fmtVnd((int)$posterBalanceAndrey)) : '—' ?><br>
+                Баланс вьетнамской компании = <?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVnd((int)$posterBalanceVietnam)) : '—' ?><br>
+                Баланс кассы = <?= $posterBalanceCash !== null ? htmlspecialchars($fmtVnd((int)$posterBalanceCash)) : '—' ?>
+            </div>
+
+            <div style="max-height: 260px; overflow:auto; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff;">
+                <table style="width:100%; border-collapse: collapse;">
+                    <thead>
+                    <tr style="background:#f9fafb;">
+                        <th style="text-align:left; padding: 8px 10px; font-weight: 900;">ID</th>
+                        <th style="text-align:left; padding: 8px 10px; font-weight: 900;">Счёт</th>
+                        <th style="text-align:right; padding: 8px 10px; font-weight: 900;">Баланс</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($posterAccounts as $a): ?>
+                        <?php
+                        $aid = (int)($a['account_id'] ?? 0);
+                        $an = (string)($a['name'] ?? '');
+                        $bal = (int)($a['balance'] ?? 0);
+                        ?>
+                        <tr>
+                            <td style="padding: 8px 10px;"><?= htmlspecialchars((string)$aid) ?></td>
+                            <td style="padding: 8px 10px;"><?= htmlspecialchars($an) ?></td>
+                            <td style="padding: 8px 10px; text-align:right;"><?= htmlspecialchars($fmtVnd($bal)) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (count($posterAccounts) === 0): ?>
+                        <tr><td colspan="3" style="padding: 10px; color:#6b7280; font-weight:900;">Нет данных: нажми 🔄</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1556,6 +1677,7 @@ $fmtVnd = function (int $v): string {
     setFormLoading('posterSyncForm', 'posterSyncBtn');
     setFormLoading('sepaySyncForm', 'sepaySyncBtn');
     setFormLoading('clearDayForm', 'clearDayBtn');
+    setFormLoading('posterAccountsForm', 'posterAccountsBtn');
 
     const widgets = new Map();
     const svgState = { svg: null, defs: null, group: null, markers: new Map() };

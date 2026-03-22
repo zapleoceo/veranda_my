@@ -264,6 +264,7 @@ class Database {
         $pc = $this->t('poster_checks');
         $ppm = $this->t('poster_payment_methods');
         $pt = $this->t('poster_transactions');
+        $pa = $this->t('poster_accounts');
         $pl = $this->t('check_payment_links');
         $fkTag = $this->tableSuffix !== '' ? substr(sha1($this->tableSuffix), 0, 6) : 'base';
 
@@ -425,6 +426,21 @@ class Database {
             $this->pdo->exec("DROP TABLE IF EXISTS " . $this->t('poster_transaction_details'));
         } catch (\Throwable $e) {
         }
+
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$pa} (
+            account_id INT UNSIGNED NOT NULL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            type TINYINT NOT NULL,
+            currency_id INT NULL,
+            currency_symbol VARCHAR(16) NULL,
+            currency_code_iso VARCHAR(16) NULL,
+            currency_code VARCHAR(32) NULL,
+            balance BIGINT NOT NULL,
+            balance_start BIGINT NULL,
+            percent_acquiring DECIMAL(8,2) NULL,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_pa_type (type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$pl} (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
