@@ -447,15 +447,28 @@ class Database {
             poster_transaction_id BIGINT UNSIGNED NOT NULL,
             sepay_id BIGINT UNSIGNED NOT NULL,
             link_type ENUM('auto_green','auto_yellow','manual') NOT NULL,
-            is_manual TINYINT(1) NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_link_pair (poster_transaction_id, sepay_id),
             KEY idx_link_poster (poster_transaction_id),
             KEY idx_link_sepay (sepay_id),
+            KEY idx_link_type (link_type),
             CONSTRAINT fk_check_links_poster_{$fkTag} FOREIGN KEY (poster_transaction_id) REFERENCES {$pc}(transaction_id) ON DELETE CASCADE,
             CONSTRAINT fk_check_links_sepay_{$fkTag} FOREIGN KEY (sepay_id) REFERENCES {$st}(sepay_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        try {
+            $cols = $this->pdo->query("SHOW COLUMNS FROM {$pl}")->fetchAll(\PDO::FETCH_ASSOC);
+            $have = [];
+            foreach ($cols as $c) {
+                $f = strtolower((string)($c['Field'] ?? ''));
+                if ($f !== '') $have[$f] = true;
+            }
+            if (!empty($have['is_manual'])) {
+                $this->pdo->exec("ALTER TABLE {$pl} DROP COLUMN is_manual");
+            }
+        } catch (\Throwable $e) {
+        }
 
         try {
             $this->pdo->exec(
@@ -469,6 +482,7 @@ class Database {
             $idx = $this->pdo->query("SHOW INDEX FROM {$pl}")->fetchAll(\PDO::FETCH_ASSOC);
             $hasIdxSepay = false;
             $hasIdxPoster = false;
+            $hasIdxType = false;
             $hasUqPair = false;
             $indexCols = [];
             foreach ($idx as $i) {
@@ -487,6 +501,9 @@ class Database {
                 if ($name === 'idx_link_poster') {
                     $hasIdxPoster = true;
                 }
+                if ($name === 'idx_link_type') {
+                    $hasIdxType = true;
+                }
                 if ($name === 'uq_link_pair' && $nonUnique === 0) {
                     $hasUqPair = true;
                 }
@@ -497,6 +514,9 @@ class Database {
             }
             if (!$hasIdxPoster) {
                 $this->pdo->exec("ALTER TABLE {$pl} ADD INDEX idx_link_poster (poster_transaction_id)");
+            }
+            if (!$hasIdxType) {
+                $this->pdo->exec("ALTER TABLE {$pl} ADD INDEX idx_link_type (link_type)");
             }
             if (!$hasUqPair) {
                 $this->pdo->exec("ALTER TABLE {$pl} ADD UNIQUE KEY uq_link_pair (poster_transaction_id, sepay_id)");

@@ -762,9 +762,9 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
         foreach ($posterIds as $pid) {
             foreach ($sepayIds as $sid) {
                 $affected = $db->query(
-                    "INSERT INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
-                     VALUES (?, ?, 'manual', 1)
-                     ON DUPLICATE KEY UPDATE link_type = 'manual', is_manual = 1",
+                    "INSERT INTO {$pl} (poster_transaction_id, sepay_id, link_type)
+                     VALUES (?, ?, 'manual')
+                     ON DUPLICATE KEY UPDATE link_type = 'manual'",
                     [(int)$pid, (int)$sid]
                 )->rowCount();
                 if ($affected > 0) $inserted++;
@@ -789,8 +789,8 @@ if (($_GET['ajax'] ?? '') === 'clear_links') {
         $db->query(
             "DELETE l FROM {$pl} l
              JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-             WHERE p.day_date = ?",
-            [$date]
+             WHERE p.day_date BETWEEN ? AND ?",
+            [$dateFrom, $dateTo]
         );
         echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
@@ -881,8 +881,8 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             if ($best !== null) {
                 $sid = (int)$best['sepay_id'];
                 $db->query(
-                    "INSERT IGNORE INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
-                     VALUES (?, ?, 'auto_green', 0)",
+                    "INSERT IGNORE INTO {$pl} (poster_transaction_id, sepay_id, link_type)
+                     VALUES (?, ?, 'auto_green')",
                     [$pid, $sid]
                 );
                 $linkedPoster[$pid] = true;
@@ -942,8 +942,8 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             if ($best !== null) {
                 $sid = (int)$best['sepay_id'];
                 $db->query(
-                    "INSERT IGNORE INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
-                     VALUES (?, ?, 'auto_green', 0)",
+                    "INSERT IGNORE INTO {$pl} (poster_transaction_id, sepay_id, link_type)
+                     VALUES (?, ?, 'auto_green')",
                     [$pid, $sid]
                 );
                 $linkedPoster[$pid] = true;
@@ -984,8 +984,8 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             if ($best !== null) {
                 $sid = (int)$best['sepay_id'];
                 $db->query(
-                    "INSERT IGNORE INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
-                     VALUES (?, ?, 'auto_yellow', 0)",
+                    "INSERT IGNORE INTO {$pl} (poster_transaction_id, sepay_id, link_type)
+                     VALUES (?, ?, 'auto_yellow')",
                     [$pid, $sid]
                 );
                 $linkedPoster[$pid] = true;
@@ -1033,7 +1033,8 @@ if (($_GET['ajax'] ?? '') === 'links') {
     header('Content-Type: application/json; charset=utf-8');
     try {
         $rows = $db->query(
-            "SELECT l.poster_transaction_id, l.sepay_id, l.link_type, l.is_manual
+            "SELECT l.poster_transaction_id, l.sepay_id, l.link_type,
+                    CASE WHEN l.link_type = 'manual' THEN 1 ELSE 0 END AS is_manual
              FROM {$pl} l
              JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
              WHERE p.day_date BETWEEN ? AND ?",
@@ -1210,7 +1211,8 @@ try {
 }
 
 $links = $db->query(
-    "SELECT l.poster_transaction_id, l.sepay_id, l.link_type, l.is_manual
+    "SELECT l.poster_transaction_id, l.sepay_id, l.link_type,
+            CASE WHEN l.link_type = 'manual' THEN 1 ELSE 0 END AS is_manual
      FROM {$pl} l
      JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
      WHERE p.day_date BETWEEN ? AND ?",
@@ -1494,6 +1496,8 @@ $fmtVnd = function (int $v): string {
         .mid-btn.active { background: #111827; border-color: #111827; color: #fff; }
         .mid-btn:disabled { opacity: 0.5; cursor: default; }
         .mid-check { display:flex; gap: 8px; align-items:center; font-weight: 800; font-size: 12px; color: #374151; user-select: none; }
+        .bottom-two { display:flex; gap: 12px; align-items:flex-start; flex-wrap: wrap; }
+        .bottom-two > .card { flex: 1 1 420px; }
     </style>
 </head>
 <body>
@@ -1550,10 +1554,11 @@ $fmtVnd = function (int $v): string {
                     <table id="sepayTable">
                         <thead>
                             <tr>
-                                <th></th>
-                                <th class="nowrap sortable" data-sort-key="ts">Время</th>
                                 <th class="sortable" data-sort-key="content">Content</th>
+                                <th class="nowrap sortable" data-sort-key="ts">Время</th>
                                 <th class="nowrap sortable" data-sort-key="sum">Сумма</th>
+                                <th></th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1576,10 +1581,11 @@ $fmtVnd = function (int $v): string {
                             ?>
                             <?php $tsRow = strtotime($r['transaction_date']) ?: 0; ?>
                             <tr class="<?= $cls ?>" data-sepay-id="<?= $sid ?>" data-ts="<?= (int)$tsRow ?>" data-sum="<?= (int)$r['transfer_amount'] ?>" data-content="<?= htmlspecialchars(mb_strtolower((string)($r['content'] ?? ''), 'UTF-8')) ?>">
-                                <td><div class="cell-anchor"><span class="anchor" id="sepay-<?= $sid ?>"></span><input type="checkbox" class="sepay-cb" data-id="<?= $sid ?>"></div></td>
-                                <td class="nowrap"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
                                 <td><?= htmlspecialchars((string)($r['content'] ?? '')) ?></td>
+                                <td class="nowrap"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
                                 <td class="sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
+                                <td><input type="checkbox" class="sepay-cb" data-id="<?= $sid ?>"></td>
+                                <td class="nowrap"><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -1696,6 +1702,7 @@ $fmtVnd = function (int $v): string {
 
         <div class="divider"></div>
 
+        <div class="bottom-two">
         <div class="card" style="background:#fbfbfd;">
             <div style="font-weight: 900; margin-bottom: 10px;">Финансовые транзакции</div>
 
@@ -1744,9 +1751,6 @@ $fmtVnd = function (int $v): string {
                 </form>
             </div>
         </div>
-
-        <div class="divider"></div>
-
         <div class="card" style="background:#fbfbfd;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; margin-bottom: 10px;">
                 <div style="font-weight: 900;">Обновляем Балансы Poster</div>
@@ -1788,6 +1792,7 @@ $fmtVnd = function (int $v): string {
                     </tbody>
                 </table>
             </div>
+        </div>
         </div>
     </div>
 </div>
@@ -1943,7 +1948,7 @@ $fmtVnd = function (int $v): string {
 
     const getAnchorPoint = (el, side, rootRect) => {
         const r = el.getBoundingClientRect();
-        const x = (side === 'right' ? (r.left + r.width) : r.left) - rootRect.left;
+        const x = (r.left + r.width / 2) - rootRect.left;
         const y = (r.top + r.height / 2) - rootRect.top;
         return { x, y };
     };
