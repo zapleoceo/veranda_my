@@ -751,24 +751,21 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
         exit;
     }
     try {
-        $from = $date . ' 00:00:00';
-        $to = $date . ' 23:59:59';
-
         $db->query(
             "DELETE l FROM {$pl} l
              JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-             WHERE p.day_date = ?",
-            [$date]
+             WHERE p.day_date BETWEEN ? AND ?",
+            [$dateFrom, $dateTo]
         );
 
         $checks = $db->query(
-            "SELECT transaction_id, date_close, payed_card, payed_third_party, tip_sum, payment_method
+            "SELECT transaction_id, date_close, payed_card, payed_third_party, tip_sum, poster_payment_method_id
              FROM {$pc}
-             WHERE day_date = ?
+             WHERE day_date BETWEEN ? AND ?
                AND pay_type IN (2,3)
                AND (payed_card + payed_third_party) > 0
              ORDER BY date_close ASC",
-            [$date]
+            [$dateFrom, $dateTo]
         )->fetchAll();
 
         $sepay = $db->query(
@@ -778,7 +775,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
                AND transfer_type = 'in'
                AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))
              ORDER BY transaction_date ASC",
-            [$from, $to]
+            [$periodFrom, $periodTo]
         )->fetchAll();
 
         $linkedSepay = [];
@@ -797,8 +794,8 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             $pid = (int)($c['transaction_id'] ?? 0);
             if ($pid <= 0) continue;
             if (!empty($linkedPoster[$pid])) continue;
-            $pm = (string)($c['payment_method'] ?? '');
-            if (strtolower($pm) === 'vietnam company') continue;
+            $pmId = (int)($c['poster_payment_method_id'] ?? 0);
+            if ($pmId === 11) continue;
 
             $payedCardVnd = $posterCentsToVnd((int)(($c['payed_card'] ?? 0) + ($c['payed_third_party'] ?? 0)));
             $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
@@ -841,9 +838,9 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             "SELECT l.poster_transaction_id, l.sepay_id
              FROM {$pl} l
              JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-             WHERE p.day_date = ?
+             WHERE p.day_date BETWEEN ? AND ?
                AND l.link_type = 'auto_green'",
-            [$date]
+            [$dateFrom, $dateTo]
         )->fetchAll();
         foreach ($rowsGreen as $r) {
             $linkedGreenPoster[(int)$r['poster_transaction_id']] = (int)$r['sepay_id'];
@@ -853,8 +850,8 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             $pid = (int)($checks[$i]['transaction_id'] ?? 0);
             if ($pid <= 0) continue;
             if (!empty($linkedPoster[$pid])) continue;
-            $pm = (string)($checks[$i]['payment_method'] ?? '');
-            if (strtolower($pm) === 'vietnam company') continue;
+            $pmId = (int)($checks[$i]['poster_payment_method_id'] ?? 0);
+            if ($pmId === 11) continue;
 
             $prevPid = (int)($checks[$i - 1]['transaction_id'] ?? 0);
             $nextPid = (int)($checks[$i + 1]['transaction_id'] ?? 0);
@@ -901,8 +898,8 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             $pid = (int)($c['transaction_id'] ?? 0);
             if ($pid <= 0) continue;
             if (!empty($linkedPoster[$pid])) continue;
-            $pm = (string)($c['payment_method'] ?? '');
-            if (strtolower($pm) === 'vietnam company') continue;
+            $pmId = (int)($c['poster_payment_method_id'] ?? 0);
+            if ($pmId === 11) continue;
 
             $payedCardVnd = $posterCentsToVnd((int)(($c['payed_card'] ?? 0) + ($c['payed_third_party'] ?? 0)));
             $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
