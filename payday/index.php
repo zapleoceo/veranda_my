@@ -172,6 +172,21 @@ $ppm = $db->t('poster_payment_methods');
 $pt = $db->t('poster_transactions');
 $pa = $db->t('poster_accounts');
 $pl = $db->t('check_payment_links');
+$sh = $db->t('sepay_hidden');
+
+try {
+    $db->query(
+        "CREATE TABLE IF NOT EXISTS {$sh} (
+            sepay_id BIGINT NOT NULL,
+            comment TEXT NULL,
+            created_by VARCHAR(255) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (sepay_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    );
+} catch (\Throwable $e) {
+}
 
 $action = (string)($_POST['action'] ?? '');
 
@@ -732,6 +747,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== '') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'sepay_hide') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    if (!is_array($payload)) $payload = [];
+    $sepayId = (int)($payload['sepay_id'] ?? 0);
+    $comment = trim((string)($payload['comment'] ?? ''));
+    if ($sepayId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($comment === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Нужен комментарий'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (mb_strlen($comment, 'UTF-8') > 2000) {
+        $comment = mb_substr($comment, 0, 2000, 'UTF-8');
+    }
+    $by = '';
+    if (!isset($_SESSION)) {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    }
+    $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+    try {
+        $db->query("DELETE FROM {$pl} WHERE sepay_id = ?", [$sepayId]);
+        $db->query(
+            "INSERT INTO {$sh} (sepay_id, comment, created_by)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE comment = VALUES(comment), created_by = VALUES(created_by), updated_at = CURRENT_TIMESTAMP",
+            [$sepayId, $comment, $by !== '' ? $by : null]
+        );
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'manual_link') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -873,12 +934,13 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
         )->fetchAll();
 
         $sepay = $db->query(
-            "SELECT sepay_id, transaction_date, transfer_amount
-             FROM {$st}
-             WHERE transaction_date BETWEEN ? AND ?
-               AND transfer_type = 'in'
-               AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))
-             ORDER BY transaction_date ASC",
+            "SELECT s.sepay_id, s.transaction_date, s.transfer_amount
+             FROM {$st} s
+             WHERE s.transaction_date BETWEEN ? AND ?
+               AND s.transfer_type = 'in'
+               AND (s.payment_method IS NULL OR s.payment_method IN ('Card','Bybit'))
+               AND NOT EXISTS (SELECT 1 FROM {$sh} h WHERE h.sepay_id = s.sepay_id)
+             ORDER BY s.transaction_date ASC",
             [$periodFrom, $periodTo]
         )->fetchAll();
 
@@ -1339,12 +1401,13 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
 }
 
 $sepayRows = $db->query(
-    "SELECT sepay_id, transaction_date, transfer_amount, payment_method, content, reference_code
-     FROM {$st}
-     WHERE transaction_date BETWEEN ? AND ?
-       AND transfer_type = 'in'
-       AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))
-     ORDER BY transaction_date ASC",
+    "SELECT s.sepay_id, s.transaction_date, s.transfer_amount, s.payment_method, s.content, s.reference_code
+     FROM {$st} s
+     WHERE s.transaction_date BETWEEN ? AND ?
+       AND s.transfer_type = 'in'
+       AND (s.payment_method IS NULL OR s.payment_method IN ('Card','Bybit'))
+       AND NOT EXISTS (SELECT 1 FROM {$sh} h WHERE h.sepay_id = s.sepay_id)
+     ORDER BY s.transaction_date ASC",
     [$periodFrom, $periodTo]
 )->fetchAll();
 
@@ -1367,10 +1430,12 @@ $posterBybitVnd = 0;
 $posterVietVnd = 0;
 try {
     $sepayTotalVnd = (int)$db->query(
-        "SELECT COALESCE(SUM(transfer_amount), 0) FROM {$st}
-         WHERE transaction_date BETWEEN ? AND ?
-           AND transfer_type = 'in'
-           AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))",
+        "SELECT COALESCE(SUM(s.transfer_amount), 0)
+         FROM {$st} s
+         WHERE s.transaction_date BETWEEN ? AND ?
+           AND s.transfer_type = 'in'
+           AND (s.payment_method IS NULL OR s.payment_method IN ('Card','Bybit'))
+           AND NOT EXISTS (SELECT 1 FROM {$sh} h WHERE h.sepay_id = s.sepay_id)",
         [$periodFrom, $periodTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
@@ -1505,10 +1570,12 @@ try {
 $sepayTxCount = 0;
 try {
     $sepayTxCount = (int)$db->query(
-        "SELECT COUNT(*) AS c FROM {$st}
-         WHERE transaction_date BETWEEN ? AND ?
-           AND transfer_type = 'in'
-           AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))",
+        "SELECT COUNT(*) AS c
+         FROM {$st} s
+         WHERE s.transaction_date BETWEEN ? AND ?
+           AND s.transfer_type = 'in'
+           AND (s.payment_method IS NULL OR s.payment_method IN ('Card','Bybit'))
+           AND NOT EXISTS (SELECT 1 FROM {$sh} h WHERE h.sepay_id = s.sepay_id)",
         [$periodFrom, $periodTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
@@ -1757,6 +1824,8 @@ $fmtVnd = function (int $v): string {
         .badge { display:inline-flex; align-items:center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; border: 1px solid #e5e7eb; background: #fff; }
         .link-x { position: absolute; z-index: 20; width: 16px; height: 16px; border-radius: 999px; border: 1px solid #d0d5dd; background: #fff; color: #111827; display:flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; }
         .link-x:hover { background: #f3f4f6; }
+        .sepay-hide { width: 14px; height: 14px; border-radius: 999px; border: 1px solid #d0d5dd; background: #fff; color: #111827; display:inline-flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; margin-right: 6px; }
+        .sepay-hide:hover { background: #f3f4f6; }
         .cell-anchor { display:flex; align-items:center; gap: 8px; }
         .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
         .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding: 10px 8px 12px; margin-top: 6px; border-radius: 14px; background: rgba(255,255,255,0.30); backdrop-filter: blur(2px); border: 1px solid rgba(208,213,221,0.6); position: relative; z-index: 3; }
@@ -1889,7 +1958,7 @@ $fmtVnd = function (int $v): string {
                                 <td class="nowrap col-sepay-time"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
                                 <td class="sum col-sepay-sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
                                 <td class="col-sepay-cb"><input type="checkbox" class="sepay-cb" data-id="<?= $sid ?>"></td>
-                                <td class="nowrap col-sepay-dot"><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
+                                <td class="nowrap col-sepay-dot"><button type="button" class="sepay-hide" data-sepay-id="<?= $sid ?>" title="Скрыть (не чек)">−</button><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -2983,6 +3052,33 @@ $fmtVnd = function (int $v): string {
             if (cb.checked) selectedSepay.add(id);
             else selectedSepay.delete(id);
             updateLinkButtonState();
+        });
+    });
+    document.querySelectorAll('button.sepay-hide').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const sepayId = Number(btn.getAttribute('data-sepay-id') || 0);
+            if (!sepayId) return;
+            const comment = prompt('Комментарий (почему скрываем этот платеж):', '');
+            if (comment === null) return;
+            const c = String(comment || '').trim();
+            if (!c) return;
+            fetch('?ajax=sepay_hide', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sepay_id: sepayId, comment: c }),
+            })
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                const tr = btn.closest('tr');
+                if (tr) tr.remove();
+                selectedSepay.delete(sepayId);
+                updateStats();
+                applyHideLinked();
+                drawLines();
+                try { scheduleRelayoutBurst(); } catch (e) {}
+            })
+            .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         });
     });
     document.querySelectorAll('input.poster-cb').forEach((cb) => {
