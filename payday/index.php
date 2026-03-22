@@ -1222,9 +1222,12 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_plan') {
                 'user_id' => 4,
                 'date' => date('Y-m-d H:i:s'),
                 'comment' => 'Коррекция излишек - недостачи за счет чая',
-                'account_id' => $accountId,
                 'account_name' => $accountName,
                 'sum' => $amount,
+                'account_to' => $type === 1 ? $accountId : null,
+                'account_from' => $type === 0 ? $accountId : null,
+                'amount_to' => $type === 1 ? $amount : null,
+                'amount_from' => $type === 0 ? $amount : null,
                 'diff_cents' => $diffCents,
             ],
         ], JSON_UNESCAPED_UNICODE);
@@ -1282,10 +1285,21 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
                 foreach ($rows as $r) {
                     if (!is_array($r)) continue;
                     if ((int)($r['type'] ?? 0) !== $type) continue;
-                    $accTo = (int)($r['account_id'] ?? $r['account_to_id'] ?? $r['accountToId'] ?? 0);
-                    if ($accTo !== $accountId) continue;
-                    $sum = (string)($r['sum'] ?? $r['amount'] ?? $r['amount_from'] ?? '');
-                    if ($sum !== '' && (string)$sum === (string)$amount) {
+                    $accToRaw = $r['account_to'] ?? $r['account_to_id'] ?? $r['accountTo'] ?? $r['accountToId'] ?? null;
+                    $accFromRaw = $r['account_from'] ?? $r['account_from_id'] ?? $r['accountFrom'] ?? $r['accountFromId'] ?? null;
+                    if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
+                    if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
+                    $accTo = (int)($accToRaw ?? 0);
+                    $accFrom = (int)($accFromRaw ?? 0);
+                    if ($type === 1 && $accTo !== $accountId) continue;
+                    if ($type === 0 && $accFrom !== $accountId) continue;
+
+                    $sum = '';
+                    if ($type === 1) $sum = (string)($r['amount_to'] ?? $r['amountTo'] ?? $r['sum'] ?? $r['amount'] ?? '');
+                    else $sum = (string)($r['amount_from'] ?? $r['amountFrom'] ?? $r['sum'] ?? $r['amount'] ?? '');
+
+                    $sumCmp = trim(str_replace(',', '.', str_replace(' ', '', $sum)));
+                    if ($sumCmp !== '' && (string)$sumCmp === (string)$amount) {
                         $cmt = (string)($r['comment'] ?? $r['description'] ?? '');
                         if ($cmt !== '' && mb_stripos($cmt, $comment) !== false) {
                             unset($_SESSION['payday_balance_sinc']);
@@ -1298,16 +1312,22 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
         } catch (\Throwable $e) {
         }
 
-        $res = $api3->request('finance.createTransactions', [
+        $payload = [
             'id' => 1,
             'type' => $type,
             'category' => 4,
             'user_id' => 4,
             'date' => date('Y-m-d H:i:s'),
             'comment' => $comment,
-            'account_id' => $accountId,
-            'sum' => $amount,
-        ], 'POST');
+        ];
+        if ($type === 1) {
+            $payload['account_to'] = $accountId;
+            $payload['amount_to'] = $amount;
+        } else {
+            $payload['account_from'] = $accountId;
+            $payload['amount_from'] = $amount;
+        }
+        $res = $api3->request('finance.createTransactions', $payload, 'POST');
 
         unset($_SESSION['payday_balance_sinc']);
         echo json_encode(['ok' => true, 'response' => $res], JSON_UNESCAPED_UNICODE);
@@ -2312,7 +2332,7 @@ $fmtVnd = function (int $v): string {
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
                 const p = j.plan || {};
                 const sum = String(p.sum || '');
-                const accId = Number(p.account_id || 0);
+                const accId = Number(p.account_to || p.account_from || 0);
                 const accName = String(p.account_name || '');
                 const type = Number(p.type || 0);
                 const action = type === 1 ? 'Начислить' : 'Списать';
