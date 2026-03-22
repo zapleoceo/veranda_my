@@ -173,6 +173,19 @@ try {
         $message = 'Poster чеки загружены: ' . json_encode(['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped], JSON_UNESCAPED_UNICODE);
     }
 
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'clear_sepay') {
+        $scope = (string)($_POST['scope'] ?? 'day');
+        if (!in_array($scope, ['day', 'all'], true)) $scope = 'day';
+
+        if ($scope === 'all') {
+            $deleted = (int)$db->query("DELETE FROM {$st}")->rowCount();
+            $message = 'SePay очищен: удалено строк = ' . $deleted;
+        } else {
+            $deleted = (int)$db->query("DELETE FROM {$st} WHERE DATE(transaction_date) = ?", [$date])->rowCount();
+            $message = 'SePay очищен за ' . $date . ': удалено строк = ' . $deleted;
+        }
+    }
+
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'auto_link') {
         $preserveManual = !empty($_POST['preserve_manual']);
 
@@ -767,6 +780,13 @@ $fmtVnd = function (int $v): string {
             <input type="hidden" name="action" value="load_poster_checks">
             <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
             <button class="btn primary" type="submit">Загрузить чеки из Poster</button>
+        </form>
+
+        <form method="POST" class="toolbar">
+            <input type="hidden" name="action" value="clear_sepay">
+            <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
+            <button class="btn" type="submit" name="scope" value="day" onclick="return confirm('Очистить SePay за выбранную дату?')">Очистить SePay (дата)</button>
+            <button class="btn" type="submit" name="scope" value="all" onclick="return confirm('Очистить SePay полностью?')">Очистить SePay (всё)</button>
         </form>
 
         <div class="divider"></div>
