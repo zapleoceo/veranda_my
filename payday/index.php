@@ -1379,6 +1379,10 @@ $fmtVnd = function (int $v): string {
                 <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                 <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
                 <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
+                <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
+                    <div>Платежи: <span id="selSepaySum">0 ₫</span></div>
+                    <div>Чеки: <span id="selPosterSum">0 ₫</span></div>
+                </div>
             </div>
 
             <div class="card" style="padding: 0;">
@@ -1465,8 +1469,18 @@ $fmtVnd = function (int $v): string {
             <div style="font-weight: 900; margin-bottom: 10px;">Финансовые транзакции</div>
 
             <?php
-            $vietnamVnd = $financeVietnamCents !== null ? $posterCentsToVnd((int)$financeVietnamCents) : null;
-            $tipsVnd = $financeTipsCents !== null ? $posterCentsToVnd((int)$financeTipsCents) : null;
+            $vietnamCents = $financeVietnamCents;
+            $tipsCents = $financeTipsCents;
+            $vietnamVnd = $vietnamCents !== null ? $posterCentsToVnd((int)$vietnamCents) : null;
+            $tipsVnd = $tipsCents !== null ? $posterCentsToVnd((int)$tipsCents) : null;
+            $vietnamDisabled = $vietnamCents === null || (int)$vietnamCents <= 0;
+            $tipsDisabled = $tipsCents === null || (int)$tipsCents <= 0;
+            $vietnamDisabledReason = $vietnamCents === null
+                ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
+                : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за период.';
+            $tipsDisabledReason = $tipsCents === null
+                ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
+                : 'Сумма = 0: нет tip_sum за период.';
             ?>
 
             <div class="finance-row">
@@ -1474,10 +1488,13 @@ $fmtVnd = function (int $v): string {
                     <div style="font-weight:900;">Vietnam Company — Card payments</div>
                     <div class="muted"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd($vietnamVnd)) : '—' ?></div>
                 </div>
-                <form method="POST">
+                <form method="POST" style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="vietnam">
-                    <button class="btn" type="submit" <?= $vietnamCents === null ? 'disabled' : '' ?>>Создать перевод</button>
+                    <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                    <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
+                    <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать перевод</button>
+                    <?php if ($vietnamDisabled): ?><div class="muted"><?= htmlspecialchars($vietnamDisabledReason) ?></div><?php endif; ?>
                 </form>
             </div>
 
@@ -1486,10 +1503,13 @@ $fmtVnd = function (int $v): string {
                     <div style="font-weight:900;">Card tips per shift</div>
                     <div class="muted"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd($tipsVnd)) : '—' ?></div>
                 </div>
-                <form method="POST">
+                <form method="POST" style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="tips">
-                    <button class="btn" type="submit" <?= $tipsCents === null ? 'disabled' : '' ?>>Создать перевод</button>
+                    <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                    <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
+                    <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать перевод</button>
+                    <?php if ($tipsDisabled): ?><div class="muted"><?= htmlspecialchars($tipsDisabledReason) ?></div><?php endif; ?>
                 </form>
             </div>
         </div>
@@ -1902,13 +1922,33 @@ $fmtVnd = function (int $v): string {
     const hideLinkedBtn = document.getElementById('hideLinkedBtn');
     const linkAutoBtn = document.getElementById('linkAutoBtn');
     const linkClearBtn = document.getElementById('linkClearBtn');
+    const selSepaySumEl = document.getElementById('selSepaySum');
+    const selPosterSumEl = document.getElementById('selPosterSum');
 
     let hideLinked = false;
+
+    const updateSelectionSums = () => {
+        let sSum = 0;
+        selectedSepay.forEach((id) => {
+            const tr = document.querySelector(`#sepayTable tbody tr[data-sepay-id="${Number(id)}"]`);
+            if (!tr) return;
+            sSum += Number(tr.getAttribute('data-sum') || 0) || 0;
+        });
+        let pSum = 0;
+        selectedPoster.forEach((id) => {
+            const tr = document.querySelector(`#posterTable tbody tr[data-poster-id="${Number(id)}"]`);
+            if (!tr) return;
+            pSum += Number(tr.getAttribute('data-total') || 0) || 0;
+        });
+        if (selSepaySumEl) selSepaySumEl.textContent = fmtVnd(sSum);
+        if (selPosterSumEl) selPosterSumEl.textContent = fmtVnd(pSum);
+    };
 
     const updateLinkButtonState = () => {
         if (!linkMakeBtn) return;
         const ok = (selectedSepay.size > 0 && selectedPoster.size > 0 && !(selectedSepay.size > 1 && selectedPoster.size > 1));
         linkMakeBtn.disabled = !ok;
+        updateSelectionSums();
     };
 
     const updateHideButtonState = () => {
