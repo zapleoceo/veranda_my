@@ -189,6 +189,11 @@ $action = (string)($_POST['action'] ?? '');
 
 try {
     $api = new \App\Classes\PosterAPI((string)$token);
+    $normalizePosterTx = function ($v): ?array {
+        if (!is_array($v)) return null;
+        if (isset($v[0]) && is_array($v[0])) return $v[0];
+        return $v;
+    };
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'load_poster_checks') {
         $txs = $api->getTransactions($date, $date);
@@ -208,7 +213,7 @@ try {
             if ($txId <= 0) continue;
 
             $payType = isset($tx['pay_type']) ? (int)$tx['pay_type'] : (int)($tx['payType'] ?? 0);
-            if ($payType !== 1 && $payType !== 2 && $payType !== 3) {
+            if ($payType !== 2 && $payType !== 3) {
                 $skipped++;
                 continue;
             }
@@ -217,10 +222,8 @@ try {
             if ($closeAt === null) {
                 $detail = null;
                 try {
-                    $detail = $api->getTransaction($txId);
-                    if (is_array($detail)) {
-                        $closeAt = $parsePosterDateTime($detail);
-                    }
+                    $detail = $normalizePosterTx($api->getTransaction($txId));
+                    if (is_array($detail)) $closeAt = $parsePosterDateTime($detail);
                 } catch (\Throwable $e) {
                     $detail = null;
                 }
@@ -262,6 +265,35 @@ try {
             $tipsCard = $moneyToInt($tx['tips_card'] ?? $tx['tipsCard'] ?? 0);
             $tipsCash = $moneyToInt($tx['tips_cash'] ?? $tx['tipsCash'] ?? 0);
             $tipSum = $serviceTip + $tipsCard + $tipsCash;
+
+            $maybeNeedsDetail = ($sum > 0 && ($payedCard + $payedCash + $payedCert + $payedBonus + $payedThirdParty) <= 0);
+            if ($maybeNeedsDetail) {
+                try {
+                    $detail = $normalizePosterTx($api->getTransaction($txId));
+                    if (is_array($detail)) {
+                        $tx = array_merge($tx, $detail);
+                        $payType = isset($tx['pay_type']) ? (int)$tx['pay_type'] : (int)($tx['payType'] ?? $payType);
+                        $cardType = $extractCardType($tx);
+                        $paymentMethod = $extractPaymentMethod($tx) ?? $cardType;
+                        $sum = $moneyToInt($tx['sum'] ?? $sum);
+                        $payedSum = $moneyToInt($tx['payed_sum'] ?? $tx['payedSum'] ?? $payedSum);
+                        $payedCash = $moneyToInt($tx['payed_cash'] ?? $tx['payedCash'] ?? $payedCash);
+                        $payedCard = $moneyToInt($tx['payed_card'] ?? $tx['payedCard'] ?? $payedCard);
+                        $payedCert = $moneyToInt($tx['payed_cert'] ?? $tx['payedCert'] ?? $payedCert);
+                        $payedBonus = $moneyToInt($tx['payed_bonus'] ?? $tx['payedBonus'] ?? $payedBonus);
+                        $payedThirdParty = $moneyToInt($tx['payed_third_party'] ?? $tx['payedThirdParty'] ?? $payedThirdParty);
+                        $serviceTip = $moneyToInt($tx['tip_sum'] ?? $tx['tipSum'] ?? $serviceTip);
+                        $tipsCard = $moneyToInt($tx['tips_card'] ?? $tx['tipsCard'] ?? $tipsCard);
+                        $tipsCash = $moneyToInt($tx['tips_cash'] ?? $tx['tipsCash'] ?? $tipsCash);
+                        $tipSum = $serviceTip + $tipsCard + $tipsCash;
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
+            if (($payType !== 2 && $payType !== 3) && $payedThirdParty > 0) {
+                $payType = 2;
+            }
             $discount = (float)($tx['discount'] ?? 0);
             $tableId = isset($tx['table_id']) ? (int)$tx['table_id'] : (isset($tx['tableId']) ? (int)$tx['tableId'] : null);
             $spotId = isset($tx['spot_id']) ? (int)$tx['spot_id'] : (isset($tx['spotId']) ? (int)$tx['spotId'] : null);
@@ -312,7 +344,7 @@ try {
         $dayAllCount = 0;
         try {
             $dayCount = (int)$db->query(
-                "SELECT COUNT(*) FROM {$pc} WHERE DATE(date_close) = ? AND pay_type IN (1,2,3) AND (payed_card + payed_third_party) > 0",
+                "SELECT COUNT(*) FROM {$pc} WHERE DATE(date_close) = ? AND pay_type IN (2,3) AND (payed_card + payed_third_party) > 0",
                 [$date]
             )->fetchColumn();
             $dayAllCount = (int)$db->query(
@@ -494,7 +526,7 @@ try {
             "SELECT transaction_id, date_close, payed_card, tip_sum, payment_method
              FROM {$pc}
              WHERE DATE(date_close) = ?
-               AND pay_type IN (1,2,3)
+               AND pay_type IN (2,3)
                AND (payed_card + payed_third_party) > 0
              ORDER BY date_close ASC",
             [$date]
@@ -968,7 +1000,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             "SELECT transaction_id, date_close, payed_card, payed_third_party, tip_sum, payment_method
              FROM {$pc}
              WHERE DATE(date_close) = ?
-               AND pay_type IN (1,2,3)
+               AND pay_type IN (2,3)
                AND (payed_card + payed_third_party) > 0
              ORDER BY date_close ASC",
             [$date]
@@ -1224,7 +1256,7 @@ $posterRows = $db->query(
     "SELECT transaction_id, receipt_number, card_type, date_close, payed_card, payed_third_party, tip_sum, payment_method, waiter_name, table_id
      FROM {$pc}
      WHERE DATE(date_close) = ?
-       AND pay_type IN (1,2,3)
+       AND pay_type IN (2,3)
        AND (payed_card + payed_third_party) > 0
      ORDER BY date_close ASC",
     [$date]
@@ -1247,7 +1279,7 @@ try {
     $posterTotalCents = (int)$db->query(
         "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0) FROM {$pc}
          WHERE DATE(date_close) = ?
-           AND pay_type IN (1,2,3)
+           AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
            AND (card_type IS NULL OR LOWER(card_type) <> 'vietnam company')
            AND (payment_method IS NULL OR LOWER(payment_method) <> 'vietnam company')",
@@ -1356,7 +1388,7 @@ try {
     $posterTxCount = (int)$db->query(
         "SELECT COUNT(*) AS c FROM {$pc}
          WHERE DATE(date_close) = ?
-           AND pay_type IN (1,2,3)
+           AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0",
         [$date]
     )->fetchColumn();
