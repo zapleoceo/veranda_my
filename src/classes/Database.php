@@ -280,12 +280,28 @@ class Database {
             reference_code VARCHAR(100) NOT NULL,
             description TEXT NOT NULL,
             payment_method VARCHAR(50) NULL,
+            raw_request_body LONGTEXT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uq_sepay_id (sepay_id),
             KEY idx_sepay_date (transaction_date),
             KEY idx_sepay_type (transfer_type),
             KEY idx_sepay_method (payment_method)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        try {
+            $cols = $this->pdo->query("SHOW COLUMNS FROM {$st}")->fetchAll(\PDO::FETCH_ASSOC);
+            $hasRaw = false;
+            foreach ($cols as $c) {
+                if (strtolower((string)($c['Field'] ?? '')) === 'raw_request_body') {
+                    $hasRaw = true;
+                    break;
+                }
+            }
+            if (!$hasRaw) {
+                $this->pdo->exec("ALTER TABLE {$st} ADD COLUMN raw_request_body LONGTEXT NULL");
+            }
+        } catch (\Throwable $e) {
+        }
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$pc} (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

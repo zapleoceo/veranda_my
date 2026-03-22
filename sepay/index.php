@@ -205,9 +205,9 @@ try {
 
     $db->query(
         "INSERT INTO {$st}
-            (sepay_id, gateway, transaction_date, account_number, code, content, transfer_type, transfer_amount, accumulated, sub_account, reference_code, description, payment_method)
+            (sepay_id, gateway, transaction_date, account_number, code, content, transfer_type, transfer_amount, accumulated, sub_account, reference_code, description, payment_method, raw_request_body)
          VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             $sepayId,
             $gateway,
@@ -221,7 +221,8 @@ try {
             $subAccount,
             $referenceCode !== '' ? $referenceCode : '-',
             $description !== '' ? $description : $content,
-            $method
+            $method,
+            $raw
         ]
     );
 
