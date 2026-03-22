@@ -31,7 +31,12 @@ class Auth {
      */
     public function requireAuth(): void {
         if (!$this->isLoggedIn()) {
-            header('Location: login.php');
+            $next = (string)($_SERVER['REQUEST_URI'] ?? '');
+            if ($next === '' || $next[0] !== '/' || str_starts_with($next, '//') || str_contains($next, "\n") || str_contains($next, "\r")) {
+                $next = '/dashboard.php';
+            }
+            $_SESSION['auth_next'] = $next;
+            header('Location: /login.php');
             exit;
         }
     }

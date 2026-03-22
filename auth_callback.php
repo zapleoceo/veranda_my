@@ -26,13 +26,18 @@ $auth = new \App\Classes\Auth($db, $googleClientId, $googleClientSecret, $google
 $code = $_GET['code'] ?? null;
 if ($code) {
     if ($auth->handleCallback($code)) {
-        header('Location: dashboard.php');
+        $next = (string)($_SESSION['auth_next'] ?? '');
+        unset($_SESSION['auth_next']);
+        if ($next === '' || $next[0] !== '/' || str_starts_with($next, '//') || str_contains($next, "\n") || str_contains($next, "\r")) {
+            $next = '/dashboard.php';
+        }
+        header('Location: ' . $next);
         exit;
     } else {
-        header('Location: login.php?error=access_denied');
+        header('Location: /login.php?error=access_denied');
         exit;
     }
 } else {
-    header('Location: login.php?error=auth_failed');
+    header('Location: /login.php?error=auth_failed');
     exit;
 }

@@ -24,7 +24,12 @@ $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
 $auth = new \App\Classes\Auth($db, $googleClientId, $googleClientSecret, $googleRedirectUri);
 
 if ($auth->isLoggedIn()) {
-    header('Location: dashboard.php');
+    $next = (string)($_SESSION['auth_next'] ?? '');
+    unset($_SESSION['auth_next']);
+    if ($next === '' || $next[0] !== '/' || str_starts_with($next, '//') || str_contains($next, "\n") || str_contains($next, "\r")) {
+        $next = '/dashboard.php';
+    }
+    header('Location: ' . $next);
     exit;
 }
 
