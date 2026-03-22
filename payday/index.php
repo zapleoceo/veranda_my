@@ -1387,6 +1387,7 @@ $fmtVnd = function (int $v): string {
                     <div id="selPosterSum">0 ₫</div>
                     <div style="height: 10px;"></div>
                     <div id="selMatch" style="font-size: 16px;">❗</div>
+                    <div id="selDiff" style="font-weight: 900;">0 ₫</div>
                 </div>
             </div>
 
@@ -1937,6 +1938,7 @@ $fmtVnd = function (int $v): string {
     const selSepaySumEl = document.getElementById('selSepaySum');
     const selPosterSumEl = document.getElementById('selPosterSum');
     const selMatchEl = document.getElementById('selMatch');
+    const selDiffEl = document.getElementById('selDiff');
 
     let hideLinked = false;
 
@@ -1955,6 +1957,10 @@ $fmtVnd = function (int $v): string {
         });
         if (selSepaySumEl) selSepaySumEl.textContent = fmtVnd(sSum);
         if (selPosterSumEl) selPosterSumEl.textContent = fmtVnd(pSum);
+        if (selDiffEl) {
+            const diff = pSum - sSum;
+            selDiffEl.textContent = fmtVnd(Math.abs(diff));
+        }
         if (selMatchEl) {
             const ok = sSum === pSum;
             selMatchEl.textContent = ok ? '✅' : '❗';
