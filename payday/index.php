@@ -1498,6 +1498,12 @@ $fmtVnd = function (int $v): string {
         .mid-check { display:flex; gap: 8px; align-items:center; font-weight: 800; font-size: 12px; color: #374151; user-select: none; }
         .bottom-two { display:flex; gap: 12px; align-items:flex-start; flex-wrap: wrap; }
         .bottom-two > .card { flex: 1 1 420px; }
+        body.mode-lite .col-sepay-content { display: none; }
+        body.mode-lite .col-poster-num,
+        body.mode-lite .col-poster-card,
+        body.mode-lite .col-poster-tips,
+        body.mode-lite .col-poster-waiter,
+        body.mode-lite .col-poster-table { display: none; }
     </style>
 </head>
 <body>
@@ -1539,6 +1545,8 @@ $fmtVnd = function (int $v): string {
                 <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                 <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Очистить день</button>
             </form>
+
+            <button class="btn" id="modeToggleBtn" type="button" title="Lite/Full">Full</button>
         </div>
 
         <div class="divider"></div>
@@ -1554,9 +1562,9 @@ $fmtVnd = function (int $v): string {
                     <table id="sepayTable">
                         <thead>
                             <tr>
-                                <th class="sortable" data-sort-key="content">Content</th>
-                                <th class="nowrap sortable" data-sort-key="ts">Время</th>
-                                <th class="nowrap sortable" data-sort-key="sum">Сумма</th>
+                                <th class="sortable col-sepay-content" data-sort-key="content">Content</th>
+                                <th class="nowrap sortable col-sepay-time" data-sort-key="ts">Время</th>
+                                <th class="nowrap sortable col-sepay-sum" data-sort-key="sum">Сумма</th>
                                 <th></th>
                                 <th></th>
                             </tr>
@@ -1581,11 +1589,11 @@ $fmtVnd = function (int $v): string {
                             ?>
                             <?php $tsRow = strtotime($r['transaction_date']) ?: 0; ?>
                             <tr class="<?= $cls ?>" data-sepay-id="<?= $sid ?>" data-ts="<?= (int)$tsRow ?>" data-sum="<?= (int)$r['transfer_amount'] ?>" data-content="<?= htmlspecialchars(mb_strtolower((string)($r['content'] ?? ''), 'UTF-8')) ?>">
-                                <td><?= htmlspecialchars((string)($r['content'] ?? '')) ?></td>
-                                <td class="nowrap"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
-                                <td class="sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
-                                <td><input type="checkbox" class="sepay-cb" data-id="<?= $sid ?>"></td>
-                                <td class="nowrap"><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
+                                <td class="col-sepay-content"><?= htmlspecialchars((string)($r['content'] ?? '')) ?></td>
+                                <td class="nowrap col-sepay-time"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
+                                <td class="sum col-sepay-sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
+                                <td class="col-sepay-cb"><input type="checkbox" class="sepay-cb" data-id="<?= $sid ?>"></td>
+                                <td class="nowrap col-sepay-dot"><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -1625,14 +1633,14 @@ $fmtVnd = function (int $v): string {
                         <thead>
                             <tr>
                                 <th></th>
-                                <th class="nowrap sortable" data-sort-key="num">№</th>
-                                <th class="nowrap sortable" data-sort-key="ts">Время</th>
-                                <th class="nowrap sortable" data-sort-key="card">Card</th>
-                                <th class="nowrap sortable" data-sort-key="tips">Tips</th>
-                                <th class="nowrap sortable" data-sort-key="total">Card+Tips</th>
-                                <th class="sortable" data-sort-key="method">Метод</th>
-                                <th class="sortable" data-sort-key="waiter">Официант</th>
-                                <th class="nowrap sortable" data-sort-key="table">Стол</th>
+                                <th class="nowrap sortable col-poster-num" data-sort-key="num">№</th>
+                                <th class="nowrap sortable col-poster-time" data-sort-key="ts">Время</th>
+                                <th class="nowrap sortable col-poster-card" data-sort-key="card">Card</th>
+                                <th class="nowrap sortable col-poster-tips" data-sort-key="tips">Tips</th>
+                                <th class="nowrap sortable col-poster-total" data-sort-key="total">Card+Tips</th>
+                                <th class="sortable col-poster-method" data-sort-key="method">Метод</th>
+                                <th class="sortable col-poster-waiter" data-sort-key="waiter">Официант</th>
+                                <th class="nowrap sortable col-poster-table" data-sort-key="table">Стол</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1666,14 +1674,14 @@ $fmtVnd = function (int $v): string {
                             ?>
                             <tr class="<?= $cls ?>" data-poster-id="<?= $pid ?>" data-vietnam="<?= $isVietnam ? '1' : '0' ?>" data-num="<?= (int)$receiptNumber ?>" data-ts="<?= (int)$tsRow ?>" data-card="<?= (int)$cardVnd ?>" data-tips="<?= (int)$tipVnd ?>" data-total="<?= (int)($cardVnd + $tipVnd) ?>" data-method="<?= htmlspecialchars(mb_strtolower($pm, 'UTF-8')) ?>" data-waiter="<?= htmlspecialchars(mb_strtolower((string)($r['waiter_name'] ?? ''), 'UTF-8')) ?>" data-table="<?= (int)($r['table_id'] ?? 0) ?>">
                                 <td><div class="cell-anchor"><span class="anchor" id="poster-<?= $pid ?>"></span><input type="checkbox" class="poster-cb" data-id="<?= $pid ?>"></div></td>
-                                <td class="nowrap"><?= htmlspecialchars((string)$receiptNumber) ?></td>
-                                <td class="nowrap"><?= date('H:i:s', strtotime($r['date_close'])) ?></td>
-                                <td class="sum"><?= htmlspecialchars($fmtVnd($cardVnd)) ?></td>
-                                <td class="sum"><?= htmlspecialchars($fmtVnd($tipVnd)) ?></td>
-                                <td class="sum"><?= htmlspecialchars($fmtVnd($cardVnd + $tipVnd)) ?></td>
-                                <td class="nowrap"><?= htmlspecialchars($pm !== '' ? $pm : '—') ?></td>
-                                <td><?= htmlspecialchars((string)($r['waiter_name'] ?? '')) ?></td>
-                                <td class="nowrap"><?= htmlspecialchars((string)($r['table_id'] ?? '')) ?></td>
+                                <td class="nowrap col-poster-num"><?= htmlspecialchars((string)$receiptNumber) ?></td>
+                                <td class="nowrap col-poster-time"><?= date('H:i:s', strtotime($r['date_close'])) ?></td>
+                                <td class="sum col-poster-card"><?= htmlspecialchars($fmtVnd($cardVnd)) ?></td>
+                                <td class="sum col-poster-tips"><?= htmlspecialchars($fmtVnd($tipVnd)) ?></td>
+                                <td class="sum col-poster-total"><?= htmlspecialchars($fmtVnd($cardVnd + $tipVnd)) ?></td>
+                                <td class="nowrap col-poster-method"><?= htmlspecialchars($pm !== '' ? $pm : '—') ?></td>
+                                <td class="col-poster-waiter"><?= htmlspecialchars((string)($r['waiter_name'] ?? '')) ?></td>
+                                <td class="nowrap col-poster-table"><?= htmlspecialchars((string)($r['table_id'] ?? '')) ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -1815,6 +1823,14 @@ $fmtVnd = function (int $v): string {
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;');
 
+    const modeToggleBtn = document.getElementById('modeToggleBtn');
+    const applyMode = (mode) => {
+        const m = (mode === 'lite') ? 'lite' : 'full';
+        document.body.classList.toggle('mode-lite', m === 'lite');
+        if (modeToggleBtn) modeToggleBtn.textContent = m === 'lite' ? 'Lite' : 'Full';
+        try { localStorage.setItem('payday_mode', m); } catch (_) {}
+    };
+
     const setFormLoading = (formId, btnId) => {
         const form = document.getElementById(formId);
         const btn = document.getElementById(btnId);
@@ -1880,6 +1896,25 @@ $fmtVnd = function (int $v): string {
                     posterAccountsBtn.classList.remove('loading');
                     posterAccountsBtn.disabled = false;
                 });
+        });
+    }
+
+    let initialMode = 'full';
+    try { initialMode = localStorage.getItem('payday_mode') || 'full'; } catch (_) {}
+    if (!initialMode || initialMode === 'full') {
+        try {
+            const mq = window.matchMedia('(max-width: 1050px)');
+            if (mq && mq.matches) initialMode = 'lite';
+        } catch (_) {}
+    }
+    applyMode(initialMode);
+
+    if (modeToggleBtn) {
+        modeToggleBtn.addEventListener('click', () => {
+            const next = document.body.classList.contains('mode-lite') ? 'full' : 'lite';
+            applyMode(next);
+            try { window.dispatchEvent(new Event('resize')); } catch (_) {}
+            setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 200);
         });
     }
 
