@@ -1284,40 +1284,6 @@ if (($_GET['ajax'] ?? '') === 'links') {
     exit;
 }
 
-if (($_GET['ajax'] ?? '') === 'poster_debug') {
-    header('Content-Type: application/json; charset=utf-8');
-    $txId = (int)($_GET['transaction_id'] ?? 0);
-    if ($txId <= 0) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    try {
-        $dbRow = $db->query(
-            "SELECT transaction_id, receipt_number, pay_type, payed_card, payed_third_party, tip_sum, payment_method, card_type, date_close, day_date
-             FROM {$pc}
-             WHERE transaction_id = ?
-             LIMIT 1",
-            [$txId]
-        )->fetch();
-
-        $api = new \App\Classes\PosterAPI((string)$token);
-        $hist = null;
-        $histError = null;
-        try {
-            $hist = $api->request('dash.getTransactionHistory', ['transaction_id' => $txId]);
-        } catch (\Throwable $e) {
-            $histError = $e->getMessage();
-        }
-
-        echo json_encode(['ok' => true, 'db' => $dbRow, 'history' => $hist, 'history_error' => $histError], JSON_UNESCAPED_UNICODE);
-    } catch (\Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-    }
-    exit;
-}
-
 $sepayRows = $db->query(
     "SELECT sepay_id, transaction_date, transfer_amount, payment_method, content, reference_code
      FROM {$st}
@@ -1521,7 +1487,7 @@ $fmtVnd = function (int $v): string {
         .grid { display:grid; grid-template-columns: 1fr 120px 1fr; gap: 12px; align-items:start; }
         @media (max-width: 1050px) { .grid { grid-template-columns: 1fr; } }
         #tablesRoot { position: relative; overflow: hidden; }
-        #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; }
+        #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
         th { background: #f8f9fa; color: #65676b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -1567,21 +1533,7 @@ $fmtVnd = function (int $v): string {
         <?php require __DIR__ . '/../partials/user_menu.php'; ?>
     </div>
 
-    <?php if ($message !== ''): ?><div class="success"><?= htmlspecialchars($message) ?></div><?php endif; ?>
     <?php if ($error !== ''): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
-
-    <div class="muted" style="margin: 0 0 10px;">
-        SePay webhook: last=<?= htmlspecialchars($sepayWebhookMeta['last_at'] !== '' ? $sepayWebhookMeta['last_at'] : '—') ?>
-        <?= $sepayWebhookMeta['last_ip'] !== '' ? (' • ip=' . htmlspecialchars($sepayWebhookMeta['last_ip'])) : '' ?>
-        <?= $sepayWebhookMeta['last_method'] !== '' ? (' • method=' . htmlspecialchars($sepayWebhookMeta['last_method'])) : '' ?>
-        <?= $sepayWebhookMeta['last_ok'] !== '' ? (' • ok=' . htmlspecialchars($sepayWebhookMeta['last_ok'])) : '' ?>
-        <?= $sepayWebhookMeta['last_sepay_id'] !== '' ? (' • id=' . htmlspecialchars($sepayWebhookMeta['last_sepay_id'])) : '' ?>
-        <?= $sepayWebhookMeta['hits_day'] !== '' ? (' • hits_day=' . htmlspecialchars($sepayWebhookMeta['hits_day'])) : '' ?>
-        <?= $sepayWebhookMeta['hits_total'] !== '' ? (' • hits_total=' . htmlspecialchars($sepayWebhookMeta['hits_total'])) : '' ?>
-        <?= $sepayWebhookMeta['last_error'] !== '' ? (' • err=' . htmlspecialchars($sepayWebhookMeta['last_error'])) : '' ?>
-        • rows: SePay=<?= (int)$sepayTxCount ?>, Poster=<?= (int)$posterTxCount ?>
-        <?= $posterTxCountError !== '' ? (' • poster_err=' . htmlspecialchars($posterTxCountError)) : '' ?>
-    </div>
 
     <div class="card">
         <div class="toolbar toolbar-line" style="margin-bottom: 10px;">
@@ -1619,7 +1571,7 @@ $fmtVnd = function (int $v): string {
                     <div style="font-weight:900;">SePay</div>
                     <div class="muted">Приходы за день</div>
                 </div>
-                <div style="max-height: 56vh; overflow:auto;">
+                <div id="sepayScroll" style="max-height: 56vh; overflow:auto;">
                     <table id="sepayTable">
                         <thead>
                             <tr>
@@ -1679,7 +1631,7 @@ $fmtVnd = function (int $v): string {
                     <div style="font-weight:900;">Poster</div>
                     <div class="muted">Безнал / смешанная (за выбранный день)</div>
                 </div>
-                <div style="max-height: 56vh; overflow:auto;">
+                <div id="posterScroll" style="max-height: 56vh; overflow:auto;">
                     <table id="posterTable">
                         <thead>
                             <tr>
@@ -1691,7 +1643,6 @@ $fmtVnd = function (int $v): string {
                                 <th class="nowrap sortable" data-sort-key="total">Card+Tips</th>
                                 <th class="sortable" data-sort-key="method">Метод</th>
                                 <th class="sortable" data-sort-key="cardtype">Тип карты</th>
-                                <th class="nowrap">?</th>
                                 <th class="sortable" data-sort-key="waiter">Официант</th>
                                 <th class="nowrap sortable" data-sort-key="table">Стол</th>
                             </tr>
@@ -1735,7 +1686,6 @@ $fmtVnd = function (int $v): string {
                                 <td class="sum"><?= htmlspecialchars($fmtVnd($cardVnd + $tipVnd)) ?></td>
                                 <td class="nowrap"><?= htmlspecialchars($pm !== '' ? $pm : '—') ?></td>
                                 <td class="nowrap"><?= htmlspecialchars($ct !== '' ? $ct : '—') ?></td>
-                                <td class="nowrap"><button class="btn" type="button" style="padding: 4px 8px; border-radius: 8px;" onclick="posterDebug(<?= (int)$pid ?>)">?</button></td>
                                 <td><?= htmlspecialchars((string)($r['waiter_name'] ?? '')) ?></td>
                                 <td class="nowrap"><?= htmlspecialchars((string)($r['table_id'] ?? '')) ?></td>
                             </tr>
@@ -1794,19 +1744,7 @@ $fmtVnd = function (int $v): string {
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leader-line/1.0.3/leader-line.min.js"></script>
 <script>
-function posterDebug(id) {
-    const base = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'poster_debug'])) ?>;
-    const url = base + '&transaction_id=' + encodeURIComponent(String(id));
-    fetch(url)
-        .then((r) => r.json())
-        .then((j) => {
-            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-            alert(JSON.stringify(j, null, 2));
-        })
-        .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
-}
 (() => {
     let links = <?= json_encode(array_values(array_map(function ($l) {
         return [
@@ -1817,8 +1755,8 @@ function posterDebug(id) {
         ];
     }, $links)), JSON_UNESCAPED_UNICODE) ?>;
 
-    const lines = [];
-    const widgets = [];
+    const widgets = new Map();
+    const svgState = { svg: null, defs: null, group: null, markers: new Map() };
 
     const colorFor = (t, isManual) => {
         if (isManual || t === 'manual') return '#6b7280';
@@ -1833,13 +1771,89 @@ function posterDebug(id) {
     };
 
     const clearLines = () => {
-        while (lines.length) {
-            try { lines.pop().remove(); } catch (_) { lines.pop(); }
+        if (svgState.group) {
+            while (svgState.group.firstChild) svgState.group.removeChild(svgState.group.firstChild);
         }
-        while (widgets.length) {
-            const w = widgets.pop();
-            try { w.btn.remove(); } catch (_) {}
-        }
+    };
+
+    const ensureSvg = () => {
+        if (!lineLayer || !tablesRoot) return;
+        if (svgState.svg) return;
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', '100%');
+        svg.style.display = 'block';
+        const defs = document.createElementNS(ns, 'defs');
+        const g = document.createElementNS(ns, 'g');
+        svg.appendChild(defs);
+        svg.appendChild(g);
+        lineLayer.appendChild(svg);
+        svgState.svg = svg;
+        svgState.defs = defs;
+        svgState.group = g;
+    };
+
+    const ensureMarker = (color) => {
+        ensureSvg();
+        if (!svgState.defs) return null;
+        const key = String(color || '');
+        if (svgState.markers.has(key)) return svgState.markers.get(key);
+        const ns = 'http://www.w3.org/2000/svg';
+        const id = 'm' + (svgState.markers.size + 1);
+        const marker = document.createElementNS(ns, 'marker');
+        marker.setAttribute('id', id);
+        marker.setAttribute('viewBox', '0 0 10 10');
+        marker.setAttribute('refX', '10');
+        marker.setAttribute('refY', '5');
+        marker.setAttribute('markerWidth', '6');
+        marker.setAttribute('markerHeight', '6');
+        marker.setAttribute('orient', 'auto');
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+        path.setAttribute('fill', key || '#9aa4b2');
+        marker.appendChild(path);
+        svgState.defs.appendChild(marker);
+        svgState.markers.set(key, id);
+        return id;
+    };
+
+    const getAnchorPoint = (el, side, rootRect) => {
+        const r = el.getBoundingClientRect();
+        const x = (side === 'right' ? (r.left + r.width) : r.left) - rootRect.left;
+        const y = (r.top + r.height / 2) - rootRect.top;
+        return { x, y };
+    };
+
+    const isInside = (pt, w, h) => pt.x >= 0 && pt.y >= 0 && pt.x <= w && pt.y <= h;
+
+    const syncButtons = () => {
+        if (!tablesRoot) return;
+        const keep = new Set();
+        links.forEach((l) => {
+            const key = String(l.sepay_id) + ':' + String(l.poster_transaction_id);
+            keep.add(key);
+            if (widgets.has(key)) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'link-x';
+            btn.textContent = '×';
+            btn.title = 'Удалить связь';
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                unlink(Number(l.sepay_id || 0), Number(l.poster_transaction_id || 0)).catch((err) => {
+                    alert(err && err.message ? err.message : 'Ошибка');
+                });
+            });
+            tablesRoot.appendChild(btn);
+            widgets.set(key, btn);
+        });
+        Array.from(widgets.entries()).forEach(([key, btn]) => {
+            if (keep.has(key)) return;
+            try { btn.remove(); } catch (_) {}
+            widgets.delete(key);
+        });
     };
 
     const fmtVnd = (v) => {
@@ -1991,7 +2005,15 @@ function posterDebug(id) {
     };
 
     const drawLines = () => {
+        ensureSvg();
         clearLines();
+        syncButtons();
+        if (!tablesRoot || !svgState.svg || !svgState.group) return;
+        const rootRect = tablesRoot.getBoundingClientRect();
+        const w = Math.max(1, Math.round(rootRect.width));
+        const h = Math.max(1, Math.round(rootRect.height));
+        svgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
         const sepayCount = {};
         const posterCount = {};
         links.forEach((l) => {
@@ -2008,49 +2030,63 @@ function posterDebug(id) {
             if (!s.getClientRects().length || !p.getClientRects().length) return;
             const isMany = (sepayCount[l.sepay_id] || 0) > 1 || (posterCount[l.poster_transaction_id] || 0) > 1;
             const isMainGreen = !isMany && !l.is_manual && l.link_type === 'auto_green';
-            const line = new LeaderLine(s, p, {
-                color: colorFor(l.link_type, l.is_manual),
-                size: isMainGreen ? 4 : 2,
-                outline: true,
-                outlineColor: 'rgba(255,255,255,0.65)',
-                startPlug: 'disc',
-                endPlug: endPlugFor(l.link_type, l.is_manual),
-                path: 'fluid',
-                startSocket: 'right',
-                endSocket: 'left',
-                parent: (lineLayer || tablesRoot || document.body),
-            });
-            lines.push(line);
+            const size = isMainGreen ? 4 : 2;
+            const color = colorFor(l.link_type, l.is_manual);
 
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'link-x';
-            btn.textContent = '×';
-            btn.title = 'Удалить связь';
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                unlink(Number(l.sepay_id || 0), Number(l.poster_transaction_id || 0)).catch((err) => {
-                    alert(err && err.message ? err.message : 'Ошибка');
-                });
-            });
-            (tablesRoot || document.body).appendChild(btn);
-            widgets.push({ btn, sepay_id: Number(l.sepay_id || 0), poster_transaction_id: Number(l.poster_transaction_id || 0) });
+            const a = getAnchorPoint(s, 'right', rootRect);
+            const b = getAnchorPoint(p, 'left', rootRect);
+            if (!isInside(a, w, h) || !isInside(b, w, h)) return;
+
+            const dx = b.x - a.x;
+            const cdx = Math.min(120, Math.max(40, Math.abs(dx) * 0.35));
+            const c1x = a.x + cdx;
+            const c1y = a.y;
+            const c2x = b.x - cdx;
+            const c2y = b.y;
+            const d = `M ${a.x} ${a.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${b.x} ${b.y}`;
+
+            const ns = 'http://www.w3.org/2000/svg';
+            const outline = document.createElementNS(ns, 'path');
+            outline.setAttribute('d', d);
+            outline.setAttribute('fill', 'none');
+            outline.setAttribute('stroke', 'rgba(255,255,255,0.65)');
+            outline.setAttribute('stroke-width', String(size + 2));
+            outline.setAttribute('stroke-linecap', 'round');
+            outline.setAttribute('stroke-linejoin', 'round');
+            svgState.group.appendChild(outline);
+
+            const path = document.createElementNS(ns, 'path');
+            path.setAttribute('d', d);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', color);
+            path.setAttribute('stroke-width', String(size));
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            if (!l.is_manual && l.link_type !== 'manual') {
+                const mid = ensureMarker(color);
+                if (mid) path.setAttribute('marker-end', `url(#${mid})`);
+            }
+            svgState.group.appendChild(path);
         });
     };
 
     const positionLines = () => {
-        lines.forEach((l) => {
-            try { l.position(); } catch (_) {}
-        });
+        drawLines();
     };
 
     const positionWidgets = () => {
         const rect = tablesRoot ? tablesRoot.getBoundingClientRect() : null;
-        widgets.forEach((w) => {
-            const s = document.getElementById('sepay-' + w.sepay_id);
-            const p = document.getElementById('poster-' + w.poster_transaction_id);
-            if (!s || !p || !rect) return;
+        if (!rect) return;
+        const w = Math.max(1, rect.width);
+        const h = Math.max(1, rect.height);
+        links.forEach((l) => {
+            const key = String(l.sepay_id) + ':' + String(l.poster_transaction_id);
+            const btn = widgets.get(key);
+            if (!btn) return;
+            const s = document.getElementById('sepay-' + l.sepay_id);
+            const p = document.getElementById('poster-' + l.poster_transaction_id);
+            if (!s || !p) { btn.style.display = 'none'; return; }
+            if (!s.getClientRects().length || !p.getClientRects().length) { btn.style.display = 'none'; return; }
             const sr = s.getBoundingClientRect();
             const pr = p.getBoundingClientRect();
             const sx = sr.left + sr.width / 2;
@@ -2061,23 +2097,31 @@ function posterDebug(id) {
             const my = (sy + py) / 2;
             const inside = mx >= rect.left && mx <= rect.right && my >= rect.top && my <= rect.bottom;
             if (!inside) {
-                w.btn.style.display = 'none';
+                btn.style.display = 'none';
                 return;
             }
-            w.btn.style.display = 'flex';
+            btn.style.display = 'flex';
             const clampedX = Math.max(rect.left + 8, Math.min(rect.right - 8, mx));
             const clampedY = Math.max(rect.top + 8, Math.min(rect.bottom - 8, my));
             const localX = clampedX - rect.left;
             const localY = clampedY - rect.top;
-            w.btn.style.left = Math.round(localX - 8) + 'px';
-            w.btn.style.top = Math.round(localY - 8) + 'px';
+            btn.style.left = Math.round(Math.max(8, Math.min(w - 8, localX)) - 8) + 'px';
+            btn.style.top = Math.round(Math.max(8, Math.min(h - 8, localY)) - 8) + 'px';
         });
     };
 
     const tablesRoot = document.getElementById('tablesRoot');
     const lineLayer = document.getElementById('lineLayer');
+    const sepayScroll = document.getElementById('sepayScroll');
+    const posterScroll = document.getElementById('posterScroll');
     if (tablesRoot) {
         tablesRoot.addEventListener('scroll', () => { positionLines(); positionWidgets(); }, { passive: true, capture: true });
+    }
+    if (sepayScroll) {
+        sepayScroll.addEventListener('scroll', () => { positionLines(); positionWidgets(); }, { passive: true });
+    }
+    if (posterScroll) {
+        posterScroll.addEventListener('scroll', () => { positionLines(); positionWidgets(); }, { passive: true });
     }
     window.addEventListener('resize', () => { positionLines(); positionWidgets(); }, { passive: true });
     window.addEventListener('load', () => {
