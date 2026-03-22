@@ -29,6 +29,12 @@ $moneyToInt = function ($v): int {
     return 0;
 };
 
+$posterCentsToVnd = function (int $cents): int {
+    if ($cents === 0) return 0;
+    if ($cents % 100 === 0) return (int)($cents / 100);
+    return (int)round($cents / 100);
+};
+
 $parsePosterDateTime = function ($tx): ?string {
     $ts = null;
     if (is_array($tx)) {
@@ -479,8 +485,8 @@ try {
             $pm = (string)($c['payment_method'] ?? '');
             if (strtolower($pm) === 'vietnam company') continue;
 
-            $payedCardVnd = (int)($c['payed_card'] ?? 0);
-            $tipVnd = (int)($c['tip_sum'] ?? 0);
+            $payedCardVnd = $posterCentsToVnd((int)($c['payed_card'] ?? 0));
+            $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
             $amounts = array_values(array_unique(array_filter([$payedCardVnd, $payedCardVnd + $tipVnd], fn($v) => (int)$v > 0)));
             $closeTs = strtotime((string)$c['date_close']);
             if ($closeTs === false || $closeTs <= 0) continue;
@@ -545,8 +551,8 @@ try {
             if ($prevPid <= 0 || $nextPid <= 0) continue;
             if (empty($linkedGreenPoster[$prevPid]) || empty($linkedGreenPoster[$nextPid])) continue;
 
-            $payedCardVnd = (int)($checks[$i]['payed_card'] ?? 0);
-            $tipVnd = (int)($checks[$i]['tip_sum'] ?? 0);
+            $payedCardVnd = $posterCentsToVnd((int)($checks[$i]['payed_card'] ?? 0));
+            $tipVnd = $posterCentsToVnd((int)($checks[$i]['tip_sum'] ?? 0));
             $amounts = array_values(array_unique(array_filter([$payedCardVnd, $payedCardVnd + $tipVnd], fn($v) => (int)$v > 0)));
             if (count($amounts) === 0) continue;
 
@@ -587,8 +593,8 @@ try {
             $pm = (string)($c['payment_method'] ?? '');
             if (strtolower($pm) === 'vietnam company') continue;
 
-            $payedCardVnd = (int)($c['payed_card'] ?? 0);
-            $tipVnd = (int)($c['tip_sum'] ?? 0);
+            $payedCardVnd = $posterCentsToVnd((int)($c['payed_card'] ?? 0));
+            $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
             $amounts = array_values(array_unique(array_filter([$payedCardVnd, $payedCardVnd + $tipVnd], fn($v) => (int)$v > 0)));
             $closeTs = strtotime((string)$c['date_close']);
             if ($closeTs === false || $closeTs <= 0) continue;
@@ -778,6 +784,32 @@ $posterRows = $db->query(
      ORDER BY date_close ASC",
     [$date]
 )->fetchAll();
+
+$sepayTotalVnd = 0;
+$posterTotalVnd = 0;
+try {
+    $sepayTotalVnd = (int)$db->query(
+        "SELECT COALESCE(SUM(transfer_amount), 0) FROM {$st}
+         WHERE DATE(transaction_date) = ?
+           AND transfer_type = 'in'
+           AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))",
+        [$date]
+    )->fetchColumn();
+} catch (\Throwable $e) {
+    $sepayTotalVnd = 0;
+}
+try {
+    $posterTotalCents = (int)$db->query(
+        "SELECT COALESCE(SUM(payed_card + tip_sum), 0) FROM {$pc}
+         WHERE DATE(date_close) = ?
+           AND pay_type IN (2,3)
+           AND (payment_method IS NULL OR LOWER(payment_method) <> 'vietnam company')",
+        [$date]
+    )->fetchColumn();
+    $posterTotalVnd = $posterCentsToVnd($posterTotalCents);
+} catch (\Throwable $e) {
+    $posterTotalVnd = 0;
+}
 
 $links = $db->query(
     "SELECT l.poster_transaction_id, l.sepay_id, l.link_type, l.is_manual
@@ -1021,9 +1053,9 @@ $fmtVnd = function (int $v): string {
                         <thead>
                             <tr>
                                 <th></th>
-                                <th class="nowrap">Время</th>
-                                <th>Content</th>
-                                <th class="nowrap">Сумма</th>
+                                <th class="nowrap sortable" data-sort-key="ts">Время</th>
+                                <th class="sortable" data-sort-key="content">Content</th>
+                                <th class="nowrap sortable" data-sort-key="sum">Сумма</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1041,7 +1073,8 @@ $fmtVnd = function (int $v): string {
                                 }
                                 $pm = (string)($r['payment_method'] ?? '');
                             ?>
-                            <tr class="<?= $cls ?>" data-sepay-id="<?= $sid ?>">
+                            <?php $tsRow = strtotime($r['transaction_date']) ?: 0; ?>
+                            <tr class="<?= $cls ?>" data-sepay-id="<?= $sid ?>" data-ts="<?= (int)$tsRow ?>" data-sum="<?= (int)$r['transfer_amount'] ?>" data-content="<?= htmlspecialchars(mb_strtolower((string)($r['content'] ?? ''), 'UTF-8')) ?>">
                                 <td><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
                                 <td class="nowrap"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
                                 <td><?= htmlspecialchars((string)($r['content'] ?? '')) ?></td>
@@ -1050,6 +1083,9 @@ $fmtVnd = function (int $v): string {
                         <?php endforeach; ?>
                         </tbody>
                     </table>
+                </div>
+                <div class="muted" style="padding: 10px 12px; font-weight: 900;">
+                    Итого: <?= htmlspecialchars($fmtVnd((int)$sepayTotalVnd)) ?>
                 </div>
             </div>
 
@@ -1063,13 +1099,13 @@ $fmtVnd = function (int $v): string {
                         <thead>
                             <tr>
                                 <th></th>
-                                <th class="nowrap">Время</th>
-                                <th class="nowrap">Card</th>
-                                <th class="nowrap">Tips</th>
-                                <th class="nowrap">Card+Tips</th>
-                                <th>Метод</th>
-                                <th>Официант</th>
-                                <th class="nowrap">Стол</th>
+                                <th class="nowrap sortable" data-sort-key="ts">Время</th>
+                                <th class="nowrap sortable" data-sort-key="card">Card</th>
+                                <th class="nowrap sortable" data-sort-key="tips">Tips</th>
+                                <th class="nowrap sortable" data-sort-key="total">Card+Tips</th>
+                                <th class="sortable" data-sort-key="method">Метод</th>
+                                <th class="sortable" data-sort-key="waiter">Официант</th>
+                                <th class="nowrap sortable" data-sort-key="table">Стол</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1089,10 +1125,13 @@ $fmtVnd = function (int $v): string {
                                 if (strtolower($pm) === 'vietnam company') {
                                     $cls = 'row-blue';
                                 }
-                                $cardVnd = (int)$r['payed_card'];
-                                $tipVnd = (int)$r['tip_sum'];
+                                $cardCents = (int)$r['payed_card'];
+                                $tipCents = (int)$r['tip_sum'];
+                                $cardVnd = $posterCentsToVnd($cardCents);
+                                $tipVnd = $posterCentsToVnd($tipCents);
+                                $tsRow = strtotime($r['date_close']) ?: 0;
                             ?>
-                            <tr class="<?= $cls ?>" data-poster-id="<?= $pid ?>">
+                            <tr class="<?= $cls ?>" data-poster-id="<?= $pid ?>" data-ts="<?= (int)$tsRow ?>" data-card="<?= (int)$cardVnd ?>" data-tips="<?= (int)$tipVnd ?>" data-total="<?= (int)($cardVnd + $tipVnd) ?>" data-method="<?= htmlspecialchars(mb_strtolower($pm, 'UTF-8')) ?>" data-waiter="<?= htmlspecialchars(mb_strtolower((string)($r['waiter_name'] ?? ''), 'UTF-8')) ?>" data-table="<?= (int)($r['table_id'] ?? 0) ?>">
                                 <td><span class="anchor" id="poster-<?= $pid ?>"></span></td>
                                 <td class="nowrap"><?= date('H:i:s', strtotime($r['date_close'])) ?></td>
                                 <td class="sum"><?= htmlspecialchars($fmtVnd($cardVnd)) ?></td>
@@ -1105,6 +1144,9 @@ $fmtVnd = function (int $v): string {
                         <?php endforeach; ?>
                         </tbody>
                     </table>
+                </div>
+                <div class="muted" style="padding: 10px 12px; font-weight: 900;">
+                    Итого: <?= htmlspecialchars($fmtVnd((int)$posterTotalVnd)) ?>
                 </div>
             </div>
         </div>
@@ -1127,31 +1169,33 @@ $fmtVnd = function (int $v): string {
             <div style="font-weight: 900; margin-bottom: 10px;">Финансовые транзакции</div>
 
             <?php
-            $vietnamSum = $financeDisplay['vietnam'] ? $moneyToInt($financeDisplay['vietnam']['sum'] ?? $financeDisplay['vietnam']['amount'] ?? 0) : null;
-            $tipsSum = $financeDisplay['tips'] ? $moneyToInt($financeDisplay['tips']['sum'] ?? $financeDisplay['tips']['amount'] ?? 0) : null;
+            $vietnamCents = $financeDisplay['vietnam'] ? $moneyToInt($financeDisplay['vietnam']['sum'] ?? $financeDisplay['vietnam']['amount'] ?? 0) : null;
+            $tipsCents = $financeDisplay['tips'] ? $moneyToInt($financeDisplay['tips']['sum'] ?? $financeDisplay['tips']['amount'] ?? 0) : null;
+            $vietnamVnd = $vietnamCents !== null ? $posterCentsToVnd($vietnamCents) : null;
+            $tipsVnd = $tipsCents !== null ? $posterCentsToVnd($tipsCents) : null;
             ?>
 
             <div class="finance-row">
                 <div class="finance-left">
                     <div style="font-weight:900;">Vietnam Company — Card payments</div>
-                    <div class="muted"><?= $vietnamSum !== null ? htmlspecialchars($fmtVnd($vietnamSum)) : '—' ?></div>
+                    <div class="muted"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd($vietnamVnd)) : '—' ?></div>
                 </div>
                 <form method="POST">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="vietnam">
-                    <button class="btn" type="submit" <?= $vietnamSum === null ? 'disabled' : '' ?>>Создать перевод</button>
+                    <button class="btn" type="submit" <?= $vietnamCents === null ? 'disabled' : '' ?>>Создать перевод</button>
                 </form>
             </div>
 
             <div class="finance-row">
                 <div class="finance-left">
                     <div style="font-weight:900;">Card tips per shift</div>
-                    <div class="muted"><?= $tipsSum !== null ? htmlspecialchars($fmtVnd($tipsSum)) : '—' ?></div>
+                    <div class="muted"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd($tipsVnd)) : '—' ?></div>
                 </div>
                 <form method="POST">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="tips">
-                    <button class="btn" type="submit" <?= $tipsSum === null ? 'disabled' : '' ?>>Создать перевод</button>
+                    <button class="btn" type="submit" <?= $tipsCents === null ? 'disabled' : '' ?>>Создать перевод</button>
                 </form>
             </div>
         </div>
@@ -1248,6 +1292,43 @@ $fmtVnd = function (int $v): string {
         posterTable.querySelectorAll('tr.row-selected').forEach((tr) => tr.classList.remove('row-selected'));
         selected = null;
     };
+
+    const setupSort = (table) => {
+        const state = { key: null, dir: 'asc' };
+        const ths = Array.from(table.querySelectorAll('th.sortable[data-sort-key]'));
+        ths.forEach((th) => {
+            th.style.cursor = 'pointer';
+            th.addEventListener('click', () => {
+                const key = (th.getAttribute('data-sort-key') || '').trim();
+                if (!key) return;
+                state.dir = (state.key === key && state.dir === 'asc') ? 'desc' : 'asc';
+                state.key = key;
+
+                const tbody = table.tBodies && table.tBodies[0] ? table.tBodies[0] : null;
+                if (!tbody) return;
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                rows.sort((a, b) => {
+                    const av = (a.dataset && a.dataset[key]) ? a.dataset[key] : '';
+                    const bv = (b.dataset && b.dataset[key]) ? b.dataset[key] : '';
+                    const na = Number(av);
+                    const nb = Number(bv);
+                    let cmp = 0;
+                    if (av !== '' && bv !== '' && !Number.isNaN(na) && !Number.isNaN(nb)) {
+                        cmp = na - nb;
+                    } else {
+                        cmp = String(av).localeCompare(String(bv), 'ru', { numeric: true, sensitivity: 'base' });
+                    }
+                    return state.dir === 'asc' ? cmp : -cmp;
+                });
+                rows.forEach((r) => tbody.appendChild(r));
+                clearSelected();
+                positionLines();
+            });
+        });
+    };
+
+    setupSort(sepayTable);
+    setupSort(posterTable);
 
     const onRowClick = (tr, side) => {
         const idAttr = side === 'sepay' ? 'data-sepay-id' : 'data-poster-id';
