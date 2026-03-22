@@ -169,6 +169,7 @@ try {
         [$today, $cutoffTime]
     )->fetchAll();
     if (!is_array($rows)) $rows = [];
+    $logLine('CANDIDATES rows=' . count($rows));
 
     $groups = [];
     foreach ($rows as $r) {
@@ -213,6 +214,7 @@ try {
             $deleted = $bot->deleteMessage($msgId);
             if (!$deleted) continue;
             $deletedCount++;
+            $logLine('DELETE tx=' . $txId . ' msg=' . $msgId);
         }
         $db->query("DELETE FROM {$tgThreads} WHERE transaction_date = ? AND transaction_id = ?", [$today, $txId]);
         $db->query("DELETE FROM {$tgItems} WHERE transaction_date = ? AND transaction_id = ?", [$today, $txId]);
@@ -225,6 +227,9 @@ try {
         if ($receipt === '') $receipt = (string)$txId;
         if ($table === '') $table = '—';
         if ($waiter === '') $waiter = '—';
+
+        $itemIds = array_values(array_filter(array_map(fn($x) => (int)($x['id'] ?? 0), (array)($g['items'] ?? [])), fn($v) => $v > 0));
+        $itemIds = array_values(array_unique($itemIds));
 
         $lines = [];
         $keyboard = [];
@@ -278,6 +283,7 @@ try {
                 $editedOk = $bot->editMessageText($prevMsgId, $text, $keyboard);
                 if ($editedOk) {
                     $editedCount++;
+                    $logLine('EDIT tx=' . $txId . ' msg=' . $prevMsgId . ' receipt=' . $receipt . ' table=' . $table . ' items=' . count($itemIds));
                     $db->query(
                         "UPDATE {$tgThreads}
                          SET last_text_hash = ?, last_seen_at = ?, last_edited_at = ?, receipt_number = ?, table_number = ?, waiter_name = ?
@@ -296,6 +302,7 @@ try {
                 if ($newMsgId) {
                     $sentCount++;
                     $currentMessageId = (int)$newMsgId;
+                    $logLine('SEND tx=' . $txId . ' msg=' . $newMsgId . ' receipt=' . $receipt . ' table=' . $table . ' items=' . count($itemIds));
                     $db->query(
                         "INSERT INTO {$tgThreads} (transaction_date, transaction_id, message_id, receipt_number, table_number, waiter_name, last_text_hash, last_edited_at, last_seen_at)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -313,9 +320,6 @@ try {
                 }
             }
         }
-
-        $itemIds = array_values(array_filter(array_map(fn($x) => (int)($x['id'] ?? 0), (array)($g['items'] ?? [])), fn($v) => $v > 0));
-        $itemIds = array_values(array_unique($itemIds));
 
         if ($currentMessageId <= 0) {
             $db->query("DELETE FROM {$tgItems} WHERE transaction_date = ? AND transaction_id = ?", [$today, $txId]);
