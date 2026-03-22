@@ -69,6 +69,65 @@ $extractPaymentMethod = function (array $tx): ?string {
     return null;
 };
 
+$extractPaymentMethodId = function (array $tx): int {
+    $wanted = [
+        'payment_method_id',
+        'paymentmethodid',
+        'payment_method',
+        'paymentmethod',
+        'payment_type',
+        'paymenttype',
+    ];
+
+    $walk = function ($v) use (&$walk, $wanted): int {
+        if (!is_array($v)) return 0;
+        foreach ($v as $k => $vv) {
+            $kk = is_string($k) ? strtolower($k) : '';
+            if ($kk !== '' && in_array($kk, $wanted, true)) {
+                if (is_numeric($vv)) {
+                    $id = (int)$vv;
+                    if ($id > 0) return $id;
+                }
+            }
+            if (is_array($vv)) {
+                $id = $walk($vv);
+                if ($id > 0) return $id;
+            }
+        }
+        return 0;
+    };
+    return $walk($tx);
+};
+
+$getPaymentMethodsMap = function (\App\Classes\PosterAPI $api): array {
+    static $cache = null;
+    if (is_array($cache)) return $cache;
+    $cache = [];
+    $calls = [
+        ['money_type' => 2, 'payment_type' => 2],
+        ['money_type' => 2, 'payment_type' => 7],
+    ];
+    foreach ($calls as $params) {
+        try {
+            $rows = $api->request('settings.getPaymentMethods', $params);
+            if (is_array($rows) && isset($rows['response']) && is_array($rows['response'])) {
+                $rows = $rows['response'];
+            }
+            if (!is_array($rows)) $rows = [];
+            foreach ($rows as $r) {
+                if (!is_array($r)) continue;
+                $id = (int)($r['payment_method_id'] ?? $r['paymentMethodId'] ?? 0);
+                $title = trim((string)($r['title'] ?? ''));
+                if ($id > 0 && $title !== '') {
+                    $cache[$id] = $title;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+    }
+    return $cache;
+};
+
 $extractCardType = function (array $tx): ?string {
     $candidates = [];
     $collectStrings = function ($v) use (&$collectStrings, &$candidates) {
@@ -215,6 +274,7 @@ try {
         if (isset($v[0]) && is_array($v[0])) return $v[0];
         return $v;
     };
+    $paymentMethodsMap = null;
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'load_poster_checks') {
         $txs = $api->getTransactions($date, $date);
@@ -328,6 +388,20 @@ try {
 
             if (($payType !== 2 && $payType !== 3) && $payedThirdParty > 0) {
                 $payType = 2;
+            }
+
+            if ($paymentMethodsMap === null) {
+                $paymentMethodsMap = $getPaymentMethodsMap($api);
+            }
+            if (($cardType === null || $cardType === '' || strtolower((string)$cardType) === 'card') && ($payedCard > 0 || $payedThirdParty > 0)) {
+                $pmId = $extractPaymentMethodId($tx);
+                $pmTitle = ($pmId > 0 && isset($paymentMethodsMap[$pmId])) ? (string)$paymentMethodsMap[$pmId] : '';
+                if ($pmTitle !== '') {
+                    $cardType = $pmTitle;
+                    if ($paymentMethod === null || $paymentMethod === '' || strtolower((string)$paymentMethod) === 'card') {
+                        $paymentMethod = $pmTitle;
+                    }
+                }
             }
 
             if ($payedThirdParty > 0) {
@@ -1227,6 +1301,7 @@ if (($_GET['ajax'] ?? '') === 'scan_card_types') {
         )->fetchAll();
 
         $api = new \App\Classes\PosterAPI((string)$token);
+        $paymentMethodsMap = $getPaymentMethodsMap($api);
 
         $updated = 0;
         $foundVietnam = 0;
@@ -1273,6 +1348,17 @@ if (($_GET['ajax'] ?? '') === 'scan_card_types') {
             }
             $cardType = $extractCardType($tx);
             $paymentMethod = $extractPaymentMethod($tx) ?? $cardType;
+
+            if ($cardType === null || $cardType === '' || strtolower((string)$cardType) === 'card') {
+                $pmId = $extractPaymentMethodId($tx);
+                $pmTitle = ($pmId > 0 && isset($paymentMethodsMap[$pmId])) ? (string)$paymentMethodsMap[$pmId] : '';
+                if ($pmTitle !== '') {
+                    $cardType = $pmTitle;
+                    if ($paymentMethod === null || $paymentMethod === '' || strtolower((string)$paymentMethod) === 'card') {
+                        $paymentMethod = $pmTitle;
+                    }
+                }
+            }
 
             if ($cardType === null || $cardType === '' || strtolower((string)$cardType) === 'card') {
                 $notFound++;
