@@ -291,8 +291,29 @@ try {
                 }
             }
 
+            if (($cardType === null || $cardType === '') && $payedCard > 0) {
+                try {
+                    $hist = $api->request('dash.getTransactionHistory', ['transaction_id' => $txId]);
+                    if (is_array($hist)) {
+                        $tx['history'] = $hist;
+                        $cardType = $extractCardType($tx);
+                        if ($paymentMethod === null || strtolower((string)$paymentMethod) === 'card') {
+                            $paymentMethod = $cardType ?? $paymentMethod;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                }
+            }
+
             if (($payType !== 2 && $payType !== 3) && $payedThirdParty > 0) {
                 $payType = 2;
+            }
+
+            if ($payedThirdParty > 0) {
+                if ($cardType === null || $cardType === '') $cardType = 'Vietnam Company';
+                if ($paymentMethod === null || $paymentMethod === '' || strtolower((string)$paymentMethod) === 'card') {
+                    $paymentMethod = 'Vietnam Company';
+                }
             }
             $discount = (float)($tx['discount'] ?? 0);
             $tableId = isset($tx['table_id']) ? (int)$tx['table_id'] : (isset($tx['tableId']) ? (int)$tx['tableId'] : null);
