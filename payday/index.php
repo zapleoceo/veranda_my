@@ -630,6 +630,7 @@ try {
         }
 
         $targetDate = $dateTo . ' 23:55:00';
+        $targetTs = strtotime($targetDate);
         $startTs = strtotime($dateTo . ' 00:00:00');
         $endTs = strtotime($dateTo . ' 23:59:59');
 
@@ -675,10 +676,8 @@ try {
             else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
             $sumInt = (int)round($sumF);
             $sumVnd = $sumInt;
-            if (abs($sumInt) > 100000000 && $sumInt % 100 === 0) {
-                $sumVnd = (int)round($sumInt / 100);
-            }
-            if ($sumVnd !== $amountVnd) continue;
+            $sumVndFromCents = ($sumInt % 100 === 0) ? (int)round($sumInt / 100) : null;
+            if ($sumVnd !== $amountVnd && ($sumVndFromCents === null || $sumVndFromCents !== $amountVnd)) continue;
 
             $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
             $ts = null;
@@ -691,6 +690,7 @@ try {
                 if ($t !== false && $t > 0) $ts = $t;
             }
             if ($ts !== null && $startTs !== false && $endTs !== false && $ts >= $startTs && $ts <= $endTs) {
+                if ($targetTs !== false && abs($ts - $targetTs) > 60) continue;
                 $dup = true;
                 break;
             }
@@ -1563,9 +1563,10 @@ $transferTipsExists = false;
 try {
     $vietnamAmountVnd = $financeVietnamCents !== null ? (int)$posterCentsToVnd((int)$financeVietnamCents) : 0;
     $tipsAmountVnd = $financeTipsCents !== null ? (int)$posterCentsToVnd((int)$financeTipsCents) : 0;
+    $targetTs = strtotime($dateTo . ' 23:55:00');
     $startTs = strtotime($dateTo . ' 00:00:00');
     $endTs = strtotime($dateTo . ' 23:59:59');
-    if ($startTs !== false && $endTs !== false) {
+    if ($targetTs !== false && $startTs !== false && $endTs !== false) {
         $apiFinance = new \App\Classes\PosterAPI((string)$token);
         $rows = [];
         try {
@@ -1599,9 +1600,7 @@ try {
             else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
             $sumInt = (int)round($sumF);
             $sumVnd = $sumInt;
-            if (abs($sumInt) > 100000000 && $sumInt % 100 === 0) {
-                $sumVnd = (int)round($sumInt / 100);
-            }
+            $sumVndFromCents = ($sumInt % 100 === 0) ? (int)round($sumInt / 100) : null;
 
             $dRaw = $r['date'] ?? $r['created_at'] ?? $r['createdAt'] ?? $r['time'] ?? $r['datetime'] ?? $r['date_time'] ?? $r['created'] ?? null;
             $ts = null;
@@ -1615,11 +1614,21 @@ try {
             }
             if ($ts === null) continue;
             if ($ts < $startTs || $ts > $endTs) continue;
+            if (abs($ts - $targetTs) > 60) continue;
 
-            if (!$transferVietnamExists && $accTo === 9 && $vietnamAmountVnd > 0 && $sumVnd === $vietnamAmountVnd) {
+            $matchVietnamSum = $vietnamAmountVnd > 0 && (
+                $sumVnd === $vietnamAmountVnd ||
+                ($sumVndFromCents !== null && $sumVndFromCents === $vietnamAmountVnd)
+            );
+            $matchTipsSum = $tipsAmountVnd > 0 && (
+                $sumVnd === $tipsAmountVnd ||
+                ($sumVndFromCents !== null && $sumVndFromCents === $tipsAmountVnd)
+            );
+
+            if (!$transferVietnamExists && $accTo === 9 && $matchVietnamSum) {
                 $transferVietnamExists = true;
             }
-            if (!$transferTipsExists && $accTo === 8 && $tipsAmountVnd > 0 && $sumVnd === $tipsAmountVnd) {
+            if (!$transferTipsExists && $accTo === 8 && $matchTipsSum) {
                 $transferTipsExists = true;
             }
         }
