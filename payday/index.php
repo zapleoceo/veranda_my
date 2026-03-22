@@ -1412,6 +1412,8 @@ $fmtVnd = function (int $v): string {
         .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .grid { display:grid; grid-template-columns: 1fr 120px 1fr; gap: 12px; align-items:start; }
         @media (max-width: 1050px) { .grid { grid-template-columns: 1fr; } }
+        #tablesRoot { position: relative; overflow: hidden; }
+        #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
         th { background: #f8f9fa; color: #65676b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -1436,7 +1438,7 @@ $fmtVnd = function (int $v): string {
         .finance-row + .finance-row { margin-top: 10px; }
         .finance-left { display:flex; flex-direction: column; gap: 4px; }
         .badge { display:inline-flex; align-items:center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; border: 1px solid #e5e7eb; background: #fff; }
-        .link-x { position: fixed; z-index: 9999; width: 16px; height: 16px; border-radius: 999px; border: 1px solid #d0d5dd; background: #fff; color: #111827; display:flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; }
+        .link-x { position: absolute; z-index: 20; width: 16px; height: 16px; border-radius: 999px; border: 1px solid #d0d5dd; background: #fff; color: #111827; display:flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; }
         .link-x:hover { background: #f3f4f6; }
         .cell-anchor { display:flex; align-items:center; gap: 8px; }
         .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
@@ -1503,6 +1505,7 @@ $fmtVnd = function (int $v): string {
         <div class="divider"></div>
 
         <div class="grid" id="tablesRoot">
+            <div id="lineLayer"></div>
             <div class="card" style="padding: 0;">
                 <div style="padding: 12px 12px 6px;">
                     <div style="font-weight:900;">SePay</div>
@@ -1718,41 +1721,6 @@ $fmtVnd = function (int $v): string {
         }
     };
 
-    const getTablesRect = () => {
-        const r = tablesRoot ? tablesRoot.getBoundingClientRect() : null;
-        if (!r) return null;
-        const sx = window.scrollX || 0;
-        const sy = window.scrollY || 0;
-        return {
-            left: r.left + sx,
-            top: r.top + sy,
-            right: r.right + sx,
-            bottom: r.bottom + sy,
-        };
-    };
-
-    const clipStyleFor = (rect) => {
-        if (!rect) return '';
-        return `polygon(${rect.left}px ${rect.top}px, ${rect.right}px ${rect.top}px, ${rect.right}px ${rect.bottom}px, ${rect.left}px ${rect.bottom}px)`;
-    };
-
-    const applyClip = () => {
-        const rect = getTablesRect();
-        const clip = clipStyleFor(rect);
-        lines.forEach((line) => {
-            const svg = line && line.svg ? line.svg : null;
-            if (!svg) return;
-            if (clip) {
-                svg.style.clipPath = clip;
-                svg.style.webkitClipPath = clip;
-            } else {
-                svg.style.clipPath = '';
-                svg.style.webkitClipPath = '';
-            }
-            svg.style.zIndex = '2';
-        });
-    };
-
     const fmtVnd = (v) => {
         try {
             return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Number(v) || 0) + ' ₫';
@@ -1929,6 +1897,7 @@ $fmtVnd = function (int $v): string {
                 path: 'fluid',
                 startSocket: 'right',
                 endSocket: 'left',
+                parent: (lineLayer || tablesRoot || document.body),
             });
             lines.push(line);
 
@@ -1944,17 +1913,15 @@ $fmtVnd = function (int $v): string {
                     alert(err && err.message ? err.message : 'Ошибка');
                 });
             });
-            document.body.appendChild(btn);
+            (tablesRoot || document.body).appendChild(btn);
             widgets.push({ btn, sepay_id: Number(l.sepay_id || 0), poster_transaction_id: Number(l.poster_transaction_id || 0) });
         });
-        applyClip();
     };
 
     const positionLines = () => {
         lines.forEach((l) => {
             try { l.position(); } catch (_) {}
         });
-        applyClip();
     };
 
     const positionWidgets = () => {
@@ -1979,12 +1946,15 @@ $fmtVnd = function (int $v): string {
             w.btn.style.display = 'flex';
             const clampedX = Math.max(rect.left + 8, Math.min(rect.right - 8, mx));
             const clampedY = Math.max(rect.top + 8, Math.min(rect.bottom - 8, my));
-            w.btn.style.left = Math.round(clampedX - 8) + 'px';
-            w.btn.style.top = Math.round(clampedY - 8) + 'px';
+            const localX = clampedX - rect.left;
+            const localY = clampedY - rect.top;
+            w.btn.style.left = Math.round(localX - 8) + 'px';
+            w.btn.style.top = Math.round(localY - 8) + 'px';
         });
     };
 
     const tablesRoot = document.getElementById('tablesRoot');
+    const lineLayer = document.getElementById('lineLayer');
     if (tablesRoot) {
         tablesRoot.addEventListener('scroll', () => { positionLines(); positionWidgets(); }, { passive: true, capture: true });
     }
