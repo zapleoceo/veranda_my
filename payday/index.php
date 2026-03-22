@@ -1500,6 +1500,14 @@ $fmtVnd = function (int $v): string {
         .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid #d0d5dd; background: #fff; font-weight: 800; cursor: pointer; }
         .btn.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
         .btn:disabled { opacity: 0.6; cursor: default; }
+        .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color:#374151; }
+        .toggle-wrap .toggle-text { user-select:none; }
+        .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#d1d5db; transition: 180ms; border-radius: 999px; }
+        .slider:before { position:absolute; content:""; height: 22px; width: 22px; left: 3px; bottom: 3px; background: #fff; transition: 180ms; border-radius: 999px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+        .switch input:checked + .slider { background:#1a73e8; }
+        .switch input:checked + .slider:before { transform: translateX(24px); }
         .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .grid { display:grid; grid-template-columns: 1fr 120px 1fr; gap: 12px; align-items:start; }
         @media (max-width: 1050px) { .grid { grid-template-columns: 1fr; } }
@@ -1617,7 +1625,14 @@ $fmtVnd = function (int $v): string {
                 <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Очистить день</button>
             </form>
 
-            <button class="btn" id="modeToggleBtn" type="button" title="Lite/Full">Full</button>
+            <div class="toggle-wrap" title="Lite/Full">
+                <span class="toggle-text">Lite</span>
+                <label class="switch">
+                    <input id="modeToggle" type="checkbox">
+                    <span class="slider"></span>
+                </label>
+                <span class="toggle-text">Full</span>
+            </div>
         </div>
 
         <div class="divider"></div>
@@ -1693,9 +1708,9 @@ $fmtVnd = function (int $v): string {
                     <div id="selDiff" style="font-weight: 900;">0 ₫</div>
                 </div>
                 <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
-                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>*цвет линии*: Авто 1</div>
-                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>*цвет линии*: Авто 2</div>
-                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>*цвет линии*: Ручная связь</div>
+                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>Авто 1</div>
+                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>Авто 2</div>
+                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>Ручная связь</div>
                 </div>
             </div>
 
@@ -1935,11 +1950,11 @@ $fmtVnd = function (int $v): string {
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;');
 
-    const modeToggleBtn = document.getElementById('modeToggleBtn');
+    const modeToggleEl = document.getElementById('modeToggle');
     const applyMode = (mode) => {
         const m = (mode === 'lite') ? 'lite' : 'full';
         document.body.classList.toggle('mode-lite', m === 'lite');
-        if (modeToggleBtn) modeToggleBtn.textContent = m === 'lite' ? 'Lite' : 'Full';
+        if (modeToggleEl) modeToggleEl.checked = (m === 'full');
         try { localStorage.setItem('payday_mode', m); } catch (_) {}
     };
 
@@ -2140,9 +2155,9 @@ $fmtVnd = function (int $v): string {
     }
     applyMode(initialMode);
 
-    if (modeToggleBtn) {
-        modeToggleBtn.addEventListener('click', () => {
-            const next = document.body.classList.contains('mode-lite') ? 'full' : 'lite';
+    if (modeToggleEl) {
+        modeToggleEl.addEventListener('change', () => {
+            const next = modeToggleEl.checked ? 'full' : 'lite';
             applyMode(next);
             try { window.dispatchEvent(new Event('resize')); } catch (_) {}
             setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 200);
