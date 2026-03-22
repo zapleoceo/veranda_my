@@ -262,6 +262,9 @@ class Database {
     public function createPaydayTables(): void {
         $st = $this->t('sepay_transactions');
         $pc = $this->t('poster_checks');
+        $ppm = $this->t('poster_payment_methods');
+        $pt = $this->t('poster_transactions');
+        $ptd = $this->t('poster_transaction_details');
         $pl = $this->t('check_payment_links');
         $fkTag = $this->tableSuffix !== '' ? substr(sha1($this->tableSuffix), 0, 6) : 'base';
 
@@ -321,6 +324,7 @@ class Database {
             tip_sum BIGINT NOT NULL,
             discount DECIMAL(5,2) NOT NULL,
             date_close DATETIME NOT NULL,
+            poster_payment_method_id INT UNSIGNED NULL,
             payment_method VARCHAR(100) NULL,
             card_type VARCHAR(100) NULL,
             waiter_name VARCHAR(100) NULL,
@@ -330,6 +334,7 @@ class Database {
             KEY idx_poster_day (day_date),
             KEY idx_poster_close (date_close),
             KEY idx_poster_method (payment_method),
+            KEY idx_poster_pm_id (poster_payment_method_id),
             KEY idx_poster_pay_type (pay_type)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
@@ -349,8 +354,56 @@ class Database {
             if (empty($have['payed_third_party'])) {
                 $this->pdo->exec("ALTER TABLE {$pc} ADD COLUMN payed_third_party BIGINT NOT NULL DEFAULT 0");
             }
+            if (empty($have['poster_payment_method_id'])) {
+                $this->pdo->exec("ALTER TABLE {$pc} ADD COLUMN poster_payment_method_id INT UNSIGNED NULL");
+                $this->pdo->exec("ALTER TABLE {$pc} ADD INDEX idx_poster_pm_id (poster_payment_method_id)");
+            }
         } catch (\Throwable $e) {
         }
+
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$ppm} (
+            payment_method_id INT UNSIGNED NOT NULL PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            icon VARCHAR(255) NULL,
+            color VARCHAR(50) NULL,
+            money_type TINYINT NOT NULL,
+            payment_type TINYINT NOT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            raw_json LONGTEXT NULL,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_ppm_type (money_type, payment_type),
+            KEY idx_ppm_active (is_active)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$pt} (
+            transaction_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+            day_date DATE NOT NULL,
+            date_close DATETIME NOT NULL,
+            pay_type TINYINT NOT NULL,
+            sum BIGINT NOT NULL,
+            payed_card BIGINT NOT NULL,
+            payed_third_party BIGINT NOT NULL DEFAULT 0,
+            tip_sum BIGINT NOT NULL,
+            spot_id INT NULL,
+            table_id INT NULL,
+            waiter_name VARCHAR(100) NULL,
+            payment_method_id INT UNSIGNED NULL,
+            raw_json LONGTEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_pt_day (day_date),
+            KEY idx_pt_close (date_close),
+            KEY idx_pt_pm_id (payment_method_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$ptd} (
+            transaction_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+            payment_method_id INT UNSIGNED NULL,
+            raw_json LONGTEXT NULL,
+            fetched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_ptd_pm_id (payment_method_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$pl} (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

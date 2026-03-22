@@ -259,6 +259,9 @@ $getEmployeesById = function (\App\Classes\PosterAPI $api): array {
 
 $st = $db->t('sepay_transactions');
 $pc = $db->t('poster_checks');
+$ppm = $db->t('poster_payment_methods');
+$pt = $db->t('poster_transactions');
+$ptd = $db->t('poster_transaction_details');
 $pl = $db->t('check_payment_links');
 
 $action = (string)($_POST['action'] ?? '');
@@ -273,9 +276,7 @@ try {
     $paymentMethodsMap = null;
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'load_poster_checks') {
-        $txs = $api->getTransactions($date, $date);
-        if (!is_array($txs)) $txs = [];
-
+        $ymd = str_replace('-', '', $date);
         $employeesById = null;
         $inserted = 0;
         $updated = 0;
@@ -283,6 +284,76 @@ try {
         $minCloseAt = null;
         $maxCloseAt = null;
         $datesSeen = [];
+
+        $methods = [];
+        try {
+            $m1 = $api->request('settings.getPaymentMethods', ['money_type' => 2, 'payment_type' => 2]);
+            if (is_array($m1)) $methods = array_merge($methods, $m1);
+        } catch (\Throwable $e) {
+        }
+        try {
+            $m2 = $api->request('settings.getPaymentMethods', ['money_type' => 2, 'payment_type' => 7]);
+            if (is_array($m2)) $methods = array_merge($methods, $m2);
+        } catch (\Throwable $e) {
+        }
+
+        $methodTitleById = [];
+        try {
+            $db->query("DELETE FROM {$ppm}");
+        } catch (\Throwable $e) {
+        }
+        foreach ($methods as $m) {
+            if (!is_array($m)) continue;
+            $id = (int)($m['payment_method_id'] ?? $m['paymentMethodId'] ?? 0);
+            $title = trim((string)($m['title'] ?? ''));
+            if ($id <= 0 || $title === '') continue;
+            $methodTitleById[$id] = $title;
+            try {
+                $db->query(
+                    "INSERT INTO {$ppm} (payment_method_id, title, icon, color, money_type, payment_type, is_active, raw_json)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                        title = VALUES(title),
+                        icon = VALUES(icon),
+                        color = VALUES(color),
+                        money_type = VALUES(money_type),
+                        payment_type = VALUES(payment_type),
+                        is_active = VALUES(is_active),
+                        raw_json = VALUES(raw_json)",
+                    [
+                        $id,
+                        $title,
+                        ($m['icon'] ?? null) !== null ? (string)$m['icon'] : null,
+                        ($m['color'] ?? null) !== null ? (string)$m['color'] : null,
+                        (int)($m['money_type'] ?? $m['moneyType'] ?? 0),
+                        (int)($m['payment_type'] ?? $m['paymentType'] ?? 0),
+                        (int)($m['is_active'] ?? $m['isActive'] ?? 1),
+                        json_encode($m, JSON_UNESCAPED_UNICODE)
+                    ]
+                );
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $txs = [];
+        try {
+            $txs = $api->request('dash.getTransactions', [
+                'dateFrom' => $ymd,
+                'dateTo' => $ymd,
+                'status' => 2,
+                'include_products' => 0,
+                'include_history' => 0
+            ]);
+        } catch (\Throwable $e) {
+            $txs = [];
+        }
+        if (!is_array($txs)) $txs = [];
+
+        try {
+            $db->query("DELETE FROM {$ptd} WHERE transaction_id IN (SELECT transaction_id FROM {$pt} WHERE day_date = ?)", [$date]);
+            $db->query("DELETE FROM {$pt} WHERE day_date = ?", [$date]);
+        } catch (\Throwable $e) {
+        }
 
         foreach ($txs as $tx) {
             if (!is_array($tx)) continue;
@@ -297,20 +368,8 @@ try {
 
             $closeAt = $parsePosterDateTime($tx);
             if ($closeAt === null) {
-                $detail = null;
-                try {
-                    $detail = $normalizePosterTx($api->getTransaction($txId));
-                    if (is_array($detail)) $closeAt = $parsePosterDateTime($detail);
-                } catch (\Throwable $e) {
-                    $detail = null;
-                }
-                if ($closeAt === null) {
-                    $skipped++;
-                    continue;
-                }
-                if (is_array($detail)) {
-                    $tx = array_merge($tx, $detail);
-                }
+                $skipped++;
+                continue;
             }
 
             $dayDate = substr($closeAt, 0, 10);
@@ -319,16 +378,13 @@ try {
             if ($maxCloseAt === null || $closeAt > $maxCloseAt) $maxCloseAt = $closeAt;
 
             $employeeId = (int)($tx['employee_id'] ?? $tx['user_id'] ?? $tx['waiter_id'] ?? 0);
-            $waiterName = trim((string)($tx['waiter_name'] ?? $tx['waiterName'] ?? ''));
+            $waiterName = trim((string)($tx['waiter_name'] ?? $tx['waiterName'] ?? $tx['name'] ?? ''));
             if ($waiterName === '' && $employeeId > 0) {
                 if ($employeesById === null) {
                     $employeesById = $getEmployeesById($api);
                 }
                 $waiterName = (string)($employeesById[$employeeId] ?? '');
             }
-
-            $cardType = $extractCardType($tx);
-            $paymentMethod = $extractPaymentMethod($tx) ?? $cardType;
 
             $sum = $moneyToInt($tx['sum'] ?? 0);
             $payedSum = $moneyToInt($tx['payed_sum'] ?? $tx['payedSum'] ?? 0);
@@ -343,78 +399,100 @@ try {
             $tipsCash = $moneyToInt($tx['tips_cash'] ?? $tx['tipsCash'] ?? 0);
             $tipSum = $serviceTip + $tipsCard + $tipsCash;
 
-            $maybeNeedsDetail = ($sum > 0 && ($payedCard + $payedCash + $payedCert + $payedBonus + $payedThirdParty) <= 0);
-            if ($maybeNeedsDetail) {
-                try {
-                    $detail = $normalizePosterTx($api->getTransaction($txId));
-                    if (is_array($detail)) {
-                        $tx = array_merge($tx, $detail);
-                        $payType = isset($tx['pay_type']) ? (int)$tx['pay_type'] : (int)($tx['payType'] ?? $payType);
-                        $cardType = $extractCardType($tx);
-                        $paymentMethod = $extractPaymentMethod($tx) ?? $cardType;
-                        $sum = $moneyToInt($tx['sum'] ?? $sum);
-                        $payedSum = $moneyToInt($tx['payed_sum'] ?? $tx['payedSum'] ?? $payedSum);
-                        $payedCash = $moneyToInt($tx['payed_cash'] ?? $tx['payedCash'] ?? $payedCash);
-                        $payedCard = $moneyToInt($tx['payed_card'] ?? $tx['payedCard'] ?? $payedCard);
-                        $payedCert = $moneyToInt($tx['payed_cert'] ?? $tx['payedCert'] ?? $payedCert);
-                        $payedBonus = $moneyToInt($tx['payed_bonus'] ?? $tx['payedBonus'] ?? $payedBonus);
-                        $payedThirdParty = $moneyToInt($tx['payed_third_party'] ?? $tx['payedThirdParty'] ?? $payedThirdParty);
-                        $serviceTip = $moneyToInt($tx['tip_sum'] ?? $tx['tipSum'] ?? $serviceTip);
-                        $tipsCard = $moneyToInt($tx['tips_card'] ?? $tx['tipsCard'] ?? $tipsCard);
-                        $tipsCash = $moneyToInt($tx['tips_cash'] ?? $tx['tipsCash'] ?? $tipsCash);
-                        $tipSum = $serviceTip + $tipsCard + $tipsCash;
-                    }
-                } catch (\Throwable $e) {
-                }
+            if (($payedCard + $payedThirdParty + $tipSum) <= 0) {
+                $skipped++;
+                continue;
             }
 
-            if (($cardType === null || $cardType === '' || strtolower((string)$cardType) === 'card') && ($payedCard > 0 || $payedThirdParty > 0)) {
-                try {
-                    $hist = $api->request('dash.getTransactionHistory', ['transaction_id' => $txId]);
-                    if (is_array($hist)) {
-                        $tx['history'] = $hist;
-                        $cardType = $extractCardType($tx);
-                        if ($paymentMethod === null || strtolower((string)$paymentMethod) === 'card') {
-                            $paymentMethod = $cardType ?? $paymentMethod;
-                        }
-                    }
-                } catch (\Throwable $e) {
-                }
-            }
-
-            if (($payType !== 2 && $payType !== 3) && $payedThirdParty > 0) {
-                $payType = 2;
-            }
-
-            if ($paymentMethodsMap === null) {
-                $paymentMethodsMap = $getPaymentMethodsMap($api);
-            }
-            if (($cardType === null || $cardType === '' || strtolower((string)$cardType) === 'card') && ($payedCard > 0 || $payedThirdParty > 0)) {
-                $pmId = $extractPaymentMethodId($tx);
-                $pmTitle = ($pmId > 0 && isset($paymentMethodsMap[$pmId])) ? (string)$paymentMethodsMap[$pmId] : '';
-                if ($pmTitle !== '') {
-                    $cardType = $pmTitle;
-                    if ($paymentMethod === null || $paymentMethod === '' || strtolower((string)$paymentMethod) === 'card') {
-                        $paymentMethod = $pmTitle;
-                    }
-                }
-            }
-
-            if ($payedThirdParty > 0) {
-                if ($cardType === null || $cardType === '') $cardType = 'Vietnam Company';
-                if ($paymentMethod === null || $paymentMethod === '' || strtolower((string)$paymentMethod) === 'card') {
-                    $paymentMethod = 'Vietnam Company';
-                }
-            }
             $discount = (float)($tx['discount'] ?? 0);
             $tableId = isset($tx['table_id']) ? (int)$tx['table_id'] : (isset($tx['tableId']) ? (int)$tx['tableId'] : null);
             $spotId = isset($tx['spot_id']) ? (int)$tx['spot_id'] : (isset($tx['spotId']) ? (int)$tx['spotId'] : null);
             $receiptNumber = (int)($tx['receipt_number'] ?? $tx['receiptNumber'] ?? $tx['receipt'] ?? $tx['check_number'] ?? $tx['checkNumber'] ?? 0);
             if ($receiptNumber <= 0) $receiptNumber = $txId;
 
-            if (($payedCard + $payedThirdParty + $tipSum) <= 0) {
-                $skipped++;
-                continue;
+            try {
+                $db->query(
+                    "INSERT INTO {$pt}
+                        (transaction_id, day_date, date_close, pay_type, sum, payed_card, payed_third_party, tip_sum, spot_id, table_id, waiter_name, raw_json)
+                     VALUES
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                        day_date = VALUES(day_date),
+                        date_close = VALUES(date_close),
+                        pay_type = VALUES(pay_type),
+                        sum = VALUES(sum),
+                        payed_card = VALUES(payed_card),
+                        payed_third_party = VALUES(payed_third_party),
+                        tip_sum = VALUES(tip_sum),
+                        spot_id = VALUES(spot_id),
+                        table_id = VALUES(table_id),
+                        waiter_name = VALUES(waiter_name),
+                        raw_json = VALUES(raw_json)",
+                    [
+                        $txId, $dayDate, $closeAt, $payType, $sum, $payedCard, $payedThirdParty, $tipSum, $spotId, $tableId,
+                        $waiterName !== '' ? $waiterName : null,
+                        json_encode($tx, JSON_UNESCAPED_UNICODE)
+                    ]
+                );
+            } catch (\Throwable $e) {
+            }
+
+            $detail = null;
+            try {
+                $detail = $normalizePosterTx($api->request('dash.getTransaction', [
+                    'transaction_id' => $txId,
+                    'include_history' => 0,
+                    'include_products' => 0,
+                    'include_delivery' => 0,
+                ]));
+            } catch (\Throwable $e) {
+                $detail = null;
+            }
+
+            $pmId = 0;
+            if (is_array($detail)) {
+                $pmId = (int)($detail['payment_method_id'] ?? $detail['paymentMethodId'] ?? 0);
+            }
+            if ($pmId <= 0) {
+                $pmId = (int)($tx['payment_method_id'] ?? $tx['paymentMethodId'] ?? 0);
+            }
+
+            try {
+                $db->query(
+                    "INSERT INTO {$ptd} (transaction_id, payment_method_id, raw_json)
+                     VALUES (?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                        payment_method_id = VALUES(payment_method_id),
+                        raw_json = VALUES(raw_json)",
+                    [$txId, $pmId > 0 ? $pmId : null, $detail !== null ? json_encode($detail, JSON_UNESCAPED_UNICODE) : null]
+                );
+            } catch (\Throwable $e) {
+            }
+
+            if ($pmId > 0) {
+                try {
+                    $db->query("UPDATE {$pt} SET payment_method_id = ? WHERE transaction_id = ? LIMIT 1", [$pmId, $txId]);
+                } catch (\Throwable $e) {
+                }
+            }
+
+            $pmTitle = ($pmId > 0 && isset($methodTitleById[$pmId])) ? (string)$methodTitleById[$pmId] : '';
+            $pmTitleLower = strtolower($pmTitle);
+            if ($pmTitleLower !== '') {
+                if (strpos($pmTitleLower, 'vietnam') !== false) $pmTitle = 'Vietnam Company';
+                if (strpos($pmTitleLower, 'bybit') !== false) $pmTitle = 'Bybit';
+            }
+
+            $cardType = null;
+            $paymentMethod = null;
+            if ($pmTitle !== '') {
+                $cardType = $pmTitle;
+                $paymentMethod = $pmTitle;
+            } else {
+                $merged = $tx;
+                if (is_array($detail)) $merged = array_merge($merged, $detail);
+                $cardType = $extractCardType($merged);
+                $paymentMethod = $extractPaymentMethod($merged) ?? $cardType;
             }
 
             $exists = (int)$db->query("SELECT 1 FROM {$pc} WHERE transaction_id = ? LIMIT 1", [$txId])->fetchColumn();
@@ -422,13 +500,15 @@ try {
                 $db->query(
                     "UPDATE {$pc}
                      SET receipt_number = ?, table_id = ?, spot_id = ?, sum = ?, payed_sum = ?, payed_cash = ?, payed_card = ?, payed_cert = ?, payed_bonus = ?, payed_third_party = ?,
-                         pay_type = ?, reason = ?, tip_sum = ?, discount = ?, date_close = ?, payment_method = ?, card_type = ?, waiter_name = ?, day_date = ?
+                         pay_type = ?, reason = ?, tip_sum = ?, discount = ?, date_close = ?, poster_payment_method_id = ?, payment_method = ?, card_type = ?, waiter_name = ?, day_date = ?
                      WHERE transaction_id = ?
                      LIMIT 1",
                     [
                         $receiptNumber > 0 ? $receiptNumber : null,
                         $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus, $payedThirdParty,
-                        $payType, $reason, $tipSum, $discount, $closeAt, $paymentMethod, $cardType, $waiterName !== '' ? $waiterName : null, $dayDate,
+                        $payType, $reason, $tipSum, $discount, $closeAt,
+                        $pmId > 0 ? $pmId : null,
+                        $paymentMethod, $cardType, $waiterName !== '' ? $waiterName : null, $dayDate,
                         $txId
                     ]
                 );
@@ -436,44 +516,29 @@ try {
             } else {
                 $db->query(
                     "INSERT INTO {$pc}
-                        (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, payed_third_party, pay_type, reason, tip_sum, discount, date_close, payment_method, card_type, waiter_name, day_date)
+                        (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, payed_third_party, pay_type, reason, tip_sum, discount, date_close, poster_payment_method_id, payment_method, card_type, waiter_name, day_date)
                      VALUES
-                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [
                         $txId,
                         $receiptNumber > 0 ? $receiptNumber : null,
                         $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus, $payedThirdParty,
-                        $payType, $reason, $tipSum, $discount, $closeAt, $paymentMethod, $cardType, $waiterName !== '' ? $waiterName : null, $dayDate
+                        $payType, $reason, $tipSum, $discount, $closeAt,
+                        $pmId > 0 ? $pmId : null,
+                        $paymentMethod, $cardType, $waiterName !== '' ? $waiterName : null, $dayDate
                     ]
                 );
                 $inserted++;
             }
         }
 
-        arsort($datesSeen);
-        $datesTop = array_slice($datesSeen, 0, 6, true);
-        $dayCount = 0;
-        $dayAllCount = 0;
-        try {
-            $dayCount = (int)$db->query(
-                "SELECT COUNT(*) FROM {$pc} WHERE day_date = ? AND pay_type IN (2,3) AND (payed_card + payed_third_party) > 0",
-                [$date]
-            )->fetchColumn();
-            $dayAllCount = (int)$db->query(
-                "SELECT COUNT(*) FROM {$pc} WHERE day_date = ?",
-                [$date]
-            )->fetchColumn();
-        } catch (\Throwable $e) {
-        }
-        $message = 'Poster чеки загружены: ' . json_encode([
+        $message = 'Poster синк: ' . json_encode([
             'inserted' => $inserted,
             'updated' => $updated,
             'skipped' => $skipped,
             'min_close_at' => $minCloseAt,
             'max_close_at' => $maxCloseAt,
-            'dates_top' => $datesTop,
-            'db_count_selected_day_pay_2_3' => $dayCount,
-            'db_count_selected_day_all' => $dayAllCount,
+            'payment_methods' => count($methodTitleById),
         ], JSON_UNESCAPED_UNICODE);
     }
 
@@ -1412,8 +1477,13 @@ $sepayRows = $db->query(
 )->fetchAll();
 
 $posterRows = $db->query(
-    "SELECT transaction_id, receipt_number, card_type, date_close, payed_card, payed_third_party, tip_sum, payment_method, waiter_name, table_id
-     FROM {$pc}
+    "SELECT p.transaction_id, p.receipt_number, p.card_type, p.date_close, p.payed_card, p.payed_third_party, p.tip_sum,
+            p.payment_method,
+            COALESCE(pm.title, p.payment_method) AS payment_method_display,
+            COALESCE(pm.title, p.card_type) AS card_type_display,
+            p.waiter_name, p.table_id, p.poster_payment_method_id
+     FROM {$pc} p
+     LEFT JOIN {$ppm} pm ON pm.payment_method_id = p.poster_payment_method_id
      WHERE day_date = ?
        AND pay_type IN (2,3)
        AND (payed_card + payed_third_party) > 0
@@ -1785,9 +1855,9 @@ $fmtVnd = function (int $v): string {
                                     if ($hasManual) $cls = 'row-gray';
                                     else $cls = $hasYellow ? 'row-yellow' : 'row-green';
                                 }
-                                $pm = (string)($r['payment_method'] ?? '');
-                                $ct = trim((string)($r['card_type'] ?? ''));
-                                $isVietnam = strtolower($ct !== '' ? $ct : $pm) === 'vietnam company';
+                                $pm = (string)($r['payment_method_display'] ?? $r['payment_method'] ?? '');
+                                $ct = trim((string)($r['card_type_display'] ?? $r['card_type'] ?? ''));
+                                $isVietnam = stripos(($ct !== '' ? $ct : $pm), 'vietnam') !== false;
                                 if ($isVietnam) {
                                     $cls = 'row-blue';
                                 }
