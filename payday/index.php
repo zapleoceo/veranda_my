@@ -148,6 +148,9 @@ try {
         $inserted = 0;
         $updated = 0;
         $skipped = 0;
+        $minCloseAt = null;
+        $maxCloseAt = null;
+        $datesSeen = [];
 
         foreach ($txs as $tx) {
             if (!is_array($tx)) continue;
@@ -181,6 +184,9 @@ try {
             }
 
             $dayDate = substr($closeAt, 0, 10);
+            $datesSeen[$dayDate] = ($datesSeen[$dayDate] ?? 0) + 1;
+            if ($minCloseAt === null || $closeAt < $minCloseAt) $minCloseAt = $closeAt;
+            if ($maxCloseAt === null || $closeAt > $maxCloseAt) $maxCloseAt = $closeAt;
 
             $employeeId = (int)($tx['employee_id'] ?? $tx['user_id'] ?? $tx['waiter_id'] ?? 0);
             $waiterName = trim((string)($tx['waiter_name'] ?? $tx['waiterName'] ?? ''));
@@ -235,7 +241,31 @@ try {
             }
         }
 
-        $message = 'Poster чеки загружены: ' . json_encode(['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped], JSON_UNESCAPED_UNICODE);
+        arsort($datesSeen);
+        $datesTop = array_slice($datesSeen, 0, 6, true);
+        $dayCount = 0;
+        $dayAllCount = 0;
+        try {
+            $dayCount = (int)$db->query(
+                "SELECT COUNT(*) FROM {$pc} WHERE DATE(date_close) = ? AND pay_type IN (2,3)",
+                [$date]
+            )->fetchColumn();
+            $dayAllCount = (int)$db->query(
+                "SELECT COUNT(*) FROM {$pc} WHERE DATE(date_close) = ?",
+                [$date]
+            )->fetchColumn();
+        } catch (\Throwable $e) {
+        }
+        $message = 'Poster чеки загружены: ' . json_encode([
+            'inserted' => $inserted,
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'min_close_at' => $minCloseAt,
+            'max_close_at' => $maxCloseAt,
+            'dates_top' => $datesTop,
+            'db_count_selected_day_pay_2_3' => $dayCount,
+            'db_count_selected_day_all' => $dayAllCount,
+        ], JSON_UNESCAPED_UNICODE);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'clear_sepay') {
@@ -999,10 +1029,8 @@ $fmtVnd = function (int $v): string {
                             <tr>
                                 <th></th>
                                 <th class="nowrap">Время</th>
-                                <th class="nowrap">Сумма</th>
-                                <th>Метод</th>
                                 <th>Content</th>
-                                <th class="nowrap">Ref</th>
+                                <th class="nowrap">Сумма</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1023,10 +1051,8 @@ $fmtVnd = function (int $v): string {
                             <tr class="<?= $cls ?>" data-sepay-id="<?= $sid ?>">
                                 <td><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
                                 <td class="nowrap"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
-                                <td class="sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
-                                <td class="nowrap"><?= htmlspecialchars($pm !== '' ? $pm : '—') ?></td>
                                 <td><?= htmlspecialchars((string)($r['content'] ?? '')) ?></td>
-                                <td class="nowrap"><?= htmlspecialchars((string)($r['reference_code'] ?? '')) ?></td>
+                                <td class="sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
