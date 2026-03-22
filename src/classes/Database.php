@@ -315,6 +315,7 @@ class Database {
             payed_card BIGINT NOT NULL,
             payed_cert BIGINT NOT NULL,
             payed_bonus BIGINT NOT NULL,
+            payed_third_party BIGINT NOT NULL DEFAULT 0,
             pay_type TINYINT NOT NULL,
             reason TINYINT NULL,
             tip_sum BIGINT NOT NULL,
@@ -344,6 +345,9 @@ class Database {
             }
             if (empty($have['card_type'])) {
                 $this->pdo->exec("ALTER TABLE {$pc} ADD COLUMN card_type VARCHAR(100) NULL");
+            }
+            if (empty($have['payed_third_party'])) {
+                $this->pdo->exec("ALTER TABLE {$pc} ADD COLUMN payed_third_party BIGINT NOT NULL DEFAULT 0");
             }
         } catch (\Throwable $e) {
         }

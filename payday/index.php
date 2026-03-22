@@ -208,7 +208,7 @@ try {
             if ($txId <= 0) continue;
 
             $payType = isset($tx['pay_type']) ? (int)$tx['pay_type'] : (int)($tx['payType'] ?? 0);
-            if ($payType !== 2 && $payType !== 3) {
+            if ($payType !== 1 && $payType !== 2 && $payType !== 3) {
                 $skipped++;
                 continue;
             }
@@ -247,8 +247,8 @@ try {
                 $waiterName = (string)($employeesById[$employeeId] ?? '');
             }
 
-            $paymentMethod = $extractPaymentMethod($tx);
-            $cardType = $extractCardType($tx) ?? $paymentMethod;
+            $cardType = $extractCardType($tx);
+            $paymentMethod = $extractPaymentMethod($tx) ?? $cardType;
 
             $sum = $moneyToInt($tx['sum'] ?? 0);
             $payedSum = $moneyToInt($tx['payed_sum'] ?? $tx['payedSum'] ?? 0);
@@ -256,6 +256,7 @@ try {
             $payedCard = $moneyToInt($tx['payed_card'] ?? $tx['payedCard'] ?? 0);
             $payedCert = $moneyToInt($tx['payed_cert'] ?? $tx['payedCert'] ?? 0);
             $payedBonus = $moneyToInt($tx['payed_bonus'] ?? $tx['payedBonus'] ?? 0);
+            $payedThirdParty = $moneyToInt($tx['payed_third_party'] ?? $tx['payedThirdParty'] ?? 0);
             $reason = isset($tx['reason']) ? (int)$tx['reason'] : null;
             $serviceTip = $moneyToInt($tx['tip_sum'] ?? $tx['tipSum'] ?? 0);
             $tipsCard = $moneyToInt($tx['tips_card'] ?? $tx['tipsCard'] ?? 0);
@@ -267,7 +268,7 @@ try {
             $receiptNumber = (int)($tx['receipt_number'] ?? $tx['receiptNumber'] ?? $tx['receipt'] ?? $tx['check_number'] ?? $tx['checkNumber'] ?? 0);
             if ($receiptNumber <= 0) $receiptNumber = $txId;
 
-            if (($payedCard + $tipSum) <= 0) {
+            if (($payedCard + $payedThirdParty + $tipSum) <= 0) {
                 $skipped++;
                 continue;
             }
@@ -276,13 +277,13 @@ try {
             if ($exists === 1) {
                 $db->query(
                     "UPDATE {$pc}
-                     SET receipt_number = ?, table_id = ?, spot_id = ?, sum = ?, payed_sum = ?, payed_cash = ?, payed_card = ?, payed_cert = ?, payed_bonus = ?,
+                     SET receipt_number = ?, table_id = ?, spot_id = ?, sum = ?, payed_sum = ?, payed_cash = ?, payed_card = ?, payed_cert = ?, payed_bonus = ?, payed_third_party = ?,
                          pay_type = ?, reason = ?, tip_sum = ?, discount = ?, date_close = ?, payment_method = ?, card_type = ?, waiter_name = ?, day_date = ?
                      WHERE transaction_id = ?
                      LIMIT 1",
                     [
                         $receiptNumber > 0 ? $receiptNumber : null,
-                        $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus,
+                        $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus, $payedThirdParty,
                         $payType, $reason, $tipSum, $discount, $closeAt, $paymentMethod, $cardType, $waiterName !== '' ? $waiterName : null, $dayDate,
                         $txId
                     ]
@@ -291,13 +292,13 @@ try {
             } else {
                 $db->query(
                     "INSERT INTO {$pc}
-                        (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, pay_type, reason, tip_sum, discount, date_close, payment_method, card_type, waiter_name, day_date)
+                        (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, payed_third_party, pay_type, reason, tip_sum, discount, date_close, payment_method, card_type, waiter_name, day_date)
                      VALUES
-                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [
                         $txId,
                         $receiptNumber > 0 ? $receiptNumber : null,
-                        $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus,
+                        $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus, $payedThirdParty,
                         $payType, $reason, $tipSum, $discount, $closeAt, $paymentMethod, $cardType, $waiterName !== '' ? $waiterName : null, $dayDate
                     ]
                 );
@@ -311,7 +312,7 @@ try {
         $dayAllCount = 0;
         try {
             $dayCount = (int)$db->query(
-                "SELECT COUNT(*) FROM {$pc} WHERE DATE(date_close) = ? AND pay_type IN (2,3) AND (payed_card + tip_sum) > 0",
+                "SELECT COUNT(*) FROM {$pc} WHERE DATE(date_close) = ? AND pay_type IN (1,2,3) AND (payed_card + payed_third_party) > 0",
                 [$date]
             )->fetchColumn();
             $dayAllCount = (int)$db->query(
@@ -493,8 +494,8 @@ try {
             "SELECT transaction_id, date_close, payed_card, tip_sum, payment_method
              FROM {$pc}
              WHERE DATE(date_close) = ?
-               AND pay_type IN (2,3)
-               AND (payed_card + tip_sum) > 0
+               AND pay_type IN (1,2,3)
+               AND (payed_card + payed_third_party) > 0
              ORDER BY date_close ASC",
             [$date]
         )->fetchAll();
@@ -544,7 +545,7 @@ try {
             $pm = (string)($c['payment_method'] ?? '');
             if (strtolower($pm) === 'vietnam company') continue;
 
-            $payedCardVnd = $posterCentsToVnd((int)($c['payed_card'] ?? 0));
+            $payedCardVnd = $posterCentsToVnd((int)(($c['payed_card'] ?? 0) + ($c['payed_third_party'] ?? 0)));
             $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
             $totalVnd = $payedCardVnd + $tipVnd;
             if ($totalVnd <= 0) continue;
@@ -612,7 +613,7 @@ try {
             if ($prevPid <= 0 || $nextPid <= 0) continue;
             if (empty($linkedGreenPoster[$prevPid]) || empty($linkedGreenPoster[$nextPid])) continue;
 
-            $payedCardVnd = $posterCentsToVnd((int)($checks[$i]['payed_card'] ?? 0));
+            $payedCardVnd = $posterCentsToVnd((int)(($checks[$i]['payed_card'] ?? 0) + ($checks[$i]['payed_third_party'] ?? 0)));
             $tipVnd = $posterCentsToVnd((int)($checks[$i]['tip_sum'] ?? 0));
             $totalVnd = $payedCardVnd + $tipVnd;
             if ($totalVnd <= 0) continue;
@@ -655,7 +656,7 @@ try {
             $pm = (string)($c['payment_method'] ?? '');
             if (strtolower($pm) === 'vietnam company') continue;
 
-            $payedCardVnd = $posterCentsToVnd((int)($c['payed_card'] ?? 0));
+            $payedCardVnd = $posterCentsToVnd((int)(($c['payed_card'] ?? 0) + ($c['payed_third_party'] ?? 0)));
             $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
             $totalVnd = $payedCardVnd + $tipVnd;
             if ($totalVnd <= 0) continue;
@@ -964,11 +965,11 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
         }
 
         $checks = $db->query(
-            "SELECT transaction_id, date_close, payed_card, tip_sum, payment_method
+            "SELECT transaction_id, date_close, payed_card, payed_third_party, tip_sum, payment_method
              FROM {$pc}
              WHERE DATE(date_close) = ?
-               AND pay_type IN (2,3)
-               AND (payed_card + tip_sum) > 0
+               AND pay_type IN (1,2,3)
+               AND (payed_card + payed_third_party) > 0
              ORDER BY date_close ASC",
             [$date]
         )->fetchAll();
@@ -1016,7 +1017,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             $pm = (string)($c['payment_method'] ?? '');
             if (strtolower($pm) === 'vietnam company') continue;
 
-            $payedCardVnd = $posterCentsToVnd((int)($c['payed_card'] ?? 0));
+            $payedCardVnd = $posterCentsToVnd((int)(($c['payed_card'] ?? 0) + ($c['payed_third_party'] ?? 0)));
             $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
             $totalVnd = $payedCardVnd + $tipVnd;
             if ($totalVnd <= 0) continue;
@@ -1077,7 +1078,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             if ($prevPid <= 0 || $nextPid <= 0) continue;
             if (empty($linkedGreenPoster[$prevPid]) || empty($linkedGreenPoster[$nextPid])) continue;
 
-            $payedCardVnd = $posterCentsToVnd((int)($checks[$i]['payed_card'] ?? 0));
+            $payedCardVnd = $posterCentsToVnd((int)(($checks[$i]['payed_card'] ?? 0) + ($checks[$i]['payed_third_party'] ?? 0)));
             $tipVnd = $posterCentsToVnd((int)($checks[$i]['tip_sum'] ?? 0));
             $totalVnd = $payedCardVnd + $tipVnd;
             if ($totalVnd <= 0) continue;
@@ -1120,7 +1121,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             $pm = (string)($c['payment_method'] ?? '');
             if (strtolower($pm) === 'vietnam company') continue;
 
-            $payedCardVnd = $posterCentsToVnd((int)($c['payed_card'] ?? 0));
+            $payedCardVnd = $posterCentsToVnd((int)(($c['payed_card'] ?? 0) + ($c['payed_third_party'] ?? 0)));
             $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
             $totalVnd = $payedCardVnd + $tipVnd;
             if ($totalVnd <= 0) continue;
@@ -1220,11 +1221,11 @@ $sepayRows = $db->query(
 )->fetchAll();
 
 $posterRows = $db->query(
-    "SELECT transaction_id, receipt_number, card_type, date_close, payed_card, tip_sum, payment_method, waiter_name, table_id
+    "SELECT transaction_id, receipt_number, card_type, date_close, payed_card, payed_third_party, tip_sum, payment_method, waiter_name, table_id
      FROM {$pc}
      WHERE DATE(date_close) = ?
-       AND pay_type IN (2,3)
-       AND (payed_card + tip_sum) > 0
+       AND pay_type IN (1,2,3)
+       AND (payed_card + payed_third_party) > 0
      ORDER BY date_close ASC",
     [$date]
 )->fetchAll();
@@ -1244,10 +1245,11 @@ try {
 }
 try {
     $posterTotalCents = (int)$db->query(
-        "SELECT COALESCE(SUM(payed_card + tip_sum), 0) FROM {$pc}
+        "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0) FROM {$pc}
          WHERE DATE(date_close) = ?
-           AND pay_type IN (2,3)
-           AND (payed_card + tip_sum) > 0
+           AND pay_type IN (1,2,3)
+           AND (payed_card + payed_third_party) > 0
+           AND (card_type IS NULL OR LOWER(card_type) <> 'vietnam company')
            AND (payment_method IS NULL OR LOWER(payment_method) <> 'vietnam company')",
         [$date]
     )->fetchColumn();
@@ -1354,8 +1356,8 @@ try {
     $posterTxCount = (int)$db->query(
         "SELECT COUNT(*) AS c FROM {$pc}
          WHERE DATE(date_close) = ?
-           AND pay_type IN (2,3)
-           AND (payed_card + tip_sum) > 0",
+           AND pay_type IN (1,2,3)
+           AND (payed_card + payed_third_party) > 0",
         [$date]
     )->fetchColumn();
 } catch (\Throwable $e) {
@@ -1606,7 +1608,7 @@ $fmtVnd = function (int $v): string {
                                 if ($isVietnam) {
                                     $cls = 'row-blue';
                                 }
-                                $cardCents = (int)$r['payed_card'];
+                                $cardCents = (int)($r['payed_card'] ?? 0) + (int)($r['payed_third_party'] ?? 0);
                                 $tipCents = (int)$r['tip_sum'];
                                 $cardVnd = $posterCentsToVnd($cardCents);
                                 $tipVnd = $posterCentsToVnd($tipCents);
