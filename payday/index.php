@@ -1712,7 +1712,7 @@ $fmtVnd = function (int $v): string {
         .switch input:checked + .slider { background:#1a73e8; }
         .switch input:checked + .slider:before { transform: translateX(24px); }
         .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .grid { display:grid; grid-template-columns: 1fr 120px 1fr; gap: 12px; align-items:start; }
+        .grid { display:grid; grid-template-columns: 1fr 104px 1fr; gap: 12px; align-items:start; }
         
         #tablesRoot { position: relative; overflow: hidden; }
         #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
@@ -1765,6 +1765,12 @@ $fmtVnd = function (int $v): string {
         .mid-btn.active { background: #111827; border-color: #111827; color: #fff; }
         .mid-btn:disabled { opacity: 0.5; cursor: default; }
         .mid-check { display:flex; gap: 8px; align-items:center; font-weight: 800; font-size: 12px; color: #374151; user-select: none; }
+        @media (max-width: 1050px) {
+            .grid { grid-template-columns: 1fr 70px 1fr; }
+            .mid-col { padding-top: 10px; gap: 6px; }
+            .mid-btn { width: 22px; height: 22px; border-radius: 8px; font-size: 14px; }
+            .mid-legend { display: none; }
+        }
         .bottom-two { display:flex; gap: 12px; align-items:flex-start; flex-wrap: wrap; }
         .bottom-two > .card { flex: 1 1 420px; }
         .bottom-two > .card.card-finance { flex: 0.7 1 360px; }
@@ -1910,7 +1916,7 @@ $fmtVnd = function (int $v): string {
                     <div id="selMatch" style="font-size: 16px;">❗</div>
                     <div id="selDiff" style="font-weight: 900;">0 ₫</div>
                 </div>
-                <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
+                <div class="muted mid-legend" style="text-align:center; font-weight:900; line-height: 1.35;">
                     <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>Авто 1</div>
                     <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>Авто 2</div>
                     <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>Ручная связь</div>
