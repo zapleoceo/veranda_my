@@ -69,6 +69,50 @@ $extractPaymentMethod = function (array $tx): ?string {
     return null;
 };
 
+$extractCardType = function (array $tx): ?string {
+    $candidates = [];
+    $history = $tx['history'] ?? $tx['transaction_history'] ?? null;
+    if (is_array($history)) {
+        foreach ($history as $h) {
+            if (!is_array($h)) continue;
+            $type = (string)($h['type_history'] ?? $h['typeHistory'] ?? '');
+            if ($type !== 'paybyterminal') continue;
+
+            $valueText = $h['value_text'] ?? $h['valueText'] ?? null;
+            $obj = null;
+            if (is_array($valueText)) {
+                $obj = $valueText;
+            } elseif (is_string($valueText) && trim($valueText) !== '') {
+                $decoded = json_decode($valueText, true);
+                if (is_array($decoded)) $obj = $decoded;
+            }
+            if (!is_array($obj)) continue;
+
+            foreach (['paymentSystemName', 'merchantId', 'paymentSystem'] as $k) {
+                $v = trim((string)($obj[$k] ?? ''));
+                if ($v !== '') $candidates[] = $v;
+            }
+        }
+    }
+
+    foreach (['card_type', 'cardType', 'payment_method', 'paymentMethod', 'payment_type', 'paymentType'] as $k) {
+        if (isset($tx[$k]) && is_string($tx[$k])) {
+            $v = trim((string)$tx[$k]);
+            if ($v !== '') $candidates[] = $v;
+        }
+    }
+
+    $hay = strtolower(json_encode($tx, JSON_UNESCAPED_UNICODE));
+    if (strpos($hay, 'vietnam company') !== false) $candidates[] = 'Vietnam Company';
+    if (strpos($hay, 'bybit') !== false) $candidates[] = 'Bybit';
+
+    foreach ($candidates as $v) {
+        $vv = trim((string)$v);
+        if ($vv !== '') return $vv;
+    }
+    return null;
+};
+
 $sepayApiToken = trim((string)($_ENV['SEPAY_API_TOKEN'] ?? $_ENV['SEPAY_USER_API_TOKEN'] ?? ''));
 $sepayAccountNumber = trim((string)($_ENV['SEPAY_ACCOUNT_NUMBER'] ?? ''));
 
@@ -204,6 +248,7 @@ try {
             }
 
             $paymentMethod = $extractPaymentMethod($tx);
+            $cardType = $extractCardType($tx) ?? $paymentMethod;
 
             $sum = $moneyToInt($tx['sum'] ?? 0);
             $payedSum = $moneyToInt($tx['payed_sum'] ?? $tx['payedSum'] ?? 0);
@@ -212,22 +257,33 @@ try {
             $payedCert = $moneyToInt($tx['payed_cert'] ?? $tx['payedCert'] ?? 0);
             $payedBonus = $moneyToInt($tx['payed_bonus'] ?? $tx['payedBonus'] ?? 0);
             $reason = isset($tx['reason']) ? (int)$tx['reason'] : null;
-            $tipSum = $moneyToInt($tx['tip_sum'] ?? $tx['tipSum'] ?? 0);
+            $serviceTip = $moneyToInt($tx['tip_sum'] ?? $tx['tipSum'] ?? 0);
+            $tipsCard = $moneyToInt($tx['tips_card'] ?? $tx['tipsCard'] ?? 0);
+            $tipsCash = $moneyToInt($tx['tips_cash'] ?? $tx['tipsCash'] ?? 0);
+            $tipSum = $serviceTip + $tipsCard + $tipsCash;
             $discount = (float)($tx['discount'] ?? 0);
             $tableId = isset($tx['table_id']) ? (int)$tx['table_id'] : (isset($tx['tableId']) ? (int)$tx['tableId'] : null);
             $spotId = isset($tx['spot_id']) ? (int)$tx['spot_id'] : (isset($tx['spotId']) ? (int)$tx['spotId'] : null);
+            $receiptNumber = (int)($tx['receipt_number'] ?? $tx['receiptNumber'] ?? $tx['receipt'] ?? $tx['check_number'] ?? $tx['checkNumber'] ?? 0);
+            if ($receiptNumber <= 0) $receiptNumber = $txId;
+
+            if (($payedCard + $tipSum) <= 0) {
+                $skipped++;
+                continue;
+            }
 
             $exists = (int)$db->query("SELECT 1 FROM {$pc} WHERE transaction_id = ? LIMIT 1", [$txId])->fetchColumn();
             if ($exists === 1) {
                 $db->query(
                     "UPDATE {$pc}
-                     SET table_id = ?, spot_id = ?, sum = ?, payed_sum = ?, payed_cash = ?, payed_card = ?, payed_cert = ?, payed_bonus = ?,
-                         pay_type = ?, reason = ?, tip_sum = ?, discount = ?, date_close = ?, payment_method = ?, waiter_name = ?, day_date = ?
+                     SET receipt_number = ?, table_id = ?, spot_id = ?, sum = ?, payed_sum = ?, payed_cash = ?, payed_card = ?, payed_cert = ?, payed_bonus = ?,
+                         pay_type = ?, reason = ?, tip_sum = ?, discount = ?, date_close = ?, payment_method = ?, card_type = ?, waiter_name = ?, day_date = ?
                      WHERE transaction_id = ?
                      LIMIT 1",
                     [
+                        $receiptNumber > 0 ? $receiptNumber : null,
                         $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus,
-                        $payType, $reason, $tipSum, $discount, $closeAt, $paymentMethod, $waiterName !== '' ? $waiterName : null, $dayDate,
+                        $payType, $reason, $tipSum, $discount, $closeAt, $paymentMethod, $cardType, $waiterName !== '' ? $waiterName : null, $dayDate,
                         $txId
                     ]
                 );
@@ -235,12 +291,14 @@ try {
             } else {
                 $db->query(
                     "INSERT INTO {$pc}
-                        (transaction_id, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, pay_type, reason, tip_sum, discount, date_close, payment_method, waiter_name, day_date)
+                        (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, pay_type, reason, tip_sum, discount, date_close, payment_method, card_type, waiter_name, day_date)
                      VALUES
-                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [
-                        $txId, $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus,
-                        $payType, $reason, $tipSum, $discount, $closeAt, $paymentMethod, $waiterName !== '' ? $waiterName : null, $dayDate
+                        $txId,
+                        $receiptNumber > 0 ? $receiptNumber : null,
+                        $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus,
+                        $payType, $reason, $tipSum, $discount, $closeAt, $paymentMethod, $cardType, $waiterName !== '' ? $waiterName : null, $dayDate
                     ]
                 );
                 $inserted++;
@@ -253,7 +311,7 @@ try {
         $dayAllCount = 0;
         try {
             $dayCount = (int)$db->query(
-                "SELECT COUNT(*) FROM {$pc} WHERE DATE(date_close) = ? AND pay_type IN (2,3)",
+                "SELECT COUNT(*) FROM {$pc} WHERE DATE(date_close) = ? AND pay_type IN (2,3) AND (payed_card + tip_sum) > 0",
                 [$date]
             )->fetchColumn();
             $dayAllCount = (int)$db->query(
@@ -436,6 +494,7 @@ try {
              FROM {$pc}
              WHERE DATE(date_close) = ?
                AND pay_type IN (2,3)
+               AND (payed_card + tip_sum) > 0
              ORDER BY date_close ASC",
             [$date]
         )->fetchAll();
@@ -729,36 +788,98 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
     $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
     if (!is_array($payload)) $payload = [];
     $posterId = (int)($payload['poster_transaction_id'] ?? 0);
+    $posterIds = $payload['poster_transaction_ids'] ?? null;
+    if (is_array($posterIds)) {
+        $posterIds = array_values(array_unique(array_filter(array_map(fn($v) => (int)$v, $posterIds), fn($v) => $v > 0)));
+    } else {
+        $posterIds = [];
+    }
     $sepayId = (int)($payload['sepay_id'] ?? 0);
     $mode = (string)($payload['mode'] ?? 'toggle');
+    if ($sepayId <= 0 || ($posterId <= 0 && count($posterIds) === 0)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $targets = count($posterIds) ? $posterIds : [$posterId];
+
+        if (count($targets) === 1 && $mode === 'toggle') {
+            $pid = (int)$targets[0];
+            $existing = $db->query(
+                "SELECT sepay_id, is_manual FROM {$pl} WHERE poster_transaction_id = ? LIMIT 1",
+                [$pid]
+            )->fetch();
+            $existingSepayId = (int)($existing['sepay_id'] ?? 0);
+            $existingIsManual = !empty($existing['is_manual']);
+
+            if ($existingIsManual && $existingSepayId === $sepayId) {
+                $db->query(
+                    "DELETE FROM {$pl} WHERE poster_transaction_id = ? AND is_manual = 1 LIMIT 1",
+                    [$pid]
+                );
+                echo json_encode(['ok' => true, 'deleted' => true], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+
+        foreach ($targets as $pid) {
+            $db->query(
+                "INSERT INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
+                 VALUES (?, ?, 'manual', 1)
+                 ON DUPLICATE KEY UPDATE sepay_id = VALUES(sepay_id), link_type = 'manual', is_manual = 1",
+                [(int)$pid, $sepayId]
+            );
+        }
+
+        echo json_encode(['ok' => true, 'created' => true, 'count' => count($targets)], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'unlink') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
+    if (!is_array($payload)) $payload = [];
+    $posterId = (int)($payload['poster_transaction_id'] ?? 0);
+    $sepayId = (int)($payload['sepay_id'] ?? 0);
     if ($posterId <= 0 || $sepayId <= 0) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
         exit;
     }
     try {
-        $existing = $db->query(
-            "SELECT id FROM {$pl} WHERE poster_transaction_id = ? AND sepay_id = ? AND is_manual = 1 LIMIT 1",
-            [$posterId, $sepayId]
-        )->fetch();
-
-        if ($mode === 'delete' || ($mode === 'toggle' && $existing)) {
-            $db->query(
-                "DELETE FROM {$pl} WHERE poster_transaction_id = ? AND sepay_id = ? AND is_manual = 1",
-                [$posterId, $sepayId]
-            );
-            echo json_encode(['ok' => true, 'deleted' => true], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-
-        $db->query("DELETE FROM {$pl} WHERE (poster_transaction_id = ? OR sepay_id = ?) AND is_manual = 1", [$posterId, $sepayId]);
         $db->query(
-            "INSERT INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
-             VALUES (?, ?, 'manual', 1)
-             ON DUPLICATE KEY UPDATE link_type = 'manual', is_manual = 1",
+            "DELETE FROM {$pl} WHERE poster_transaction_id = ? AND sepay_id = ? LIMIT 1",
             [$posterId, $sepayId]
         );
-        echo json_encode(['ok' => true, 'created' => true], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => true, 'deleted' => true], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'links') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $rows = $db->query(
+            "SELECT l.poster_transaction_id, l.sepay_id, l.link_type, l.is_manual
+             FROM {$pl} l
+             JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+             WHERE DATE(p.date_close) = ?",
+            [$date]
+        )->fetchAll();
+        echo json_encode(['ok' => true, 'links' => $rows], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -777,10 +898,11 @@ $sepayRows = $db->query(
 )->fetchAll();
 
 $posterRows = $db->query(
-    "SELECT transaction_id, date_close, payed_card, tip_sum, payment_method, waiter_name, table_id
+    "SELECT transaction_id, receipt_number, card_type, date_close, payed_card, tip_sum, payment_method, waiter_name, table_id
      FROM {$pc}
      WHERE DATE(date_close) = ?
        AND pay_type IN (2,3)
+       AND (payed_card + tip_sum) > 0
      ORDER BY date_close ASC",
     [$date]
 )->fetchAll();
@@ -803,6 +925,7 @@ try {
         "SELECT COALESCE(SUM(payed_card + tip_sum), 0) FROM {$pc}
          WHERE DATE(date_close) = ?
            AND pay_type IN (2,3)
+           AND (payed_card + tip_sum) > 0
            AND (payment_method IS NULL OR LOWER(payment_method) <> 'vietnam company')",
         [$date]
     )->fetchColumn();
@@ -828,7 +951,8 @@ foreach ($links as $l) {
     $t = (string)($l['link_type'] ?? '');
     $m = !empty($l['is_manual']);
     $linkByPoster[$pid] = ['sepay_id' => $sid, 'link_type' => $t, 'is_manual' => $m];
-    $linkBySepay[$sid] = ['poster_transaction_id' => $pid, 'link_type' => $t, 'is_manual' => $m];
+    if (!isset($linkBySepay[$sid])) $linkBySepay[$sid] = [];
+    $linkBySepay[$sid][] = ['poster_transaction_id' => $pid, 'link_type' => $t, 'is_manual' => $m];
 }
 
 $financeRows = [];
@@ -907,7 +1031,8 @@ try {
     $posterTxCount = (int)$db->query(
         "SELECT COUNT(*) AS c FROM {$pc}
          WHERE DATE(date_close) = ?
-           AND pay_type IN (2,3)",
+           AND pay_type IN (2,3)
+           AND (payed_card + tip_sum) > 0",
         [$date]
     )->fetchColumn();
 } catch (\Throwable $e) {
@@ -986,6 +1111,8 @@ $fmtVnd = function (int $v): string {
         .finance-row + .finance-row { margin-top: 10px; }
         .finance-left { display:flex; flex-direction: column; gap: 4px; }
         .badge { display:inline-flex; align-items:center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; border: 1px solid #e5e7eb; background: #fff; }
+        .link-x { position: fixed; z-index: 9999; width: 16px; height: 16px; border-radius: 999px; border: 1px solid #d0d5dd; background: #fff; color: #111827; display:flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; }
+        .link-x:hover { background: #f3f4f6; }
     </style>
 </head>
 <body>
@@ -1062,14 +1189,17 @@ $fmtVnd = function (int $v): string {
                         <?php foreach ($sepayRows as $r): ?>
                             <?php
                                 $sid = (int)$r['sepay_id'];
-                                $link = $linkBySepay[$sid] ?? null;
+                                $linkList = $linkBySepay[$sid] ?? [];
                                 $cls = 'row-red';
-                                if ($link) {
-                                    if (!empty($link['is_manual'])) {
-                                        $cls = 'row-gray';
-                                    } else {
-                                        $cls = ($link['link_type'] === 'auto_green') ? 'row-green' : (($link['link_type'] === 'auto_yellow') ? 'row-yellow' : 'row-green');
+                                if ($linkList) {
+                                    $hasManual = false;
+                                    $hasYellow = false;
+                                    foreach ($linkList as $l) {
+                                        if (!empty($l['is_manual'])) $hasManual = true;
+                                        if (($l['link_type'] ?? '') === 'auto_yellow') $hasYellow = true;
                                     }
+                                    if ($hasManual) $cls = 'row-gray';
+                                    else $cls = $hasYellow ? 'row-yellow' : 'row-green';
                                 }
                                 $pm = (string)($r['payment_method'] ?? '');
                             ?>
@@ -1085,7 +1215,9 @@ $fmtVnd = function (int $v): string {
                     </table>
                 </div>
                 <div class="muted" style="padding: 10px 12px; font-weight: 900;">
-                    Итого: <?= htmlspecialchars($fmtVnd((int)$sepayTotalVnd)) ?>
+                    Итого: <span id="sepayTotal"><?= htmlspecialchars($fmtVnd((int)$sepayTotalVnd)) ?></span>
+                    • связанные: <span id="sepayLinked">—</span>
+                    • несвязанные: <span id="sepayUnlinked">—</span>
                 </div>
             </div>
 
@@ -1099,11 +1231,13 @@ $fmtVnd = function (int $v): string {
                         <thead>
                             <tr>
                                 <th></th>
+                                <th class="nowrap sortable" data-sort-key="num">№</th>
                                 <th class="nowrap sortable" data-sort-key="ts">Время</th>
                                 <th class="nowrap sortable" data-sort-key="card">Card</th>
                                 <th class="nowrap sortable" data-sort-key="tips">Tips</th>
                                 <th class="nowrap sortable" data-sort-key="total">Card+Tips</th>
                                 <th class="sortable" data-sort-key="method">Метод</th>
+                                <th class="sortable" data-sort-key="cardtype">Тип карты</th>
                                 <th class="sortable" data-sort-key="waiter">Официант</th>
                                 <th class="nowrap sortable" data-sort-key="table">Стол</th>
                             </tr>
@@ -1112,6 +1246,8 @@ $fmtVnd = function (int $v): string {
                         <?php foreach ($posterRows as $r): ?>
                             <?php
                                 $pid = (int)$r['transaction_id'];
+                                $receiptNumber = (int)($r['receipt_number'] ?? 0);
+                                if ($receiptNumber <= 0) $receiptNumber = $pid;
                                 $link = $linkByPoster[$pid] ?? null;
                                 $cls = 'row-red';
                                 if ($link) {
@@ -1122,7 +1258,9 @@ $fmtVnd = function (int $v): string {
                                     }
                                 }
                                 $pm = (string)($r['payment_method'] ?? '');
-                                if (strtolower($pm) === 'vietnam company') {
+                                $ct = trim((string)($r['card_type'] ?? ''));
+                                $isVietnam = strtolower($ct !== '' ? $ct : $pm) === 'vietnam company';
+                                if ($isVietnam) {
                                     $cls = 'row-blue';
                                 }
                                 $cardCents = (int)$r['payed_card'];
@@ -1131,13 +1269,15 @@ $fmtVnd = function (int $v): string {
                                 $tipVnd = $posterCentsToVnd($tipCents);
                                 $tsRow = strtotime($r['date_close']) ?: 0;
                             ?>
-                            <tr class="<?= $cls ?>" data-poster-id="<?= $pid ?>" data-ts="<?= (int)$tsRow ?>" data-card="<?= (int)$cardVnd ?>" data-tips="<?= (int)$tipVnd ?>" data-total="<?= (int)($cardVnd + $tipVnd) ?>" data-method="<?= htmlspecialchars(mb_strtolower($pm, 'UTF-8')) ?>" data-waiter="<?= htmlspecialchars(mb_strtolower((string)($r['waiter_name'] ?? ''), 'UTF-8')) ?>" data-table="<?= (int)($r['table_id'] ?? 0) ?>">
+                            <tr class="<?= $cls ?>" data-poster-id="<?= $pid ?>" data-vietnam="<?= $isVietnam ? '1' : '0' ?>" data-num="<?= (int)$receiptNumber ?>" data-ts="<?= (int)$tsRow ?>" data-card="<?= (int)$cardVnd ?>" data-tips="<?= (int)$tipVnd ?>" data-total="<?= (int)($cardVnd + $tipVnd) ?>" data-method="<?= htmlspecialchars(mb_strtolower($pm, 'UTF-8')) ?>" data-cardtype="<?= htmlspecialchars(mb_strtolower($ct, 'UTF-8')) ?>" data-waiter="<?= htmlspecialchars(mb_strtolower((string)($r['waiter_name'] ?? ''), 'UTF-8')) ?>" data-table="<?= (int)($r['table_id'] ?? 0) ?>">
                                 <td><span class="anchor" id="poster-<?= $pid ?>"></span></td>
+                                <td class="nowrap"><?= htmlspecialchars((string)$receiptNumber) ?></td>
                                 <td class="nowrap"><?= date('H:i:s', strtotime($r['date_close'])) ?></td>
                                 <td class="sum"><?= htmlspecialchars($fmtVnd($cardVnd)) ?></td>
                                 <td class="sum"><?= htmlspecialchars($fmtVnd($tipVnd)) ?></td>
                                 <td class="sum"><?= htmlspecialchars($fmtVnd($cardVnd + $tipVnd)) ?></td>
                                 <td class="nowrap"><?= htmlspecialchars($pm !== '' ? $pm : '—') ?></td>
+                                <td class="nowrap"><?= htmlspecialchars($ct !== '' ? $ct : '—') ?></td>
                                 <td><?= htmlspecialchars((string)($r['waiter_name'] ?? '')) ?></td>
                                 <td class="nowrap"><?= htmlspecialchars((string)($r['table_id'] ?? '')) ?></td>
                             </tr>
@@ -1146,7 +1286,9 @@ $fmtVnd = function (int $v): string {
                     </table>
                 </div>
                 <div class="muted" style="padding: 10px 12px; font-weight: 900;">
-                    Итого: <?= htmlspecialchars($fmtVnd((int)$posterTotalVnd)) ?>
+                    Итого: <span id="posterTotal"><?= htmlspecialchars($fmtVnd((int)$posterTotalVnd)) ?></span>
+                    • связанные: <span id="posterLinked">—</span>
+                    • несвязанные: <span id="posterUnlinked">—</span>
                 </div>
             </div>
         </div>
@@ -1160,7 +1302,7 @@ $fmtVnd = function (int $v): string {
                     Сохранять ручные связи
                 </label>
             </form>
-            <div class="muted">Ручная связь: клик строка слева → клик строка справа (или наоборот)</div>
+            <div class="muted">Ручная связь: выдели чеки (Ctrl), затем кликни платеж (SePay)</div>
         </div>
 
         <div class="divider"></div>
@@ -1205,7 +1347,7 @@ $fmtVnd = function (int $v): string {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leader-line/1.0.3/leader-line.min.js"></script>
 <script>
 (() => {
-    const links = <?= json_encode(array_values(array_map(function ($l) {
+    let links = <?= json_encode(array_values(array_map(function ($l) {
         return [
             'poster_transaction_id' => (int)$l['poster_transaction_id'],
             'sepay_id' => (int)$l['sepay_id'],
@@ -1215,6 +1357,7 @@ $fmtVnd = function (int $v): string {
     }, $links)), JSON_UNESCAPED_UNICODE) ?>;
 
     const lines = [];
+    const widgets = [];
 
     const colorFor = (t, isManual) => {
         if (isManual || t === 'manual') return '#6b7280';
@@ -1232,17 +1375,182 @@ $fmtVnd = function (int $v): string {
         while (lines.length) {
             try { lines.pop().remove(); } catch (_) { lines.pop(); }
         }
+        while (widgets.length) {
+            const w = widgets.pop();
+            try { w.btn.remove(); } catch (_) {}
+        }
+    };
+
+    const fmtVnd = (v) => {
+        try {
+            return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Number(v) || 0) + ' ₫';
+        } catch (_) {
+            return String(v) + ' ₫';
+        }
+    };
+
+    const buildLinkState = () => {
+        const sepay = new Map();
+        const poster = new Map();
+        links.forEach((l) => {
+            const sid = Number(l.sepay_id || 0);
+            const pid = Number(l.poster_transaction_id || 0);
+            if (!sid || !pid) return;
+
+            const s = sepay.get(sid) || { hasAny: false, hasManual: false, hasYellow: false };
+            s.hasAny = true;
+            if (l.is_manual) s.hasManual = true;
+            if (l.link_type === 'auto_yellow') s.hasYellow = true;
+            sepay.set(sid, s);
+
+            const pPrev = poster.get(pid);
+            const pNew = { hasAny: true, isManual: !!l.is_manual, linkType: String(l.link_type || '') };
+            if (!pPrev) {
+                poster.set(pid, pNew);
+            } else {
+                if (pPrev.isManual) return;
+                if (pNew.isManual) { poster.set(pid, pNew); return; }
+                if (pPrev.linkType === 'auto_yellow') return;
+                if (pNew.linkType === 'auto_yellow') { poster.set(pid, pNew); return; }
+            }
+        });
+        return { sepay, poster };
+    };
+
+    const applyRowClasses = () => {
+        const state = buildLinkState();
+
+        const sepayRows = Array.from(document.querySelectorAll('#sepayTable tbody tr[data-sepay-id]'));
+        sepayRows.forEach((tr) => {
+            const sid = Number(tr.getAttribute('data-sepay-id') || 0);
+            const s = state.sepay.get(sid);
+            tr.classList.remove('row-red', 'row-green', 'row-yellow', 'row-gray');
+            if (!s || !s.hasAny) {
+                tr.classList.add('row-red');
+            } else if (s.hasManual) {
+                tr.classList.add('row-gray');
+            } else if (s.hasYellow) {
+                tr.classList.add('row-yellow');
+            } else {
+                tr.classList.add('row-green');
+            }
+        });
+
+        const posterRows = Array.from(document.querySelectorAll('#posterTable tbody tr[data-poster-id]'));
+        posterRows.forEach((tr) => {
+            const isVietnam = String(tr.getAttribute('data-vietnam') || '0') === '1';
+            tr.classList.remove('row-red', 'row-green', 'row-yellow', 'row-gray', 'row-blue');
+            if (isVietnam) {
+                tr.classList.add('row-blue');
+                return;
+            }
+            const pid = Number(tr.getAttribute('data-poster-id') || 0);
+            const p = state.poster.get(pid);
+            if (!p || !p.hasAny) {
+                tr.classList.add('row-red');
+            } else if (p.isManual) {
+                tr.classList.add('row-gray');
+            } else if (p.linkType === 'auto_yellow') {
+                tr.classList.add('row-yellow');
+            } else {
+                tr.classList.add('row-green');
+            }
+        });
+    };
+
+    const updateStats = () => {
+        const state = buildLinkState();
+
+        let sepayTotal = 0;
+        let sepayLinked = 0;
+        let sepayUnlinked = 0;
+        document.querySelectorAll('#sepayTable tbody tr[data-sepay-id]').forEach((tr) => {
+            const sid = Number(tr.getAttribute('data-sepay-id') || 0);
+            const sum = Number(tr.getAttribute('data-sum') || 0) || 0;
+            sepayTotal += sum;
+            if (state.sepay.has(sid)) sepayLinked += sum;
+            else sepayUnlinked += sum;
+        });
+
+        let posterTotal = 0;
+        let posterLinked = 0;
+        let posterUnlinked = 0;
+        document.querySelectorAll('#posterTable tbody tr[data-poster-id]').forEach((tr) => {
+            const isVietnam = String(tr.getAttribute('data-vietnam') || '0') === '1';
+            if (isVietnam) return;
+            const pid = Number(tr.getAttribute('data-poster-id') || 0);
+            const sum = Number(tr.getAttribute('data-total') || 0) || 0;
+            posterTotal += sum;
+            if (state.poster.has(pid)) posterLinked += sum;
+            else posterUnlinked += sum;
+        });
+
+        const setText = (id, v) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = fmtVnd(v);
+        };
+        setText('sepayTotal', sepayTotal);
+        setText('sepayLinked', sepayLinked);
+        setText('sepayUnlinked', sepayUnlinked);
+        setText('posterTotal', posterTotal);
+        setText('posterLinked', posterLinked);
+        setText('posterUnlinked', posterUnlinked);
+    };
+
+    const refreshLinks = () => {
+        return fetch('?<?= htmlspecialchars(http_build_query(['date' => $date, 'ajax' => 'links'])) ?>')
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                const rows = Array.isArray(j.links) ? j.links : [];
+                links = rows.map((l) => ({
+                    poster_transaction_id: Number(l.poster_transaction_id || 0),
+                    sepay_id: Number(l.sepay_id || 0),
+                    link_type: String(l.link_type || ''),
+                    is_manual: !!l.is_manual,
+                }));
+                drawLines();
+                applyRowClasses();
+                updateStats();
+                setTimeout(() => { positionLines(); positionWidgets(); }, 0);
+                setTimeout(() => { positionLines(); positionWidgets(); }, 200);
+            });
+    };
+
+    const unlink = (sepayId, posterId) => {
+        return fetch('?<?= htmlspecialchars(http_build_query(['date' => $date, 'ajax' => 'unlink'])) ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sepay_id: sepayId, poster_transaction_id: posterId }),
+        })
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                return refreshLinks();
+            });
     };
 
     const drawLines = () => {
         clearLines();
+        const sepayCount = {};
+        const posterCount = {};
+        links.forEach((l) => {
+            const sid = Number(l.sepay_id || 0);
+            const pid = Number(l.poster_transaction_id || 0);
+            if (sid) sepayCount[sid] = (sepayCount[sid] || 0) + 1;
+            if (pid) posterCount[pid] = (posterCount[pid] || 0) + 1;
+        });
+
         links.forEach((l) => {
             const s = document.getElementById('sepay-' + l.sepay_id);
             const p = document.getElementById('poster-' + l.poster_transaction_id);
             if (!s || !p) return;
+            const isMany = (sepayCount[l.sepay_id] || 0) > 1 || (posterCount[l.poster_transaction_id] || 0) > 1;
+            const isMainGreen = !isMany && !l.is_manual && l.link_type === 'auto_green';
             const line = new LeaderLine(s, p, {
                 color: colorFor(l.link_type, l.is_manual),
-                size: l.is_manual ? 3 : 2,
+                size: isMainGreen ? 4 : 2,
                 outline: true,
                 outlineColor: 'rgba(255,255,255,0.65)',
                 startPlug: 'disc',
@@ -1252,6 +1560,21 @@ $fmtVnd = function (int $v): string {
                 endSocket: 'left',
             });
             lines.push(line);
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'link-x';
+            btn.textContent = '×';
+            btn.title = 'Удалить связь';
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                unlink(Number(l.sepay_id || 0), Number(l.poster_transaction_id || 0)).catch((err) => {
+                    alert(err && err.message ? err.message : 'Ошибка');
+                });
+            });
+            document.body.appendChild(btn);
+            widgets.push({ btn, sepay_id: Number(l.sepay_id || 0), poster_transaction_id: Number(l.poster_transaction_id || 0) });
         });
     };
 
@@ -1261,36 +1584,62 @@ $fmtVnd = function (int $v): string {
         });
     };
 
+    const positionWidgets = () => {
+        widgets.forEach((w) => {
+            const s = document.getElementById('sepay-' + w.sepay_id);
+            const p = document.getElementById('poster-' + w.poster_transaction_id);
+            if (!s || !p) return;
+            const sr = s.getBoundingClientRect();
+            const pr = p.getBoundingClientRect();
+            const sx = sr.left + sr.width / 2;
+            const sy = sr.top + sr.height / 2;
+            const px = pr.left + pr.width / 2;
+            const py = pr.top + pr.height / 2;
+            const mx = (sx + px) / 2;
+            const my = (sy + py) / 2;
+            w.btn.style.left = Math.round(mx - 8) + 'px';
+            w.btn.style.top = Math.round(my - 8) + 'px';
+        });
+    };
+
     const tablesRoot = document.getElementById('tablesRoot');
     if (tablesRoot) {
-        tablesRoot.addEventListener('scroll', () => positionLines(), { passive: true, capture: true });
+        tablesRoot.addEventListener('scroll', () => { positionLines(); positionWidgets(); }, { passive: true, capture: true });
     }
-    window.addEventListener('resize', () => positionLines(), { passive: true });
+    window.addEventListener('resize', () => { positionLines(); positionWidgets(); }, { passive: true });
     window.addEventListener('load', () => {
         drawLines();
-        setTimeout(positionLines, 200);
-        setTimeout(positionLines, 800);
+        applyRowClasses();
+        updateStats();
+        setTimeout(() => { positionLines(); positionWidgets(); }, 200);
+        setTimeout(() => { positionLines(); positionWidgets(); }, 800);
     });
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             drawLines();
-            setTimeout(positionLines, 200);
+            applyRowClasses();
+            updateStats();
+            setTimeout(() => { positionLines(); positionWidgets(); }, 200);
         });
     } else {
         drawLines();
-        setTimeout(positionLines, 200);
+        applyRowClasses();
+        updateStats();
+        setTimeout(() => { positionLines(); positionWidgets(); }, 200);
     }
 
     const sepayTable = document.getElementById('sepayTable');
     const posterTable = document.getElementById('posterTable');
     if (!sepayTable || !posterTable) return;
 
-    let selected = null;
+    const selectedSepay = new Set();
+    const selectedPoster = new Set();
 
     const clearSelected = () => {
         sepayTable.querySelectorAll('tr.row-selected').forEach((tr) => tr.classList.remove('row-selected'));
         posterTable.querySelectorAll('tr.row-selected').forEach((tr) => tr.classList.remove('row-selected'));
-        selected = null;
+        selectedSepay.clear();
+        selectedPoster.clear();
     };
 
     const setupSort = (table) => {
@@ -1323,6 +1672,7 @@ $fmtVnd = function (int $v): string {
                 rows.forEach((r) => tbody.appendChild(r));
                 clearSelected();
                 positionLines();
+                positionWidgets();
             });
         });
     };
@@ -1330,53 +1680,73 @@ $fmtVnd = function (int $v): string {
     setupSort(sepayTable);
     setupSort(posterTable);
 
-    const onRowClick = (tr, side) => {
-        const idAttr = side === 'sepay' ? 'data-sepay-id' : 'data-poster-id';
-        const id = Number(tr.getAttribute(idAttr) || 0);
-        if (!id) return;
-
-        if (!selected) {
-            clearSelected();
-            tr.classList.add('row-selected');
-            selected = { side, id };
-            return;
-        }
-
-        if (selected.side === side) {
-            clearSelected();
-            tr.classList.add('row-selected');
-            selected = { side, id };
-            return;
-        }
-
-        const posterId = side === 'poster' ? id : selected.id;
-        const sepayId = side === 'sepay' ? id : selected.id;
-
-        fetch('index.php?<?= htmlspecialchars(http_build_query(['date' => $date, 'ajax' => 'manual_link'])) ?>', {
+    const sendManualLinks = (sepayId, posterIds, mode) => {
+        return fetch('?<?= htmlspecialchars(http_build_query(['date' => $date, 'ajax' => 'manual_link'])) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ poster_transaction_id: posterId, sepay_id: sepayId, mode: 'toggle' }),
+            body: JSON.stringify({ sepay_id: sepayId, poster_transaction_ids: posterIds, mode }),
         })
         .then((r) => r.json())
         .then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-            location.reload();
-        })
-        .catch((e) => {
-            alert(e && e.message ? e.message : 'Ошибка');
-            clearSelected();
+            return refreshLinks();
         });
+    };
+
+    const maybeCommitSelection = (triggeredBySingleClick) => {
+        if (!triggeredBySingleClick) return;
+        if (!selectedSepay.size || !selectedPoster.size) return;
+
+        if (selectedSepay.size !== 1) {
+            alert('Для связи выбери 1 платеж (SePay) и один/несколько чеков (Poster).');
+            return;
+        }
+
+        const sepayId = Number(Array.from(selectedSepay.values())[0] || 0);
+        const posterIds = Array.from(selectedPoster.values()).map((v) => Number(v)).filter((v) => v > 0);
+        if (!sepayId || !posterIds.length) return;
+        sendManualLinks(sepayId, posterIds, posterIds.length === 1 ? 'toggle' : 'set')
+            .catch((e) => {
+                alert(e && e.message ? e.message : 'Ошибка');
+                clearSelected();
+            });
+    };
+
+    const onRowClick = (tr, side, multi) => {
+        const idAttr = side === 'sepay' ? 'data-sepay-id' : 'data-poster-id';
+        const id = Number(tr.getAttribute(idAttr) || 0);
+        if (!id) return;
+
+        const isSepay = side === 'sepay';
+        const set = isSepay ? selectedSepay : selectedPoster;
+
+        if (!multi) {
+            const table = isSepay ? sepayTable : posterTable;
+            table.querySelectorAll('tr.row-selected').forEach((x) => x.classList.remove('row-selected'));
+            set.clear();
+        }
+
+        if (multi && set.has(id)) {
+            set.delete(id);
+            tr.classList.remove('row-selected');
+            return;
+        }
+
+        set.add(id);
+        tr.classList.add('row-selected');
+
+        maybeCommitSelection(!multi);
     };
 
     sepayTable.addEventListener('click', (e) => {
         const tr = e.target.closest('tr[data-sepay-id]');
         if (!tr) return;
-        onRowClick(tr, 'sepay');
+        onRowClick(tr, 'sepay', !!(e.ctrlKey || e.metaKey));
     });
     posterTable.addEventListener('click', (e) => {
         const tr = e.target.closest('tr[data-poster-id]');
         if (!tr) return;
-        onRowClick(tr, 'poster');
+        onRowClick(tr, 'poster', !!(e.ctrlKey || e.metaKey));
     });
 
     document.addEventListener('keydown', (e) => {

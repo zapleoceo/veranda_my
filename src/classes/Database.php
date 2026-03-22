@@ -306,6 +306,7 @@ class Database {
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$pc} (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             transaction_id BIGINT UNSIGNED NOT NULL,
+            receipt_number BIGINT NULL,
             table_id INT NULL,
             spot_id INT NULL,
             sum BIGINT NOT NULL,
@@ -320,6 +321,7 @@ class Database {
             discount DECIMAL(5,2) NOT NULL,
             date_close DATETIME NOT NULL,
             payment_method VARCHAR(100) NULL,
+            card_type VARCHAR(100) NULL,
             waiter_name VARCHAR(100) NULL,
             day_date DATE NOT NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -330,6 +332,22 @@ class Database {
             KEY idx_poster_pay_type (pay_type)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
+        try {
+            $cols = $this->pdo->query("SHOW COLUMNS FROM {$pc}")->fetchAll(\PDO::FETCH_ASSOC);
+            $have = [];
+            foreach ($cols as $c) {
+                $f = strtolower((string)($c['Field'] ?? ''));
+                if ($f !== '') $have[$f] = true;
+            }
+            if (empty($have['receipt_number'])) {
+                $this->pdo->exec("ALTER TABLE {$pc} ADD COLUMN receipt_number BIGINT NULL");
+            }
+            if (empty($have['card_type'])) {
+                $this->pdo->exec("ALTER TABLE {$pc} ADD COLUMN card_type VARCHAR(100) NULL");
+            }
+        } catch (\Throwable $e) {
+        }
+
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$pl} (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             poster_transaction_id BIGINT UNSIGNED NOT NULL,
@@ -339,9 +357,28 @@ class Database {
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_link_poster (poster_transaction_id),
-            UNIQUE KEY uq_link_sepay (sepay_id),
+            KEY idx_link_sepay (sepay_id),
             CONSTRAINT fk_check_links_poster_{$fkTag} FOREIGN KEY (poster_transaction_id) REFERENCES {$pc}(transaction_id) ON DELETE CASCADE,
             CONSTRAINT fk_check_links_sepay_{$fkTag} FOREIGN KEY (sepay_id) REFERENCES {$st}(sepay_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        try {
+            $idx = $this->pdo->query("SHOW INDEX FROM {$pl}")->fetchAll(\PDO::FETCH_ASSOC);
+            $hasIdxSepay = false;
+            foreach ($idx as $i) {
+                $name = (string)($i['Key_name'] ?? '');
+                $nonUnique = (int)($i['Non_unique'] ?? 1);
+                if ($name === 'uq_link_sepay' && $nonUnique === 0) {
+                    $this->pdo->exec("ALTER TABLE {$pl} DROP INDEX uq_link_sepay");
+                }
+                if ($name === 'idx_link_sepay') {
+                    $hasIdxSepay = true;
+                }
+            }
+            if (!$hasIdxSepay) {
+                $this->pdo->exec("ALTER TABLE {$pl} ADD INDEX idx_link_sepay (sepay_id)");
+            }
+        } catch (\Throwable $e) {
+        }
     }
 }
