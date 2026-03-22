@@ -1713,7 +1713,7 @@ $fmtVnd = function (int $v): string {
         .switch input:checked + .slider:before { transform: translateX(24px); }
         .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .grid { display:grid; grid-template-columns: 1fr 120px 1fr; gap: 12px; align-items:start; }
-        @media (max-width: 1050px) { .grid { grid-template-columns: 1fr; } }
+        
         #tablesRoot { position: relative; overflow: hidden; }
         #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
         table { width: 100%; border-collapse: collapse; }
@@ -2703,8 +2703,12 @@ $fmtVnd = function (int $v): string {
             const key = String(l.sepay_id) + ':' + String(l.poster_transaction_id);
             const btn = widgets.get(key);
             if (btn) {
-                const mx = (a.x + b.x) / 2;
-                const my = (a.y + b.y) / 2;
+                const dxBtn = b.x - a.x;
+                const dyBtn = b.y - a.y;
+                const lenBtn = Math.hypot(dxBtn, dyBtn) || 1;
+                const tBtn = Math.min(0.4, Math.max(0.15, 28 / lenBtn));
+                const mx = a.x + dxBtn * tBtn;
+                const my = a.y + dyBtn * tBtn;
                 const localX = Math.max(8, Math.min(w - 8, mx));
                 const localY = Math.max(8, Math.min(h - 8, my));
                 btn.style.left = Math.round(localX - 8) + 'px';
