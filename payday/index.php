@@ -720,19 +720,9 @@ try {
         }
 
         $amount = (int)($matchRow['sum'] ?? $matchRow['amount'] ?? 0);
-        $origDateRaw = $matchRow['date'] ?? $matchRow['created_at'] ?? $matchRow['time'] ?? null;
-        $origTs = null;
-        if (is_numeric($origDateRaw)) {
-            $n = (int)$origDateRaw;
-            if ($n > 2000000000000) $n = (int)round($n / 1000);
-            if ($n > 0) $origTs = $n;
-        } elseif (is_string($origDateRaw) && trim($origDateRaw) !== '') {
-            $t = strtotime($origDateRaw);
-            if ($t !== false && $t > 0) $origTs = $t;
-        }
-        if ($origTs === null) $origTs = time();
-        $targetTs = $origTs + 60;
-        $targetDate = date('Y-m-d H:i:s', $targetTs);
+        $targetDate = $date . ' 23:50:00';
+        $startTs = strtotime($date . ' 00:00:00');
+        $endTs = strtotime($date . ' 23:59:59');
 
         $accountTo = $kind === 'vietnam' ? 9 : 8;
 
@@ -755,7 +745,7 @@ try {
                 $t = strtotime($dRaw);
                 if ($t !== false && $t > 0) $ts = $t;
             }
-            if ($ts !== null && $ts >= $origTs) {
+            if ($ts !== null && $startTs !== false && $endTs !== false && $ts >= $startTs && $ts <= $endTs) {
                 $dup = true;
                 break;
             }
@@ -1381,6 +1371,41 @@ $fmtVnd = function (int $v): string {
         }
     };
 
+    const getTablesRect = () => {
+        const r = tablesRoot ? tablesRoot.getBoundingClientRect() : null;
+        if (!r) return null;
+        const sx = window.scrollX || 0;
+        const sy = window.scrollY || 0;
+        return {
+            left: r.left + sx,
+            top: r.top + sy,
+            right: r.right + sx,
+            bottom: r.bottom + sy,
+        };
+    };
+
+    const clipStyleFor = (rect) => {
+        if (!rect) return '';
+        return `polygon(${rect.left}px ${rect.top}px, ${rect.right}px ${rect.top}px, ${rect.right}px ${rect.bottom}px, ${rect.left}px ${rect.bottom}px)`;
+    };
+
+    const applyClip = () => {
+        const rect = getTablesRect();
+        const clip = clipStyleFor(rect);
+        lines.forEach((line) => {
+            const svg = line && line.svg ? line.svg : null;
+            if (!svg) return;
+            if (clip) {
+                svg.style.clipPath = clip;
+                svg.style.webkitClipPath = clip;
+            } else {
+                svg.style.clipPath = '';
+                svg.style.webkitClipPath = '';
+            }
+            svg.style.zIndex = '2';
+        });
+    };
+
     const fmtVnd = (v) => {
         try {
             return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Number(v) || 0) + ' ₫';
@@ -1576,19 +1601,22 @@ $fmtVnd = function (int $v): string {
             document.body.appendChild(btn);
             widgets.push({ btn, sepay_id: Number(l.sepay_id || 0), poster_transaction_id: Number(l.poster_transaction_id || 0) });
         });
+        applyClip();
     };
 
     const positionLines = () => {
         lines.forEach((l) => {
             try { l.position(); } catch (_) {}
         });
+        applyClip();
     };
 
     const positionWidgets = () => {
+        const rect = tablesRoot ? tablesRoot.getBoundingClientRect() : null;
         widgets.forEach((w) => {
             const s = document.getElementById('sepay-' + w.sepay_id);
             const p = document.getElementById('poster-' + w.poster_transaction_id);
-            if (!s || !p) return;
+            if (!s || !p || !rect) return;
             const sr = s.getBoundingClientRect();
             const pr = p.getBoundingClientRect();
             const sx = sr.left + sr.width / 2;
@@ -1597,8 +1625,16 @@ $fmtVnd = function (int $v): string {
             const py = pr.top + pr.height / 2;
             const mx = (sx + px) / 2;
             const my = (sy + py) / 2;
-            w.btn.style.left = Math.round(mx - 8) + 'px';
-            w.btn.style.top = Math.round(my - 8) + 'px';
+            const inside = mx >= rect.left && mx <= rect.right && my >= rect.top && my <= rect.bottom;
+            if (!inside) {
+                w.btn.style.display = 'none';
+                return;
+            }
+            w.btn.style.display = 'flex';
+            const clampedX = Math.max(rect.left + 8, Math.min(rect.right - 8, mx));
+            const clampedY = Math.max(rect.top + 8, Math.min(rect.bottom - 8, my));
+            w.btn.style.left = Math.round(clampedX - 8) + 'px';
+            w.btn.style.top = Math.round(clampedY - 8) + 'px';
         });
     };
 
