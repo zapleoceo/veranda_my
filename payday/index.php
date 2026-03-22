@@ -1765,11 +1765,8 @@ $fmtVnd = function (int $v): string {
         .mid-btn.active { background: #111827; border-color: #111827; color: #fff; }
         .mid-btn:disabled { opacity: 0.5; cursor: default; }
         .mid-check { display:flex; gap: 8px; align-items:center; font-weight: 800; font-size: 12px; color: #374151; user-select: none; }
-        @media (max-width: 1200px) {
-            #tablesRoot { overflow-x: auto; overflow-y: hidden; }
-            #tablesRoot { grid-template-columns: minmax(520px, 1fr) 70px minmax(520px, 1fr); }
-        }
         @media (max-width: 1050px) {
+            .grid { grid-template-columns: 1fr 70px 1fr; }
             .mid-col { padding-top: 10px; gap: 6px; }
             .mid-btn { width: 22px; height: 22px; border-radius: 8px; font-size: 14px; }
             .mid-legend { display: none; }
