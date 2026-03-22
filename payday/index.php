@@ -73,10 +73,6 @@ $extractPaymentMethodId = function (array $tx): int {
     $wanted = [
         'payment_method_id',
         'paymentmethodid',
-        'payment_method',
-        'paymentmethod',
-        'payment_type',
-        'paymenttype',
     ];
 
     $walk = function ($v) use (&$walk, $wanted): int {
