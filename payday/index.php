@@ -1519,6 +1519,9 @@ $fmtVnd = function (int $v): string {
         body.mode-lite .col-poster-tips,
         body.mode-lite .col-poster-waiter,
         body.mode-lite .col-poster-table { display: none; }
+        .pm-lite { display: none; }
+        body.mode-lite .pm-full { display: none; }
+        body.mode-lite .pm-lite { display: inline; }
     </style>
 </head>
 <body>
@@ -1636,6 +1639,11 @@ $fmtVnd = function (int $v): string {
                     <div id="selMatch" style="font-size: 16px;">❗</div>
                     <div id="selDiff" style="font-weight: 900;">0 ₫</div>
                 </div>
+                <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
+                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>*цвет линии*: Авто 1</div>
+                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>*цвет линии*: Авто 2</div>
+                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>*цвет линии*: Ручная связь</div>
+                </div>
             </div>
 
             <div class="card" style="padding: 0;">
@@ -1677,6 +1685,10 @@ $fmtVnd = function (int $v): string {
                                     else $cls = $hasYellow ? 'row-yellow' : 'row-green';
                                 }
                                 $pm = (string)($r['payment_method_display'] ?? '');
+                                $pmFull = $pm !== '' ? $pm : '—';
+                                $pmLite = $pmFull;
+                                if (stripos($pmFull, 'vietnam') !== false) $pmLite = 'VC';
+                                else if (stripos($pmFull, 'bybit') !== false) $pmLite = 'BB';
                                 $isVietnam = stripos($pm, 'vietnam') !== false;
                                 if ($isVietnam) {
                                     $cls = 'row-blue';
@@ -1694,7 +1706,7 @@ $fmtVnd = function (int $v): string {
                                 <td class="sum col-poster-card"><?= htmlspecialchars($fmtVnd($cardVnd)) ?></td>
                                 <td class="sum col-poster-tips"><?= htmlspecialchars($fmtVnd($tipVnd)) ?></td>
                                 <td class="sum col-poster-total"><?= htmlspecialchars($fmtVnd($cardVnd + $tipVnd)) ?></td>
-                                <td class="nowrap col-poster-method"><?= htmlspecialchars($pm !== '' ? $pm : '—') ?></td>
+                                <td class="nowrap col-poster-method"><span class="pm-full"><?= htmlspecialchars($pmFull) ?></span><span class="pm-lite"><?= htmlspecialchars($pmLite) ?></span></td>
                                 <td class="col-poster-waiter"><?= htmlspecialchars((string)($r['waiter_name'] ?? '')) ?></td>
                                 <td class="nowrap col-poster-table"><?= htmlspecialchars((string)($r['table_id'] ?? '')) ?></td>
                             </tr>
@@ -1709,17 +1721,6 @@ $fmtVnd = function (int $v): string {
                     • Bybit: <span><?= htmlspecialchars($fmtVnd((int)$posterBybitVnd)) ?></span>
                     • VietComp: <span><?= htmlspecialchars($fmtVnd((int)$posterVietVnd)) ?></span>
                 </div>
-            </div>
-        </div>
-
-        <div class="actions">
-            <div class="muted" style="display:flex; gap: 14px; flex-wrap: wrap; align-items:center; font-weight: 900;">
-                <div><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#e5e7eb; vertical-align:middle; margin-right:6px;"></span>строка: ручная связь</div>
-                <div><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#dcfce7; vertical-align:middle; margin-right:6px;"></span>строка: автосвязь (четкая)</div>
-                <div><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#fef9c3; vertical-align:middle; margin-right:6px;"></span>строка: автосвязь (остаточный принцип)</div>
-                <div><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#dbeafe; vertical-align:middle; margin-right:6px;"></span>строка: Vietnam Company</div>
-                <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>линия: Автосвязь</div>
-                <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>линия: Ручная связь</div>
             </div>
         </div>
 
