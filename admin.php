@@ -1332,52 +1332,66 @@ if ($tab === 'menu' || $tab === 'categories') {
             </div>
 
         <?php elseif ($tab === 'telegram'): ?>
+        <?php
+            $telegramMeta = [];
+            foreach (['telegram_last_run_at', 'telegram_last_run_result', 'telegram_last_run_error'] as $k) {
+                $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$k])->fetch();
+                $telegramMeta[$k] = $row ? (string)$row['meta_value'] : '';
+            }
+        ?>
         <div class="card">
-            <h3>Настройки уведомлений (Telegram)</h3>
-            <form method="POST">
-                <div class="settings-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); max-width: 760px;">
+            <div style="display:flex; align-items:flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                <div>
+                    <h3 style="margin:0 0 6px;">Telegram</h3>
+                    <div class="muted">Алерты по просроченным блюдам из Kitchen Online. Сообщение одно на чек.</div>
+                </div>
+                <div class="muted" style="text-align:right;">
+                    <div>Последний запуск: <b><?= htmlspecialchars($telegramMeta['telegram_last_run_at'] !== '' ? $telegramMeta['telegram_last_run_at'] : '—') ?></b></div>
+                    <?php if (!empty($telegramMeta['telegram_last_run_error'])): ?>
+                        <div style="color:#b91c1c; font-weight:800; margin-top:4px;">Ошибка: <?= htmlspecialchars((string)$telegramMeta['telegram_last_run_error']) ?></div>
+                    <?php else: ?>
+                        <div style="margin-top:4px;"><?= htmlspecialchars($telegramMeta['telegram_last_run_result'] ?? '') ?></div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <form method="POST" style="margin-top: 14px;">
+                <div class="settings-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); max-width: 820px;">
                     <div class="form-group">
-                        <label>Тайминг до выс. нагрузки (мин)</label>
-                        <input type="number" name="alert_timing_low_load" value="<?= $settings['alert_timing_low_load'] ?>" required style="max-width: 220px;">
+                        <label>Тайминг (низк. нагр.), мин</label>
+                        <input type="number" name="alert_timing_low_load" value="<?= $settings['alert_timing_low_load'] ?>" required>
                     </div>
                     <div class="form-group">
-                        <label>Порог чеков для выс. нагрузки</label>
-                        <input type="number" name="alert_load_threshold" value="<?= $settings['alert_load_threshold'] ?>" required style="max-width: 220px;">
+                        <label>Порог чеков</label>
+                        <input type="number" name="alert_load_threshold" value="<?= $settings['alert_load_threshold'] ?>" required>
                     </div>
                     <div class="form-group">
-                        <label>Тайминг при выс. нагрузке (мин)</label>
-                        <input type="number" name="alert_timing_high_load" value="<?= $settings['alert_timing_high_load'] ?>" required style="max-width: 220px;">
+                        <label>Тайминг (выс. нагр.), мин</label>
+                        <input type="number" name="alert_timing_high_load" value="<?= $settings['alert_timing_high_load'] ?>" required>
                     </div>
                     <div class="form-group">
-                        <label>Повтор после "✅ Принято" (мин)</label>
-                        <input type="number" name="alert_ack_snooze_minutes" value="<?= $settings['alert_ack_snooze_minutes'] ?>" required style="max-width: 220px;">
+                        <label>Повтор после “Принято”, мин</label>
+                        <input type="number" name="alert_ack_snooze_minutes" value="<?= $settings['alert_ack_snooze_minutes'] ?>" required>
                     </div>
                 </div>
-                <button type="submit" name="save_settings">Сохранить настройки</button>
+                <div style="margin-top: 10px; display:flex; gap: 12px; align-items:center; flex-wrap: wrap;">
+                    <label style="display:flex; align-items:center; gap: 8px; font-size: 14px; font-weight: 800;">
+                        <input type="hidden" name="exclude_partners_from_load" value="0">
+                        <input type="checkbox" name="exclude_partners_from_load" value="1" <?= !empty($settings['exclude_partners_from_load']) ? 'checked' : '' ?>>
+                        Не учитывать стол Partners в нагрузке
+                    </label>
+                    <button type="submit" name="save_settings">Сохранить</button>
+                </div>
             </form>
-            <form method="POST" style="margin-top: 15px;">
-                 <input type="hidden" name="save_settings" value="1">
-                 <input type="hidden" name="exclude_partners_from_load" value="0">
-                 <label style="display:flex; align-items:center; gap: 8px; font-size: 15px;">
-                     <input type="checkbox" name="exclude_partners_from_load" value="1" <?= !empty($settings['exclude_partners_from_load']) ? 'checked' : '' ?> onchange="this.form.submit()">
-                     ИСКЛЮЧИТЬ СТОЛ "PARTNERS" ИЗ РАСЧЕТА НАГРУЗКИ
-                 </label>
-            </form>
-        </div>
 
-        <div class="description-card">
-            <h4>Логика работы уведомлений в Telegram:</h4>
-            <ul>
-                <li><strong>Каждые 5 минут (cron):</strong> Скрипт сначала очищает старые алерты, затем отправляет актуальные.</li>
-                <li><strong>Очистка:</strong> Для всех сообщений с tg_message_id за последние 2 часа (по ticket_sent_at) проверяется актуальность. Если блюдо готово/удалено/позиция исключена/чек закрыт/✅ Принято — бот удаляет сообщение и очищает tg_message_id.</li>
-                <li><strong>Динамический тайминг:</strong> Лимит ожидания зависит от нагрузки. Если открыто меньше <b><?= $settings['alert_load_threshold'] ?></b> чеков — <b><?= $settings['alert_timing_low_load'] ?> мин</b>, иначе — <b><?= $settings['alert_timing_high_load'] ?> мин</b>. Если включено "ИСКЛЮЧИТЬ СТОЛ PARTNERS", он не влияет на нагрузку, но отображается в заголовке отдельно (напр. 9+4).</li>
-                <li><strong>Кандидаты на алерт:</strong> Берутся только позиции с ticket_sent_at, которые старше лимита, status=1, ready_pressed_at IS NULL и tg_acknowledged=0.</li>
-                <li><strong>Проверка через Poster:</strong> Перед отправкой по каждой позиции проверяется, что чек всё ещё открыт, и по истории чека определяется готовность (finishedcooking) и удаление позиции (delete/deleteitem или changeitemcount=0).</li>
-                <li><strong>Обновление текста:</strong> Если по позиции уже было сообщение, бот удаляет старое и отправляет новое с актуальным временем ожидания.</li>
-                <li><strong>Подтверждение (✅ Принято):</strong> Нажатие временно отключает алерты на <b><?= (int)$settings['alert_ack_snooze_minutes'] ?></b> минут. Подтверждение применяется ко всем дублям этой позиции в чеке (transaction_date + transaction_id + dish_id + station).</li>
-                <li><strong>Контроль доступа к ✅ Принято:</strong> Обрабатываются только от пользователей, у которых Telegram username указан в разделе "Доступы" и включено право "✅ Принято (Telegram)".</li>
-                <li><strong>Надёжность удаления:</strong> tg_message_id очищается только если Telegram подтвердил удаление (ok=true). Если удалить не удалось — будет повторная попытка в следующих запусках.</li>
-            </ul>
+            <details style="margin-top: 14px;">
+                <summary style="cursor:pointer; font-weight: 900;">Формат сообщения</summary>
+                <div class="muted" style="margin-top: 10px; white-space: pre-wrap;">
+Чек:(номерчека)|Стол(номер стола)
+Имя официанта
+Название блюда — сколько уже готовится
+                </div>
+            </details>
         </div>
 
         <?php elseif ($tab === 'access'): ?>

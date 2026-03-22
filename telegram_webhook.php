@@ -146,14 +146,6 @@ $postJson = function (string $method, array $payload) use ($apiBase): void {
     curl_close($ch);
 };
 
-if ($chatId !== '' && $messageId > 0) {
-    $postJson('editMessageReplyMarkup', [
-        'chat_id' => $chatId,
-        'message_id' => $messageId,
-        'reply_markup' => ['inline_keyboard' => []]
-    ]);
-}
-
 if ($callbackId !== '') {
     $postJson('answerCallbackQuery', [
         'callback_query_id' => $callbackId,
