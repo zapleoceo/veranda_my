@@ -1578,6 +1578,7 @@ $fmtVnd = function (int $v): string {
             btn.className = 'link-x';
             btn.textContent = '×';
             btn.title = 'Удалить связь';
+            btn.style.display = 'none';
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1752,6 +1753,7 @@ $fmtVnd = function (int $v): string {
         const w = Math.max(1, Math.round(rootRect.width));
         const h = Math.max(1, Math.round(rootRect.height));
         svgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        widgets.forEach((btn) => { btn.style.display = 'none'; });
 
         const sepayCount = {};
         const posterCount = {};
@@ -1801,11 +1803,19 @@ $fmtVnd = function (int $v): string {
             path.setAttribute('stroke-width', String(size));
             path.setAttribute('stroke-linecap', 'round');
             path.setAttribute('stroke-linejoin', 'round');
-            if (!l.is_manual && l.link_type !== 'manual') {
-                const mid = ensureMarker(color);
-                if (mid) path.setAttribute('marker-end', `url(#${mid})`);
-            }
             svgState.group.appendChild(path);
+
+            const key = String(l.sepay_id) + ':' + String(l.poster_transaction_id);
+            const btn = widgets.get(key);
+            if (btn) {
+                const mx = (a.x + b.x) / 2;
+                const my = (a.y + b.y) / 2;
+                const localX = Math.max(8, Math.min(w - 8, mx));
+                const localY = Math.max(8, Math.min(h - 8, my));
+                btn.style.left = Math.round(localX - 8) + 'px';
+                btn.style.top = Math.round(localY - 8) + 'px';
+                btn.style.display = 'flex';
+            }
         });
     };
 
@@ -1814,39 +1824,7 @@ $fmtVnd = function (int $v): string {
     };
 
     const positionWidgets = () => {
-        const rect = tablesRoot ? tablesRoot.getBoundingClientRect() : null;
-        if (!rect) return;
-        const w = Math.max(1, rect.width);
-        const h = Math.max(1, rect.height);
-        links.forEach((l) => {
-            const key = String(l.sepay_id) + ':' + String(l.poster_transaction_id);
-            const btn = widgets.get(key);
-            if (!btn) return;
-            const s = document.getElementById('sepay-' + l.sepay_id);
-            const p = document.getElementById('poster-' + l.poster_transaction_id);
-            if (!s || !p) { btn.style.display = 'none'; return; }
-            if (!s.getClientRects().length || !p.getClientRects().length) { btn.style.display = 'none'; return; }
-            const sr = s.getBoundingClientRect();
-            const pr = p.getBoundingClientRect();
-            const sx = sr.left + sr.width / 2;
-            const sy = sr.top + sr.height / 2;
-            const px = pr.left + pr.width / 2;
-            const py = pr.top + pr.height / 2;
-            const mx = (sx + px) / 2;
-            const my = (sy + py) / 2;
-            const inside = mx >= rect.left && mx <= rect.right && my >= rect.top && my <= rect.bottom;
-            if (!inside) {
-                btn.style.display = 'none';
-                return;
-            }
-            btn.style.display = 'flex';
-            const clampedX = Math.max(rect.left + 8, Math.min(rect.right - 8, mx));
-            const clampedY = Math.max(rect.top + 8, Math.min(rect.bottom - 8, my));
-            const localX = clampedX - rect.left;
-            const localY = clampedY - rect.top;
-            btn.style.left = Math.round(Math.max(8, Math.min(w - 8, localX)) - 8) + 'px';
-            btn.style.top = Math.round(Math.max(8, Math.min(h - 8, localY)) - 8) + 'px';
-        });
+        return;
     };
 
     const tablesRoot = document.getElementById('tablesRoot');

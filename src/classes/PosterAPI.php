@@ -15,11 +15,16 @@ class PosterAPI {
      * Выполнение запроса к Poster API
      */
     public function request(string $method, array $params = [], string $httpMethod = 'GET'): array {
+        $httpMethod = strtoupper($httpMethod);
         $params['token'] = $this->token;
         $url = $this->baseUrl . '/' . $method;
 
-        if ($httpMethod === 'GET' && !empty($params)) {
-            $url .= '?' . http_build_query($params);
+        if ($httpMethod === 'GET') {
+            if (!empty($params)) {
+                $url .= '?' . http_build_query($params);
+            }
+        } else {
+            $url .= '?' . http_build_query(['token' => $this->token]);
         }
 
         $ch = curl_init();
@@ -29,7 +34,9 @@ class PosterAPI {
 
         if ($httpMethod === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+            $postParams = $params;
+            unset($postParams['token']);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postParams));
         }
 
         $response = curl_exec($ch);
