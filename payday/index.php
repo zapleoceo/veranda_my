@@ -1372,6 +1372,7 @@ $fmtVnd = function (int $v): string {
         .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding-top: 16px; }
         .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; }
         .mid-btn.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
+        .mid-btn.active { background: #111827; border-color: #111827; color: #fff; }
         .mid-btn:disabled { opacity: 0.5; cursor: default; }
         .mid-check { display:flex; gap: 8px; align-items:center; font-weight: 800; font-size: 12px; color: #374151; user-select: none; }
     </style>
@@ -1484,6 +1485,7 @@ $fmtVnd = function (int $v): string {
 
             <div class="mid-col">
                 <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">⛓</button>
+                <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                 <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи заново">↻</button>
                 <label class="mid-check"><input type="checkbox" id="preserveManualCb" checked>ручн.</label>
                 <button class="mid-btn" id="linkClearBtn" type="button" title="Удалить связи за день">×</button>
@@ -1808,6 +1810,7 @@ $fmtVnd = function (int $v): string {
                 drawLines();
                 applyRowClasses();
                 updateStats();
+                applyHideLinked();
                 setTimeout(() => { positionLines(); positionWidgets(); }, 0);
                 setTimeout(() => { positionLines(); positionWidgets(); }, 200);
             });
@@ -1842,6 +1845,7 @@ $fmtVnd = function (int $v): string {
             const s = document.getElementById('sepay-' + l.sepay_id);
             const p = document.getElementById('poster-' + l.poster_transaction_id);
             if (!s || !p) return;
+            if (!s.getClientRects().length || !p.getClientRects().length) return;
             const isMany = (sepayCount[l.sepay_id] || 0) > 1 || (posterCount[l.poster_transaction_id] || 0) > 1;
             const isMainGreen = !isMany && !l.is_manual && l.link_type === 'auto_green';
             const line = new LeaderLine(s, p, {
@@ -1918,6 +1922,7 @@ $fmtVnd = function (int $v): string {
         drawLines();
         applyRowClasses();
         updateStats();
+        applyHideLinked();
         setTimeout(() => { positionLines(); positionWidgets(); }, 200);
         setTimeout(() => { positionLines(); positionWidgets(); }, 800);
     });
@@ -1926,12 +1931,14 @@ $fmtVnd = function (int $v): string {
             drawLines();
             applyRowClasses();
             updateStats();
+            applyHideLinked();
             setTimeout(() => { positionLines(); positionWidgets(); }, 200);
         });
     } else {
         drawLines();
         applyRowClasses();
         updateStats();
+        applyHideLinked();
         setTimeout(() => { positionLines(); positionWidgets(); }, 200);
     }
 
@@ -1943,14 +1950,22 @@ $fmtVnd = function (int $v): string {
     const selectedPoster = new Set();
 
     const linkMakeBtn = document.getElementById('linkMakeBtn');
+    const hideLinkedBtn = document.getElementById('hideLinkedBtn');
     const linkAutoBtn = document.getElementById('linkAutoBtn');
     const linkClearBtn = document.getElementById('linkClearBtn');
     const preserveManualCb = document.getElementById('preserveManualCb');
     const clearManualCb = document.getElementById('clearManualCb');
 
+    let hideLinked = false;
+
     const updateLinkButtonState = () => {
         if (!linkMakeBtn) return;
         linkMakeBtn.disabled = !(selectedSepay.size > 0 && selectedPoster.size > 0);
+    };
+
+    const updateHideButtonState = () => {
+        if (!hideLinkedBtn) return;
+        hideLinkedBtn.classList.toggle('active', hideLinked);
     };
 
     const clearCheckboxes = () => {
@@ -2041,6 +2056,33 @@ $fmtVnd = function (int $v): string {
         });
     };
 
+    const applyHideLinked = () => {
+        const state = buildLinkState();
+        document.querySelectorAll('#sepayTable tbody tr[data-sepay-id]').forEach((tr) => {
+            const sid = Number(tr.getAttribute('data-sepay-id') || 0);
+            const linked = state.sepay.has(sid);
+            const hidden = hideLinked && linked;
+            tr.style.display = hidden ? 'none' : '';
+            if (hidden) {
+                const cb = tr.querySelector('input.sepay-cb');
+                if (cb) cb.checked = false;
+                selectedSepay.delete(sid);
+            }
+        });
+        document.querySelectorAll('#posterTable tbody tr[data-poster-id]').forEach((tr) => {
+            const pid = Number(tr.getAttribute('data-poster-id') || 0);
+            const linked = state.poster.has(pid);
+            const hidden = hideLinked && linked;
+            tr.style.display = hidden ? 'none' : '';
+            if (hidden) {
+                const cb = tr.querySelector('input.poster-cb');
+                if (cb) cb.checked = false;
+                selectedPoster.delete(pid);
+            }
+        });
+        updateLinkButtonState();
+    };
+
     document.querySelectorAll('input.sepay-cb').forEach((cb) => {
         cb.addEventListener('change', () => {
             const id = Number(cb.getAttribute('data-id') || 0);
@@ -2069,6 +2111,16 @@ $fmtVnd = function (int $v): string {
                 .then(() => clearCheckboxes())
                 .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         });
+    }
+    if (hideLinkedBtn) {
+        hideLinkedBtn.addEventListener('click', () => {
+            hideLinked = !hideLinked;
+            updateHideButtonState();
+            applyHideLinked();
+            drawLines();
+            setTimeout(() => { positionLines(); positionWidgets(); }, 0);
+        });
+        updateHideButtonState();
     }
     if (linkAutoBtn) {
         linkAutoBtn.addEventListener('click', () => {
