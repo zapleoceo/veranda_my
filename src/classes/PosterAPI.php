@@ -47,10 +47,18 @@ class PosterAPI {
         if ($error) {
             throw new \Exception("CURL Error: " . $error);
         }
+        if (!is_string($response)) {
+            throw new \Exception("Poster API Error: empty response (http=" . (int)$httpCode . ")");
+        }
 
         $data = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception("JSON Decode Error: " . json_last_error_msg());
+        }
+
+        if ($httpCode < 200 || $httpCode > 299) {
+            $snippet = mb_substr($response, 0, 500);
+            throw new \Exception("Poster API Error: http=" . (int)$httpCode . " body=" . $snippet);
         }
 
         if (isset($data['error'])) {
@@ -64,10 +72,10 @@ class PosterAPI {
                     $msg = json_encode($err, JSON_UNESCAPED_UNICODE);
                 }
             } else {
-                $msg = 'Unknown error';
+                $msg = json_encode($err, JSON_UNESCAPED_UNICODE);
             }
             if (!is_string($msg) || $msg === '') $msg = 'Unknown error';
-            throw new \Exception("Poster API Error: " . $msg);
+            throw new \Exception("Poster API Error: " . $msg . " (http=" . (int)$httpCode . ")");
         }
 
         return $data['response'] ?? $data;

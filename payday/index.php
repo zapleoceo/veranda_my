@@ -638,10 +638,25 @@ try {
             ? 'Перевод чеков вьетнаской компании'
             : 'Перевод типсов';
 
-        $txs = $api->request('finance.getTransactions', [
-            'dateFrom' => str_replace('-', '', $dateTo),
-            'dateTo' => str_replace('-', '', $dateTo),
-        ]);
+        $txs = [];
+        try {
+            $txs = $api->request('finance.getTransactions', [
+                'dateFrom' => str_replace('-', '', $dateTo),
+                'dateTo' => str_replace('-', '', $dateTo),
+            ]);
+        } catch (\Throwable $e) {
+            $txs = [];
+        }
+        if (!is_array($txs) || count($txs) === 0) {
+            try {
+                $txs = $api->request('finance.getTransactions', [
+                    'dateFrom' => date('dmY', $startTs !== false ? $startTs : time()),
+                    'dateTo' => date('dmY', $endTs !== false ? $endTs : time()),
+                ]);
+            } catch (\Throwable $e) {
+                $txs = [];
+            }
+        }
         if (!is_array($txs)) $txs = [];
 
         $dup = false;
@@ -649,13 +664,23 @@ try {
             if (!is_array($row)) continue;
             $type = (int)($row['type'] ?? 0);
             if ($type !== 2) continue;
-            $sum = (int)($row['amount_from'] ?? $row['amountFrom'] ?? $row['sum'] ?? $row['amount'] ?? 0);
-            if ($sum !== $amountVnd) continue;
-            $toId = (int)($row['account_to_id'] ?? $row['accountTo'] ?? 0);
+            $toRaw = $row['account_to_id'] ?? $row['account_to'] ?? $row['accountToId'] ?? $row['accountTo'] ?? 0;
+            if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+            $toId = (int)$toRaw;
             if ($toId !== $accountTo) continue;
-            $cmt = strtolower((string)($row['comment'] ?? $row['description'] ?? ''));
-            if ($cmt !== '' && strpos($cmt, strtolower($comment)) === false) continue;
-            $dRaw = $row['date'] ?? $row['created_at'] ?? $row['time'] ?? null;
+
+            $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
+            $sumF = 0.0;
+            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
+            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
+            $sumInt = (int)round($sumF);
+            $sumVnd = $sumInt;
+            if (abs($sumInt) > 100000000 && $sumInt % 100 === 0) {
+                $sumVnd = (int)round($sumInt / 100);
+            }
+            if ($sumVnd !== $amountVnd) continue;
+
+            $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
             $ts = null;
             if (is_numeric($dRaw)) {
                 $n = (int)$dRaw;
@@ -1529,20 +1554,36 @@ try {
                 'dateTo' => str_replace('-', '', $dateTo),
             ]);
         } catch (\Throwable $e) {
-            $rows = $apiFinance->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
-            ]);
+            $rows = [];
+        }
+        if (!is_array($rows) || count($rows) === 0) {
+            try {
+                $rows = $apiFinance->request('finance.getTransactions', [
+                    'dateFrom' => date('dmY', $startTs),
+                    'dateTo' => date('dmY', $endTs),
+                ]);
+            } catch (\Throwable $e) {
+                $rows = [];
+            }
         }
         if (!is_array($rows)) $rows = [];
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
             if ((int)($r['type'] ?? 0) !== 2) continue;
-            $accTo = (int)($r['account_to_id'] ?? $r['account_to'] ?? $r['accountToId'] ?? $r['accountTo'] ?? $r['account_to'] ?? 0);
+            $accToRaw = $r['account_to_id'] ?? $r['account_to'] ?? $r['accountToId'] ?? $r['accountTo'] ?? 0;
+            if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
+            $accTo = (int)$accToRaw;
             $sumRaw = $r['amount_from'] ?? $r['amountFrom'] ?? $r['amount_to'] ?? $r['amountTo'] ?? $r['sum'] ?? $r['amount'] ?? 0;
-            $sum = (int)$sumRaw;
+            $sumF = 0.0;
+            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
+            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
+            $sumInt = (int)round($sumF);
+            $sumVnd = $sumInt;
+            if (abs($sumInt) > 100000000 && $sumInt % 100 === 0) {
+                $sumVnd = (int)round($sumInt / 100);
+            }
 
-            $dRaw = $r['date'] ?? $r['created_at'] ?? $r['time'] ?? null;
+            $dRaw = $r['date'] ?? $r['created_at'] ?? $r['createdAt'] ?? $r['time'] ?? $r['datetime'] ?? $r['date_time'] ?? $r['created'] ?? null;
             $ts = null;
             if (is_numeric($dRaw)) {
                 $n = (int)$dRaw;
@@ -1555,10 +1596,10 @@ try {
             if ($ts === null) continue;
             if ($ts < $startTs || $ts > $endTs) continue;
 
-            if (!$transferVietnamExists && $accTo === 9 && $vietnamAmountVnd > 0 && $sum === $vietnamAmountVnd) {
+            if (!$transferVietnamExists && $accTo === 9 && $vietnamAmountVnd > 0 && $sumVnd === $vietnamAmountVnd) {
                 $transferVietnamExists = true;
             }
-            if (!$transferTipsExists && $accTo === 8 && $tipsAmountVnd > 0 && $sum === $tipsAmountVnd) {
+            if (!$transferTipsExists && $accTo === 8 && $tipsAmountVnd > 0 && $sumVnd === $tipsAmountVnd) {
                 $transferTipsExists = true;
             }
         }
