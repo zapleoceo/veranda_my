@@ -10,6 +10,15 @@ $db->createPaydayTables();
 $message = '';
 $error = '';
 
+if (!isset($_SESSION)) {
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+}
+if (!empty($_SESSION['payday_flash']) && is_array($_SESSION['payday_flash'])) {
+    $message = (string)($_SESSION['payday_flash']['message'] ?? '');
+    $error = (string)($_SESSION['payday_flash']['error'] ?? '');
+    unset($_SESSION['payday_flash']);
+}
+
 $dateFrom = trim((string)($_GET['dateFrom'] ?? ($_POST['dateFrom'] ?? '')));
 $dateTo = trim((string)($_GET['dateTo'] ?? ($_POST['dateTo'] ?? '')));
 $dateSingle = trim((string)($_GET['date'] ?? ($_POST['date'] ?? '')));
@@ -683,6 +692,19 @@ try {
     }
 } catch (\Throwable $e) {
     if ($error === '') $error = $e->getMessage();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== '') {
+    if (!isset($_SESSION)) {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    }
+    $_SESSION['payday_flash'] = [
+        'message' => $message,
+        'error' => $error,
+        'at' => time(),
+    ];
+    header('Location: ?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo]));
+    exit;
 }
 
 if (($_GET['ajax'] ?? '') === 'manual_link') {
@@ -1524,10 +1546,10 @@ try {
             if ($ts === null) continue;
             if (abs($ts - $targetTs) > 15 * 60) continue;
 
-            if (!$transferVietnamExists && $accTo === 9 && $vietnamAmountVnd > 0 && $sum === $vietnamAmountVnd && strpos($cmt, 'перевод чеков') !== false) {
+            if (!$transferVietnamExists && $accTo === 9 && $vietnamAmountVnd > 0 && $sum === $vietnamAmountVnd) {
                 $transferVietnamExists = true;
             }
-            if (!$transferTipsExists && $accTo === 8 && $tipsAmountVnd > 0 && $sum === $tipsAmountVnd && strpos($cmt, 'перевод типсов') !== false) {
+            if (!$transferTipsExists && $accTo === 8 && $tipsAmountVnd > 0 && $sum === $tipsAmountVnd) {
                 $transferTipsExists = true;
             }
         }
