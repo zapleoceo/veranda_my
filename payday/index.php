@@ -1130,7 +1130,7 @@ if (($_GET['ajax'] ?? '') === 'poster_accounts') {
     exit;
 }
 
-if (($_GET['ajax'] ?? '') === 'balance_sinc') {
+if (($_GET['ajax'] ?? '') === 'balance_sinc_plan') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
@@ -1148,19 +1148,121 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc') {
 
         $type = $diffCents > 0 ? 1 : 0;
         $amount = sprintf('%.2f', abs($diffCents) / 100);
+        $accountId = 8;
+        $accountName = '';
+        try {
+            $accountName = (string)$db->query("SELECT name FROM {$pa} WHERE account_id = ? LIMIT 1", [$accountId])->fetchColumn();
+        } catch (\Throwable $e) {
+            $accountName = '';
+        }
+        if (!isset($_SESSION)) {
+            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        }
+        $nonce = bin2hex(random_bytes(16));
+        $_SESSION['payday_balance_sinc'] = [
+            'nonce' => $nonce,
+            'diff_cents' => $diffCents,
+            'created_at' => time(),
+        ];
+
+        echo json_encode([
+            'ok' => true,
+            'nonce' => $nonce,
+            'plan' => [
+                'id' => 0,
+                'type' => $type,
+                'category' => 4,
+                'user_id' => 4,
+                'date' => date('Y-m-d H:i:s'),
+                'comment' => 'Коррекция излишек - недостачи за счет чая',
+                'account_id' => $accountId,
+                'account_name' => $accountName,
+                'sum' => $amount,
+                'diff_cents' => $diffCents,
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $raw = file_get_contents('php://input');
+        $j = json_decode($raw ?: '[]', true);
+        if (!is_array($j)) $j = [];
+        $nonce = (string)($j['nonce'] ?? '');
+        if ($nonce === '') throw new \Exception('Нет подтверждения (nonce)');
+
+        if (!isset($_SESSION)) {
+            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        }
+        $st = $_SESSION['payday_balance_sinc'] ?? null;
+        if (!is_array($st) || (string)($st['nonce'] ?? '') !== $nonce) {
+            throw new \Exception('Подтверждение устарело');
+        }
+        $createdAt = (int)($st['created_at'] ?? 0);
+        if ($createdAt <= 0 || (time() - $createdAt) > 300) {
+            unset($_SESSION['payday_balance_sinc']);
+            throw new \Exception('Подтверждение истекло');
+        }
+        $diffCents = (int)($st['diff_cents'] ?? 0);
+        if ($diffCents === 0) {
+            unset($_SESSION['payday_balance_sinc']);
+            throw new \Exception('Разница = 0');
+        }
+
+        $type = $diffCents > 0 ? 1 : 0;
+        $amount = sprintf('%.2f', abs($diffCents) / 100);
+        $accountId = 8;
+        $comment = 'Коррекция излишек - недостачи за счет чая';
 
         $api3 = new \App\Classes\PosterAPI((string)$token);
+        try {
+            $rows = $api3->request('finance.getTransactions', [
+                'dateFrom' => str_replace('-', '', date('Y-m-d')),
+                'dateTo' => str_replace('-', '', date('Y-m-d')),
+            ]);
+            if (is_array($rows)) {
+                foreach ($rows as $r) {
+                    if (!is_array($r)) continue;
+                    if ((int)($r['type'] ?? 0) !== $type) continue;
+                    $accTo = (int)($r['account_id'] ?? $r['account_to_id'] ?? $r['accountToId'] ?? 0);
+                    if ($accTo !== $accountId) continue;
+                    $sum = (string)($r['sum'] ?? $r['amount'] ?? $r['amount_from'] ?? '');
+                    if ($sum !== '' && (string)$sum === (string)$amount) {
+                        $cmt = (string)($r['comment'] ?? $r['description'] ?? '');
+                        if ($cmt !== '' && mb_stripos($cmt, $comment) !== false) {
+                            unset($_SESSION['payday_balance_sinc']);
+                            echo json_encode(['ok' => true, 'already' => true], JSON_UNESCAPED_UNICODE);
+                            exit;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
         $res = $api3->request('finance.createTransactions', [
             'id' => 0,
             'type' => $type,
             'category' => 4,
             'user_id' => 4,
             'date' => date('Y-m-d H:i:s'),
-            'comment' => 'Коррекция излишек - недостачи за счет чая',
-            'account_id' => 8,
+            'comment' => $comment,
+            'account_id' => $accountId,
             'sum' => $amount,
         ], 'POST');
 
+        unset($_SESSION['payday_balance_sinc']);
         echo json_encode(['ok' => true, 'response' => $res], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
@@ -2124,16 +2226,38 @@ $fmtVnd = function (int $v): string {
             const diff = fact - exp;
             if (!diff) return alert('Разница = 0');
 
-            const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'balance_sinc'])) ?>;
             balanceSyncBtn.classList.add('loading');
             balanceSyncBtn.disabled = true;
-            fetch(url, {
+            const urlPlan = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'balance_sinc_plan'])) ?>;
+            const urlCommit = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'balance_sinc_commit'])) ?>;
+            fetch(urlPlan, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ diff_cents: diff }),
             })
             .then((r) => r.json())
             .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                const p = j.plan || {};
+                const sum = String(p.sum || '');
+                const accId = Number(p.account_id || 0);
+                const accName = String(p.account_name || '');
+                const type = Number(p.type || 0);
+                const action = type === 1 ? 'Начислить' : 'Списать';
+                const accLabel = accName ? `счёт ${accId} (${accName})` : `счёт ${accId}`;
+                const ok = confirm(`${action} ${sum} ₫ на ${accLabel}?\nКомментарий: ${String(p.comment || '')}`);
+                if (!ok) return null;
+
+                const nonce = String(j.nonce || '');
+                if (!nonce) throw new Error('Нет подтверждения (nonce)');
+                return fetch(urlCommit, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nonce }),
+                }).then((r) => r.json());
+            })
+            .then((j) => {
+                if (j === null) return null;
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
                 return refreshPosterAccounts();
             })
