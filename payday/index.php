@@ -829,17 +829,6 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
                 $indexCols[$name]['non_unique'] = $nonUnique;
                 $indexCols[$name]['cols'][$seq] = $col;
             }
-            foreach ($indexCols as $name => $meta) {
-                if ($name === 'PRIMARY') continue;
-                $nonUnique = (int)($meta['non_unique'] ?? 1);
-                if ($nonUnique !== 0) continue;
-                $cols = $meta['cols'] ?? [];
-                ksort($cols);
-                $cols = array_values($cols);
-                if ($cols === ['sepay_id'] || $cols === ['poster_transaction_id']) {
-                    $db->query("ALTER TABLE {$pl} DROP INDEX {$name}");
-                }
-            }
             $have = array_keys($indexCols);
             if (!in_array('idx_link_sepay', $have, true)) {
                 $db->query("ALTER TABLE {$pl} ADD INDEX idx_link_sepay (sepay_id)");
@@ -849,6 +838,18 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
             }
             if (!in_array('uq_link_pair', $have, true)) {
                 $db->query("ALTER TABLE {$pl} ADD UNIQUE KEY uq_link_pair (poster_transaction_id, sepay_id)");
+            }
+            foreach ($indexCols as $name => $meta) {
+                if ($name === 'PRIMARY') continue;
+                if ($name === 'uq_link_pair') continue;
+                $nonUnique = (int)($meta['non_unique'] ?? 1);
+                if ($nonUnique !== 0) continue;
+                $cols = $meta['cols'] ?? [];
+                ksort($cols);
+                $cols = array_values($cols);
+                if ($cols === ['sepay_id'] || $cols === ['poster_transaction_id']) {
+                    $db->query("ALTER TABLE {$pl} DROP INDEX `{$name}`");
+                }
             }
         } catch (\Throwable $e) {
         }

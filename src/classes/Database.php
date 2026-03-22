@@ -398,6 +398,16 @@ class Database {
                 }
             }
 
+            if (!$hasIdxSepay) {
+                $this->pdo->exec("ALTER TABLE {$pl} ADD INDEX idx_link_sepay (sepay_id)");
+            }
+            if (!$hasIdxPoster) {
+                $this->pdo->exec("ALTER TABLE {$pl} ADD INDEX idx_link_poster (poster_transaction_id)");
+            }
+            if (!$hasUqPair) {
+                $this->pdo->exec("ALTER TABLE {$pl} ADD UNIQUE KEY uq_link_pair (poster_transaction_id, sepay_id)");
+            }
+
             foreach ($indexCols as $name => $meta) {
                 $nonUnique = (int)($meta['non_unique'] ?? 1);
                 if ($nonUnique !== 0) continue;
@@ -407,17 +417,8 @@ class Database {
                 if ($name === 'PRIMARY') continue;
                 if ($name === 'uq_link_pair') continue;
                 if ($cols === ['sepay_id'] || $cols === ['poster_transaction_id']) {
-                    $this->pdo->exec("ALTER TABLE {$pl} DROP INDEX {$name}");
+                    $this->pdo->exec("ALTER TABLE {$pl} DROP INDEX `{$name}`");
                 }
-            }
-            if (!$hasIdxSepay) {
-                $this->pdo->exec("ALTER TABLE {$pl} ADD INDEX idx_link_sepay (sepay_id)");
-            }
-            if (!$hasIdxPoster) {
-                $this->pdo->exec("ALTER TABLE {$pl} ADD INDEX idx_link_poster (poster_transaction_id)");
-            }
-            if (!$hasUqPair) {
-                $this->pdo->exec("ALTER TABLE {$pl} ADD UNIQUE KEY uq_link_pair (poster_transaction_id, sepay_id)");
             }
         } catch (\Throwable $e) {
         }
