@@ -164,7 +164,7 @@ try {
     $transferType = strtolower(trim((string)($payload['transfer_type'] ?? $payload['transferType'] ?? $payload['type'] ?? 'in')));
     if ($transferType !== 'in' && $transferType !== 'out') $transferType = 'in';
 
-    $transferAmount = (int)($payload['transfer_amount'] ?? $payload['amount'] ?? 0);
+    $transferAmount = (int)($payload['transfer_amount'] ?? $payload['transferAmount'] ?? $payload['amount'] ?? 0);
     $accumulated = (int)($payload['accumulated'] ?? $payload['balance'] ?? 0);
 
     $subAccount = $payload['sub_account'] ?? $payload['subAccount'] ?? $payload['va'] ?? null;
