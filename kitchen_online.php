@@ -32,7 +32,7 @@ $today = date('Y-m-d');
 $lastSyncLabel = '—';
 $ks = $db->t('kitchen_stats');
 $metaTable = $db->t('system_meta');
-$tgThreads = $db->t('tg_alert_threads');
+$tgItems = $db->t('tg_alert_items');
 
 try {
     $api = new \App\Classes\PosterAPI($token);
@@ -400,9 +400,9 @@ if ($isAjax) {
         try {
             $rows = $db->query(
                 "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
-                        tga.created_at AS tg_sent_at, tga.last_edited_at AS tg_last_edit_at
+                        tga.created_at AS tg_sent_at, tga.updated_at AS tg_last_edit_at
                  FROM {$ks} ks
-                 LEFT JOIN {$tgThreads} tga ON tga.transaction_date = ks.transaction_date AND tga.transaction_id = ks.transaction_id
+                 LEFT JOIN {$tgItems} tga ON tga.transaction_date = ks.transaction_date AND tga.kitchen_stats_id = ks.id
                  WHERE transaction_date = ?
                    AND status = 1
                    AND ready_pressed_at IS NULL
