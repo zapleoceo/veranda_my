@@ -1618,11 +1618,11 @@ $fmtVnd = function (int $v): string {
             </div>
 
             <div class="mid-col">
-                <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">⛓</button>
+                <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">🎯</button>
                 <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
-                <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи заново">↻</button>
+                <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
                 <label class="mid-check"><input type="checkbox" id="preserveManualCb" checked>ручн.</label>
-                <button class="mid-btn" id="linkClearBtn" type="button" title="Удалить связи за день">×</button>
+                <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
                 <label class="mid-check"><input type="checkbox" id="clearManualCb">ручн.</label>
             </div>
 
