@@ -14,7 +14,7 @@ class PosterAPI {
     /**
      * Выполнение запроса к Poster API
      */
-    public function request(string $method, array $params = [], string $httpMethod = 'GET'): array {
+    public function request(string $method, array $params = [], string $httpMethod = 'GET') {
         $httpMethod = strtoupper($httpMethod);
         $params['token'] = $this->token;
         $url = $this->baseUrl . '/' . $method;

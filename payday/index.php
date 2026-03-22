@@ -10,10 +10,29 @@ $db->createPaydayTables();
 $message = '';
 $error = '';
 
-$date = trim((string)($_GET['date'] ?? ($_POST['date'] ?? '')));
-if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-    $date = date('Y-m-d');
+$dateFrom = trim((string)($_GET['dateFrom'] ?? ($_POST['dateFrom'] ?? '')));
+$dateTo = trim((string)($_GET['dateTo'] ?? ($_POST['dateTo'] ?? '')));
+$dateSingle = trim((string)($_GET['date'] ?? ($_POST['date'] ?? '')));
+
+if ($dateFrom === '' && $dateTo === '' && $dateSingle !== '') {
+    $dateFrom = $dateSingle;
+    $dateTo = $dateSingle;
 }
+if ($dateFrom === '' && $dateTo !== '') $dateFrom = $dateTo;
+if ($dateTo === '' && $dateFrom !== '') $dateTo = $dateFrom;
+
+if ($dateFrom === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-d');
+if ($dateTo === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = $dateFrom;
+
+if ($dateFrom > $dateTo) {
+    $tmp = $dateFrom;
+    $dateFrom = $dateTo;
+    $dateTo = $tmp;
+}
+
+$date = $dateTo;
+$periodFrom = $dateFrom . ' 00:00:00';
+$periodTo = $dateTo . ' 23:59:59';
 
 $moneyToInt = function ($v): int {
     if (is_int($v)) return $v;
@@ -64,9 +83,9 @@ $parsePosterDateTime = function ($tx): ?string {
 $sepayApiToken = trim((string)($_ENV['SEPAY_API_TOKEN'] ?? $_ENV['SEPAY_USER_API_TOKEN'] ?? ''));
 $sepayAccountNumber = trim((string)($_ENV['SEPAY_ACCOUNT_NUMBER'] ?? ''));
 
-$sepayFetchTransactions = function (string $date, string $token, string $accountNumber): array {
-    $from = $date . ' 00:00:00';
-    $to = $date . ' 23:59:59';
+$sepayFetchTransactions = function (string $dateFrom, string $dateTo, string $token, string $accountNumber): array {
+    $from = $dateFrom . ' 00:00:00';
+    $to = $dateTo . ' 23:59:59';
     $params = [
         'transaction_date_min' => $from,
         'transaction_date_max' => $to,
@@ -146,7 +165,8 @@ try {
     };
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'load_poster_checks') {
-        $ymd = str_replace('-', '', $date);
+        $ymdFrom = str_replace('-', '', $dateFrom);
+        $ymdTo = str_replace('-', '', $dateTo);
         $employeesById = null;
         $inserted = 0;
         $updated = 0;
@@ -204,8 +224,8 @@ try {
         $txs = [];
         try {
             $txs = $api->request('dash.getTransactions', [
-                'dateFrom' => $ymd,
-                'dateTo' => $ymd,
+                'dateFrom' => $ymdFrom,
+                'dateTo' => $ymdTo,
                 'status' => 2,
                 'include_products' => 0,
                 'include_history' => 0
@@ -215,10 +235,7 @@ try {
         }
         if (!is_array($txs)) $txs = [];
 
-        try {
-            $db->query("DELETE FROM {$pt} WHERE day_date = ?", [$date]);
-        } catch (\Throwable $e) {
-        }
+        try { $db->query("DELETE FROM {$pt} WHERE day_date BETWEEN ? AND ?", [$dateFrom, $dateTo]); } catch (\Throwable $e) {}
 
         foreach ($txs as $tx) {
             if (!is_array($tx)) continue;
@@ -374,21 +391,19 @@ try {
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'clear_day') {
-        $from = $date . ' 00:00:00';
-        $to = $date . ' 23:59:59';
         try {
             $db->query('START TRANSACTION');
             $db->query(
                 "DELETE l FROM {$pl} l
                  JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE p.day_date = ?",
-                [$date]
+                 WHERE p.day_date BETWEEN ? AND ?",
+                [$dateFrom, $dateTo]
             );
-            $db->query("DELETE FROM {$pc} WHERE day_date = ?", [$date]);
-            $db->query("DELETE FROM {$pt} WHERE day_date = ?", [$date]);
-            $db->query("DELETE FROM {$st} WHERE transaction_date BETWEEN ? AND ?", [$from, $to]);
+            $db->query("DELETE FROM {$pc} WHERE day_date BETWEEN ? AND ?", [$dateFrom, $dateTo]);
+            $db->query("DELETE FROM {$pt} WHERE day_date BETWEEN ? AND ?", [$dateFrom, $dateTo]);
+            $db->query("DELETE FROM {$st} WHERE transaction_date BETWEEN ? AND ?", [$periodFrom, $periodTo]);
             $db->query('COMMIT');
-            $message = 'День очищен: ' . $date;
+            $message = ($dateFrom === $dateTo ? ('День очищен: ' . $dateFrom) : ('Период очищен: ' . $dateFrom . ' — ' . $dateTo));
         } catch (\Throwable $e) {
             try { $db->query('ROLLBACK'); } catch (\Throwable $e2) {}
             throw $e;
@@ -400,11 +415,8 @@ try {
             throw new \Exception('Не задан SEPAY_API_TOKEN в .env');
         }
 
-        $txs = $sepayFetchTransactions($date, $sepayApiToken, $sepayAccountNumber);
-
-        $from = $date . ' 00:00:00';
-        $to = $date . ' 23:59:59';
-        $db->query("DELETE FROM {$st} WHERE transaction_date BETWEEN ? AND ?", [$from, $to]);
+        $txs = $sepayFetchTransactions($dateFrom, $dateTo, $sepayApiToken, $sepayAccountNumber);
+        $db->query("DELETE FROM {$st} WHERE transaction_date BETWEEN ? AND ?", [$periodFrom, $periodTo]);
 
         $inserted = 0;
         $updated = 0;
@@ -516,7 +528,8 @@ try {
             elseif ($affected >= 2) $updated++;
         }
 
-        $message = 'SePay загружен по API за ' . $date . ': ' . json_encode(['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped, 'api_rows' => count($txs)], JSON_UNESCAPED_UNICODE);
+        $label = $dateFrom === $dateTo ? $dateFrom : ($dateFrom . ' — ' . $dateTo);
+        $message = 'SePay загружен по API за ' . $label . ': ' . json_encode(['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped, 'api_rows' => count($txs)], JSON_UNESCAPED_UNICODE);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'create_transfer') {
@@ -524,48 +537,58 @@ try {
         if (!in_array($kind, ['vietnam', 'tips'], true)) {
             throw new \Exception('Bad request');
         }
-        $txs = $api->request('finance.getTransactions', [
-            'dateFrom' => str_replace('-', '', $date),
-            'dateTo' => str_replace('-', '', $date),
-        ]);
-        if (!is_array($txs)) $txs = [];
-
-        $matchRow = null;
-        foreach ($txs as $row) {
-            if (!is_array($row)) continue;
-            $hay = strtolower(json_encode($row, JSON_UNESCAPED_UNICODE));
-            if ($kind === 'vietnam') {
-                if (strpos($hay, 'vietnam company') === false) continue;
-                if (strpos($hay, 'card') === false) continue;
-                $matchRow = $row;
-                break;
-            } else {
-                if (strpos($hay, 'tip') === false) continue;
-                if (strpos($hay, 'shift') === false) continue;
-                $matchRow = $row;
-                break;
-            }
+        $amount = 0;
+        if ($kind === 'vietnam') {
+            $amount = (int)$db->query(
+                "SELECT COALESCE(SUM(payed_card + payed_third_party), 0)
+                 FROM {$pc}
+                 WHERE day_date BETWEEN ? AND ?
+                   AND pay_type IN (2,3)
+                   AND (payed_card + payed_third_party) > 0
+                   AND poster_payment_method_id = 11",
+                [$dateFrom, $dateTo]
+            )->fetchColumn();
+        } else {
+            $amount = (int)$db->query(
+                "SELECT COALESCE(SUM(tip_sum), 0)
+                 FROM {$pc}
+                 WHERE day_date BETWEEN ? AND ?
+                   AND pay_type IN (2,3)
+                   AND (payed_card + payed_third_party) > 0
+                   AND tip_sum > 0",
+                [$dateFrom, $dateTo]
+            )->fetchColumn();
         }
-        if ($matchRow === null) {
-            throw new \Exception('Не найдена исходная транзакция в Poster за день.');
+        if ($amount <= 0) {
+            throw new \Exception('Сумма для перевода = 0.');
         }
 
-        $amount = (int)($matchRow['sum'] ?? $matchRow['amount'] ?? 0);
-        $targetDate = $date . ' 23:55:00';
-        $startTs = strtotime($date . ' 00:00:00');
-        $endTs = strtotime($date . ' 23:59:59');
+        $targetDate = $dateTo . ' 23:55:00';
+        $startTs = strtotime($dateTo . ' 00:00:00');
+        $endTs = strtotime($dateTo . ' 23:59:59');
 
         $accountTo = $kind === 'vietnam' ? 9 : 8;
+        $comment = $kind === 'vietnam'
+            ? 'Перевод чеков вьетнаской компании'
+            : 'Перевод типсов';
+
+        $txs = $api->request('finance.getTransactions', [
+            'dateFrom' => str_replace('-', '', $dateTo),
+            'dateTo' => str_replace('-', '', $dateTo),
+        ]);
+        if (!is_array($txs)) $txs = [];
 
         $dup = false;
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
             $type = (int)($row['type'] ?? 0);
             if ($type !== 2) continue;
-            $sum = (int)($row['sum'] ?? $row['amount'] ?? 0);
+            $sum = (int)($row['amount_from'] ?? $row['amountFrom'] ?? $row['sum'] ?? $row['amount'] ?? 0);
             if ($sum !== $amount) continue;
             $toId = (int)($row['account_to_id'] ?? $row['accountTo'] ?? 0);
             if ($toId !== $accountTo) continue;
+            $cmt = strtolower((string)($row['comment'] ?? $row['description'] ?? ''));
+            if ($cmt !== '' && strpos($cmt, strtolower($comment)) === false) continue;
             $dRaw = $row['date'] ?? $row['created_at'] ?? $row['time'] ?? null;
             $ts = null;
             if (is_numeric($dRaw)) {
@@ -584,10 +607,6 @@ try {
         if ($dup) {
             throw new \Exception('Перевод за этот день уже создан.');
         }
-
-        $comment = $kind === 'vietnam'
-            ? 'Перевод чеков вьетнаской компании'
-            : 'Перевод типсов';
 
         $api->request('finance.createTransactions', [
             'type' => 2,
@@ -981,7 +1000,7 @@ $sepayRows = $db->query(
        AND transfer_type = 'in'
        AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))
      ORDER BY transaction_date ASC",
-    [$date . ' 00:00:00', $date . ' 23:59:59']
+    [$periodFrom, $periodTo]
 )->fetchAll();
 
 $posterRows = $db->query(
@@ -990,11 +1009,11 @@ $posterRows = $db->query(
             p.waiter_name, p.table_id, p.poster_payment_method_id
      FROM {$pc} p
      LEFT JOIN {$ppm} pm ON pm.payment_method_id = p.poster_payment_method_id
-     WHERE day_date = ?
+     WHERE p.day_date BETWEEN ? AND ?
        AND pay_type IN (2,3)
        AND (payed_card + payed_third_party) > 0
      ORDER BY date_close ASC",
-    [$date]
+    [$dateFrom, $dateTo]
 )->fetchAll();
 
 $sepayTotalVnd = 0;
@@ -1007,7 +1026,7 @@ try {
          WHERE transaction_date BETWEEN ? AND ?
            AND transfer_type = 'in'
            AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))",
-        [$date . ' 00:00:00', $date . ' 23:59:59']
+        [$periodFrom, $periodTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
     $sepayTotalVnd = 0;
@@ -1017,11 +1036,11 @@ try {
         "SELECT COALESCE(SUM(p.payed_card + p.payed_third_party + p.tip_sum), 0)
          FROM {$pc} p
          LEFT JOIN {$ppm} pm ON pm.payment_method_id = p.poster_payment_method_id
-         WHERE p.day_date = ?
+         WHERE p.day_date BETWEEN ? AND ?
            AND p.pay_type IN (2,3)
            AND (p.payed_card + p.payed_third_party) > 0
            AND (pm.title IS NULL OR LOWER(pm.title) <> 'vietnam company')",
-        [$date]
+        [$dateFrom, $dateTo]
     )->fetchColumn();
     $posterTotalVnd = $posterCentsToVnd($posterTotalCents);
 } catch (\Throwable $e) {
@@ -1032,11 +1051,11 @@ try {
     $bybitCents = (int)$db->query(
         "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0)
          FROM {$pc}
-         WHERE day_date = ?
+         WHERE day_date BETWEEN ? AND ?
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
            AND poster_payment_method_id = 12",
-        [$date]
+        [$dateFrom, $dateTo]
     )->fetchColumn();
     $posterBybitVnd = $posterCentsToVnd($bybitCents);
 } catch (\Throwable $e) {
@@ -1047,11 +1066,11 @@ try {
     $vietCents = (int)$db->query(
         "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0)
          FROM {$pc}
-         WHERE day_date = ?
+         WHERE day_date BETWEEN ? AND ?
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
            AND poster_payment_method_id = 11",
-        [$date]
+        [$dateFrom, $dateTo]
     )->fetchColumn();
     $posterVietVnd = $posterCentsToVnd($vietCents);
 } catch (\Throwable $e) {
@@ -1062,8 +1081,8 @@ $links = $db->query(
     "SELECT l.poster_transaction_id, l.sepay_id, l.link_type, l.is_manual
      FROM {$pl} l
      JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-     WHERE p.day_date = ?",
-    [$date]
+     WHERE p.day_date BETWEEN ? AND ?",
+    [$dateFrom, $dateTo]
 )->fetchAll();
 
 $linkByPoster = [];
@@ -1144,7 +1163,7 @@ try {
          WHERE transaction_date BETWEEN ? AND ?
            AND transfer_type = 'in'
            AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))",
-        [$date . ' 00:00:00', $date . ' 23:59:59']
+        [$periodFrom, $periodTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
     $sepayTxCount = 0;
@@ -1155,34 +1174,42 @@ $posterTxCountError = '';
 try {
     $posterTxCount = (int)$db->query(
         "SELECT COUNT(*) AS c FROM {$pc}
-         WHERE day_date = ?
+         WHERE day_date BETWEEN ? AND ?
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0",
-        [$date]
+        [$dateFrom, $dateTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
     $posterTxCount = 0;
     $posterTxCountError = $e->getMessage();
 }
-
+$financeVietnamCents = null;
+$financeTipsCents = null;
 try {
-    $api2 = new \App\Classes\PosterAPI((string)$token);
-    $financeRows = $api2->request('finance.getTransactions', [
-        'dateFrom' => str_replace('-', '', $date),
-        'dateTo' => str_replace('-', '', $date),
-    ]);
-    if (!is_array($financeRows)) $financeRows = [];
-    foreach ($financeRows as $r) {
-        if (!is_array($r)) continue;
-        $hay = strtolower(json_encode($r, JSON_UNESCAPED_UNICODE));
-        if ($financeDisplay['vietnam'] === null && strpos($hay, 'vietnam company') !== false && strpos($hay, 'card') !== false) {
-            $financeDisplay['vietnam'] = $r;
-        }
-        if ($financeDisplay['tips'] === null && strpos($hay, 'tip') !== false && strpos($hay, 'shift') !== false) {
-            $financeDisplay['tips'] = $r;
-        }
-    }
+    $financeVietnamCents = (int)$db->query(
+        "SELECT COALESCE(SUM(payed_card + payed_third_party), 0)
+         FROM {$pc}
+         WHERE day_date BETWEEN ? AND ?
+           AND pay_type IN (2,3)
+           AND (payed_card + payed_third_party) > 0
+           AND poster_payment_method_id = 11",
+        [$dateFrom, $dateTo]
+    )->fetchColumn();
 } catch (\Throwable $e) {
+    $financeVietnamCents = null;
+}
+try {
+    $financeTipsCents = (int)$db->query(
+        "SELECT COALESCE(SUM(tip_sum), 0)
+         FROM {$pc}
+         WHERE day_date BETWEEN ? AND ?
+           AND pay_type IN (2,3)
+           AND (payed_card + payed_third_party) > 0
+           AND tip_sum > 0",
+        [$dateFrom, $dateTo]
+    )->fetchColumn();
+} catch (\Throwable $e) {
+    $financeTipsCents = null;
 }
 
 $fmtVnd = function (int $v): string {
@@ -1268,25 +1295,29 @@ $fmtVnd = function (int $v): string {
     <div class="card">
         <div class="toolbar toolbar-line" style="margin-bottom: 10px;">
             <form method="GET">
-                <input type="date" name="date" value="<?= htmlspecialchars($date) ?>" class="btn" style="padding: 8px 10px;">
+                <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px;">
+                <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px;">
                 <button class="btn" type="submit">Открыть</button>
             </form>
 
             <form method="POST" id="posterSyncForm">
                 <input type="hidden" name="action" value="load_poster_checks">
-                <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
+                <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                 <button class="btn primary" id="posterSyncBtn" type="submit">Загрузить чеки из Poster</button>
             </form>
 
             <form method="POST" id="sepaySyncForm">
                 <input type="hidden" name="action" value="reload_sepay_api">
-                <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
+                <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                 <button class="btn primary" id="sepaySyncBtn" type="submit">Обновить платежи</button>
             </form>
 
             <form method="POST" id="clearDayForm">
                 <input type="hidden" name="action" value="clear_day">
-                <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
+                <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                 <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Очистить день</button>
             </form>
         </div>
@@ -1437,10 +1468,8 @@ $fmtVnd = function (int $v): string {
             <div style="font-weight: 900; margin-bottom: 10px;">Финансовые транзакции</div>
 
             <?php
-            $vietnamCents = $financeDisplay['vietnam'] ? $moneyToInt($financeDisplay['vietnam']['sum'] ?? $financeDisplay['vietnam']['amount'] ?? 0) : null;
-            $tipsCents = $financeDisplay['tips'] ? $moneyToInt($financeDisplay['tips']['sum'] ?? $financeDisplay['tips']['amount'] ?? 0) : null;
-            $vietnamVnd = $vietnamCents !== null ? $posterCentsToVnd($vietnamCents) : null;
-            $tipsVnd = $tipsCents !== null ? $posterCentsToVnd($tipsCents) : null;
+            $vietnamVnd = $financeVietnamCents !== null ? $posterCentsToVnd((int)$financeVietnamCents) : null;
+            $tipsVnd = $financeTipsCents !== null ? $posterCentsToVnd((int)$financeTipsCents) : null;
             ?>
 
             <div class="finance-row">
@@ -1709,7 +1738,7 @@ $fmtVnd = function (int $v): string {
     };
 
     const refreshLinks = () => {
-        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'links'])) ?>;
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'links'])) ?>;
         return fetch(url)
             .then((r) => r.json())
             .then((j) => {
@@ -1731,7 +1760,7 @@ $fmtVnd = function (int $v): string {
     };
 
     const unlink = (sepayId, posterId) => {
-        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'unlink'])) ?>;
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'unlink'])) ?>;
         return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1937,7 +1966,7 @@ $fmtVnd = function (int $v): string {
     setupSort(posterTable);
 
     const sendManualLinks = (sepayIds, posterIds) => {
-        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'manual_link'])) ?>;
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'manual_link'])) ?>;
         return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1951,7 +1980,7 @@ $fmtVnd = function (int $v): string {
     };
 
     const sendAutoLinks = () => {
-        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'auto_link'])) ?>;
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'auto_link'])) ?>;
         return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1965,7 +1994,7 @@ $fmtVnd = function (int $v): string {
     };
 
     const sendClearLinks = () => {
-        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'clear_links'])) ?>;
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'clear_links'])) ?>;
         return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
