@@ -1465,6 +1465,21 @@ $fmtVnd = function (int $v): string {
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
         th { background: #f8f9fa; color: #65676b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+        #sepayTable th, #sepayTable td,
+        #posterTable th, #posterTable td { padding: 6px 8px; vertical-align: middle; }
+        #sepayTable td, #posterTable td { font-size: 13px; line-height: 1.2; }
+        #sepayTable .col-sepay-cb, #sepayTable .col-sepay-dot { width: 1%; padding-left: 6px; padding-right: 6px; text-align: center; }
+        #sepayTable .col-sepay-dot { padding-left: 4px; padding-right: 4px; }
+        #sepayTable .col-sepay-content { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+        #posterTable td:first-child, #posterTable th:first-child { width: 1%; padding-left: 6px; padding-right: 6px; }
+        #posterTable .cell-anchor { gap: 6px; }
+        #posterTable .cell-anchor input[type="checkbox"] { width: 14px; height: 14px; }
+        #posterTable .col-poster-method,
+        #posterTable .col-poster-waiter { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+        @media (max-width: 1050px) {
+            #sepayTable td, #posterTable td { font-size: 12px; }
+            #sepayTable th, #posterTable th { font-size: 11px; }
+        }
         tr.row-green { background: rgba(46, 125, 50, 0.08); }
         tr.row-yellow { background: rgba(255, 193, 7, 0.16); }
         tr.row-red { background: rgba(211, 47, 47, 0.08); }
