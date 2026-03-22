@@ -174,6 +174,8 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
 
 if ($isAjax) {
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
     try {
         $logger = new \App\Classes\EventLogger($db, 'kitchen_online', null, $_SESSION['user_email'] ?? null);
         $api = $api ?? new \App\Classes\PosterAPI($token);
@@ -192,6 +194,28 @@ if ($isAjax) {
                     [$now]
                 );
                 $lastSyncLabel = date('d.m.Y H:i:s', strtotime($now));
+            } catch (\Throwable $e) {
+            }
+        }
+        if ($action === 'refresh') {
+            try {
+                $metaRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = 'poster_last_sync_at' LIMIT 1")->fetch();
+                $last = !empty($metaRow['meta_value']) ? strtotime((string)$metaRow['meta_value']) : 0;
+                if ($last <= 0 || (time() - $last) >= 15) {
+                    $analytics = new \App\Classes\KitchenAnalytics($api);
+                    $stats = $analytics->getDailyStats($today);
+                    if (is_array($stats) && count($stats) > 0) {
+                        $db->saveStats($stats);
+                    }
+                    $now = date('Y-m-d H:i:s');
+                    $db->query(
+                        "INSERT INTO {$metaTable} (meta_key, meta_value)
+                         VALUES ('poster_last_sync_at', ?)
+                         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                        [$now]
+                    );
+                    $lastSyncLabel = date('d.m.Y H:i:s', strtotime($now));
+                }
             } catch (\Throwable $e) {
             }
         }
@@ -648,31 +672,55 @@ $dashboardQuery = http_build_query([
             }
         };
 
-        const loadCards = async (action = 'list') => {
-            if (loading) return;
+        let reqSeq = 0;
+        let activeCtrl = null;
+        const request = async (method, action, payload) => {
+            reqSeq += 1;
+            const mySeq = reqSeq;
+            if (activeCtrl) {
+                try { activeCtrl.abort(); } catch (_) {}
+            }
+            activeCtrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
             loading = true;
             try {
                 const params = new URLSearchParams();
                 params.set('ajax', '1');
                 params.set('action', action);
                 params.set('station', stationEl.value);
-                const res = await fetch(`kitchen_online.php?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                params.set('_ts', String(Date.now()));
+                const init = {
+                    method,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    cache: 'no-store',
+                    signal: activeCtrl ? activeCtrl.signal : undefined,
+                    body: payload
+                };
+                const res = await fetch(`kitchen_online.php?${params.toString()}`, init);
                 const data = await res.json();
-                if (!data || !data.ok) throw new Error('bad');
-                cardsEl.innerHTML = data.html || '';
-                emptyEl.style.display = (cardsEl.children.length === 0) ? 'block' : 'none';
-                if (data.last_sync) lastSyncEl.textContent = data.last_sync;
-                if (typeof data.wait_limit_minutes === 'number') waitLimitSec = data.wait_limit_minutes * 60;
-                updateLive();
-                detectNewItems();
+                if (mySeq !== reqSeq) return null;
+                return data;
             } catch (e) {
+                if (e && e.name === 'AbortError') return null;
+                return null;
             } finally {
-                loading = false;
+                if (mySeq === reqSeq) {
+                    loading = false;
+                }
             }
         };
 
+        const loadCards = async (action = 'list') => {
+            const data = await request('GET', action, undefined);
+            if (!data || !data.ok) return;
+            cardsEl.innerHTML = data.html || '';
+            emptyEl.style.display = (cardsEl.children.length === 0) ? 'block' : 'none';
+            if (data.last_sync) lastSyncEl.textContent = data.last_sync;
+            if (typeof data.wait_limit_minutes === 'number') waitLimitSec = data.wait_limit_minutes * 60;
+            updateLive();
+            detectNewItems();
+        };
+
         const refreshVisible = async () => {
-            if (loading) return;
             const txIds = Array.from(cardsEl.querySelectorAll('.ko-card'))
                 .map(el => parseInt(el.dataset.txId || '0', 10))
                 .filter(n => n > 0);
@@ -680,30 +728,22 @@ $dashboardQuery = http_build_query([
                 await loadCards('list');
                 return;
             }
-            loading = true;
-            try {
-                const params = new URLSearchParams();
-                params.set('ajax', '1');
-                params.set('action', 'refresh');
-                params.set('station', stationEl.value);
-                const payload = new FormData();
-                for (const id of txIds) payload.append('tx_ids[]', String(id));
-                const res = await fetch(`kitchen_online.php?${params.toString()}`, { method: 'POST', body: payload, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-                const data = await res.json();
-                if (!data || !data.ok) throw new Error('bad');
-                cardsEl.innerHTML = data.html || '';
-                emptyEl.style.display = (cardsEl.children.length === 0) ? 'block' : 'none';
-                if (data.last_sync) lastSyncEl.textContent = data.last_sync;
-                if (typeof data.wait_limit_minutes === 'number') waitLimitSec = data.wait_limit_minutes * 60;
-                updateLive();
-                detectNewItems();
-            } catch (e) {
-            } finally {
-                loading = false;
-            }
+            const payload = new FormData();
+            for (const id of txIds) payload.append('tx_ids[]', String(id));
+            const data = await request('POST', 'refresh', payload);
+            if (!data || !data.ok) return;
+            cardsEl.innerHTML = data.html || '';
+            emptyEl.style.display = (cardsEl.children.length === 0) ? 'block' : 'none';
+            if (data.last_sync) lastSyncEl.textContent = data.last_sync;
+            if (typeof data.wait_limit_minutes === 'number') waitLimitSec = data.wait_limit_minutes * 60;
+            updateLive();
+            detectNewItems();
         };
 
-        stationEl.addEventListener('change', () => loadCards('list'));
+        stationEl.addEventListener('change', () => {
+            refreshCycleStartedAt = Date.now();
+            loadCards('list');
+        });
         loadMuted();
         renderSoundIcon();
         if (soundBtn) {
