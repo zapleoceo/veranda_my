@@ -1,0 +1,7 @@
+DirectorySlash Off
+
+RewriteEngine On
+
+RewriteRule ^sepay$ /sepay/index.php [L]
+RewriteRule ^payday$ /payday/index.php [L]
+
