@@ -1234,21 +1234,43 @@ if (($_GET['ajax'] ?? '') === 'scan_card_types') {
         $notFound = 0;
         $items = [];
 
+        $normalizeHist = function ($hist): array {
+            if (!is_array($hist)) return [];
+            if (isset($hist['history']) && is_array($hist['history'])) return $hist['history'];
+            if (isset($hist['response']) && is_array($hist['response'])) return $hist['response'];
+            return $hist;
+        };
+        $normalizeTx = function ($v): ?array {
+            if (!is_array($v)) return null;
+            if (isset($v[0]) && is_array($v[0])) return $v[0];
+            return $v;
+        };
+
         foreach ($targets as $t) {
             $txId = (int)($t['transaction_id'] ?? 0);
             if ($txId <= 0) continue;
             $hist = null;
+            $detail = null;
             try {
                 $hist = $api->request('dash.getTransactionHistory', ['transaction_id' => $txId]);
             } catch (\Throwable $e) {
                 $hist = null;
             }
+            try {
+                $detail = $normalizeTx($api->getTransaction($txId));
+            } catch (\Throwable $e) {
+                $detail = null;
+            }
+            $hist = $normalizeHist($hist);
             $tx = [
                 'transaction_id' => $txId,
                 'history' => $hist,
                 'payment_method' => $t['payment_method'] ?? null,
                 'card_type' => $t['card_type'] ?? null,
             ];
+            if (is_array($detail)) {
+                $tx = array_merge($tx, $detail);
+            }
             $cardType = $extractCardType($tx);
             $paymentMethod = $extractPaymentMethod($tx) ?? $cardType;
 
@@ -1530,10 +1552,13 @@ $fmtVnd = function (int $v): string {
         .cell-anchor { display:flex; align-items:center; gap: 8px; }
         .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
         .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding-top: 16px; }
-        .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; }
+        .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; position: relative; overflow: hidden; }
         .mid-btn.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
         .mid-btn.active { background: #111827; border-color: #111827; color: #fff; }
         .mid-btn:disabled { opacity: 0.5; cursor: default; }
+        .mid-btn.loading::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: 6px; height: 3px; border-radius: 999px; background: rgba(17, 24, 39, 0.12); }
+        .mid-btn.loading::before { content: ''; position: absolute; left: 8px; bottom: 6px; height: 3px; width: 18px; border-radius: 999px; background: #1a73e8; animation: scanbar 900ms ease-in-out infinite alternate; }
+        @keyframes scanbar { from { transform: translateX(0); } to { transform: translateX(18px); } }
         .mid-check { display:flex; gap: 8px; align-items:center; font-weight: 800; font-size: 12px; color: #374151; user-select: none; }
     </style>
 </head>
@@ -2393,7 +2418,14 @@ $fmtVnd = function (int $v): string {
     if (scanCardTypesBtn) {
         scanCardTypesBtn.addEventListener('click', () => {
             if (!confirm('Проверить типы карт по чекам Poster без типа карты?')) return;
-            scanCardTypes().catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+            scanCardTypesBtn.disabled = true;
+            scanCardTypesBtn.classList.add('loading');
+            scanCardTypes()
+                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
+                .finally(() => {
+                    scanCardTypesBtn.classList.remove('loading');
+                    scanCardTypesBtn.disabled = false;
+                });
         });
     }
     if (linkClearBtn) {
