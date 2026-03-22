@@ -1216,7 +1216,7 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_plan') {
             'ok' => true,
             'nonce' => $nonce,
             'plan' => [
-                'id' => 0,
+                'id' => 1,
                 'type' => $type,
                 'category' => 4,
                 'user_id' => 4,
@@ -1299,7 +1299,7 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
         }
 
         $res = $api3->request('finance.createTransactions', [
-            'id' => 0,
+            'id' => 1,
             'type' => $type,
             'category' => 4,
             'user_id' => 4,
