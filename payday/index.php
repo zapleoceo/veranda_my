@@ -54,6 +54,15 @@ $posterCentsToVnd = function (int $cents): int {
     return (int)round($cents / 100);
 };
 
+$fmtVndCents = function (int $cents): string {
+    $neg = $cents < 0;
+    $abs = $neg ? -$cents : $cents;
+    $int = (int)floor($abs / 100);
+    $frac = (int)($abs % 100);
+    $intFmt = number_format($int, 0, '.', ' ');
+    return ($neg ? '-' : '') . $intFmt . '.' . str_pad((string)$frac, 2, '0', STR_PAD_LEFT) . ' ₫';
+};
+
 $parsePosterDateTime = function ($tx): ?string {
     $ts = null;
     if (is_array($tx)) {
@@ -1027,10 +1036,88 @@ if (($_GET['ajax'] ?? '') === 'links') {
             "SELECT l.poster_transaction_id, l.sepay_id, l.link_type, l.is_manual
              FROM {$pl} l
              JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-             WHERE p.day_date = ?",
-            [$date]
+             WHERE p.day_date BETWEEN ? AND ?",
+            [$dateFrom, $dateTo]
         )->fetchAll();
         echo json_encode(['ok' => true, 'links' => $rows], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'poster_accounts') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $api2 = new \App\Classes\PosterAPI((string)$token);
+        $rows = $api2->request('finance.getAccounts', []);
+        if (!is_array($rows)) $rows = [];
+
+        try { $db->query("DELETE FROM {$pa}"); } catch (\Throwable $e) {}
+
+        $accounts = [];
+        $byId = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $accountId = (int)($r['account_id'] ?? $r['accountId'] ?? 0);
+            $name = trim((string)($r['name'] ?? ''));
+            if ($accountId <= 0 || $name === '') continue;
+            $balance = $moneyToInt($r['balance'] ?? 0);
+            $db->query(
+                "INSERT INTO {$pa} (account_id, name, type, currency_id, currency_symbol, currency_code_iso, currency_code, balance, balance_start, percent_acquiring)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                    name = VALUES(name),
+                    type = VALUES(type),
+                    currency_id = VALUES(currency_id),
+                    currency_symbol = VALUES(currency_symbol),
+                    currency_code_iso = VALUES(currency_code_iso),
+                    currency_code = VALUES(currency_code),
+                    balance = VALUES(balance),
+                    balance_start = VALUES(balance_start),
+                    percent_acquiring = VALUES(percent_acquiring)",
+                [
+                    $accountId,
+                    $name,
+                    (int)($r['type'] ?? 0),
+                    isset($r['currency_id']) ? (int)$r['currency_id'] : null,
+                    isset($r['currency_symbol']) ? (string)$r['currency_symbol'] : null,
+                    isset($r['currency_code_iso']) ? (string)$r['currency_code_iso'] : null,
+                    isset($r['currency_code']) ? (string)$r['currency_code'] : null,
+                    $balance,
+                    isset($r['balance_start']) ? $moneyToInt($r['balance_start']) : null,
+                    isset($r['percent_acquiring']) ? (float)$r['percent_acquiring'] : null,
+                ]
+            );
+            $accounts[] = [
+                'account_id' => $accountId,
+                'name' => $name,
+                'balance_cents' => $balance,
+                'balance' => $fmtVndCents($balance),
+            ];
+            $byId[$accountId] = $balance;
+        }
+
+        $andrey = (int)($byId[1] ?? 0) + (int)($byId[8] ?? 0);
+        $vietnam = (int)($byId[9] ?? 0);
+        $cash = (int)($byId[2] ?? 0);
+        $total = 0;
+        foreach ($byId as $b) $total += (int)$b;
+
+        echo json_encode([
+            'ok' => true,
+            'accounts' => $accounts,
+            'balance_andrey' => $fmtVndCents($andrey),
+            'balance_vietnam' => $fmtVndCents($vietnam),
+            'balance_cash' => $fmtVndCents($cash),
+            'balance_total' => $fmtVndCents($total),
+        ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -1257,6 +1344,50 @@ try {
     $financeTipsCents = null;
 }
 
+$transferVietnamExists = false;
+$transferTipsExists = false;
+try {
+    $vietnamAmountVnd = $financeVietnamCents !== null ? (int)$posterCentsToVnd((int)$financeVietnamCents) : 0;
+    $tipsAmountVnd = $financeTipsCents !== null ? (int)$posterCentsToVnd((int)$financeTipsCents) : 0;
+    $targetTs = strtotime($dateTo . ' 23:55:00');
+    if ($targetTs !== false) {
+        $apiFinance = new \App\Classes\PosterAPI((string)$token);
+        $rows = $apiFinance->request('finance.getTransactions', [
+            'dateFrom' => str_replace('-', '', $dateTo),
+            'dateTo' => str_replace('-', '', $dateTo),
+        ]);
+        if (!is_array($rows)) $rows = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            if ((int)($r['type'] ?? 0) !== 2) continue;
+            $accTo = (int)($r['account_to'] ?? $r['account_to_id'] ?? $r['accountTo'] ?? $r['accountToId'] ?? 0);
+            $sum = (int)($r['amount_from'] ?? $r['amountFrom'] ?? $r['sum'] ?? $r['amount'] ?? 0);
+            $cmt = strtolower((string)($r['comment'] ?? $r['description'] ?? ''));
+
+            $dRaw = $r['date'] ?? $r['created_at'] ?? $r['time'] ?? null;
+            $ts = null;
+            if (is_numeric($dRaw)) {
+                $n = (int)$dRaw;
+                if ($n > 2000000000000) $n = (int)round($n / 1000);
+                if ($n > 0) $ts = $n;
+            } elseif (is_string($dRaw) && trim($dRaw) !== '') {
+                $t = strtotime($dRaw);
+                if ($t !== false && $t > 0) $ts = $t;
+            }
+            if ($ts === null) continue;
+            if (abs($ts - $targetTs) > 15 * 60) continue;
+
+            if (!$transferVietnamExists && $accTo === 9 && $vietnamAmountVnd > 0 && $sum === $vietnamAmountVnd && strpos($cmt, 'перевод чеков') !== false) {
+                $transferVietnamExists = true;
+            }
+            if (!$transferTipsExists && $accTo === 8 && $tipsAmountVnd > 0 && $sum === $tipsAmountVnd && strpos($cmt, 'перевод типсов') !== false) {
+                $transferTipsExists = true;
+            }
+        }
+    }
+} catch (\Throwable $e) {
+}
+
 $posterAccounts = [];
 $posterAccountsById = [];
 try {
@@ -1277,6 +1408,7 @@ try {
 $posterBalanceAndrey = null;
 $posterBalanceVietnam = null;
 $posterBalanceCash = null;
+$posterBalanceTotal = null;
 if (isset($posterAccountsById[1]) || isset($posterAccountsById[8])) {
     $posterBalanceAndrey = (int)($posterAccountsById[1]['balance'] ?? 0) + (int)($posterAccountsById[8]['balance'] ?? 0);
 }
@@ -1285,6 +1417,13 @@ if (isset($posterAccountsById[9])) {
 }
 if (isset($posterAccountsById[2])) {
     $posterBalanceCash = (int)($posterAccountsById[2]['balance'] ?? 0);
+}
+if (count($posterAccountsById) > 0) {
+    $sum = 0;
+    foreach ($posterAccountsById as $r) {
+        $sum += (int)($r['balance'] ?? 0);
+    }
+    $posterBalanceTotal = $sum;
 }
 
 $fmtVnd = function (int $v): string {
@@ -1565,8 +1704,8 @@ $fmtVnd = function (int $v): string {
             $tipsCents = $financeTipsCents;
             $vietnamVnd = $vietnamCents !== null ? $posterCentsToVnd((int)$vietnamCents) : null;
             $tipsVnd = $tipsCents !== null ? $posterCentsToVnd((int)$tipsCents) : null;
-            $vietnamDisabled = $vietnamCents === null || (int)$vietnamCents <= 0;
-            $tipsDisabled = $tipsCents === null || (int)$tipsCents <= 0;
+            $vietnamDisabled = $transferVietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
+            $tipsDisabled = $transferTipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             $vietnamDisabledReason = $vietnamCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за период.';
@@ -1586,7 +1725,7 @@ $fmtVnd = function (int $v): string {
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                     <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать перевод</button>
-                    <?php if ($vietnamDisabled): ?><div class="muted"><?= htmlspecialchars($vietnamDisabledReason) ?></div><?php endif; ?>
+                    <?php if ($transferVietnamExists): ?><div class="muted" style="color:#16a34a; font-weight:900;">Перевод уже создан</div><?php elseif ($vietnamDisabled): ?><div class="muted"><?= htmlspecialchars($vietnamDisabledReason) ?></div><?php endif; ?>
                 </form>
             </div>
 
@@ -1601,7 +1740,7 @@ $fmtVnd = function (int $v): string {
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                     <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать перевод</button>
-                    <?php if ($tipsDisabled): ?><div class="muted"><?= htmlspecialchars($tipsDisabledReason) ?></div><?php endif; ?>
+                    <?php if ($transferTipsExists): ?><div class="muted" style="color:#16a34a; font-weight:900;">Перевод уже создан</div><?php elseif ($tipsDisabled): ?><div class="muted"><?= htmlspecialchars($tipsDisabledReason) ?></div><?php endif; ?>
                 </form>
             </div>
         </div>
@@ -1611,16 +1750,14 @@ $fmtVnd = function (int $v): string {
         <div class="card" style="background:#fbfbfd;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; margin-bottom: 10px;">
                 <div style="font-weight: 900;">Обновляем Балансы Poster</div>
-                <form method="POST" id="posterAccountsForm" style="margin:0;">
-                    <input type="hidden" name="action" value="load_poster_accounts">
-                    <button class="btn" id="posterAccountsBtn" type="submit" title="Обновить балансы">🔄</button>
-                </form>
+                <button class="btn" id="posterAccountsBtn" type="button" title="Обновить балансы">🔄</button>
             </div>
 
-            <div class="muted" style="font-weight: 900; margin-bottom: 10px;">
-                Баланс Счета Андрей = <?= $posterBalanceAndrey !== null ? htmlspecialchars($fmtVnd((int)$posterBalanceAndrey)) : '—' ?><br>
-                Баланс вьетнамской компании = <?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVnd((int)$posterBalanceVietnam)) : '—' ?><br>
-                Баланс кассы = <?= $posterBalanceCash !== null ? htmlspecialchars($fmtVnd((int)$posterBalanceCash)) : '—' ?>
+            <div class="muted" style="font-weight: 900; margin-bottom: 10px; display:inline-block; width: fit-content; white-space: nowrap;">
+                Баланс Счета Андрей = <span id="balAndrey"><?= $posterBalanceAndrey !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceAndrey)) : '—' ?></span><br>
+                Баланс вьетнамской компании = <span id="balVietnam"><?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceVietnam)) : '—' ?></span><br>
+                Баланс кассы = <span id="balCash"><?= $posterBalanceCash !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceCash)) : '—' ?></span><br>
+                Total = <span id="balTotal"><?= $posterBalanceTotal !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceTotal)) : '—' ?></span>
             </div>
 
             <div style="max-height: 260px; overflow:auto; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff;">
@@ -1632,7 +1769,7 @@ $fmtVnd = function (int $v): string {
                         <th style="text-align:right; padding: 8px 10px; font-weight: 900;">Баланс</th>
                     </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="posterAccountsTbody">
                     <?php foreach ($posterAccounts as $a): ?>
                         <?php
                         $aid = (int)($a['account_id'] ?? 0);
@@ -1642,7 +1779,7 @@ $fmtVnd = function (int $v): string {
                         <tr>
                             <td style="padding: 8px 10px;"><?= htmlspecialchars((string)$aid) ?></td>
                             <td style="padding: 8px 10px;"><?= htmlspecialchars($an) ?></td>
-                            <td style="padding: 8px 10px; text-align:right;"><?= htmlspecialchars($fmtVnd($bal)) ?></td>
+                            <td style="padding: 8px 10px; text-align:right;"><?= htmlspecialchars($fmtVndCents($bal)) ?></td>
                         </tr>
                     <?php endforeach; ?>
                     <?php if (count($posterAccounts) === 0): ?>
@@ -1666,6 +1803,13 @@ $fmtVnd = function (int $v): string {
         ];
     }, $links)), JSON_UNESCAPED_UNICODE) ?>;
 
+    const escapeHtml = (s) => String(s)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+
     const setFormLoading = (formId, btnId) => {
         const form = document.getElementById(formId);
         const btn = document.getElementById(btnId);
@@ -1678,7 +1822,61 @@ $fmtVnd = function (int $v): string {
     setFormLoading('posterSyncForm', 'posterSyncBtn');
     setFormLoading('sepaySyncForm', 'sepaySyncBtn');
     setFormLoading('clearDayForm', 'clearDayBtn');
-    setFormLoading('posterAccountsForm', 'posterAccountsBtn');
+
+    const posterAccountsBtn = document.getElementById('posterAccountsBtn');
+    const posterAccountsTbody = document.getElementById('posterAccountsTbody');
+    const balAndreyEl = document.getElementById('balAndrey');
+    const balVietnamEl = document.getElementById('balVietnam');
+    const balCashEl = document.getElementById('balCash');
+    const balTotalEl = document.getElementById('balTotal');
+
+    const refreshPosterAccounts = () => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'poster_accounts'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            if (balAndreyEl) balAndreyEl.textContent = String(j.balance_andrey || '—');
+            if (balVietnamEl) balVietnamEl.textContent = String(j.balance_vietnam || '—');
+            if (balCashEl) balCashEl.textContent = String(j.balance_cash || '—');
+            if (balTotalEl) balTotalEl.textContent = String(j.balance_total || '—');
+
+            if (posterAccountsTbody) {
+                const rows = Array.isArray(j.accounts) ? j.accounts : [];
+                if (rows.length === 0) {
+                    posterAccountsTbody.innerHTML = '<tr><td colspan="3" style="padding: 10px; color:#6b7280; font-weight:900;">Нет данных</td></tr>';
+                } else {
+                    posterAccountsTbody.innerHTML = rows.map((a) => {
+                        const id = Number(a.account_id || 0);
+                        const name = String(a.name || '');
+                        const bal = String(a.balance || '0 ₫');
+                        return `<tr>
+                            <td style="padding: 8px 10px;">${String(id)}</td>
+                            <td style="padding: 8px 10px;">${escapeHtml(name)}</td>
+                            <td style="padding: 8px 10px; text-align:right;">${escapeHtml(bal)}</td>
+                        </tr>`;
+                    }).join('');
+                }
+            }
+        });
+    };
+
+    if (posterAccountsBtn) {
+        posterAccountsBtn.addEventListener('click', () => {
+            posterAccountsBtn.classList.add('loading');
+            posterAccountsBtn.disabled = true;
+            refreshPosterAccounts()
+                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
+                .finally(() => {
+                    posterAccountsBtn.classList.remove('loading');
+                    posterAccountsBtn.disabled = false;
+                });
+        });
+    }
 
     const widgets = new Map();
     const svgState = { svg: null, defs: null, group: null, markers: new Map() };
