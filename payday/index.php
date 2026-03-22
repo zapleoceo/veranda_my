@@ -386,11 +386,11 @@ try {
         $dayAllCount = 0;
         try {
             $dayCount = (int)$db->query(
-                "SELECT COUNT(*) FROM {$pc} WHERE DATE(date_close) = ? AND pay_type IN (2,3) AND (payed_card + payed_third_party) > 0",
+                "SELECT COUNT(*) FROM {$pc} WHERE day_date = ? AND pay_type IN (2,3) AND (payed_card + payed_third_party) > 0",
                 [$date]
             )->fetchColumn();
             $dayAllCount = (int)$db->query(
-                "SELECT COUNT(*) FROM {$pc} WHERE DATE(date_close) = ?",
+                "SELECT COUNT(*) FROM {$pc} WHERE day_date = ?",
                 [$date]
             )->fetchColumn();
         } catch (\Throwable $e) {
@@ -415,7 +415,9 @@ try {
             $deleted = (int)$db->query("DELETE FROM {$st}")->rowCount();
             $message = 'SePay очищен: удалено строк = ' . $deleted;
         } else {
-            $deleted = (int)$db->query("DELETE FROM {$st} WHERE DATE(transaction_date) = ?", [$date])->rowCount();
+            $from = $date . ' 00:00:00';
+            $to = $date . ' 23:59:59';
+            $deleted = (int)$db->query("DELETE FROM {$st} WHERE transaction_date BETWEEN ? AND ?", [$from, $to])->rowCount();
             $message = 'SePay очищен за ' . $date . ': удалено строк = ' . $deleted;
         }
     }
@@ -427,7 +429,9 @@ try {
 
         $txs = $sepayFetchTransactions($date, $sepayApiToken, $sepayAccountNumber);
 
-        $db->query("DELETE FROM {$st} WHERE DATE(transaction_date) = ?", [$date]);
+        $from = $date . ' 00:00:00';
+        $to = $date . ' 23:59:59';
+        $db->query("DELETE FROM {$st} WHERE transaction_date BETWEEN ? AND ?", [$from, $to]);
 
         $inserted = 0;
         $updated = 0;
@@ -543,31 +547,19 @@ try {
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'auto_link') {
-        $preserveManual = !empty($_POST['preserve_manual']);
-
-        if ($preserveManual) {
-            $db->query(
-                "DELETE l FROM {$pl} l
-                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE DATE(p.date_close) = ?
-                   AND l.is_manual = 0
-                   AND l.link_type IN ('auto_green','auto_yellow')",
-                [$date]
-            );
-        } else {
-            $db->query(
-                "DELETE l FROM {$pl} l
-                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE DATE(p.date_close) = ?
-                   AND l.link_type IN ('auto_green','auto_yellow','manual')",
-                [$date]
-            );
-        }
+        $from = $date . ' 00:00:00';
+        $to = $date . ' 23:59:59';
+        $db->query(
+            "DELETE l FROM {$pl} l
+             JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+             WHERE p.day_date = ?",
+            [$date]
+        );
 
         $checks = $db->query(
-            "SELECT transaction_id, date_close, payed_card, tip_sum, payment_method
+            "SELECT transaction_id, date_close, payed_card, payed_third_party, tip_sum, payment_method
              FROM {$pc}
-             WHERE DATE(date_close) = ?
+             WHERE day_date = ?
                AND pay_type IN (2,3)
                AND (payed_card + payed_third_party) > 0
              ORDER BY date_close ASC",
@@ -577,29 +569,15 @@ try {
         $sepay = $db->query(
             "SELECT sepay_id, transaction_date, transfer_amount
              FROM {$st}
-             WHERE DATE(transaction_date) = ?
+             WHERE transaction_date BETWEEN ? AND ?
                AND transfer_type = 'in'
                AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))
              ORDER BY transaction_date ASC",
-            [$date]
+            [$from, $to]
         )->fetchAll();
 
         $linkedSepay = [];
         $linkedPoster = [];
-        if ($preserveManual) {
-            $manual = $db->query(
-                "SELECT l.poster_transaction_id, l.sepay_id
-                 FROM {$pl} l
-                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE DATE(p.date_close) = ?
-                   AND l.is_manual = 1",
-                [$date]
-            )->fetchAll();
-            foreach ($manual as $m) {
-                $linkedPoster[(int)$m['poster_transaction_id']] = true;
-                $linkedSepay[(int)$m['sepay_id']] = true;
-            }
-        }
 
         $sepayByAmount = [];
         foreach ($sepay as $s) {
@@ -667,7 +645,7 @@ try {
             "SELECT l.poster_transaction_id, l.sepay_id
              FROM {$pl} l
              JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-             WHERE DATE(p.date_close) = ?
+             WHERE p.day_date = ?
                AND l.link_type = 'auto_green'",
             [$date]
         )->fetchAll();
@@ -889,67 +867,35 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
         exit;
     }
     try {
-        try {
-            $idxRows = $db->query("SHOW INDEX FROM {$pl}")->fetchAll();
-            $indexCols = [];
-            foreach ($idxRows as $i) {
-                if (!is_array($i)) continue;
-                $name = (string)($i['Key_name'] ?? '');
-                if ($name === '') continue;
-                $nonUnique = (int)($i['Non_unique'] ?? 1);
-                $col = (string)($i['Column_name'] ?? '');
-                $seq = (int)($i['Seq_in_index'] ?? 0);
-                if ($seq <= 0 || $col === '') continue;
-                if (!isset($indexCols[$name])) $indexCols[$name] = ['non_unique' => $nonUnique, 'cols' => []];
-                $indexCols[$name]['non_unique'] = $nonUnique;
-                $indexCols[$name]['cols'][$seq] = $col;
-            }
-            $have = array_keys($indexCols);
-            if (!in_array('idx_link_sepay', $have, true)) {
-                $db->query("ALTER TABLE {$pl} ADD INDEX idx_link_sepay (sepay_id)");
-            }
-            if (!in_array('idx_link_poster', $have, true)) {
-                $db->query("ALTER TABLE {$pl} ADD INDEX idx_link_poster (poster_transaction_id)");
-            }
-            if (!in_array('uq_link_pair', $have, true)) {
-                $db->query("ALTER TABLE {$pl} ADD UNIQUE KEY uq_link_pair (poster_transaction_id, sepay_id)");
-            }
-            foreach ($indexCols as $name => $meta) {
-                if ($name === 'PRIMARY') continue;
-                if ($name === 'uq_link_pair') continue;
-                $nonUnique = (int)($meta['non_unique'] ?? 1);
-                if ($nonUnique !== 0) continue;
-                $cols = $meta['cols'] ?? [];
-                ksort($cols);
-                $cols = array_values($cols);
-                if ($cols === ['sepay_id'] || $cols === ['poster_transaction_id']) {
-                    $db->query("ALTER TABLE {$pl} DROP INDEX `{$name}`");
-                }
-            }
-        } catch (\Throwable $e) {
-        }
-
         if (count($sepayIds) === 1) {
             $sid = (int)$sepayIds[0];
-            foreach ($posterIds as $pid) {
-                $other = (int)$db->query(
-                    "SELECT 1 FROM {$pl} WHERE poster_transaction_id = ? AND sepay_id <> ? LIMIT 1",
-                    [(int)$pid, $sid]
-                )->fetchColumn();
-                if ($other === 1) {
-                    throw new \Exception('Чек уже привязан к другому платежу (получится много-ко-много).');
-                }
+            $placeholders = implode(',', array_fill(0, count($posterIds), '?'));
+            $params = array_merge(array_map(fn($v) => (int)$v, $posterIds), [$sid]);
+            $other = (int)$db->query(
+                "SELECT 1
+                 FROM {$pl}
+                 WHERE poster_transaction_id IN ({$placeholders})
+                   AND sepay_id <> ?
+                 LIMIT 1",
+                $params
+            )->fetchColumn();
+            if ($other === 1) {
+                throw new \Exception('Чек уже привязан к другому платежу (получится много-ко-много).');
             }
         } elseif (count($posterIds) === 1) {
             $pid = (int)$posterIds[0];
-            foreach ($sepayIds as $sid) {
-                $other = (int)$db->query(
-                    "SELECT 1 FROM {$pl} WHERE sepay_id = ? AND poster_transaction_id <> ? LIMIT 1",
-                    [(int)$sid, $pid]
-                )->fetchColumn();
-                if ($other === 1) {
-                    throw new \Exception('Платеж уже привязан к другому чеку (получится много-ко-много).');
-                }
+            $placeholders = implode(',', array_fill(0, count($sepayIds), '?'));
+            $params = array_merge(array_map(fn($v) => (int)$v, $sepayIds), [$pid]);
+            $other = (int)$db->query(
+                "SELECT 1
+                 FROM {$pl}
+                 WHERE sepay_id IN ({$placeholders})
+                   AND poster_transaction_id <> ?
+                 LIMIT 1",
+                $params
+            )->fetchColumn();
+            if ($other === 1) {
+                throw new \Exception('Платеж уже привязан к другому чеку (получится много-ко-много).');
             }
         }
 
@@ -988,14 +934,14 @@ if (($_GET['ajax'] ?? '') === 'clear_links') {
             $db->query(
                 "DELETE l FROM {$pl} l
                  JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE DATE(p.date_close) = ?",
+                 WHERE p.day_date = ?",
                 [$date]
             );
         } else {
             $db->query(
                 "DELETE l FROM {$pl} l
                  JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE DATE(p.date_close) = ?
+                 WHERE p.day_date = ?
                    AND l.is_manual = 0",
                 [$date]
             );
@@ -1015,33 +961,21 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
-    if (!is_array($payload)) $payload = [];
-    $preserveManual = !empty($payload['preserve_manual']);
     try {
-        if ($preserveManual) {
-            $db->query(
-                "DELETE l FROM {$pl} l
-                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE DATE(p.date_close) = ?
-                   AND l.is_manual = 0
-                   AND l.link_type IN ('auto_green','auto_yellow')",
-                [$date]
-            );
-        } else {
-            $db->query(
-                "DELETE l FROM {$pl} l
-                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE DATE(p.date_close) = ?
-                   AND l.link_type IN ('auto_green','auto_yellow','manual')",
-                [$date]
-            );
-        }
+        $from = $date . ' 00:00:00';
+        $to = $date . ' 23:59:59';
+
+        $db->query(
+            "DELETE l FROM {$pl} l
+             JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+             WHERE p.day_date = ?",
+            [$date]
+        );
 
         $checks = $db->query(
             "SELECT transaction_id, date_close, payed_card, payed_third_party, tip_sum, payment_method
              FROM {$pc}
-             WHERE DATE(date_close) = ?
+             WHERE day_date = ?
                AND pay_type IN (2,3)
                AND (payed_card + payed_third_party) > 0
              ORDER BY date_close ASC",
@@ -1051,29 +985,15 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
         $sepay = $db->query(
             "SELECT sepay_id, transaction_date, transfer_amount
              FROM {$st}
-             WHERE DATE(transaction_date) = ?
+             WHERE transaction_date BETWEEN ? AND ?
                AND transfer_type = 'in'
                AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))
              ORDER BY transaction_date ASC",
-            [$date]
+            [$from, $to]
         )->fetchAll();
 
         $linkedSepay = [];
         $linkedPoster = [];
-        if ($preserveManual) {
-            $manual = $db->query(
-                "SELECT l.poster_transaction_id, l.sepay_id
-                 FROM {$pl} l
-                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE DATE(p.date_close) = ?
-                   AND l.is_manual = 1",
-                [$date]
-            )->fetchAll();
-            foreach ($manual as $m) {
-                $linkedPoster[(int)$m['poster_transaction_id']] = true;
-                $linkedSepay[(int)$m['sepay_id']] = true;
-            }
-        }
 
         $sepayByAmount = [];
         foreach ($sepay as $s) {
@@ -1132,7 +1052,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             "SELECT l.poster_transaction_id, l.sepay_id
              FROM {$pl} l
              JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-             WHERE DATE(p.date_close) = ?
+             WHERE p.day_date = ?
                AND l.link_type = 'auto_green'",
             [$date]
         )->fetchAll();
@@ -1273,7 +1193,7 @@ if (($_GET['ajax'] ?? '') === 'links') {
             "SELECT l.poster_transaction_id, l.sepay_id, l.link_type, l.is_manual
              FROM {$pl} l
              JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-             WHERE DATE(p.date_close) = ?",
+             WHERE p.day_date = ?",
             [$date]
         )->fetchAll();
         echo json_encode(['ok' => true, 'links' => $rows], JSON_UNESCAPED_UNICODE);
@@ -1295,7 +1215,7 @@ if (($_GET['ajax'] ?? '') === 'scan_card_types') {
         $targets = $db->query(
             "SELECT transaction_id, payment_method, card_type, payed_card, payed_third_party
              FROM {$pc}
-             WHERE DATE(date_close) = ?
+             WHERE day_date = ?
                AND pay_type IN (2,3)
                AND (payed_card + payed_third_party) > 0
                AND (
@@ -1380,17 +1300,17 @@ if (($_GET['ajax'] ?? '') === 'scan_card_types') {
 $sepayRows = $db->query(
     "SELECT sepay_id, transaction_date, transfer_amount, payment_method, content, reference_code
      FROM {$st}
-     WHERE DATE(transaction_date) = ?
+     WHERE transaction_date BETWEEN ? AND ?
        AND transfer_type = 'in'
        AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))
      ORDER BY transaction_date ASC",
-    [$date]
+    [$date . ' 00:00:00', $date . ' 23:59:59']
 )->fetchAll();
 
 $posterRows = $db->query(
     "SELECT transaction_id, receipt_number, card_type, date_close, payed_card, payed_third_party, tip_sum, payment_method, waiter_name, table_id
      FROM {$pc}
-     WHERE DATE(date_close) = ?
+     WHERE day_date = ?
        AND pay_type IN (2,3)
        AND (payed_card + payed_third_party) > 0
      ORDER BY date_close ASC",
@@ -1402,10 +1322,10 @@ $posterTotalVnd = 0;
 try {
     $sepayTotalVnd = (int)$db->query(
         "SELECT COALESCE(SUM(transfer_amount), 0) FROM {$st}
-         WHERE DATE(transaction_date) = ?
+         WHERE transaction_date BETWEEN ? AND ?
            AND transfer_type = 'in'
            AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))",
-        [$date]
+        [$date . ' 00:00:00', $date . ' 23:59:59']
     )->fetchColumn();
 } catch (\Throwable $e) {
     $sepayTotalVnd = 0;
@@ -1413,7 +1333,7 @@ try {
 try {
     $posterTotalCents = (int)$db->query(
         "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0) FROM {$pc}
-         WHERE DATE(date_close) = ?
+         WHERE day_date = ?
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
            AND (card_type IS NULL OR LOWER(card_type) <> 'vietnam company')
@@ -1429,7 +1349,7 @@ $links = $db->query(
     "SELECT l.poster_transaction_id, l.sepay_id, l.link_type, l.is_manual
      FROM {$pl} l
      JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-     WHERE DATE(p.date_close) = ?",
+     WHERE p.day_date = ?",
     [$date]
 )->fetchAll();
 
@@ -1508,10 +1428,10 @@ $sepayTxCount = 0;
 try {
     $sepayTxCount = (int)$db->query(
         "SELECT COUNT(*) AS c FROM {$st}
-         WHERE DATE(transaction_date) = ?
+         WHERE transaction_date BETWEEN ? AND ?
            AND transfer_type = 'in'
            AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))",
-        [$date]
+        [$date . ' 00:00:00', $date . ' 23:59:59']
     )->fetchColumn();
 } catch (\Throwable $e) {
     $sepayTxCount = 0;
@@ -1522,7 +1442,7 @@ $posterTxCountError = '';
 try {
     $posterTxCount = (int)$db->query(
         "SELECT COUNT(*) AS c FROM {$pc}
-         WHERE DATE(date_close) = ?
+         WHERE day_date = ?
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0",
         [$date]
@@ -1715,9 +1635,8 @@ $fmtVnd = function (int $v): string {
                 <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                 <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
                 <button class="mid-btn" id="scanCardTypesBtn" type="button" title="Проверить типы карт">💳</button>
-                <label class="mid-check"><input type="checkbox" id="preserveManualCb" checked>ручн.</label>
                 <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
-                <label class="mid-check"><input type="checkbox" id="clearManualCb">ручн.</label>
+                <label class="mid-check" title="Удалять ручные связи при разрыве"><input type="checkbox" id="clearManualCb">👉👈</label>
             </div>
 
             <div class="card" style="padding: 0;">
@@ -2254,7 +2173,6 @@ $fmtVnd = function (int $v): string {
     const linkAutoBtn = document.getElementById('linkAutoBtn');
     const scanCardTypesBtn = document.getElementById('scanCardTypesBtn');
     const linkClearBtn = document.getElementById('linkClearBtn');
-    const preserveManualCb = document.getElementById('preserveManualCb');
     const clearManualCb = document.getElementById('clearManualCb');
 
     let hideLinked = false;
@@ -2330,12 +2248,12 @@ $fmtVnd = function (int $v): string {
         });
     };
 
-    const sendAutoLinks = (preserveManual) => {
+    const sendAutoLinks = () => {
         const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'auto_link'])) ?>;
         return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ preserve_manual: preserveManual ? 1 : 0 }),
+            body: JSON.stringify({}),
         })
         .then((r) => r.json())
         .then((j) => {
@@ -2467,8 +2385,7 @@ $fmtVnd = function (int $v): string {
     }
     if (linkAutoBtn) {
         linkAutoBtn.addEventListener('click', () => {
-            const preserve = preserveManualCb ? preserveManualCb.checked : true;
-            sendAutoLinks(preserve)
+            sendAutoLinks()
                 .then(() => clearCheckboxes())
                 .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         });
