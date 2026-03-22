@@ -1380,8 +1380,13 @@ $fmtVnd = function (int $v): string {
                 <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
                 <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
                 <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
-                    <div>Платежи: <span id="selSepaySum">0 ₫</span></div>
-                    <div>Чеки: <span id="selPosterSum">0 ₫</span></div>
+                    <div>Платежи:</div>
+                    <div id="selSepaySum">0 ₫</div>
+                    <div style="height: 10px;"></div>
+                    <div>Чеки:</div>
+                    <div id="selPosterSum">0 ₫</div>
+                    <div style="height: 10px;"></div>
+                    <div id="selMatch" style="font-size: 16px;">❗</div>
                 </div>
             </div>
 
@@ -1932,6 +1937,7 @@ $fmtVnd = function (int $v): string {
     const linkClearBtn = document.getElementById('linkClearBtn');
     const selSepaySumEl = document.getElementById('selSepaySum');
     const selPosterSumEl = document.getElementById('selPosterSum');
+    const selMatchEl = document.getElementById('selMatch');
 
     let hideLinked = false;
 
@@ -1950,6 +1956,11 @@ $fmtVnd = function (int $v): string {
         });
         if (selSepaySumEl) selSepaySumEl.textContent = fmtVnd(sSum);
         if (selPosterSumEl) selPosterSumEl.textContent = fmtVnd(pSum);
+        if (selMatchEl) {
+            const ok = sSum === pSum;
+            selMatchEl.textContent = ok ? '✅' : '❗';
+            selMatchEl.style.color = ok ? '#16a34a' : '#dc2626';
+        }
     };
 
     const updateLinkButtonState = () => {
