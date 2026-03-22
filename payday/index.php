@@ -782,52 +782,310 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
     }
     $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
     if (!is_array($payload)) $payload = [];
+    $posterIds = $payload['poster_transaction_ids'] ?? $payload['poster_ids'] ?? null;
+    $sepayIds = $payload['sepay_ids'] ?? null;
     $posterId = (int)($payload['poster_transaction_id'] ?? 0);
-    $posterIds = $payload['poster_transaction_ids'] ?? null;
+    $sepayId = (int)($payload['sepay_id'] ?? 0);
+
     if (is_array($posterIds)) {
         $posterIds = array_values(array_unique(array_filter(array_map(fn($v) => (int)$v, $posterIds), fn($v) => $v > 0)));
+    } elseif ($posterId > 0) {
+        $posterIds = [$posterId];
     } else {
         $posterIds = [];
     }
-    $sepayId = (int)($payload['sepay_id'] ?? 0);
-    $mode = (string)($payload['mode'] ?? 'toggle');
-    if ($sepayId <= 0 || ($posterId <= 0 && count($posterIds) === 0)) {
+
+    if (is_array($sepayIds)) {
+        $sepayIds = array_values(array_unique(array_filter(array_map(fn($v) => (int)$v, $sepayIds), fn($v) => $v > 0)));
+    } elseif ($sepayId > 0) {
+        $sepayIds = [$sepayId];
+    } else {
+        $sepayIds = [];
+    }
+
+    if (count($sepayIds) === 0 || count($posterIds) === 0) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
         exit;
     }
     try {
-        $targets = count($posterIds) ? $posterIds : [$posterId];
-
-        if (count($targets) === 1 && $mode === 'toggle') {
-            $pid = (int)$targets[0];
-            $existing = $db->query(
-                "SELECT sepay_id, is_manual FROM {$pl} WHERE poster_transaction_id = ? LIMIT 1",
-                [$pid]
-            )->fetch();
-            $existingSepayId = (int)($existing['sepay_id'] ?? 0);
-            $existingIsManual = !empty($existing['is_manual']);
-
-            if ($existingIsManual && $existingSepayId === $sepayId) {
-                $db->query(
-                    "DELETE FROM {$pl} WHERE poster_transaction_id = ? AND is_manual = 1 LIMIT 1",
-                    [$pid]
-                );
-                echo json_encode(['ok' => true, 'deleted' => true], JSON_UNESCAPED_UNICODE);
-                exit;
+        $inserted = 0;
+        foreach ($posterIds as $pid) {
+            foreach ($sepayIds as $sid) {
+                $affected = $db->query(
+                    "INSERT INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
+                     VALUES (?, ?, 'manual', 1)
+                     ON DUPLICATE KEY UPDATE link_type = 'manual', is_manual = 1",
+                    [(int)$pid, (int)$sid]
+                )->rowCount();
+                if ($affected > 0) $inserted++;
             }
         }
+        echo json_encode(['ok' => true, 'created' => true, 'pairs' => $inserted], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
 
-        foreach ($targets as $pid) {
+if (($_GET['ajax'] ?? '') === 'clear_links') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
+    if (!is_array($payload)) $payload = [];
+    $clearManual = !empty($payload['clear_manual']);
+    try {
+        if ($clearManual) {
             $db->query(
-                "INSERT INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
-                 VALUES (?, ?, 'manual', 1)
-                 ON DUPLICATE KEY UPDATE sepay_id = VALUES(sepay_id), link_type = 'manual', is_manual = 1",
-                [(int)$pid, $sepayId]
+                "DELETE l FROM {$pl} l
+                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+                 WHERE DATE(p.date_close) = ?",
+                [$date]
+            );
+        } else {
+            $db->query(
+                "DELETE l FROM {$pl} l
+                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+                 WHERE DATE(p.date_close) = ?
+                   AND l.is_manual = 0",
+                [$date]
+            );
+        }
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'auto_link') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
+    if (!is_array($payload)) $payload = [];
+    $preserveManual = !empty($payload['preserve_manual']);
+    try {
+        if ($preserveManual) {
+            $db->query(
+                "DELETE l FROM {$pl} l
+                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+                 WHERE DATE(p.date_close) = ?
+                   AND l.is_manual = 0
+                   AND l.link_type IN ('auto_green','auto_yellow')",
+                [$date]
+            );
+        } else {
+            $db->query(
+                "DELETE l FROM {$pl} l
+                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+                 WHERE DATE(p.date_close) = ?
+                   AND l.link_type IN ('auto_green','auto_yellow','manual')",
+                [$date]
             );
         }
 
-        echo json_encode(['ok' => true, 'created' => true, 'count' => count($targets)], JSON_UNESCAPED_UNICODE);
+        $checks = $db->query(
+            "SELECT transaction_id, date_close, payed_card, tip_sum, payment_method
+             FROM {$pc}
+             WHERE DATE(date_close) = ?
+               AND pay_type IN (2,3)
+               AND (payed_card + tip_sum) > 0
+             ORDER BY date_close ASC",
+            [$date]
+        )->fetchAll();
+
+        $sepay = $db->query(
+            "SELECT sepay_id, transaction_date, transfer_amount
+             FROM {$st}
+             WHERE DATE(transaction_date) = ?
+               AND transfer_type = 'in'
+               AND (payment_method IS NULL OR payment_method IN ('Card','Bybit'))
+             ORDER BY transaction_date ASC",
+            [$date]
+        )->fetchAll();
+
+        $linkedSepay = [];
+        $linkedPoster = [];
+        if ($preserveManual) {
+            $manual = $db->query(
+                "SELECT l.poster_transaction_id, l.sepay_id
+                 FROM {$pl} l
+                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+                 WHERE DATE(p.date_close) = ?
+                   AND l.is_manual = 1",
+                [$date]
+            )->fetchAll();
+            foreach ($manual as $m) {
+                $linkedPoster[(int)$m['poster_transaction_id']] = true;
+                $linkedSepay[(int)$m['sepay_id']] = true;
+            }
+        }
+
+        $sepayByAmount = [];
+        foreach ($sepay as $s) {
+            $sid = (int)($s['sepay_id'] ?? 0);
+            if ($sid <= 0) continue;
+            if (!empty($linkedSepay[$sid])) continue;
+            $amt = (int)($s['transfer_amount'] ?? 0);
+            $sepayByAmount[$amt][] = $s;
+        }
+
+        foreach ($checks as $c) {
+            $pid = (int)($c['transaction_id'] ?? 0);
+            if ($pid <= 0) continue;
+            if (!empty($linkedPoster[$pid])) continue;
+            $pm = (string)($c['payment_method'] ?? '');
+            if (strtolower($pm) === 'vietnam company') continue;
+
+            $payedCardVnd = $posterCentsToVnd((int)($c['payed_card'] ?? 0));
+            $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
+            $totalVnd = $payedCardVnd + $tipVnd;
+            if ($totalVnd <= 0) continue;
+            $amounts = [$totalVnd];
+            $closeTs = strtotime((string)$c['date_close']);
+            if ($closeTs === false || $closeTs <= 0) continue;
+
+            $best = null;
+            $bestDiff = null;
+            foreach ($amounts as $amt) {
+                foreach (($sepayByAmount[$amt] ?? []) as $s) {
+                    $sid = (int)$s['sepay_id'];
+                    if (!empty($linkedSepay[$sid])) continue;
+                    $stTs = strtotime((string)$s['transaction_date']);
+                    if ($stTs === false || $stTs <= 0) continue;
+                    $diff = abs($stTs - $closeTs);
+                    if ($diff > 600) continue;
+                    if ($best === null || $diff < $bestDiff) {
+                        $best = $s;
+                        $bestDiff = $diff;
+                    }
+                }
+            }
+            if ($best !== null) {
+                $sid = (int)$best['sepay_id'];
+                $db->query(
+                    "INSERT IGNORE INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
+                     VALUES (?, ?, 'auto_green', 0)",
+                    [$pid, $sid]
+                );
+                $linkedPoster[$pid] = true;
+                $linkedSepay[$sid] = true;
+            }
+        }
+
+        $linkedGreenPoster = [];
+        $rowsGreen = $db->query(
+            "SELECT l.poster_transaction_id, l.sepay_id
+             FROM {$pl} l
+             JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+             WHERE DATE(p.date_close) = ?
+               AND l.link_type = 'auto_green'",
+            [$date]
+        )->fetchAll();
+        foreach ($rowsGreen as $r) {
+            $linkedGreenPoster[(int)$r['poster_transaction_id']] = (int)$r['sepay_id'];
+        }
+
+        for ($i = 1; $i < count($checks) - 1; $i++) {
+            $pid = (int)($checks[$i]['transaction_id'] ?? 0);
+            if ($pid <= 0) continue;
+            if (!empty($linkedPoster[$pid])) continue;
+            $pm = (string)($checks[$i]['payment_method'] ?? '');
+            if (strtolower($pm) === 'vietnam company') continue;
+
+            $prevPid = (int)($checks[$i - 1]['transaction_id'] ?? 0);
+            $nextPid = (int)($checks[$i + 1]['transaction_id'] ?? 0);
+            if ($prevPid <= 0 || $nextPid <= 0) continue;
+            if (empty($linkedGreenPoster[$prevPid]) || empty($linkedGreenPoster[$nextPid])) continue;
+
+            $payedCardVnd = $posterCentsToVnd((int)($checks[$i]['payed_card'] ?? 0));
+            $tipVnd = $posterCentsToVnd((int)($checks[$i]['tip_sum'] ?? 0));
+            $totalVnd = $payedCardVnd + $tipVnd;
+            if ($totalVnd <= 0) continue;
+            $amounts = [$totalVnd];
+
+            $best = null;
+            $bestDiff = null;
+            $closeTs = strtotime((string)$checks[$i]['date_close']);
+            if ($closeTs === false || $closeTs <= 0) continue;
+
+            foreach ($amounts as $amt) {
+                foreach (($sepayByAmount[$amt] ?? []) as $s) {
+                    $sid = (int)$s['sepay_id'];
+                    if (!empty($linkedSepay[$sid])) continue;
+                    $stTs = strtotime((string)$s['transaction_date']);
+                    if ($stTs === false || $stTs <= 0) continue;
+                    $diff = abs($stTs - $closeTs);
+                    if ($best === null || $diff < $bestDiff) {
+                        $best = $s;
+                        $bestDiff = $diff;
+                    }
+                }
+            }
+            if ($best !== null) {
+                $sid = (int)$best['sepay_id'];
+                $db->query(
+                    "INSERT IGNORE INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
+                     VALUES (?, ?, 'auto_green', 0)",
+                    [$pid, $sid]
+                );
+                $linkedPoster[$pid] = true;
+                $linkedSepay[$sid] = true;
+            }
+        }
+
+        foreach ($checks as $c) {
+            $pid = (int)($c['transaction_id'] ?? 0);
+            if ($pid <= 0) continue;
+            if (!empty($linkedPoster[$pid])) continue;
+            $pm = (string)($c['payment_method'] ?? '');
+            if (strtolower($pm) === 'vietnam company') continue;
+
+            $payedCardVnd = $posterCentsToVnd((int)($c['payed_card'] ?? 0));
+            $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
+            $totalVnd = $payedCardVnd + $tipVnd;
+            if ($totalVnd <= 0) continue;
+            $amounts = [$totalVnd];
+            $closeTs = strtotime((string)$c['date_close']);
+            if ($closeTs === false || $closeTs <= 0) continue;
+
+            $best = null;
+            $bestDiff = null;
+            foreach ($amounts as $amt) {
+                foreach (($sepayByAmount[$amt] ?? []) as $s) {
+                    $sid = (int)$s['sepay_id'];
+                    if (!empty($linkedSepay[$sid])) continue;
+                    $stTs = strtotime((string)$s['transaction_date']);
+                    if ($stTs === false || $stTs <= 0) continue;
+                    $diff = abs($stTs - $closeTs);
+                    if ($best === null || $diff < $bestDiff) {
+                        $best = $s;
+                        $bestDiff = $diff;
+                    }
+                }
+            }
+            if ($best !== null) {
+                $sid = (int)$best['sepay_id'];
+                $db->query(
+                    "INSERT IGNORE INTO {$pl} (poster_transaction_id, sepay_id, link_type, is_manual)
+                     VALUES (?, ?, 'auto_yellow', 0)",
+                    [$pid, $sid]
+                );
+                $linkedPoster[$pid] = true;
+                $linkedSepay[$sid] = true;
+            }
+        }
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -945,7 +1203,8 @@ foreach ($links as $l) {
     if ($pid <= 0 || $sid <= 0) continue;
     $t = (string)($l['link_type'] ?? '');
     $m = !empty($l['is_manual']);
-    $linkByPoster[$pid] = ['sepay_id' => $sid, 'link_type' => $t, 'is_manual' => $m];
+    if (!isset($linkByPoster[$pid])) $linkByPoster[$pid] = [];
+    $linkByPoster[$pid][] = ['sepay_id' => $sid, 'link_type' => $t, 'is_manual' => $m];
     if (!isset($linkBySepay[$sid])) $linkBySepay[$sid] = [];
     $linkBySepay[$sid][] = ['poster_transaction_id' => $pid, 'link_type' => $t, 'is_manual' => $m];
 }
@@ -1080,7 +1339,7 @@ $fmtVnd = function (int $v): string {
         .btn.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
         .btn:disabled { opacity: 0.6; cursor: default; }
         .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items:start; }
+        .grid { display:grid; grid-template-columns: 1fr 120px 1fr; gap: 12px; align-items:start; }
         @media (max-width: 1050px) { .grid { grid-template-columns: 1fr; } }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
@@ -1108,6 +1367,13 @@ $fmtVnd = function (int $v): string {
         .badge { display:inline-flex; align-items:center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; border: 1px solid #e5e7eb; background: #fff; }
         .link-x { position: fixed; z-index: 9999; width: 16px; height: 16px; border-radius: 999px; border: 1px solid #d0d5dd; background: #fff; color: #111827; display:flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; }
         .link-x:hover { background: #f3f4f6; }
+        .cell-anchor { display:flex; align-items:center; gap: 8px; }
+        .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
+        .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding-top: 16px; }
+        .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; }
+        .mid-btn.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
+        .mid-btn:disabled { opacity: 0.5; cursor: default; }
+        .mid-check { display:flex; gap: 8px; align-items:center; font-weight: 800; font-size: 12px; color: #374151; user-select: none; }
     </style>
 </head>
 <body>
@@ -1200,7 +1466,7 @@ $fmtVnd = function (int $v): string {
                             ?>
                             <?php $tsRow = strtotime($r['transaction_date']) ?: 0; ?>
                             <tr class="<?= $cls ?>" data-sepay-id="<?= $sid ?>" data-ts="<?= (int)$tsRow ?>" data-sum="<?= (int)$r['transfer_amount'] ?>" data-content="<?= htmlspecialchars(mb_strtolower((string)($r['content'] ?? ''), 'UTF-8')) ?>">
-                                <td><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
+                                <td><div class="cell-anchor"><span class="anchor" id="sepay-<?= $sid ?>"></span><input type="checkbox" class="sepay-cb" data-id="<?= $sid ?>"></div></td>
                                 <td class="nowrap"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
                                 <td><?= htmlspecialchars((string)($r['content'] ?? '')) ?></td>
                                 <td class="sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
@@ -1214,6 +1480,14 @@ $fmtVnd = function (int $v): string {
                     • связанные: <span id="sepayLinked">—</span>
                     • несвязанные: <span id="sepayUnlinked">—</span>
                 </div>
+            </div>
+
+            <div class="mid-col">
+                <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">⛓</button>
+                <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи заново">↻</button>
+                <label class="mid-check"><input type="checkbox" id="preserveManualCb" checked>ручн.</label>
+                <button class="mid-btn" id="linkClearBtn" type="button" title="Удалить связи за день">×</button>
+                <label class="mid-check"><input type="checkbox" id="clearManualCb">ручн.</label>
             </div>
 
             <div class="card" style="padding: 0;">
@@ -1243,14 +1517,17 @@ $fmtVnd = function (int $v): string {
                                 $pid = (int)$r['transaction_id'];
                                 $receiptNumber = (int)($r['receipt_number'] ?? 0);
                                 if ($receiptNumber <= 0) $receiptNumber = $pid;
-                                $link = $linkByPoster[$pid] ?? null;
+                                $linkList = $linkByPoster[$pid] ?? [];
                                 $cls = 'row-red';
-                                if ($link) {
-                                    if (!empty($link['is_manual'])) {
-                                        $cls = 'row-gray';
-                                    } else {
-                                        $cls = ($link['link_type'] === 'auto_green') ? 'row-green' : (($link['link_type'] === 'auto_yellow') ? 'row-yellow' : 'row-green');
+                                if ($linkList) {
+                                    $hasManual = false;
+                                    $hasYellow = false;
+                                    foreach ($linkList as $l) {
+                                        if (!empty($l['is_manual'])) $hasManual = true;
+                                        if (($l['link_type'] ?? '') === 'auto_yellow') $hasYellow = true;
                                     }
+                                    if ($hasManual) $cls = 'row-gray';
+                                    else $cls = $hasYellow ? 'row-yellow' : 'row-green';
                                 }
                                 $pm = (string)($r['payment_method'] ?? '');
                                 $ct = trim((string)($r['card_type'] ?? ''));
@@ -1265,7 +1542,7 @@ $fmtVnd = function (int $v): string {
                                 $tsRow = strtotime($r['date_close']) ?: 0;
                             ?>
                             <tr class="<?= $cls ?>" data-poster-id="<?= $pid ?>" data-vietnam="<?= $isVietnam ? '1' : '0' ?>" data-num="<?= (int)$receiptNumber ?>" data-ts="<?= (int)$tsRow ?>" data-card="<?= (int)$cardVnd ?>" data-tips="<?= (int)$tipVnd ?>" data-total="<?= (int)($cardVnd + $tipVnd) ?>" data-method="<?= htmlspecialchars(mb_strtolower($pm, 'UTF-8')) ?>" data-cardtype="<?= htmlspecialchars(mb_strtolower($ct, 'UTF-8')) ?>" data-waiter="<?= htmlspecialchars(mb_strtolower((string)($r['waiter_name'] ?? ''), 'UTF-8')) ?>" data-table="<?= (int)($r['table_id'] ?? 0) ?>">
-                                <td><span class="anchor" id="poster-<?= $pid ?>"></span></td>
+                                <td><div class="cell-anchor"><span class="anchor" id="poster-<?= $pid ?>"></span><input type="checkbox" class="poster-cb" data-id="<?= $pid ?>"></div></td>
                                 <td class="nowrap"><?= htmlspecialchars((string)$receiptNumber) ?></td>
                                 <td class="nowrap"><?= date('H:i:s', strtotime($r['date_close'])) ?></td>
                                 <td class="sum"><?= htmlspecialchars($fmtVnd($cardVnd)) ?></td>
@@ -1289,15 +1566,7 @@ $fmtVnd = function (int $v): string {
         </div>
 
         <div class="actions">
-            <form method="POST" style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
-                <input type="hidden" name="action" value="auto_link">
-                <button class="btn" type="submit">Найти связи</button>
-                <label style="display:inline-flex; gap: 8px; align-items:center; font-weight:800;">
-                    <input type="checkbox" name="preserve_manual" value="1" checked>
-                    Сохранять ручные связи
-                </label>
-            </form>
-            <div class="muted">Ручная связь: выдели чеки (Ctrl), затем кликни платеж (SePay)</div>
+            <div class="muted">Связь: отметь чекбоксы в обеих таблицах → ⛓</div>
         </div>
 
         <div class="divider"></div>
@@ -1433,16 +1702,11 @@ $fmtVnd = function (int $v): string {
             if (l.link_type === 'auto_yellow') s.hasYellow = true;
             sepay.set(sid, s);
 
-            const pPrev = poster.get(pid);
-            const pNew = { hasAny: true, isManual: !!l.is_manual, linkType: String(l.link_type || '') };
-            if (!pPrev) {
-                poster.set(pid, pNew);
-            } else {
-                if (pPrev.isManual) return;
-                if (pNew.isManual) { poster.set(pid, pNew); return; }
-                if (pPrev.linkType === 'auto_yellow') return;
-                if (pNew.linkType === 'auto_yellow') { poster.set(pid, pNew); return; }
-            }
+            const p = poster.get(pid) || { hasAny: false, hasManual: false, hasYellow: false };
+            p.hasAny = true;
+            if (l.is_manual) p.hasManual = true;
+            if (l.link_type === 'auto_yellow') p.hasYellow = true;
+            poster.set(pid, p);
         });
         return { sepay, poster };
     };
@@ -1478,9 +1742,9 @@ $fmtVnd = function (int $v): string {
             const p = state.poster.get(pid);
             if (!p || !p.hasAny) {
                 tr.classList.add('row-red');
-            } else if (p.isManual) {
+            } else if (p.hasManual) {
                 tr.classList.add('row-gray');
-            } else if (p.linkType === 'auto_yellow') {
+            } else if (p.hasYellow) {
                 tr.classList.add('row-yellow');
             } else {
                 tr.classList.add('row-green');
@@ -1678,11 +1942,24 @@ $fmtVnd = function (int $v): string {
     const selectedSepay = new Set();
     const selectedPoster = new Set();
 
-    const clearSelected = () => {
-        sepayTable.querySelectorAll('tr.row-selected').forEach((tr) => tr.classList.remove('row-selected'));
-        posterTable.querySelectorAll('tr.row-selected').forEach((tr) => tr.classList.remove('row-selected'));
+    const linkMakeBtn = document.getElementById('linkMakeBtn');
+    const linkAutoBtn = document.getElementById('linkAutoBtn');
+    const linkClearBtn = document.getElementById('linkClearBtn');
+    const preserveManualCb = document.getElementById('preserveManualCb');
+    const clearManualCb = document.getElementById('clearManualCb');
+
+    const updateLinkButtonState = () => {
+        if (!linkMakeBtn) return;
+        linkMakeBtn.disabled = !(selectedSepay.size > 0 && selectedPoster.size > 0);
+    };
+
+    const clearCheckboxes = () => {
+        document.querySelectorAll('input.sepay-cb, input.poster-cb').forEach((cb) => {
+            cb.checked = false;
+        });
         selectedSepay.clear();
         selectedPoster.clear();
+        updateLinkButtonState();
     };
 
     const setupSort = (table) => {
@@ -1713,7 +1990,6 @@ $fmtVnd = function (int $v): string {
                     return state.dir === 'asc' ? cmp : -cmp;
                 });
                 rows.forEach((r) => tbody.appendChild(r));
-                clearSelected();
                 positionLines();
                 positionWidgets();
             });
@@ -1723,12 +1999,12 @@ $fmtVnd = function (int $v): string {
     setupSort(sepayTable);
     setupSort(posterTable);
 
-    const sendManualLinks = (sepayId, posterIds, mode) => {
+    const sendManualLinks = (sepayIds, posterIds) => {
         const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'manual_link'])) ?>;
         return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sepay_id: sepayId, poster_transaction_ids: posterIds, mode }),
+            body: JSON.stringify({ sepay_ids: sepayIds, poster_transaction_ids: posterIds }),
         })
         .then((r) => r.json())
         .then((j) => {
@@ -1737,64 +2013,84 @@ $fmtVnd = function (int $v): string {
         });
     };
 
-    const maybeCommitSelection = (triggeredBySingleClick) => {
-        if (!triggeredBySingleClick) return;
-        if (!selectedSepay.size || !selectedPoster.size) return;
-
-        if (selectedSepay.size !== 1) {
-            alert('Для связи выбери 1 платеж (SePay) и один/несколько чеков (Poster).');
-            return;
-        }
-
-        const sepayId = Number(Array.from(selectedSepay.values())[0] || 0);
-        const posterIds = Array.from(selectedPoster.values()).map((v) => Number(v)).filter((v) => v > 0);
-        if (!sepayId || !posterIds.length) return;
-        sendManualLinks(sepayId, posterIds, posterIds.length === 1 ? 'toggle' : 'set')
-            .catch((e) => {
-                alert(e && e.message ? e.message : 'Ошибка');
-                clearSelected();
-            });
+    const sendAutoLinks = (preserveManual) => {
+        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'auto_link'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preserve_manual: preserveManual ? 1 : 0 }),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            return refreshLinks();
+        });
     };
 
-    const onRowClick = (tr, side, multi) => {
-        const idAttr = side === 'sepay' ? 'data-sepay-id' : 'data-poster-id';
-        const id = Number(tr.getAttribute(idAttr) || 0);
-        if (!id) return;
-
-        const isSepay = side === 'sepay';
-        const set = isSepay ? selectedSepay : selectedPoster;
-
-        if (!multi) {
-            const table = isSepay ? sepayTable : posterTable;
-            table.querySelectorAll('tr.row-selected').forEach((x) => x.classList.remove('row-selected'));
-            set.clear();
-        }
-
-        if (multi && set.has(id)) {
-            set.delete(id);
-            tr.classList.remove('row-selected');
-            return;
-        }
-
-        set.add(id);
-        tr.classList.add('row-selected');
-
-        maybeCommitSelection(!multi);
+    const sendClearLinks = (clearManual) => {
+        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'clear_links'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clear_manual: clearManual ? 1 : 0 }),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            return refreshLinks();
+        });
     };
 
-    sepayTable.addEventListener('click', (e) => {
-        const tr = e.target.closest('tr[data-sepay-id]');
-        if (!tr) return;
-        onRowClick(tr, 'sepay', !!(e.ctrlKey || e.metaKey));
+    document.querySelectorAll('input.sepay-cb').forEach((cb) => {
+        cb.addEventListener('change', () => {
+            const id = Number(cb.getAttribute('data-id') || 0);
+            if (!id) return;
+            if (cb.checked) selectedSepay.add(id);
+            else selectedSepay.delete(id);
+            updateLinkButtonState();
+        });
     });
-    posterTable.addEventListener('click', (e) => {
-        const tr = e.target.closest('tr[data-poster-id]');
-        if (!tr) return;
-        onRowClick(tr, 'poster', !!(e.ctrlKey || e.metaKey));
+    document.querySelectorAll('input.poster-cb').forEach((cb) => {
+        cb.addEventListener('change', () => {
+            const id = Number(cb.getAttribute('data-id') || 0);
+            if (!id) return;
+            if (cb.checked) selectedPoster.add(id);
+            else selectedPoster.delete(id);
+            updateLinkButtonState();
+        });
     });
+
+    if (linkMakeBtn) {
+        linkMakeBtn.addEventListener('click', () => {
+            const sepayIds = Array.from(selectedSepay.values()).map((v) => Number(v)).filter((v) => v > 0);
+            const posterIds = Array.from(selectedPoster.values()).map((v) => Number(v)).filter((v) => v > 0);
+            if (!sepayIds.length || !posterIds.length) return;
+            sendManualLinks(sepayIds, posterIds)
+                .then(() => clearCheckboxes())
+                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+        });
+    }
+    if (linkAutoBtn) {
+        linkAutoBtn.addEventListener('click', () => {
+            const preserve = preserveManualCb ? preserveManualCb.checked : true;
+            sendAutoLinks(preserve)
+                .then(() => clearCheckboxes())
+                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+        });
+    }
+    if (linkClearBtn) {
+        linkClearBtn.addEventListener('click', () => {
+            const clearManual = clearManualCb ? clearManualCb.checked : false;
+            if (!confirm(clearManual ? 'Удалить все связи за день (включая ручные)?' : 'Удалить автосвязи за день?')) return;
+            sendClearLinks(clearManual)
+                .then(() => clearCheckboxes())
+                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+        });
+    }
+    updateLinkButtonState();
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') clearSelected();
+        if (e.key === 'Escape') clearCheckboxes();
     });
 })();
 </script>

@@ -356,27 +356,53 @@ class Database {
             is_manual TINYINT(1) NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_link_poster (poster_transaction_id),
+            UNIQUE KEY uq_link_pair (poster_transaction_id, sepay_id),
+            KEY idx_link_poster (poster_transaction_id),
             KEY idx_link_sepay (sepay_id),
             CONSTRAINT fk_check_links_poster_{$fkTag} FOREIGN KEY (poster_transaction_id) REFERENCES {$pc}(transaction_id) ON DELETE CASCADE,
             CONSTRAINT fk_check_links_sepay_{$fkTag} FOREIGN KEY (sepay_id) REFERENCES {$st}(sepay_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
         try {
+            $this->pdo->exec(
+                "DELETE l1 FROM {$pl} l1
+                 JOIN {$pl} l2
+                   ON l2.poster_transaction_id = l1.poster_transaction_id
+                  AND l2.sepay_id = l1.sepay_id
+                  AND l2.id < l1.id"
+            );
+
             $idx = $this->pdo->query("SHOW INDEX FROM {$pl}")->fetchAll(\PDO::FETCH_ASSOC);
             $hasIdxSepay = false;
+            $hasIdxPoster = false;
+            $hasUqPair = false;
             foreach ($idx as $i) {
                 $name = (string)($i['Key_name'] ?? '');
                 $nonUnique = (int)($i['Non_unique'] ?? 1);
                 if ($name === 'uq_link_sepay' && $nonUnique === 0) {
                     $this->pdo->exec("ALTER TABLE {$pl} DROP INDEX uq_link_sepay");
                 }
+                if ($name === 'uq_link_poster' && $nonUnique === 0) {
+                    $this->pdo->exec("ALTER TABLE {$pl} DROP INDEX uq_link_poster");
+                }
                 if ($name === 'idx_link_sepay') {
                     $hasIdxSepay = true;
+                }
+                if ($name === 'idx_link_poster') {
+                    $hasIdxPoster = true;
+                }
+                if ($name === 'uq_link_pair' && $nonUnique === 0) {
+                    $hasUqPair = true;
                 }
             }
             if (!$hasIdxSepay) {
                 $this->pdo->exec("ALTER TABLE {$pl} ADD INDEX idx_link_sepay (sepay_id)");
+            }
+            if (!$hasIdxPoster) {
+                $this->pdo->exec("ALTER TABLE {$pl} ADD INDEX idx_link_poster (poster_transaction_id)");
+            }
+            if (!$hasUqPair) {
+                $this->pdo->exec("ALTER TABLE {$pl} ADD UNIQUE KEY uq_link_pair (poster_transaction_id, sepay_id)");
             }
         } catch (\Throwable $e) {
         }
