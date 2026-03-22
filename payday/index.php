@@ -1299,6 +1299,7 @@ $fmtVnd = function (int $v): string {
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>Payday</title>
     <link rel="stylesheet" href="/assets/app.css">
+    <script src="/assets/app.js" defer></script>
     <style>
         body { font-family: Arial, sans-serif; background: #f5f6fa; margin: 0; padding: 0; }
         .container { width: 100%; max-width: 1800px; margin: 0 auto; padding: 12px; box-sizing: border-box; }
