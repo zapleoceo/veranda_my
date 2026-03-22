@@ -18,6 +18,8 @@ class PosterAPI {
         $httpMethod = strtoupper($httpMethod);
         $params['token'] = $this->token;
         $url = $this->baseUrl . '/' . $method;
+        $debugParams = $params;
+        unset($debugParams['token']);
 
         if ($httpMethod === 'GET') {
             if (!empty($params)) {
@@ -48,7 +50,7 @@ class PosterAPI {
             throw new \Exception("CURL Error: " . $error);
         }
         if (!is_string($response)) {
-            throw new \Exception("Poster API Error: empty response (http=" . (int)$httpCode . ")");
+            throw new \Exception("Poster API Error: empty response (http=" . (int)$httpCode . ", method=" . $method . ")");
         }
 
         $data = json_decode($response, true);
@@ -58,7 +60,7 @@ class PosterAPI {
 
         if ($httpCode < 200 || $httpCode > 299) {
             $snippet = mb_substr($response, 0, 500);
-            throw new \Exception("Poster API Error: http=" . (int)$httpCode . " body=" . $snippet);
+            throw new \Exception("Poster API Error: http=" . (int)$httpCode . " method=" . $method . " params=" . json_encode($debugParams, JSON_UNESCAPED_UNICODE) . " body=" . $snippet);
         }
 
         if (isset($data['error'])) {
@@ -66,6 +68,8 @@ class PosterAPI {
             $msg = '';
             if (is_string($err)) {
                 $msg = $err;
+            } elseif (is_int($err) || is_float($err)) {
+                $msg = (string)$err;
             } elseif (is_array($err)) {
                 $msg = (string)($err['message'] ?? $err['msg'] ?? $err['error'] ?? '');
                 if ($msg === '') {
@@ -75,7 +79,7 @@ class PosterAPI {
                 $msg = json_encode($err, JSON_UNESCAPED_UNICODE);
             }
             if (!is_string($msg) || $msg === '') $msg = 'Unknown error';
-            throw new \Exception("Poster API Error: " . $msg . " (http=" . (int)$httpCode . ")");
+            throw new \Exception("Poster API Error: " . $msg . " (http=" . (int)$httpCode . ", method=" . $method . ", params=" . json_encode($debugParams, JSON_UNESCAPED_UNICODE) . ")");
         }
 
         return $data['response'] ?? $data;
