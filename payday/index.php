@@ -89,8 +89,6 @@ $extractCardType = function (array $tx): ?string {
         foreach ($history as $h) {
             if (!is_array($h)) continue;
             $type = (string)($h['type_history'] ?? $h['typeHistory'] ?? '');
-            if (strtolower($type) !== 'paybyterminal') continue;
-
             $valueText = $h['value_text'] ?? $h['valueText'] ?? null;
             $obj = null;
             if (is_array($valueText)) {
@@ -99,13 +97,19 @@ $extractCardType = function (array $tx): ?string {
                 $decoded = json_decode($valueText, true);
                 if (is_array($decoded)) $obj = $decoded;
             }
-            if (!is_array($obj)) continue;
-
-            foreach (['merchantId', 'merchantName', 'merchant', 'acquirer', 'acquiringBank', 'bank', 'paymentSystemName', 'paymentSystem', 'payment_method', 'paymentMethod'] as $k) {
-                $v = trim((string)($obj[$k] ?? ''));
-                if ($v !== '') $candidates[] = $v;
+            if (is_array($obj)) {
+                foreach (['merchantId', 'merchantName', 'merchant', 'acquirer', 'acquiringBank', 'bank', 'paymentSystemName', 'paymentSystem', 'payment_method', 'paymentMethod'] as $k) {
+                    $v = trim((string)($obj[$k] ?? ''));
+                    if ($v !== '') $candidates[] = $v;
+                }
+                $collectStrings($obj);
+            } elseif (is_string($valueText) && trim($valueText) !== '') {
+                $collectStrings($valueText);
             }
-            $collectStrings($obj);
+
+            if (strtolower($type) === 'paybyterminal') {
+                $collectStrings($h);
+            }
         }
     }
 
@@ -1280,6 +1284,40 @@ if (($_GET['ajax'] ?? '') === 'links') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'poster_debug') {
+    header('Content-Type: application/json; charset=utf-8');
+    $txId = (int)($_GET['transaction_id'] ?? 0);
+    if ($txId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $dbRow = $db->query(
+            "SELECT transaction_id, receipt_number, pay_type, payed_card, payed_third_party, tip_sum, payment_method, card_type, date_close, day_date
+             FROM {$pc}
+             WHERE transaction_id = ?
+             LIMIT 1",
+            [$txId]
+        )->fetch();
+
+        $api = new \App\Classes\PosterAPI((string)$token);
+        $hist = null;
+        $histError = null;
+        try {
+            $hist = $api->request('dash.getTransactionHistory', ['transaction_id' => $txId]);
+        } catch (\Throwable $e) {
+            $histError = $e->getMessage();
+        }
+
+        echo json_encode(['ok' => true, 'db' => $dbRow, 'history' => $hist, 'history_error' => $histError], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 $sepayRows = $db->query(
     "SELECT sepay_id, transaction_date, transfer_amount, payment_method, content, reference_code
      FROM {$st}
@@ -1653,6 +1691,7 @@ $fmtVnd = function (int $v): string {
                                 <th class="nowrap sortable" data-sort-key="total">Card+Tips</th>
                                 <th class="sortable" data-sort-key="method">Метод</th>
                                 <th class="sortable" data-sort-key="cardtype">Тип карты</th>
+                                <th class="nowrap">?</th>
                                 <th class="sortable" data-sort-key="waiter">Официант</th>
                                 <th class="nowrap sortable" data-sort-key="table">Стол</th>
                             </tr>
@@ -1696,6 +1735,7 @@ $fmtVnd = function (int $v): string {
                                 <td class="sum"><?= htmlspecialchars($fmtVnd($cardVnd + $tipVnd)) ?></td>
                                 <td class="nowrap"><?= htmlspecialchars($pm !== '' ? $pm : '—') ?></td>
                                 <td class="nowrap"><?= htmlspecialchars($ct !== '' ? $ct : '—') ?></td>
+                                <td class="nowrap"><button class="btn" type="button" style="padding: 4px 8px; border-radius: 8px;" onclick="posterDebug(<?= (int)$pid ?>)">?</button></td>
                                 <td><?= htmlspecialchars((string)($r['waiter_name'] ?? '')) ?></td>
                                 <td class="nowrap"><?= htmlspecialchars((string)($r['table_id'] ?? '')) ?></td>
                             </tr>
@@ -1756,6 +1796,17 @@ $fmtVnd = function (int $v): string {
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leader-line/1.0.3/leader-line.min.js"></script>
 <script>
+function posterDebug(id) {
+    const base = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'poster_debug'])) ?>;
+    const url = base + '&transaction_id=' + encodeURIComponent(String(id));
+    fetch(url)
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            alert(JSON.stringify(j, null, 2));
+        })
+        .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+}
 (() => {
     let links = <?= json_encode(array_values(array_map(function ($l) {
         return [
