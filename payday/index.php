@@ -71,12 +71,25 @@ $extractPaymentMethod = function (array $tx): ?string {
 
 $extractCardType = function (array $tx): ?string {
     $candidates = [];
+    $collectStrings = function ($v) use (&$collectStrings, &$candidates) {
+        if (is_string($v)) {
+            $s = trim($v);
+            if ($s !== '') $candidates[] = $s;
+            return;
+        }
+        if (is_array($v)) {
+            foreach ($v as $vv) {
+                $collectStrings($vv);
+            }
+        }
+    };
+
     $history = $tx['history'] ?? $tx['transaction_history'] ?? null;
     if (is_array($history)) {
         foreach ($history as $h) {
             if (!is_array($h)) continue;
             $type = (string)($h['type_history'] ?? $h['typeHistory'] ?? '');
-            if ($type !== 'paybyterminal') continue;
+            if (strtolower($type) !== 'paybyterminal') continue;
 
             $valueText = $h['value_text'] ?? $h['valueText'] ?? null;
             $obj = null;
@@ -88,10 +101,11 @@ $extractCardType = function (array $tx): ?string {
             }
             if (!is_array($obj)) continue;
 
-            foreach (['paymentSystemName', 'merchantId', 'paymentSystem'] as $k) {
+            foreach (['merchantId', 'merchantName', 'merchant', 'acquirer', 'acquiringBank', 'bank', 'paymentSystemName', 'paymentSystem', 'payment_method', 'paymentMethod'] as $k) {
                 $v = trim((string)($obj[$k] ?? ''));
                 if ($v !== '') $candidates[] = $v;
             }
+            $collectStrings($obj);
         }
     }
 
@@ -108,6 +122,9 @@ $extractCardType = function (array $tx): ?string {
 
     foreach ($candidates as $v) {
         $vv = trim((string)$v);
+        $vvLower = strtolower($vv);
+        if (strpos($vvLower, 'vietnam') !== false) return 'Vietnam Company';
+        if (strpos($vvLower, 'bybit') !== false) return 'Bybit';
         if ($vv !== '') return $vv;
     }
     return null;
@@ -291,7 +308,7 @@ try {
                 }
             }
 
-            if (($cardType === null || $cardType === '') && $payedCard > 0) {
+            if (($cardType === null || $cardType === '' || strtolower((string)$cardType) === 'card') && ($payedCard > 0 || $payedThirdParty > 0)) {
                 try {
                     $hist = $api->request('dash.getTransactionHistory', ['transaction_id' => $txId]);
                     if (is_array($hist)) {
