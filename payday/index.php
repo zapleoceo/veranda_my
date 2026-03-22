@@ -546,7 +546,9 @@ try {
 
             $payedCardVnd = $posterCentsToVnd((int)($c['payed_card'] ?? 0));
             $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
-            $amounts = array_values(array_unique(array_filter([$payedCardVnd, $payedCardVnd + $tipVnd], fn($v) => (int)$v > 0)));
+            $totalVnd = $payedCardVnd + $tipVnd;
+            if ($totalVnd <= 0) continue;
+            $amounts = [$totalVnd];
             $closeTs = strtotime((string)$c['date_close']);
             if ($closeTs === false || $closeTs <= 0) continue;
 
@@ -612,8 +614,9 @@ try {
 
             $payedCardVnd = $posterCentsToVnd((int)($checks[$i]['payed_card'] ?? 0));
             $tipVnd = $posterCentsToVnd((int)($checks[$i]['tip_sum'] ?? 0));
-            $amounts = array_values(array_unique(array_filter([$payedCardVnd, $payedCardVnd + $tipVnd], fn($v) => (int)$v > 0)));
-            if (count($amounts) === 0) continue;
+            $totalVnd = $payedCardVnd + $tipVnd;
+            if ($totalVnd <= 0) continue;
+            $amounts = [$totalVnd];
 
             $best = null;
             $bestDiff = null;
@@ -654,7 +657,9 @@ try {
 
             $payedCardVnd = $posterCentsToVnd((int)($c['payed_card'] ?? 0));
             $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
-            $amounts = array_values(array_unique(array_filter([$payedCardVnd, $payedCardVnd + $tipVnd], fn($v) => (int)$v > 0)));
+            $totalVnd = $payedCardVnd + $tipVnd;
+            if ($totalVnd <= 0) continue;
+            $amounts = [$totalVnd];
             $closeTs = strtotime((string)$c['date_close']);
             if ($closeTs === false || $closeTs <= 0) continue;
 
@@ -1524,7 +1529,8 @@ $fmtVnd = function (int $v): string {
     };
 
     const refreshLinks = () => {
-        return fetch('?<?= htmlspecialchars(http_build_query(['date' => $date, 'ajax' => 'links'])) ?>')
+        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'links'])) ?>;
+        return fetch(url)
             .then((r) => r.json())
             .then((j) => {
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
@@ -1544,7 +1550,8 @@ $fmtVnd = function (int $v): string {
     };
 
     const unlink = (sepayId, posterId) => {
-        return fetch('?<?= htmlspecialchars(http_build_query(['date' => $date, 'ajax' => 'unlink'])) ?>', {
+        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'unlink'])) ?>;
+        return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sepay_id: sepayId, poster_transaction_id: posterId }),
@@ -1717,7 +1724,8 @@ $fmtVnd = function (int $v): string {
     setupSort(posterTable);
 
     const sendManualLinks = (sepayId, posterIds, mode) => {
-        return fetch('?<?= htmlspecialchars(http_build_query(['date' => $date, 'ajax' => 'manual_link'])) ?>', {
+        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'manual_link'])) ?>;
+        return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sepay_id: sepayId, poster_transaction_ids: posterIds, mode }),
