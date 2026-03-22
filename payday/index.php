@@ -1115,10 +1115,53 @@ if (($_GET['ajax'] ?? '') === 'poster_accounts') {
             'ok' => true,
             'accounts' => $accounts,
             'balance_andrey' => $fmtVndCents($andrey),
+            'balance_andrey_cents' => $andrey,
             'balance_vietnam' => $fmtVndCents($vietnam),
+            'balance_vietnam_cents' => $vietnam,
             'balance_cash' => $fmtVndCents($cash),
+            'balance_cash_cents' => $cash,
             'balance_total' => $fmtVndCents($total),
+            'balance_total_cents' => $total,
         ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'balance_sinc') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $raw = file_get_contents('php://input');
+        $j = json_decode($raw ?: '[]', true);
+        if (!is_array($j)) $j = [];
+        $diffCents = (int)($j['diff_cents'] ?? 0);
+        if ($diffCents === 0) {
+            throw new \Exception('Разница = 0');
+        }
+
+        $type = $diffCents > 0 ? 1 : 0;
+        $amount = sprintf('%.2f', abs($diffCents) / 100);
+
+        $api3 = new \App\Classes\PosterAPI((string)$token);
+        $res = $api3->request('finance.createTransactions', [
+            'id' => 0,
+            'type' => $type,
+            'category' => 4,
+            'user_id' => 4,
+            'date' => date('Y-m-d H:i:s'),
+            'comment' => 'Коррекция излишек - недостачи за счет чая',
+            'account_id' => 8,
+            'sum' => $amount,
+        ], 'POST');
+
+        echo json_encode(['ok' => true, 'response' => $res], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -1505,7 +1548,7 @@ $fmtVnd = function (int $v): string {
         .link-x:hover { background: #f3f4f6; }
         .cell-anchor { display:flex; align-items:center; gap: 8px; }
         .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
-        .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding-top: 16px; }
+        .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding-top: 16px; position: relative; z-index: 3; }
         .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; position: relative; overflow: hidden; }
         .mid-btn.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
         .mid-btn.active { background: #111827; border-color: #111827; color: #fff; }
@@ -1513,6 +1556,16 @@ $fmtVnd = function (int $v): string {
         .mid-check { display:flex; gap: 8px; align-items:center; font-weight: 800; font-size: 12px; color: #374151; user-select: none; }
         .bottom-two { display:flex; gap: 12px; align-items:flex-start; flex-wrap: wrap; }
         .bottom-two > .card { flex: 1 1 420px; }
+        .bottom-two > .card.card-finance { flex: 0.7 1 360px; }
+        .bottom-two > .card.card-balances { flex: 1 1 560px; }
+        .btn.tiny { padding: 6px 10px; border-radius: 10px; font-weight: 900; font-size: 11px; }
+        .bal-grid { width: 100%; border: 1px solid #e5e7eb; border-radius: 10px; overflow:hidden; background:#fff; }
+        .bal-grid table { width:100%; border-collapse: collapse; }
+        .bal-grid th, .bal-grid td { padding: 6px 8px; border-bottom: 1px solid #eef2f7; vertical-align: middle; font-size: 12px; }
+        .bal-grid th { background:#f9fafb; text-transform:none; letter-spacing: 0; }
+        .bal-grid input { width: 140px; max-width: 100%; padding: 6px 8px; border: 1px solid #d0d5dd; border-radius: 10px; font-weight: 900; font-size: 12px; }
+        .bal-diff-pos { color:#16a34a; font-weight: 900; }
+        .bal-diff-neg { color:#dc2626; font-weight: 900; }
         body.mode-lite .col-sepay-content { display: none; }
         body.mode-lite .col-poster-num,
         body.mode-lite .col-poster-card,
@@ -1727,7 +1780,7 @@ $fmtVnd = function (int $v): string {
         <div class="divider"></div>
 
         <div class="bottom-two">
-        <div class="card" style="background:#fbfbfd;">
+        <div class="card card-finance" style="background:#fbfbfd;">
             <div style="font-weight: 900; margin-bottom: 10px;">Финансовые транзакции</div>
 
             <?php
@@ -1775,17 +1828,60 @@ $fmtVnd = function (int $v): string {
                 </form>
             </div>
         </div>
-        <div class="card" style="background:#fbfbfd;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; margin-bottom: 10px;">
+        <div class="card card-balances" style="background:#fbfbfd;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 10px; margin-bottom: 10px;">
                 <div style="font-weight: 900;">Обновляем Балансы Poster</div>
-                <button class="btn" id="posterAccountsBtn" type="button" title="Обновить балансы">🔄</button>
+                <div style="display:flex; gap: 8px; align-items:center;">
+                    <button class="btn tiny" id="balanceSyncBtn" type="button" title="SINC">SINC</button>
+                    <button class="btn" id="posterAccountsBtn" type="button" title="Обновить балансы">🔄</button>
+                </div>
             </div>
 
-            <div class="muted" style="font-weight: 900; margin-bottom: 10px; display:inline-block; width: fit-content; white-space: nowrap;">
-                Баланс Счета Андрей = <span id="balAndrey"><?= $posterBalanceAndrey !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceAndrey)) : '—' ?></span><br>
-                Баланс вьетнамской компании = <span id="balVietnam"><?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceVietnam)) : '—' ?></span><br>
-                Баланс кассы = <span id="balCash"><?= $posterBalanceCash !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceCash)) : '—' ?></span><br>
-                Total = <span id="balTotal"><?= $posterBalanceTotal !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceTotal)) : '—' ?></span>
+            <div class="bal-grid" style="margin-bottom: 10px;">
+                <table>
+                    <thead>
+                    <tr>
+                        <th style="text-align:left;">Показатель</th>
+                        <th style="text-align:right;">Poster</th>
+                        <th style="text-align:right;">Факт.</th>
+                        <th style="text-align:right;">Разница</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr data-key="andrey">
+                        <td style="font-weight:900;">Баланс Счета Андрей</td>
+                        <td style="text-align:right;">
+                            <span id="balAndrey" data-cents="<?= $posterBalanceAndrey !== null ? (int)$posterBalanceAndrey : '' ?>"><?= $posterBalanceAndrey !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceAndrey)) : '—' ?></span>
+                        </td>
+                        <td style="text-align:right;"><input id="balAndreyActual" type="text" inputmode="decimal" placeholder="0.00"></td>
+                        <td style="text-align:right;"><span id="balAndreyDiff">—</span></td>
+                    </tr>
+                    <tr data-key="vietnam">
+                        <td style="font-weight:900;">Баланс вьетнамской компании</td>
+                        <td style="text-align:right;">
+                            <span id="balVietnam" data-cents="<?= $posterBalanceVietnam !== null ? (int)$posterBalanceVietnam : '' ?>"><?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceVietnam)) : '—' ?></span>
+                        </td>
+                        <td style="text-align:right;"><input id="balVietnamActual" type="text" inputmode="decimal" placeholder="0.00"></td>
+                        <td style="text-align:right;"><span id="balVietnamDiff">—</span></td>
+                    </tr>
+                    <tr data-key="cash">
+                        <td style="font-weight:900;">Баланс кассы</td>
+                        <td style="text-align:right;">
+                            <span id="balCash" data-cents="<?= $posterBalanceCash !== null ? (int)$posterBalanceCash : '' ?>"><?= $posterBalanceCash !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceCash)) : '—' ?></span>
+                        </td>
+                        <td style="text-align:right;"><input id="balCashActual" type="text" inputmode="decimal" placeholder="0.00"></td>
+                        <td style="text-align:right;"><span id="balCashDiff">—</span></td>
+                    </tr>
+                    <tr data-key="total">
+                        <td style="font-weight:900;">Total</td>
+                        <td style="text-align:right;">
+                            <span id="balTotal" data-cents="<?= $posterBalanceTotal !== null ? (int)$posterBalanceTotal : '' ?>"><?= $posterBalanceTotal !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceTotal)) : '—' ?></span>
+                        </td>
+                        <td style="text-align:right;"><input id="balTotalActual" type="text" inputmode="decimal" placeholder="0.00"></td>
+                        <td style="text-align:right;"><span id="balTotalDiff">—</span></td>
+                    </tr>
+                    </tbody>
+                </table>
             </div>
 
             <div style="max-height: 260px; overflow:auto; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff;">
@@ -1866,6 +1962,81 @@ $fmtVnd = function (int $v): string {
     const balVietnamEl = document.getElementById('balVietnam');
     const balCashEl = document.getElementById('balCash');
     const balTotalEl = document.getElementById('balTotal');
+    const balanceSyncBtn = document.getElementById('balanceSyncBtn');
+    const balAndreyActualEl = document.getElementById('balAndreyActual');
+    const balVietnamActualEl = document.getElementById('balVietnamActual');
+    const balCashActualEl = document.getElementById('balCashActual');
+    const balTotalActualEl = document.getElementById('balTotalActual');
+    const balAndreyDiffEl = document.getElementById('balAndreyDiff');
+    const balVietnamDiffEl = document.getElementById('balVietnamDiff');
+    const balCashDiffEl = document.getElementById('balCashDiff');
+    const balTotalDiffEl = document.getElementById('balTotalDiff');
+
+    const fmtIntSpaces = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const fmtVndCentsJs = (cents) => {
+        const c = Number(cents || 0) || 0;
+        const neg = c < 0;
+        const abs = Math.abs(Math.trunc(c));
+        const i = Math.floor(abs / 100);
+        const f = abs % 100;
+        return (neg ? '-' : '') + fmtIntSpaces(i) + '.' + String(f).padStart(2, '0') + ' ₫';
+    };
+    const parseVndCentsJs = (raw) => {
+        const s = String(raw || '').trim();
+        if (!s) return null;
+        const cleaned = s
+            .replaceAll('₫', '')
+            .replaceAll(' ', '')
+            .replaceAll(',', '.')
+            .trim();
+        if (!cleaned) return null;
+        const n = Number(cleaned);
+        if (!Number.isFinite(n)) return null;
+        return Math.round(n * 100);
+    };
+
+    const setDiff = (el, diffCents) => {
+        if (!el) return;
+        el.classList.remove('bal-diff-pos', 'bal-diff-neg');
+        if (diffCents === null) {
+            el.textContent = '—';
+            return;
+        }
+        const d = Number(diffCents) || 0;
+        if (d > 0) {
+            el.classList.add('bal-diff-pos');
+            el.textContent = '+' + fmtVndCentsJs(d);
+        } else if (d < 0) {
+            el.classList.add('bal-diff-neg');
+            el.textContent = fmtVndCentsJs(d);
+        } else {
+            el.textContent = fmtVndCentsJs(0);
+        }
+    };
+
+    const updateBalanceDiffs = () => {
+        const expAndrey = balAndreyEl ? parseInt(balAndreyEl.getAttribute('data-cents') || '', 10) : NaN;
+        const expVietnam = balVietnamEl ? parseInt(balVietnamEl.getAttribute('data-cents') || '', 10) : NaN;
+        const expCash = balCashEl ? parseInt(balCashEl.getAttribute('data-cents') || '', 10) : NaN;
+        const expTotal = balTotalEl ? parseInt(balTotalEl.getAttribute('data-cents') || '', 10) : NaN;
+
+        const factAndrey = balAndreyActualEl ? parseVndCentsJs(balAndreyActualEl.value) : null;
+        const factVietnam = balVietnamActualEl ? parseVndCentsJs(balVietnamActualEl.value) : null;
+        const factCash = balCashActualEl ? parseVndCentsJs(balCashActualEl.value) : null;
+        const factTotal = balTotalActualEl ? parseVndCentsJs(balTotalActualEl.value) : null;
+
+        setDiff(balAndreyDiffEl, Number.isFinite(expAndrey) && factAndrey !== null ? (factAndrey - expAndrey) : null);
+        setDiff(balVietnamDiffEl, Number.isFinite(expVietnam) && factVietnam !== null ? (factVietnam - expVietnam) : null);
+        setDiff(balCashDiffEl, Number.isFinite(expCash) && factCash !== null ? (factCash - expCash) : null);
+        setDiff(balTotalDiffEl, Number.isFinite(expTotal) && factTotal !== null ? (factTotal - expTotal) : null);
+
+        try {
+            if (balAndreyActualEl) localStorage.setItem('payday_bal_andrey', balAndreyActualEl.value || '');
+            if (balVietnamActualEl) localStorage.setItem('payday_bal_vietnam', balVietnamActualEl.value || '');
+            if (balCashActualEl) localStorage.setItem('payday_bal_cash', balCashActualEl.value || '');
+            if (balTotalActualEl) localStorage.setItem('payday_bal_total', balTotalActualEl.value || '');
+        } catch (_) {}
+    };
 
     const refreshPosterAccounts = () => {
         const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'poster_accounts'])) ?>;
@@ -1877,10 +2048,10 @@ $fmtVnd = function (int $v): string {
         .then((r) => r.json())
         .then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-            if (balAndreyEl) balAndreyEl.textContent = String(j.balance_andrey || '—');
-            if (balVietnamEl) balVietnamEl.textContent = String(j.balance_vietnam || '—');
-            if (balCashEl) balCashEl.textContent = String(j.balance_cash || '—');
-            if (balTotalEl) balTotalEl.textContent = String(j.balance_total || '—');
+            if (balAndreyEl) { balAndreyEl.textContent = String(j.balance_andrey || '—'); if ('balance_andrey_cents' in j) balAndreyEl.setAttribute('data-cents', String(j.balance_andrey_cents)); }
+            if (balVietnamEl) { balVietnamEl.textContent = String(j.balance_vietnam || '—'); if ('balance_vietnam_cents' in j) balVietnamEl.setAttribute('data-cents', String(j.balance_vietnam_cents)); }
+            if (balCashEl) { balCashEl.textContent = String(j.balance_cash || '—'); if ('balance_cash_cents' in j) balCashEl.setAttribute('data-cents', String(j.balance_cash_cents)); }
+            if (balTotalEl) { balTotalEl.textContent = String(j.balance_total || '—'); if ('balance_total_cents' in j) balTotalEl.setAttribute('data-cents', String(j.balance_total_cents)); }
 
             if (posterAccountsTbody) {
                 const rows = Array.isArray(j.accounts) ? j.accounts : [];
@@ -1899,6 +2070,7 @@ $fmtVnd = function (int $v): string {
                     }).join('');
                 }
             }
+            updateBalanceDiffs();
         });
     };
 
@@ -1912,6 +2084,49 @@ $fmtVnd = function (int $v): string {
                     posterAccountsBtn.classList.remove('loading');
                     posterAccountsBtn.disabled = false;
                 });
+        });
+    }
+
+    try {
+        if (balAndreyActualEl) balAndreyActualEl.value = localStorage.getItem('payday_bal_andrey') || '';
+        if (balVietnamActualEl) balVietnamActualEl.value = localStorage.getItem('payday_bal_vietnam') || '';
+        if (balCashActualEl) balCashActualEl.value = localStorage.getItem('payday_bal_cash') || '';
+        if (balTotalActualEl) balTotalActualEl.value = localStorage.getItem('payday_bal_total') || '';
+    } catch (_) {}
+    updateBalanceDiffs();
+
+    [balAndreyActualEl, balVietnamActualEl, balCashActualEl, balTotalActualEl].forEach((el) => {
+        if (!el) return;
+        el.addEventListener('input', () => updateBalanceDiffs(), { passive: true });
+    });
+
+    if (balanceSyncBtn) {
+        balanceSyncBtn.addEventListener('click', () => {
+            const exp = balAndreyEl ? parseInt(balAndreyEl.getAttribute('data-cents') || '', 10) : NaN;
+            const fact = balAndreyActualEl ? parseVndCentsJs(balAndreyActualEl.value) : null;
+            if (!Number.isFinite(exp)) return alert('Нет баланса Poster по Счету Андрей');
+            if (fact === null) return alert('Заполни фактический баланс (Счет Андрей)');
+            const diff = fact - exp;
+            if (!diff) return alert('Разница = 0');
+
+            const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'balance_sinc'])) ?>;
+            balanceSyncBtn.classList.add('loading');
+            balanceSyncBtn.disabled = true;
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ diff_cents: diff }),
+            })
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                return refreshPosterAccounts();
+            })
+            .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
+            .finally(() => {
+                balanceSyncBtn.classList.remove('loading');
+                balanceSyncBtn.disabled = false;
+            });
         });
     }
 
