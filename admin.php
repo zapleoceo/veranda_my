@@ -1369,10 +1369,6 @@ if ($tab === 'menu' || $tab === 'categories') {
                         <label>Тайминг (выс. нагр.), мин</label>
                         <input type="number" name="alert_timing_high_load" value="<?= $settings['alert_timing_high_load'] ?>" required>
                     </div>
-                    <div class="form-group">
-                        <label>Повтор после “Принято”, мин</label>
-                        <input type="number" name="alert_ack_snooze_minutes" value="<?= $settings['alert_ack_snooze_minutes'] ?>" required>
-                    </div>
                 </div>
                 <div style="margin-top: 10px; display:flex; gap: 12px; align-items:center; flex-wrap: wrap;">
                     <label style="display:flex; align-items:center; gap: 8px; font-size: 14px; font-weight: 800;">
@@ -1383,6 +1379,17 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <button type="submit" name="save_settings">Сохранить</button>
                 </div>
             </form>
+
+            <details style="margin-top: 14px;">
+                <summary style="cursor:pointer; font-weight: 900;">Логика работы</summary>
+                <div class="muted" style="margin-top: 10px; line-height: 1.55;">
+                    <div><b>Кандидаты</b>: позиции из Kitchen Online, которые обводятся красным (ticket_sent_at старше лимита, чек открыт, позиция не удалена и не в “Игнор” на табло).</div>
+                    <div><b>Один алерт = один чек</b>: если в чеке несколько просроченных блюд — всё в одном сообщении.</div>
+                    <div><b>Обновление</b>: при изменениях состав/время — бот редактирует сообщение; если просроченных блюд в чеке не осталось — сообщение удаляется.</div>
+                    <div><b>Принято</b>: кнопка “Принято” ставит игнор по конкретному блюду до готовности (бессрочно).</div>
+                    <div><b>Доступ</b>: нажимать “Принято” могут только пользователи с правом “✅ Принято (Telegram)” (раздел “Доступы”).</div>
+                </div>
+            </details>
 
             <details style="margin-top: 14px;">
                 <summary style="cursor:pointer; font-weight: 900;">Формат сообщения</summary>

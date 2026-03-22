@@ -9,9 +9,25 @@ require_once __DIR__ . '/src/classes/EventLogger.php';
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
+if (file_exists(__DIR__ . '/.env')) {
+    $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        $t = trim($line);
+        if ($t === '' || $t[0] === '#' || strpos($t, '=') === false) continue;
+        [$name, $value] = explode('=', $line, 2);
+        $_ENV[$name] = trim($value);
+    }
+}
+
 try {
     $startedAt = microtime(true);
-    $db = new \App\Classes\Database();
+    $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
+    $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
+    $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
+    $dbPass = $_ENV['DB_PASS'] ?? '';
+    $tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
+
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
     $metaTable = $db->t('system_meta');
     $ks = $db->t('kitchen_stats');
     $tgThreads = $db->t('tg_alert_threads');
@@ -37,15 +53,15 @@ try {
     $logger = new \App\Classes\EventLogger($db, 'telegram_alerts');
     $metaRepo = new \App\Classes\MetaRepository($db);
 
-    $token = trim((string)getenv('POSTER_TOKEN'));
-    $tgToken = trim((string)getenv('TG_BOT_TOKEN'));
-    $tgChatId = trim((string)getenv('TG_CHAT_ID'));
-    $tgThreadId = trim((string)getenv('TG_THREAD_ID'));
+    $token = trim((string)($_ENV['POSTER_API_TOKEN'] ?? $_ENV['POSTER_TOKEN'] ?? ''));
+    $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+    $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
+    $tgThreadId = trim((string)($_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? ''));
     $tgThreadId = $tgThreadId !== '' ? (int)$tgThreadId : null;
 
-    if ($token === '') throw new \Exception('Missing POSTER_TOKEN');
-    if ($tgToken === '') throw new \Exception('Missing TG_BOT_TOKEN');
-    if ($tgChatId === '') throw new \Exception('Missing TG_CHAT_ID');
+    if ($token === '') throw new \Exception('Missing POSTER_API_TOKEN');
+    if ($tgToken === '') throw new \Exception('Missing TELEGRAM_BOT_TOKEN');
+    if ($tgChatId === '') throw new \Exception('Missing TELEGRAM_CHAT_ID');
 
     $api = new \App\Classes\PosterAPI($token);
     $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
@@ -83,7 +99,6 @@ try {
         'alert_timing_low_load' => 20,
         'alert_load_threshold' => 25,
         'alert_timing_high_load' => 30,
-        'alert_ack_snooze_minutes' => 15,
         'exclude_partners_from_load' => 0
     ];
     $settings = [];
@@ -114,8 +129,6 @@ try {
         : (int)$settings['alert_timing_high_load'];
 
     $cutoffTime = date('Y-m-d H:i:s', strtotime("-{$waitLimit} minutes"));
-    $ackSnooze = (int)$settings['alert_ack_snooze_minutes'];
-    $ackCutoffTime = $ackSnooze > 0 ? date('Y-m-d H:i:s', strtotime("-{$ackSnooze} minutes")) : '1970-01-01 00:00:00';
 
     $rows = $db->query(
         "SELECT id, transaction_id, receipt_number, table_number, waiter_name, dish_name, ticket_sent_at
@@ -127,13 +140,10 @@ try {
            AND COALESCE(was_deleted, 0) = 0
            AND COALESCE(exclude_from_dashboard, 0) = 0
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND (
-                COALESCE(tg_acknowledged, 0) = 0
-             OR (tg_acknowledged_at IS NOT NULL AND tg_acknowledged_at < ?)
-           )
+           AND COALESCE(tg_acknowledged, 0) = 0
            AND ticket_sent_at < ?
          ORDER BY transaction_id ASC, ticket_sent_at ASC, id ASC",
-        [$today, $ackCutoffTime, $cutoffTime]
+        [$today, $cutoffTime]
     )->fetchAll();
     if (!is_array($rows)) $rows = [];
 
@@ -292,4 +302,3 @@ try {
     }
     echo "[" . date('Y-m-d H:i:s') . "] ERROR: " . $e->getMessage() . "\n";
 }
-

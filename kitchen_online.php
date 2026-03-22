@@ -32,7 +32,7 @@ $today = date('Y-m-d');
 $lastSyncLabel = '—';
 $ks = $db->t('kitchen_stats');
 $metaTable = $db->t('system_meta');
-$tgm = $db->t('tg_alert_messages');
+$tgThreads = $db->t('tg_alert_threads');
 
 try {
     $api = new \App\Classes\PosterAPI($token);
@@ -179,23 +179,19 @@ if ($isAjax) {
         $api = $api ?? new \App\Classes\PosterAPI($token);
         if ($action === 'list') {
             try {
-                $metaRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = 'poster_last_sync_at' LIMIT 1")->fetch();
-                $last = !empty($metaRow['meta_value']) ? strtotime((string)$metaRow['meta_value']) : 0;
-                if ($last <= 0 || (time() - $last) >= 5) {
-                    $analytics = new \App\Classes\KitchenAnalytics($api);
-                    $stats = $analytics->getDailyStats($today);
-                    if (is_array($stats) && count($stats) > 0) {
-                        $db->saveStats($stats);
-                    }
-                    $now = date('Y-m-d H:i:s');
-                    $db->query(
-                        "INSERT INTO {$metaTable} (meta_key, meta_value)
-                         VALUES ('poster_last_sync_at', ?)
-                         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
-                        [$now]
-                    );
-                    $lastSyncLabel = date('d.m.Y H:i:s', strtotime($now));
+                $analytics = new \App\Classes\KitchenAnalytics($api);
+                $stats = $analytics->getDailyStats($today);
+                if (is_array($stats) && count($stats) > 0) {
+                    $db->saveStats($stats);
                 }
+                $now = date('Y-m-d H:i:s');
+                $db->query(
+                    "INSERT INTO {$metaTable} (meta_key, meta_value)
+                     VALUES ('poster_last_sync_at', ?)
+                     ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                    [$now]
+                );
+                $lastSyncLabel = date('d.m.Y H:i:s', strtotime($now));
             } catch (\Throwable $e) {
             }
         }
@@ -404,9 +400,9 @@ if ($isAjax) {
         try {
             $rows = $db->query(
                 "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
-                        tgm.created_at AS tg_sent_at, tgm.last_edited_at AS tg_last_edit_at
+                        tga.created_at AS tg_sent_at, tga.last_edited_at AS tg_last_edit_at
                  FROM {$ks} ks
-                 LEFT JOIN {$tgm} tgm ON tgm.kitchen_stats_id = ks.id
+                 LEFT JOIN {$tgThreads} tga ON tga.transaction_date = ks.transaction_date AND tga.transaction_id = ks.transaction_id
                  WHERE transaction_date = ?
                    AND status = 1
                    AND ready_pressed_at IS NULL
