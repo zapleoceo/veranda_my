@@ -1284,6 +1284,99 @@ if (($_GET['ajax'] ?? '') === 'links') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'scan_card_types') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $targets = $db->query(
+            "SELECT transaction_id, payment_method, card_type, payed_card, payed_third_party
+             FROM {$pc}
+             WHERE DATE(date_close) = ?
+               AND pay_type IN (2,3)
+               AND (payed_card + payed_third_party) > 0
+               AND (
+                    card_type IS NULL OR card_type = '' OR LOWER(card_type) = 'card'
+                    OR payment_method IS NULL OR payment_method = '' OR LOWER(payment_method) = 'card'
+               )
+             ORDER BY date_close ASC",
+            [$date]
+        )->fetchAll();
+
+        $api = new \App\Classes\PosterAPI((string)$token);
+
+        $updated = 0;
+        $foundVietnam = 0;
+        $foundBybit = 0;
+        $notFound = 0;
+        $items = [];
+
+        foreach ($targets as $t) {
+            $txId = (int)($t['transaction_id'] ?? 0);
+            if ($txId <= 0) continue;
+            $hist = null;
+            try {
+                $hist = $api->request('dash.getTransactionHistory', ['transaction_id' => $txId]);
+            } catch (\Throwable $e) {
+                $hist = null;
+            }
+            $tx = [
+                'transaction_id' => $txId,
+                'history' => $hist,
+                'payment_method' => $t['payment_method'] ?? null,
+                'card_type' => $t['card_type'] ?? null,
+            ];
+            $cardType = $extractCardType($tx);
+            $paymentMethod = $extractPaymentMethod($tx) ?? $cardType;
+
+            if ($cardType === null || $cardType === '' || strtolower((string)$cardType) === 'card') {
+                $notFound++;
+                continue;
+            }
+
+            $setMethod = (string)($t['payment_method'] ?? '');
+            if ($setMethod === '' || strtolower($setMethod) === 'card') {
+                $setMethod = (string)($paymentMethod ?? $cardType);
+            }
+
+            $db->query(
+                "UPDATE {$pc}
+                 SET card_type = ?, payment_method = ?
+                 WHERE transaction_id = ?
+                 LIMIT 1",
+                [(string)$cardType, (string)$setMethod, $txId]
+            );
+            $updated++;
+
+            $ctLower = strtolower((string)$cardType);
+            if (strpos($ctLower, 'vietnam') !== false) $foundVietnam++;
+            if (strpos($ctLower, 'bybit') !== false) $foundBybit++;
+
+            $items[] = [
+                'transaction_id' => $txId,
+                'card_type' => (string)$cardType,
+                'payment_method' => (string)$setMethod,
+            ];
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'updated' => $updated,
+            'found_vietnam' => $foundVietnam,
+            'found_bybit' => $foundBybit,
+            'not_found' => $notFound,
+            'items' => $items,
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 $sepayRows = $db->query(
     "SELECT sepay_id, transaction_date, transfer_amount, payment_method, content, reference_code
      FROM {$st}
@@ -1621,6 +1714,7 @@ $fmtVnd = function (int $v): string {
                 <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">🎯</button>
                 <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                 <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
+                <button class="mid-btn" id="scanCardTypesBtn" type="button" title="Проверить типы карт">💳</button>
                 <label class="mid-check"><input type="checkbox" id="preserveManualCb" checked>ручн.</label>
                 <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
                 <label class="mid-check"><input type="checkbox" id="clearManualCb">ручн.</label>
@@ -2030,7 +2124,7 @@ $fmtVnd = function (int $v): string {
             if (!s.getClientRects().length || !p.getClientRects().length) return;
             const isMany = (sepayCount[l.sepay_id] || 0) > 1 || (posterCount[l.poster_transaction_id] || 0) > 1;
             const isMainGreen = !isMany && !l.is_manual && l.link_type === 'auto_green';
-            const size = isMainGreen ? 4 : 2;
+            const size = 2;
             const color = colorFor(l.link_type, l.is_manual);
 
             const a = getAnchorPoint(s, 'right', rootRect);
@@ -2158,6 +2252,7 @@ $fmtVnd = function (int $v): string {
     const linkMakeBtn = document.getElementById('linkMakeBtn');
     const hideLinkedBtn = document.getElementById('hideLinkedBtn');
     const linkAutoBtn = document.getElementById('linkAutoBtn');
+    const scanCardTypesBtn = document.getElementById('scanCardTypesBtn');
     const linkClearBtn = document.getElementById('linkClearBtn');
     const preserveManualCb = document.getElementById('preserveManualCb');
     const clearManualCb = document.getElementById('clearManualCb');
@@ -2263,6 +2358,43 @@ $fmtVnd = function (int $v): string {
         });
     };
 
+    const scanCardTypes = () => {
+        const url = <?= json_encode('?' . http_build_query(['date' => $date, 'ajax' => 'scan_card_types'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            const items = Array.isArray(j.items) ? j.items : [];
+            items.forEach((it) => {
+                const id = Number(it.transaction_id || 0);
+                if (!id) return;
+                const tr = document.querySelector(`#posterTable tbody tr[data-poster-id="${id}"]`);
+                if (!tr) return;
+                const tds = tr.querySelectorAll('td');
+                if (tds.length >= 8) {
+                    tds[6].textContent = String(it.payment_method || '—');
+                    tds[7].textContent = String(it.card_type || '—');
+                }
+                const methodLower = String(it.payment_method || '').toLowerCase();
+                const typeLower = String(it.card_type || '').toLowerCase();
+                tr.dataset.method = methodLower;
+                tr.dataset.cardtype = typeLower;
+                const isVietnam = methodLower.includes('vietnam') || typeLower.includes('vietnam');
+                tr.setAttribute('data-vietnam', isVietnam ? '1' : '0');
+            });
+            applyRowClasses();
+            updateStats();
+            applyHideLinked();
+            positionLines();
+            positionWidgets();
+            alert(`Проверка типов карт: обновлено ${Number(j.updated || 0)} • Vietnam ${Number(j.found_vietnam || 0)} • Bybit ${Number(j.found_bybit || 0)} • не найдено ${Number(j.not_found || 0)}`);
+        });
+    };
+
     const applyHideLinked = () => {
         const state = buildLinkState();
         document.querySelectorAll('#sepayTable tbody tr[data-sepay-id]').forEach((tr) => {
@@ -2339,6 +2471,12 @@ $fmtVnd = function (int $v): string {
             sendAutoLinks(preserve)
                 .then(() => clearCheckboxes())
                 .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+        });
+    }
+    if (scanCardTypesBtn) {
+        scanCardTypesBtn.addEventListener('click', () => {
+            if (!confirm('Проверить типы карт по чекам Poster без типа карты?')) return;
+            scanCardTypes().catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         });
     }
     if (linkClearBtn) {
