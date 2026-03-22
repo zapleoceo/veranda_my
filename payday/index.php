@@ -1759,7 +1759,7 @@ $fmtVnd = function (int $v): string {
         .link-x:hover { background: #f3f4f6; }
         .cell-anchor { display:flex; align-items:center; gap: 8px; }
         .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
-        .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding: 10px 8px 12px; margin-top: 6px; border-radius: 14px; background: rgba(255,255,255,0.30); backdrop-filter: blur(6px); border: 1px solid rgba(208,213,221,0.6); position: relative; z-index: 3; }
+        .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding: 10px 8px 12px; margin-top: 6px; border-radius: 14px; background: rgba(255,255,255,0.30); backdrop-filter: blur(2px); border: 1px solid rgba(208,213,221,0.6); position: relative; z-index: 3; }
         .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; position: relative; overflow: hidden; }
         .mid-btn.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
         .mid-btn.active { background: #111827; border-color: #111827; color: #fff; }
