@@ -537,9 +537,9 @@ try {
         if (!in_array($kind, ['vietnam', 'tips'], true)) {
             throw new \Exception('Bad request');
         }
-        $amount = 0;
+        $amountCents = 0;
         if ($kind === 'vietnam') {
-            $amount = (int)$db->query(
+            $amountCents = (int)$db->query(
                 "SELECT COALESCE(SUM(payed_card + payed_third_party), 0)
                  FROM {$pc}
                  WHERE day_date BETWEEN ? AND ?
@@ -549,7 +549,7 @@ try {
                 [$dateFrom, $dateTo]
             )->fetchColumn();
         } else {
-            $amount = (int)$db->query(
+            $amountCents = (int)$db->query(
                 "SELECT COALESCE(SUM(tip_sum), 0)
                  FROM {$pc}
                  WHERE day_date BETWEEN ? AND ?
@@ -559,7 +559,11 @@ try {
                 [$dateFrom, $dateTo]
             )->fetchColumn();
         }
-        if ($amount <= 0) {
+        if ($amountCents <= 0) {
+            throw new \Exception('Сумма для перевода = 0.');
+        }
+        $amountVnd = (int)$posterCentsToVnd($amountCents);
+        if ($amountVnd <= 0) {
             throw new \Exception('Сумма для перевода = 0.');
         }
 
@@ -584,7 +588,7 @@ try {
             $type = (int)($row['type'] ?? 0);
             if ($type !== 2) continue;
             $sum = (int)($row['amount_from'] ?? $row['amountFrom'] ?? $row['sum'] ?? $row['amount'] ?? 0);
-            if ($sum !== $amount) continue;
+            if ($sum !== $amountVnd) continue;
             $toId = (int)($row['account_to_id'] ?? $row['accountTo'] ?? 0);
             if ($toId !== $accountTo) continue;
             $cmt = strtolower((string)($row['comment'] ?? $row['description'] ?? ''));
@@ -613,13 +617,13 @@ try {
             'user_id' => 4,
             'account_from' => 1,
             'account_to' => $accountTo,
-            'amount_from' => $amount,
-            'amount_to' => $amount,
+            'amount_from' => $amountVnd,
+            'amount_to' => $amountVnd,
             'date' => $targetDate,
             'comment' => $comment,
             'account_id' => 1,
             'account_to_id' => $accountTo,
-            'sum' => $amount,
+            'sum' => $amountVnd,
         ], 'POST');
 
         $message = 'Перевод создан.';
