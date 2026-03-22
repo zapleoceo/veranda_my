@@ -34,7 +34,7 @@ $parsePosterDateTime = function ($tx): ?string {
     if (is_array($tx)) {
         if (!empty($tx['date_close']) && is_numeric($tx['date_close'])) {
             $n = (int)$tx['date_close'];
-            if ($n > 2000000000000) $n = (int)round($n / 1000);
+            if ($n > 20000000000) $n = (int)round($n / 1000);
             if ($n > 0) $ts = $n;
         }
         if ($ts === null && !empty($tx['date_close']) && is_string($tx['date_close'])) {
@@ -922,6 +922,8 @@ $fmtVnd = function (int $v): string {
         .nav-left { display:flex; gap: 14px; align-items:center; flex-wrap: wrap; }
         .nav-title { font-weight: 800; color: #2c3e50; }
         .toolbar { display:flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .toolbar-line { flex-wrap: nowrap; overflow-x: auto; }
+        .toolbar-line form { margin: 0; }
         .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid #d0d5dd; background: #fff; font-weight: 800; cursor: pointer; }
         .btn.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
         .btn:disabled { opacity: 0.6; cursor: default; }
@@ -979,41 +981,32 @@ $fmtVnd = function (int $v): string {
         <?= $posterTxCountError !== '' ? (' • poster_err=' . htmlspecialchars($posterTxCountError)) : '' ?>
     </div>
 
-    <?php if ($sepayWebhookMeta['last_body'] !== ''): ?>
-        <details class="card" style="padding: 10px 12px; margin: 0 0 10px;">
-            <summary style="font-weight: 900; cursor: pointer;">Последнее тело запроса (SePay)</summary>
-            <div class="muted" style="margin-top: 8px;">
-                <?= $sepayWebhookMeta['last_body_sha256'] !== '' ? ('sha256=' . htmlspecialchars($sepayWebhookMeta['last_body_sha256'])) : '' ?>
-                <?= $sepayWebhookMeta['last_body_truncated'] === '1' ? ' • truncated=1' : '' ?>
-            </div>
-            <pre style="white-space: pre-wrap; word-break: break-word; margin: 10px 0 0; padding: 10px; background: #0b1220; color: #e5e7eb; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);"><?= htmlspecialchars($sepayWebhookMeta['last_body']) ?></pre>
-        </details>
-    <?php endif; ?>
-
     <div class="card">
-        <form method="GET" class="toolbar" style="margin-bottom: 10px;">
-            <input type="date" name="date" value="<?= htmlspecialchars($date) ?>" class="btn" style="padding: 8px 10px;">
-            <button class="btn" type="submit">Открыть</button>
-        </form>
+        <div class="toolbar toolbar-line" style="margin-bottom: 10px;">
+            <form method="GET">
+                <input type="date" name="date" value="<?= htmlspecialchars($date) ?>" class="btn" style="padding: 8px 10px;">
+                <button class="btn" type="submit">Открыть</button>
+            </form>
 
-        <form method="POST" class="toolbar">
-            <input type="hidden" name="action" value="load_poster_checks">
-            <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
-            <button class="btn primary" type="submit">Загрузить чеки из Poster</button>
-        </form>
+            <form method="POST">
+                <input type="hidden" name="action" value="load_poster_checks">
+                <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
+                <button class="btn primary" type="submit">Загрузить чеки из Poster</button>
+            </form>
 
-        <form method="POST" class="toolbar">
-            <input type="hidden" name="action" value="clear_sepay">
-            <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
-            <button class="btn" type="submit" name="scope" value="day" onclick="return confirm('Очистить SePay за выбранную дату?')">Очистить SePay (дата)</button>
-            <button class="btn" type="submit" name="scope" value="all" onclick="return confirm('Очистить SePay полностью?')">Очистить SePay (всё)</button>
-        </form>
+            <form method="POST">
+                <input type="hidden" name="action" value="clear_sepay">
+                <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
+                <button class="btn" type="submit" name="scope" value="day" onclick="return confirm('Очистить SePay за выбранную дату?')">Очистить SePay (дата)</button>
+                <button class="btn" type="submit" name="scope" value="all" onclick="return confirm('Очистить SePay полностью?')">Очистить SePay (всё)</button>
+            </form>
 
-        <form method="POST" class="toolbar">
-            <input type="hidden" name="action" value="reload_sepay_api">
-            <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
-            <button class="btn" type="submit" onclick="return confirm('Перезагрузить SePay за выбранную дату по API? Это перезапишет данные за день.')">Перезагрузить SePay (API)</button>
-        </form>
+            <form method="POST">
+                <input type="hidden" name="action" value="reload_sepay_api">
+                <input type="hidden" name="date" value="<?= htmlspecialchars($date) ?>">
+                <button class="btn" type="submit" onclick="return confirm('Перезагрузить SePay за выбранную дату по API? Это перезапишет данные за день.')">Перезагрузить SePay (API)</button>
+            </form>
+        </div>
 
         <div class="divider"></div>
 
