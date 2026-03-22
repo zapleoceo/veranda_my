@@ -808,7 +808,36 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    if (count($sepayIds) > 1 && count($posterIds) > 1) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Нельзя: выбери 1 платеж и много чеков или 1 чек и много платежей.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     try {
+        if (count($sepayIds) === 1) {
+            $sid = (int)$sepayIds[0];
+            foreach ($posterIds as $pid) {
+                $other = (int)$db->query(
+                    "SELECT 1 FROM {$pl} WHERE poster_transaction_id = ? AND sepay_id <> ? LIMIT 1",
+                    [(int)$pid, $sid]
+                )->fetchColumn();
+                if ($other === 1) {
+                    throw new \Exception('Чек уже привязан к другому платежу (получится много-ко-много).');
+                }
+            }
+        } elseif (count($posterIds) === 1) {
+            $pid = (int)$posterIds[0];
+            foreach ($sepayIds as $sid) {
+                $other = (int)$db->query(
+                    "SELECT 1 FROM {$pl} WHERE sepay_id = ? AND poster_transaction_id <> ? LIMIT 1",
+                    [(int)$sid, $pid]
+                )->fetchColumn();
+                if ($other === 1) {
+                    throw new \Exception('Платеж уже привязан к другому чеку (получится много-ко-много).');
+                }
+            }
+        }
+
         $inserted = 0;
         foreach ($posterIds as $pid) {
             foreach ($sepayIds as $sid) {
@@ -1960,7 +1989,8 @@ $fmtVnd = function (int $v): string {
 
     const updateLinkButtonState = () => {
         if (!linkMakeBtn) return;
-        linkMakeBtn.disabled = !(selectedSepay.size > 0 && selectedPoster.size > 0);
+        const ok = (selectedSepay.size > 0 && selectedPoster.size > 0 && !(selectedSepay.size > 1 && selectedPoster.size > 1));
+        linkMakeBtn.disabled = !ok;
     };
 
     const updateHideButtonState = () => {
@@ -2107,6 +2137,10 @@ $fmtVnd = function (int $v): string {
             const sepayIds = Array.from(selectedSepay.values()).map((v) => Number(v)).filter((v) => v > 0);
             const posterIds = Array.from(selectedPoster.values()).map((v) => Number(v)).filter((v) => v > 0);
             if (!sepayIds.length || !posterIds.length) return;
+            if (sepayIds.length > 1 && posterIds.length > 1) {
+                alert('Нельзя: выбери 1 платеж и много чеков или 1 чек и много платежей.');
+                return;
+            }
             sendManualLinks(sepayIds, posterIds)
                 .then(() => clearCheckboxes())
                 .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));

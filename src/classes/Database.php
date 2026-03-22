@@ -376,14 +376,16 @@ class Database {
             $hasIdxSepay = false;
             $hasIdxPoster = false;
             $hasUqPair = false;
+            $indexCols = [];
             foreach ($idx as $i) {
                 $name = (string)($i['Key_name'] ?? '');
                 $nonUnique = (int)($i['Non_unique'] ?? 1);
-                if ($name === 'uq_link_sepay' && $nonUnique === 0) {
-                    $this->pdo->exec("ALTER TABLE {$pl} DROP INDEX uq_link_sepay");
-                }
-                if ($name === 'uq_link_poster' && $nonUnique === 0) {
-                    $this->pdo->exec("ALTER TABLE {$pl} DROP INDEX uq_link_poster");
+                $col = (string)($i['Column_name'] ?? '');
+                $seq = (int)($i['Seq_in_index'] ?? 0);
+                if ($name !== '' && $seq > 0 && $col !== '') {
+                    if (!isset($indexCols[$name])) $indexCols[$name] = ['non_unique' => $nonUnique, 'cols' => []];
+                    $indexCols[$name]['non_unique'] = $nonUnique;
+                    $indexCols[$name]['cols'][$seq] = $col;
                 }
                 if ($name === 'idx_link_sepay') {
                     $hasIdxSepay = true;
@@ -393,6 +395,19 @@ class Database {
                 }
                 if ($name === 'uq_link_pair' && $nonUnique === 0) {
                     $hasUqPair = true;
+                }
+            }
+
+            foreach ($indexCols as $name => $meta) {
+                $nonUnique = (int)($meta['non_unique'] ?? 1);
+                if ($nonUnique !== 0) continue;
+                $cols = $meta['cols'] ?? [];
+                ksort($cols);
+                $cols = array_values($cols);
+                if ($name === 'PRIMARY') continue;
+                if ($name === 'uq_link_pair') continue;
+                if ($cols === ['sepay_id'] || $cols === ['poster_transaction_id']) {
+                    $this->pdo->exec("ALTER TABLE {$pl} DROP INDEX {$name}");
                 }
             }
             if (!$hasIdxSepay) {
