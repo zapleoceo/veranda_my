@@ -814,6 +814,45 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
         exit;
     }
     try {
+        try {
+            $idxRows = $db->query("SHOW INDEX FROM {$pl}")->fetchAll();
+            $indexCols = [];
+            foreach ($idxRows as $i) {
+                if (!is_array($i)) continue;
+                $name = (string)($i['Key_name'] ?? '');
+                if ($name === '') continue;
+                $nonUnique = (int)($i['Non_unique'] ?? 1);
+                $col = (string)($i['Column_name'] ?? '');
+                $seq = (int)($i['Seq_in_index'] ?? 0);
+                if ($seq <= 0 || $col === '') continue;
+                if (!isset($indexCols[$name])) $indexCols[$name] = ['non_unique' => $nonUnique, 'cols' => []];
+                $indexCols[$name]['non_unique'] = $nonUnique;
+                $indexCols[$name]['cols'][$seq] = $col;
+            }
+            foreach ($indexCols as $name => $meta) {
+                if ($name === 'PRIMARY') continue;
+                $nonUnique = (int)($meta['non_unique'] ?? 1);
+                if ($nonUnique !== 0) continue;
+                $cols = $meta['cols'] ?? [];
+                ksort($cols);
+                $cols = array_values($cols);
+                if ($cols === ['sepay_id'] || $cols === ['poster_transaction_id']) {
+                    $db->query("ALTER TABLE {$pl} DROP INDEX {$name}");
+                }
+            }
+            $have = array_keys($indexCols);
+            if (!in_array('idx_link_sepay', $have, true)) {
+                $db->query("ALTER TABLE {$pl} ADD INDEX idx_link_sepay (sepay_id)");
+            }
+            if (!in_array('idx_link_poster', $have, true)) {
+                $db->query("ALTER TABLE {$pl} ADD INDEX idx_link_poster (poster_transaction_id)");
+            }
+            if (!in_array('uq_link_pair', $have, true)) {
+                $db->query("ALTER TABLE {$pl} ADD UNIQUE KEY uq_link_pair (poster_transaction_id, sepay_id)");
+            }
+        } catch (\Throwable $e) {
+        }
+
         if (count($sepayIds) === 1) {
             $sid = (int)$sepayIds[0];
             foreach ($posterIds as $pid) {
