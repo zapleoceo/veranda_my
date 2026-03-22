@@ -2,5 +2,6 @@ DirectorySlash Off
 
 RewriteEngine On
 
+RewriteRule ^links$ links/ [L,QSA,R=302]
 RewriteRule ^sepay/?$ sepay/index.php [L,QSA]
 RewriteRule ^payday/?$ payday/index.php [L,QSA]
