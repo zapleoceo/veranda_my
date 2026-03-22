@@ -1467,12 +1467,11 @@ $fmtVnd = function (int $v): string {
         <div class="actions">
             <div class="muted" style="display:flex; gap: 14px; flex-wrap: wrap; align-items:center; font-weight: 900;">
                 <div><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#e5e7eb; vertical-align:middle; margin-right:6px;"></span>строка: ручная связь</div>
-                <div><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#dcfce7; vertical-align:middle; margin-right:6px;"></span>строка: автосвязь (1↔1)</div>
-                <div><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#fef9c3; vertical-align:middle; margin-right:6px;"></span>строка: много‑ко‑много</div>
+                <div><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#dcfce7; vertical-align:middle; margin-right:6px;"></span>строка: автосвязь (четкая)</div>
+                <div><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#fef9c3; vertical-align:middle; margin-right:6px;"></span>строка: автосвязь (остаточный принцип)</div>
                 <div><span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:#dbeafe; vertical-align:middle; margin-right:6px;"></span>строка: Vietnam Company</div>
-                <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>линия: auto_green</div>
-                <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>линия: auto_yellow</div>
-                <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>линия: manual</div>
+                <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>линия: Автосвязь</div>
+                <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>линия: Ручная связь</div>
             </div>
         </div>
 
