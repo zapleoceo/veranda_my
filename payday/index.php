@@ -676,6 +676,7 @@ try {
         if (!is_array($txs)) $txs = [];
 
         $dup = false;
+        $expectedUserId = 4;
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
             $type = (int)($row['type'] ?? 0);
@@ -685,14 +686,10 @@ try {
             $toId = (int)$toRaw;
             if ($toId !== $accountTo) continue;
 
-            $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
-            $sumF = 0.0;
-            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
-            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
-            $sumInt = (int)round($sumF);
-            $sumVnd = $sumInt;
-            $sumVndFromCents = ($sumInt % 100 === 0) ? (int)round($sumInt / 100) : null;
-            if ($sumVnd !== $amountVnd && ($sumVndFromCents === null || $sumVndFromCents !== $amountVnd)) continue;
+            $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user_id'] ?? $row['user'] ?? $row['employee_id'] ?? null;
+            if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
+            $uId = (int)($uRaw ?? 0);
+            if ($uId !== 0 && $uId !== $expectedUserId) continue;
 
             $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
             $ts = null;
@@ -744,6 +741,177 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== '') {
         'at' => time(),
     ];
     header('Location: ?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo]));
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'create_transfer') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    if (!is_array($payload)) $payload = [];
+    $kind = (string)($payload['kind'] ?? '');
+    $dFrom = trim((string)($payload['dateFrom'] ?? ''));
+    $dTo = trim((string)($payload['dateTo'] ?? ''));
+    if (!in_array($kind, ['vietnam', 'tips'], true) || $dFrom === '' || $dTo === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $amountCents = 0;
+        if ($kind === 'vietnam') {
+            $amountCents = (int)$db->query(
+                "SELECT COALESCE(SUM(payed_card + payed_third_party), 0)
+                 FROM {$pc}
+                 WHERE day_date BETWEEN ? AND ?
+                   AND pay_type IN (2,3)
+                   AND (payed_card + payed_third_party) > 0
+                   AND poster_payment_method_id = 11",
+                [$dFrom, $dTo]
+            )->fetchColumn();
+        } else {
+            $amountCents = (int)$db->query(
+                "SELECT COALESCE(SUM(tip_sum), 0)
+                 FROM {$pc}
+                 WHERE day_date BETWEEN ? AND ?
+                   AND pay_type IN (2,3)
+                   AND (payed_card + payed_third_party) > 0
+                   AND tip_sum > 0",
+                [$dFrom, $dTo]
+            )->fetchColumn();
+        }
+        if ($amountCents <= 0) {
+            throw new \Exception($kind === 'vietnam'
+                ? 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за период.'
+                : 'Сумма = 0: нет tip_sum за период.'
+            );
+        }
+        $amountVnd = (int)$posterCentsToVnd($amountCents);
+        if ($amountVnd <= 0) {
+            throw new \Exception('Сумма для перевода = 0.');
+        }
+
+        $targetDate = $dTo . ' 23:55:00';
+        $targetTs = strtotime($targetDate);
+        $startTs = strtotime($dTo . ' 00:00:00');
+        $endTs = strtotime($dTo . ' 23:59:59');
+        if ($targetTs === false || $startTs === false || $endTs === false) {
+            throw new \Exception('Bad date');
+        }
+
+        $accountTo = $kind === 'vietnam' ? 9 : 8;
+        $comment = $kind === 'vietnam'
+            ? 'Перевод чеков вьетнаской компании'
+            : 'Перевод типсов';
+        $expectedUserId = 4;
+
+        $txs = [];
+        try {
+            $txs = $api->request('finance.getTransactions', [
+                'dateFrom' => str_replace('-', '', $dTo),
+                'dateTo' => str_replace('-', '', $dTo),
+            ]);
+        } catch (\Throwable $e) {
+            $txs = [];
+        }
+        if (!is_array($txs) || count($txs) === 0) {
+            try {
+                $txs = $api->request('finance.getTransactions', [
+                    'dateFrom' => date('dmY', $startTs),
+                    'dateTo' => date('dmY', $endTs),
+                ]);
+            } catch (\Throwable $e) {
+                $txs = [];
+            }
+        }
+        if (!is_array($txs)) $txs = [];
+
+        $found = null;
+        foreach ($txs as $row) {
+            if (!is_array($row)) continue;
+            if ((int)($row['type'] ?? 0) !== 2) continue;
+            $toRaw = $row['account_to_id'] ?? $row['account_to'] ?? $row['accountToId'] ?? $row['accountTo'] ?? 0;
+            if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+            if ((int)$toRaw !== $accountTo) continue;
+
+            $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
+            if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
+            $uId = (int)($uRaw ?? 0);
+            if ($uId !== 0 && $uId !== $expectedUserId) continue;
+
+            $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
+            $ts = null;
+            if (is_numeric($dRaw)) {
+                $n = (int)$dRaw;
+                if ($n > 2000000000000) $n = (int)round($n / 1000);
+                if ($n > 0) $ts = $n;
+            } elseif (is_string($dRaw) && trim($dRaw) !== '') {
+                $t = strtotime($dRaw);
+                if ($t !== false && $t > 0) $ts = $t;
+            }
+            if ($ts === null) continue;
+            if ($ts < $startTs || $ts > $endTs) continue;
+            if (abs($ts - $targetTs) > 60) continue;
+
+            $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
+            $sumF = 0.0;
+            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
+            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
+            $sumInt = (int)round($sumF);
+            $sumMaybe = ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
+
+            $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
+            $found = [
+                'ts' => $ts,
+                'sum' => $sumMaybe,
+                'comment' => $cmt !== '' ? $cmt : $comment,
+            ];
+            break;
+        }
+
+        if ($found !== null) {
+            echo json_encode([
+                'ok' => true,
+                'already' => true,
+                'date' => date('d.m.Y', (int)$found['ts']),
+                'time' => date('H:i:s', (int)$found['ts']),
+                'sum' => (int)$found['sum'],
+                'comment' => (string)$found['comment'],
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $api->request('finance.createTransactions', [
+            'type' => 2,
+            'user_id' => $expectedUserId,
+            'account_from' => 1,
+            'account_to' => $accountTo,
+            'amount_from' => $amountVnd,
+            'amount_to' => $amountVnd,
+            'date' => $targetDate,
+            'comment' => $comment,
+            'account_id' => 1,
+            'account_to_id' => $accountTo,
+            'sum' => $amountVnd,
+        ], 'POST');
+
+        echo json_encode([
+            'ok' => true,
+            'already' => false,
+            'date' => date('d.m.Y', (int)$targetTs),
+            'time' => date('H:i:s', (int)$targetTs),
+            'sum' => (int)$amountVnd,
+            'comment' => $comment,
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
     exit;
 }
 
@@ -1627,9 +1795,9 @@ try {
 
 $transferVietnamExists = false;
 $transferTipsExists = false;
+$transferVietnamFound = null;
+$transferTipsFound = null;
 try {
-    $vietnamAmountVnd = $financeVietnamCents !== null ? (int)$posterCentsToVnd((int)$financeVietnamCents) : 0;
-    $tipsAmountVnd = $financeTipsCents !== null ? (int)$posterCentsToVnd((int)$financeTipsCents) : 0;
     $targetTs = strtotime($dateTo . ' 23:55:00');
     $startTs = strtotime($dateTo . ' 00:00:00');
     $endTs = strtotime($dateTo . ' 23:59:59');
@@ -1661,13 +1829,12 @@ try {
             $accToRaw = $r['account_to_id'] ?? $r['account_to'] ?? $r['accountToId'] ?? $r['accountTo'] ?? 0;
             if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
             $accTo = (int)$accToRaw;
-            $sumRaw = $r['amount_from'] ?? $r['amountFrom'] ?? $r['amount_to'] ?? $r['amountTo'] ?? $r['sum'] ?? $r['amount'] ?? 0;
-            $sumF = 0.0;
-            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
-            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
-            $sumInt = (int)round($sumF);
-            $sumVnd = $sumInt;
-            $sumVndFromCents = ($sumInt % 100 === 0) ? (int)round($sumInt / 100) : null;
+            if ($accTo !== 9 && $accTo !== 8) continue;
+
+            $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
+            if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
+            $uId = (int)($uRaw ?? 0);
+            if ($uId !== 0 && $uId !== 4) continue;
 
             $dRaw = $r['date'] ?? $r['created_at'] ?? $r['createdAt'] ?? $r['time'] ?? $r['datetime'] ?? $r['date_time'] ?? $r['created'] ?? null;
             $ts = null;
@@ -1683,20 +1850,21 @@ try {
             if ($ts < $startTs || $ts > $endTs) continue;
             if (abs($ts - $targetTs) > 60) continue;
 
-            $matchVietnamSum = $vietnamAmountVnd > 0 && (
-                $sumVnd === $vietnamAmountVnd ||
-                ($sumVndFromCents !== null && $sumVndFromCents === $vietnamAmountVnd)
-            );
-            $matchTipsSum = $tipsAmountVnd > 0 && (
-                $sumVnd === $tipsAmountVnd ||
-                ($sumVndFromCents !== null && $sumVndFromCents === $tipsAmountVnd)
-            );
+            $sumRaw = $r['amount_from'] ?? $r['amountFrom'] ?? $r['amount_to'] ?? $r['amountTo'] ?? $r['sum'] ?? $r['amount'] ?? 0;
+            $sumF = 0.0;
+            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
+            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
+            $sumInt = (int)round($sumF);
+            $sumMaybe = ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
+            $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
 
-            if (!$transferVietnamExists && $accTo === 9 && $matchVietnamSum) {
+            if (!$transferVietnamExists && $accTo === 9) {
                 $transferVietnamExists = true;
+                $transferVietnamFound = ['ts' => $ts, 'sum' => $sumMaybe, 'comment' => $cmt];
             }
-            if (!$transferTipsExists && $accTo === 8 && $matchTipsSum) {
+            if (!$transferTipsExists && $accTo === 8) {
                 $transferTipsExists = true;
+                $transferTipsFound = ['ts' => $ts, 'sum' => $sumMaybe, 'comment' => $cmt];
             }
         }
     }
@@ -2084,6 +2252,22 @@ $fmtVnd = function (int $v): string {
             $tipsVnd = $tipsCents !== null ? $posterCentsToVnd((int)$tipsCents) : null;
             $vietnamDisabled = $transferVietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
             $tipsDisabled = $transferTipsExists || $tipsCents === null || (int)$tipsCents <= 0;
+            $vietnamFoundLine = null;
+            if ($transferVietnamFound !== null && isset($transferVietnamFound['ts'])) {
+                $ts = (int)$transferVietnamFound['ts'];
+                $sum = (int)($transferVietnamFound['sum'] ?? 0);
+                $cmt = trim((string)($transferVietnamFound['comment'] ?? ''));
+                if ($cmt === '') $cmt = 'Перевод чеков вьетнаской компании';
+                $vietnamFoundLine = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVnd($sum) . ' - ' . $cmt;
+            }
+            $tipsFoundLine = null;
+            if ($transferTipsFound !== null && isset($transferTipsFound['ts'])) {
+                $ts = (int)$transferTipsFound['ts'];
+                $sum = (int)($transferTipsFound['sum'] ?? 0);
+                $cmt = trim((string)($transferTipsFound['comment'] ?? ''));
+                if ($cmt === '') $cmt = 'Перевод типсов';
+                $tipsFoundLine = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVnd($sum) . ' - ' . $cmt;
+            }
             $vietnamDisabledReason = $vietnamCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за период.';
@@ -2097,13 +2281,20 @@ $fmtVnd = function (int $v): string {
                     <div style="font-weight:900;">Vietnam Company — Card payments</div>
                     <div class="muted"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd($vietnamVnd)) : '—' ?></div>
                 </div>
-                <form method="POST" style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
+                <form method="POST" class="finance-transfer" data-kind="vietnam" data-date-from="<?= htmlspecialchars($dateFrom) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="vietnam">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                     <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать перевод</button>
-                    <?php if ($transferVietnamExists): ?><div class="muted" style="color:#16a34a; font-weight:900;">Перевод уже создан</div><?php elseif ($vietnamDisabled): ?><div class="muted"><?= htmlspecialchars($vietnamDisabledReason) ?></div><?php endif; ?>
+                    <div class="muted finance-status">
+                        <?php if ($transferVietnamExists): ?>
+                            <span style="color:#16a34a; font-weight:900;">Найдена транзакция:</span>
+                            <span><?= htmlspecialchars((string)($vietnamFoundLine ?? '')) ?></span>
+                        <?php elseif ($vietnamDisabled): ?>
+                            <?= htmlspecialchars($vietnamDisabledReason) ?>
+                        <?php endif; ?>
+                    </div>
                 </form>
             </div>
 
@@ -2112,13 +2303,20 @@ $fmtVnd = function (int $v): string {
                     <div style="font-weight:900;">Card tips per shift</div>
                     <div class="muted"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd($tipsVnd)) : '—' ?></div>
                 </div>
-                <form method="POST" style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
+                <form method="POST" class="finance-transfer" data-kind="tips" data-date-from="<?= htmlspecialchars($dateFrom) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="tips">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                     <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать перевод</button>
-                    <?php if ($transferTipsExists): ?><div class="muted" style="color:#16a34a; font-weight:900;">Перевод уже создан</div><?php elseif ($tipsDisabled): ?><div class="muted"><?= htmlspecialchars($tipsDisabledReason) ?></div><?php endif; ?>
+                    <div class="muted finance-status">
+                        <?php if ($transferTipsExists): ?>
+                            <span style="color:#16a34a; font-weight:900;">Найдена транзакция:</span>
+                            <span><?= htmlspecialchars((string)($tipsFoundLine ?? '')) ?></span>
+                        <?php elseif ($tipsDisabled): ?>
+                            <?= htmlspecialchars($tipsDisabledReason) ?>
+                        <?php endif; ?>
+                    </div>
                 </form>
             </div>
         </div>
@@ -3079,6 +3277,48 @@ $fmtVnd = function (int $v): string {
                 try { scheduleRelayoutBurst(); } catch (e) {}
             })
             .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+        });
+    });
+    document.querySelectorAll('form.finance-transfer').forEach((form) => {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const btn = form.querySelector('button.btn');
+            const statusEl = form.querySelector('.finance-status');
+            if (btn && btn.disabled) return;
+            const kind = String(form.getAttribute('data-kind') || '');
+            const dateFrom = String(form.getAttribute('data-date-from') || '');
+            const dateTo = String(form.getAttribute('data-date-to') || '');
+            if (!kind || !dateFrom || !dateTo) return;
+            if (btn) {
+                btn.classList.add('loading');
+                btn.disabled = true;
+            }
+            fetch('?ajax=create_transfer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind, dateFrom, dateTo }),
+            })
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                const line = `${j.date || ''} - ${j.time || ''} - ${Number(j.sum || 0).toLocaleString('en-US')} ₫ - ${j.comment || ''}`.trim();
+                if (statusEl) {
+                    const label = j.already ? 'Найдена транзакция:' : 'Транзакция создана:';
+                    statusEl.innerHTML = `<span style="color:#16a34a; font-weight:900;">${label}</span> <span>${line}</span>`;
+                }
+                if (btn) {
+                    btn.classList.remove('loading');
+                    btn.disabled = true;
+                }
+            })
+            .catch((err) => {
+                const msg = err && err.message ? err.message : 'Ошибка';
+                if (statusEl) statusEl.textContent = msg;
+                if (btn) {
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
+                }
+            });
         });
     });
     document.querySelectorAll('input.poster-cb').forEach((cb) => {
