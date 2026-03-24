@@ -2159,6 +2159,9 @@ $fmtVnd = function (int $v): string {
                     <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>Авто 2</div>
                     <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>Ручная связь</div>
                 </div>
+                <div class="muted" style="text-align:center; font-weight:900; margin-top: 6px;">
+                    <span id="totalsDiff">—</span>
+                </div>
             </div>
 
             <div class="card" style="padding: 0;">
@@ -2231,10 +2234,11 @@ $fmtVnd = function (int $v): string {
                 </div>
                 <div class="muted" style="padding: 10px 12px; font-weight: 900;">
                     Итого: <span id="posterTotal"><?= htmlspecialchars($fmtVnd((int)$posterTotalVnd)) ?></span>
-                    • связанные: <span id="posterLinked">—</span>
-                    • несвязанные: <span id="posterUnlinked">—</span>
-                    • Bybit: <span><?= htmlspecialchars($fmtVnd((int)$posterBybitVnd)) ?></span>
-                    • VietComp: <span><?= htmlspecialchars($fmtVnd((int)$posterVietVnd)) ?></span>
+                    • Tips: <span id="posterTipsLinked">—</span>
+                    • в таблице связи: <span id="posterLinked">—</span>
+                    • несвязи: <span id="posterUnlinked">—</span>
+                    • BB: <span><?= htmlspecialchars($fmtVnd((int)$posterBybitVnd)) ?></span>
+                    • VC: <span><?= htmlspecialchars($fmtVnd((int)$posterVietVnd)) ?></span>
                 </div>
             </div>
         </div>
@@ -2854,14 +2858,24 @@ $fmtVnd = function (int $v): string {
         let posterTotal = 0;
         let posterLinked = 0;
         let posterUnlinked = 0;
+        let posterTipsLinked = 0;
+        let posterVietTotal = 0;
         document.querySelectorAll('#posterTable tbody tr[data-poster-id]').forEach((tr) => {
             const isVietnam = String(tr.getAttribute('data-vietnam') || '0') === '1';
-            if (isVietnam) return;
             const pid = Number(tr.getAttribute('data-poster-id') || 0);
             const sum = Number(tr.getAttribute('data-total') || 0) || 0;
+            const tips = Number(tr.getAttribute('data-tips') || 0) || 0;
+            if (isVietnam) {
+                posterVietTotal += sum;
+                return;
+            }
             posterTotal += sum;
-            if (state.poster.has(pid)) posterLinked += sum;
-            else posterUnlinked += sum;
+            if (state.poster.has(pid)) {
+                posterLinked += sum;
+                posterTipsLinked += tips;
+            } else {
+                posterUnlinked += sum;
+            }
         });
 
         const setText = (id, v) => {
@@ -2873,8 +2887,17 @@ $fmtVnd = function (int $v): string {
         setText('sepayLinked', sepayLinked);
         setText('sepayUnlinked', sepayUnlinked);
         setText('posterTotal', posterTotal);
+        setText('posterTipsLinked', posterTipsLinked);
         setText('posterLinked', posterLinked);
         setText('posterUnlinked', posterUnlinked);
+
+        const totalsDiffEl = document.getElementById('totalsDiff');
+        if (totalsDiffEl) {
+            const sepayNoVc = sepayTotal - posterVietTotal;
+            const diff = sepayNoVc - posterTotal;
+            const arrow = diff > 0 ? '←' : (diff < 0 ? '→' : '↔');
+            totalsDiffEl.textContent = `${arrow} ${fmtVnd(Math.abs(diff))}`;
+        }
     };
 
     const refreshLinks = () => {
