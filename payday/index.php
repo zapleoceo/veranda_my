@@ -2847,9 +2847,11 @@ $fmtVnd = function (int $v): string {
         let sepayTotal = 0;
         let sepayLinked = 0;
         let sepayUnlinked = 0;
+        const sepaySumById = new Map();
         document.querySelectorAll('#sepayTable tbody tr[data-sepay-id]').forEach((tr) => {
             const sid = Number(tr.getAttribute('data-sepay-id') || 0);
             const sum = Number(tr.getAttribute('data-sum') || 0) || 0;
+            if (sid > 0) sepaySumById.set(sid, sum);
             sepayTotal += sum;
             if (state.sepay.has(sid)) sepayLinked += sum;
             else sepayUnlinked += sum;
@@ -2859,14 +2861,14 @@ $fmtVnd = function (int $v): string {
         let posterLinked = 0;
         let posterUnlinked = 0;
         let posterTipsLinked = 0;
-        let posterVietTotal = 0;
+        const posterVietnam = new Set();
         document.querySelectorAll('#posterTable tbody tr[data-poster-id]').forEach((tr) => {
             const isVietnam = String(tr.getAttribute('data-vietnam') || '0') === '1';
             const pid = Number(tr.getAttribute('data-poster-id') || 0);
             const sum = Number(tr.getAttribute('data-total') || 0) || 0;
             const tips = Number(tr.getAttribute('data-tips') || 0) || 0;
             if (isVietnam) {
-                posterVietTotal += sum;
+                if (pid > 0) posterVietnam.add(pid);
                 return;
             }
             posterTotal += sum;
@@ -2893,7 +2895,20 @@ $fmtVnd = function (int $v): string {
 
         const totalsDiffEl = document.getElementById('totalsDiff');
         if (totalsDiffEl) {
-            const sepayNoVc = sepayTotal - posterVietTotal;
+            let vcSepaySum = 0;
+            if (Array.isArray(links) && posterVietnam.size > 0 && sepaySumById.size > 0) {
+                const vcSepayIds = new Set();
+                for (const l of links) {
+                    const pid = Number(l.poster_transaction_id || 0);
+                    if (!pid || !posterVietnam.has(pid)) continue;
+                    const sid = Number(l.sepay_id || 0);
+                    if (sid > 0) vcSepayIds.add(sid);
+                }
+                for (const sid of vcSepayIds) {
+                    vcSepaySum += Number(sepaySumById.get(sid) || 0);
+                }
+            }
+            const sepayNoVc = sepayTotal - vcSepaySum;
             const diff = sepayNoVc - posterTotal;
             const arrow = diff > 0 ? '←' : (diff < 0 ? '→' : '↔');
             totalsDiffEl.textContent = `${arrow} ${fmtVnd(Math.abs(diff))}`;
