@@ -2328,7 +2328,7 @@ $fmtVnd = function (int $v): string {
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 10px; margin-bottom: 10px;">
                 <div style="font-weight: 900;">Обновляем Балансы Poster</div>
                 <div style="display:flex; gap: 8px; align-items:center;">
-                    <button class="btn tiny" id="balanceSyncBtn" type="button" title="SINC">SINC</button>
+                    <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
                     <button class="btn" id="posterAccountsBtn" type="button" title="Обновить балансы">🔄</button>
                 </div>
             </div>
@@ -2480,15 +2480,24 @@ $fmtVnd = function (int $v): string {
     const parseVndCentsJs = (raw) => {
         const s = String(raw || '').trim();
         if (!s) return null;
-        const cleaned = s
-            .replaceAll('₫', '')
-            .replaceAll(' ', '')
-            .replaceAll(',', '.')
-            .trim();
+        const cleaned = s.replace(/[^\d.,-]/g, '').replaceAll(' ', '').replaceAll(',', '.').trim();
         if (!cleaned) return null;
         const n = Number(cleaned);
         if (!Number.isFinite(n)) return null;
         return Math.round(n * 100);
+    };
+    const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
+    const sanitizeInputDigits = (el) => {
+        if (!el) return;
+        const v = digitsOnly(el.value);
+        el.value = v;
+    };
+    const updateTotalActual = () => {
+        const a = Number(digitsOnly(balAndreyActualEl ? balAndreyActualEl.value : '')) || 0;
+        const v = Number(digitsOnly(balVietnamActualEl ? balVietnamActualEl.value : '')) || 0;
+        const c = Number(digitsOnly(balCashActualEl ? balCashActualEl.value : '')) || 0;
+        const sum = a + v + c;
+        if (balTotalActualEl) balTotalActualEl.value = String(sum);
     };
 
     const setDiff = (el, diffCents) => {
@@ -2589,12 +2598,26 @@ $fmtVnd = function (int $v): string {
         if (balCashActualEl) balCashActualEl.value = localStorage.getItem('payday_bal_cash') || '';
         if (balTotalActualEl) balTotalActualEl.value = localStorage.getItem('payday_bal_total') || '';
     } catch (_) {}
+    sanitizeInputDigits(balAndreyActualEl);
+    sanitizeInputDigits(balVietnamActualEl);
+    sanitizeInputDigits(balCashActualEl);
+    updateTotalActual();
     updateBalanceDiffs();
 
-    [balAndreyActualEl, balVietnamActualEl, balCashActualEl, balTotalActualEl].forEach((el) => {
+    [balAndreyActualEl, balVietnamActualEl, balCashActualEl].forEach((el) => {
         if (!el) return;
-        el.addEventListener('input', () => updateBalanceDiffs(), { passive: true });
+        el.addEventListener('input', () => {
+            sanitizeInputDigits(el);
+            updateTotalActual();
+            updateBalanceDiffs();
+        }, { passive: true });
     });
+    if (balTotalActualEl) {
+        balTotalActualEl.addEventListener('input', () => {
+            sanitizeInputDigits(balTotalActualEl);
+            updateBalanceDiffs();
+        }, { passive: true });
+    }
 
     if (balanceSyncBtn) {
         balanceSyncBtn.addEventListener('click', () => {
