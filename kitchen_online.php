@@ -24,6 +24,7 @@ $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
 $tgChatIdEnv = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
+$tgChatUsername = trim((string)($_ENV['TELEGRAM_CHAT_USERNAME'] ?? $_ENV['TG_CHAT_USERNAME'] ?? ''));
 $tgChatInternalId = '';
 if ($tgChatIdEnv !== '') {
     $tmp = $tgChatIdEnv;
@@ -184,8 +185,12 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                                     if ($tgLastEditAt !== '' && strtotime($tgLastEditAt) > strtotime($tgSentAt)) {
                                         $tgTitle .= '; обновлено ' . date('H:i:s', strtotime($tgLastEditAt));
                                     }
-                                    if ($tgChatInternalId !== '' && $tgMsgId > 0) {
-                                        $tgHref = 'https://t.me/c/' . $tgChatInternalId . '/' . $tgMsgId;
+                                    if ($tgMsgId > 0) {
+                                        if ('<?= htmlspecialchars($tgChatUsername, ENT_QUOTES) ?>' !== '') {
+                                            $tgHref = 'https://t.me/<?= htmlspecialchars($tgChatUsername, ENT_QUOTES) ?>/' + $tgMsgId;
+                                        } else if ('<?= htmlspecialchars($tgChatInternalId, ENT_QUOTES) ?>' !== '') {
+                                            $tgHref = 'https://t.me/c/<?= htmlspecialchars($tgChatInternalId, ENT_QUOTES) ?>/' + $tgMsgId;
+                                        }
                                     }
                                 }
                             ?>
@@ -724,6 +729,7 @@ $dashboardQuery = http_build_query([
             }
             activeCtrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
             loading = true;
+            isRefreshing = true;
             try {
                 const params = new URLSearchParams();
                 params.set('ajax', '1');
@@ -747,6 +753,7 @@ $dashboardQuery = http_build_query([
             } finally {
                 if (mySeq === reqSeq) {
                     loading = false;
+                    isRefreshing = false;
                 }
             }
         };
@@ -850,15 +857,16 @@ $dashboardQuery = http_build_query([
                 refreshCircleLen = 0;
             }
         }
+        let isRefreshing = false;
         const renderRefreshCountdown = () => {
             const now = Date.now();
             const durMs = refreshIntervalSec * 1000;
             const elapsed = Math.max(0, Math.min(durMs, now - refreshCycleStartedAt));
             const remainingMs = Math.max(0, durMs - elapsed);
             const remainingSec = Math.max(0, Math.floor((Math.max(0, remainingMs) - 1) / 1000));
-            if (refreshInEl) refreshInEl.textContent = String(remainingSec);
+            if (refreshInEl) refreshInEl.textContent = isRefreshing ? '…' : String(remainingSec);
             if (refreshProgressEl && refreshCircleLen > 0) {
-                const progress = elapsed / durMs;
+                const progress = isRefreshing ? 0 : (elapsed / durMs);
                 refreshProgressEl.style.strokeDashoffset = String(refreshCircleLen * (1 - progress));
             }
         };

@@ -39,6 +39,38 @@ try {
     } catch (\Throwable $e) {
     }
 
+    try {
+        $statusText = 'Открыто чеков: ' . htmlspecialchars($openChecksDisplay) . "\n";
+        $statusText .= 'Лимит времени: ' . (int)$waitLimit . " мин\n";
+        $statusText .= 'Долгих блюд: ' . (int)$overdueAll . "\n";
+        $statusText .= 'Время обновления: ' . date('Y-m-d H:i:s');
+        $statusHash = sha1($statusText);
+        $prevStatusId = (int)$getMeta('telegram_status_msg_id', '0');
+        $prevStatusHash = (string)$getMeta('telegram_status_msg_hash', '');
+        if ($prevStatusId > 0 && $prevStatusHash === $statusHash) {
+            // do nothing
+        } elseif ($prevStatusId > 0) {
+            $ok = $bot->editMessageText($prevStatusId, $statusText, null);
+            if (!$ok) {
+                $newId = $bot->sendMessageGetId($statusText, $tgThreadId);
+                if ($newId) {
+                    $setMeta('telegram_status_msg_id', (string)$newId);
+                    $setMeta('telegram_status_msg_hash', $statusHash);
+                }
+            } else {
+                $setMeta('telegram_status_msg_hash', $statusHash);
+            }
+        } else {
+            $newId = $bot->sendMessageGetId($statusText, $tgThreadId);
+            if ($newId) {
+                $setMeta('telegram_status_msg_id', (string)$newId);
+                $setMeta('telegram_status_msg_hash', $statusHash);
+            }
+        }
+    } catch (\Throwable $e) {
+        $logLine('STATUS_FAIL ' . $e->getMessage());
+    }
+
     $db->query(
         "CREATE TABLE IF NOT EXISTS {$tgThreads} (
             transaction_date DATE NOT NULL,
@@ -303,14 +335,14 @@ try {
             ['text' => 'Игнор Чек‼️', 'callback_data' => 'ignore_tx:' . $txId],
         ]];
 
-        $text = '<b>Откр чеков</b> ' . htmlspecialchars($openChecksDisplay) . ' <b>Лимит времени</b> ' . (int)$waitLimit . " мин\n";
-        $text .= '<b>Чек:' . htmlspecialchars($receipt) . '|Стол ' . htmlspecialchars($table) . "</b>\n";
-        $text .= htmlspecialchars($waiter);
+        $text = '<b>Чек: ' . htmlspecialchars($receipt) . ' | Стол ' . htmlspecialchars($table) . "</b>\n";
+        $text .= 'Офик: ' . htmlspecialchars($waiter);
         if ($comment !== '') {
             $text .= ' <i>' . htmlspecialchars($comment) . '</i>';
         }
         $text .= "\n";
-        $text .= '• ' . htmlspecialchars($dish) . ' - Старт:<b>' . htmlspecialchars($start) . '</b> Ждет:<b>' . $elapsed . '</b>';
+        $text .= 'Блюдо: ' . htmlspecialchars($dish) . "\n";
+        $text .= 'Старт: <b>' . htmlspecialchars($start) . '</b> Ждет: <b>' . $elapsed . '</b>';
 
         $textHash = sha1($text . '|' . json_encode($keyboard, JSON_UNESCAPED_UNICODE));
         $prev = $existingByItem[$kid] ?? null;
