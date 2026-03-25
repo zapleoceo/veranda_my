@@ -3,7 +3,7 @@
 require_once __DIR__ . '/auth_check.php';
 veranda_require('admin');
 
-$view = (string)($_GET['view'] ?? 'kitchen');
+$view = (string)($_REQUEST['view'] ?? 'kitchen');
 $lines = (int)($_GET['lines'] ?? 200);
 if ($lines < 50) $lines = 50;
 if ($lines > 800) $lines = 800;
@@ -19,6 +19,19 @@ if (!array_key_exists($view, $logMap)) {
     $view = 'kitchen';
 }
 $path = $logMap[$view];
+$message = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'clear_log') {
+    if (array_key_exists($view, $logMap)) {
+        $path = $logMap[$view];
+        @file_put_contents($path, '');
+        header('Location: logs.php?view=' . urlencode($view) . '&lines=' . (int)$lines . '&cleared=1');
+        exit;
+    }
+}
+if (!empty($_GET['cleared'])) {
+    $message = 'Лог очищен.';
+}
 
 $tailFile = function (string $filePath, int $maxLines): string {
     if (!is_file($filePath)) return '';
@@ -27,6 +40,7 @@ $tailFile = function (string $filePath, int $maxLines): string {
     if (count($data) > $maxLines) {
         $data = array_slice($data, -$maxLines);
     }
+    $data = array_reverse($data);
     return implode("\n", $data);
 };
 
@@ -109,6 +123,7 @@ $fileInfo = function (string $filePath): array {
         .filters label { display:block; font-size:12px; font-weight:800; text-transform:uppercase; color:#6b7280; margin-bottom:6px; }
         .in { padding:8px 10px; border:1px solid #d1d5db; border-radius:10px; background:#fff; }
         .btn { padding:9px 16px; border-radius:10px; border:0; background:#1a73e8; color:#fff; font-weight:800; cursor:pointer; }
+        .btn-danger { padding:9px 16px; border-radius:10px; border:0; background:#d32f2f; color:#fff; font-weight:800; cursor:pointer; }
         table { width: 100%; border-collapse: collapse; margin-top: 12px; }
         th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid #eee; vertical-align: top; }
         th { background: #f8f9fa; color: #65676b; font-size: 13px; text-transform: uppercase; font-weight: 600; }
@@ -174,7 +189,12 @@ $fileInfo = function (string $filePath): array {
     </div>
 
     <div class="card">
-        <form method="get" class="filters">
+        <?php if ($message !== ''): ?>
+            <div class="pill ok" style="margin-bottom:12px;"><?= htmlspecialchars($message) ?></div>
+        <?php endif; ?>
+
+        <div class="filters">
+        <form method="get" class="filters" style="margin-bottom:0;">
             <div>
                 <label for="view">Лог</label>
                 <select class="in" id="view" name="view">
@@ -193,6 +213,12 @@ $fileInfo = function (string $filePath): array {
                 <?= is_file($path) ? htmlspecialchars(basename($path)) : 'Файл не найден' ?>
             </div>
         </form>
+        <form method="post" class="filters" style="margin-bottom:0;">
+            <input type="hidden" name="action" value="clear_log">
+            <input type="hidden" name="view" value="<?= htmlspecialchars($view, ENT_QUOTES) ?>">
+            <button class="btn-danger" type="submit">Очистить</button>
+        </form>
+        </div>
 
         <pre><?= htmlspecialchars($content !== '' ? $content : '—') ?></pre>
     </div>
