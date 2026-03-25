@@ -188,7 +188,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                                         $tgTitle .= '; обновлено ' . date('H:i:s', strtotime($tgLastEditAt));
                                     }
                                     if ($tgMsgId > 0) {
-                                        $th = (int)<?= (int)$tgThreadIdVal ?>;
+                                        $th = (int)$tgThreadIdVal;
                                         $uname = '<?= htmlspecialchars($tgChatUsername, ENT_QUOTES) ?>';
                                         $internal = '<?= htmlspecialchars($tgChatInternalId, ENT_QUOTES) ?>';
                                         if ($uname !== '') {
