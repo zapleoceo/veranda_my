@@ -1205,7 +1205,14 @@ if ($tab === 'menu' || $tab === 'categories') {
                         'at_key' => 'telegram_last_run_at',
                         'result_key' => 'telegram_last_run_result',
                         'error_key' => 'telegram_last_run_error',
-                        'desc' => 'Отправляет/обновляет уведомления в Telegram по долгим позициям. Снимает уведомления после готовности/закрытия/игнора.',
+                        'desc' => 'Отправляет/обновляет уведомления в Telegram по долгим блюдам (по блюду, не по чеку). Удаляет уведомления при готовности/закрытии/игноре.',
+                    ],
+                    [
+                        'label' => 'Kitchen resync job',
+                        'at_key' => 'kitchen_resync_job_last_update_at',
+                        'result_key' => 'kitchen_resync_job_progress',
+                        'error_key' => 'kitchen_resync_job_error',
+                        'desc' => 'Фоновый пересинк кухни за диапазон дат. Нужен для пересчёта статистики за периоды без 504 таймаутов.',
                     ],
                     [
                         'label' => 'Menu sync',
@@ -1255,6 +1262,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 <?php
                     $disabled = strtolower((string)ini_get('disable_functions'));
                     $canExec = function_exists('exec') && ($disabled === '' || strpos($disabled, 'exec') === false);
+                    $phpBin = (defined('PHP_BINARY') && is_string(PHP_BINARY) && PHP_BINARY !== '') ? PHP_BINARY : 'php';
                 ?>
                 <form method="post" style="margin-top: 12px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
                     <input type="hidden" name="run_script" value="1">
@@ -1262,7 +1270,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                         <label for="script_name">Скрипт</label>
                         <select name="script_name" id="script_name">
                             <option value="kitchen_cron" data-desc="cron.php — синк кухни за сегодня (kitchen_stats), обновляет Kitchen Online / Dashboard / Rawdata.">Кухня: синк за сегодня</option>
-                            <option value="kitchen_resync_range" data-desc="scripts/kitchen/resync_range.php — пересинк кухни за диапазон дат (аккуратно).">Кухня: пересинк диапазон</option>
+                            <option value="kitchen_resync_range" data-desc="scripts/kitchen/resync_range.php — пересинк кухни за диапазон дат (фоновой запуск, чтобы не ловить 504).">Кухня: пересинк диапазон</option>
                             <option value="kitchen_prob_close" data-desc="scripts/kitchen/backfill_prob_close_at.php — пересчёт логического закрытия (ProbCloseTime).">Пересчёт ВрЛогЗакр</option>
                             <option value="menu_cron" data-desc="menu_cron.php — синк меню из Poster (poster_menu_items + справочники).">Меню: синк из Poster</option>
                             <option value="tg_alerts" data-desc="telegram_alerts.php — отправка/обновление Telegram уведомлений.">Telegram: уведомления</option>
@@ -1291,16 +1299,19 @@ if ($tab === 'menu' || $tab === 'categories') {
                         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d');
 
                         $cmd = null;
+                        $isBackground = false;
                         if ($script === 'kitchen_cron') {
-                            $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/cron.php');
+                            $cmd = $phpBin . ' ' . escapeshellarg(__DIR__ . '/cron.php');
                         } elseif ($script === 'kitchen_resync_range') {
-                            $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/scripts/kitchen/resync_range.php') . ' ' . escapeshellarg($dateFrom) . ' ' . escapeshellarg($dateTo);
+                            $jobId = date('Ymd_His');
+                            $cmd = $phpBin . ' ' . escapeshellarg(__DIR__ . '/scripts/kitchen/resync_range.php') . ' ' . escapeshellarg($dateFrom) . ' ' . escapeshellarg($dateTo) . ' ' . escapeshellarg($jobId);
+                            $isBackground = true;
                         } elseif ($script === 'kitchen_prob_close') {
-                            $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/scripts/kitchen/backfill_prob_close_at.php');
+                            $cmd = $phpBin . ' ' . escapeshellarg(__DIR__ . '/scripts/kitchen/backfill_prob_close_at.php');
                         } elseif ($script === 'menu_cron') {
-                            $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/menu_cron.php');
+                            $cmd = $phpBin . ' ' . escapeshellarg(__DIR__ . '/menu_cron.php');
                         } elseif ($script === 'tg_alerts') {
-                            $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/telegram_alerts.php');
+                            $cmd = $phpBin . ' ' . escapeshellarg(__DIR__ . '/telegram_alerts.php');
                         }
 
                         if (!$canExec) {
@@ -1308,7 +1319,12 @@ if ($tab === 'menu' || $tab === 'categories') {
                         } elseif ($cmd) {
                             $out = [];
                             $code = 0;
-                            exec($cmd . ' 2>&1', $out, $code);
+                            if ($isBackground) {
+                                $logFile = __DIR__ . '/resync_range.log';
+                                exec($cmd . ' >> ' . escapeshellarg($logFile) . ' 2>&1 & echo $!', $out, $code);
+                            } else {
+                                exec($cmd . ' 2>&1', $out, $code);
+                            }
                             if (count($out) > 200) $out = array_slice($out, -200);
                             echo '<pre style="margin-top:12px; white-space:pre-wrap; word-break:break-word; background:#0b1020; color:#e5e7eb; padding:12px; border-radius:12px; overflow:auto; max-height:360px;">' . htmlspecialchars("exit={$code}\n" . implode("\n", $out)) . '</pre>';
                         } else {
