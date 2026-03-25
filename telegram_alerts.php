@@ -111,7 +111,7 @@ try {
     try {
         $lastSyncAt = $getMeta('poster_last_sync_at', '');
         $last = $lastSyncAt !== '' ? strtotime($lastSyncAt) : 0;
-        if ($last <= 0 || (time() - $last) >= 5) {
+        if ($last <= 0 || (time() - $last) >= 15) {
             $analytics = new \App\Classes\KitchenAnalytics($api);
             $stats = $analytics->getDailyStats($today);
             if (is_array($stats) && count($stats) > 0) {
