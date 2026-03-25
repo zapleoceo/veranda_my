@@ -147,7 +147,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
         <div class="ko-card" data-tx-id="<?= (int)$c['transaction_id'] ?>">
             <div class="ko-card-header">
                 <div class="ko-card-top">
-                    <div class="ko-title">Чек <?= htmlspecialchars($receiptLabel) ?></div>
+                    <div class="ko-title"># <?= htmlspecialchars($receiptLabel) ?></div>
                     <div class="ko-table">Стол: <?= htmlspecialchars($table !== '' ? $table : '—') ?></div>
                 </div>
                 <div class="ko-meta">
@@ -167,7 +167,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                     <div class="ko-item<?= $isOverdue ? ' ko-item-overdue' : '' ?>" data-sent-ts="<?= (int)$sentTs ?>"<?= !empty($it['item_id']) ? (' data-item-id="' . (int)$it['item_id'] . '"') : '' ?>>
                         <div class="ko-item-name"><?= htmlspecialchars($it['dish_name'] ?: ('Dish #' . (int)$it['dish_id'])) ?></div>
                         <div class="ko-item-row">
-                            <span class="ko-item-sent">Пришло: <?= htmlspecialchars($sentLabel) ?></span>
+                            <span class="ko-item-sent">Старт: <?= htmlspecialchars($sentLabel) ?></span>
                             <?php if ($sentTs > 0): ?>
                                 <span class="ko-item-wait live-wait" data-sent-ts="<?= $sentTs ?>"><span class="wait-spinner" aria-hidden="true"></span><span class="live-time">00:00</span></span>
                             <?php else: ?>
