@@ -645,6 +645,7 @@ $dashboardQuery = http_build_query([
         let seenIds = null;
         let soundMuted = false;
         let audioCtx = null;
+        let isRefreshing = false;
 
         const loadMuted = () => {
             try { soundMuted = (localStorage.getItem('ko_sound_muted') === '1'); } catch (_) { soundMuted = false; }
@@ -862,7 +863,6 @@ $dashboardQuery = http_build_query([
                 refreshCircleLen = 0;
             }
         }
-        let isRefreshing = false;
         const renderRefreshCountdown = () => {
             const now = Date.now();
             const durMs = refreshIntervalSec * 1000;
