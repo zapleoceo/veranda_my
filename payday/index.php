@@ -2362,7 +2362,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;">
                             <span id="balAndrey" data-cents="<?= $posterBalanceAndrey !== null ? (int)$posterBalanceAndrey : '' ?>"><?= $posterBalanceAndrey !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceAndrey)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balAndreyActual" type="text" inputmode="decimal" placeholder="0.00"></td>
+                        <td style="text-align:right;"><input id="balAndreyActual" type="text" inputmode="decimal" placeholder="0.00" style="text-align:right;"></td>
                         <td style="text-align:right;"><span id="balAndreyDiff">—</span></td>
                     </tr>
                     <tr data-key="vietnam">
@@ -2370,7 +2370,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;">
                             <span id="balVietnam" data-cents="<?= $posterBalanceVietnam !== null ? (int)$posterBalanceVietnam : '' ?>"><?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceVietnam)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balVietnamActual" type="text" inputmode="decimal" placeholder="0.00"></td>
+                        <td style="text-align:right;"><input id="balVietnamActual" type="text" inputmode="decimal" placeholder="0.00" style="text-align:right;"></td>
                         <td style="text-align:right;"><span id="balVietnamDiff">—</span></td>
                     </tr>
                     <tr data-key="cash">
@@ -2378,7 +2378,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;">
                             <span id="balCash" data-cents="<?= $posterBalanceCash !== null ? (int)$posterBalanceCash : '' ?>"><?= $posterBalanceCash !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceCash)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balCashActual" type="text" inputmode="decimal" placeholder="0.00"></td>
+                        <td style="text-align:right;"><input id="balCashActual" type="text" inputmode="decimal" placeholder="0.00" style="text-align:right;"></td>
                         <td style="text-align:right;"><span id="balCashDiff">—</span></td>
                     </tr>
                     <tr data-key="total">
@@ -2386,7 +2386,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;">
                             <span id="balTotal" data-cents="<?= $posterBalanceTotal !== null ? (int)$posterBalanceTotal : '' ?>"><?= $posterBalanceTotal !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceTotal)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balTotalActual" type="text" inputmode="decimal" placeholder="0.00"></td>
+                        <td style="text-align:right;"><input id="balTotalActual" type="text" inputmode="decimal" placeholder="0.00" style="text-align:right;" readonly></td>
                         <td style="text-align:right;"><span id="balTotalDiff">—</span></td>
                     </tr>
                     </tbody>
