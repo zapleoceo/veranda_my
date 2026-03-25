@@ -46,6 +46,18 @@ try {
     $db->query("ALTER TABLE {$ks} ADD COLUMN transaction_comment TEXT NULL");
 } catch (\Throwable $e) {
 }
+try {
+    $db->query("ALTER TABLE {$ks} ADD COLUMN tg_message_id BIGINT NULL");
+} catch (\Throwable $e) {
+}
+try {
+    $db->query("ALTER TABLE {$ks} ADD COLUMN tg_sent_at DATETIME NULL");
+} catch (\Throwable $e) {
+}
+try {
+    $db->query("ALTER TABLE {$ks} ADD COLUMN tg_last_edit_at DATETIME NULL");
+} catch (\Throwable $e) {
+}
 
 try {
     $api = new \App\Classes\PosterAPI($token);
@@ -455,9 +467,8 @@ if ($isAjax) {
         try {
             $rows = $db->query(
                 "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.transaction_comment, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
-                        tga.created_at AS tg_sent_at, tga.updated_at AS tg_last_edit_at, tga.message_id AS tg_message_id
+                        ks.tg_sent_at, ks.tg_last_edit_at, ks.tg_message_id
                  FROM {$ks} ks
-                 LEFT JOIN {$tgItems} tga ON tga.transaction_date = ks.transaction_date AND tga.kitchen_stats_id = ks.id
                  WHERE transaction_date = ?
                    AND status = 1
                    AND ready_pressed_at IS NULL
@@ -472,7 +483,7 @@ if ($isAjax) {
         } catch (\Throwable $e) {
             $rows = $db->query(
                 "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.transaction_comment, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
-                        NULL AS tg_sent_at, NULL AS tg_last_edit_at, NULL AS tg_message_id
+                        ks.tg_sent_at, ks.tg_last_edit_at, ks.tg_message_id
                  FROM {$ks} ks
                  WHERE transaction_date = ?
                    AND status = 1

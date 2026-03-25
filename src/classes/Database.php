@@ -83,6 +83,18 @@ class Database {
             $this->pdo->exec("ALTER TABLE {$ks} ADD COLUMN transaction_comment TEXT NULL");
         } catch (\Throwable $e) {
         }
+        try {
+            $this->pdo->exec("ALTER TABLE {$ks} ADD COLUMN tg_message_id BIGINT NULL");
+        } catch (\Throwable $e) {
+        }
+        try {
+            $this->pdo->exec("ALTER TABLE {$ks} ADD COLUMN tg_sent_at DATETIME NULL");
+        } catch (\Throwable $e) {
+        }
+        try {
+            $this->pdo->exec("ALTER TABLE {$ks} ADD COLUMN tg_last_edit_at DATETIME NULL");
+        } catch (\Throwable $e) {
+        }
     }
 
     public function saveStats(array $stats): void {

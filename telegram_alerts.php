@@ -333,6 +333,17 @@ try {
                 if ($editedOk) {
                     $editedCount++;
                     $logLine('EDIT item=' . $kid . ' tx=' . $txId . ' msg=' . $prevMsgId . ' receipt=' . $receipt);
+                    try {
+                        $db->query(
+                            "UPDATE {$ks}
+                             SET tg_message_id = ?,
+                                 tg_sent_at = COALESCE(tg_sent_at, ?),
+                                 tg_last_edit_at = ?
+                             WHERE id = ?",
+                            [$prevMsgId, $nowDt, $nowDt, $kid]
+                        );
+                    } catch (\Throwable $e) {
+                    }
                     $db->query(
                         "UPDATE {$tgItems}
                          SET transaction_id = ?, last_text_hash = ?, last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
@@ -353,6 +364,17 @@ try {
                     $sentCount++;
                     $currentMsgId = (int)$newMsgId;
                     $logLine('SEND item=' . $kid . ' tx=' . $txId . ' msg=' . $newMsgId . ' receipt=' . $receipt);
+                    try {
+                        $db->query(
+                            "UPDATE {$ks}
+                             SET tg_message_id = ?,
+                                 tg_sent_at = COALESCE(tg_sent_at, ?),
+                                 tg_last_edit_at = ?
+                             WHERE id = ?",
+                            [(int)$newMsgId, $nowDt, $nowDt, $kid]
+                        );
+                    } catch (\Throwable $e) {
+                    }
                     $db->query(
                         "INSERT INTO {$tgItems} (transaction_date, kitchen_stats_id, transaction_id, message_id, last_text_hash, last_seen_at)
                          VALUES (?, ?, ?, ?, ?, ?)
