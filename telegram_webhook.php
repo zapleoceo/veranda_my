@@ -121,6 +121,38 @@ try {
                    AND transaction_id = ?",
                 [$txDate, $txId]
             );
+            try {
+                $itemsTable = $db->t('tg_alert_items');
+                $rows = $db->query(
+                    "SELECT message_id
+                     FROM {$itemsTable}
+                     WHERE transaction_date = ?
+                       AND transaction_id = ?",
+                    [$txDate, $txId]
+                )->fetchAll();
+                $apiBase = "https://api.telegram.org/bot{$tgToken}";
+                $postJson = function (string $method, array $payload) use ($apiBase): void {
+                    $ch = curl_init("{$apiBase}/{$method}");
+                    curl_setopt($ch, CURLOPT_POST, true);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                    curl_exec($ch);
+                    curl_close($ch);
+                };
+                foreach ($rows as $r) {
+                    $mid = (int)($r['message_id'] ?? 0);
+                    if ($mid > 0 && $chatId !== '') {
+                        $postJson('deleteMessage', [
+                            'chat_id' => $chatId,
+                            'message_id' => $mid
+                        ]);
+                    }
+                }
+                $db->query("DELETE FROM {$itemsTable} WHERE transaction_date = ? AND transaction_id = ?", [$txDate, $txId]);
+            } catch (\Throwable $eDel) {
+            }
         }
         $callbackText = 'Игнор чека установлен.';
     } elseif ($action === 'ignore_item' && $id > 0) {
@@ -132,6 +164,30 @@ try {
              WHERE id = ?",
             [$itemId]
         );
+        try {
+            $itemsTable = $db->t('tg_alert_items');
+            $row = $db->query(
+                "SELECT message_id, transaction_date
+                 FROM {$itemsTable}
+                 WHERE kitchen_stats_id = ?
+                 LIMIT 1",
+                [$itemId]
+            )->fetch();
+            $mid = (int)($row['message_id'] ?? 0);
+            if ($mid > 0 && $chatId !== '') {
+                $apiBase = "https://api.telegram.org/bot{$tgToken}";
+                $ch = curl_init("{$apiBase}/deleteMessage");
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['chat_id' => $chatId, 'message_id' => $mid], JSON_UNESCAPED_UNICODE));
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                curl_exec($ch);
+                curl_close($ch);
+            }
+            $db->query("DELETE FROM {$itemsTable} WHERE kitchen_stats_id = ? AND transaction_date = ?", [$itemId, (string)($row['transaction_date'] ?? $dRow['transaction_date'] ?? date('Y-m-d'))]);
+        } catch (\Throwable $eDel) {
+        }
         $callbackText = 'Игнор блюда установлен.';
     } elseif ($action === 'ack_tx' && $id > 0) {
         $txId = $id;
