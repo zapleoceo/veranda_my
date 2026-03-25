@@ -67,7 +67,6 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                 'receipt_number' => (string)($r['receipt_number'] ?? ''),
                 'table_number' => (string)($r['table_number'] ?? ''),
                 'waiter_name' => (string)($r['waiter_name'] ?? ''),
-                'comment' => trim((string)($r['transaction_comment'] ?? '')),
                 'min_sent_ts' => 0,
                 'items' => []
             ];
@@ -123,9 +122,6 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                 </div>
                 <div class="ko-meta">
                     <span>Официант: <?= htmlspecialchars($waiter) ?></span>
-                    <?php if (!empty($c['comment'])): ?>
-                        <span class="ko-comment" style="display:inline-block; margin-left: 8px; color:#b91c1c; font-weight:900;" title="Комментарий к чеку"><?= htmlspecialchars($c['comment']) ?></span>
-                    <?php endif; ?>
                 </div>
             </div>
             <div class="ko-items">
@@ -137,9 +133,6 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                     ?>
                     <div class="ko-item<?= $isOverdue ? ' ko-item-overdue' : '' ?>" data-sent-ts="<?= (int)$sentTs ?>"<?= !empty($it['item_id']) ? (' data-item-id="' . (int)$it['item_id'] . '"') : '' ?>>
                         <div class="ko-item-name"><?= htmlspecialchars($it['dish_name'] ?: ('Dish #' . (int)$it['dish_id'])) ?></div>
-                        <?php if (!empty($c['comment'])): ?>
-                            <div class="ko-item-comment" style="color:#b91c1c; font-weight:900; margin: 2px 0 4px;">Комментарий: <?= htmlspecialchars($c['comment']) ?></div>
-                        <?php endif; ?>
                         <div class="ko-item-row">
                             <span class="ko-item-sent">Пришло: <?= htmlspecialchars($sentLabel) ?></span>
                             <?php if ($sentTs > 0): ?>
@@ -430,7 +423,7 @@ if ($isAjax) {
 
         try {
             $rows = $db->query(
-                "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.transaction_comment, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
+                "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
                         tga.created_at AS tg_sent_at, tga.updated_at AS tg_last_edit_at
                  FROM {$ks} ks
                  LEFT JOIN {$tgItems} tga ON tga.transaction_date = ks.transaction_date AND tga.kitchen_stats_id = ks.id
@@ -447,7 +440,7 @@ if ($isAjax) {
             )->fetchAll();
         } catch (\Throwable $e) {
             $rows = $db->query(
-                "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.transaction_comment, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
+                "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
                         NULL AS tg_sent_at, NULL AS tg_last_edit_at
                  FROM {$ks} ks
                  WHERE transaction_date = ?

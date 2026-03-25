@@ -232,7 +232,6 @@ class KitchenAnalytics {
                     'transaction_id' => $txId,
                     'table_number' => $tx['table_name'] ?? ($tx['table_id'] ?? null),
                     'waiter_name' => $waiterName !== '' ? $waiterName : null,
-                    'transaction_comment' => isset($tx['transaction_comment']) && trim((string)$tx['transaction_comment']) !== '' ? trim((string)$tx['transaction_comment']) : null,
                     'status' => $tx['status'] ?? 1,
                     'pay_type' => isset($tx['pay_type']) ? (int)$tx['pay_type'] : null,
                     'close_reason' => isset($tx['reason']) && $tx['reason'] !== '' ? (int)$tx['reason'] : null,
