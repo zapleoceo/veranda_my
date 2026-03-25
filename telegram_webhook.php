@@ -43,13 +43,13 @@ if ($tgTokenMissing) {
     exit;
 }
 
-if (!preg_match('/^(ack_alert:(\d+)|ack_tx:(\d+))$/', $data, $m)) {
+if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx):(\d+)$/', $data, $m)) {
     echo 'ok';
     exit;
 }
 
-$itemId = (int)($m[2] ?? 0);
-$txId = (int)($m[3] ?? 0);
+$action = (string)($m[1] ?? '');
+$id = (int)($m[2] ?? 0);
 $from = $callback['from'] ?? [];
 $ackBy = trim(($from['first_name'] ?? '') . ' ' . ($from['last_name'] ?? ''));
 if ($ackBy === '') {
@@ -101,7 +101,40 @@ try {
         exit;
     }
 
-    if ($txId > 0) {
+    if ($action === 'ignore_tx' && $id > 0) {
+        $txId = $id;
+        $dRow = $db->query(
+            "SELECT transaction_date
+             FROM {$ks}
+             WHERE transaction_id = ?
+             ORDER BY transaction_date DESC
+             LIMIT 1",
+            [$txId]
+        )->fetch();
+        $txDate = (string)($dRow['transaction_date'] ?? '');
+        if ($txDate !== '') {
+            $db->query(
+                "UPDATE {$ks}
+                 SET exclude_from_dashboard = 1,
+                     exclude_auto = 0
+                 WHERE transaction_date = ?
+                   AND transaction_id = ?",
+                [$txDate, $txId]
+            );
+        }
+        $callbackText = 'Игнор чека установлен.';
+    } elseif ($action === 'ignore_item' && $id > 0) {
+        $itemId = $id;
+        $db->query(
+            "UPDATE {$ks}
+             SET exclude_from_dashboard = 1,
+                 exclude_auto = 0
+             WHERE id = ?",
+            [$itemId]
+        );
+        $callbackText = 'Игнор блюда установлен.';
+    } elseif ($action === 'ack_tx' && $id > 0) {
+        $txId = $id;
         $dRow = $db->query(
             "SELECT transaction_date
              FROM {$ks}
@@ -122,7 +155,9 @@ try {
                 [$ackAt, $ackBy, $txDate, $txId]
             );
         }
-    } elseif ($itemId > 0) {
+        $callbackText = 'Принято.';
+    } elseif ($action === 'ack_alert' && $id > 0) {
+        $itemId = $id;
         $row = $db->query(
             "SELECT transaction_date, transaction_id, dish_id, station
              FROM {$ks}
@@ -153,6 +188,7 @@ try {
                 [$ackAt, $ackBy, $itemId]
             );
         }
+        $callbackText = 'Принято.';
     }
 } catch (\Exception $e) {
 }
@@ -173,7 +209,7 @@ $postJson = function (string $method, array $payload) use ($apiBase): void {
 if ($callbackId !== '') {
     $postJson('answerCallbackQuery', [
         'callback_query_id' => $callbackId,
-        'text' => 'Принято.',
+        'text' => $callbackText ?? 'OK',
         'show_alert' => false
     ]);
 }

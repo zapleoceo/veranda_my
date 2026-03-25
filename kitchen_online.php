@@ -232,7 +232,7 @@ if ($isAjax) {
             try {
                 $metaRow = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = 'poster_last_sync_at' LIMIT 1")->fetch();
                 $last = !empty($metaRow['meta_value']) ? strtotime((string)$metaRow['meta_value']) : 0;
-                if ($last <= 0 || (time() - $last) >= 15) {
+                if ($last <= 0 || (time() - $last) >= 10) {
                     $analytics = new \App\Classes\KitchenAnalytics($api);
                     $stats = $analytics->getDailyStats($today);
                     if (is_array($stats) && count($stats) > 0) {
@@ -844,7 +844,7 @@ $dashboardQuery = http_build_query([
             const durMs = refreshIntervalSec * 1000;
             const elapsed = Math.max(0, Math.min(durMs, now - refreshCycleStartedAt));
             const remainingMs = Math.max(0, durMs - elapsed);
-            const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+            const remainingSec = Math.max(0, Math.floor((Math.max(0, remainingMs) - 1) / 1000));
             if (refreshInEl) refreshInEl.textContent = String(remainingSec);
             if (refreshProgressEl && refreshCircleLen > 0) {
                 const progress = elapsed / durMs;

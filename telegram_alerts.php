@@ -62,6 +62,7 @@ try {
             kitchen_stats_id BIGINT NOT NULL,
             transaction_id BIGINT NOT NULL,
             message_id BIGINT NULL,
+            last_text_hash CHAR(40) NULL,
             last_seen_at DATETIME NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -70,6 +71,10 @@ try {
             KEY idx_tg_items_msg (message_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     );
+    try {
+        $db->query("ALTER TABLE {$tgItems} ADD COLUMN last_text_hash CHAR(40) NULL");
+    } catch (\Throwable $e) {
+    }
 
     $logger = new \App\Classes\EventLogger($db, 'telegram_alerts');
     $metaRepo = new \App\Classes\MetaRepository($db);
@@ -111,7 +116,7 @@ try {
     try {
         $lastSyncAt = $getMeta('poster_last_sync_at', '');
         $last = $lastSyncAt !== '' ? strtotime($lastSyncAt) : 0;
-        if ($last <= 0 || (time() - $last) >= 15) {
+        if ($last <= 0 || (time() - $last) >= 10) {
             $analytics = new \App\Classes\KitchenAnalytics($api);
             $stats = $analytics->getDailyStats($today);
             if (is_array($stats) && count($stats) > 0) {
@@ -200,43 +205,12 @@ try {
            AND COALESCE(was_deleted, 0) = 0
            AND COALESCE(exclude_from_dashboard, 0) = 0
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-           AND COALESCE(tg_acknowledged, 0) = 0
            AND ticket_sent_at < ?
          ORDER BY transaction_id ASC, ticket_sent_at ASC, id ASC",
         [$today, $cutoffTime]
     )->fetchAll();
     if (!is_array($rows)) $rows = [];
     $logLine('CANDIDATES rows=' . count($rows));
-
-    $groups = [];
-    foreach ($rows as $r) {
-        $txId = (int)($r['transaction_id'] ?? 0);
-        if ($txId <= 0) continue;
-        if (!isset($groups[$txId])) {
-            $groups[$txId] = [
-                'receipt_number' => (string)($r['receipt_number'] ?? ''),
-                'table_number' => (string)($r['table_number'] ?? ''),
-                'waiter_name' => (string)($r['waiter_name'] ?? ''),
-                'comment' => trim((string)($r['transaction_comment'] ?? '')),
-                'items' => []
-            ];
-        }
-        $groups[$txId]['items'][] = $r;
-    }
-
-    $existing = $db->query(
-        "SELECT transaction_id, message_id, last_text_hash
-         FROM {$tgThreads}
-         WHERE transaction_date = ?",
-        [$today]
-    )->fetchAll();
-    if (!is_array($existing)) $existing = [];
-    $existingByTx = [];
-    foreach ($existing as $e) {
-        $tx = (int)($e['transaction_id'] ?? 0);
-        if ($tx <= 0) continue;
-        $existingByTx[$tx] = $e;
-    }
 
     $nowTs = time();
     $nowDt = date('Y-m-d H:i:s', $nowTs);
@@ -245,53 +219,89 @@ try {
     $deletedCount = 0;
     $unchangedCount = 0;
 
-    foreach ($existingByTx as $txId => $e) {
-        if (isset($groups[$txId])) continue;
+    try {
+        $oldThreads = $db->query(
+            "SELECT transaction_id, message_id
+             FROM {$tgThreads}
+             WHERE transaction_date = ?",
+            [$today]
+        )->fetchAll();
+        if (!is_array($oldThreads)) $oldThreads = [];
+        foreach ($oldThreads as $t) {
+            $msgId = (int)($t['message_id'] ?? 0);
+            if ($msgId > 0) {
+                $bot->deleteMessage($msgId);
+                $deletedCount++;
+                $logLine('DELETE_OLD tx=' . (int)($t['transaction_id'] ?? 0) . ' msg=' . $msgId);
+            }
+        }
+        $db->query("DELETE FROM {$tgThreads} WHERE transaction_date = ?", [$today]);
+    } catch (\Throwable $e) {
+    }
+
+    $existingItems = $db->query(
+        "SELECT kitchen_stats_id, transaction_id, message_id, last_text_hash
+         FROM {$tgItems}
+         WHERE transaction_date = ?",
+        [$today]
+    )->fetchAll();
+    if (!is_array($existingItems)) $existingItems = [];
+    $existingByItem = [];
+    foreach ($existingItems as $e) {
+        $kid = (int)($e['kitchen_stats_id'] ?? 0);
+        if ($kid <= 0) continue;
+        $existingByItem[$kid] = $e;
+    }
+
+    $candidateIds = [];
+    foreach ($rows as $r) {
+        $id = (int)($r['id'] ?? 0);
+        if ($id > 0) $candidateIds[$id] = true;
+    }
+
+    foreach ($existingByItem as $kid => $e) {
+        if (isset($candidateIds[$kid])) continue;
         $msgId = (int)($e['message_id'] ?? 0);
         if ($msgId > 0) {
             $deleted = $bot->deleteMessage($msgId);
-            if (!$deleted) continue;
-            $deletedCount++;
-            $logLine('DELETE tx=' . $txId . ' msg=' . $msgId);
+            if ($deleted) {
+                $deletedCount++;
+                $logLine('DELETE item=' . $kid . ' msg=' . $msgId);
+            }
         }
-        $db->query("DELETE FROM {$tgThreads} WHERE transaction_date = ? AND transaction_id = ?", [$today, $txId]);
-        $db->query("DELETE FROM {$tgItems} WHERE transaction_date = ? AND transaction_id = ?", [$today, $txId]);
+        $db->query("DELETE FROM {$tgItems} WHERE transaction_date = ? AND kitchen_stats_id = ?", [$today, $kid]);
     }
 
-    foreach ($groups as $txId => $g) {
-        $receipt = trim((string)$g['receipt_number']);
-        $table = trim((string)$g['table_number']);
-        $waiter = trim((string)$g['waiter_name']);
-        $comment = trim((string)($g['comment'] ?? ''));
+    foreach ($rows as $r) {
+        $kid = (int)($r['id'] ?? 0);
+        $txId = (int)($r['transaction_id'] ?? 0);
+        if ($kid <= 0 || $txId <= 0) continue;
+
+        $receipt = trim((string)($r['receipt_number'] ?? ''));
+        $table = trim((string)($r['table_number'] ?? ''));
+        $waiter = trim((string)($r['waiter_name'] ?? ''));
+        $comment = trim((string)($r['transaction_comment'] ?? ''));
+        $dish = trim((string)($r['dish_name'] ?? ''));
+        $sentAt = trim((string)($r['ticket_sent_at'] ?? ''));
+
         if ($receipt === '') $receipt = (string)$txId;
         if ($table === '') $table = '—';
         if ($waiter === '') $waiter = '—';
+        if ($dish === '') $dish = '—';
 
-        $itemIds = array_values(array_filter(array_map(fn($x) => (int)($x['id'] ?? 0), (array)($g['items'] ?? [])), fn($v) => $v > 0));
-        $itemIds = array_values(array_unique($itemIds));
+        $sentTs = $sentAt !== '' ? strtotime($sentAt) : 0;
+        $diffSec = $sentTs > 0 ? max(0, $nowTs - $sentTs) : 0;
+        $hh = (int)floor($diffSec / 3600);
+        $mm = (int)floor(($diffSec % 3600) / 60);
+        $ss = (int)($diffSec % 60);
+        $elapsed = ($hh > 0 ? (string)$hh . ':' . str_pad((string)$mm, 2, '0', STR_PAD_LEFT) : str_pad((string)$mm, 2, '0', STR_PAD_LEFT))
+            . ':' . str_pad((string)$ss, 2, '0', STR_PAD_LEFT);
+        $start = $sentTs > 0 ? date('H:i:s', $sentTs) : '—';
 
-        $lines = [];
-        $keyboard = [[[
-            'text' => '✅ Принято',
-            'callback_data' => 'ack_tx:' . (int)$txId
-        ]]];
-
-        foreach ($g['items'] as $it) {
-            $dish = trim((string)($it['dish_name'] ?? ''));
-            if ($dish === '') $dish = '—';
-
-            $sentAt = (string)($it['ticket_sent_at'] ?? '');
-            $sentTs = $sentAt !== '' ? strtotime($sentAt) : 0;
-            $diffSec = $sentTs > 0 ? max(0, $nowTs - $sentTs) : 0;
-            $hh = (int)floor($diffSec / 3600);
-            $mm = (int)floor(($diffSec % 3600) / 60);
-            $ss = (int)($diffSec % 60);
-            $elapsed = ($hh > 0 ? (string)$hh . ':' . str_pad((string)$mm, 2, '0', STR_PAD_LEFT) : str_pad((string)$mm, 2, '0', STR_PAD_LEFT))
-                . ':' . str_pad((string)$ss, 2, '0', STR_PAD_LEFT);
-            $start = $sentTs > 0 ? date('H:i:s', $sentTs) : '—';
-
-            $lines[] = htmlspecialchars($dish) . ' - Старт:<b>' . htmlspecialchars($start) . '</b> Ждет:<b>' . $elapsed . '</b>';
-        }
+        $keyboard = [[
+            ['text' => 'Игнор❗️', 'callback_data' => 'ignore_item:' . $kid],
+            ['text' => 'Игнор Чек‼️', 'callback_data' => 'ignore_tx:' . $txId],
+        ]];
 
         $text = '<b>Откр чеков</b> ' . htmlspecialchars($openChecksDisplay) . ' <b>Лимит времени</b> ' . (int)$waitLimit . " мин\n";
         $text .= '<b>Чек:' . htmlspecialchars($receipt) . '|Стол ' . htmlspecialchars($table) . "</b>\n";
@@ -300,21 +310,20 @@ try {
             $text .= ' <i>' . htmlspecialchars($comment) . '</i>';
         }
         $text .= "\n";
-        $text .= implode("\n", array_map(fn($l) => '• ' . $l, $lines));
+        $text .= '• ' . htmlspecialchars($dish) . ' - Старт:<b>' . htmlspecialchars($start) . '</b> Ждет:<b>' . $elapsed . '</b>';
 
         $textHash = sha1($text . '|' . json_encode($keyboard, JSON_UNESCAPED_UNICODE));
-
-        $prev = $existingByTx[$txId] ?? null;
+        $prev = $existingByItem[$kid] ?? null;
         $prevMsgId = $prev ? (int)($prev['message_id'] ?? 0) : 0;
         $prevHash = $prev ? (string)($prev['last_text_hash'] ?? '') : '';
-        $currentMessageId = $prevMsgId > 0 ? $prevMsgId : 0;
 
+        $currentMsgId = $prevMsgId;
         if ($prevMsgId > 0 && $prevHash === $textHash) {
             $db->query(
-                "UPDATE {$tgThreads}
-                 SET last_seen_at = ?, receipt_number = ?, table_number = ?, waiter_name = ?
-                 WHERE transaction_date = ? AND transaction_id = ?",
-                [$nowDt, $receipt, $table, $waiter, $today, $txId]
+                "UPDATE {$tgItems}
+                 SET last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
+                 WHERE transaction_date = ? AND kitchen_stats_id = ?",
+                [$nowDt, $today, $kid]
             );
             $unchangedCount++;
         } else {
@@ -323,17 +332,18 @@ try {
                 $editedOk = $bot->editMessageText($prevMsgId, $text, $keyboard);
                 if ($editedOk) {
                     $editedCount++;
-                    $logLine('EDIT tx=' . $txId . ' msg=' . $prevMsgId . ' receipt=' . $receipt . ' table=' . $table . ' items=' . count($itemIds));
+                    $logLine('EDIT item=' . $kid . ' tx=' . $txId . ' msg=' . $prevMsgId . ' receipt=' . $receipt);
                     $db->query(
-                        "UPDATE {$tgThreads}
-                         SET last_text_hash = ?, last_seen_at = ?, last_edited_at = ?, receipt_number = ?, table_number = ?, waiter_name = ?
-                         WHERE transaction_date = ? AND transaction_id = ?",
-                        [$textHash, $nowDt, $nowDt, $receipt, $table, $waiter, $today, $txId]
+                        "UPDATE {$tgItems}
+                         SET transaction_id = ?, last_text_hash = ?, last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
+                         WHERE transaction_date = ? AND kitchen_stats_id = ?",
+                        [$txId, $textHash, $nowDt, $today, $kid]
                     );
-                    $currentMessageId = $prevMsgId;
+                    $currentMsgId = $prevMsgId;
+                } else {
+                    $logLine('EDIT_FAIL item=' . $kid . ' tx=' . $txId . ' msg=' . $prevMsgId . ' receipt=' . $receipt);
                 }
             }
-
             if (!$editedOk) {
                 if ($prevMsgId > 0) {
                     $bot->deleteMessage($prevMsgId);
@@ -341,54 +351,32 @@ try {
                 $newMsgId = $bot->sendMessageGetIdWithKeyboard($text, $keyboard, $tgThreadId);
                 if ($newMsgId) {
                     $sentCount++;
-                    $currentMessageId = (int)$newMsgId;
-                    $logLine('SEND tx=' . $txId . ' msg=' . $newMsgId . ' receipt=' . $receipt . ' table=' . $table . ' items=' . count($itemIds));
+                    $currentMsgId = (int)$newMsgId;
+                    $logLine('SEND item=' . $kid . ' tx=' . $txId . ' msg=' . $newMsgId . ' receipt=' . $receipt);
                     $db->query(
-                        "INSERT INTO {$tgThreads} (transaction_date, transaction_id, message_id, receipt_number, table_number, waiter_name, last_text_hash, last_edited_at, last_seen_at)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        "INSERT INTO {$tgItems} (transaction_date, kitchen_stats_id, transaction_id, message_id, last_text_hash, last_seen_at)
+                         VALUES (?, ?, ?, ?, ?, ?)
                          ON DUPLICATE KEY UPDATE
+                            transaction_id = VALUES(transaction_id),
                             message_id = VALUES(message_id),
-                            receipt_number = VALUES(receipt_number),
-                            table_number = VALUES(table_number),
-                            waiter_name = VALUES(waiter_name),
                             last_text_hash = VALUES(last_text_hash),
-                            last_edited_at = VALUES(last_edited_at),
                             last_seen_at = VALUES(last_seen_at),
                             updated_at = CURRENT_TIMESTAMP",
-                        [$today, $txId, (int)$newMsgId, $receipt, $table, $waiter, $textHash, $nowDt, $nowDt]
+                        [$today, $kid, $txId, $currentMsgId, $textHash, $nowDt]
                     );
+                } else {
+                    $logLine('SEND_FAIL item=' . $kid . ' tx=' . $txId . ' receipt=' . $receipt);
                 }
             }
         }
 
-        if ($currentMessageId <= 0) {
-            $db->query("DELETE FROM {$tgItems} WHERE transaction_date = ? AND transaction_id = ?", [$today, $txId]);
-            continue;
-        }
-
-        if (count($itemIds) === 0) {
-            $db->query("DELETE FROM {$tgItems} WHERE transaction_date = ? AND transaction_id = ?", [$today, $txId]);
-        } else {
-            $placeholders = implode(',', array_fill(0, count($itemIds), '?'));
-            $db->query(
-                "DELETE FROM {$tgItems}
-                 WHERE transaction_date = ?
-                   AND transaction_id = ?
-                   AND kitchen_stats_id NOT IN ({$placeholders})",
-                array_merge([$today, $txId], $itemIds)
-            );
-            foreach ($itemIds as $id) {
-                $db->query(
-                    "INSERT INTO {$tgItems} (transaction_date, kitchen_stats_id, transaction_id, message_id, last_seen_at)
-                     VALUES (?, ?, ?, ?, ?)
-                     ON DUPLICATE KEY UPDATE
-                        transaction_id = VALUES(transaction_id),
-                        message_id = VALUES(message_id),
-                        last_seen_at = VALUES(last_seen_at),
-                        updated_at = CURRENT_TIMESTAMP",
-                    [$today, $id, $txId, $currentMessageId, $nowDt]
-                );
-            }
+        if ($currentMsgId > 0 && (!isset($existingByItem[$kid]) || (int)($existingByItem[$kid]['message_id'] ?? 0) !== $currentMsgId)) {
+            $existingByItem[$kid] = [
+                'kitchen_stats_id' => $kid,
+                'transaction_id' => $txId,
+                'message_id' => $currentMsgId,
+                'last_text_hash' => $textHash
+            ];
         }
     }
 
