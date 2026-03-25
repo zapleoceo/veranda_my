@@ -169,7 +169,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                         <div class="ko-item-row">
                             <span class="ko-item-sent">Старт: <?= htmlspecialchars($sentLabel) ?></span>
                             <?php if ($sentTs > 0): ?>
-                                <span class="ko-item-wait live-wait" data-sent-ts="<?= $sentTs ?>"><span class="wait-spinner" aria-hidden="true"></span><span class="live-time">00:00</span></span>
+                                <span class="ko-item-wait live-wait" data-sent-ts="<?= $sentTs ?>"><span class="live-time">00:00</span></span>
                             <?php else: ?>
                                 <span class="ko-item-wait">—</span>
                             <?php endif; ?>
@@ -716,6 +716,12 @@ $dashboardQuery = http_build_query([
                 if (waitLimitSec > 0) {
                     const itemEl = el.closest('.ko-item');
                     if (itemEl) itemEl.classList.toggle('ko-item-overdue', diffSec >= waitLimitSec);
+                    const remaining = Math.max(0, waitLimitSec - diffSec);
+                    const ratio = Math.max(0, Math.min(1, remaining / waitLimitSec));
+                    const pct = Math.round(ratio * 100);
+                    el.style.background = `linear-gradient(to right, rgba(38,165,228,0.18) 0%, rgba(38,165,228,0.18) ${pct}%, transparent ${pct}%, transparent 100%)`;
+                    el.style.borderRadius = '6px';
+                    el.style.padding = '1px 4px';
                 }
                 const mm = Math.floor(diffSec / 60);
                 const ss = diffSec % 60;
