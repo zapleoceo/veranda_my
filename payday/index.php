@@ -175,6 +175,18 @@ $pl = $db->t('check_payment_links');
 $sh = $db->t('sepay_hidden');
 
 try {
+    $db->query("ALTER TABLE {$pc} ADD COLUMN was_deleted TINYINT(1) NOT NULL DEFAULT 0");
+} catch (\Throwable $e) {}
+try {
+    $db->query("ALTER TABLE {$pc} ADD COLUMN deleted_at DATETIME NULL");
+} catch (\Throwable $e) {}
+try {
+    $db->query("ALTER TABLE {$st} ADD COLUMN was_deleted TINYINT(1) NOT NULL DEFAULT 0");
+} catch (\Throwable $e) {}
+try {
+    $db->query("ALTER TABLE {$st} ADD COLUMN deleted_at DATETIME NULL");
+} catch (\Throwable $e) {}
+try {
     $db->query(
         "CREATE TABLE IF NOT EXISTS {$sh} (
             sepay_id BIGINT NOT NULL,
@@ -383,6 +395,7 @@ try {
                     "UPDATE {$pc}
                      SET receipt_number = ?, table_id = ?, spot_id = ?, sum = ?, payed_sum = ?, payed_cash = ?, payed_card = ?, payed_cert = ?, payed_bonus = ?, payed_third_party = ?,
                          pay_type = ?, reason = ?, tip_sum = ?, discount = ?, date_close = ?, poster_payment_method_id = ?, waiter_name = ?, day_date = ?
+                         , was_deleted = 0, deleted_at = NULL
                      WHERE transaction_id = ?
                      LIMIT 1",
                     [
@@ -470,15 +483,8 @@ try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'clear_day') {
         try {
             $db->query('START TRANSACTION');
-            $db->query(
-                "DELETE l FROM {$pl} l
-                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-                 WHERE p.day_date BETWEEN ? AND ?",
-                [$dateFrom, $dateTo]
-            );
-            $db->query("DELETE FROM {$pc} WHERE day_date BETWEEN ? AND ?", [$dateFrom, $dateTo]);
-            $db->query("DELETE FROM {$pt} WHERE day_date BETWEEN ? AND ?", [$dateFrom, $dateTo]);
-            $db->query("DELETE FROM {$st} WHERE transaction_date BETWEEN ? AND ?", [$periodFrom, $periodTo]);
+            $db->query("UPDATE {$pc} SET was_deleted = 1, deleted_at = NOW() WHERE day_date BETWEEN ? AND ?", [$dateFrom, $dateTo]);
+            $db->query("UPDATE {$st} SET was_deleted = 1, deleted_at = NOW() WHERE transaction_date BETWEEN ? AND ?", [$periodFrom, $periodTo]);
             $db->query('COMMIT');
             $message = ($dateFrom === $dateTo ? ('День очищен: ' . $dateFrom) : ('Период очищен: ' . $dateFrom . ' — ' . $dateTo));
         } catch (\Throwable $e) {
@@ -493,7 +499,6 @@ try {
         }
 
         $txs = $sepayFetchTransactions($dateFrom, $dateTo, $sepayApiToken, $sepayAccountNumber);
-        $db->query("DELETE FROM {$st} WHERE transaction_date BETWEEN ? AND ?", [$periodFrom, $periodTo]);
 
         $inserted = 0;
         $updated = 0;
@@ -582,7 +587,9 @@ try {
                     reference_code = VALUES(reference_code),
                     description = VALUES(description),
                     payment_method = VALUES(payment_method),
-                    raw_request_body = VALUES(raw_request_body)",
+                    raw_request_body = VALUES(raw_request_body),
+                    was_deleted = 0,
+                    deleted_at = NULL",
                 [
                     $sepayId,
                     $gateway,
@@ -1574,6 +1581,7 @@ $sepayRows = $db->query(
      WHERE s.transaction_date BETWEEN ? AND ?
        AND s.transfer_type = 'in'
        AND (s.payment_method IS NULL OR s.payment_method IN ('Card','Bybit'))
+       AND COALESCE(s.was_deleted, 0) = 0
        AND NOT EXISTS (SELECT 1 FROM {$sh} h WHERE h.sepay_id = s.sepay_id)
      ORDER BY s.transaction_date ASC",
     [$periodFrom, $periodTo]
@@ -1586,8 +1594,9 @@ $posterRows = $db->query(
      FROM {$pc} p
      LEFT JOIN {$ppm} pm ON pm.payment_method_id = p.poster_payment_method_id
      WHERE p.day_date BETWEEN ? AND ?
-       AND pay_type IN (2,3)
-       AND (payed_card + payed_third_party) > 0
+       AND COALESCE(p.was_deleted, 0) = 0
+       AND p.pay_type IN (2,3)
+       AND (p.payed_card + p.payed_third_party) > 0
      ORDER BY date_close ASC",
     [$dateFrom, $dateTo]
 )->fetchAll();
@@ -1603,6 +1612,7 @@ try {
          WHERE s.transaction_date BETWEEN ? AND ?
            AND s.transfer_type = 'in'
            AND (s.payment_method IS NULL OR s.payment_method IN ('Card','Bybit'))
+           AND COALESCE(s.was_deleted, 0) = 0
            AND NOT EXISTS (SELECT 1 FROM {$sh} h WHERE h.sepay_id = s.sepay_id)",
         [$periodFrom, $periodTo]
     )->fetchColumn();
@@ -1615,6 +1625,7 @@ try {
          FROM {$pc} p
          LEFT JOIN {$ppm} pm ON pm.payment_method_id = p.poster_payment_method_id
          WHERE p.day_date BETWEEN ? AND ?
+           AND COALESCE(p.was_deleted, 0) = 0
            AND p.pay_type IN (2,3)
            AND (p.payed_card + p.payed_third_party) > 0
            AND (pm.title IS NULL OR LOWER(pm.title) <> 'vietnam company')",
@@ -1630,6 +1641,7 @@ try {
         "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0)
          FROM {$pc}
          WHERE day_date BETWEEN ? AND ?
+           AND COALESCE(was_deleted, 0) = 0
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
            AND poster_payment_method_id = 12",
@@ -1645,6 +1657,7 @@ try {
         "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0)
          FROM {$pc}
          WHERE day_date BETWEEN ? AND ?
+           AND COALESCE(was_deleted, 0) = 0
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
            AND poster_payment_method_id = 11",
