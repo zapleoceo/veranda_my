@@ -432,8 +432,8 @@ if ($isAjax) {
                     );
                 }
 
-                $items = $db->query(
-                    "SELECT id, dish_id, was_deleted, ticket_sent_at
+                $itemSql = $useLogicalClose
+                    ? "SELECT id, dish_id, was_deleted, ticket_sent_at
                      FROM {$ks}
                      WHERE transaction_date = ?
                        AND transaction_id = ?
@@ -441,9 +441,17 @@ if ($isAjax) {
                        AND ready_pressed_at IS NULL
                        AND ticket_sent_at IS NOT NULL
                        AND COALESCE(exclude_from_dashboard, 0) = 0
-                       AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
-                    [$today, $txId]
-                )->fetchAll();
+                       AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)"
+                    : "SELECT id, dish_id, was_deleted, ticket_sent_at
+                     FROM {$ks}
+                     WHERE transaction_date = ?
+                       AND transaction_id = ?
+                       AND status = 1
+                       AND ready_pressed_at IS NULL
+                       AND ticket_sent_at IS NOT NULL
+                       AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0)
+                       AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)";
+                $items = $db->query($itemSql, [$today, $txId])->fetchAll();
 
                 foreach ($items as $it) {
                     $id = (int)($it['id'] ?? 0);
@@ -642,6 +650,10 @@ $dashboardQuery = http_build_query([
                         <option value="bar">Бар</option>
                     </select>
                 </label>
+                <label style="display:flex; align-items:center; gap:6px;">
+                    <input type="checkbox" id="useLogicalClose"<?= $useLogicalClose ? ' checked' : '' ?>>
+                    <span style="font-weight:900;">УчитыватьВрЛогЗакр</span>
+                </label>
             </div>
             <?php require __DIR__ . '/partials/user_menu.php'; ?>
         </div>
@@ -659,6 +671,7 @@ $dashboardQuery = http_build_query([
         const cardsEl = document.getElementById('cards');
         const emptyEl = document.getElementById('empty');
         const stationEl = document.getElementById('station');
+        const useLogicalCloseEl = document.getElementById('useLogicalClose');
         const lastSyncEl = document.getElementById('lastSync');
         const refreshInEl = document.getElementById('refreshIn');
         const refreshProgressEl = document.getElementById('refreshProgress');
@@ -774,9 +787,13 @@ $dashboardQuery = http_build_query([
                 params.set('action', action);
                 params.set('station', stationEl.value);
                 params.set('_ts', String(Date.now()));
+                const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+                if (method === 'POST' && typeof payload === 'string') {
+                    headers['Content-Type'] = 'application/json';
+                }
                 const init = {
                     method,
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    headers,
                     cache: 'no-store',
                     signal: activeCtrl ? activeCtrl.signal : undefined,
                     body: payload
@@ -831,6 +848,13 @@ $dashboardQuery = http_build_query([
             refreshCycleStartedAt = Date.now();
             loadCards('list');
         });
+        if (useLogicalCloseEl) {
+            useLogicalCloseEl.addEventListener('change', async () => {
+                await request('POST', 'set_logclose', JSON.stringify({ use: useLogicalCloseEl.checked ? 1 : 0 }));
+                refreshCycleStartedAt = Date.now();
+                loadCards('list');
+            }, { passive: true });
+        }
         loadMuted();
         renderSoundIcon();
         if (soundBtn) {
