@@ -34,6 +34,11 @@ try {
     $tgItems = $db->t('tg_alert_items');
     $logFile = __DIR__ . '/telegram.log';
 
+    try {
+        $db->query("ALTER TABLE {$ks} ADD COLUMN transaction_comment TEXT NULL");
+    } catch (\Throwable $e) {
+    }
+
     $db->query(
         "CREATE TABLE IF NOT EXISTS {$tgThreads} (
             transaction_date DATE NOT NULL,
@@ -186,7 +191,7 @@ try {
     }
 
     $rows = $db->query(
-        "SELECT id, transaction_id, receipt_number, table_number, waiter_name, dish_name, ticket_sent_at
+        "SELECT id, transaction_id, receipt_number, table_number, waiter_name, transaction_comment, dish_name, ticket_sent_at
          FROM {$ks}
          WHERE ready_pressed_at IS NULL
            AND ticket_sent_at IS NOT NULL
@@ -212,6 +217,7 @@ try {
                 'receipt_number' => (string)($r['receipt_number'] ?? ''),
                 'table_number' => (string)($r['table_number'] ?? ''),
                 'waiter_name' => (string)($r['waiter_name'] ?? ''),
+                'comment' => trim((string)($r['transaction_comment'] ?? '')),
                 'items' => []
             ];
         }
@@ -256,6 +262,7 @@ try {
         $receipt = trim((string)$g['receipt_number']);
         $table = trim((string)$g['table_number']);
         $waiter = trim((string)$g['waiter_name']);
+        $comment = trim((string)($g['comment'] ?? ''));
         if ($receipt === '') $receipt = (string)$txId;
         if ($table === '') $table = '—';
         if ($waiter === '') $waiter = '—';
@@ -264,8 +271,10 @@ try {
         $itemIds = array_values(array_unique($itemIds));
 
         $lines = [];
-        $keyboard = [];
-        $btnRow = [];
+        $keyboard = [[[
+            'text' => '✅ Принято',
+            'callback_data' => 'ack_tx:' . (int)$txId
+        ]]];
 
         foreach ($g['items'] as $it) {
             $dish = trim((string)($it['dish_name'] ?? ''));
@@ -274,24 +283,23 @@ try {
             $sentAt = (string)($it['ticket_sent_at'] ?? '');
             $sentTs = $sentAt !== '' ? strtotime($sentAt) : 0;
             $diffSec = $sentTs > 0 ? max(0, $nowTs - $sentTs) : 0;
-            $mm = (int)floor($diffSec / 60);
+            $hh = (int)floor($diffSec / 3600);
+            $mm = (int)floor(($diffSec % 3600) / 60);
             $ss = (int)($diffSec % 60);
-            $elapsed = str_pad((string)$mm, 2, '0', STR_PAD_LEFT) . ':' . str_pad((string)$ss, 2, '0', STR_PAD_LEFT);
+            $elapsed = ($hh > 0 ? (string)$hh . ':' . str_pad((string)$mm, 2, '0', STR_PAD_LEFT) : str_pad((string)$mm, 2, '0', STR_PAD_LEFT))
+                . ':' . str_pad((string)$ss, 2, '0', STR_PAD_LEFT);
+            $start = $sentTs > 0 ? date('H:i:s', $sentTs) : '—';
 
-            $lines[] = htmlspecialchars($dish) . ' — <b>' . $elapsed . '</b>';
-            $btnRow[] = [
-                'text' => 'Принято',
-                'callback_data' => 'ack_alert:' . (int)($it['id'] ?? 0)
-            ];
-            if (count($btnRow) >= 2) {
-                $keyboard[] = $btnRow;
-                $btnRow = [];
-            }
+            $lines[] = htmlspecialchars($dish) . ' - Старт:<b>' . htmlspecialchars($start) . '</b> Ждет:<b>' . $elapsed . '</b>';
         }
-        if (count($btnRow) > 0) $keyboard[] = $btnRow;
 
-        $text = '<b>Чек:' . htmlspecialchars($receipt) . '|Стол ' . htmlspecialchars($table) . "</b>\n";
-        $text .= htmlspecialchars($waiter) . "\n";
+        $text = '<b>Откр чеков</b> ' . htmlspecialchars($openChecksDisplay) . ' <b>Лимит времени</b> ' . (int)$waitLimit . " мин\n";
+        $text .= '<b>Чек:' . htmlspecialchars($receipt) . '|Стол ' . htmlspecialchars($table) . "</b>\n";
+        $text .= htmlspecialchars($waiter);
+        if ($comment !== '') {
+            $text .= ' <i>' . htmlspecialchars($comment) . '</i>';
+        }
+        $text .= "\n";
         $text .= implode("\n", array_map(fn($l) => '• ' . $l, $lines));
 
         $textHash = sha1($text . '|' . json_encode($keyboard, JSON_UNESCAPED_UNICODE));

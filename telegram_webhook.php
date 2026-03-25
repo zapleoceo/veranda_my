@@ -43,12 +43,13 @@ if ($tgTokenMissing) {
     exit;
 }
 
-if (!preg_match('/^ack_alert:(\d+)$/', $data, $m)) {
+if (!preg_match('/^(ack_alert:(\d+)|ack_tx:(\d+))$/', $data, $m)) {
     echo 'ok';
     exit;
 }
 
-$itemId = (int)$m[1];
+$itemId = (int)($m[2] ?? 0);
+$txId = (int)($m[3] ?? 0);
 $from = $callback['from'] ?? [];
 $ackBy = trim(($from['first_name'] ?? '') . ' ' . ($from['last_name'] ?? ''));
 if ($ackBy === '') {
@@ -100,35 +101,58 @@ try {
         exit;
     }
 
-    $row = $db->query(
-        "SELECT transaction_date, transaction_id, dish_id, station
-         FROM {$ks}
-         WHERE id = ?
-         LIMIT 1",
-        [$itemId]
-    )->fetch();
+    if ($txId > 0) {
+        $dRow = $db->query(
+            "SELECT transaction_date
+             FROM {$ks}
+             WHERE transaction_id = ?
+             ORDER BY transaction_date DESC
+             LIMIT 1",
+            [$txId]
+        )->fetch();
+        $txDate = (string)($dRow['transaction_date'] ?? '');
+        if ($txDate !== '') {
+            $db->query(
+                "UPDATE {$ks}
+                 SET tg_acknowledged = 1,
+                     tg_acknowledged_at = ?,
+                     tg_acknowledged_by = ?
+                 WHERE transaction_date = ?
+                   AND transaction_id = ?",
+                [$ackAt, $ackBy, $txDate, $txId]
+            );
+        }
+    } elseif ($itemId > 0) {
+        $row = $db->query(
+            "SELECT transaction_date, transaction_id, dish_id, station
+             FROM {$ks}
+             WHERE id = ?
+             LIMIT 1",
+            [$itemId]
+        )->fetch();
 
-    if (!empty($row['transaction_id']) && !empty($row['dish_id']) && !empty($row['transaction_date']) && !empty($row['station'])) {
-        $db->query(
-            "UPDATE {$ks}
-             SET tg_acknowledged = 1,
-                 tg_acknowledged_at = ?,
-                 tg_acknowledged_by = ?
-             WHERE transaction_date = ?
-               AND transaction_id = ?
-               AND dish_id = ?
-               AND station = ?",
-            [$ackAt, $ackBy, $row['transaction_date'], $row['transaction_id'], $row['dish_id'], $row['station']]
-        );
-    } else {
-        $db->query(
-            "UPDATE {$ks}
-             SET tg_acknowledged = 1,
-                 tg_acknowledged_at = ?,
-                 tg_acknowledged_by = ?
-             WHERE id = ?",
-            [$ackAt, $ackBy, $itemId]
-        );
+        if (!empty($row['transaction_id']) && !empty($row['dish_id']) && !empty($row['transaction_date']) && !empty($row['station'])) {
+            $db->query(
+                "UPDATE {$ks}
+                 SET tg_acknowledged = 1,
+                     tg_acknowledged_at = ?,
+                     tg_acknowledged_by = ?
+                 WHERE transaction_date = ?
+                   AND transaction_id = ?
+                   AND dish_id = ?
+                   AND station = ?",
+                [$ackAt, $ackBy, $row['transaction_date'], $row['transaction_id'], $row['dish_id'], $row['station']]
+            );
+        } else {
+            $db->query(
+                "UPDATE {$ks}
+                 SET tg_acknowledged = 1,
+                     tg_acknowledged_at = ?,
+                     tg_acknowledged_by = ?
+                 WHERE id = ?",
+                [$ackAt, $ackBy, $itemId]
+            );
+        }
     }
 } catch (\Exception $e) {
 }

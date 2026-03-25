@@ -23,6 +23,14 @@ $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
+$tgChatIdEnv = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
+$tgChatInternalId = '';
+if ($tgChatIdEnv !== '') {
+    $tmp = $tgChatIdEnv;
+    if (str_starts_with($tmp, '-100')) $tmp = substr($tmp, 4);
+    $tmp = ltrim($tmp, '-');
+    if ($tmp !== '' && ctype_digit($tmp)) $tgChatInternalId = $tmp;
+}
 
 $stationFilter = $_GET['station'] ?? 'all'; // all|kitchen|bar
 $isAjax = (($_GET['ajax'] ?? '') === '1');
@@ -91,6 +99,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
             'station' => (string)($r['station'] ?? ''),
             'tg_sent_at' => (string)($r['tg_sent_at'] ?? ''),
             'tg_last_edit_at' => (string)($r['tg_last_edit_at'] ?? ''),
+            'tg_message_id' => (int)($r['tg_message_id'] ?? 0),
         ];
     }
 
@@ -129,7 +138,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                 <div class="ko-meta">
                     <span>Официант: <?= htmlspecialchars($waiter) ?></span>
                     <?php if (!empty($c['comment'])): ?>
-                        <span class="ko-comment" style="display:inline-block; margin-left: 8px; color:#b91c1c; font-weight:900;" title="Комментарий к чеку"><?= htmlspecialchars($c['comment']) ?></span>
+                        <span class="ko-comment" style="display:inline-block; margin-left: 8px; font-size:12px; font-style:italic; color:#6b7280;" title="Комментарий к чеку"><?= htmlspecialchars($c['comment']) ?></span>
                     <?php endif; ?>
                 </div>
             </div>
@@ -152,8 +161,10 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                             <?php
                                 $tgSentAt = trim((string)($it['tg_sent_at'] ?? ''));
                                 $tgLastEditAt = trim((string)($it['tg_last_edit_at'] ?? ''));
+                                $tgMsgId = (int)($it['tg_message_id'] ?? 0);
                                 $tgTitle = 'Telegram: уведомление не отправлено';
                                 $tgClass = '';
+                                $tgHref = '';
                                 if ($tgSentAt !== '') {
                                     $tgClass = ' sent';
                                     $tgSentLabel = date('H:i:s', strtotime($tgSentAt));
@@ -161,13 +172,24 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                                     if ($tgLastEditAt !== '' && strtotime($tgLastEditAt) > strtotime($tgSentAt)) {
                                         $tgTitle .= '; обновлено ' . date('H:i:s', strtotime($tgLastEditAt));
                                     }
+                                    if ($tgChatInternalId !== '' && $tgMsgId > 0) {
+                                        $tgHref = 'https://t.me/c/' . $tgChatInternalId . '/' . $tgMsgId;
+                                    }
                                 }
                             ?>
-                            <span class="tg-indicator<?= $tgClass ?>" title="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>" aria-label="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>">
+                            <?php if ($tgHref !== ''): ?>
+                                <a class="tg-indicator<?= $tgClass ?>" href="<?= htmlspecialchars($tgHref, ENT_QUOTES) ?>" target="_blank" rel="noopener noreferrer" title="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>" aria-label="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>">
+                            <?php else: ?>
+                                <span class="tg-indicator<?= $tgClass ?>" title="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>" aria-label="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>">
+                            <?php endif; ?>
                                 <svg viewBox="0 0 240 240" aria-hidden="true" focusable="false">
                                     <path d="M120 0C53.7 0 0 53.7 0 120s53.7 120 120 120 120-53.7 120-120S186.3 0 120 0zm58.9 82.2-19.7 93.1c-1.5 6.6-5.5 8.2-11.1 5.1l-30.7-22.6-14.8 14.2c-1.6 1.6-3 3-6.1 3l2.2-31.6 57.5-51.9c2.5-2.2-.5-3.4-3.9-1.2l-71.1 44.8-30.6-9.6c-6.6-2.1-6.8-6.6 1.4-9.8l119.6-46.1c5.5-2 10.3 1.3 8.6 9.6z"/>
                                 </svg>
-                            </span>
+                            <?php if ($tgHref !== ''): ?>
+                                </a>
+                            <?php else: ?>
+                                </span>
+                            <?php endif; ?>
                             <?php if (!empty($it['item_id']) && veranda_can('exclude_toggle')): ?>
                                 <button type="button" class="ko-ack" title="Игнор" aria-label="Игнор" data-item-id="<?= (int)$it['item_id'] ?>">✕</button>
                             <?php endif; ?>
@@ -433,7 +455,7 @@ if ($isAjax) {
         try {
             $rows = $db->query(
                 "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.transaction_comment, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
-                        tga.created_at AS tg_sent_at, tga.updated_at AS tg_last_edit_at
+                        tga.created_at AS tg_sent_at, tga.updated_at AS tg_last_edit_at, tga.message_id AS tg_message_id
                  FROM {$ks} ks
                  LEFT JOIN {$tgItems} tga ON tga.transaction_date = ks.transaction_date AND tga.kitchen_stats_id = ks.id
                  WHERE transaction_date = ?
@@ -450,7 +472,7 @@ if ($isAjax) {
         } catch (\Throwable $e) {
             $rows = $db->query(
                 "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.transaction_comment, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
-                        NULL AS tg_sent_at, NULL AS tg_last_edit_at
+                        NULL AS tg_sent_at, NULL AS tg_last_edit_at, NULL AS tg_message_id
                  FROM {$ks} ks
                  WHERE transaction_date = ?
                    AND status = 1
