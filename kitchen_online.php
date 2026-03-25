@@ -188,13 +188,13 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                                         $tgTitle .= '; обновлено ' . date('H:i:s', strtotime($tgLastEditAt));
                                     }
                                     if ($tgMsgId > 0) {
-                                        const th = <?= (int)$tgThreadIdVal ?>;
-                                        const uname = '<?= htmlspecialchars($tgChatUsername, ENT_QUOTES) ?>';
-                                        const internal = '<?= htmlspecialchars($tgChatInternalId, ENT_QUOTES) ?>';
-                                        if (uname !== '') {
-                                            $tgHref = th > 0 ? ('https://t.me/' + uname + '/' + th + '/' + $tgMsgId) : ('https://t.me/' + uname + '/' + $tgMsgId);
-                                        } else if (internal !== '') {
-                                            $tgHref = th > 0 ? ('https://t.me/c/' + internal + '/' + th + '/' + $tgMsgId) : ('https://t.me/c/' + internal + '/' + $tgMsgId);
+                                        $th = (int)<?= (int)$tgThreadIdVal ?>;
+                                        $uname = '<?= htmlspecialchars($tgChatUsername, ENT_QUOTES) ?>';
+                                        $internal = '<?= htmlspecialchars($tgChatInternalId, ENT_QUOTES) ?>';
+                                        if ($uname !== '') {
+                                            $tgHref = $th > 0 ? ('https://t.me/' . $uname . '/' . $th . '/' . $tgMsgId) : ('https://t.me/' . $uname . '/' . $tgMsgId);
+                                        } elseif ($internal !== '') {
+                                            $tgHref = $th > 0 ? ('https://t.me/c/' . $internal . '/' . $th . '/' . $tgMsgId) : ('https://t.me/c/' . $internal . '/' . $tgMsgId);
                                         }
                                     }
                                 }
