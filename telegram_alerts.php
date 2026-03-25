@@ -153,6 +153,38 @@ try {
 
     $cutoffTime = date('Y-m-d H:i:s', strtotime("-{$waitLimit} minutes"));
 
+    try {
+        $overdueAll = (int)$db->query(
+            "SELECT COUNT(*)
+             FROM {$ks}
+             WHERE ready_pressed_at IS NULL
+               AND ticket_sent_at IS NOT NULL
+               AND transaction_date = ?
+               AND status = 1
+               AND COALESCE(was_deleted, 0) = 0
+               AND COALESCE(exclude_from_dashboard, 0) = 0
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
+               AND ticket_sent_at < ?",
+            [$today, $cutoffTime]
+        )->fetchColumn();
+        $overdueAck = (int)$db->query(
+            "SELECT COUNT(*)
+             FROM {$ks}
+             WHERE ready_pressed_at IS NULL
+               AND ticket_sent_at IS NOT NULL
+               AND transaction_date = ?
+               AND status = 1
+               AND COALESCE(was_deleted, 0) = 0
+               AND COALESCE(exclude_from_dashboard, 0) = 0
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
+               AND COALESCE(tg_acknowledged, 0) = 1
+               AND ticket_sent_at < ?",
+            [$today, $cutoffTime]
+        )->fetchColumn();
+        $logLine('OVERDUE total=' . $overdueAll . ' ack=' . $overdueAck . ' cutoff=' . $cutoffTime);
+    } catch (\Throwable $e) {
+    }
+
     $rows = $db->query(
         "SELECT id, transaction_id, receipt_number, table_number, waiter_name, dish_name, ticket_sent_at
          FROM {$ks}
