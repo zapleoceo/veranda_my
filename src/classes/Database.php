@@ -79,13 +79,17 @@ class Database {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
         
         $this->pdo->exec($sql);
+        try {
+            $this->pdo->exec("ALTER TABLE {$ks} ADD COLUMN transaction_comment TEXT NULL");
+        } catch (\Throwable $e) {
+        }
     }
 
     public function saveStats(array $stats): void {
         $ks = $this->t('kitchen_stats');
         $sql = "INSERT INTO {$ks} 
-                (transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id, table_number, waiter_name, status, pay_type, close_reason, dish_id, item_seq, dish_category_id, dish_sub_category_id, dish_name, ticket_sent_at, ready_pressed_at, ready_chass_at, was_deleted, service_type, total_sum, station, exclude_from_dashboard, exclude_auto) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id, table_number, waiter_name, transaction_comment, status, pay_type, close_reason, dish_id, item_seq, dish_category_id, dish_sub_category_id, dish_name, ticket_sent_at, ready_pressed_at, ready_chass_at, was_deleted, service_type, total_sum, station, exclude_from_dashboard, exclude_auto) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE 
                 dish_id = VALUES(dish_id),
                 item_seq = VALUES(item_seq),
@@ -96,6 +100,7 @@ class Database {
                 transaction_closed_at = VALUES(transaction_closed_at),
                 table_number = VALUES(table_number),
                 waiter_name = VALUES(waiter_name),
+                transaction_comment = COALESCE(VALUES(transaction_comment), transaction_comment),
                 status = VALUES(status),
                 pay_type = VALUES(pay_type),
                 close_reason = VALUES(close_reason),
@@ -128,6 +133,7 @@ class Database {
                 $row['transaction_id'],
                 $row['table_number'] ?? null,
                 $row['waiter_name'] ?? null,
+                $row['transaction_comment'] ?? null,
                 $row['status'],
                 $row['pay_type'] ?? null,
                 $row['close_reason'] ?? null,
