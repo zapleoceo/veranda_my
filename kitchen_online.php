@@ -44,6 +44,11 @@ $lastSyncLabel = '—';
 $ks = $db->t('kitchen_stats');
 $metaTable = $db->t('system_meta');
 $tgItems = $db->t('tg_alert_items');
+$useLogicalClose = true;
+try {
+    $m = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key='ko_use_logical_close' LIMIT 1")->fetch();
+    $useLogicalClose = !isset($m['meta_value']) || (string)$m['meta_value'] !== '0';
+} catch (\Throwable $e) {}
 
 try {
     $db->query("ALTER TABLE {$ks} ADD COLUMN transaction_comment TEXT NULL");
@@ -287,6 +292,21 @@ if ($isAjax) {
             echo json_encode(['ok' => true, 'item_id' => $itemId], JSON_UNESCAPED_UNICODE);
             exit;
         }
+        if ($action === 'set_logclose' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+            $raw = file_get_contents('php://input');
+            $j = json_decode($raw, true);
+            $use = (int)($j['use'] ?? 1);
+            try {
+                $db->query(
+                    "INSERT INTO {$metaTable} (meta_key, meta_value)
+                     VALUES ('ko_use_logical_close', ?)
+                     ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                    [$use ? '1' : '0']
+                );
+            } catch (\Throwable $e) {}
+            echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         if ($action === 'refresh' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $txIds = $_POST['tx_ids'] ?? [];
             if (!is_array($txIds)) $txIds = [];
@@ -475,6 +495,9 @@ if ($isAjax) {
             : (int)$settings['alert_timing_high_load'];
 
         try {
+            $excludeSql = $useLogicalClose
+                ? " AND COALESCE(exclude_from_dashboard, 0) = 0 "
+                : " AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0) ";
             $rows = $db->query(
                 "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.transaction_comment, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
                         ks.tg_sent_at, ks.tg_last_edit_at, ks.tg_message_id
@@ -484,13 +507,16 @@ if ($isAjax) {
                    AND ready_pressed_at IS NULL
                    AND ticket_sent_at IS NOT NULL
                    AND COALESCE(was_deleted, 0) = 0
-                   AND COALESCE(exclude_from_dashboard, 0) = 0
+               {$excludeSql}
                    AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                    {$stationSql}
                  ORDER BY ticket_sent_at ASC",
                 array_merge([$today], $stationParams)
             )->fetchAll();
         } catch (\Throwable $e) {
+            $excludeSql = $useLogicalClose
+                ? " AND COALESCE(exclude_from_dashboard, 0) = 0 "
+                : " AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0) ";
             $rows = $db->query(
                 "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.transaction_comment, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
                         ks.tg_sent_at, ks.tg_last_edit_at, ks.tg_message_id
@@ -500,7 +526,7 @@ if ($isAjax) {
                    AND ready_pressed_at IS NULL
                    AND ticket_sent_at IS NOT NULL
                    AND COALESCE(was_deleted, 0) = 0
-                   AND COALESCE(exclude_from_dashboard, 0) = 0
+               {$excludeSql}
                    AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                    {$stationSql}
                  ORDER BY ticket_sent_at ASC",

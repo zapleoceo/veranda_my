@@ -33,6 +33,11 @@ try {
     $tgThreads = $db->t('tg_alert_threads');
     $tgItems = $db->t('tg_alert_items');
     $logFile = __DIR__ . '/telegram.log';
+    $useLogicalClose = true;
+    try {
+        $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key='ko_use_logical_close' LIMIT 1")->fetch();
+        $useLogicalClose = !isset($row['meta_value']) || (string)$row['meta_value'] !== '0';
+    } catch (\Throwable $e) {}
 
     try {
         $db->query("ALTER TABLE {$ks} ADD COLUMN transaction_comment TEXT NULL");
@@ -227,6 +232,9 @@ try {
     } catch (\Throwable $e) {
     }
 
+    $excludeSql = $useLogicalClose
+        ? " AND COALESCE(exclude_from_dashboard, 0) = 0 "
+        : " AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0) ";
     $rows = $db->query(
         "SELECT id, transaction_id, receipt_number, table_number, waiter_name, transaction_comment, dish_name, ticket_sent_at
          FROM {$ks}
@@ -235,7 +243,7 @@ try {
            AND transaction_date = ?
            AND status = 1
            AND COALESCE(was_deleted, 0) = 0
-           AND COALESCE(exclude_from_dashboard, 0) = 0
+           {$excludeSql}
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
            AND ticket_sent_at < ?
          ORDER BY transaction_id ASC, ticket_sent_at ASC, id ASC",

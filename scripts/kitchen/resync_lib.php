@@ -88,12 +88,11 @@ function veranda_resync_range_period(string $from, string $to): void {
             if ($sentTs === false || $sentTs <= 0) continue;
 
             $candidate = null;
-            for ($d = 1; $d <= 3; $d++) {
-                $next = $receipt + $d;
-                if (isset($byReceiptStation[$next][$station])) {
-                    $candidate = $byReceiptStation[$next][$station];
-                    break;
-                }
+            // New rule: require both next and next-next receipt have closed dishes for this station
+            $next1 = $receipt + 1;
+            $next2 = $receipt + 2;
+            if (isset($byReceiptStation[$next1][$station]) && isset($byReceiptStation[$next2][$station])) {
+                $candidate = $byReceiptStation[$next1][$station];
             }
             if ($candidate !== null) {
                 $candTs = strtotime($candidate);
