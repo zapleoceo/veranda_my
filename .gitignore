@@ -16,3 +16,6 @@ Thumbs.db
 
 # Generated artifacts
 *.tmp
+
+# Project docs (local only)
+/docs/
