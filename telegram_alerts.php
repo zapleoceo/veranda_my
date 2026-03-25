@@ -103,6 +103,16 @@ try {
     $api = new \App\Classes\PosterAPI($token);
     $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
 
+    try {
+        $webhookInfo = $bot->getWebhookInfo();
+        $currentUrl = is_array($webhookInfo) ? (string)($webhookInfo['url'] ?? '') : '';
+        $targetUrl = 'https://veranda.my/telegram_webhook.php';
+        if ($currentUrl !== $targetUrl) {
+            $bot->setWebhook($targetUrl);
+        }
+    } catch (\Throwable $e) {
+    }
+
     $getMeta = function (string $key, string $default = '') use ($metaRepo): string {
         $vals = $metaRepo->getMany([$key]);
         return array_key_exists($key, $vals) ? (string)$vals[$key] : $default;
@@ -173,7 +183,20 @@ try {
         : " AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0) ";
 
     $overdueAll = 0;
+    $queueAll = 0;
     try {
+        $queueAll = (int)$db->query(
+            "SELECT COUNT(*)
+             FROM {$ks}
+             WHERE ready_pressed_at IS NULL
+               AND ticket_sent_at IS NOT NULL
+               AND transaction_date = ?
+               AND status = 1
+               AND COALESCE(was_deleted, 0) = 0
+               {$excludeSql}
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
+            [$today]
+        )->fetchColumn();
         $overdueAll = (int)$db->query(
             "SELECT COUNT(*)
              FROM {$ks}
@@ -194,6 +217,7 @@ try {
         $lastPosterSync = $getMeta('poster_last_sync_at', '');
         $statusText = 'Открыто чеков: ' . htmlspecialchars($openChecksDisplay) . "\n";
         $statusText .= 'Лимит времени: ' . (int)$waitLimit . " мин\n";
+        $statusText .= 'Блюд в очереди: ' . (int)$queueAll . "\n";
         $statusText .= 'Долгих блюд: ' . (int)$overdueAll . "\n";
         $statusText .= 'Время обновления: ' . ($lastPosterSync !== '' ? $lastPosterSync : date('Y-m-d H:i:s'));
         $statusHash = sha1($statusText);

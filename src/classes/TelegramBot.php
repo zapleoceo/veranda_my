@@ -173,4 +173,41 @@ class TelegramBot {
         }
         return true;
     }
+
+    public function getWebhookInfo(): ?array {
+        $url = "https://api.telegram.org/bot{$this->token}/getWebhookInfo";
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $response = curl_exec($ch);
+        curl_close($ch);
+        if ($response === false || $response === null || $response === '') return null;
+        $data = json_decode($response, true);
+        if (!is_array($data) || empty($data['ok'])) return null;
+        $result = $data['result'] ?? null;
+        return is_array($result) ? $result : null;
+    }
+
+    public function setWebhook(string $webhookUrl): bool {
+        $url = "https://api.telegram.org/bot{$this->token}/setWebhook";
+        $params = [
+            'url' => $webhookUrl,
+            'allowed_updates' => json_encode(['callback_query'], JSON_UNESCAPED_UNICODE),
+        ];
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $response = curl_exec($ch);
+        curl_close($ch);
+        if ($response === false) return false;
+        $data = json_decode($response, true);
+        if (is_array($data) && array_key_exists('ok', $data)) {
+            return (bool)$data['ok'];
+        }
+        return true;
+    }
 }
