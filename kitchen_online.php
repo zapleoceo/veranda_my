@@ -25,6 +25,8 @@ $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
 $tgChatIdEnv = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
 $tgChatUsername = trim((string)($_ENV['TELEGRAM_CHAT_USERNAME'] ?? $_ENV['TG_CHAT_USERNAME'] ?? ''));
+$tgThreadIdEnv = trim((string)($_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? ''));
+$tgThreadIdVal = ($tgThreadIdEnv !== '' && ctype_digit($tgThreadIdEnv)) ? (int)$tgThreadIdEnv : 0;
 $tgChatInternalId = '';
 if ($tgChatIdEnv !== '') {
     $tmp = $tgChatIdEnv;
@@ -186,10 +188,13 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                                         $tgTitle .= '; обновлено ' . date('H:i:s', strtotime($tgLastEditAt));
                                     }
                                     if ($tgMsgId > 0) {
-                                        if ('<?= htmlspecialchars($tgChatUsername, ENT_QUOTES) ?>' !== '') {
-                                            $tgHref = 'https://t.me/<?= htmlspecialchars($tgChatUsername, ENT_QUOTES) ?>/' + $tgMsgId;
-                                        } else if ('<?= htmlspecialchars($tgChatInternalId, ENT_QUOTES) ?>' !== '') {
-                                            $tgHref = 'https://t.me/c/<?= htmlspecialchars($tgChatInternalId, ENT_QUOTES) ?>/' + $tgMsgId;
+                                        const th = <?= (int)$tgThreadIdVal ?>;
+                                        const uname = '<?= htmlspecialchars($tgChatUsername, ENT_QUOTES) ?>';
+                                        const internal = '<?= htmlspecialchars($tgChatInternalId, ENT_QUOTES) ?>';
+                                        if (uname !== '') {
+                                            $tgHref = th > 0 ? ('https://t.me/' + uname + '/' + th + '/' + $tgMsgId) : ('https://t.me/' + uname + '/' + $tgMsgId);
+                                        } else if (internal !== '') {
+                                            $tgHref = th > 0 ? ('https://t.me/c/' + internal + '/' + th + '/' + $tgMsgId) : ('https://t.me/c/' + internal + '/' + $tgMsgId);
                                         }
                                     }
                                 }
@@ -561,19 +566,19 @@ $dashboardQuery = http_build_query([
         .nav-mid select { padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; }
         .wait-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(245, 124, 0, 0.3); border-top-color: #f57c00; border-radius: 50%; margin-right: 6px; animation: waitSpin 0.9s linear infinite; vertical-align: -1px; }
         @keyframes waitSpin { to { transform: rotate(360deg); } }
-        .cards { display: flex; flex-wrap: nowrap; gap: 14px; align-items: flex-start; overflow-x: auto; overflow-y: hidden; padding-bottom: 10px; }
+        .cards { display: flex; flex-wrap: nowrap; gap: 10px; align-items: flex-start; overflow-x: auto; overflow-y: hidden; padding-bottom: 8px; }
         .ko-card { flex: 0 0 auto; }
-        .ko-card { width: 320px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); overflow: hidden; }
-        .ko-card-header { padding: 12px 14px; border-bottom: 1px solid #eee; background: #fafafa; }
+        .ko-card { width: 240px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.06); overflow: hidden; }
+        .ko-card-header { padding: 8px 10px; border-bottom: 1px solid #eee; background: #fafafa; }
         .ko-card-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
         .ko-title { font-weight: 800; color: #2c3e50; }
         .ko-table { font-weight: 800; color: #2c3e50; white-space: nowrap; }
         .ko-meta { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #607d8b; }
-        .ko-items { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-        .ko-item { border: 1px solid #eef2f6; border-radius: 10px; padding: 10px; background: #fff; box-sizing: border-box; }
+        .ko-items { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+        .ko-item { border: 1px solid #eef2f6; border-radius: 10px; padding: 6px; background: #fff; box-sizing: border-box; }
         .ko-item-overdue { border: 2px solid #d32f2f; }
         .ko-item-name { font-weight: 700; color: #263238; }
-        .ko-item-row { margin-top: 8px; display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: #546e7a; }
+        .ko-item-row { margin-top: 4px; display: flex; justify-content: space-between; gap: 2px; font-size: 13px; color: #546e7a; }
         .ko-item-wait { font-weight: 700; color: #d32f2f; white-space: nowrap; }
         .ko-ack { border: 0; background: transparent; color: #9aa0a6; font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
         .ko-ack:hover { color: #5f6368; }
