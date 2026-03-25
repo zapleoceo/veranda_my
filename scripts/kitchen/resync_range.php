@@ -40,6 +40,26 @@ $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix
 $ks = $db->t('kitchen_stats');
 $api = new \App\Classes\PosterAPI($token);
 $analytics = new \App\Classes\KitchenAnalytics($api);
+$jobId = (string)($argv[3] ?? '');
+$metaTable = $db->t('system_meta');
+$setMeta = function (string $key, string $value) use ($db, $metaTable): void {
+    try {
+        $db->query(
+            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+            [$key, $value]
+        );
+    } catch (\Throwable $e) {
+    }
+};
+if ($jobId !== '') {
+    $setMeta('kitchen_resync_job_id', $jobId);
+    $setMeta('kitchen_resync_job_from', $from);
+    $setMeta('kitchen_resync_job_to', $to);
+    $setMeta('kitchen_resync_job_status', 'running');
+    $setMeta('kitchen_resync_job_started_at', date('Y-m-d H:i:s'));
+    $setMeta('kitchen_resync_job_last_update_at', date('Y-m-d H:i:s'));
+}
 
 function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
     $ks = $db->t('kitchen_stats');
@@ -93,12 +113,10 @@ function computeProbCloseAt(\App\Classes\Database $db, string $date): array {
         $sentTs = $sentAt !== '' ? strtotime($sentAt) : false;
         if ($sentTs === false || $sentTs <= 0) continue;
         $candidate = null;
-        for ($d = 1; $d <= 3; $d++) {
-            $next = $receipt + $d;
-            if (isset($byReceiptStation[$next][$station])) {
-                $candidate = $byReceiptStation[$next][$station];
-                break;
-            }
+        $next1 = $receipt + 1;
+        $next2 = $receipt + 2;
+        if (isset($byReceiptStation[$next1][$station]) && isset($byReceiptStation[$next2][$station])) {
+            $candidate = $byReceiptStation[$next1][$station];
         }
         if ($candidate !== null) {
             $candTs = strtotime($candidate);
@@ -184,9 +202,19 @@ function autoExclude(\App\Classes\Database $db, string $date): array {
     return ['set_hookah' => (int)$setHookah, 'set_prob' => (int)$set1, 'set_close' => (int)$set2, 'unset_fact' => (int)$unset1, 'unset_lost' => (int)$unset2];
 }
 
+$totalDays = 0;
+for ($tmp = $fromTs; $tmp <= $toTs; $tmp = strtotime('+1 day', $tmp)) $totalDays++;
+$idx = 0;
+
 for ($d = $fromTs; $d <= $toTs; $d = strtotime('+1 day', $d)) {
     $date = date('Y-m-d', $d);
+    $idx++;
     echo "[" . date('Y-m-d H:i:s') . "] Syncing {$date}...\n";
+    if ($jobId !== '') {
+        $setMeta('kitchen_resync_job_last_date', $date);
+        $setMeta('kitchen_resync_job_progress', (string)$idx . '/' . (string)$totalDays);
+        $setMeta('kitchen_resync_job_last_update_at', date('Y-m-d H:i:s'));
+    }
     try {
         $stats = $analytics->getStatsForPeriod($date, $date);
         if (!empty($stats)) {
@@ -250,8 +278,19 @@ for ($d = $fromTs; $d <= $toTs; $d = strtotime('+1 day', $d)) {
         echo "  AutoExclude: set_prob={$auto['set_prob']} set_close={$auto['set_close']} unset_fact={$auto['unset_fact']} unset_lost={$auto['unset_lost']}\n";
     } catch (\Exception $e) {
         echo "  ERROR: " . $e->getMessage() . "\n";
+        if ($jobId !== '') {
+            $setMeta('kitchen_resync_job_status', 'error');
+            $setMeta('kitchen_resync_job_error', $e->getMessage());
+            $setMeta('kitchen_resync_job_last_update_at', date('Y-m-d H:i:s'));
+        }
+        exit(2);
     }
 }
 
 echo "[" . date('Y-m-d H:i:s') . "] DONE\n";
+if ($jobId !== '') {
+    $setMeta('kitchen_resync_job_status', 'done');
+    $setMeta('kitchen_resync_job_done_at', date('Y-m-d H:i:s'));
+    $setMeta('kitchen_resync_job_last_update_at', date('Y-m-d H:i:s'));
+}
 ?>

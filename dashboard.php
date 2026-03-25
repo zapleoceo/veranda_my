@@ -23,9 +23,42 @@ $rawParams = [
     'hourEnd' => $hourEnd
 ];
 if ($doResync) {
-    require_once __DIR__ . '/scripts/kitchen/resync_lib.php';
-    veranda_resync_range_period($dateFrom, $dateTo);
+    $metaTable = $db->t('system_meta');
+    $pidVal = 0;
+    $statusRow = $db->query(
+        "SELECT meta_key, meta_value
+         FROM {$metaTable}
+         WHERE meta_key IN ('kitchen_resync_job_pid','kitchen_resync_job_status')"
+    )->fetchAll();
+    $meta = [];
+    foreach ($statusRow as $r) $meta[(string)$r['meta_key']] = (string)$r['meta_value'];
+    $existingPid = (int)($meta['kitchen_resync_job_pid'] ?? 0);
+    $existingStatus = (string)($meta['kitchen_resync_job_status'] ?? '');
+    $isRunning = false;
+    if ($existingPid > 0 && $existingStatus === 'running') {
+        if (function_exists('posix_kill')) {
+            $isRunning = @posix_kill($existingPid, 0);
+        } else {
+            $isRunning = is_dir('/proc/' . $existingPid);
+        }
+    }
+    if (!$isRunning) {
+        $jobId = date('Ymd_His');
+        $cmd = PHP_BINARY . ' ' . escapeshellarg(__DIR__ . '/scripts/kitchen/resync_range.php') . ' ' . escapeshellarg($dateFrom) . ' ' . escapeshellarg($dateTo) . ' ' . escapeshellarg($jobId);
+        $logFile = __DIR__ . '/resync_range.log';
+        $out = [];
+        @exec($cmd . ' >> ' . escapeshellarg($logFile) . ' 2>&1 & echo $!', $out);
+        $pidVal = (int)trim((string)end($out));
+        if ($pidVal > 0) {
+            $db->query(
+                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+                ['kitchen_resync_job_pid', (string)$pidVal]
+            );
+        }
+    }
     $redirectParams = $rawParams;
+    $redirectParams['resync_started'] = '1';
     $qs = http_build_query($redirectParams);
     header('Location: dashboard.php' . ($qs ? ('?' . $qs) : ''));
     exit;
