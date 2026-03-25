@@ -26,6 +26,64 @@ try {
     $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
     $dbPass = $_ENV['DB_PASS'] ?? '';
     $tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
+    if ($tableSuffix === '') {
+        try {
+            $pdo = new \PDO("mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4", $dbUser, $dbPass, [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            ]);
+            $names = [];
+            $stmt = $pdo->query("SHOW TABLES LIKE 'kitchen_stats%'");
+            $rows = $stmt ? $stmt->fetchAll() : [];
+            foreach ($rows as $r) {
+                $n = array_values($r)[0] ?? '';
+                if (is_string($n) && $n !== '') $names[] = $n;
+            }
+            if (empty($names)) {
+                $stmt = $pdo->query("SHOW TABLES LIKE 'poster_checks%'");
+                $rows = $stmt ? $stmt->fetchAll() : [];
+                foreach ($rows as $r) {
+                    $n = array_values($r)[0] ?? '';
+                    if (is_string($n) && $n !== '') $names[] = $n;
+                }
+            }
+            $suffix = '';
+            foreach ($names as $n) {
+                if (str_starts_with($n, 'kitchen_stats')) {
+                    $suffix = substr($n, strlen('kitchen_stats'));
+                    break;
+                }
+                if (str_starts_with($n, 'poster_checks')) {
+                    $suffix = substr($n, strlen('poster_checks'));
+                    break;
+                }
+            }
+            if ($suffix !== '') {
+                $tableSuffix = $suffix;
+                $_ENV['DB_TABLE_SUFFIX'] = $tableSuffix;
+                $envPath = __DIR__ . '/.env';
+                $existing = file_exists($envPath) ? file($envPath, FILE_IGNORE_NEW_LINES) : [];
+                $hasKey = false;
+                foreach ($existing as $line) {
+                    if (strpos($line, 'DB_TABLE_SUFFIX=') === 0) {
+                        $hasKey = true;
+                        break;
+                    }
+                }
+                $newLines = [];
+                foreach ($existing as $line) {
+                    if (strpos($line, 'DB_TABLE_SUFFIX=') === 0) {
+                        $newLines[] = 'DB_TABLE_SUFFIX=' . $tableSuffix;
+                    } else {
+                        $newLines[] = $line;
+                    }
+                }
+                if (!$hasKey) $newLines[] = 'DB_TABLE_SUFFIX=' . $tableSuffix;
+                file_put_contents($envPath, implode(PHP_EOL, $newLines) . PHP_EOL);
+            }
+        } catch (\Throwable $e) {
+        }
+    }
 
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
     $metaTable = $db->t('system_meta');
