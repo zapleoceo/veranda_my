@@ -1,13 +1,18 @@
-/.env
-/.env.*
+# Secrets and environment
+.env
+
+# Logs
 *.log
-/telegram.log
-/prob_close_backfill.log
-/DEPLOY_TEST.txt
-/docs/
-/debug_*.php
-/get_open_count.php
-/.git-rewrite/
-/.idea/
-/.vscode/
+telegram.log
+
+# Temp/cache
+tmp/
+cache/
+.DS_Store
+
+# IDE/OS
+.vscode/
 Thumbs.db
+
+# Generated artifacts
+*.tmp
