@@ -2027,6 +2027,9 @@ $fmtVnd = function (int $v): string {
         .mid-btn.active { background: #111827; border-color: #111827; color: #fff; }
         .mid-btn:disabled { opacity: 0.5; cursor: default; }
         .mid-check { display:flex; gap: 8px; align-items:center; font-weight: 800; font-size: 12px; color: #374151; user-select: none; }
+        .vc-subtitle { display:flex; align-items:center; gap: 8px; }
+        .vc-toggle { display:inline-flex; align-items:center; justify-content:center; width: 22px; height: 22px; border-radius: 8px; border: 1px solid rgba(26, 115, 232, 0.35); background: rgba(26, 115, 232, 0.08); color: #1a73e8; cursor: pointer; font-weight: 900; line-height: 1; padding: 0; }
+        .vc-toggle.on { border-color: #1a73e8; background: #1a73e8; color: #fff; }
         @media (max-width: 1050px) {
             .grid { grid-template-columns: 1fr 70px 1fr; }
             .mid-col { padding-top: 10px; gap: 6px; }
@@ -2192,7 +2195,10 @@ $fmtVnd = function (int $v): string {
             <div class="card" style="padding: 0;">
                 <div style="padding: 12px 12px 6px;">
                     <div style="font-weight:900;">Poster</div>
-                    <div class="muted">Безнал / смешанная (за выбранный день)</div>
+                    <div class="muted vc-subtitle">
+                        <span>Безнал / смешанная (за выбранный день)</span>
+                        <button type="button" class="vc-toggle" id="toggleVietnamBtn" title="Показать/скрыть Vietnam Company">👁</button>
+                    </div>
                 </div>
                 <div id="posterScroll" style="max-height: 56vh; overflow:auto;">
                     <table id="posterTable">
@@ -3175,6 +3181,9 @@ $fmtVnd = function (int $v): string {
     const selDiffEl = document.getElementById('selDiff');
 
     let hideLinked = false;
+    let hideVietnam = false;
+    try { hideVietnam = localStorage.getItem('payday_hide_vietnam') === '1'; } catch (e) {}
+    const toggleVietnamBtn = document.getElementById('toggleVietnamBtn');
 
     const updateSelectionSums = () => {
         let sSum = 0;
@@ -3212,6 +3221,11 @@ $fmtVnd = function (int $v): string {
     const updateHideButtonState = () => {
         if (!hideLinkedBtn) return;
         hideLinkedBtn.classList.toggle('active', hideLinked);
+    };
+
+    const updateVietnamButtonState = () => {
+        if (!toggleVietnamBtn) return;
+        toggleVietnamBtn.classList.toggle('on', hideVietnam);
     };
 
     const clearCheckboxes = () => {
@@ -3316,9 +3330,10 @@ $fmtVnd = function (int $v): string {
             }
         });
         document.querySelectorAll('#posterTable tbody tr[data-poster-id]').forEach((tr) => {
+            const isVietnam = String(tr.getAttribute('data-vietnam') || '0') === '1';
             const pid = Number(tr.getAttribute('data-poster-id') || 0);
             const linked = state.poster.has(pid);
-            const hidden = hideLinked && linked;
+            const hidden = (hideLinked && linked) || (hideVietnam && isVietnam);
             tr.style.display = hidden ? 'none' : '';
             if (hidden) {
                 const cb = tr.querySelector('input.poster-cb');
@@ -3440,6 +3455,17 @@ $fmtVnd = function (int $v): string {
             setTimeout(() => { positionLines(); positionWidgets(); }, 0);
         });
         updateHideButtonState();
+    }
+    if (toggleVietnamBtn) {
+        toggleVietnamBtn.addEventListener('click', () => {
+            hideVietnam = !hideVietnam;
+            try { localStorage.setItem('payday_hide_vietnam', hideVietnam ? '1' : '0'); } catch (e) {}
+            updateVietnamButtonState();
+            applyHideLinked();
+            drawLines();
+            setTimeout(() => { positionLines(); positionWidgets(); }, 0);
+        });
+        updateVietnamButtonState();
     }
     if (linkAutoBtn) {
         linkAutoBtn.addEventListener('click', () => {
