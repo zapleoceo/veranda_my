@@ -25,12 +25,6 @@ $tgTokenMissing = empty($tgToken);
 $raw = file_get_contents('php://input');
 $update = json_decode($raw, true);
 
-$logDir = __DIR__ . '/logs';
-if (!is_dir($logDir)) {
-    @mkdir($logDir, 0777, true);
-}
-file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " RAW: " . $raw . "\n", FILE_APPEND);
-
 if (empty($update['callback_query'])) {
     echo 'ok';
     exit;
@@ -70,9 +64,7 @@ try {
 
     $username = strtolower(trim((string)($from['username'] ?? '')));
     $username = ltrim($username, '@');
-    
-    $isAllowed = false; 
-
+    $isAllowed = false;
     if ($username !== '') {
         $uRow = $db->query(
             "SELECT permissions_json
@@ -81,35 +73,24 @@ try {
              LIMIT 1",
             [$username]
         )->fetch();
-        if ($uRow) {
-            $perms = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
-            // DEBUG: bypass
-            if (is_array($perms) && (!empty($perms['telegram_ack']) || !empty($perms['admin']))) {
-                $isAllowed = true;
-            }
+        $perms = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
+        if (is_array($perms) && (!empty($perms['telegram_ack']) || !empty($perms['admin']))) {
+            $isAllowed = true;
         }
     }
-    // TEMPORARY: allow you to test while we debug
-    if ($username === 'zapleosoft') {
-        $isAllowed = true;
-    }
-    
-    file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " Action: $action, ID: $id, User: $username, Allowed: " . ($isAllowed ? 'yes' : 'no') . "\n", FILE_APPEND);
-
     if (!$isAllowed) {
         if ($callbackId !== '') {
             $apiBase = "https://api.telegram.org/bot{$tgToken}";
-            $postJson = function (string $method, array $payload) use ($apiBase, $logDir): void {
-                    $ch = curl_init("{$apiBase}/{$method}");
-                    curl_setopt($ch, CURLOPT_POST, true);
-                    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                    $res = curl_exec($ch);
-                    file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " DEL MSG RES: " . $res . " PAYLOAD: " . json_encode($payload) . "\n", FILE_APPEND);
-                    curl_close($ch);
-                };
+            $postJson = function (string $method, array $payload) use ($apiBase): void {
+                $ch = curl_init("{$apiBase}/{$method}");
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                curl_exec($ch);
+                curl_close($ch);
+            };
             $postJson('answerCallbackQuery', [
                 'callback_query_id' => $callbackId,
                 'text' => 'Эта кнопка только для уважаемых людей',
@@ -150,20 +131,16 @@ try {
                     [$txDate, $txId]
                 )->fetchAll();
                 $apiBase = "https://api.telegram.org/bot{$tgToken}";
-                $postJson = function (string $method, array $payload) use ($apiBase, $logDir): void {
+                $postJson = function (string $method, array $payload) use ($apiBase): void {
                     $ch = curl_init("{$apiBase}/{$method}");
                     curl_setopt($ch, CURLOPT_POST, true);
                     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
                     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                    $res = curl_exec($ch);
-                    file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " DEL MSG RES: " . $res . " PAYLOAD: " . json_encode($payload) . "\n", FILE_APPEND);
+                    curl_exec($ch);
                     curl_close($ch);
                 };
-                
-                file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " FOUND " . count($rows) . " MSGS for tx $txId\n", FILE_APPEND);
-
                 foreach ($rows as $r) {
                     $mid = (int)($r['message_id'] ?? 0);
                     if ($mid > 0 && $chatId !== '') {
@@ -173,9 +150,8 @@ try {
                         ]);
                     }
                 }
-                $db->query("DELETE FROM {$itemsTable} WHERE transaction_id = ?", [$txId]);
+                $db->query("DELETE FROM {$itemsTable} WHERE transaction_date = ? AND transaction_id = ?", [$txDate, $txId]);
             } catch (\Throwable $eDel) {
-                file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " DEL ERROR: " . $eDel->getMessage() . "\n", FILE_APPEND);
             }
         }
         $callbackText = 'Игнор чека установлен.';
@@ -198,25 +174,19 @@ try {
                 [$itemId]
             )->fetch();
             $mid = (int)($row['message_id'] ?? 0);
-            
-            file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " FOUND MSG: $mid for item $itemId\n", FILE_APPEND);
-
             if ($mid > 0 && $chatId !== '') {
                 $apiBase = "https://api.telegram.org/bot{$tgToken}";
                 $ch = curl_init("{$apiBase}/deleteMessage");
-                $payload = ['chat_id' => $chatId, 'message_id' => $mid];
                 curl_setopt($ch, CURLOPT_POST, true);
                 curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['chat_id' => $chatId, 'message_id' => $mid], JSON_UNESCAPED_UNICODE));
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                $res = curl_exec($ch);
-                file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " DEL MSG RES: " . $res . " PAYLOAD: " . json_encode($payload) . "\n", FILE_APPEND);
+                curl_exec($ch);
                 curl_close($ch);
             }
-            $db->query("DELETE FROM {$itemsTable} WHERE kitchen_stats_id = ?", [$itemId]);
+            $db->query("DELETE FROM {$itemsTable} WHERE kitchen_stats_id = ? AND transaction_date = ?", [$itemId, (string)($row['transaction_date'] ?? $dRow['transaction_date'] ?? date('Y-m-d'))]);
         } catch (\Throwable $eDel) {
-            file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " DEL ERROR: " . $eDel->getMessage() . "\n", FILE_APPEND);
         }
         $callbackText = 'Игнор блюда установлен.';
     } elseif ($action === 'ack_tx' && $id > 0) {
