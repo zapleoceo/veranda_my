@@ -161,6 +161,9 @@ try {
                     file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " DEL MSG RES: " . $res . " PAYLOAD: " . json_encode($payload) . "\n", FILE_APPEND);
                     curl_close($ch);
                 };
+                
+                file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " FOUND " . count($rows) . " MSGS for tx $txId\n", FILE_APPEND);
+
                 foreach ($rows as $r) {
                     $mid = (int)($r['message_id'] ?? 0);
                     if ($mid > 0 && $chatId !== '') {
@@ -195,6 +198,9 @@ try {
                 [$itemId]
             )->fetch();
             $mid = (int)($row['message_id'] ?? 0);
+            
+            file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " FOUND MSG: $mid for item $itemId\n", FILE_APPEND);
+
             if ($mid > 0 && $chatId !== '') {
                 $apiBase = "https://api.telegram.org/bot{$tgToken}";
                 $ch = curl_init("{$apiBase}/deleteMessage");
