@@ -296,7 +296,8 @@ try {
 
     $existingItems = $db->query(
         "SELECT kitchen_stats_id, transaction_date, transaction_id, message_id, last_text_hash
-         FROM {$tgItems}"
+         FROM {$tgItems}
+         WHERE transaction_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)"
     )->fetchAll();
     if (!is_array($existingItems)) $existingItems = [];
     $existingByItem = [];
@@ -439,7 +440,7 @@ try {
                             last_text_hash = VALUES(last_text_hash),
                             last_seen_at = VALUES(last_seen_at),
                             updated_at = CURRENT_TIMESTAMP",
-                        [$today, $kid, $txId, $currentMsgId, $textHash, $nowDt]
+                        [$prevDate, $kid, $txId, $currentMsgId, $textHash, $nowDt]
                     );
                 } else {
                     $logLine('SEND_FAIL item=' . $kid . ' tx=' . $txId . ' receipt=' . $receipt);
