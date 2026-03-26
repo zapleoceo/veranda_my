@@ -89,7 +89,7 @@ if ($stationFilter === 'kitchen') {
     $stationSql = " AND (station = '3' OR station = 3 OR station = 'Bar Veranda')";
 }
 
-$renderCards = function (array $rows, int $waitLimitMinutes): string {
+$renderCards = function (array $rows, int $waitLimitMinutes) use ($tgThreadIdVal, $tgChatUsername, $tgChatInternalId): string {
     $cards = [];
     foreach ($rows as $r) {
         $txId = (int)($r['transaction_id'] ?? 0);
@@ -208,7 +208,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                                     }
                                 }
                             ?>
-                            <?php if ($tgMsgId > 0 && $tgHref !== ''): ?>
+                            <?php if ($tgHref !== ''): ?>
                                 <a class="tg-indicator<?= $tgClass ?>" href="<?= htmlspecialchars($tgHref, ENT_QUOTES) ?>" target="_blank" rel="noopener noreferrer" title="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>" aria-label="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>">
                             <?php else: ?>
                                 <span class="tg-indicator<?= $tgClass ?>" title="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>" aria-label="<?= htmlspecialchars($tgTitle, ENT_QUOTES) ?>">
@@ -216,7 +216,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                                 <svg viewBox="0 0 240 240" aria-hidden="true" focusable="false">
                                     <path d="M120 0C53.7 0 0 53.7 0 120s53.7 120 120 120 120-53.7 120-120S186.3 0 120 0zm58.9 82.2-19.7 93.1c-1.5 6.6-5.5 8.2-11.1 5.1l-30.7-22.6-14.8 14.2c-1.6 1.6-3 3-6.1 3l2.2-31.6 57.5-51.9c2.5-2.2-.5-3.4-3.9-1.2l-71.1 44.8-30.6-9.6c-6.6-2.1-6.8-6.6 1.4-9.8l119.6-46.1c5.5-2 10.3 1.3 8.6 9.6z"/>
                                 </svg>
-                            <?php if ($tgMsgId > 0 && $tgHref !== ''): ?>
+                            <?php if ($tgHref !== ''): ?>
                                 </a>
                             <?php else: ?>
                                 </span>
