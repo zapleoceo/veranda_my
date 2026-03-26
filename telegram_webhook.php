@@ -67,8 +67,7 @@ try {
     $username = strtolower(trim((string)($from['username'] ?? '')));
     $username = ltrim($username, '@');
     
-    // Check if user is explicitly allowed, but default to true for group staff if we want everyone to be able to click
-    $isAllowed = true; 
+    $isAllowed = false; 
 
     if ($username !== '') {
         $uRow = $db->query(
@@ -80,12 +79,14 @@ try {
         )->fetch();
         if ($uRow) {
             $perms = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
-            if (is_array($perms) && (isset($perms['telegram_ack']) && !$perms['telegram_ack']) && empty($perms['admin'])) {
-                $isAllowed = false; // explicitly forbidden
+            if (is_array($perms) && (!empty($perms['telegram_ack']) || !empty($perms['admin']))) {
+                $isAllowed = true;
             }
         }
     }
     
+    file_put_contents(__DIR__ . '/logs/webhook_debug.txt', date('Y-m-d H:i:s') . " Action: $action, ID: $id, User: $username, Allowed: " . ($isAllowed ? 'yes' : 'no') . "\n", FILE_APPEND);
+
     if (!$isAllowed) {
         if ($callbackId !== '') {
             $apiBase = "https://api.telegram.org/bot{$tgToken}";
