@@ -1977,6 +1977,8 @@ $fmtVnd = function (int $v): string {
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
         th { background: #f8f9fa; color: #65676b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+        #sepayScroll thead th,
+        #posterScroll thead th { position: sticky; top: 0; z-index: 5; }
         #sepayTable th, #sepayTable td,
         #posterTable th, #posterTable td { padding: 6px 8px; vertical-align: middle; }
         #sepayTable td, #posterTable td { font-size: 13px; line-height: 1.2; }
