@@ -1060,6 +1060,11 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
             $amount = (int)($r['amount'] ?? 0);
             $amountVnd = $posterCentsToVnd(abs($amount));
             $dateStr = (string)($r['date'] ?? '');
+            $dateYmd = '';
+            if ($dateStr !== '') {
+                $t = strtotime($dateStr);
+                if ($t !== false && $t > 0) $dateYmd = date('Ymd', $t);
+            }
             $comment = (string)($r['comment'] ?? '');
             $cat = (int)($r['category_id'] ?? 0);
             $userId = (int)($r['user_id'] ?? 0);
@@ -1069,7 +1074,7 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
                 'type' => $type,
                 'category' => $cat,
                 'user_id' => $userId,
-                'date' => $dateStr,
+                'date' => $dateYmd !== '' ? $dateYmd : date('Ymd'),
                 'comment' => $comment,
                 'delete' => 1,
             ];
