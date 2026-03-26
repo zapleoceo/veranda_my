@@ -1020,7 +1020,12 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
             if (!is_array($r)) continue;
             $bt = (int)($r['binding_type'] ?? 0);
             $bid = (int)($r['binding_id'] ?? 0);
-            if ($bt !== 1 || $bid !== $bindingId) continue;
+            $rt = (int)($r['recipient_type'] ?? 0);
+            $rid = (int)($r['recipient_id'] ?? 0);
+            $match = false;
+            if ($bt === 1 && $bid === $bindingId) $match = true;
+            if (!$match && $rt === 1 && $rid === $bindingId) $match = true;
+            if (!$match) continue;
             $tid = (int)($r['transaction_id'] ?? 0);
             if ($tid > 0) $toDelete[] = $r;
         }
@@ -2002,7 +2007,12 @@ try {
             if (!is_array($r)) continue;
             $bt = (int)($r['binding_type'] ?? 0);
             $bid = (int)($r['binding_id'] ?? 0);
-            if ($bt !== 1 || $bid <= 0) continue;
+            $rt = (int)($r['recipient_type'] ?? 0);
+            if ($bid <= 0 && $rt === 1) {
+                $bid = (int)($r['recipient_id'] ?? 0);
+            }
+            if ($bid <= 0) continue;
+            if ($bt !== 1 && $rt !== 1) continue;
 
             $type = (int)($r['type'] ?? 0);
             if ($type !== 0 && $type !== 1) continue;
