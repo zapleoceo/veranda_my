@@ -853,25 +853,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $found = null;
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
-            if ((int)($row['type'] ?? 0) !== 2) continue;
-            $toRaw = $row['account_to_id'] ?? $row['account_to'] ?? $row['accountToId'] ?? $row['accountTo'] ?? 0;
-            if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
-            if ((int)$toRaw !== $accountTo) continue;
-
-            $fromRaw = $row['account_from_id'] ?? $row['account_from'] ?? $row['accountFromId'] ?? $row['accountFrom'] ?? $row['account_id'] ?? $row['accountId'] ?? 0;
-            if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
-            if ((int)$fromRaw !== 1) continue;
-
-            $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
-            if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
-            $uId = (int)($uRaw ?? 0);
-            $userName = '';
-            $uObj = $row['user'] ?? $row['employee'] ?? null;
-            if (is_array($uObj)) {
-                $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
-                $userName = trim($userName);
-            }
-            if ($userName === '' && $uId > 0) $userName = '#' . $uId;
+            $type = (int)($row['type'] ?? 0);
+            if ($type !== 0 && $type !== 1) continue;
 
             $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
             $ts = null;
@@ -884,18 +867,38 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
                 if ($t !== false && $t > 0) $ts = $t;
             }
             if ($ts === null) continue;
-            if ($ts < $windowStartTs || $ts > $endTs) continue;
+            if ($ts < $startTs || $ts > $endTs) continue;
+
+            $accRaw = $row['account_id'] ?? $row['accountId'] ?? $row['account_from_id'] ?? $row['account_from'] ?? $row['accountFromId'] ?? $row['accountFrom'] ?? 0;
+            if (is_array($accRaw)) $accRaw = $accRaw['account_id'] ?? $accRaw['id'] ?? 0;
+            $accId = (int)$accRaw;
 
             $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
             $sumMaybe = $normMoney($sumRaw);
-            if ($sumMaybe !== $amountVnd) continue;
+            if (abs($sumMaybe) !== $amountVnd) continue;
 
             $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
-            $cmtNorm = $normText($cmt !== '' ? $cmt : $comment);
-            if ($cmtNorm !== $normText($comment)) continue;
+            if ($normText($cmt !== '' ? $cmt : $comment) !== $normText($comment)) continue;
+
+            $isMatch = false;
+            if ($type === 0 && $sumMaybe < 0 && $accId === 1) $isMatch = true;
+            if ($type === 1 && $sumMaybe > 0 && $accId === $accountTo) $isMatch = true;
+            if (!$isMatch) continue;
+
+            $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
+            if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
+            $uId = (int)($uRaw ?? 0);
+            $userName = '';
+            $uObj = $row['user'] ?? $row['employee'] ?? null;
+            if (is_array($uObj)) {
+                $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
+                $userName = trim($userName);
+            }
+            if ($userName === '' && $uId > 0) $userName = '#' . $uId;
+
             $found = [
                 'ts' => $ts,
-                'sum' => $sumMaybe,
+                'sum' => abs($sumMaybe),
                 'comment' => $cmt !== '' ? $cmt : $comment,
                 'user' => $userName,
             ];
@@ -929,11 +932,67 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             'sum' => $amountVnd,
         ], 'POST');
 
+        $created = null;
+        try {
+            $txs2 = [];
+            try {
+                $txs2 = $api->request('finance.getTransactions', [
+                    'dateFrom' => str_replace('-', '', $dTo),
+                    'dateTo' => str_replace('-', '', $dTo),
+                ]);
+            } catch (\Throwable $e) {
+                $txs2 = [];
+            }
+            if (!is_array($txs2) || count($txs2) === 0) {
+                try {
+                    $txs2 = $api->request('finance.getTransactions', [
+                        'dateFrom' => date('dmY', $startTs),
+                        'dateTo' => date('dmY', $endTs),
+                    ]);
+                } catch (\Throwable $e) {
+                    $txs2 = [];
+                }
+            }
+            if (!is_array($txs2)) $txs2 = [];
+            foreach ($txs2 as $row) {
+                if (!is_array($row)) continue;
+                $type = (int)($row['type'] ?? 0);
+                if ($type !== 0 && $type !== 1) continue;
+                $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
+                $ts = null;
+                if (is_numeric($dRaw)) {
+                    $n = (int)$dRaw;
+                    if ($n > 2000000000000) $n = (int)round($n / 1000);
+                    if ($n > 0) $ts = $n;
+                } elseif (is_string($dRaw) && trim($dRaw) !== '') {
+                    $t = strtotime($dRaw);
+                    if ($t !== false && $t > 0) $ts = $t;
+                }
+                if ($ts === null) continue;
+                if ($ts < $startTs || $ts > $endTs) continue;
+                $accRaw = $row['account_id'] ?? $row['accountId'] ?? $row['account_from_id'] ?? $row['account_from'] ?? $row['accountFromId'] ?? $row['accountFrom'] ?? 0;
+                if (is_array($accRaw)) $accRaw = $accRaw['account_id'] ?? $accRaw['id'] ?? 0;
+                $accId = (int)$accRaw;
+                $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
+                $sumMaybe = $normMoney($sumRaw);
+                if (abs($sumMaybe) !== $amountVnd) continue;
+                $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
+                if ($normText($cmt !== '' ? $cmt : $comment) !== $normText($comment)) continue;
+                $isMatch = false;
+                if ($type === 0 && $sumMaybe < 0 && $accId === 1) $isMatch = true;
+                if ($type === 1 && $sumMaybe > 0 && $accId === $accountTo) $isMatch = true;
+                if (!$isMatch) continue;
+                $created = ['ts' => $ts];
+                break;
+            }
+        } catch (\Throwable $e) {
+        }
+
         echo json_encode([
             'ok' => true,
             'already' => false,
-            'date' => date('d.m.Y', strtotime($targetDate) ?: time()),
-            'time' => date('H:i:s', strtotime($targetDate) ?: time()),
+            'date' => date('d.m.Y', (int)(($created['ts'] ?? null) ?: time())),
+            'time' => date('H:i:s', (int)(($created['ts'] ?? null) ?: time())),
             'sum' => (int)$amountVnd,
             'user' => '#' . (string)$expectedUserId,
             'comment' => $comment,
@@ -1877,17 +1936,16 @@ try {
             $sumInt = (int)round($sumF);
             return ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
         };
+        $normText = function (string $s): string {
+            $t = trim($s);
+            return mb_strtolower($t, 'UTF-8');
+        };
+        $vietnamExpected = ($financeVietnamCents !== null && (int)$financeVietnamCents > 0) ? (int)$posterCentsToVnd((int)$financeVietnamCents) : 0;
+        $tipsExpected = ($financeTipsCents !== null && (int)$financeTipsCents > 0) ? (int)$posterCentsToVnd((int)$financeTipsCents) : 0;
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
-            if ((int)($r['type'] ?? 0) !== 2) continue;
-            $accToRaw = $r['account_to_id'] ?? $r['account_to'] ?? $r['accountToId'] ?? $r['accountTo'] ?? 0;
-            if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
-            $accTo = (int)$accToRaw;
-            if ($accTo !== 9 && $accTo !== 8) continue;
-
-            $accFromRaw = $r['account_from_id'] ?? $r['account_from'] ?? $r['accountFromId'] ?? $r['accountFrom'] ?? $r['account_id'] ?? $r['accountId'] ?? 0;
-            if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
-            if ((int)$accFromRaw !== 1) continue;
+            $type = (int)($r['type'] ?? 0);
+            if ($type !== 0 && $type !== 1) continue;
 
             $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
@@ -1913,14 +1971,22 @@ try {
             if ($ts === null) continue;
             if ($ts < $startTs || $ts > $endTs) continue;
 
+            $accRaw = $r['account_id'] ?? $r['accountId'] ?? $r['account_from_id'] ?? $r['account_from'] ?? $r['accountFromId'] ?? $r['accountFrom'] ?? 0;
+            if (is_array($accRaw)) $accRaw = $accRaw['account_id'] ?? $accRaw['id'] ?? 0;
+            $accId = (int)$accRaw;
+
             $sumRaw = $r['amount_from'] ?? $r['amountFrom'] ?? $r['amount_to'] ?? $r['amountTo'] ?? $r['sum'] ?? $r['amount'] ?? 0;
             $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
             $sumMaybe = $normMoney($sumRaw);
-            if ($accTo === 9) {
-                $transferVietnamFoundList[] = ['ts' => $ts, 'sum' => $sumMaybe, 'comment' => $cmt, 'user' => $userName];
+            if ($vietnamExpected > 0 && abs($sumMaybe) === $vietnamExpected && $normText($cmt) === $normText('Перевод чеков вьетнаской компании')) {
+                if (($type === 0 && $sumMaybe < 0 && $accId === 1) || ($type === 1 && $sumMaybe > 0 && $accId === 9)) {
+                    $transferVietnamFoundList[] = ['ts' => $ts, 'sum' => abs($sumMaybe), 'comment' => $cmt, 'user' => $userName];
+                }
             }
-            if ($accTo === 8) {
-                $transferTipsFoundList[] = ['ts' => $ts, 'sum' => $sumMaybe, 'comment' => $cmt, 'user' => $userName];
+            if ($tipsExpected > 0 && abs($sumMaybe) === $tipsExpected && $normText($cmt) === $normText('Перевод типсов')) {
+                if (($type === 0 && $sumMaybe < 0 && $accId === 1) || ($type === 1 && $sumMaybe > 0 && $accId === 8)) {
+                    $transferTipsFoundList[] = ['ts' => $ts, 'sum' => abs($sumMaybe), 'comment' => $cmt, 'user' => $userName];
+                }
             }
         }
     }
