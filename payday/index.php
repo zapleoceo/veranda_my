@@ -1982,8 +1982,8 @@ $fmtVnd = function (int $v): string {
         #sepayTable th, #sepayTable td,
         #posterTable th, #posterTable td { padding: 6px 8px; vertical-align: middle; }
         #sepayTable td, #posterTable td { font-size: 13px; line-height: 1.2; }
-        #sepayTable .col-sepay-cb, #sepayTable .col-sepay-dot { width: 1%; padding-left: 6px; padding-right: 6px; text-align: center; }
-        #sepayTable .col-sepay-dot { padding-left: 4px; padding-right: 4px; }
+        #sepayTable .col-sepay-cb, #sepayTable .col-sepay-hide, #sepayTable .col-sepay-dot { width: 1%; padding-left: 6px; padding-right: 6px; text-align: center; }
+        #sepayTable .col-sepay-hide, #sepayTable .col-sepay-dot { padding-left: 4px; padding-right: 4px; }
         #sepayTable .col-sepay-content { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
         #posterTable td:first-child, #posterTable th:first-child { width: 1%; padding-left: 6px; padding-right: 6px; }
         #posterTable .cell-anchor { gap: 6px; }
@@ -2123,6 +2123,7 @@ $fmtVnd = function (int $v): string {
                     <table id="sepayTable">
                         <thead>
                             <tr>
+                                <th></th>
                                 <th class="sortable col-sepay-content" data-sort-key="content">Content</th>
                                 <th class="nowrap sortable col-sepay-time" data-sort-key="ts">Время</th>
                                 <th class="nowrap sortable col-sepay-sum" data-sort-key="sum">Сумма</th>
@@ -2150,11 +2151,12 @@ $fmtVnd = function (int $v): string {
                             ?>
                             <?php $tsRow = strtotime($r['transaction_date']) ?: 0; ?>
                             <tr class="<?= $cls ?>" data-sepay-id="<?= $sid ?>" data-ts="<?= (int)$tsRow ?>" data-sum="<?= (int)$r['transfer_amount'] ?>" data-content="<?= htmlspecialchars(mb_strtolower((string)($r['content'] ?? ''), 'UTF-8')) ?>">
+                                <td class="nowrap col-sepay-hide"><button type="button" class="sepay-hide" data-sepay-id="<?= $sid ?>" title="Скрыть (не чек)">−</button></td>
                                 <td class="col-sepay-content"><?= htmlspecialchars((string)($r['content'] ?? '')) ?></td>
                                 <td class="nowrap col-sepay-time"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
                                 <td class="sum col-sepay-sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
                                 <td class="col-sepay-cb"><input type="checkbox" class="sepay-cb" data-id="<?= $sid ?>"></td>
-                                <td class="nowrap col-sepay-dot"><button type="button" class="sepay-hide" data-sepay-id="<?= $sid ?>" title="Скрыть (не чек)">−</button><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
+                                <td class="nowrap col-sepay-dot"><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
