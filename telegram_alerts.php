@@ -301,7 +301,9 @@ try {
          WHERE transaction_date = ?",
         [$today]
     )->fetchAll();
-    if (!is_array($existingItems)) $existingItems = [];
+    if (!is_array($existingItems)) {
+        $existingItems = [];
+    }
     $existingByItem = [];
     foreach ($existingItems as $e) {
         $kid = (int)($e['kitchen_stats_id'] ?? 0);
@@ -372,6 +374,19 @@ try {
         $prev = $existingByItem[$kid] ?? null;
         $prevMsgId = $prev ? (int)($prev['message_id'] ?? 0) : 0;
         $prevHash = $prev ? (string)($prev['last_text_hash'] ?? '') : '';
+        
+        // Logic to update message only once per minute to save Telegram API limits
+        $lastSeen = $prev ? (string)($prev['last_seen_at'] ?? '') : '';
+        $skipEdit = false;
+        if ($prevMsgId > 0 && $prevHash !== $textHash && $lastSeen !== '') {
+            $lastSeenTime = strtotime($lastSeen);
+            $nowTime = time();
+            if (($nowTime - $lastSeenTime) < 60) {
+                // If less than 60 seconds have passed since last edit, skip this edit to save limits
+                $skipEdit = true;
+                $textHash = $prevHash; // pretend it didn't change
+            }
+        }
 
         $currentMsgId = $prevMsgId;
         if ($prevMsgId > 0 && $prevHash === $textHash) {
