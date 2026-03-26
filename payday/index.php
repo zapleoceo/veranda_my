@@ -1038,12 +1038,100 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
     }
     $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
     try {
+        $rows = [];
+        try {
+            $rows = $api->request('finance.getTransactions', [
+                'dateFrom' => date('dmY', $startTs),
+                'dateTo' => date('dmY', $endTs),
+            ]);
+        } catch (\Throwable $e) {
+            $rows = [];
+        }
+        if (!is_array($rows)) $rows = [];
+
+        $isMatchKind = function (array $r, string $kind): bool {
+            $type = (int)($r['type'] ?? 0);
+            if ($type !== 1) return false;
+            $accId = (int)($r['account_id'] ?? 0);
+            $amount = (int)($r['amount'] ?? 0);
+            if ($amount <= 0) return false;
+            $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
+            $cmt = mb_strtolower(trim($cmt), 'UTF-8');
+            if ($kind === 'vietnam') {
+                return $accId === 9 && mb_stripos($cmt, 'вьетна', 0, 'UTF-8') !== false;
+            }
+            if ($kind === 'tips') {
+                return $accId === 8 && (mb_stripos($cmt, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmt, 'tips', 0, 'UTF-8') !== false);
+            }
+            return false;
+        };
+
+        $found = false;
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $tid = (int)($r['transaction_id'] ?? 0);
+            if ($txId > 0 && $tid !== $txId) continue;
+            if ($transferId > 0 && $txId <= 0) {
+                $bt = (int)($r['binding_type'] ?? 0);
+                $bid = (int)($r['binding_id'] ?? 0);
+                $rt = (int)($r['recipient_type'] ?? 0);
+                $rid = (int)($r['recipient_id'] ?? 0);
+                $match = false;
+                if ($bt === 1 && $bid === $transferId) $match = true;
+                if (!$match && $rt === 1 && $rid === $transferId) $match = true;
+                if (!$match) continue;
+            }
+            if (!$isMatchKind($r, $kind)) continue;
+            $found = true;
+            break;
+        }
+        if (!$found) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Транзакция не найдена для выбранного дня'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         $db->query(
             "INSERT INTO {$pfh} (date_to, kind, transfer_id, tx_id, comment, created_by)
              VALUES (?, ?, ?, ?, ?, ?)",
             [$dTo, $kind, $transferId > 0 ? $transferId : null, $txId > 0 ? $txId : null, $comment !== '' ? $comment : null, $by !== '' ? $by : null]
         );
-        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+
+        $hiddenTx = [];
+        $hiddenTransfer = [];
+        try {
+            $hRows = $db->query(
+                "SELECT transfer_id, tx_id
+                 FROM {$pfh}
+                 WHERE date_to = ? AND kind = ?",
+                [$dTo, $kind]
+            )->fetchAll();
+            if (!is_array($hRows)) $hRows = [];
+            foreach ($hRows as $hr) {
+                $hidT = (int)($hr['transfer_id'] ?? 0);
+                $hidX = (int)($hr['tx_id'] ?? 0);
+                if ($hidT > 0) $hiddenTransfer[$hidT] = true;
+                if ($hidX > 0) $hiddenTx[$hidX] = true;
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $remaining = 0;
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            if (!$isMatchKind($r, $kind)) continue;
+            $tid = (int)($r['transaction_id'] ?? 0);
+            if ($tid > 0 && !empty($hiddenTx[$tid])) continue;
+            $bt = (int)($r['binding_type'] ?? 0);
+            $bid = (int)($r['binding_id'] ?? 0);
+            $rt = (int)($r['recipient_type'] ?? 0);
+            $rid = (int)($r['recipient_id'] ?? 0);
+            if ($bt === 1 && $bid > 0 && !empty($hiddenTransfer[$bid])) continue;
+            if ($rt === 1 && $rid > 0 && !empty($hiddenTransfer[$rid])) continue;
+            $remaining++;
+        }
+
+        echo json_encode(['ok' => true, 'remaining' => $remaining], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
