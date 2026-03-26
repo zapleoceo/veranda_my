@@ -168,8 +168,9 @@ try {
                         ]);
                     }
                 }
-                $db->query("DELETE FROM {$itemsTable} WHERE transaction_date = ? AND transaction_id = ?", [$txDate, $txId]);
+                $db->query("DELETE FROM {$itemsTable} WHERE transaction_id = ?", [$txId]);
             } catch (\Throwable $eDel) {
+                file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " DEL ERROR: " . $eDel->getMessage() . "\n", FILE_APPEND);
             }
         }
         $callbackText = 'Игнор чека установлен.';
@@ -203,8 +204,9 @@ try {
                 curl_exec($ch);
                 curl_close($ch);
             }
-            $db->query("DELETE FROM {$itemsTable} WHERE kitchen_stats_id = ? AND transaction_date = ?", [$itemId, (string)($row['transaction_date'] ?? $dRow['transaction_date'] ?? date('Y-m-d'))]);
+            $db->query("DELETE FROM {$itemsTable} WHERE kitchen_stats_id = ?", [$itemId]);
         } catch (\Throwable $eDel) {
+            file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " DEL ERROR: " . $eDel->getMessage() . "\n", FILE_APPEND);
         }
         $callbackText = 'Игнор блюда установлен.';
     } elseif ($action === 'ack_tx' && $id > 0) {
