@@ -1091,13 +1091,6 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
         exit;
     }
     try {
-        $db->query(
-            "DELETE l FROM {$pl} l
-             JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
-             WHERE p.day_date BETWEEN ? AND ?",
-            [$dateFrom, $dateTo]
-        );
-
         $checks = $db->query(
             "SELECT transaction_id, date_close, payed_card, payed_third_party, tip_sum, poster_payment_method_id
              FROM {$pc}
@@ -1121,6 +1114,23 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
 
         $linkedSepay = [];
         $linkedPoster = [];
+        try {
+            $existingLinks = $db->query(
+                "SELECT l.poster_transaction_id, l.sepay_id
+                 FROM {$pl} l
+                 JOIN {$pc} p ON p.transaction_id = l.poster_transaction_id
+                 WHERE p.day_date BETWEEN ? AND ?",
+                [$dateFrom, $dateTo]
+            )->fetchAll();
+            if (!is_array($existingLinks)) $existingLinks = [];
+            foreach ($existingLinks as $l) {
+                $pid = (int)($l['poster_transaction_id'] ?? 0);
+                $sid = (int)($l['sepay_id'] ?? 0);
+                if ($pid > 0) $linkedPoster[$pid] = true;
+                if ($sid > 0) $linkedSepay[$sid] = true;
+            }
+        } catch (\Throwable $e) {
+        }
 
         $sepayByAmount = [];
         foreach ($sepay as $s) {
