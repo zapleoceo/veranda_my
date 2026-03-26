@@ -804,10 +804,10 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         }
 
         $targetDate = $dTo . ' 23:55:00';
-        $targetTs = strtotime($targetDate);
         $startTs = strtotime($dTo . ' 00:00:00');
         $endTs = strtotime($dTo . ' 23:59:59');
-        if ($targetTs === false || $startTs === false || $endTs === false) {
+        $windowStartTs = strtotime($dTo . ' 22:00:00');
+        if ($startTs === false || $endTs === false || $windowStartTs === false) {
             throw new \Exception('Bad date');
         }
 
@@ -865,7 +865,13 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
             $uId = (int)($uRaw ?? 0);
-            if ($uId !== 0 && $uId !== $expectedUserId) continue;
+            $userName = '';
+            $uObj = $row['user'] ?? $row['employee'] ?? null;
+            if (is_array($uObj)) {
+                $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
+                $userName = trim($userName);
+            }
+            if ($userName === '' && $uId > 0) $userName = '#' . $uId;
 
             $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
             $ts = null;
@@ -878,8 +884,7 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
                 if ($t !== false && $t > 0) $ts = $t;
             }
             if ($ts === null) continue;
-            if ($ts < $startTs || $ts > $endTs) continue;
-            if (abs($ts - $targetTs) > 60) continue;
+            if ($ts < $windowStartTs || $ts > $endTs) continue;
 
             $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
             $sumMaybe = $normMoney($sumRaw);
@@ -892,6 +897,7 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
                 'ts' => $ts,
                 'sum' => $sumMaybe,
                 'comment' => $cmt !== '' ? $cmt : $comment,
+                'user' => $userName,
             ];
             break;
         }
@@ -903,6 +909,7 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
                 'date' => date('d.m.Y', (int)$found['ts']),
                 'time' => date('H:i:s', (int)$found['ts']),
                 'sum' => (int)$found['sum'],
+                'user' => (string)($found['user'] ?? ''),
                 'comment' => (string)$found['comment'],
             ], JSON_UNESCAPED_UNICODE);
             exit;
@@ -925,9 +932,10 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         echo json_encode([
             'ok' => true,
             'already' => false,
-            'date' => date('d.m.Y', (int)$targetTs),
-            'time' => date('H:i:s', (int)$targetTs),
+            'date' => date('d.m.Y', strtotime($targetDate) ?: time()),
+            'time' => date('H:i:s', strtotime($targetDate) ?: time()),
             'sum' => (int)$amountVnd,
+            'user' => '#' . (string)$expectedUserId,
             'comment' => $comment,
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
@@ -1833,8 +1841,8 @@ try {
 
 $transferVietnamExists = false;
 $transferTipsExists = false;
-$transferVietnamFound = null;
-$transferTipsFound = null;
+$transferVietnamFoundList = [];
+$transferTipsFoundList = [];
 try {
     $targetTs = strtotime($dateTo . ' 23:55:00');
     $startTs = strtotime($dateTo . ' 00:00:00');
@@ -1862,20 +1870,12 @@ try {
         }
         if (!is_array($rows)) $rows = [];
 
-        $vietnamVndExpected = ($financeVietnamCents !== null && (int)$financeVietnamCents > 0) ? (int)$posterCentsToVnd((int)$financeVietnamCents) : 0;
-        $tipsVndExpected = ($financeTipsCents !== null && (int)$financeTipsCents > 0) ? (int)$posterCentsToVnd((int)$financeTipsCents) : 0;
-        $vietnamComment = 'Перевод чеков вьетнаской компании';
-        $tipsComment = 'Перевод типсов';
         $normMoney = function ($sumRaw): int {
             $sumF = 0.0;
             if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
             else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
             $sumInt = (int)round($sumF);
             return ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
-        };
-        $normText = function (string $s): string {
-            $t = trim($s);
-            return mb_strtolower($t, 'UTF-8');
         };
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
@@ -1892,7 +1892,13 @@ try {
             $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
             $uId = (int)($uRaw ?? 0);
-            if ($uId !== 0 && $uId !== 4) continue;
+            $userName = '';
+            $uObj = $r['user'] ?? $r['employee'] ?? null;
+            if (is_array($uObj)) {
+                $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
+                $userName = trim($userName);
+            }
+            if ($userName === '' && $uId > 0) $userName = '#' . $uId;
 
             $dRaw = $r['date'] ?? $r['created_at'] ?? $r['createdAt'] ?? $r['time'] ?? $r['datetime'] ?? $r['date_time'] ?? $r['created'] ?? null;
             $ts = null;
@@ -1906,25 +1912,23 @@ try {
             }
             if ($ts === null) continue;
             if ($ts < $startTs || $ts > $endTs) continue;
-            if (abs($ts - $targetTs) > 60) continue;
 
             $sumRaw = $r['amount_from'] ?? $r['amountFrom'] ?? $r['amount_to'] ?? $r['amountTo'] ?? $r['sum'] ?? $r['amount'] ?? 0;
             $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
             $sumMaybe = $normMoney($sumRaw);
-            $cmtNorm = $normText($cmt);
-
-            if (!$transferVietnamExists && $accTo === 9 && $vietnamVndExpected > 0 && $sumMaybe === $vietnamVndExpected && $cmtNorm === $normText($vietnamComment)) {
-                $transferVietnamExists = true;
-                $transferVietnamFound = ['ts' => $ts, 'sum' => $sumMaybe, 'comment' => $cmt];
+            if ($accTo === 9) {
+                $transferVietnamFoundList[] = ['ts' => $ts, 'sum' => $sumMaybe, 'comment' => $cmt, 'user' => $userName];
             }
-            if (!$transferTipsExists && $accTo === 8 && $tipsVndExpected > 0 && $sumMaybe === $tipsVndExpected && $cmtNorm === $normText($tipsComment)) {
-                $transferTipsExists = true;
-                $transferTipsFound = ['ts' => $ts, 'sum' => $sumMaybe, 'comment' => $cmt];
+            if ($accTo === 8) {
+                $transferTipsFoundList[] = ['ts' => $ts, 'sum' => $sumMaybe, 'comment' => $cmt, 'user' => $userName];
             }
         }
     }
 } catch (\Throwable $e) {
 }
+
+$transferVietnamExists = count($transferVietnamFoundList) > 0;
+$transferTipsExists = count($transferTipsFoundList) > 0;
 
 $posterAccounts = [];
 $posterAccountsById = [];
@@ -2321,22 +2325,6 @@ $fmtVnd = function (int $v): string {
             $tipsVnd = $tipsCents !== null ? $posterCentsToVnd((int)$tipsCents) : null;
             $vietnamDisabled = $transferVietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
             $tipsDisabled = $transferTipsExists || $tipsCents === null || (int)$tipsCents <= 0;
-            $vietnamFoundLine = null;
-            if ($transferVietnamFound !== null && isset($transferVietnamFound['ts'])) {
-                $ts = (int)$transferVietnamFound['ts'];
-                $sum = (int)($transferVietnamFound['sum'] ?? 0);
-                $cmt = trim((string)($transferVietnamFound['comment'] ?? ''));
-                if ($cmt === '') $cmt = 'Перевод чеков вьетнаской компании';
-                $vietnamFoundLine = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVnd($sum) . ' - ' . $cmt;
-            }
-            $tipsFoundLine = null;
-            if ($transferTipsFound !== null && isset($transferTipsFound['ts'])) {
-                $ts = (int)$transferTipsFound['ts'];
-                $sum = (int)($transferTipsFound['sum'] ?? 0);
-                $cmt = trim((string)($transferTipsFound['comment'] ?? ''));
-                if ($cmt === '') $cmt = 'Перевод типсов';
-                $tipsFoundLine = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVnd($sum) . ' - ' . $cmt;
-            }
             $vietnamDisabledReason = $vietnamCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за период.';
@@ -2358,8 +2346,19 @@ $fmtVnd = function (int $v): string {
                     <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать перевод</button>
                     <div class="muted finance-status">
                         <?php if ($transferVietnamExists): ?>
-                            <span style="color:#16a34a; font-weight:900;">Найдена транзакция:</span>
-                            <span><?= htmlspecialchars((string)($vietnamFoundLine ?? '')) ?></span>
+                            <span style="color:#16a34a; font-weight:900;">Найдены транзакции за день:</span>
+                            <?php foreach ($transferVietnamFoundList as $f): ?>
+                                <?php
+                                    $ts = (int)($f['ts'] ?? 0);
+                                    $sum = (int)($f['sum'] ?? 0);
+                                    $cmt = trim((string)($f['comment'] ?? ''));
+                                    $u = trim((string)($f['user'] ?? ''));
+                                    $line = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVnd($sum);
+                                    if ($u !== '') $line .= ' - ' . $u;
+                                    if ($cmt !== '') $line .= ' - ' . $cmt;
+                                ?>
+                                <div><?= htmlspecialchars($line) ?></div>
+                            <?php endforeach; ?>
                         <?php elseif ($vietnamDisabled): ?>
                             <?= htmlspecialchars($vietnamDisabledReason) ?>
                         <?php endif; ?>
@@ -2380,8 +2379,19 @@ $fmtVnd = function (int $v): string {
                     <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать перевод</button>
                     <div class="muted finance-status">
                         <?php if ($transferTipsExists): ?>
-                            <span style="color:#16a34a; font-weight:900;">Найдена транзакция:</span>
-                            <span><?= htmlspecialchars((string)($tipsFoundLine ?? '')) ?></span>
+                            <span style="color:#16a34a; font-weight:900;">Найдены транзакции за день:</span>
+                            <?php foreach ($transferTipsFoundList as $f): ?>
+                                <?php
+                                    $ts = (int)($f['ts'] ?? 0);
+                                    $sum = (int)($f['sum'] ?? 0);
+                                    $cmt = trim((string)($f['comment'] ?? ''));
+                                    $u = trim((string)($f['user'] ?? ''));
+                                    $line = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVnd($sum);
+                                    if ($u !== '') $line .= ' - ' . $u;
+                                    if ($cmt !== '') $line .= ' - ' . $cmt;
+                                ?>
+                                <div><?= htmlspecialchars($line) ?></div>
+                            <?php endforeach; ?>
                         <?php elseif ($tipsDisabled): ?>
                             <?= htmlspecialchars($tipsDisabledReason) ?>
                         <?php endif; ?>
@@ -3453,7 +3463,9 @@ $fmtVnd = function (int $v): string {
             .then((r) => r.json())
             .then((j) => {
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                const line = `${j.date || ''} - ${j.time || ''} - ${Number(j.sum || 0).toLocaleString('en-US')} ₫ - ${j.comment || ''}`.trim();
+                const who = String(j.user || '').trim();
+                const whoPart = who ? ` - ${who}` : '';
+                const line = `${j.date || ''} - ${j.time || ''} - ${Number(j.sum || 0).toLocaleString('en-US')} ₫${whoPart} - ${j.comment || ''}`.trim();
                 if (statusEl) {
                     const label = j.already ? 'Найдена транзакция:' : 'Транзакция создана:';
                     statusEl.innerHTML = `<span style="color:#16a34a; font-weight:900;">${label}</span> <span>${line}</span>`;
