@@ -508,40 +508,70 @@ if ($isAjax) {
 
         try {
             $excludeSql = $useLogicalClose
-                ? " AND COALESCE(exclude_from_dashboard, 0) = 0 "
-                : " AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0) ";
+                ? " AND COALESCE(ks.exclude_from_dashboard, 0) = 0 "
+                : " AND NOT (COALESCE(ks.exclude_from_dashboard, 0) = 1 AND COALESCE(ks.exclude_auto, 0) = 0) ";
             $rows = $db->query(
-                "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.transaction_comment, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
-                        ks.tg_sent_at, ks.tg_last_edit_at, ks.tg_message_id
+                "SELECT
+                        ks.id,
+                        ks.transaction_id,
+                        ks.receipt_number,
+                        ks.table_number,
+                        ks.waiter_name,
+                        ks.transaction_comment,
+                        ks.dish_id,
+                        ks.dish_name,
+                        ks.station,
+                        ks.ticket_sent_at,
+                        COALESCE(ks.tg_sent_at, tga.created_at) AS tg_sent_at,
+                        COALESCE(ks.tg_last_edit_at, tga.updated_at) AS tg_last_edit_at,
+                        COALESCE(ks.tg_message_id, tga.message_id) AS tg_message_id
                  FROM {$ks} ks
-                 WHERE transaction_date = ?
-                   AND status = 1
-                   AND ready_pressed_at IS NULL
-                   AND ticket_sent_at IS NOT NULL
-                   AND COALESCE(was_deleted, 0) = 0
+                 LEFT JOIN {$tgItems} tga
+                   ON tga.transaction_date = ks.transaction_date
+                  AND tga.kitchen_stats_id = ks.id
+                 WHERE ks.transaction_date = ?
+                   AND ks.status = 1
+                   AND ks.ready_pressed_at IS NULL
+                   AND ks.ticket_sent_at IS NOT NULL
+                   AND COALESCE(ks.was_deleted, 0) = 0
                {$excludeSql}
-                   AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
+                   AND NOT (COALESCE(ks.dish_category_id, 0) = 47 OR COALESCE(ks.dish_sub_category_id, 0) = 47)
                    {$stationSql}
-                 ORDER BY ticket_sent_at ASC",
+                 ORDER BY ks.ticket_sent_at ASC",
                 array_merge([$today], $stationParams)
             )->fetchAll();
         } catch (\Throwable $e) {
             $excludeSql = $useLogicalClose
-                ? " AND COALESCE(exclude_from_dashboard, 0) = 0 "
-                : " AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0) ";
+                ? " AND COALESCE(ks.exclude_from_dashboard, 0) = 0 "
+                : " AND NOT (COALESCE(ks.exclude_from_dashboard, 0) = 1 AND COALESCE(ks.exclude_auto, 0) = 0) ";
             $rows = $db->query(
-                "SELECT ks.id, ks.transaction_id, ks.receipt_number, ks.table_number, ks.waiter_name, ks.transaction_comment, ks.dish_id, ks.dish_name, ks.station, ks.ticket_sent_at,
-                        ks.tg_sent_at, ks.tg_last_edit_at, ks.tg_message_id
+                "SELECT
+                        ks.id,
+                        ks.transaction_id,
+                        ks.receipt_number,
+                        ks.table_number,
+                        ks.waiter_name,
+                        ks.transaction_comment,
+                        ks.dish_id,
+                        ks.dish_name,
+                        ks.station,
+                        ks.ticket_sent_at,
+                        COALESCE(ks.tg_sent_at, tga.created_at) AS tg_sent_at,
+                        COALESCE(ks.tg_last_edit_at, tga.updated_at) AS tg_last_edit_at,
+                        COALESCE(ks.tg_message_id, tga.message_id) AS tg_message_id
                  FROM {$ks} ks
-                 WHERE transaction_date = ?
-                   AND status = 1
-                   AND ready_pressed_at IS NULL
-                   AND ticket_sent_at IS NOT NULL
-                   AND COALESCE(was_deleted, 0) = 0
+                 LEFT JOIN {$tgItems} tga
+                   ON tga.transaction_date = ks.transaction_date
+                  AND tga.kitchen_stats_id = ks.id
+                 WHERE ks.transaction_date = ?
+                   AND ks.status = 1
+                   AND ks.ready_pressed_at IS NULL
+                   AND ks.ticket_sent_at IS NOT NULL
+                   AND COALESCE(ks.was_deleted, 0) = 0
                {$excludeSql}
-                   AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
+                   AND NOT (COALESCE(ks.dish_category_id, 0) = 47 OR COALESCE(ks.dish_sub_category_id, 0) = 47)
                    {$stationSql}
-                 ORDER BY ticket_sent_at ASC",
+                 ORDER BY ks.ticket_sent_at ASC",
                 array_merge([$today], $stationParams)
             )->fetchAll();
         }
