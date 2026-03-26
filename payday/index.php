@@ -2479,7 +2479,7 @@ $fmtVnd = function (int $v): string {
             <div class="finance-row">
                 <div class="finance-left">
                     <div style="font-weight:900;">Vietnam Company — Card payments</div>
-                    <div class="muted"><?= $vietnamCents !== null ? htmlspecialchars($fmtVndCents((int)$vietnamCents)) : '—' ?></div>
+                    <div class="muted"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
                 </div>
                 <form method="POST" class="finance-transfer" data-kind="vietnam" data-date-from="<?= htmlspecialchars($dateFrom) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
                     <input type="hidden" name="action" value="create_transfer">
@@ -2497,7 +2497,8 @@ $fmtVnd = function (int $v): string {
                                     $cmt = trim((string)($f['comment'] ?? ''));
                                     $u = trim((string)($f['user'] ?? ''));
                                     $bid = (int)($f['binding_id'] ?? 0);
-                                    $line = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVndCents($sumMinor);
+                                    $sumVnd = $posterCentsToVnd($sumMinor);
+                                    $line = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVnd($sumVnd);
                                     if ($u !== '') $line .= ' - ' . $u;
                                     if ($cmt !== '') $line .= ' - ' . $cmt;
                                 ?>
@@ -2513,7 +2514,7 @@ $fmtVnd = function (int $v): string {
             <div class="finance-row">
                 <div class="finance-left">
                     <div style="font-weight:900;">Card tips per shift</div>
-                    <div class="muted"><?= $tipsCents !== null ? htmlspecialchars($fmtVndCents((int)$tipsCents)) : '—' ?></div>
+                    <div class="muted"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
                 </div>
                 <form method="POST" class="finance-transfer" data-kind="tips" data-date-from="<?= htmlspecialchars($dateFrom) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
                     <input type="hidden" name="action" value="create_transfer">
@@ -2531,7 +2532,8 @@ $fmtVnd = function (int $v): string {
                                     $cmt = trim((string)($f['comment'] ?? ''));
                                     $u = trim((string)($f['user'] ?? ''));
                                     $bid = (int)($f['binding_id'] ?? 0);
-                                    $line = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVndCents($sumMinor);
+                                    $sumVnd = $posterCentsToVnd($sumMinor);
+                                    $line = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVnd($sumVnd);
                                     if ($u !== '') $line .= ' - ' . $u;
                                     if ($cmt !== '') $line .= ' - ' . $cmt;
                                 ?>
