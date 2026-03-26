@@ -25,7 +25,11 @@ $tgTokenMissing = empty($tgToken);
 $raw = file_get_contents('php://input');
 $update = json_decode($raw, true);
 
-file_put_contents(__DIR__ . '/logs/webhook_debug.txt', date('Y-m-d H:i:s') . " RAW: " . $raw . "\n", FILE_APPEND);
+$logDir = __DIR__ . '/logs';
+if (!is_dir($logDir)) {
+    @mkdir($logDir, 0777, true);
+}
+file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " RAW: " . $raw . "\n", FILE_APPEND);
 
 if (empty($update['callback_query'])) {
     echo 'ok';
@@ -85,7 +89,7 @@ try {
         }
     }
     
-    file_put_contents(__DIR__ . '/logs/webhook_debug.txt', date('Y-m-d H:i:s') . " Action: $action, ID: $id, User: $username, Allowed: " . ($isAllowed ? 'yes' : 'no') . "\n", FILE_APPEND);
+    file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " Action: $action, ID: $id, User: $username, Allowed: " . ($isAllowed ? 'yes' : 'no') . "\n", FILE_APPEND);
 
     if (!$isAllowed) {
         if ($callbackId !== '') {
