@@ -522,9 +522,9 @@ if ($isAjax) {
                         ks.dish_name,
                         ks.station,
                         ks.ticket_sent_at,
-                        COALESCE(ks.tg_sent_at, tga.created_at) AS tg_sent_at,
-                        COALESCE(ks.tg_last_edit_at, tga.updated_at) AS tg_last_edit_at,
-                        COALESCE(ks.tg_message_id, tga.message_id) AS tg_message_id
+                        COALESCE(NULLIF(ks.tg_sent_at, '0000-00-00 00:00:00'), tga.created_at) AS tg_sent_at,
+                        COALESCE(NULLIF(ks.tg_last_edit_at, '0000-00-00 00:00:00'), tga.updated_at) AS tg_last_edit_at,
+                        COALESCE(NULLIF(ks.tg_message_id, 0), tga.message_id) AS tg_message_id
                  FROM {$ks} ks
                  LEFT JOIN {$tgItems} tga
                    ON tga.transaction_date = ks.transaction_date
@@ -556,9 +556,9 @@ if ($isAjax) {
                         ks.dish_name,
                         ks.station,
                         ks.ticket_sent_at,
-                        COALESCE(ks.tg_sent_at, tga.created_at) AS tg_sent_at,
-                        COALESCE(ks.tg_last_edit_at, tga.updated_at) AS tg_last_edit_at,
-                        COALESCE(ks.tg_message_id, tga.message_id) AS tg_message_id
+                        COALESCE(NULLIF(ks.tg_sent_at, '0000-00-00 00:00:00'), tga.created_at) AS tg_sent_at,
+                        COALESCE(NULLIF(ks.tg_last_edit_at, '0000-00-00 00:00:00'), tga.updated_at) AS tg_last_edit_at,
+                        COALESCE(NULLIF(ks.tg_message_id, 0), tga.message_id) AS tg_message_id
                  FROM {$ks} ks
                  LEFT JOIN {$tgItems} tga
                    ON tga.transaction_date = ks.transaction_date
