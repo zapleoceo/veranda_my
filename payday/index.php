@@ -994,9 +994,10 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
     $raw = file_get_contents('php://input');
     $payload = json_decode((string)$raw, true);
     if (!is_array($payload)) $payload = [];
-    $bindingId = (int)($payload['binding_id'] ?? 0);
+    $transferId = (int)($payload['transfer_id'] ?? 0);
+    $txId = (int)($payload['tx_id'] ?? 0);
     $dTo = trim((string)($payload['dateTo'] ?? ''));
-    if ($bindingId <= 0 || $dTo === '') {
+    if (($transferId <= 0 && $txId <= 0) || $dTo === '') {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
         exit;
@@ -1015,6 +1016,21 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
         ]);
         if (!is_array($rows)) $rows = [];
 
+        if ($transferId <= 0 && $txId > 0) {
+            foreach ($rows as $r) {
+                if (!is_array($r)) continue;
+                $tid = (int)($r['transaction_id'] ?? 0);
+                if ($tid !== $txId) continue;
+                $rt = (int)($r['recipient_type'] ?? 0);
+                $rid = (int)($r['recipient_id'] ?? 0);
+                if ($rt === 1 && $rid > 0) $transferId = $rid;
+                $bt = (int)($r['binding_type'] ?? 0);
+                $bid = (int)($r['binding_id'] ?? 0);
+                if ($transferId <= 0 && $bt === 1 && $bid > 0) $transferId = $bid;
+                break;
+            }
+        }
+
         $toDelete = [];
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
@@ -1023,8 +1039,9 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
             $rt = (int)($r['recipient_type'] ?? 0);
             $rid = (int)($r['recipient_id'] ?? 0);
             $match = false;
-            if ($bt === 1 && $bid === $bindingId) $match = true;
-            if (!$match && $rt === 1 && $rid === $bindingId) $match = true;
+            if ($txId > 0 && (int)($r['transaction_id'] ?? 0) === $txId) $match = true;
+            if (!$match && $transferId > 0 && $bt === 1 && $bid === $transferId) $match = true;
+            if (!$match && $transferId > 0 && $rt === 1 && $rid === $transferId) $match = true;
             if (!$match) continue;
             $tid = (int)($r['transaction_id'] ?? 0);
             if ($tid > 0) $toDelete[] = $r;
@@ -1041,6 +1058,7 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
             $type = (int)($r['type'] ?? 0);
             $accId = (int)($r['account_id'] ?? 0);
             $amount = (int)($r['amount'] ?? 0);
+            $amountVnd = $posterCentsToVnd(abs($amount));
             $dateStr = (string)($r['date'] ?? '');
             $comment = (string)($r['comment'] ?? '');
             $cat = (int)($r['category_id'] ?? 0);
@@ -1057,10 +1075,10 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
             ];
             if ($type === 0) {
                 $params['account_from'] = $accId;
-                $params['amount_from'] = abs($amount);
+                $params['amount_from'] = $amountVnd;
             } elseif ($type === 1) {
                 $params['account_to'] = $accId;
-                $params['amount_to'] = abs($amount);
+                $params['amount_to'] = $amountVnd;
             } else {
                 continue;
             }
@@ -2002,29 +2020,35 @@ try {
             $t = trim($s);
             return mb_strtolower($t, 'UTF-8');
         };
-        $transfers = [];
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
-            $bt = (int)($r['binding_type'] ?? 0);
-            $bid = (int)($r['binding_id'] ?? 0);
-            $rt = (int)($r['recipient_type'] ?? 0);
-            if ($bid <= 0 && $rt === 1) {
-                $bid = (int)($r['recipient_id'] ?? 0);
-            }
-            if ($bid <= 0) continue;
-            if ($bt !== 1 && $rt !== 1) continue;
-
             $type = (int)($r['type'] ?? 0);
-            if ($type !== 0 && $type !== 1) continue;
+            if ($type !== 1) continue;
 
             $dStr = (string)($r['date'] ?? '');
             $ts = $dStr !== '' ? strtotime($dStr) : false;
             if ($ts === false || $ts < $startTs || $ts > $endTs) continue;
 
-            $tid = (int)($r['transaction_id'] ?? 0);
             $accId = (int)($r['account_id'] ?? 0);
+            if ($accId !== 8 && $accId !== 9) continue;
+
             $amountMinor = (int)($r['amount'] ?? 0);
+            if ($amountMinor <= 0) continue;
+
             $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
+            $cmtNorm = $normText($cmt);
+            $isVietnam = $accId === 9 && mb_stripos($cmtNorm, 'вьетна', 0, 'UTF-8') !== false;
+            $isTips = $accId === 8 && (mb_stripos($cmtNorm, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmtNorm, 'tips', 0, 'UTF-8') !== false);
+            if (!$isVietnam && !$isTips) continue;
+
+            $tid = (int)($r['transaction_id'] ?? 0);
+            $bt = (int)($r['binding_type'] ?? 0);
+            $bid = (int)($r['binding_id'] ?? 0);
+            $rt = (int)($r['recipient_type'] ?? 0);
+            $rid = (int)($r['recipient_id'] ?? 0);
+            $transferId = 0;
+            if ($rt === 1 && $rid > 0) $transferId = $rid;
+            elseif ($bt === 1 && $bid > 0) $transferId = $bid;
 
             $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
@@ -2037,42 +2061,16 @@ try {
             }
             if ($userName === '' && $uId > 0) $userName = '#' . $uId;
 
-            $transfers[$bid][] = [
-                'binding_id' => $bid,
+            $rowOut = [
+                'transfer_id' => $transferId,
                 'transaction_id' => $tid,
-                'type' => $type,
-                'account_id' => $accId,
-                'amount_minor' => $amountMinor,
                 'ts' => (int)$ts,
+                'sum_minor' => abs($amountMinor),
                 'comment' => $cmt,
                 'user' => $userName,
             ];
-        }
-
-        foreach ($transfers as $bid => $items) {
-            $hasOutFrom1 = false;
-            $hasInTo9 = false;
-            $hasInTo8 = false;
-            $tsPick = 0;
-            $sumPick = 0;
-            $userPick = '';
-            $commentPick = '';
-
-            foreach ($items as $it) {
-                $t = (int)($it['type'] ?? 0);
-                $acc = (int)($it['account_id'] ?? 0);
-                $amt = (int)($it['amount_minor'] ?? 0);
-                if ($t === 0 && $acc === 1 && $amt < 0) $hasOutFrom1 = true;
-                if ($t === 1 && $acc === 9 && $amt > 0) { $hasInTo9 = true; $tsPick = (int)$it['ts']; $sumPick = abs($amt); $userPick = (string)$it['user']; $commentPick = (string)$it['comment']; }
-                if ($t === 1 && $acc === 8 && $amt > 0) { $hasInTo8 = true; $tsPick = (int)$it['ts']; $sumPick = abs($amt); $userPick = (string)$it['user']; $commentPick = (string)$it['comment']; }
-            }
-
-            if ($hasOutFrom1 && $hasInTo9) {
-                $transferVietnamFoundList[] = ['binding_id' => (int)$bid, 'ts' => $tsPick, 'sum_minor' => $sumPick, 'comment' => $commentPick, 'user' => $userPick];
-            }
-            if ($hasOutFrom1 && $hasInTo8) {
-                $transferTipsFoundList[] = ['binding_id' => (int)$bid, 'ts' => $tsPick, 'sum_minor' => $sumPick, 'comment' => $commentPick, 'user' => $userPick];
-            }
+            if ($isVietnam) $transferVietnamFoundList[] = $rowOut;
+            if ($isTips) $transferTipsFoundList[] = $rowOut;
         }
     }
 } catch (\Throwable $e) {
@@ -2512,7 +2510,7 @@ $fmtVnd = function (int $v): string {
                                     if ($u !== '') $line .= ' - ' . $u;
                                     if ($cmt !== '') $line .= ' - ' . $cmt;
                                 ?>
-                                <div><button type="button" class="finance-del" data-binding-id="<?= $bid ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Удалить транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
+                                <div><button type="button" class="finance-del" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Удалить транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
                             <?php endforeach; ?>
                         <?php elseif ($vietnamDisabled): ?>
                             <?= htmlspecialchars($vietnamDisabledReason) ?>
@@ -2547,7 +2545,7 @@ $fmtVnd = function (int $v): string {
                                     if ($u !== '') $line .= ' - ' . $u;
                                     if ($cmt !== '') $line .= ' - ' . $cmt;
                                 ?>
-                                <div><button type="button" class="finance-del" data-binding-id="<?= $bid ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Удалить транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
+                                <div><button type="button" class="finance-del" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Удалить транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
                             <?php endforeach; ?>
                         <?php elseif ($tipsDisabled): ?>
                             <?= htmlspecialchars($tipsDisabledReason) ?>
@@ -3644,14 +3642,15 @@ $fmtVnd = function (int $v): string {
     });
     document.querySelectorAll('button.finance-del').forEach((btn) => {
         btn.addEventListener('click', () => {
-            const bindingId = Number(btn.getAttribute('data-binding-id') || 0);
+            const transferId = Number(btn.getAttribute('data-transfer-id') || 0);
+            const txId = Number(btn.getAttribute('data-tx-id') || 0);
             const dateTo = String(btn.getAttribute('data-date-to') || '');
-            if (!bindingId || !dateTo) return;
+            if ((!transferId && !txId) || !dateTo) return;
             if (!confirm('Удалить эту финансовую транзакцию из Poster?')) return;
             fetch('?ajax=delete_finance_transfer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ binding_id: bindingId, dateTo }),
+                body: JSON.stringify({ transfer_id: transferId, tx_id: txId, dateTo }),
             })
             .then((r) => r.json())
             .then((j) => {
