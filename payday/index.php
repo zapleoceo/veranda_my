@@ -1051,6 +1051,51 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
             exit;
         }
 
+        if ($transferId > 0) {
+            $inRow = null;
+            foreach ($toDelete as $r) {
+                if (!is_array($r)) continue;
+                if ((int)($r['type'] ?? 0) !== 1) continue;
+                $accId = (int)($r['account_id'] ?? 0);
+                $amt = (int)($r['amount'] ?? 0);
+                if ($amt <= 0) continue;
+                if ($accId !== 8 && $accId !== 9) continue;
+                $inRow = $r;
+                break;
+            }
+            if (is_array($inRow)) {
+                $destAcc = (int)($inRow['account_id'] ?? 0);
+                $amount = (int)($inRow['amount'] ?? 0);
+                $amountVnd = $posterCentsToVnd(abs($amount));
+                $dateStr = (string)($inRow['date'] ?? '');
+                $dateYmd = '';
+                if ($dateStr !== '') {
+                    $t = strtotime($dateStr);
+                    if ($t !== false && $t > 0) $dateYmd = date('Ymd', $t);
+                }
+                $comment = (string)($inRow['comment'] ?? '');
+                $cat = (int)($inRow['category_id'] ?? 0);
+                $userId = (int)($inRow['user_id'] ?? 0);
+
+                $params = [
+                    'transaction_id' => $transferId,
+                    'type' => 2,
+                    'category' => $cat,
+                    'user_id' => $userId,
+                    'date' => $dateYmd !== '' ? $dateYmd : date('Ymd'),
+                    'comment' => $comment,
+                    'account_from' => 1,
+                    'account_to' => $destAcc,
+                    'amount_from' => $amountVnd,
+                    'amount_to' => $amountVnd,
+                    'delete' => 1,
+                ];
+                $api->request('finance.updateTransactions', $params, 'POST');
+                echo json_encode(['ok' => true, 'deleted' => count($toDelete)], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+
         $deleted = 0;
         foreach ($toDelete as $r) {
             $tid = (int)($r['transaction_id'] ?? 0);
