@@ -173,6 +173,7 @@ $pt = $db->t('poster_transactions');
 $pa = $db->t('poster_accounts');
 $pl = $db->t('check_payment_links');
 $sh = $db->t('sepay_hidden');
+$pfh = $db->t('poster_finance_hidden');
 
 try {
     $db->query("ALTER TABLE {$pc} ADD COLUMN was_deleted TINYINT(1) NOT NULL DEFAULT 0");
@@ -195,6 +196,25 @@ try {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (sepay_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    );
+} catch (\Throwable $e) {
+}
+try {
+    $db->query(
+        "CREATE TABLE IF NOT EXISTS {$pfh} (
+            id BIGINT NOT NULL AUTO_INCREMENT,
+            date_to DATE NOT NULL,
+            kind VARCHAR(32) NOT NULL,
+            transfer_id BIGINT NULL,
+            tx_id BIGINT NULL,
+            comment TEXT NULL,
+            created_by VARCHAR(255) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_date_kind (date_to, kind),
+            KEY idx_transfer (transfer_id),
+            KEY idx_tx (tx_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     );
 } catch (\Throwable $e) {
@@ -994,10 +1014,11 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
     $raw = file_get_contents('php://input');
     $payload = json_decode((string)$raw, true);
     if (!is_array($payload)) $payload = [];
+    $kind = (string)($payload['kind'] ?? '');
     $transferId = (int)($payload['transfer_id'] ?? 0);
     $txId = (int)($payload['tx_id'] ?? 0);
     $dTo = trim((string)($payload['dateTo'] ?? ''));
-    if (($transferId <= 0 && $txId <= 0) || $dTo === '') {
+    if (!in_array($kind, ['vietnam', 'tips'], true) || ($transferId <= 0 && $txId <= 0) || $dTo === '') {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
         exit;
@@ -1009,134 +1030,20 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
         echo json_encode(['ok' => false, 'error' => 'Bad date'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    $comment = trim((string)($payload['comment'] ?? ''));
+    if (mb_strlen($comment, 'UTF-8') > 2000) $comment = mb_substr($comment, 0, 2000, 'UTF-8');
+    $by = '';
+    if (!isset($_SESSION)) {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    }
+    $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
     try {
-        $rows = $api->request('finance.getTransactions', [
-            'dateFrom' => date('dmY', $startTs),
-            'dateTo' => date('dmY', $endTs),
-        ]);
-        if (!is_array($rows)) $rows = [];
-
-        if ($transferId <= 0 && $txId > 0) {
-            foreach ($rows as $r) {
-                if (!is_array($r)) continue;
-                $tid = (int)($r['transaction_id'] ?? 0);
-                if ($tid !== $txId) continue;
-                $rt = (int)($r['recipient_type'] ?? 0);
-                $rid = (int)($r['recipient_id'] ?? 0);
-                if ($rt === 1 && $rid > 0) $transferId = $rid;
-                $bt = (int)($r['binding_type'] ?? 0);
-                $bid = (int)($r['binding_id'] ?? 0);
-                if ($transferId <= 0 && $bt === 1 && $bid > 0) $transferId = $bid;
-                break;
-            }
-        }
-
-        $toDelete = [];
-        foreach ($rows as $r) {
-            if (!is_array($r)) continue;
-            $bt = (int)($r['binding_type'] ?? 0);
-            $bid = (int)($r['binding_id'] ?? 0);
-            $rt = (int)($r['recipient_type'] ?? 0);
-            $rid = (int)($r['recipient_id'] ?? 0);
-            $match = false;
-            if ($txId > 0 && (int)($r['transaction_id'] ?? 0) === $txId) $match = true;
-            if (!$match && $transferId > 0 && $bt === 1 && $bid === $transferId) $match = true;
-            if (!$match && $transferId > 0 && $rt === 1 && $rid === $transferId) $match = true;
-            if (!$match) continue;
-            $tid = (int)($r['transaction_id'] ?? 0);
-            if ($tid > 0) $toDelete[] = $r;
-        }
-        if (!$toDelete) {
-            echo json_encode(['ok' => true, 'deleted' => 0], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-
-        if ($transferId > 0) {
-            $inRow = null;
-            foreach ($toDelete as $r) {
-                if (!is_array($r)) continue;
-                if ((int)($r['type'] ?? 0) !== 1) continue;
-                $accId = (int)($r['account_id'] ?? 0);
-                $amt = (int)($r['amount'] ?? 0);
-                if ($amt <= 0) continue;
-                if ($accId !== 8 && $accId !== 9) continue;
-                $inRow = $r;
-                break;
-            }
-            if (is_array($inRow)) {
-                $destAcc = (int)($inRow['account_id'] ?? 0);
-                $amount = (int)($inRow['amount'] ?? 0);
-                $amountVnd = $posterCentsToVnd(abs($amount));
-                $dateStr = (string)($inRow['date'] ?? '');
-                $dateYmd = '';
-                if ($dateStr !== '') {
-                    $t = strtotime($dateStr);
-                    if ($t !== false && $t > 0) $dateYmd = date('Ymd', $t);
-                }
-                $comment = (string)($inRow['comment'] ?? '');
-                $cat = (int)($inRow['category_id'] ?? 0);
-                $userId = (int)($inRow['user_id'] ?? 0);
-
-                $params = [
-                    'transaction_id' => $transferId,
-                    'type' => 2,
-                    'category' => $cat,
-                    'user_id' => $userId,
-                    'date' => $dateYmd !== '' ? $dateYmd : date('Ymd'),
-                    'comment' => $comment,
-                    'account_from' => 1,
-                    'account_to' => $destAcc,
-                    'amount_from' => $amountVnd,
-                    'amount_to' => $amountVnd,
-                    'delete' => 1,
-                ];
-                $api->request('finance.updateTransactions', $params, 'POST');
-                echo json_encode(['ok' => true, 'deleted' => count($toDelete)], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
-        }
-
-        $deleted = 0;
-        foreach ($toDelete as $r) {
-            $tid = (int)($r['transaction_id'] ?? 0);
-            if ($tid <= 0) continue;
-            $type = (int)($r['type'] ?? 0);
-            $accId = (int)($r['account_id'] ?? 0);
-            $amount = (int)($r['amount'] ?? 0);
-            $amountVnd = $posterCentsToVnd(abs($amount));
-            $dateStr = (string)($r['date'] ?? '');
-            $dateYmd = '';
-            if ($dateStr !== '') {
-                $t = strtotime($dateStr);
-                if ($t !== false && $t > 0) $dateYmd = date('Ymd', $t);
-            }
-            $comment = (string)($r['comment'] ?? '');
-            $cat = (int)($r['category_id'] ?? 0);
-            $userId = (int)($r['user_id'] ?? 0);
-
-            $params = [
-                'transaction_id' => $tid,
-                'type' => $type,
-                'category' => $cat,
-                'user_id' => $userId,
-                'date' => $dateYmd !== '' ? $dateYmd : date('Ymd'),
-                'comment' => $comment,
-                'delete' => 1,
-            ];
-            if ($type === 0) {
-                $params['account_from'] = $accId;
-                $params['amount_from'] = $amountVnd;
-            } elseif ($type === 1) {
-                $params['account_to'] = $accId;
-                $params['amount_to'] = $amountVnd;
-            } else {
-                continue;
-            }
-            $api->request('finance.updateTransactions', $params, 'POST');
-            $deleted++;
-        }
-
-        echo json_encode(['ok' => true, 'deleted' => $deleted], JSON_UNESCAPED_UNICODE);
+        $db->query(
+            "INSERT INTO {$pfh} (date_to, kind, transfer_id, tx_id, comment, created_by)
+             VALUES (?, ?, ?, ?, ?, ?)",
+            [$dTo, $kind, $transferId > 0 ? $transferId : null, $txId > 0 ? $txId : null, $comment !== '' ? $comment : null, $by !== '' ? $by : null]
+        );
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -2042,6 +1949,25 @@ $transferVietnamExists = false;
 $transferTipsExists = false;
 $transferVietnamFoundList = [];
 $transferTipsFoundList = [];
+$hiddenFinanceByKind = ['vietnam' => ['tx' => [], 'transfer' => []], 'tips' => ['tx' => [], 'transfer' => []]];
+try {
+    $hRows = $db->query(
+        "SELECT kind, transfer_id, tx_id
+         FROM {$pfh}
+         WHERE date_to = ?",
+        [$dateTo]
+    )->fetchAll();
+    if (!is_array($hRows)) $hRows = [];
+    foreach ($hRows as $r) {
+        $k = (string)($r['kind'] ?? '');
+        if (!isset($hiddenFinanceByKind[$k])) continue;
+        $tid = (int)($r['transfer_id'] ?? 0);
+        $xid = (int)($r['tx_id'] ?? 0);
+        if ($tid > 0) $hiddenFinanceByKind[$k]['transfer'][$tid] = true;
+        if ($xid > 0) $hiddenFinanceByKind[$k]['tx'][$xid] = true;
+    }
+} catch (\Throwable $e) {
+}
 try {
     $targetTs = strtotime($dateTo . ' 23:55:00');
     $startTs = strtotime($dateTo . ' 00:00:00');
@@ -2119,8 +2045,14 @@ try {
                 'comment' => $cmt,
                 'user' => $userName,
             ];
-            if ($isVietnam) $transferVietnamFoundList[] = $rowOut;
-            if ($isTips) $transferTipsFoundList[] = $rowOut;
+            if ($isVietnam) {
+                if (!empty($hiddenFinanceByKind['vietnam']['transfer'][$transferId]) || !empty($hiddenFinanceByKind['vietnam']['tx'][$tid])) continue;
+                $transferVietnamFoundList[] = $rowOut;
+            }
+            if ($isTips) {
+                if (!empty($hiddenFinanceByKind['tips']['transfer'][$transferId]) || !empty($hiddenFinanceByKind['tips']['tx'][$tid])) continue;
+                $transferTipsFoundList[] = $rowOut;
+            }
         }
     }
 } catch (\Throwable $e) {
@@ -2560,7 +2492,7 @@ $fmtVnd = function (int $v): string {
                                     if ($u !== '') $line .= ' - ' . $u;
                                     if ($cmt !== '') $line .= ' - ' . $cmt;
                                 ?>
-                                <div><button type="button" class="finance-del" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Удалить транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
+                                <div><button type="button" class="finance-del" data-kind="vietnam" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
                             <?php endforeach; ?>
                         <?php elseif ($vietnamDisabled): ?>
                             <?= htmlspecialchars($vietnamDisabledReason) ?>
@@ -2595,7 +2527,7 @@ $fmtVnd = function (int $v): string {
                                     if ($u !== '') $line .= ' - ' . $u;
                                     if ($cmt !== '') $line .= ' - ' . $cmt;
                                 ?>
-                                <div><button type="button" class="finance-del" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Удалить транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
+                                <div><button type="button" class="finance-del" data-kind="tips" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
                             <?php endforeach; ?>
                         <?php elseif ($tipsDisabled): ?>
                             <?= htmlspecialchars($tipsDisabledReason) ?>
@@ -3695,12 +3627,15 @@ $fmtVnd = function (int $v): string {
             const transferId = Number(btn.getAttribute('data-transfer-id') || 0);
             const txId = Number(btn.getAttribute('data-tx-id') || 0);
             const dateTo = String(btn.getAttribute('data-date-to') || '');
-            if ((!transferId && !txId) || !dateTo) return;
-            if (!confirm('Удалить эту финансовую транзакцию из Poster?')) return;
+            const kind = String(btn.getAttribute('data-kind') || '');
+            if ((!transferId && !txId) || !dateTo || !kind) return;
+            const comment = prompt('Комментарий (почему скрываем):', '');
+            if (comment === null) return;
+            const c = String(comment || '').trim();
             fetch('?ajax=delete_finance_transfer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ transfer_id: transferId, tx_id: txId, dateTo }),
+                body: JSON.stringify({ kind, transfer_id: transferId, tx_id: txId, dateTo, comment: c }),
             })
             .then((r) => r.json())
             .then((j) => {
