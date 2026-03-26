@@ -3016,6 +3016,16 @@ $fmtVnd = function (int $v): string {
         svgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
         widgets.forEach((btn) => { btn.style.display = 'none'; });
 
+        const isVisibleInScroll = (el, scrollEl) => {
+            if (!el || !scrollEl) return false;
+            if (!el.getClientRects().length) return false;
+            const tr = el.closest('tr');
+            if (tr && tr.style.display === 'none') return false;
+            const r = el.getBoundingClientRect();
+            const sr = scrollEl.getBoundingClientRect();
+            return r.bottom >= sr.top && r.top <= sr.bottom;
+        };
+
         const sepayCount = {};
         const posterCount = {};
         links.forEach((l) => {
@@ -3030,6 +3040,8 @@ $fmtVnd = function (int $v): string {
             const p = document.getElementById('poster-' + l.poster_transaction_id);
             if (!s || !p) return;
             if (!s.getClientRects().length || !p.getClientRects().length) return;
+            if (sepayScroll && !isVisibleInScroll(s, sepayScroll)) return;
+            if (posterScroll && !isVisibleInScroll(p, posterScroll)) return;
             const isMany = (sepayCount[l.sepay_id] || 0) > 1 || (posterCount[l.poster_transaction_id] || 0) > 1;
             const isMainGreen = !isMany && !l.is_manual && l.link_type === 'auto_green';
             const size = 2;
