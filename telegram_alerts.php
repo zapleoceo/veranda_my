@@ -159,14 +159,14 @@ try {
     $partnersCount = 0;
     $otherCount = 0;
     if (!empty($settings['exclude_partners_from_load'])) {
-        $partnersCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date = ? AND table_number = 'Partners'", [$today])->fetch();
+        $partnersCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND table_number = 'Partners'")->fetch();
         $partnersCount = (int)($partnersCountRow['c'] ?? 0);
-        $otherCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date = ? AND table_number != 'Partners'", [$today])->fetch();
+        $otherCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND table_number != 'Partners'")->fetch();
         $otherCount = (int)($otherCountRow['c'] ?? 0);
         $loadCount = $otherCount;
         $openChecksDisplay = "{$otherCount}+{$partnersCount}";
     } else {
-        $openCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date = ?", [$today])->fetch();
+        $openCountRow = $db->query("SELECT COUNT(DISTINCT transaction_id) as c FROM {$ks} WHERE status = 1 AND transaction_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)")->fetch();
         $openCount = (int)($openCountRow['c'] ?? 0);
         $loadCount = $openCount;
         $openChecksDisplay = (string)$openCount;
@@ -190,25 +190,24 @@ try {
              FROM {$ks}
              WHERE ready_pressed_at IS NULL
                AND ticket_sent_at IS NOT NULL
-               AND transaction_date = ?
+               AND transaction_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
                AND status = 1
                AND COALESCE(was_deleted, 0) = 0
                {$excludeSql}
-               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
-            [$today]
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)"
         )->fetchColumn();
         $overdueAll = (int)$db->query(
             "SELECT COUNT(*)
              FROM {$ks}
              WHERE ready_pressed_at IS NULL
                AND ticket_sent_at IS NOT NULL
-               AND transaction_date = ?
+               AND transaction_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
                AND status = 1
                AND COALESCE(was_deleted, 0) = 0
                {$excludeSql}
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ticket_sent_at < ?",
-            [$today, $cutoffTime]
+            [$cutoffTime]
         )->fetchColumn();
     } catch (\Throwable $e) {
     }
@@ -256,14 +255,14 @@ try {
          FROM {$ks}
          WHERE ready_pressed_at IS NULL
            AND ticket_sent_at IS NOT NULL
-           AND transaction_date = ?
+           AND transaction_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
            AND status = 1
            AND COALESCE(was_deleted, 0) = 0
            {$excludeSql}
            AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
            AND ticket_sent_at < ?
          ORDER BY transaction_id ASC, ticket_sent_at ASC, id ASC",
-        [$today, $cutoffTime]
+        [$cutoffTime]
     )->fetchAll();
     if (!is_array($rows)) $rows = [];
     $logLine('CANDIDATES rows=' . count($rows));
@@ -296,10 +295,8 @@ try {
     }
 
     $existingItems = $db->query(
-        "SELECT kitchen_stats_id, transaction_id, message_id, last_text_hash
-         FROM {$tgItems}
-         WHERE transaction_date = ?",
-        [$today]
+        "SELECT kitchen_stats_id, transaction_date, transaction_id, message_id, last_text_hash
+         FROM {$tgItems}"
     )->fetchAll();
     if (!is_array($existingItems)) $existingItems = [];
     $existingByItem = [];
@@ -318,6 +315,7 @@ try {
     foreach ($existingByItem as $kid => $e) {
         if (isset($candidateIds[$kid])) continue;
         $msgId = (int)($e['message_id'] ?? 0);
+        $eDate = (string)($e['transaction_date'] ?? $today);
         if ($msgId > 0) {
             $deleted = $bot->deleteMessage($msgId);
             if ($deleted) {
@@ -325,7 +323,7 @@ try {
                 $logLine('DELETE item=' . $kid . ' msg=' . $msgId);
             }
         }
-        $db->query("DELETE FROM {$tgItems} WHERE transaction_date = ? AND kitchen_stats_id = ?", [$today, $kid]);
+        $db->query("DELETE FROM {$tgItems} WHERE transaction_date = ? AND kitchen_stats_id = ?", [$eDate, $kid]);
     }
 
     foreach ($rows as $r) {
@@ -372,6 +370,7 @@ try {
         $prev = $existingByItem[$kid] ?? null;
         $prevMsgId = $prev ? (int)($prev['message_id'] ?? 0) : 0;
         $prevHash = $prev ? (string)($prev['last_text_hash'] ?? '') : '';
+        $prevDate = $prev ? (string)($prev['transaction_date'] ?? $today) : $today;
 
         $currentMsgId = $prevMsgId;
         if ($prevMsgId > 0 && $prevHash === $textHash) {
@@ -379,7 +378,7 @@ try {
                 "UPDATE {$tgItems}
                  SET last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
                  WHERE transaction_date = ? AND kitchen_stats_id = ?",
-                [$nowDt, $today, $kid]
+                [$nowDt, $prevDate, $kid]
             );
             $unchangedCount++;
         } else {
@@ -404,7 +403,7 @@ try {
                         "UPDATE {$tgItems}
                          SET transaction_id = ?, last_text_hash = ?, last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
                          WHERE transaction_date = ? AND kitchen_stats_id = ?",
-                        [$txId, $textHash, $nowDt, $today, $kid]
+                        [$txId, $textHash, $nowDt, $prevDate, $kid]
                     );
                     $currentMsgId = $prevMsgId;
                 } else {

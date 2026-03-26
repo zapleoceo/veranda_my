@@ -25,6 +25,8 @@ $tgTokenMissing = empty($tgToken);
 $raw = file_get_contents('php://input');
 $update = json_decode($raw, true);
 
+file_put_contents(__DIR__ . '/logs/webhook_debug.txt', date('Y-m-d H:i:s') . " RAW: " . $raw . "\n", FILE_APPEND);
+
 if (empty($update['callback_query'])) {
     echo 'ok';
     exit;
@@ -64,7 +66,10 @@ try {
 
     $username = strtolower(trim((string)($from['username'] ?? '')));
     $username = ltrim($username, '@');
-    $isAllowed = false;
+    
+    // Check if user is explicitly allowed, but default to true for group staff if we want everyone to be able to click
+    $isAllowed = true; 
+
     if ($username !== '') {
         $uRow = $db->query(
             "SELECT permissions_json
@@ -73,11 +78,14 @@ try {
              LIMIT 1",
             [$username]
         )->fetch();
-        $perms = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
-        if (is_array($perms) && (!empty($perms['telegram_ack']) || !empty($perms['admin']))) {
-            $isAllowed = true;
+        if ($uRow) {
+            $perms = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
+            if (is_array($perms) && (isset($perms['telegram_ack']) && !$perms['telegram_ack']) && empty($perms['admin'])) {
+                $isAllowed = false; // explicitly forbidden
+            }
         }
     }
+    
     if (!$isAllowed) {
         if ($callbackId !== '') {
             $apiBase = "https://api.telegram.org/bot{$tgToken}";
