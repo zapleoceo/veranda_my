@@ -3016,12 +3016,13 @@ $fmtVnd = function (int $v): string {
         svgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
         widgets.forEach((btn) => { btn.style.display = 'none'; });
 
-        const isVisibleInScroll = (el, scrollEl) => {
+        const isVisibleInScrollY = (el, scrollEl) => {
             if (!el || !scrollEl) return false;
-            if (!el.getClientRects().length) return false;
             const tr = el.closest('tr');
-            if (tr && tr.style.display === 'none') return false;
-            const r = el.getBoundingClientRect();
+            if (!tr) return false;
+            if (!tr.getClientRects().length) return false;
+            if (tr.style.display === 'none') return false;
+            const r = tr.getBoundingClientRect();
             const sr = scrollEl.getBoundingClientRect();
             return r.bottom >= sr.top && r.top <= sr.bottom;
         };
@@ -3040,16 +3041,20 @@ $fmtVnd = function (int $v): string {
             const p = document.getElementById('poster-' + l.poster_transaction_id);
             if (!s || !p) return;
             if (!s.getClientRects().length || !p.getClientRects().length) return;
-            if (sepayScroll && !isVisibleInScroll(s, sepayScroll)) return;
-            if (posterScroll && !isVisibleInScroll(p, posterScroll)) return;
+            if (sepayScroll && !isVisibleInScrollY(s, sepayScroll)) return;
+            if (posterScroll && !isVisibleInScrollY(p, posterScroll)) return;
             const isMany = (sepayCount[l.sepay_id] || 0) > 1 || (posterCount[l.poster_transaction_id] || 0) > 1;
             const isMainGreen = !isMany && !l.is_manual && l.link_type === 'auto_green';
             const size = 2;
             const color = colorFor(l.link_type, l.is_manual);
 
-            const a = getAnchorPoint(s, 'right', rootRect);
-            const b = getAnchorPoint(p, 'left', rootRect);
-            if (!isInside(a, w, h) || !isInside(b, w, h)) return;
+            const a0 = getAnchorPoint(s, 'right', rootRect);
+            const b0 = getAnchorPoint(p, 'left', rootRect);
+            if (a0.y < 0 || b0.y < 0 || a0.y > h || b0.y > h) return;
+
+            const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+            const a = { x: clamp(a0.x, 0, w), y: clamp(a0.y, 0, h) };
+            const b = { x: clamp(b0.x, 0, w), y: clamp(b0.y, 0, h) };
 
             const dx = b.x - a.x;
             const cdx = Math.min(120, Math.max(40, Math.abs(dx) * 0.35));
