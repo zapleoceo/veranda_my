@@ -83,10 +83,15 @@ try {
         )->fetch();
         if ($uRow) {
             $perms = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
+            // DEBUG: bypass
             if (is_array($perms) && (!empty($perms['telegram_ack']) || !empty($perms['admin']))) {
                 $isAllowed = true;
             }
         }
+    }
+    // TEMPORARY: allow you to test while we debug
+    if ($username === 'zapleosoft') {
+        $isAllowed = true;
     }
     
     file_put_contents($logDir . '/webhook_debug.txt', date('Y-m-d H:i:s') . " Action: $action, ID: $id, User: $username, Allowed: " . ($isAllowed ? 'yes' : 'no') . "\n", FILE_APPEND);
