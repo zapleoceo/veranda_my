@@ -820,21 +820,11 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $txs = [];
         try {
             $txs = $api->request('finance.getTransactions', [
-                'dateFrom' => str_replace('-', '', $dTo),
-                'dateTo' => str_replace('-', '', $dTo),
+                'dateFrom' => date('dmY', $startTs),
+                'dateTo' => date('dmY', $endTs),
             ]);
         } catch (\Throwable $e) {
             $txs = [];
-        }
-        if (!is_array($txs) || count($txs) === 0) {
-            try {
-                $txs = $api->request('finance.getTransactions', [
-                    'dateFrom' => date('dmY', $startTs),
-                    'dateTo' => date('dmY', $endTs),
-                ]);
-            } catch (\Throwable $e) {
-                $txs = [];
-            }
         }
         if (!is_array($txs)) $txs = [];
 
@@ -937,21 +927,11 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             $txs2 = [];
             try {
                 $txs2 = $api->request('finance.getTransactions', [
-                    'dateFrom' => str_replace('-', '', $dTo),
-                    'dateTo' => str_replace('-', '', $dTo),
+                    'dateFrom' => date('dmY', $startTs),
+                    'dateTo' => date('dmY', $endTs),
                 ]);
             } catch (\Throwable $e) {
                 $txs2 = [];
-            }
-            if (!is_array($txs2) || count($txs2) === 0) {
-                try {
-                    $txs2 = $api->request('finance.getTransactions', [
-                        'dateFrom' => date('dmY', $startTs),
-                        'dateTo' => date('dmY', $endTs),
-                    ]);
-                } catch (\Throwable $e) {
-                    $txs2 = [];
-                }
             }
             if (!is_array($txs2)) $txs2 = [];
             foreach ($txs2 as $row) {
@@ -1911,21 +1891,11 @@ try {
         $rows = [];
         try {
             $rows = $apiFinance->request('finance.getTransactions', [
-                'dateFrom' => str_replace('-', '', $dateTo),
-                'dateTo' => str_replace('-', '', $dateTo),
+                'dateFrom' => date('dmY', $startTs),
+                'dateTo' => date('dmY', $endTs),
             ]);
         } catch (\Throwable $e) {
             $rows = [];
-        }
-        if (!is_array($rows) || count($rows) === 0) {
-            try {
-                $rows = $apiFinance->request('finance.getTransactions', [
-                    'dateFrom' => date('dmY', $startTs),
-                    'dateTo' => date('dmY', $endTs),
-                ]);
-            } catch (\Throwable $e) {
-                $rows = [];
-            }
         }
         if (!is_array($rows)) $rows = [];
 
@@ -1940,12 +1910,10 @@ try {
             $t = trim($s);
             return mb_strtolower($t, 'UTF-8');
         };
-        $vietnamExpected = ($financeVietnamCents !== null && (int)$financeVietnamCents > 0) ? (int)$posterCentsToVnd((int)$financeVietnamCents) : 0;
-        $tipsExpected = ($financeTipsCents !== null && (int)$financeTipsCents > 0) ? (int)$posterCentsToVnd((int)$financeTipsCents) : 0;
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
             $type = (int)($r['type'] ?? 0);
-            if ($type !== 0 && $type !== 1) continue;
+            if ($type !== 0 && $type !== 1 && $type !== 2) continue;
 
             $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
@@ -1978,15 +1946,29 @@ try {
             $sumRaw = $r['amount_from'] ?? $r['amountFrom'] ?? $r['amount_to'] ?? $r['amountTo'] ?? $r['sum'] ?? $r['amount'] ?? 0;
             $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
             $sumMaybe = $normMoney($sumRaw);
-            if ($vietnamExpected > 0 && abs($sumMaybe) === $vietnamExpected && $normText($cmt) === $normText('Перевод чеков вьетнаской компании')) {
-                if (($type === 0 && $sumMaybe < 0 && $accId === 1) || ($type === 1 && $sumMaybe > 0 && $accId === 9)) {
-                    $transferVietnamFoundList[] = ['ts' => $ts, 'sum' => abs($sumMaybe), 'comment' => $cmt, 'user' => $userName];
-                }
+            $toRaw = $r['account_to_id'] ?? $r['account_to'] ?? $r['accountToId'] ?? $r['accountTo'] ?? 0;
+            if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+            $toId = (int)$toRaw;
+
+            $fromRaw = $r['account_from_id'] ?? $r['account_from'] ?? $r['accountFromId'] ?? $r['accountFrom'] ?? 0;
+            if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+            $fromId = (int)$fromRaw;
+
+            $isVietnam = false;
+            $isTips = false;
+            if ($type === 2) {
+                if ($fromId === 1 && $toId === 9) $isVietnam = true;
+                if ($fromId === 1 && $toId === 8) $isTips = true;
+            } else {
+                if ($type === 1 && $sumMaybe > 0 && $accId === 9) $isVietnam = true;
+                if ($type === 1 && $sumMaybe > 0 && $accId === 8) $isTips = true;
             }
-            if ($tipsExpected > 0 && abs($sumMaybe) === $tipsExpected && $normText($cmt) === $normText('Перевод типсов')) {
-                if (($type === 0 && $sumMaybe < 0 && $accId === 1) || ($type === 1 && $sumMaybe > 0 && $accId === 8)) {
-                    $transferTipsFoundList[] = ['ts' => $ts, 'sum' => abs($sumMaybe), 'comment' => $cmt, 'user' => $userName];
-                }
+
+            if ($isVietnam) {
+                $transferVietnamFoundList[] = ['ts' => $ts, 'sum' => abs($sumMaybe), 'comment' => $cmt, 'user' => $userName];
+            }
+            if ($isTips) {
+                $transferTipsFoundList[] = ['ts' => $ts, 'sum' => abs($sumMaybe), 'comment' => $cmt, 'user' => $userName];
             }
         }
     }
