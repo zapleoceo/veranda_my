@@ -838,6 +838,18 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         }
         if (!is_array($txs)) $txs = [];
 
+        $normMoney = function ($sumRaw): int {
+            $sumF = 0.0;
+            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
+            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
+            $sumInt = (int)round($sumF);
+            return ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
+        };
+        $normText = function (string $s): string {
+            $t = trim($s);
+            return mb_strtolower($t, 'UTF-8');
+        };
+
         $found = null;
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
@@ -845,6 +857,10 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             $toRaw = $row['account_to_id'] ?? $row['account_to'] ?? $row['accountToId'] ?? $row['accountTo'] ?? 0;
             if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
             if ((int)$toRaw !== $accountTo) continue;
+
+            $fromRaw = $row['account_from_id'] ?? $row['account_from'] ?? $row['accountFromId'] ?? $row['accountFrom'] ?? $row['account_id'] ?? $row['accountId'] ?? 0;
+            if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+            if ((int)$fromRaw !== 1) continue;
 
             $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
@@ -866,13 +882,12 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             if (abs($ts - $targetTs) > 60) continue;
 
             $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
-            $sumF = 0.0;
-            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
-            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
-            $sumInt = (int)round($sumF);
-            $sumMaybe = ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
+            $sumMaybe = $normMoney($sumRaw);
+            if ($sumMaybe !== $amountVnd) continue;
 
             $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
+            $cmtNorm = $normText($cmt !== '' ? $cmt : $comment);
+            if ($cmtNorm !== $normText($comment)) continue;
             $found = [
                 'ts' => $ts,
                 'sum' => $sumMaybe,
@@ -1846,6 +1861,22 @@ try {
             }
         }
         if (!is_array($rows)) $rows = [];
+
+        $vietnamVndExpected = ($financeVietnamCents !== null && (int)$financeVietnamCents > 0) ? (int)$posterCentsToVnd((int)$financeVietnamCents) : 0;
+        $tipsVndExpected = ($financeTipsCents !== null && (int)$financeTipsCents > 0) ? (int)$posterCentsToVnd((int)$financeTipsCents) : 0;
+        $vietnamComment = 'Перевод чеков вьетнаской компании';
+        $tipsComment = 'Перевод типсов';
+        $normMoney = function ($sumRaw): int {
+            $sumF = 0.0;
+            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
+            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
+            $sumInt = (int)round($sumF);
+            return ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
+        };
+        $normText = function (string $s): string {
+            $t = trim($s);
+            return mb_strtolower($t, 'UTF-8');
+        };
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
             if ((int)($r['type'] ?? 0) !== 2) continue;
@@ -1853,6 +1884,10 @@ try {
             if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
             $accTo = (int)$accToRaw;
             if ($accTo !== 9 && $accTo !== 8) continue;
+
+            $accFromRaw = $r['account_from_id'] ?? $r['account_from'] ?? $r['accountFromId'] ?? $r['accountFrom'] ?? $r['account_id'] ?? $r['accountId'] ?? 0;
+            if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
+            if ((int)$accFromRaw !== 1) continue;
 
             $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
@@ -1874,18 +1909,15 @@ try {
             if (abs($ts - $targetTs) > 60) continue;
 
             $sumRaw = $r['amount_from'] ?? $r['amountFrom'] ?? $r['amount_to'] ?? $r['amountTo'] ?? $r['sum'] ?? $r['amount'] ?? 0;
-            $sumF = 0.0;
-            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
-            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
-            $sumInt = (int)round($sumF);
-            $sumMaybe = ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
             $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
+            $sumMaybe = $normMoney($sumRaw);
+            $cmtNorm = $normText($cmt);
 
-            if (!$transferVietnamExists && $accTo === 9) {
+            if (!$transferVietnamExists && $accTo === 9 && $vietnamVndExpected > 0 && $sumMaybe === $vietnamVndExpected && $cmtNorm === $normText($vietnamComment)) {
                 $transferVietnamExists = true;
                 $transferVietnamFound = ['ts' => $ts, 'sum' => $sumMaybe, 'comment' => $cmt];
             }
-            if (!$transferTipsExists && $accTo === 8) {
+            if (!$transferTipsExists && $accTo === 8 && $tipsVndExpected > 0 && $sumMaybe === $tipsVndExpected && $cmtNorm === $normText($tipsComment)) {
                 $transferTipsExists = true;
                 $transferTipsFound = ['ts' => $ts, 'sum' => $sumMaybe, 'comment' => $cmt];
             }
