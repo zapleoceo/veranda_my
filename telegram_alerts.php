@@ -223,24 +223,16 @@ try {
         $statusHash = sha1($statusText);
         $prevStatusId = (int)$getMeta('telegram_status_msg_id', '0');
         $prevStatusHash = (string)$getMeta('telegram_status_msg_hash', '');
-        if ($prevStatusId > 0 && $prevStatusHash === $statusHash) {
-        } elseif ($prevStatusId > 0) {
-            $ok = $bot->editMessageText($prevStatusId, $statusText, null);
-            if (!$ok) {
-                $newId = $bot->sendMessageGetId($statusText, $tgThreadId);
-                if ($newId) {
-                    $setMeta('telegram_status_msg_id', (string)$newId);
-                    $setMeta('telegram_status_msg_hash', $statusHash);
-                }
-            } else {
-                $setMeta('telegram_status_msg_hash', $statusHash);
-            }
-        } else {
-            $newId = $bot->sendMessageGetId($statusText, $tgThreadId);
-            if ($newId) {
-                $setMeta('telegram_status_msg_id', (string)$newId);
-                $setMeta('telegram_status_msg_hash', $statusHash);
-            }
+
+        // Always delete the old status message and send a new one to keep it at the bottom
+        if ($prevStatusId > 0) {
+            $bot->deleteMessage($prevStatusId);
+        }
+        
+        $newId = $bot->sendMessageGetId($statusText, $tgThreadId);
+        if ($newId) {
+            $setMeta('telegram_status_msg_id', (string)$newId);
+            $setMeta('telegram_status_msg_hash', $statusHash);
         }
     } catch (\Throwable $e) {
         $logLine('STATUS_FAIL ' . $e->getMessage());
