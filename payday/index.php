@@ -2691,6 +2691,8 @@ $fmtVnd = function (int $v): string {
         .sum { font-weight: 900; white-space: nowrap; }
         .nowrap { white-space: nowrap; }
         .anchor { display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #9aa4b2; vertical-align: middle; line-height: 0; }
+        #outSepayTable .col-out-anchor,
+        #outPosterTable .col-out-anchor2 { vertical-align: middle; text-align: center; padding: 6px 8px; }
         tr.row-green .anchor { background: #2e7d32; }
         tr.row-yellow .anchor { background: #f6c026; }
         tr.row-blue .anchor { background: #1a73e8; }
