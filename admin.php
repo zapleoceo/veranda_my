@@ -4,6 +4,7 @@ require_once __DIR__ . '/src/classes/PosterAPI.php';
 require_once __DIR__ . '/src/classes/PosterMenuSync.php';
 require_once __DIR__ . '/src/classes/MenuAutoFill.php';
 require_once __DIR__ . '/src/classes/TelegramBot.php';
+require_once __DIR__ . '/src/classes/MetaRepository.php';
 veranda_require('admin');
 
 $posterToken = $_ENV['POSTER_API_TOKEN'] ?? null;
