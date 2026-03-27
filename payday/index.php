@@ -174,6 +174,7 @@ $pa = $db->t('poster_accounts');
 $pl = $db->t('check_payment_links');
 $sh = $db->t('sepay_hidden');
 $pfh = $db->t('poster_finance_hidden');
+$mh = $db->t('mail_hidden');
 
 try {
     $db->query("ALTER TABLE {$pc} ADD COLUMN was_deleted TINYINT(1) NOT NULL DEFAULT 0");
@@ -215,6 +216,22 @@ try {
             KEY idx_date_kind (date_to, kind),
             KEY idx_transfer (transfer_id),
             KEY idx_tx (tx_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    );
+} catch (\Throwable $e) {
+}
+try {
+    $db->query(
+        "CREATE TABLE IF NOT EXISTS {$mh} (
+            id BIGINT NOT NULL AUTO_INCREMENT,
+            mail_uid BIGINT NOT NULL,
+            date_to DATE NOT NULL,
+            comment TEXT NULL,
+            created_by VARCHAR(255) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_mail_date (mail_uid, date_to),
+            KEY idx_date (date_to)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     );
 } catch (\Throwable $e) {
@@ -1585,6 +1602,13 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
     rsort($emails);
     $fromTs = strtotime($dFrom !== '' ? ($dFrom . ' 00:00:00') : ($dTo . ' 00:00:00'));
     $toTs = strtotime($dTo . ' 23:59:59');
+    $hidden = [];
+    try {
+        $hRows = $db->query("SELECT mail_uid FROM {$mh} WHERE date_to = ?", [$dTo])->fetchAll();
+        foreach ($hRows as $hr) {
+            $hidden[(int)($hr['mail_uid'] ?? 0)] = true;
+        }
+    } catch (\Throwable $e) {}
     $rows = [];
     foreach ($emails as $num) {
         $h = @imap_headerinfo($inbox, $num);
@@ -1640,10 +1664,51 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
         ];
     }
     @imap_close($inbox);
+    $rows = array_values(array_filter($rows, function ($r) use ($hidden) {
+        $uid = (int)($r['mail_uid'] ?? 0);
+        return $uid > 0 && empty($hidden[$uid]);
+    }));
     echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'mail_hide') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $j = json_decode($raw ?: '[]', true);
+    if (!is_array($j)) $j = [];
+    $uid = (int)($j['mail_uid'] ?? 0);
+    $dTo = trim((string)($j['dateTo'] ?? ''));
+    $comment = trim((string)($j['comment'] ?? ''));
+    if ($uid <= 0 || $dTo === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $by = '';
+    if (!isset($_SESSION)) {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    }
+    $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+    try {
+        $db->query(
+            "INSERT INTO {$mh} (mail_uid, date_to, comment, created_by)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE comment = VALUES(comment), created_by = VALUES(created_by)",
+            [$uid, $dTo, ($comment !== '' ? $comment : null), ($by !== '' ? $by : null)]
+        );
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
 if (($_GET['ajax'] ?? '') === 'poster_accounts') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -2946,14 +3011,21 @@ $fmtVnd = function (int $v): string {
     const loadOutMail = () => {
         const { dateFrom, dateTo } = getDateRange();
         const qs = new URLSearchParams({ dateFrom, dateTo });
-        return fetchJsonSafe('?' + qs.toString() + '&ajax=mail_out').then((j) => {
+        return fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=mail_out').then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка mail_out');
             const tbody = outSepayTable.tBodies[0]; tbody.innerHTML = '';
             (j.rows || []).forEach((row) => {
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-mail-uid', String(row.mail_uid || 0));
                 tr.setAttribute('data-sum', String(row.amount || 0));
-                tr.innerHTML = `<td>${escapeHtml(row.content || '')}</td><td class="nowrap">${escapeHtml(row.tx_time || row.date || '')}</td><td class="sum">${Number(row.amount || 0).toLocaleString('en-US')} ₫</td><td><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td><td><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>`;
+                tr.innerHTML = `
+                    <td class="nowrap col-sepay-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
+                    <td class="col-out-content">${escapeHtml(row.content || '')}</td>
+                    <td class="nowrap col-out-time">${escapeHtml(row.tx_time || row.date || '')}</td>
+                    <td class="sum col-out-sum">${Number(row.amount || 0).toLocaleString('en-US')} ₫</td>
+                    <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
+                    <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
+                `;
                 tbody.appendChild(tr);
             });
         });
@@ -2961,7 +3033,7 @@ $fmtVnd = function (int $v): string {
     const loadOutFinance = () => {
         const { dateFrom, dateTo } = getDateRange();
         const qs = new URLSearchParams({ dateFrom, dateTo });
-        return fetchJsonSafe('?' + qs.toString() + '&ajax=finance_out').then((j) => {
+        return fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=finance_out').then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_out');
             const tbody = outPosterTable.tBodies[0]; tbody.innerHTML = '';
             (j.rows || []).forEach((row) => {
