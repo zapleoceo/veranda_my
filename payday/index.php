@@ -3252,10 +3252,10 @@ $fmtVnd = function (int $v): string {
     };
     const fmtVnd0 = (v) => {
         try {
-            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0)) + ' ₫';
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0));
         } catch (_) {
             const num = Math.round(Number(v) || 0);
-            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ₫';
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
     };
     const getDateRange = () => {
@@ -4147,7 +4147,9 @@ $fmtVnd = function (int $v): string {
         const cx = (r.left + r.width / 2) - rootRect.left;
         const cy = (r.top + r.height / 2) - rootRect.top;
         const x = Math.round(cx) + 0.5;
-        const y = Math.round(cy) + 0.5;
+        let y = Math.round(cy) + 0.5;
+        const id = String(el.id || '');
+        if (id.startsWith('out-')) y -= 1;
         return { x, y };
     };
 
