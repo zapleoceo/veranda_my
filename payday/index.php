@@ -4163,7 +4163,8 @@ $fmtVnd = function (int $v): string {
     };
 
     const getAnchorPoint = (el, side, rootRect) => {
-        const r = el.getBoundingClientRect();
+        const cell = el.closest('td') || el;
+        const r = cell.getBoundingClientRect();
         const cx = (r.left + r.width / 2) - rootRect.left;
         const cy = (r.top + r.height / 2) - rootRect.top;
         const x = Math.round(cx) + 0.5;
