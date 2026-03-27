@@ -19,4 +19,5 @@ Thumbs.db
 
 # Project docs (local only)
 /docs/
+!/docs/TZ_KITCHEN_ANALYTICS.md
 /ops/
