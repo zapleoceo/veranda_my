@@ -3,6 +3,7 @@ require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 require_once __DIR__ . '/src/classes/PosterMenuSync.php';
 require_once __DIR__ . '/src/classes/MenuAutoFill.php';
+require_once __DIR__ . '/src/classes/TelegramBot.php';
 veranda_require('admin');
 
 $posterToken = $_ENV['POSTER_API_TOKEN'] ?? null;
@@ -283,6 +284,34 @@ if ($isMenuAjax) {
         [$isPublished ? 1 : 0, $menuItemId]
     );
     echo json_encode(['ok' => true, 'is_published' => $isPublished], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'telegram_test') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+        $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
+        $tgThreadId = trim((string)($_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? ''));
+        $tgThreadNum = $tgThreadId !== '' ? (int)$tgThreadId : 0;
+        if ($tgToken === '' || $tgChatId === '') {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'Missing TELEGRAM_* in .env'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $text = (string)($_POST['text'] ?? $_GET['text'] ?? 'Тест: статус проверки');
+        $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
+        $msgId = $bot->sendMessageGetId($text, $tgThreadNum > 0 ? $tgThreadNum : null);
+        if ($msgId) {
+            echo json_encode(['ok' => true, 'message_id' => (int)$msgId], JSON_UNESCAPED_UNICODE);
+        } else {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'Telegram send failed'], JSON_UNESCAPED_UNICODE);
+        }
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
     exit;
 }
 
