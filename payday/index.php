@@ -2758,7 +2758,7 @@ $fmtVnd = function (int $v): string {
         
         #tablesRoot { position: relative; overflow: hidden; }
         #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
-        #outLineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 1000; grid-column: 1 / -1; grid-row: 1 / -1; }
+        #outLineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
         th { background: #f8f9fa; color: #65676b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
