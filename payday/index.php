@@ -3555,6 +3555,32 @@ $fmtVnd = function (int $v): string {
         outWidgets.clear();
     };
 
+    const outReloadLinks = (dateTo) => {
+        return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(String(dateTo || '')))
+            .then((j2) => {
+                if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
+                outLinks.length = 0;
+                outLinkByMail.clear();
+                outLinkByFin.clear();
+                (j2.links || []).forEach((lx) => {
+                    const link = {
+                        mail_uid: Number(lx.mail_uid || 0),
+                        finance_id: Number(lx.finance_id || 0),
+                        link_type: String(lx.link_type || ''),
+                        is_manual: (lx.is_manual === true || lx.is_manual === 1 || lx.is_manual === '1')
+                    };
+                    if (!link.mail_uid || !link.finance_id) return;
+                    outLinks.push(link);
+                    outLinkByMail.set(link.mail_uid, link);
+                    outLinkByFin.set(link.finance_id, link);
+                });
+                applyOutRowClasses();
+                applyOutHideLinked();
+                updateOutSelection();
+                outScheduleRelayout();
+            });
+    };
+
     const outSyncButtons = () => {
         if (!outGrid) return;
         const keep = new Set();
@@ -3580,24 +3606,7 @@ $fmtVnd = function (int $v): string {
                 .then((r) => r.json())
                 .then((j) => {
                     if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_unlink');
-                    return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
-                })
-                .then((j2) => {
-                    if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
-                    outLinks.length = 0;
-                    outLinkByMail.clear();
-                    outLinkByFin.clear();
-                    (j2.links || []).forEach((lx) => {
-                        const link = { mail_uid: Number(lx.mail_uid || 0), finance_id: Number(lx.finance_id || 0), link_type: String(lx.link_type || ''), is_manual: !!lx.is_manual };
-                        if (!link.mail_uid || !link.finance_id) return;
-                        outLinks.push(link);
-                        outLinkByMail.set(link.mail_uid, link);
-                        outLinkByFin.set(link.finance_id, link);
-                    });
-                    applyOutRowClasses();
-                    applyOutHideLinked();
-                    updateOutSelection();
-                    outScheduleRelayout();
+                    return outReloadLinks(dateTo);
                 })
                 .catch((err) => alert(err && err.message ? err.message : 'Ошибка'));
             });
@@ -3873,18 +3882,12 @@ $fmtVnd = function (int $v): string {
         .then((r) => r.json())
         .then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_clear_links');
-            outLinks.length = 0;
-            outLinkByMail.clear();
-            outLinkByFin.clear();
             outSelectedMail.clear();
             outSelectedFin.clear();
             Array.from(outSepayTable.querySelectorAll('input.out-sepay-cb')).forEach((cb) => { cb.checked = false; });
             Array.from(outPosterTable.querySelectorAll('input.out-poster-cb')).forEach((cb) => { cb.checked = false; });
             outHideLinkedOn = false;
-            applyOutRowClasses();
-            applyOutHideLinked();
-            updateOutSelection();
-            outScheduleRelayout();
+            return outReloadLinks(dateTo);
         })
         .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
     });
