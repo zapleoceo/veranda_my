@@ -2571,9 +2571,7 @@ $fmtVnd = function (int $v): string {
         .tabs .tab.active { background:#111827; color:#fff; border-color:#111827; }
         .btn.loading { opacity: 0.7; pointer-events: none; }
         body.mode-lite #outSepayTable .col-out-content,
-        body.mode-lite #outSepayTable .col-out-select,
         body.mode-lite #outSepayTable .col-out-anchor { display: none; }
-        body.mode-lite #outPosterTable .col-out-select2,
         body.mode-lite #outPosterTable .col-out-user,
         body.mode-lite #outPosterTable .col-out-category,
         body.mode-lite #outPosterTable .col-out-type,
@@ -3095,6 +3093,7 @@ $fmtVnd = function (int $v): string {
         if (sepaySyncForm) sepaySyncForm.style.display = inOn ? '' : 'none';
         if (clearDayForm) clearDayForm.style.display = inOn ? '' : 'none';
         activeTab = inOn ? 'in' : 'out';
+        if (!inOn) outScheduleRelayout();
     };
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
     if (tabOut) tabOut.addEventListener('click', () => setTab('out'));
@@ -3322,6 +3321,16 @@ $fmtVnd = function (int $v): string {
         setTimeout(outPositionLines, 200);
         setTimeout(outPositionLines, 600);
     };
+    if (outGrid) {
+        outGrid.addEventListener('scroll', () => outScheduleRelayout(), { passive: true, capture: true });
+    }
+    if (outSepayScroll) {
+        outSepayScroll.addEventListener('scroll', () => outScheduleRelayout(), { passive: true });
+    }
+    if (outPosterScroll) {
+        outPosterScroll.addEventListener('scroll', () => outScheduleRelayout(), { passive: true });
+    }
+    window.addEventListener('resize', () => outScheduleRelayout(), { passive: true });
 
     let outHideLinkedOn = false;
     const outLinks = [];
@@ -3419,6 +3428,7 @@ $fmtVnd = function (int $v): string {
         applyOutRowClasses();
         applyOutHideLinked();
         updateOutSelection();
+        outScheduleRelayout();
     });
 
     if (outLinkClearBtn) outLinkClearBtn.addEventListener('click', () => {
@@ -3429,11 +3439,13 @@ $fmtVnd = function (int $v): string {
         applyOutRowClasses();
         applyOutHideLinked();
         updateOutSelection();
+        outScheduleRelayout();
     });
 
     if (outHideLinkedBtn) outHideLinkedBtn.addEventListener('click', () => {
         outHideLinkedOn = !outHideLinkedOn;
         applyOutHideLinked();
+        outScheduleRelayout();
     });
 
     if (outLinkAutoBtn) outLinkAutoBtn.addEventListener('click', () => {
