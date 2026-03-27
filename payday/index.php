@@ -646,21 +646,21 @@ try {
             $amountCents = (int)$db->query(
                 "SELECT COALESCE(SUM(payed_card + payed_third_party), 0)
                  FROM {$pc}
-                 WHERE day_date BETWEEN ? AND ?
+                 WHERE day_date = ?
                    AND pay_type IN (2,3)
                    AND (payed_card + payed_third_party) > 0
                    AND poster_payment_method_id = 11",
-                [$dateFrom, $dateTo]
+                [$dateTo]
             )->fetchColumn();
         } else {
             $amountCents = (int)$db->query(
                 "SELECT COALESCE(SUM(tip_sum), 0)
                  FROM {$pc}
-                 WHERE day_date BETWEEN ? AND ?
+                 WHERE day_date = ?
                    AND pay_type IN (2,3)
                    AND (payed_card + payed_third_party) > 0
                    AND tip_sum > 0",
-                [$dateFrom, $dateTo]
+                [$dateTo]
             )->fetchColumn();
         }
         if ($amountCents <= 0) {
@@ -795,27 +795,27 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             $amountCents = (int)$db->query(
                 "SELECT COALESCE(SUM(payed_card + payed_third_party), 0)
                  FROM {$pc}
-                 WHERE day_date BETWEEN ? AND ?
+                 WHERE day_date = ?
                    AND pay_type IN (2,3)
                    AND (payed_card + payed_third_party) > 0
                    AND poster_payment_method_id = 11",
-                [$dFrom, $dTo]
+                [$dTo]
             )->fetchColumn();
         } else {
             $amountCents = (int)$db->query(
                 "SELECT COALESCE(SUM(tip_sum), 0)
                  FROM {$pc}
-                 WHERE day_date BETWEEN ? AND ?
+                 WHERE day_date = ?
                    AND pay_type IN (2,3)
                    AND (payed_card + payed_third_party) > 0
                    AND tip_sum > 0",
-                [$dFrom, $dTo]
+                [$dTo]
             )->fetchColumn();
         }
         if ($amountCents <= 0) {
             throw new \Exception($kind === 'vietnam'
-                ? 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за период.'
-                : 'Сумма = 0: нет tip_sum за период.'
+                ? 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за выбранный день.'
+                : 'Сумма = 0: нет tip_sum за выбранный день.'
             );
         }
         $amountVnd = (int)$posterCentsToVnd($amountCents);
@@ -2010,11 +2010,11 @@ try {
     $financeVietnamCents = (int)$db->query(
         "SELECT COALESCE(SUM(payed_card + payed_third_party), 0)
          FROM {$pc}
-         WHERE day_date BETWEEN ? AND ?
+         WHERE day_date = ?
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
            AND poster_payment_method_id = 11",
-        [$dateFrom, $dateTo]
+        [$dateTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
     $financeVietnamCents = null;
@@ -2023,11 +2023,11 @@ try {
     $financeTipsCents = (int)$db->query(
         "SELECT COALESCE(SUM(tip_sum), 0)
          FROM {$pc}
-         WHERE day_date BETWEEN ? AND ?
+         WHERE day_date = ?
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
            AND tip_sum > 0",
-        [$dateFrom, $dateTo]
+        [$dateTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
     $financeTipsCents = null;
@@ -2548,10 +2548,10 @@ $fmtVnd = function (int $v): string {
             $tipsDisabled = $transferTipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             $vietnamDisabledReason = $vietnamCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
-                : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за период.';
+                : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за выбранный день.';
             $tipsDisabledReason = $tipsCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
-                : 'Сумма = 0: нет tip_sum за период.';
+                : 'Сумма = 0: нет tip_sum за выбранный день.';
             ?>
 
             <div class="finance-row">
