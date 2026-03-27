@@ -8,7 +8,18 @@ class TelegramBot {
 
     public function __construct(string $token, string $chatId) {
         $this->token = $token;
-        $this->chatId = $chatId;
+        $this->chatId = $this->normalizeChatId($chatId);
+    }
+
+    private function normalizeChatId(string $id): string {
+        $t = trim($id);
+        if ($t === '') return $t;
+        if ($t[0] === '@' || $t[0] === '-') return $t;
+        $digits = preg_replace('/\D+/', '', $t);
+        if ($digits !== '' && ctype_digit($digits)) {
+            return '-100' . $digits;
+        }
+        return $t;
     }
 
     /**
