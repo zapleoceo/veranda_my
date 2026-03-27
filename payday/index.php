@@ -1709,6 +1709,55 @@ if (($_GET['ajax'] ?? '') === 'mail_hide') {
     }
     exit;
 }
+
+if (($_GET['ajax'] ?? '') === 'finance_out') {
+    header('Content-Type: application/json; charset=utf-8');
+    $dFrom = trim((string)($_GET['dateFrom'] ?? ''));
+    $dTo = trim((string)($_GET['dateTo'] ?? ''));
+    if ($dTo === '') {
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $fromDate = $dFrom !== '' ? $dFrom : $dTo;
+        $fromTs = strtotime($fromDate . ' 00:00:00');
+        $toTs = strtotime($dTo . ' 23:59:59');
+
+        $apiOut = new \App\Classes\PosterAPI((string)$token);
+        $rows = $apiOut->request('finance.getTransactions', [
+            'dateFrom' => date('Ymd', strtotime($fromDate)),
+            'dateTo' => date('Ymd', strtotime($dTo)),
+            'account_type' => 1,
+            'timezone' => 'client',
+        ]);
+        if (!is_array($rows)) $rows = [];
+
+        $out = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $dateStr = (string)($r['date'] ?? '');
+            $ts = $dateStr !== '' ? strtotime($dateStr) : false;
+            if ($ts === false) continue;
+            if ($fromTs !== false && $ts < $fromTs) continue;
+            if ($toTs !== false && $ts > $toTs) continue;
+            $out[] = [
+                'transaction_id' => (int)($r['transaction_id'] ?? 0),
+                'user_id' => (int)($r['user_id'] ?? 0),
+                'category_id' => (int)($r['category_id'] ?? 0),
+                'type' => (int)($r['type'] ?? 0),
+                'amount' => (int)($r['amount'] ?? 0),
+                'balance' => (int)($r['balance'] ?? 0),
+                'date' => $dateStr,
+                'comment' => (string)($r['comment'] ?? ''),
+            ];
+        }
+        echo json_encode(['ok' => true, 'rows' => $out], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
 if (($_GET['ajax'] ?? '') === 'poster_accounts') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
