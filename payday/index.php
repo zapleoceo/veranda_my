@@ -3667,15 +3667,27 @@ $fmtVnd = function (int $v): string {
         mailRows.forEach((tr) => {
             tr.classList.remove('row-red', 'row-gray', 'row-green', 'row-yellow');
             const uid = Number(tr.getAttribute('data-mail-uid') || 0);
-            if (uid && outLinkByMail.has(uid)) tr.classList.add('row-gray');
-            else tr.classList.add('row-red');
+            if (uid && outLinkByMail.has(uid)) {
+                const l = outLinkByMail.get(uid);
+                if (l && (l.is_manual || l.link_type === 'manual')) tr.classList.add('row-gray');
+                else if (l && l.link_type === 'auto_yellow') tr.classList.add('row-yellow');
+                else tr.classList.add('row-green');
+            } else {
+                tr.classList.add('row-red');
+            }
         });
         const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
         finRows.forEach((tr) => {
             tr.classList.remove('row-red', 'row-gray', 'row-green', 'row-yellow');
             const fid = Number(tr.getAttribute('data-finance-id') || 0);
-            if (fid && outLinkByFin.has(fid)) tr.classList.add('row-gray');
-            else tr.classList.add('row-red');
+            if (fid && outLinkByFin.has(fid)) {
+                const l = outLinkByFin.get(fid);
+                if (l && (l.is_manual || l.link_type === 'manual')) tr.classList.add('row-gray');
+                else if (l && l.link_type === 'auto_yellow') tr.classList.add('row-yellow');
+                else tr.classList.add('row-green');
+            } else {
+                tr.classList.add('row-red');
+            }
         });
     };
 
