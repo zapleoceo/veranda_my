@@ -2431,7 +2431,7 @@ $fmtVnd = function (int $v): string {
 
     <div class="card">
         <div class="toolbar toolbar-line" style="margin-bottom: 10px;">
-            <form method="GET">
+            <form method="GET" id="dateForm">
                 <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px;">
                 <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px;">
                 <button class="btn" type="submit">Открыть</button>
@@ -2896,6 +2896,12 @@ $fmtVnd = function (int $v): string {
     const outSepayTable = document.getElementById('outSepayTable');
     const outPosterTable = document.getElementById('outPosterTable');
     const fetchJsonSafe = (url) => fetch(url).then(async (r) => { const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('Bad JSON: ' + (txt || '(empty)')); } return j; });
+    const getDateRange = () => {
+        const dfEl = document.querySelector('input[name="dateFrom"]');
+        const dtEl = document.querySelector('input[name="dateTo"]');
+        return { dateFrom: dfEl ? dfEl.value : '', dateTo: dtEl ? dtEl.value : '' };
+    };
+    let activeTab = 'in';
     const setTab = (m) => {
         const inOn = m === 'in';
         const tablesRoot = document.getElementById('tablesRoot');
@@ -2906,12 +2912,14 @@ $fmtVnd = function (int $v): string {
         if (outSection) outSection.style.display = inOn ? 'none' : '';
         if (outMailBtn) outMailBtn.style.display = inOn ? 'none' : '';
         if (outFinanceBtn) outFinanceBtn.style.display = inOn ? 'none' : '';
+        activeTab = inOn ? 'in' : 'out';
     };
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
     if (tabOut) tabOut.addEventListener('click', () => setTab('out'));
     setTab('in');
     const loadOutMail = () => {
-        const qs = new URLSearchParams({ dateFrom: <?= json_encode($dateFrom) ?>, dateTo: <?= json_encode($dateTo) ?> });
+        const { dateFrom, dateTo } = getDateRange();
+        const qs = new URLSearchParams({ dateFrom, dateTo });
         return fetchJsonSafe('?' + qs.toString() + '&ajax=mail_out').then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка mail_out');
             const tbody = outSepayTable.tBodies[0]; tbody.innerHTML = '';
@@ -2925,7 +2933,8 @@ $fmtVnd = function (int $v): string {
         });
     };
     const loadOutFinance = () => {
-        const qs = new URLSearchParams({ dateFrom: <?= json_encode($dateFrom) ?>, dateTo: <?= json_encode($dateTo) ?> });
+        const { dateFrom, dateTo } = getDateRange();
+        const qs = new URLSearchParams({ dateFrom, dateTo });
         return fetchJsonSafe('?' + qs.toString() + '&ajax=finance_out').then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_out');
             const tbody = outPosterTable.tBodies[0]; tbody.innerHTML = '';
@@ -2940,6 +2949,15 @@ $fmtVnd = function (int $v): string {
     };
     if (outMailBtn) outMailBtn.addEventListener('click', () => loadOutMail().catch((e) => alert(e && e.message ? e.message : 'Ошибка')));
     if (outFinanceBtn) outFinanceBtn.addEventListener('click', () => loadOutFinance().catch((e) => alert(e && e.message ? e.message : 'Ошибка')));
+    const dateForm = document.getElementById('dateForm');
+    if (dateForm) {
+        dateForm.addEventListener('submit', (ev) => {
+            if (activeTab === 'out') {
+                ev.preventDefault();
+                Promise.all([loadOutMail(), loadOutFinance()]).catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+            }
+        });
+    }
 
     const setFormLoading = (formId, btnId) => {
         const form = document.getElementById(formId);
