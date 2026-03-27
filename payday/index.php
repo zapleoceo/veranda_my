@@ -2437,6 +2437,7 @@ $fmtVnd = function (int $v): string {
         
         #tablesRoot { position: relative; overflow: hidden; }
         #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
+        #outLineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
         th { background: #f8f9fa; color: #65676b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -2597,7 +2598,8 @@ $fmtVnd = function (int $v): string {
         <div class="divider"></div>
 
         <div id="outSection" class="card" style="padding:0; display:none;">
-            <div class="grid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; padding: 12px;">
+            <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; padding: 12px; position: relative;">
+                <div id="outLineLayer"></div>
                 <div class="card" style="padding:0;">
                     <div style="padding:8px 12px; font-weight:900;">Sepay (Mail)</div>
                     <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
@@ -3091,7 +3093,7 @@ $fmtVnd = function (int $v): string {
                     <td class="col-out-type">${Number(row.type || 0)}</td>
                     <td class="sum col-out-amount">${Number(amountVnd).toLocaleString('en-US')} ₫</td>
                     <td class="sum col-out-balance">${Number(balanceVnd).toLocaleString('en-US')} ₫</td>
-                    <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
+                    <td class="col-out-comment">${escapeHtml(row.comment || '')} <span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -3104,14 +3106,14 @@ $fmtVnd = function (int $v): string {
         outMailBtn.classList.add('loading'); outMailBtn.textContent = 'Обновление…'; outMailBtn.disabled = true;
         loadOutMail()
             .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
-            .finally(() => { outMailBtn.classList.remove('loading'); outMailBtn.textContent = orig; outMailBtn.disabled = false; });
+            .finally(() => { outMailBtn.classList.remove('loading'); outMailBtn.textContent = orig; outMailBtn.disabled = false; outScheduleRelayout(); });
     });
     if (outFinanceBtn) outFinanceBtn.addEventListener('click', () => {
         const orig = outFinanceBtn.textContent;
         outFinanceBtn.classList.add('loading'); outFinanceBtn.textContent = 'Обновление…'; outFinanceBtn.disabled = true;
         loadOutFinance()
             .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
-            .finally(() => { outFinanceBtn.classList.remove('loading'); outFinanceBtn.textContent = orig; outFinanceBtn.disabled = false; });
+            .finally(() => { outFinanceBtn.classList.remove('loading'); outFinanceBtn.textContent = orig; outFinanceBtn.disabled = false; outScheduleRelayout(); });
     });
     const dateForm = document.getElementById('dateForm');
     if (dateForm) {
@@ -3127,6 +3129,7 @@ $fmtVnd = function (int $v): string {
                     .finally(() => {
                         if (outMailBtn) { outMailBtn.classList.remove('loading'); outMailBtn.textContent = origMail; outMailBtn.disabled = false; }
                         if (outFinanceBtn) { outFinanceBtn.classList.remove('loading'); outFinanceBtn.textContent = origFin; outFinanceBtn.disabled = false; }
+                        outScheduleRelayout();
                     });
             }
         });
@@ -3140,6 +3143,111 @@ $fmtVnd = function (int $v): string {
     const outSelPosterSumEl = document.getElementById('outSelPosterSum');
     const outSelDiffEl = document.getElementById('outSelDiff');
     const outSelMatchEl = document.getElementById('outSelMatch');
+    const outGrid = document.getElementById('outGrid');
+    const outLineLayer = document.getElementById('outLineLayer');
+    const outSepayScroll = document.getElementById('outSepayScroll');
+    const outPosterScroll = document.getElementById('outPosterScroll');
+    const outWidgets = new Map();
+    const outSvgState = { svg: null, defs: null, group: null };
+
+    const outClearLines = () => {
+        if (outSvgState.group) {
+            while (outSvgState.group.firstChild) outSvgState.group.removeChild(outSvgState.group.firstChild);
+        }
+        Array.from(outWidgets.values()).forEach((btn) => { try { btn.remove(); } catch (_) {} });
+        outWidgets.clear();
+    };
+
+    const outEnsureSvg = () => {
+        if (!outLineLayer || !outGrid) return;
+        if (outSvgState.svg) return;
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', '100%');
+        svg.style.display = 'block';
+        const defs = document.createElementNS(ns, 'defs');
+        const g = document.createElementNS(ns, 'g');
+        svg.appendChild(defs);
+        svg.appendChild(g);
+        outLineLayer.appendChild(svg);
+        outSvgState.svg = svg;
+        outSvgState.defs = defs;
+        outSvgState.group = g;
+    };
+
+    const outIsVisibleInScrollY = (el, scrollEl) => {
+        if (!el || !scrollEl) return false;
+        const tr = el.closest('tr');
+        if (!tr) return false;
+        if (!tr.getClientRects().length) return false;
+        if (tr.style.display === 'none') return false;
+        const r = tr.getBoundingClientRect();
+        const sr = scrollEl.getBoundingClientRect();
+        return r.bottom >= sr.top && r.top <= sr.bottom;
+    };
+
+    const outDrawLines = () => {
+        outEnsureSvg();
+        outClearLines();
+        if (!outGrid || !outSvgState.svg || !outSvgState.group) return;
+        const rootRect = outGrid.getBoundingClientRect();
+        const w = Math.max(1, Math.round(rootRect.width));
+        const h = Math.max(1, Math.round(rootRect.height));
+        outSvgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+        outLinks.forEach((l) => {
+            const s = document.getElementById('out-sepay-' + l.mail_uid);
+            const p = document.getElementById('out-poster-' + l.finance_id);
+            if (!s || !p) return;
+            if (!s.getClientRects().length || !p.getClientRects().length) return;
+            if (outSepayScroll && !outIsVisibleInScrollY(s, outSepayScroll)) return;
+            if (outPosterScroll && !outIsVisibleInScrollY(p, outPosterScroll)) return;
+            const size = 2;
+            const color = colorFor(l.link_type, l.link_type === 'manual');
+
+            const a0 = getAnchorPoint(s, 'right', rootRect);
+            const b0 = getAnchorPoint(p, 'left', rootRect);
+            if (a0.y < 0 || b0.y < 0 || a0.y > h || b0.y > h) return;
+            const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+            const a = { x: clamp(a0.x, 0, w), y: clamp(a0.y, 0, h) };
+            const b = { x: clamp(b0.x, 0, w), y: clamp(b0.y, 0, h) };
+            const dx = b.x - a.x;
+            const cdx = Math.min(120, Math.max(40, Math.abs(dx) * 0.35));
+            const c1x = a.x + cdx;
+            const c1y = a.y;
+            const c2x = b.x - cdx;
+            const c2y = b.y;
+            const d = `M ${a.x} ${a.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${b.x} ${b.y}`;
+
+            const ns = 'http://www.w3.org/2000/svg';
+            const outline = document.createElementNS(ns, 'path');
+            outline.setAttribute('d', d);
+            outline.setAttribute('fill', 'none');
+            outline.setAttribute('stroke', 'rgba(255,255,255,0.65)');
+            outline.setAttribute('stroke-width', String(size + 2));
+            outline.setAttribute('stroke-linecap', 'round');
+            outline.setAttribute('stroke-linejoin', 'round');
+            outSvgState.group.appendChild(outline);
+
+            const path = document.createElementNS(ns, 'path');
+            path.setAttribute('d', d);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', color);
+            path.setAttribute('stroke-width', String(size));
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            outSvgState.group.appendChild(path);
+        });
+    };
+
+    const outPositionLines = () => outDrawLines();
+    const outScheduleRelayout = () => {
+        requestAnimationFrame(outPositionLines);
+        setTimeout(outPositionLines, 50);
+        setTimeout(outPositionLines, 200);
+        setTimeout(outPositionLines, 600);
+    };
 
     let outHideLinkedOn = false;
     const outLinks = [];
