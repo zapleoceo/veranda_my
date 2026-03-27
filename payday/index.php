@@ -1758,6 +1758,48 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
     }
     exit;
 }
+
+if (($_GET['ajax'] ?? '') === 'poster_employees') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $apiEmp = new \App\Classes\PosterAPI((string)$token);
+        $rows = $apiEmp->request('access.getEmployees', []);
+        if (!is_array($rows)) $rows = [];
+        $out = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $uid = (int)($r['user_id'] ?? 0);
+            $name = (string)($r['name'] ?? '');
+            if ($uid > 0 && $name !== '') $out[$uid] = $name;
+        }
+        echo json_encode(['ok' => true, 'employees' => $out], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'finance_categories') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $apiCat = new \App\Classes\PosterAPI((string)$token);
+        $rows = $apiCat->request('finance.getCategories', []);
+        if (!is_array($rows)) $rows = [];
+        $out = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $cid = (int)($r['category_id'] ?? 0);
+            $name = (string)($r['name'] ?? '');
+            if ($cid > 0 && $name !== '') $out[$cid] = $name;
+        }
+        echo json_encode(['ok' => true, 'categories' => $out], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
 if (($_GET['ajax'] ?? '') === 'poster_accounts') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -2631,7 +2673,7 @@ $fmtVnd = function (int $v): string {
                         <table id="outPosterTable">
                             <thead>
                                 <tr>
-                                    <th class="col-out-select2"></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User ID</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
+                                    <th class="col-out-select2"></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -3019,10 +3061,16 @@ $fmtVnd = function (int $v): string {
     const outPosterTable = document.getElementById('outPosterTable');
     const fetchJsonSafe = (url) => fetch(url).then(async (r) => { const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('Bad JSON: ' + (txt || '(empty)')); } return j; });
     const posterMinorToVnd = (n) => {
-        const x = Math.round(Number(n || 0));
-        const ax = Math.abs(x);
-        if (ax > 200000000 && x % 100 === 0) return Math.round(x / 100);
-        return x;
+        const x = Number(n || 0);
+        return x / 100;
+    };
+    const fmtVnd2 = (v) => {
+        try {
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0) + ' ₫';
+        } catch (_) {
+            const num = Number(v) || 0;
+            return num.toFixed(2) + ' ₫';
+        }
     };
     const getDateRange = () => {
         const dfEl = document.querySelector('input[name="dateFrom"]');
@@ -3073,26 +3121,52 @@ $fmtVnd = function (int $v): string {
             });
         });
     };
+    let employeesMap = null;
+    let categoriesMap = null;
+    const ensureEmployees = () => {
+        if (employeesMap) return Promise.resolve(employeesMap);
+        return fetchJsonSafe(location.pathname + '?ajax=poster_employees')
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка poster_employees');
+                employeesMap = j.employees || {};
+                return employeesMap;
+            });
+    };
+    const ensureCategories = () => {
+        if (categoriesMap) return Promise.resolve(categoriesMap);
+        return fetchJsonSafe(location.pathname + '?ajax=finance_categories')
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_categories');
+                categoriesMap = j.categories || {};
+                return categoriesMap;
+            });
+    };
     const loadOutFinance = () => {
         const { dateFrom, dateTo } = getDateRange();
         const qs = new URLSearchParams({ dateFrom, dateTo });
-        return fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=finance_out').then((j) => {
+        return Promise.all([
+            ensureEmployees(),
+            ensureCategories(),
+            fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=finance_out'),
+        ]).then(([emps, cats, j]) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_out');
             const tbody = outPosterTable.tBodies[0]; tbody.innerHTML = '';
             (j.rows || []).forEach((row) => {
                 const amountVnd = posterMinorToVnd(Math.abs(Number(row.amount || 0)));
                 const balanceVnd = posterMinorToVnd(Math.abs(Number(row.balance || 0)));
+                const userName = String(emps && emps[Number(row.user_id || 0)] ? emps[Number(row.user_id || 0)] : row.user_id || '');
+                const catName = String(cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : row.category_id || '');
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
                 tr.setAttribute('data-sum', String(amountVnd));
                 tr.innerHTML = `
                     <td class="nowrap col-out-select2"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
                     <td class="nowrap col-out-date">${escapeHtml(row.date || '')}</td>
-                    <td class="col-out-user">${Number(row.user_id || 0)}</td>
-                    <td class="col-out-category">${Number(row.category_id || 0)}</td>
+                    <td class="col-out-user">${escapeHtml(userName)}</td>
+                    <td class="col-out-category">${escapeHtml(catName)}</td>
                     <td class="col-out-type">${Number(row.type || 0)}</td>
-                    <td class="sum col-out-amount">${Number(amountVnd).toLocaleString('en-US')} ₫</td>
-                    <td class="sum col-out-balance">${Number(balanceVnd).toLocaleString('en-US')} ₫</td>
+                    <td class="sum col-out-amount">${fmtVnd2(amountVnd)}</td>
+                    <td class="sum col-out-balance">${fmtVnd2(balanceVnd)}</td>
                     <td class="col-out-comment">${escapeHtml(row.comment || '')} <span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
                 `;
                 tbody.appendChild(tr);
