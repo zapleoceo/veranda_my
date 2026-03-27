@@ -1531,6 +1531,119 @@ if (($_GET['ajax'] ?? '') === 'links') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'mail_out') {
+    header('Content-Type: application/json; charset=utf-8');
+    $dFrom = trim((string)($_GET['dateFrom'] ?? ''));
+    $dTo = trim((string)($_GET['dateTo'] ?? ''));
+    if ($dTo === '') {
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (!function_exists('decode_imap_text')) {
+        function decode_imap_text($str) {
+            if (!$str) return '';
+            if (!function_exists('imap_mime_header_decode')) return $str;
+            $result = '';
+            $decode = @imap_mime_header_decode($str);
+            if (is_array($decode)) {
+                foreach ($decode as $obj) {
+                    $text = isset($obj->text) ? $obj->text : '';
+                    $charset = isset($obj->charset) ? $obj->charset : 'default';
+                    if ($charset === 'default' || $charset === 'us-ascii' || $charset === 'utf-8') {
+                        $result .= $text;
+                    } else {
+                        $result .= @mb_convert_encoding($text, 'UTF-8', $charset) ?: $text;
+                    }
+                }
+            } else {
+                $result = $str;
+            }
+            return $result;
+        }
+    }
+    if (file_exists(__DIR__ . '/../.env')) {
+        $lines = file(__DIR__ . '/../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            $t = trim($line);
+            if ($t === '' || $t[0] === '#' || strpos($line, '=') === false) continue;
+            [$name, $value] = explode('=', $line, 2);
+            $_ENV[trim($name)] = trim(trim($value), '"\'');
+        }
+    }
+    $mailUser = $_ENV['MAIL_USER'] ?? '';
+    $mailPass = $_ENV['MAIL_PASS'] ?? '';
+    if (!extension_loaded('imap') || $mailUser === '' || $mailPass === '') {
+        echo json_encode(['ok' => false, 'error' => 'IMAP not available'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $inbox = @imap_open('{imap.gmail.com:993/imap/ssl}INBOX', $mailUser, $mailPass);
+    if (!$inbox) {
+        echo json_encode(['ok' => false, 'error' => 'IMAP open failed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $emails = imap_search($inbox, 'ALL') ?: [];
+    rsort($emails);
+    $fromTs = strtotime($dFrom !== '' ? ($dFrom . ' 00:00:00') : ($dTo . ' 00:00:00'));
+    $toTs = strtotime($dTo . ' 23:59:59');
+    $rows = [];
+    foreach ($emails as $num) {
+        $h = @imap_headerinfo($inbox, $num);
+        if (!$h) continue;
+        $fromAddr = isset($h->from[0]) ? ($h->from[0]->mailbox . '@' . $h->from[0]->host) : '';
+        if (strcasecmp($fromAddr, 'bidvsmartbanking@bidv.com.vn') !== 0) continue;
+        $tsHeader = isset($h->udate) ? (int)$h->udate : (isset($h->date) ? strtotime($h->date) : 0);
+        if ($tsHeader <= 0) $tsHeader = 0;
+        $struct = @imap_fetchstructure($inbox, $num);
+        $body = '';
+        $encoding = 0;
+        if ($struct && isset($struct->parts) && count($struct->parts)) {
+            for ($i = 0, $n = count($struct->parts); $i < $n; $i++) {
+                $p = $struct->parts[$i];
+                if (isset($p->subtype) && strtoupper($p->subtype) === 'HTML') {
+                    $body = @imap_fetchbody($inbox, $num, $i + 1);
+                    $encoding = $p->encoding ?? 0;
+                    break;
+                }
+            }
+            if (!$body) {
+                $body = @imap_fetchbody($inbox, $num, 1);
+                $encoding = $struct->parts[0]->encoding ?? 0;
+            }
+        } else {
+            $body = @imap_body($inbox, $num);
+            $encoding = $struct->encoding ?? 0;
+        }
+        if ($encoding == 3) $body = base64_decode($body);
+        elseif ($encoding == 4) $body = quoted_printable_decode($body);
+        $src = preg_replace('/\s+/u', ' ', (string)$body);
+        $timeStr = '';
+        $txTs = 0;
+        if (preg_match('/\b(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\b/u', $src, $m)) {
+            $timeStr = $m[0];
+            $d = (int)$m[1]; $mo = (int)$m[2]; $y = (int)$m[3]; $hh = (int)$m[4]; $mm = (int)$m[5]; $ss = (int)$m[6];
+            $txTs = mktime($hh, $mm, $ss, $mo, $d, $y);
+        }
+        $amtStr = '';
+        if (preg_match('/([\d.,]+)\s*VND\b/ui', $src, $m)) $amtStr = $m[1];
+        $amountVnd = 0;
+        if ($amtStr !== '') {
+            $amountVnd = (int)str_replace([',','.'], ['', ''], $amtStr);
+        }
+        $useTs = $txTs > 0 ? $txTs : $tsHeader;
+        if ($useTs > 0 && ($useTs < $fromTs || $useTs > $toTs)) continue;
+        $rows[] = [
+            'mail_uid' => (int)@imap_uid($inbox, $num),
+            'date' => $useTs > 0 ? date('Y-m-d H:i:s', $useTs) : '',
+            'tx_time' => $timeStr,
+            'amount' => $amountVnd,
+            'content' => decode_imap_text($h->subject ?? ''),
+        ];
+    }
+    @imap_close($inbox);
+    echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'poster_accounts') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -2296,6 +2409,9 @@ $fmtVnd = function (int $v): string {
         .pm-lite { display: none; }
         body.mode-lite .pm-full { display: none; }
         body.mode-lite .pm-lite { display: inline; }
+        .tabs { display:flex; gap:6px; align-items:center; margin-left: 12px; }
+        .tabs .tab { padding: 6px 12px; border:1px solid #d0d5dd; border-radius:10px; cursor:pointer; font-weight:900; color:#374151; background:#fff; }
+        .tabs .tab.active { background:#111827; color:#fff; border-color:#111827; }
     </style>
 </head>
 <body>
@@ -2303,6 +2419,10 @@ $fmtVnd = function (int $v): string {
     <div class="top-nav">
         <div class="nav-left">
             <div class="nav-title">Payday</div>
+            <div class="tabs">
+                <button type="button" class="tab active" id="tabIn">IN</button>
+                <button type="button" class="tab" id="tabOut">OUT</button>
+            </div>
         </div>
         <?php require __DIR__ . '/../partials/user_menu.php'; ?>
     </div>
@@ -2330,6 +2450,8 @@ $fmtVnd = function (int $v): string {
                 <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                 <button class="btn primary" id="sepaySyncBtn" type="submit">Обновить платежи</button>
             </form>
+            <button class="btn" id="outMailBtn" type="button" style="display:none;">Обновить Платежи Out</button>
+            <button class="btn" id="outFinanceBtn" type="button" style="display:none;">Обновить транзакции</button>
 
             <form method="POST" id="clearDayForm">
                 <input type="hidden" name="action" value="clear_day">
@@ -2349,6 +2471,53 @@ $fmtVnd = function (int $v): string {
         </div>
 
         <div class="divider"></div>
+
+        <div id="outSection" class="card" style="padding:0; display:none;">
+            <div style="padding: 12px 12px 6px;">
+                <div style="font-weight:900;">OUT • Sepay (Mail BIDV) / Poster Finance</div>
+                <div class="muted">Парсинг почты BIDV и транзакций Poster finance.getTransactions (account_type=1)</div>
+            </div>
+            <div class="grid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; padding: 0 12px 12px;">
+                <div class="card" style="padding:0;">
+                    <div style="padding:8px 12px; font-weight:900;">Sepay (Mail)</div>
+                    <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
+                        <table id="outSepayTable">
+                            <thead><tr><th>Content</th><th class="nowrap">Время</th><th class="nowrap">Сумма</th><th></th><th></th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="mid-col" id="outMidCol">
+                    <button class="mid-btn primary" id="outLinkMakeBtn" type="button" title="Связать выбранные" disabled>🎯</button>
+                    <button class="mid-btn" id="outHideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
+                    <button class="mid-btn" id="outLinkAutoBtn" type="button" title="Автосвязи">🧩</button>
+                    <button class="mid-btn" id="outLinkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
+                    <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
+                        <div>←</div>
+                        <div id="outSelSepaySum">0 ₫</div>
+                        <div style="height: 10px;"></div>
+                        <div>→</div>
+                        <div id="outSelPosterSum">0 ₫</div>
+                        <div style="height: 10px;"></div>
+                        <div id="outSelMatch" style="font-size: 16px; color: #16a34a;">✅</div>
+                        <div id="outSelDiff" style="font-weight: 900;">0 ₫</div>
+                    </div>
+                </div>
+                <div class="card" style="padding:0;">
+                    <div style="padding:8px 12px; font-weight:900;">Poster Finance</div>
+                    <div id="outPosterScroll" style="max-height: 56vh; overflow:auto;">
+                        <table id="outPosterTable">
+                            <thead>
+                                <tr>
+                                    <th></th><th class="nowrap">Дата</th><th>User ID</th><th>Category</th><th>Type</th><th>Amount</th><th>Balance</th><th>Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div class="grid" id="tablesRoot">
             <div id="lineLayer"></div>
@@ -2719,6 +2888,58 @@ $fmtVnd = function (int $v): string {
         if (modeToggleEl) modeToggleEl.checked = (m === 'full');
         try { localStorage.setItem('payday_mode', m); } catch (_) {}
     };
+    const tabIn = document.getElementById('tabIn');
+    const tabOut = document.getElementById('tabOut');
+    const outSection = document.getElementById('outSection');
+    const outMailBtn = document.getElementById('outMailBtn');
+    const outFinanceBtn = document.getElementById('outFinanceBtn');
+    const outSepayTable = document.getElementById('outSepayTable');
+    const outPosterTable = document.getElementById('outPosterTable');
+    const fetchJsonSafe = (url) => fetch(url).then(async (r) => { const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('Bad JSON: ' + (txt || '(empty)')); } return j; });
+    const setTab = (m) => {
+        const inOn = m === 'in';
+        const tablesRoot = document.getElementById('tablesRoot');
+        const lineLayer = document.getElementById('lineLayer');
+        if (tablesRoot) tablesRoot.style.display = inOn ? '' : 'none';
+        if (lineLayer) lineLayer.style.display = inOn ? '' : 'none';
+        if (tabIn && tabOut) { tabIn.classList.toggle('active', inOn); tabOut.classList.toggle('active', !inOn); }
+        if (outSection) outSection.style.display = inOn ? 'none' : '';
+        if (outMailBtn) outMailBtn.style.display = inOn ? 'none' : '';
+        if (outFinanceBtn) outFinanceBtn.style.display = inOn ? 'none' : '';
+    };
+    if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
+    if (tabOut) tabOut.addEventListener('click', () => setTab('out'));
+    setTab('in');
+    const loadOutMail = () => {
+        const qs = new URLSearchParams({ dateFrom: <?= json_encode($dateFrom) ?>, dateTo: <?= json_encode($dateTo) ?> });
+        return fetchJsonSafe('?' + qs.toString() + '&ajax=mail_out').then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка mail_out');
+            const tbody = outSepayTable.tBodies[0]; tbody.innerHTML = '';
+            (j.rows || []).forEach((row) => {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-mail-uid', String(row.mail_uid || 0));
+                tr.setAttribute('data-sum', String(row.amount || 0));
+                tr.innerHTML = `<td>${escapeHtml(row.content || '')}</td><td class="nowrap">${escapeHtml(row.tx_time || row.date || '')}</td><td class="sum">${Number(row.amount || 0).toLocaleString('en-US')} ₫</td><td><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td><td><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>`;
+                tbody.appendChild(tr);
+            });
+        });
+    };
+    const loadOutFinance = () => {
+        const qs = new URLSearchParams({ dateFrom: <?= json_encode($dateFrom) ?>, dateTo: <?= json_encode($dateTo) ?> });
+        return fetchJsonSafe('?' + qs.toString() + '&ajax=finance_out').then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_out');
+            const tbody = outPosterTable.tBodies[0]; tbody.innerHTML = '';
+            (j.rows || []).forEach((row) => {
+                const tr = document.createElement('tr');
+                tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
+                tr.setAttribute('data-sum', String(Math.abs(Number(row.amount || 0))));
+                tr.innerHTML = `<td class="nowrap"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td><td class="nowrap">${escapeHtml(row.date || '')}</td><td>${Number(row.user_id || 0)}</td><td>${Number(row.category_id || 0)}</td><td>${Number(row.type || 0)}</td><td class="sum">${Number(Math.abs(Number(row.amount || 0))).toLocaleString('en-US')} ₫</td><td class="sum">${Number(Math.abs(Number(row.balance || 0))).toLocaleString('en-US')} ₫</td><td>${escapeHtml(row.comment || '')}</td>`;
+                tbody.appendChild(tr);
+            });
+        });
+    };
+    if (outMailBtn) outMailBtn.addEventListener('click', () => loadOutMail().catch((e) => alert(e && e.message ? e.message : 'Ошибка')));
+    if (outFinanceBtn) outFinanceBtn.addEventListener('click', () => loadOutFinance().catch((e) => alert(e && e.message ? e.message : 'Ошибка')));
 
     const setFormLoading = (formId, btnId) => {
         const form = document.getElementById(formId);
