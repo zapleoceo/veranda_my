@@ -176,6 +176,8 @@ $sh = $db->t('sepay_hidden');
 $pfh = $db->t('poster_finance_hidden');
 $mh = $db->t('mail_hidden');
 $ol = $db->t('out_links');
+$om = $db->t('out_mails');
+$of = $db->t('out_finance');
 
 try {
     $db->query("ALTER TABLE {$pc} ADD COLUMN was_deleted TINYINT(1) NOT NULL DEFAULT 0");
@@ -253,6 +255,40 @@ try {
             KEY idx_date (date_to),
             KEY idx_mail (mail_uid),
             KEY idx_fin (finance_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    );
+} catch (\Throwable $e) {
+}
+try {
+    $db->query(
+        "CREATE TABLE IF NOT EXISTS {$om} (
+            mail_uid BIGINT NOT NULL,
+            date DATETIME NULL,
+            tx_time VARCHAR(32) NULL,
+            amount BIGINT NOT NULL DEFAULT 0,
+            content TEXT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (mail_uid),
+            KEY idx_date (date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    );
+} catch (\Throwable $e) {
+}
+try {
+    $db->query(
+        "CREATE TABLE IF NOT EXISTS {$of} (
+            transaction_id BIGINT NOT NULL,
+            user_id BIGINT NULL,
+            category_id BIGINT NULL,
+            type INT NULL,
+            amount BIGINT NOT NULL DEFAULT 0,
+            balance BIGINT NOT NULL DEFAULT 0,
+            date DATETIME NULL,
+            comment TEXT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (transaction_id),
+            KEY idx_date (date),
+            KEY idx_cat (category_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     );
 } catch (\Throwable $e) {
@@ -1685,6 +1721,29 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
         ];
     }
     @imap_close($inbox);
+    // Cache rows
+    try {
+        foreach ($rows as $r) {
+            $uid = (int)($r['mail_uid'] ?? 0);
+            if ($uid <= 0) continue;
+            $db->query(
+                "INSERT INTO {$om} (mail_uid, date, tx_time, amount, content)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                    date = VALUES(date),
+                    tx_time = VALUES(tx_time),
+                    amount = VALUES(amount),
+                    content = VALUES(content)",
+                [
+                    $uid,
+                    (string)($r['date'] ?? null) !== '' ? (string)$r['date'] : null,
+                    (string)($r['tx_time'] ?? null) !== '' ? (string)$r['tx_time'] : null,
+                    (int)($r['amount'] ?? 0),
+                    (string)($r['content'] ?? null) !== '' ? (string)$r['content'] : null,
+                ]
+            );
+        }
+    } catch (\Throwable $e) {}
     $rows = array_values(array_filter($rows, function ($r) use ($hidden) {
         $uid = (int)($r['mail_uid'] ?? 0);
         return $uid > 0 && empty($hidden[$uid]);
@@ -1788,7 +1847,95 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
                 'comment' => (string)($r['comment'] ?? ''),
             ];
         }
+        // Cache rows
+        try {
+            foreach ($out as $r) {
+                $tid = (int)($r['transaction_id'] ?? 0);
+                if ($tid <= 0) continue;
+                $db->query(
+                    "INSERT INTO {$of} (transaction_id, user_id, category_id, type, amount, balance, date, comment)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                        user_id = VALUES(user_id),
+                        category_id = VALUES(category_id),
+                        type = VALUES(type),
+                        amount = VALUES(amount),
+                        balance = VALUES(balance),
+                        date = VALUES(date),
+                        comment = VALUES(comment)",
+                    [
+                        $tid,
+                        (int)($r['user_id'] ?? 0) ?: null,
+                        (int)($r['category_id'] ?? 0) ?: null,
+                        (int)($r['type'] ?? 0) ?: null,
+                        (int)($r['amount'] ?? 0),
+                        (int)($r['balance'] ?? 0),
+                        (string)($r['date'] ?? null) !== '' ? (string)$r['date'] : null,
+                        (string)($r['comment'] ?? null) !== '' ? (string)$r['comment'] : null,
+                    ]
+                );
+            }
+        } catch (\Throwable $e) {}
         echo json_encode(['ok' => true, 'rows' => $out], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'mail_out_cached') {
+    header('Content-Type: application/json; charset=utf-8');
+    $dFrom = trim((string)($_GET['dateFrom'] ?? ''));
+    $dTo = trim((string)($_GET['dateTo'] ?? ''));
+    if ($dTo === '') {
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $fromDate = $dFrom !== '' ? $dFrom : $dTo;
+        $fromTs = strtotime($fromDate . ' 00:00:00');
+        $toTs = strtotime($dTo . ' 23:59:59');
+        $hidden = [];
+        try {
+            $hRows = $db->query("SELECT mail_uid FROM {$mh} WHERE date_to = ?", [$dTo])->fetchAll();
+            foreach ($hRows as $hr) $hidden[(int)($hr['mail_uid'] ?? 0)] = true;
+        } catch (\Throwable $e) {}
+        $rows = $db->query(
+            "SELECT mail_uid, date, tx_time, amount, content FROM {$om} WHERE date BETWEEN ? AND ?",
+            [date('Y-m-d H:i:s', $fromTs), date('Y-m-d H:i:s', $toTs)]
+        )->fetchAll();
+        if (!is_array($rows)) $rows = [];
+        $rows = array_values(array_filter($rows, function ($r) use ($hidden) {
+            $uid = (int)($r['mail_uid'] ?? 0);
+            return $uid > 0 && empty($hidden[$uid]);
+        }));
+        echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'finance_out_cached') {
+    header('Content-Type: application/json; charset=utf-8');
+    $dFrom = trim((string)($_GET['dateFrom'] ?? ''));
+    $dTo = trim((string)($_GET['dateTo'] ?? ''));
+    if ($dTo === '') {
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $fromDate = $dFrom !== '' ? $dFrom : $dTo;
+        $rows = $db->query(
+            "SELECT transaction_id, user_id, category_id, type, amount, balance, date, comment
+             FROM {$of}
+             WHERE date BETWEEN ? AND ?",
+            [$fromDate . ' 00:00:00', $dTo . ' 23:59:59']
+        )->fetchAll();
+        if (!is_array($rows)) $rows = [];
+        echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -2660,7 +2807,7 @@ $fmtVnd = function (int $v): string {
         
         #tablesRoot { position: relative; overflow: hidden; }
         #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
-        #outLineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
+        #outLineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 200; grid-column: 1 / -1; grid-row: 1 / -1; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
         th { background: #f8f9fa; color: #65676b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -2751,13 +2898,14 @@ $fmtVnd = function (int $v): string {
         .tabs .tab { padding: 6px 12px; border:1px solid #d0d5dd; border-radius:10px; cursor:pointer; font-weight:900; color:#374151; background:#fff; }
         .tabs .tab.active { background:#111827; color:#fff; border-color:#111827; }
         .btn.loading { opacity: 0.7; pointer-events: none; }
-        body.mode-lite #outSepayTable .col-out-content,
-        body.mode-lite #outSepayTable .col-out-anchor { display: none; }
+        body.mode-lite #outSepayTable .col-out-content { display: none; }
         body.mode-lite #outPosterTable .col-out-user,
         body.mode-lite #outPosterTable .col-out-category,
         body.mode-lite #outPosterTable .col-out-type,
         body.mode-lite #outPosterTable .col-out-balance,
         body.mode-lite #outPosterTable .col-out-comment { display: none; }
+        body.mode-lite #outSepayTable .col-out-anchor,
+        body.mode-lite #outPosterTable .col-out-anchor2 { display: table-cell; }
     </style>
 </head>
 <body>
@@ -2825,9 +2973,12 @@ $fmtVnd = function (int $v): string {
                     <div style="padding:8px 12px; font-weight:900;">Sepay (Mail)</div>
                     <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
                         <table id="outSepayTable">
-                            <thead><tr><th class="col-out-hide"></th><th class="col-out-content">Content</th><th class="nowrap col-out-time">Время</th><th class="nowrap col-out-sum">Сумма</th><th class="col-out-select"></th><th class="col-out-anchor"></th></tr></thead>
+                            <thead><tr><th class="col-out-anchor"></th><th class="col-out-hide"></th><th class="col-out-content">Content</th><th class="nowrap col-out-time">Время</th><th class="nowrap col-out-sum">Сумма</th><th class="col-out-select"></th></tr></thead>
                             <tbody></tbody>
                         </table>
+                    </div>
+                    <div class="muted" style="padding: 10px 12px; font-weight: 900;">
+                        Итого: <span id="outSepayTotal">0 ₫</span>
                     </div>
                 </div>
                 <div class="mid-col" id="outMidCol">
@@ -2852,11 +3003,14 @@ $fmtVnd = function (int $v): string {
                         <table id="outPosterTable">
                             <thead>
                                 <tr>
-                                    <th class="col-out-select2"></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
+                                    <th class="col-out-anchor2"></th><th class="col-out-select2"></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
+                    </div>
+                    <div class="muted" style="padding: 10px 12px; font-weight: 900;">
+                        Итого: <span id="outPosterTotal">0 ₫</span>
                     </div>
                 </div>
             </div>
@@ -3274,7 +3428,89 @@ $fmtVnd = function (int $v): string {
         if (sepaySyncForm) sepaySyncForm.style.display = inOn ? '' : 'none';
         if (clearDayForm) clearDayForm.style.display = inOn ? '' : 'none';
         activeTab = inOn ? 'in' : 'out';
-        if (!inOn) outScheduleRelayout();
+        if (!inOn) {
+            const { dateFrom, dateTo } = getDateRange();
+            const qs = new URLSearchParams({ dateFrom, dateTo });
+            const load1 = fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=mail_out_cached')
+                .then((j) => {
+                    if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка mail_out_cached');
+                    const tbody = outSepayTable.tBodies[0]; tbody.innerHTML = '';
+                    (j.rows || []).forEach((row) => {
+                        const tr = document.createElement('tr');
+                        tr.setAttribute('data-mail-uid', String(row.mail_uid || 0));
+                        tr.setAttribute('data-sum', String(row.amount || 0));
+                        tr.innerHTML = `
+                            <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
+                            <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
+                            <td class="col-out-content">${escapeHtml(row.content || '')}</td>
+                            <td class="nowrap col-out-time">${escapeHtml(row.tx_time || row.date || '')}</td>
+                            <td class="sum col-out-sum">${Number(row.amount || 0).toLocaleString('en-US')} ₫</td>
+                            <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    updateOutTotals();
+                });
+            const load2 = Promise.all([ensureEmployees(), ensureCategories(),
+                fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=finance_out_cached')])
+                .then(([emps, cats, j]) => {
+                    if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_out_cached');
+                    const tbody = outPosterTable.tBodies[0]; tbody.innerHTML = '';
+                    (j.rows || []).forEach((row) => {
+                        const amountVnd = posterMinorToVnd(Math.abs(Number(row.amount || 0)));
+                        const balanceVnd = posterMinorToVnd(Math.abs(Number(row.balance || 0)));
+                        const userName = String(emps && emps[Number(row.user_id || 0)] ? emps[Number(row.user_id || 0)] : row.user_id || '');
+                        const catName = String(cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : row.category_id || '');
+                        const tr = document.createElement('tr');
+                        tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
+                        tr.setAttribute('data-sum', String(amountVnd));
+                        tr.innerHTML = `
+                            <td class="col-out-anchor2"><span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
+                            <td class="nowrap col-out-select2"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
+                            <td class="nowrap col-out-date">${escapeHtml(row.date || '')}</td>
+                            <td class="col-out-user">${escapeHtml(userName)}</td>
+                            <td class="col-out-category">${escapeHtml(catName)}</td>
+                            <td class="col-out-type">${Number(row.type || 0)}</td>
+                            <td class="sum col-out-amount">${fmtVnd2(amountVnd)}</td>
+                            <td class="sum col-out-balance">${fmtVnd2(balanceVnd)}</td>
+                            <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    updateOutTotals();
+                });
+            Promise.all([load1, load2])
+                .then(() => fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(getDateRange().dateTo)))
+                .then((j2) => {
+                    if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
+                    outLinks.length = 0;
+                    outLinkByMail.clear();
+                    outLinkByFin.clear();
+                    outSummaryByMail.clear();
+                    outSummaryByFin.clear();
+                    (j2.links || []).forEach((l) => {
+                        const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: Boolean(Number(l.is_manual || 0)) };
+                        if (!link.mail_uid || !link.finance_id) return;
+                        outLinks.push(link);
+                        outLinkByMail.set(link.mail_uid, link);
+                        outLinkByFin.set(link.finance_id, link);
+                        const ms = outSummaryByMail.get(link.mail_uid) || { hasManual: false, hasYellow: false };
+                        if (link.is_manual || link.link_type === 'manual') ms.hasManual = true;
+                        if (link.link_type === 'auto_yellow') ms.hasYellow = true;
+                        outSummaryByMail.set(link.mail_uid, ms);
+                        const fs = outSummaryByFin.get(link.finance_id) || { hasManual: false, hasYellow: false };
+                        if (link.is_manual || link.link_type === 'manual') fs.hasManual = true;
+                        if (link.link_type === 'auto_yellow') fs.hasYellow = true;
+                        outSummaryByFin.set(link.finance_id, fs);
+                    });
+                    applyOutRowClasses();
+                    applyOutHideLinked();
+                    updateOutSelection();
+                    updateOutTotals();
+                })
+                .catch(() => {})
+                .finally(() => { outScheduleRelayout(); });
+        }
     };
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
     if (tabOut) tabOut.addEventListener('click', () => setTab('out'));
@@ -3290,12 +3526,12 @@ $fmtVnd = function (int $v): string {
                 tr.setAttribute('data-mail-uid', String(row.mail_uid || 0));
                 tr.setAttribute('data-sum', String(row.amount || 0));
                 tr.innerHTML = `
+                    <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
                     <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
                     <td class="col-out-content">${escapeHtml(row.content || '')}</td>
                     <td class="nowrap col-out-time">${escapeHtml(row.tx_time || row.date || '')}</td>
                     <td class="sum col-out-sum">${Number(row.amount || 0).toLocaleString('en-US')} ₫</td>
                     <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
-                    <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -3305,14 +3541,25 @@ $fmtVnd = function (int $v): string {
             outLinks.length = 0;
             outLinkByMail.clear();
             outLinkByFin.clear();
+            outSummaryByMail.clear();
+            outSummaryByFin.clear();
             (j2.links || []).forEach((l) => {
-                const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: !!l.is_manual };
+                const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: Boolean(Number(l.is_manual || 0)) };
                 if (!link.mail_uid || !link.finance_id) return;
                 outLinks.push(link);
                 outLinkByMail.set(link.mail_uid, link);
                 outLinkByFin.set(link.finance_id, link);
+                const ms = outSummaryByMail.get(link.mail_uid) || { hasManual: false, hasYellow: false };
+                if (link.is_manual || link.link_type === 'manual') ms.hasManual = true;
+                if (link.link_type === 'auto_yellow') ms.hasYellow = true;
+                outSummaryByMail.set(link.mail_uid, ms);
+                const fs = outSummaryByFin.get(link.finance_id) || { hasManual: false, hasYellow: false };
+                if (link.is_manual || link.link_type === 'manual') fs.hasManual = true;
+                if (link.link_type === 'auto_yellow') fs.hasYellow = true;
+                outSummaryByFin.set(link.finance_id, fs);
             });
             applyOutRowClasses();
+            updateOutTotals();
             outScheduleRelayout();
         });
     };
@@ -3355,6 +3602,7 @@ $fmtVnd = function (int $v): string {
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
                 tr.setAttribute('data-sum', String(amountVnd));
                 tr.innerHTML = `
+                    <td class="col-out-anchor2"><span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
                     <td class="nowrap col-out-select2"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
                     <td class="nowrap col-out-date">${escapeHtml(row.date || '')}</td>
                     <td class="col-out-user">${escapeHtml(userName)}</td>
@@ -3362,12 +3610,13 @@ $fmtVnd = function (int $v): string {
                     <td class="col-out-type">${Number(row.type || 0)}</td>
                     <td class="sum col-out-amount">${fmtVnd2(amountVnd)}</td>
                     <td class="sum col-out-balance">${fmtVnd2(balanceVnd)}</td>
-                    <td class="col-out-comment">${escapeHtml(row.comment || '')} <span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
+                    <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
                 `;
                 tbody.appendChild(tr);
             });
             applyOutRowClasses();
             applyOutHideLinked();
+            updateOutTotals();
         });
     };
     if (outMailBtn) outMailBtn.addEventListener('click', () => {
@@ -3418,6 +3667,8 @@ $fmtVnd = function (int $v): string {
     const outPosterScroll = document.getElementById('outPosterScroll');
     const outWidgets = new Map();
     const outSvgState = { svg: null, defs: null, group: null };
+    const outSepayTotalEl = document.getElementById('outSepayTotal');
+    const outPosterTotalEl = document.getElementById('outPosterTotal');
 
     const outClearLines = () => {
         if (outSvgState.group) {
@@ -3425,6 +3676,15 @@ $fmtVnd = function (int $v): string {
         }
         Array.from(outWidgets.values()).forEach((btn) => { try { btn.remove(); } catch (_) {} });
         outWidgets.clear();
+    };
+
+    const updateOutTotals = () => {
+        const mailRows = Array.from(outSepayTable.tBodies[0]?.rows || []);
+        const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
+        const totalMail = mailRows.reduce((acc, tr) => acc + Number(tr.getAttribute('data-sum') || 0), 0);
+        const totalFin = finRows.reduce((acc, tr) => acc + Number(tr.getAttribute('data-sum') || 0), 0);
+        if (outSepayTotalEl) outSepayTotalEl.textContent = Number(totalMail).toLocaleString('en-US') + ' ₫';
+        if (outPosterTotalEl) outPosterTotalEl.textContent = fmtVnd2(totalFin);
     };
 
     const outSyncButtons = () => {
@@ -3459,12 +3719,22 @@ $fmtVnd = function (int $v): string {
                     outLinks.length = 0;
                     outLinkByMail.clear();
                     outLinkByFin.clear();
+                    outSummaryByMail.clear();
+                    outSummaryByFin.clear();
                     (j2.links || []).forEach((lx) => {
-                        const link = { mail_uid: Number(lx.mail_uid || 0), finance_id: Number(lx.finance_id || 0), link_type: String(lx.link_type || ''), is_manual: !!lx.is_manual };
+                        const link = { mail_uid: Number(lx.mail_uid || 0), finance_id: Number(lx.finance_id || 0), link_type: String(lx.link_type || ''), is_manual: Boolean(Number(lx.is_manual || 0)) };
                         if (!link.mail_uid || !link.finance_id) return;
                         outLinks.push(link);
                         outLinkByMail.set(link.mail_uid, link);
                         outLinkByFin.set(link.finance_id, link);
+                        const ms = outSummaryByMail.get(link.mail_uid) || { hasManual: false, hasYellow: false };
+                        if (link.is_manual || link.link_type === 'manual') ms.hasManual = true;
+                        if (link.link_type === 'auto_yellow') ms.hasYellow = true;
+                        outSummaryByMail.set(link.mail_uid, ms);
+                        const fs = outSummaryByFin.get(link.finance_id) || { hasManual: false, hasYellow: false };
+                        if (link.is_manual || link.link_type === 'manual') fs.hasManual = true;
+                        if (link.link_type === 'auto_yellow') fs.hasYellow = true;
+                        outSummaryByFin.set(link.finance_id, fs);
                     });
                     applyOutRowClasses();
                     applyOutHideLinked();
@@ -3527,10 +3797,9 @@ $fmtVnd = function (int $v): string {
             const p = document.getElementById('out-poster-' + l.finance_id);
             if (!s || !p) return;
             if (!s.getClientRects().length || !p.getClientRects().length) return;
-            if (outSepayScroll && !outIsVisibleInScrollY(s, outSepayScroll)) return;
-            if (outPosterScroll && !outIsVisibleInScrollY(p, outPosterScroll)) return;
+            // Draw lines regardless of scroll visibility
             const size = 2;
-            const color = colorFor(l.link_type, l.link_type === 'manual');
+            const color = colorFor(l.link_type, !!l.is_manual);
 
             const a0 = getAnchorPoint(s, 'right', rootRect);
             const b0 = getAnchorPoint(p, 'left', rootRect);
@@ -3606,6 +3875,8 @@ $fmtVnd = function (int $v): string {
     const outLinks = [];
     const outLinkByMail = new Map();
     const outLinkByFin = new Map();
+    const outSummaryByMail = new Map(); // uid -> { hasManual, hasYellow }
+    const outSummaryByFin = new Map();  // fid -> { hasManual, hasYellow }
     const outSelectedMail = new Set();
     const outSelectedFin = new Set();
 
@@ -3637,15 +3908,27 @@ $fmtVnd = function (int $v): string {
         mailRows.forEach((tr) => {
             tr.classList.remove('row-red', 'row-gray', 'row-green', 'row-yellow');
             const uid = Number(tr.getAttribute('data-mail-uid') || 0);
-            if (uid && outLinkByMail.has(uid)) tr.classList.add('row-gray');
-            else tr.classList.add('row-red');
+            if (uid && (outLinkByMail.has(uid) || outSummaryByMail.has(uid))) {
+                const s = outSummaryByMail.get(uid);
+                if (s && s.hasManual) tr.classList.add('row-gray');
+                else if (s && s.hasYellow) tr.classList.add('row-yellow');
+                else tr.classList.add('row-green');
+            } else {
+                tr.classList.add('row-red');
+            }
         });
         const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
         finRows.forEach((tr) => {
             tr.classList.remove('row-red', 'row-gray', 'row-green', 'row-yellow');
             const fid = Number(tr.getAttribute('data-finance-id') || 0);
-            if (fid && outLinkByFin.has(fid)) tr.classList.add('row-gray');
-            else tr.classList.add('row-red');
+            if (fid && (outLinkByFin.has(fid) || outSummaryByFin.has(fid))) {
+                const s = outSummaryByFin.get(fid);
+                if (s && s.hasManual) tr.classList.add('row-gray');
+                else if (s && s.hasYellow) tr.classList.add('row-yellow');
+                else tr.classList.add('row-green');
+            } else {
+                tr.classList.add('row-red');
+            }
         });
     };
 
@@ -3693,6 +3976,7 @@ $fmtVnd = function (int $v): string {
             pairs.push({ mail_uid: uid, finance_id: fid });
         }
         const { dateTo } = getDateRange();
+        if (!dateTo || pairs.length === 0) return;
         fetch(location.pathname + '?ajax=out_manual_link', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3709,11 +3993,27 @@ $fmtVnd = function (int $v): string {
             outLinkByMail.clear();
             outLinkByFin.clear();
             (j2.links || []).forEach((l) => {
-                const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: !!l.is_manual };
+                const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: Boolean(Number(l.is_manual || 0)) };
                 if (!link.mail_uid || !link.finance_id) return;
                 outLinks.push(link);
                 outLinkByMail.set(link.mail_uid, link);
                 outLinkByFin.set(link.finance_id, link);
+                const ms = outSummaryByMail.get(link.mail_uid) || { hasManual: false, hasYellow: false };
+                if (link.is_manual || link.link_type === 'manual') ms.hasManual = true;
+                if (link.link_type === 'auto_yellow') ms.hasYellow = true;
+                outSummaryByMail.set(link.mail_uid, ms);
+                const fs = outSummaryByFin.get(link.finance_id) || { hasManual: false, hasYellow: false };
+                if (link.is_manual || link.link_type === 'manual') fs.hasManual = true;
+                if (link.link_type === 'auto_yellow') fs.hasYellow = true;
+                outSummaryByFin.set(link.finance_id, fs);
+            });
+            applyOutRowClasses();
+            applyOutHideLinked();
+            updateOutSelection();
+            outScheduleRelayout();
+                if (link.is_manual || link.link_type === 'manual') fs.hasManual = true;
+                if (link.link_type === 'auto_yellow') fs.hasYellow = true;
+                outSummaryByFin.set(link.finance_id, fs);
             });
             applyOutRowClasses();
             applyOutHideLinked();
@@ -3763,6 +4063,7 @@ $fmtVnd = function (int $v): string {
             pairs.push({ mail_uid: uid, finance_id: fid, link_type: lt });
         });
         const { dateTo } = getDateRange();
+        if (!dateTo || pairs.length === 0) { return; }
         fetch(location.pathname + '?ajax=out_auto_link', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3778,16 +4079,28 @@ $fmtVnd = function (int $v): string {
             outLinks.length = 0;
             outLinkByMail.clear();
             outLinkByFin.clear();
+            outSummaryByMail.clear();
+            outSummaryByFin.clear();
             (j2.links || []).forEach((l) => {
-                const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: !!l.is_manual };
+                const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: Boolean(Number(l.is_manual || 0)) };
                 if (!link.mail_uid || !link.finance_id) return;
                 outLinks.push(link);
                 outLinkByMail.set(link.mail_uid, link);
                 outLinkByFin.set(link.finance_id, link);
+                const ms = outSummaryByMail.get(link.mail_uid) || { hasManual: false, hasYellow: false };
+                if (link.is_manual || link.link_type === 'manual') ms.hasManual = true;
+                if (link.link_type === 'auto_yellow') ms.hasYellow = true;
+                outSummaryByMail.set(link.mail_uid, ms);
+                const fs = outSummaryByFin.get(link.finance_id) || { hasManual: false, hasYellow: false };
+                if (link.is_manual || link.link_type === 'manual') fs.hasManual = true;
+                if (link.link_type === 'auto_yellow') fs.hasYellow = true;
+                outSummaryByFin.set(link.finance_id, fs);
             });
             applyOutRowClasses();
             applyOutHideLinked();
             updateOutSelection();
+            outScheduleRelayout();
+        })
             outScheduleRelayout();
         })
         .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
