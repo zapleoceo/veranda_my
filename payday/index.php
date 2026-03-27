@@ -2478,15 +2478,16 @@ $fmtVnd = function (int $v): string {
         .tabs .tab { padding: 6px 12px; border:1px solid #d0d5dd; border-radius:10px; cursor:pointer; font-weight:900; color:#374151; background:#fff; }
         .tabs .tab.active { background:#111827; color:#fff; border-color:#111827; }
         .btn.loading { opacity: 0.7; pointer-events: none; }
-        .out-lite #outSepayTable .col-out-content,
-        .out-lite #outSepayTable .col-out-select,
-        .out-lite #outSepayTable .col-out-anchor { display: none; }
-        .out-lite #outPosterTable .col-out-select2,
-        .out-lite #outPosterTable .col-out-user,
-        .out-lite #outPosterTable .col-out-category,
-        .out-lite #outPosterTable .col-out-type,
-        .out-lite #outPosterTable .col-out-balance,
-        .out-lite #outPosterTable .col-out-comment { display: none; }
+        body.mode-lite #outSepayTable .col-out-hide,
+        body.mode-lite #outSepayTable .col-out-content,
+        body.mode-lite #outSepayTable .col-out-select,
+        body.mode-lite #outSepayTable .col-out-anchor { display: none; }
+        body.mode-lite #outPosterTable .col-out-select2,
+        body.mode-lite #outPosterTable .col-out-user,
+        body.mode-lite #outPosterTable .col-out-category,
+        body.mode-lite #outPosterTable .col-out-type,
+        body.mode-lite #outPosterTable .col-out-balance,
+        body.mode-lite #outPosterTable .col-out-comment { display: none; }
     </style>
 </head>
 <body>
@@ -2543,29 +2544,17 @@ $fmtVnd = function (int $v): string {
                 </label>
                 <span class="toggle-text">Full</span>
             </div>
-            <div class="toggle-wrap" id="outToggleWrap" title="Lite/Full OUT" style="display:none;">
-                <span class="toggle-text">Lite</span>
-                <label class="switch">
-                    <input id="outModeToggle" type="checkbox">
-                    <span class="slider"></span>
-                </label>
-                <span class="toggle-text">Full</span>
-            </div>
         </div>
 
         <div class="divider"></div>
 
         <div id="outSection" class="card" style="padding:0; display:none;">
-            <div style="padding: 12px 12px 6px;">
-                <div style="font-weight:900;">OUT • Sepay (Mail BIDV) / Poster Finance</div>
-                <div class="muted">Парсинг почты BIDV и транзакций Poster finance.getTransactions (account_type=1)</div>
-            </div>
-            <div class="grid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; padding: 0 12px 12px;">
+            <div class="grid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; padding: 12px;">
                 <div class="card" style="padding:0;">
                     <div style="padding:8px 12px; font-weight:900;">Sepay (Mail)</div>
                     <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
                         <table id="outSepayTable">
-                            <thead><tr><th class="col-out-content">Content</th><th class="nowrap col-out-time">Время</th><th class="nowrap col-out-sum">Сумма</th><th class="col-out-select"></th><th class="col-out-anchor"></th></tr></thead>
+                            <thead><tr><th class="col-out-hide"></th><th class="col-out-content">Content</th><th class="nowrap col-out-time">Время</th><th class="nowrap col-out-sum">Сумма</th><th class="col-out-select"></th><th class="col-out-anchor"></th></tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
@@ -3001,8 +2990,6 @@ $fmtVnd = function (int $v): string {
         if (posterSyncForm) posterSyncForm.style.display = inOn ? '' : 'none';
         if (sepaySyncForm) sepaySyncForm.style.display = inOn ? '' : 'none';
         if (clearDayForm) clearDayForm.style.display = inOn ? '' : 'none';
-        const outToggleWrap = document.getElementById('outToggleWrap');
-        if (outToggleWrap) outToggleWrap.style.display = inOn ? 'none' : '';
         activeTab = inOn ? 'in' : 'out';
     };
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
@@ -3019,7 +3006,7 @@ $fmtVnd = function (int $v): string {
                 tr.setAttribute('data-mail-uid', String(row.mail_uid || 0));
                 tr.setAttribute('data-sum', String(row.amount || 0));
                 tr.innerHTML = `
-                    <td class="nowrap col-sepay-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
+                    <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
                     <td class="col-out-content">${escapeHtml(row.content || '')}</td>
                     <td class="nowrap col-out-time">${escapeHtml(row.tx_time || row.date || '')}</td>
                     <td class="sum col-out-sum">${Number(row.amount || 0).toLocaleString('en-US')} ₫</td>
@@ -3040,29 +3027,34 @@ $fmtVnd = function (int $v): string {
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
                 tr.setAttribute('data-sum', String(Math.abs(Number(row.amount || 0))));
-                tr.innerHTML = `<td class="nowrap"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td><td class="nowrap">${escapeHtml(row.date || '')}</td><td>${Number(row.user_id || 0)}</td><td>${Number(row.category_id || 0)}</td><td>${Number(row.type || 0)}</td><td class="sum">${Number(Math.abs(Number(row.amount || 0))).toLocaleString('en-US')} ₫</td><td class="sum">${Number(Math.abs(Number(row.balance || 0))).toLocaleString('en-US')} ₫</td><td>${escapeHtml(row.comment || '')}</td>`;
+                tr.innerHTML = `
+                    <td class="nowrap col-out-select2"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
+                    <td class="nowrap col-out-date">${escapeHtml(row.date || '')}</td>
+                    <td class="col-out-user">${Number(row.user_id || 0)}</td>
+                    <td class="col-out-category">${Number(row.category_id || 0)}</td>
+                    <td class="col-out-type">${Number(row.type || 0)}</td>
+                    <td class="sum col-out-amount">${Number(Math.abs(Number(row.amount || 0))).toLocaleString('en-US')} ₫</td>
+                    <td class="sum col-out-balance">${Number(Math.abs(Number(row.balance || 0))).toLocaleString('en-US')} ₫</td>
+                    <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
+                `;
                 tbody.appendChild(tr);
             });
         });
     };
-    if (outMailBtn) outMailBtn.addEventListener('click', () => loadOutMail().catch((e) => alert(e && e.message ? e.message : 'Ошибка')));
-    if (outFinanceBtn) outFinanceBtn.addEventListener('click', () => loadOutFinance().catch((e) => alert(e && e.message ? e.message : 'Ошибка')));
-    const outModeToggle = document.getElementById('outModeToggle');
-    const applyOutMode = (mode) => {
-        const m = (mode === 'lite') ? 'lite' : 'full';
-        if (outSection) {
-            outSection.classList.toggle('out-lite', m === 'lite');
-        }
-        try { localStorage.setItem('payday_out_mode', m); } catch (_) {}
-        if (outModeToggle) outModeToggle.checked = (m === 'full');
-    };
-    const savedOutMode = (() => { try { return localStorage.getItem('payday_out_mode'); } catch (_) { return null; } })();
-    applyOutMode(savedOutMode === 'lite' ? 'lite' : 'full');
-    if (outModeToggle) {
-        outModeToggle.addEventListener('change', () => {
-            applyOutMode(outModeToggle.checked ? 'full' : 'lite');
-        });
-    }
+    if (outMailBtn) outMailBtn.addEventListener('click', () => {
+        const orig = outMailBtn.textContent;
+        outMailBtn.classList.add('loading'); outMailBtn.textContent = 'Обновление…'; outMailBtn.disabled = true;
+        loadOutMail()
+            .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
+            .finally(() => { outMailBtn.classList.remove('loading'); outMailBtn.textContent = orig; outMailBtn.disabled = false; });
+    });
+    if (outFinanceBtn) outFinanceBtn.addEventListener('click', () => {
+        const orig = outFinanceBtn.textContent;
+        outFinanceBtn.classList.add('loading'); outFinanceBtn.textContent = 'Обновление…'; outFinanceBtn.disabled = true;
+        loadOutFinance()
+            .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
+            .finally(() => { outFinanceBtn.classList.remove('loading'); outFinanceBtn.textContent = orig; outFinanceBtn.disabled = false; });
+    });
     const dateForm = document.getElementById('dateForm');
     if (dateForm) {
         dateForm.addEventListener('submit', (ev) => {
