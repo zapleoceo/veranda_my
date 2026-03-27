@@ -2852,7 +2852,7 @@ $fmtVnd = function (int $v): string {
                         <table id="outPosterTable">
                             <thead>
                                 <tr>
-                                    <th class="col-out-select2"></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
+                                    <th class="col-out-anchor2"></th><th class="col-out-select2"></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -3355,6 +3355,7 @@ $fmtVnd = function (int $v): string {
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
                 tr.setAttribute('data-sum', String(amountVnd));
                 tr.innerHTML = `
+                    <td class="col-out-anchor2"><span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
                     <td class="nowrap col-out-select2"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
                     <td class="nowrap col-out-date">${escapeHtml(row.date || '')}</td>
                     <td class="col-out-user">${escapeHtml(userName)}</td>
@@ -3362,7 +3363,7 @@ $fmtVnd = function (int $v): string {
                     <td class="col-out-type">${Number(row.type || 0)}</td>
                     <td class="sum col-out-amount">${fmtVnd2(amountVnd)}</td>
                     <td class="sum col-out-balance">${fmtVnd2(balanceVnd)}</td>
-                    <td class="col-out-comment">${escapeHtml(row.comment || '')} <span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
+                    <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
                 `;
                 tbody.appendChild(tr);
             });
