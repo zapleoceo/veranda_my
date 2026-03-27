@@ -175,6 +175,7 @@ $pl = $db->t('check_payment_links');
 $sh = $db->t('sepay_hidden');
 $pfh = $db->t('poster_finance_hidden');
 $mh = $db->t('mail_hidden');
+$ol = $db->t('out_links');
 
 try {
     $db->query("ALTER TABLE {$pc} ADD COLUMN was_deleted TINYINT(1) NOT NULL DEFAULT 0");
@@ -232,6 +233,26 @@ try {
             PRIMARY KEY (id),
             UNIQUE KEY uniq_mail_date (mail_uid, date_to),
             KEY idx_date (date_to)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    );
+} catch (\Throwable $e) {
+}
+try {
+    $db->query(
+        "CREATE TABLE IF NOT EXISTS {$ol} (
+            id BIGINT NOT NULL AUTO_INCREMENT,
+            date_to DATE NOT NULL,
+            mail_uid BIGINT NOT NULL,
+            finance_id BIGINT NOT NULL,
+            link_type VARCHAR(32) NOT NULL,
+            is_manual TINYINT(1) NOT NULL DEFAULT 0,
+            created_by VARCHAR(255) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_pair_date (date_to, mail_uid, finance_id),
+            KEY idx_date (date_to),
+            KEY idx_mail (mail_uid),
+            KEY idx_fin (finance_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     );
 } catch (\Throwable $e) {
@@ -1816,6 +1837,150 @@ if (($_GET['ajax'] ?? '') === 'finance_categories') {
     }
     exit;
 }
+
+if (($_GET['ajax'] ?? '') === 'out_links') {
+    header('Content-Type: application/json; charset=utf-8');
+    $dTo = trim((string)($_GET['dateTo'] ?? ''));
+    if ($dTo === '') {
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $rows = $db->query(
+            "SELECT mail_uid, finance_id, link_type, is_manual FROM {$ol} WHERE date_to = ?",
+            [$dTo]
+        )->fetchAll();
+        if (!is_array($rows)) $rows = [];
+        $links = [];
+        foreach ($rows as $r) {
+            $links[] = [
+                'mail_uid' => (int)($r['mail_uid'] ?? 0),
+                'finance_id' => (int)($r['finance_id'] ?? 0),
+                'link_type' => (string)($r['link_type'] ?? ''),
+                'is_manual' => !empty($r['is_manual']),
+            ];
+        }
+        echo json_encode(['ok' => true, 'links' => $links], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'out_manual_link') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $j = json_decode($raw ?: '[]', true);
+    if (!is_array($j)) $j = [];
+    $dTo = trim((string)($j['dateTo'] ?? ''));
+    $pairs = is_array($j['links'] ?? null) ? $j['links'] : [];
+    if ($dTo === '' || !$pairs) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $by = '';
+    if (!isset($_SESSION)) {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    }
+    $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+    try {
+        foreach ($pairs as $p) {
+            $uid = (int)($p['mail_uid'] ?? 0);
+            $fid = (int)($p['finance_id'] ?? 0);
+            if ($uid <= 0 || $fid <= 0) continue;
+            $db->query(
+                "INSERT INTO {$ol} (date_to, mail_uid, finance_id, link_type, is_manual, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE link_type = VALUES(link_type), is_manual = VALUES(is_manual), created_by = VALUES(created_by)",
+                [$dTo, $uid, $fid, 'manual', 1, ($by !== '' ? $by : null)]
+            );
+        }
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'out_auto_link') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $j = json_decode($raw ?: '[]', true);
+    if (!is_array($j)) $j = [];
+    $dTo = trim((string)($j['dateTo'] ?? ''));
+    $pairs = is_array($j['links'] ?? null) ? $j['links'] : [];
+    if ($dTo === '' || !$pairs) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $by = '';
+    if (!isset($_SESSION)) {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    }
+    $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+    try {
+        foreach ($pairs as $p) {
+            $uid = (int)($p['mail_uid'] ?? 0);
+            $fid = (int)($p['finance_id'] ?? 0);
+            $lt = (string)($p['link_type'] ?? 'auto_green');
+            if ($uid <= 0 || $fid <= 0) continue;
+            if ($lt !== 'auto_green' && $lt !== 'auto_yellow') $lt = 'auto_green';
+            $db->query(
+                "INSERT INTO {$ol} (date_to, mail_uid, finance_id, link_type, is_manual, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE link_type = VALUES(link_type), is_manual = VALUES(is_manual), created_by = VALUES(created_by)",
+                [$dTo, $uid, $fid, $lt, 0, ($by !== '' ? $by : null)]
+            );
+        }
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'out_unlink') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $j = json_decode($raw ?: '[]', true);
+    if (!is_array($j)) $j = [];
+    $dTo = trim((string)($j['dateTo'] ?? ''));
+    $uid = (int)($j['mail_uid'] ?? 0);
+    $fid = (int)($j['finance_id'] ?? 0);
+    if ($dTo === '' || $uid <= 0 || $fid <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $db->query("DELETE FROM {$ol} WHERE date_to = ? AND mail_uid = ? AND finance_id = ?", [$dTo, $uid, $fid]);
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
 if (($_GET['ajax'] ?? '') === 'poster_accounts') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -3134,6 +3299,21 @@ $fmtVnd = function (int $v): string {
                 `;
                 tbody.appendChild(tr);
             });
+            return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
+        }).then((j2) => {
+            if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
+            outLinks.length = 0;
+            outLinkByMail.clear();
+            outLinkByFin.clear();
+            (j2.links || []).forEach((l) => {
+                const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: !!l.is_manual };
+                if (!link.mail_uid || !link.finance_id) return;
+                outLinks.push(link);
+                outLinkByMail.set(link.mail_uid, link);
+                outLinkByFin.set(link.finance_id, link);
+            });
+            applyOutRowClasses();
+            outScheduleRelayout();
         });
     };
     let employeesMap = null;
@@ -3431,20 +3611,42 @@ $fmtVnd = function (int $v): string {
         const mails = Array.from(outSelectedMail);
         const fins = Array.from(outSelectedFin);
         const n = Math.min(mails.length, fins.length);
+        const pairs = [];
         for (let i = 0; i < n; i++) {
-            const uid = mails[i];
-            const fid = fins[i];
+            const uid = mails[i], fid = fins[i];
             if (!uid || !fid) continue;
             if (outLinkByMail.has(uid) || outLinkByFin.has(fid)) continue;
-            const link = { mail_uid: uid, finance_id: fid, link_type: 'manual' };
-            outLinks.push(link);
-            outLinkByMail.set(uid, link);
-            outLinkByFin.set(fid, link);
+            pairs.push({ mail_uid: uid, finance_id: fid });
         }
-        applyOutRowClasses();
-        applyOutHideLinked();
-        updateOutSelection();
-        outScheduleRelayout();
+        const { dateTo } = getDateRange();
+        fetch(location.pathname + '?ajax=out_manual_link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dateTo, links: pairs }),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_manual_link');
+            return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
+        })
+        .then((j2) => {
+            if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
+            outLinks.length = 0;
+            outLinkByMail.clear();
+            outLinkByFin.clear();
+            (j2.links || []).forEach((l) => {
+                const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: !!l.is_manual };
+                if (!link.mail_uid || !link.finance_id) return;
+                outLinks.push(link);
+                outLinkByMail.set(link.mail_uid, link);
+                outLinkByFin.set(link.finance_id, link);
+            });
+            applyOutRowClasses();
+            applyOutHideLinked();
+            updateOutSelection();
+            outScheduleRelayout();
+        })
+        .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
     });
 
     if (outLinkClearBtn) outLinkClearBtn.addEventListener('click', () => {
@@ -3475,6 +3677,7 @@ $fmtVnd = function (int $v): string {
             if (!finBySum.has(sum)) finBySum.set(sum, []);
             finBySum.get(sum).push(fid);
         });
+        const pairs = [];
         mailRows.forEach((tr) => {
             const uid = Number(tr.getAttribute('data-mail-uid') || 0);
             if (!uid || outLinkByMail.has(uid)) return;
@@ -3482,14 +3685,38 @@ $fmtVnd = function (int $v): string {
             const arr = finBySum.get(sum);
             if (!arr || arr.length === 0) return;
             const fid = arr.shift();
-            const link = { mail_uid: uid, finance_id: fid, link_type: 'auto' };
-            outLinks.push(link);
-            outLinkByMail.set(uid, link);
-            outLinkByFin.set(fid, link);
+            const lt = (arr.length === 0) ? 'auto_green' : 'auto_yellow';
+            pairs.push({ mail_uid: uid, finance_id: fid, link_type: lt });
         });
-        applyOutRowClasses();
-        applyOutHideLinked();
-        updateOutSelection();
+        const { dateTo } = getDateRange();
+        fetch(location.pathname + '?ajax=out_auto_link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dateTo, links: pairs }),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_auto_link');
+            return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
+        })
+        .then((j2) => {
+            if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
+            outLinks.length = 0;
+            outLinkByMail.clear();
+            outLinkByFin.clear();
+            (j2.links || []).forEach((l) => {
+                const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: !!l.is_manual };
+                if (!link.mail_uid || !link.finance_id) return;
+                outLinks.push(link);
+                outLinkByMail.set(link.mail_uid, link);
+                outLinkByFin.set(link.finance_id, link);
+            });
+            applyOutRowClasses();
+            applyOutHideLinked();
+            updateOutSelection();
+            outScheduleRelayout();
+        })
+        .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
     });
 
     document.addEventListener('click', (ev) => {
