@@ -644,23 +644,32 @@ try {
         $amountCents = 0;
         if ($kind === 'vietnam') {
             $amountCents = (int)$db->query(
-                "SELECT COALESCE(SUM(payed_card + payed_third_party), 0)
+                "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0)
                  FROM {$pc}
-                 WHERE day_date = ?
+                 WHERE day_date BETWEEN ? AND ?
                    AND pay_type IN (2,3)
                    AND (payed_card + payed_third_party) > 0
                    AND poster_payment_method_id = 11",
-                [$dateTo]
+                [$dateFrom, $dateTo]
             )->fetchColumn();
         } else {
             $amountCents = (int)$db->query(
-                "SELECT COALESCE(SUM(tip_sum), 0)
-                 FROM {$pc}
-                 WHERE day_date = ?
-                   AND pay_type IN (2,3)
-                   AND (payed_card + payed_third_party) > 0
-                   AND tip_sum > 0",
-                [$dateTo]
+                "SELECT COALESCE(SUM(p.tip_sum), 0)
+                 FROM {$pc} p
+                 JOIN (
+                    SELECT DISTINCT l.poster_transaction_id
+                    FROM {$pl} l
+                    JOIN {$pc} p2 ON p2.transaction_id = l.poster_transaction_id
+                    WHERE p2.day_date BETWEEN ? AND ?
+                      AND COALESCE(p2.was_deleted, 0) = 0
+                 ) x ON x.poster_transaction_id = p.transaction_id
+                 WHERE p.day_date BETWEEN ? AND ?
+                   AND COALESCE(p.was_deleted, 0) = 0
+                   AND p.pay_type IN (2,3)
+                   AND (p.payed_card + p.payed_third_party) > 0
+                   AND p.tip_sum > 0
+                   AND p.poster_payment_method_id <> 11",
+                [$dateFrom, $dateTo, $dateFrom, $dateTo]
             )->fetchColumn();
         }
         if ($amountCents <= 0) {
@@ -793,29 +802,38 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $amountCents = 0;
         if ($kind === 'vietnam') {
             $amountCents = (int)$db->query(
-                "SELECT COALESCE(SUM(payed_card + payed_third_party), 0)
+                "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0)
                  FROM {$pc}
-                 WHERE day_date = ?
+                 WHERE day_date BETWEEN ? AND ?
                    AND pay_type IN (2,3)
                    AND (payed_card + payed_third_party) > 0
                    AND poster_payment_method_id = 11",
-                [$dTo]
+                [$dFrom, $dTo]
             )->fetchColumn();
         } else {
             $amountCents = (int)$db->query(
-                "SELECT COALESCE(SUM(tip_sum), 0)
-                 FROM {$pc}
-                 WHERE day_date = ?
-                   AND pay_type IN (2,3)
-                   AND (payed_card + payed_third_party) > 0
-                   AND tip_sum > 0",
-                [$dTo]
+                "SELECT COALESCE(SUM(p.tip_sum), 0)
+                 FROM {$pc} p
+                 JOIN (
+                    SELECT DISTINCT l.poster_transaction_id
+                    FROM {$pl} l
+                    JOIN {$pc} p2 ON p2.transaction_id = l.poster_transaction_id
+                    WHERE p2.day_date BETWEEN ? AND ?
+                      AND COALESCE(p2.was_deleted, 0) = 0
+                 ) x ON x.poster_transaction_id = p.transaction_id
+                 WHERE p.day_date BETWEEN ? AND ?
+                   AND COALESCE(p.was_deleted, 0) = 0
+                   AND p.pay_type IN (2,3)
+                   AND (p.payed_card + p.payed_third_party) > 0
+                   AND p.tip_sum > 0
+                   AND p.poster_payment_method_id <> 11",
+                [$dFrom, $dTo, $dFrom, $dTo]
             )->fetchColumn();
         }
         if ($amountCents <= 0) {
             throw new \Exception($kind === 'vietnam'
-                ? 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за выбранный день.'
-                : 'Сумма = 0: нет tip_sum за выбранный день.'
+                ? 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за выбранный период.'
+                : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.'
             );
         }
         $amountVnd = (int)$posterCentsToVnd($amountCents);
@@ -2008,26 +2026,35 @@ $financeVietnamCents = null;
 $financeTipsCents = null;
 try {
     $financeVietnamCents = (int)$db->query(
-        "SELECT COALESCE(SUM(payed_card + payed_third_party), 0)
+        "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0)
          FROM {$pc}
-         WHERE day_date = ?
+         WHERE day_date BETWEEN ? AND ?
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
            AND poster_payment_method_id = 11",
-        [$dateTo]
+        [$dateFrom, $dateTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
     $financeVietnamCents = null;
 }
 try {
     $financeTipsCents = (int)$db->query(
-        "SELECT COALESCE(SUM(tip_sum), 0)
-         FROM {$pc}
-         WHERE day_date = ?
-           AND pay_type IN (2,3)
-           AND (payed_card + payed_third_party) > 0
-           AND tip_sum > 0",
-        [$dateTo]
+        "SELECT COALESCE(SUM(p.tip_sum), 0)
+         FROM {$pc} p
+         JOIN (
+            SELECT DISTINCT l.poster_transaction_id
+            FROM {$pl} l
+            JOIN {$pc} p2 ON p2.transaction_id = l.poster_transaction_id
+            WHERE p2.day_date BETWEEN ? AND ?
+              AND COALESCE(p2.was_deleted, 0) = 0
+         ) x ON x.poster_transaction_id = p.transaction_id
+         WHERE p.day_date BETWEEN ? AND ?
+           AND COALESCE(p.was_deleted, 0) = 0
+           AND p.pay_type IN (2,3)
+           AND (p.payed_card + p.payed_third_party) > 0
+           AND p.tip_sum > 0
+           AND p.poster_payment_method_id <> 11",
+        [$dateFrom, $dateTo, $dateFrom, $dateTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
     $financeTipsCents = null;
@@ -2548,10 +2575,10 @@ $fmtVnd = function (int $v): string {
             $tipsDisabled = $transferTipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             $vietnamDisabledReason = $vietnamCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
-                : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за выбранный день.';
+                : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за выбранный период.';
             $tipsDisabledReason = $tipsCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
-                : 'Сумма = 0: нет tip_sum за выбранный день.';
+                : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.';
             ?>
 
             <div class="finance-row">
