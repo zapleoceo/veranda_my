@@ -74,7 +74,7 @@ try {
             [$username]
         )->fetch();
         $perms = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
-        if (is_array($perms) && (!empty($perms['telegram_ack']) || !empty($perms['admin']))) {
+        if (is_array($perms) && (!empty($perms['exclude_toggle']) || !empty($perms['telegram_ack']) || !empty($perms['admin']))) {
             $isAllowed = true;
         }
     }

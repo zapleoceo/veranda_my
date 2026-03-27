@@ -53,6 +53,10 @@ if (!function_exists('veranda_get_user_permissions')) {
                     $out[$k] = (bool)$decoded[$k];
                 }
             }
+            if (!empty($out['exclude_toggle']) || !empty($out['telegram_ack'])) {
+                $out['exclude_toggle'] = true;
+                $out['telegram_ack'] = true;
+            }
             return $out;
         } catch (\Exception $e) {
             return $defaults;

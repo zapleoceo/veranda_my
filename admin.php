@@ -51,7 +51,7 @@ $permissionKeys = [
     'kitchen_online' => 'КухняOnline',
     'payday' => 'Payday',
     'admin' => 'УПРАВЛЕНИЕ',
-    'exclude_toggle' => 'Кнопка «Игнор»',
+    'exclude_toggle' => 'Игнор + ✅ Принято (Telegram)',
     'telegram_ack' => '✅ Принято (Telegram)',
 ];
 
@@ -62,6 +62,7 @@ if (isset($_POST['save_user_permissions'])) {
         foreach ($permissionKeys as $k => $_label) {
             $perms[$k] = isset($_POST['perm_' . $k]) ? 1 : 0;
         }
+        $perms['telegram_ack'] = !empty($perms['exclude_toggle']) ? 1 : 0;
         $tgUsername = strtolower(trim((string)($_POST['perm_tg_username'] ?? '')));
         $tgUsername = ltrim($tgUsername, '@');
         if ($tgUsername === '') {
@@ -1573,7 +1574,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <div><b>Один алерт = один чек</b>: если в чеке несколько просроченных блюд — всё в одном сообщении.</div>
                     <div><b>Обновление</b>: при изменениях состав/время — бот редактирует сообщение; если просроченных блюд в чеке не осталось — сообщение удаляется.</div>
                     <div><b>Принято</b>: кнопка “Принято” ставит игнор по конкретному блюду до готовности (бессрочно).</div>
-                    <div><b>Доступ</b>: нажимать “Принято” могут только пользователи с правом “✅ Принято (Telegram)” (раздел “Доступы”).</div>
+                    <div><b>Доступ</b>: нажимать “Принято” можно только при наличии права “Игнор + ✅ Принято (Telegram)” и заполненном Telegram username.</div>
                 </div>
             </details>
 
@@ -1666,6 +1667,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                         </div>
                         <div class="perm-list">
                             <?php foreach ($permissionKeys as $k => $label): ?>
+                                <?php if ($k === 'telegram_ack') continue; ?>
                                 <label class="perm-row">
                                     <input type="checkbox" name="perm_<?= htmlspecialchars($k) ?>" id="perm_<?= htmlspecialchars($k) ?>" value="1">
                                     <?= htmlspecialchars($label) ?>
@@ -2468,7 +2470,6 @@ if ($tab === 'menu' || $tab === 'categories') {
                 payday: false,
                 admin: true,
                 exclude_toggle: true,
-                telegram_ack: false,
             };
 
             const close = () => { modal.style.display = 'none'; };
@@ -2476,6 +2477,8 @@ if ($tab === 'menu' || $tab === 'categories') {
                 emailEl.value = email;
                 tgEl.value = (tg || '').trim();
                 const p = Object.assign({}, defaultPerms, perms || {});
+                if (p.telegram_ack && !p.exclude_toggle) p.exclude_toggle = true;
+                p.telegram_ack = !!p.exclude_toggle;
                 Object.keys(defaultPerms).forEach((k) => {
                     const cb = document.getElementById('perm_' + k);
                     if (cb) cb.checked = !!p[k];
