@@ -263,6 +263,10 @@ try {
                 if ($newId) {
                     $setMeta('telegram_status_msg_id', (string)$newId);
                     $setMeta('telegram_status_msg_hash', $statusHash);
+                } else {
+                    // If both edit and send failed, clear meta to force retry next run
+                    $setMeta('telegram_status_msg_id', '0');
+                    $setMeta('telegram_status_msg_hash', '');
                 }
             }
         } else {
@@ -270,6 +274,10 @@ try {
             if ($newId) {
                 $setMeta('telegram_status_msg_id', (string)$newId);
                 $setMeta('telegram_status_msg_hash', $statusHash);
+            } else {
+                // Force retry on next run
+                $setMeta('telegram_status_msg_id', '0');
+                $setMeta('telegram_status_msg_hash', '');
             }
         }
     } catch (\Throwable $e) {

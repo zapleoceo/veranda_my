@@ -43,7 +43,7 @@ class TelegramBot {
         if (is_array($data) && array_key_exists('ok', $data)) {
             return (bool)$data['ok'];
         }
-        return true;
+        return false;
     }
 
     /**
