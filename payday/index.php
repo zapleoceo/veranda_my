@@ -2757,6 +2757,8 @@ $fmtVnd = function (int $v): string {
         body.mode-lite #outPosterTable .col-out-type,
         body.mode-lite #outPosterTable .col-out-balance,
         body.mode-lite #outPosterTable .col-out-comment { display: none; }
+        body.mode-lite #outPosterTable .col-out-date-date { display: none; }
+        body.mode-lite #outSepayTable .col-out-date-part { display: none; }
     </style>
 </head>
 <body>
@@ -3258,6 +3260,20 @@ $fmtVnd = function (int $v): string {
             return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
     };
+    const formatOutDT = (txTime, dateStr) => {
+        const s1 = String(txTime || '').trim();
+        const s2 = String(dateStr || '').trim();
+        if (s1 && /\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2}/.test(s1)) {
+            const m = s1.match(/^(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2}:\d{2})$/);
+            if (m) return { date: m[1], time: m[2] };
+        }
+        if (s2 && /\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/.test(s2)) {
+            const [dRaw, t] = s2.split(/\s+/);
+            const [Y, M, D] = dRaw.split('-');
+            return { date: `${D}/${M}/${Y}`, time: t };
+        }
+        return { date: '', time: '' };
+    };
     const getDateRange = () => {
         const dfEl = document.querySelector('input[name="dateFrom"]');
         const dtEl = document.querySelector('input[name="dateTo"]');
@@ -3296,10 +3312,11 @@ $fmtVnd = function (int $v): string {
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-mail-uid', String(row.mail_uid || 0));
                 tr.setAttribute('data-sum', String(row.amount || 0));
+                const dt = formatOutDT(row.tx_time, row.date);
                 tr.innerHTML = `
                     <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
                     <td class="col-out-content">${escapeHtml(row.content || '')}</td>
-                    <td class="nowrap col-out-time">${escapeHtml(row.tx_time || row.date || '')}</td>
+                    <td class="nowrap col-out-time"><div class="col-out-date-part">${escapeHtml(dt.date)}</div><div class="col-out-time-part">${escapeHtml(dt.time)}</div></td>
                     <td class="sum col-out-sum">${Number(row.amount || 0).toLocaleString('en-US')} ₫</td>
                     <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
                     <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
@@ -3363,10 +3380,11 @@ $fmtVnd = function (int $v): string {
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
                 tr.setAttribute('data-sum', String(amountInt));
+                const dt2 = formatOutDT('', row.date);
                 tr.innerHTML = `
                     <td class="col-out-anchor2"><span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
                     <td class="nowrap col-out-select2"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
-                    <td class="nowrap col-out-date">${escapeHtml(row.date || '')}</td>
+                    <td class="nowrap col-out-date"><div class="col-out-date-date">${escapeHtml(dt2.date)}</div><div class="col-out-date-time">${escapeHtml(dt2.time)}</div></td>
                     <td class="col-out-user">${escapeHtml(userName)}</td>
                     <td class="col-out-category">${escapeHtml(catName)}</td>
                     <td class="col-out-type">${Number(row.type || 0)}</td>
