@@ -2751,8 +2751,7 @@ $fmtVnd = function (int $v): string {
         .tabs .tab { padding: 6px 12px; border:1px solid #d0d5dd; border-radius:10px; cursor:pointer; font-weight:900; color:#374151; background:#fff; }
         .tabs .tab.active { background:#111827; color:#fff; border-color:#111827; }
         .btn.loading { opacity: 0.7; pointer-events: none; }
-        body.mode-lite #outSepayTable .col-out-content,
-        body.mode-lite #outSepayTable .col-out-anchor { display: none; }
+        body.mode-lite #outSepayTable .col-out-content { display: none; }
         body.mode-lite #outPosterTable .col-out-user,
         body.mode-lite #outPosterTable .col-out-category,
         body.mode-lite #outPosterTable .col-out-type,
