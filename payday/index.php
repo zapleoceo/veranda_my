@@ -3016,6 +3016,12 @@ $fmtVnd = function (int $v): string {
     const outSepayTable = document.getElementById('outSepayTable');
     const outPosterTable = document.getElementById('outPosterTable');
     const fetchJsonSafe = (url) => fetch(url).then(async (r) => { const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('Bad JSON: ' + (txt || '(empty)')); } return j; });
+    const posterMinorToVnd = (n) => {
+        const x = Math.round(Number(n || 0));
+        const ax = Math.abs(x);
+        if (ax > 200000000 && x % 100 === 0) return Math.round(x / 100);
+        return x;
+    };
     const getDateRange = () => {
         const dfEl = document.querySelector('input[name="dateFrom"]');
         const dtEl = document.querySelector('input[name="dateTo"]');
@@ -3072,21 +3078,25 @@ $fmtVnd = function (int $v): string {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_out');
             const tbody = outPosterTable.tBodies[0]; tbody.innerHTML = '';
             (j.rows || []).forEach((row) => {
+                const amountVnd = posterMinorToVnd(Math.abs(Number(row.amount || 0)));
+                const balanceVnd = posterMinorToVnd(Math.abs(Number(row.balance || 0)));
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
-                tr.setAttribute('data-sum', String(Math.abs(Number(row.amount || 0))));
+                tr.setAttribute('data-sum', String(amountVnd));
                 tr.innerHTML = `
                     <td class="nowrap col-out-select2"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
                     <td class="nowrap col-out-date">${escapeHtml(row.date || '')}</td>
                     <td class="col-out-user">${Number(row.user_id || 0)}</td>
                     <td class="col-out-category">${Number(row.category_id || 0)}</td>
                     <td class="col-out-type">${Number(row.type || 0)}</td>
-                    <td class="sum col-out-amount">${Number(Math.abs(Number(row.amount || 0))).toLocaleString('en-US')} ₫</td>
-                    <td class="sum col-out-balance">${Number(Math.abs(Number(row.balance || 0))).toLocaleString('en-US')} ₫</td>
+                    <td class="sum col-out-amount">${Number(amountVnd).toLocaleString('en-US')} ₫</td>
+                    <td class="sum col-out-balance">${Number(balanceVnd).toLocaleString('en-US')} ₫</td>
                     <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
                 `;
                 tbody.appendChild(tr);
             });
+            applyOutRowClasses();
+            applyOutHideLinked();
         });
     };
     if (outMailBtn) outMailBtn.addEventListener('click', () => {
@@ -3121,6 +3131,181 @@ $fmtVnd = function (int $v): string {
             }
         });
     }
+
+    const outLinkMakeBtn = document.getElementById('outLinkMakeBtn');
+    const outHideLinkedBtn = document.getElementById('outHideLinkedBtn');
+    const outLinkAutoBtn = document.getElementById('outLinkAutoBtn');
+    const outLinkClearBtn = document.getElementById('outLinkClearBtn');
+    const outSelSepaySumEl = document.getElementById('outSelSepaySum');
+    const outSelPosterSumEl = document.getElementById('outSelPosterSum');
+    const outSelDiffEl = document.getElementById('outSelDiff');
+    const outSelMatchEl = document.getElementById('outSelMatch');
+
+    let outHideLinkedOn = false;
+    const outLinks = [];
+    const outLinkByMail = new Map();
+    const outLinkByFin = new Map();
+    const outSelectedMail = new Set();
+    const outSelectedFin = new Set();
+
+    const updateOutSelection = () => {
+        const mailRows = Array.from(outSepayTable.tBodies[0]?.rows || []);
+        const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
+        const sumMail = mailRows.reduce((acc, tr) => {
+            const cb = tr.querySelector('input.out-sepay-cb');
+            const id = cb ? Number(cb.getAttribute('data-id') || 0) : 0;
+            if (!id || !outSelectedMail.has(id)) return acc;
+            return acc + Number(tr.getAttribute('data-sum') || 0);
+        }, 0);
+        const sumFin = finRows.reduce((acc, tr) => {
+            const cb = tr.querySelector('input.out-poster-cb');
+            const id = cb ? Number(cb.getAttribute('data-id') || 0) : 0;
+            if (!id || !outSelectedFin.has(id)) return acc;
+            return acc + Number(tr.getAttribute('data-sum') || 0);
+        }, 0);
+        const diff = Math.abs(sumMail - sumFin);
+        if (outSelSepaySumEl) outSelSepaySumEl.textContent = Number(sumMail).toLocaleString('en-US') + ' ₫';
+        if (outSelPosterSumEl) outSelPosterSumEl.textContent = Number(sumFin).toLocaleString('en-US') + ' ₫';
+        if (outSelDiffEl) outSelDiffEl.textContent = Number(diff).toLocaleString('en-US') + ' ₫';
+        if (outSelMatchEl) outSelMatchEl.style.color = diff === 0 ? '#16a34a' : '#dc2626';
+        if (outLinkMakeBtn) outLinkMakeBtn.disabled = (outSelectedMail.size === 0 || outSelectedFin.size === 0);
+    };
+
+    const applyOutRowClasses = () => {
+        const mailRows = Array.from(outSepayTable.tBodies[0]?.rows || []);
+        mailRows.forEach((tr) => {
+            tr.classList.remove('row-red', 'row-gray', 'row-green', 'row-yellow');
+            const uid = Number(tr.getAttribute('data-mail-uid') || 0);
+            if (uid && outLinkByMail.has(uid)) tr.classList.add('row-gray');
+            else tr.classList.add('row-red');
+        });
+        const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
+        finRows.forEach((tr) => {
+            tr.classList.remove('row-red', 'row-gray', 'row-green', 'row-yellow');
+            const fid = Number(tr.getAttribute('data-finance-id') || 0);
+            if (fid && outLinkByFin.has(fid)) tr.classList.add('row-gray');
+            else tr.classList.add('row-red');
+        });
+    };
+
+    const applyOutHideLinked = () => {
+        const mailRows = Array.from(outSepayTable.tBodies[0]?.rows || []);
+        mailRows.forEach((tr) => {
+            if (!outHideLinkedOn) { tr.style.display = ''; return; }
+            const uid = Number(tr.getAttribute('data-mail-uid') || 0);
+            tr.style.display = (uid && outLinkByMail.has(uid)) ? 'none' : '';
+        });
+        const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
+        finRows.forEach((tr) => {
+            if (!outHideLinkedOn) { tr.style.display = ''; return; }
+            const fid = Number(tr.getAttribute('data-finance-id') || 0);
+            tr.style.display = (fid && outLinkByFin.has(fid)) ? 'none' : '';
+        });
+    };
+
+    document.addEventListener('change', (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLInputElement)) return;
+        if (t.classList.contains('out-sepay-cb')) {
+            const id = Number(t.getAttribute('data-id') || 0);
+            if (!id) return;
+            if (t.checked) outSelectedMail.add(id); else outSelectedMail.delete(id);
+            updateOutSelection();
+        }
+        if (t.classList.contains('out-poster-cb')) {
+            const id = Number(t.getAttribute('data-id') || 0);
+            if (!id) return;
+            if (t.checked) outSelectedFin.add(id); else outSelectedFin.delete(id);
+            updateOutSelection();
+        }
+    });
+
+    if (outLinkMakeBtn) outLinkMakeBtn.addEventListener('click', () => {
+        const mails = Array.from(outSelectedMail);
+        const fins = Array.from(outSelectedFin);
+        const n = Math.min(mails.length, fins.length);
+        for (let i = 0; i < n; i++) {
+            const uid = mails[i];
+            const fid = fins[i];
+            if (!uid || !fid) continue;
+            if (outLinkByMail.has(uid) || outLinkByFin.has(fid)) continue;
+            const link = { mail_uid: uid, finance_id: fid, link_type: 'manual' };
+            outLinks.push(link);
+            outLinkByMail.set(uid, link);
+            outLinkByFin.set(fid, link);
+        }
+        applyOutRowClasses();
+        applyOutHideLinked();
+        updateOutSelection();
+    });
+
+    if (outLinkClearBtn) outLinkClearBtn.addEventListener('click', () => {
+        outLinks.length = 0;
+        outLinkByMail.clear();
+        outLinkByFin.clear();
+        outHideLinkedOn = false;
+        applyOutRowClasses();
+        applyOutHideLinked();
+        updateOutSelection();
+    });
+
+    if (outHideLinkedBtn) outHideLinkedBtn.addEventListener('click', () => {
+        outHideLinkedOn = !outHideLinkedOn;
+        applyOutHideLinked();
+    });
+
+    if (outLinkAutoBtn) outLinkAutoBtn.addEventListener('click', () => {
+        const mailRows = Array.from(outSepayTable.tBodies[0]?.rows || []);
+        const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
+        const finBySum = new Map();
+        finRows.forEach((tr) => {
+            const fid = Number(tr.getAttribute('data-finance-id') || 0);
+            if (!fid || outLinkByFin.has(fid)) return;
+            const sum = Number(tr.getAttribute('data-sum') || 0);
+            if (!finBySum.has(sum)) finBySum.set(sum, []);
+            finBySum.get(sum).push(fid);
+        });
+        mailRows.forEach((tr) => {
+            const uid = Number(tr.getAttribute('data-mail-uid') || 0);
+            if (!uid || outLinkByMail.has(uid)) return;
+            const sum = Number(tr.getAttribute('data-sum') || 0);
+            const arr = finBySum.get(sum);
+            if (!arr || arr.length === 0) return;
+            const fid = arr.shift();
+            const link = { mail_uid: uid, finance_id: fid, link_type: 'auto' };
+            outLinks.push(link);
+            outLinkByMail.set(uid, link);
+            outLinkByFin.set(fid, link);
+        });
+        applyOutRowClasses();
+        applyOutHideLinked();
+        updateOutSelection();
+    });
+
+    document.addEventListener('click', (ev) => {
+        const t = ev.target;
+        if (!(t instanceof HTMLElement)) return;
+        if (t.classList.contains('out-hide')) {
+            const uid = Number(t.getAttribute('data-mail-uid') || 0);
+            const { dateTo } = getDateRange();
+            if (!uid || !dateTo) return;
+            const c = prompt('Комментарий (почему скрываем):', '');
+            if (c === null) return;
+            fetch(location.pathname + '?ajax=mail_hide', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mail_uid: uid, dateTo, comment: String(c || '').trim() }),
+                credentials: 'same-origin',
+            })
+                .then((r) => r.json())
+                .then((j) => {
+                    if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                    return loadOutMail();
+                })
+                .then(() => { applyOutRowClasses(); applyOutHideLinked(); updateOutSelection(); })
+                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+        }
+    });
 
     const setFormLoading = (formId, btnId) => {
         const form = document.getElementById(formId);
