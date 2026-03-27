@@ -2692,7 +2692,7 @@ $fmtVnd = function (int $v): string {
         .nowrap { white-space: nowrap; }
         .anchor { display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #9aa4b2; vertical-align: middle; line-height: 0; }
         #outSepayTable .col-out-anchor,
-        #outPosterTable .col-out-anchor2 { vertical-align: middle; text-align: center; padding: 6px 8px; }
+        #outPosterTable .col-out-anchor2 { vertical-align: middle; text-align: center; width: 1%; padding: 4px 6px; }
         tr.row-green .anchor { background: #2e7d32; }
         tr.row-yellow .anchor { background: #f6c026; }
         tr.row-blue .anchor { background: #1a73e8; }
@@ -4163,8 +4163,7 @@ $fmtVnd = function (int $v): string {
     };
 
     const getAnchorPoint = (el, side, rootRect) => {
-        const cell = el.closest('td') || el;
-        const r = cell.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
         const cx = (r.left + r.width / 2) - rootRect.left;
         const cy = (r.top + r.height / 2) - rootRect.top;
         const x = Math.round(cx) + 0.5;
