@@ -3427,6 +3427,62 @@ $fmtVnd = function (int $v): string {
         outWidgets.clear();
     };
 
+    const outSyncButtons = () => {
+        if (!outGrid) return;
+        const keep = new Set();
+        outLinks.forEach((l) => {
+            const key = String(l.mail_uid) + ':' + String(l.finance_id);
+            keep.add(key);
+            if (outWidgets.has(key)) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'link-x';
+            btn.textContent = '×';
+            btn.title = 'Удалить связь';
+            btn.style.display = 'none';
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const { dateTo } = getDateRange();
+                fetch(location.pathname + '?ajax=out_unlink', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dateTo, mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0) }),
+                })
+                .then((r) => r.json())
+                .then((j) => {
+                    if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_unlink');
+                    return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
+                })
+                .then((j2) => {
+                    if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
+                    outLinks.length = 0;
+                    outLinkByMail.clear();
+                    outLinkByFin.clear();
+                    (j2.links || []).forEach((lx) => {
+                        const link = { mail_uid: Number(lx.mail_uid || 0), finance_id: Number(lx.finance_id || 0), link_type: String(lx.link_type || ''), is_manual: !!lx.is_manual };
+                        if (!link.mail_uid || !link.finance_id) return;
+                        outLinks.push(link);
+                        outLinkByMail.set(link.mail_uid, link);
+                        outLinkByFin.set(link.finance_id, link);
+                    });
+                    applyOutRowClasses();
+                    applyOutHideLinked();
+                    updateOutSelection();
+                    outScheduleRelayout();
+                })
+                .catch((err) => alert(err && err.message ? err.message : 'Ошибка'));
+            });
+            outGrid.appendChild(btn);
+            outWidgets.set(key, btn);
+        });
+        Array.from(outWidgets.entries()).forEach(([key, btn]) => {
+            if (keep.has(key)) return;
+            try { btn.remove(); } catch (_) {}
+            outWidgets.delete(key);
+        });
+    };
+
     const outEnsureSvg = () => {
         if (!outLineLayer || !outGrid) return;
         if (outSvgState.svg) return;
@@ -3459,6 +3515,7 @@ $fmtVnd = function (int $v): string {
     const outDrawLines = () => {
         outEnsureSvg();
         outClearLines();
+        outSyncButtons();
         if (!outGrid || !outSvgState.svg || !outSvgState.group) return;
         const rootRect = outGrid.getBoundingClientRect();
         const w = Math.max(1, Math.round(rootRect.width));
@@ -3507,6 +3564,23 @@ $fmtVnd = function (int $v): string {
             path.setAttribute('stroke-linecap', 'round');
             path.setAttribute('stroke-linejoin', 'round');
             outSvgState.group.appendChild(path);
+
+            const key = String(l.mail_uid) + ':' + String(l.finance_id);
+            const btn = outWidgets.get(key);
+            if (btn) {
+                const dxBtn = b.x - a.x;
+                const dyBtn = b.y - a.y;
+                const lenBtn = Math.hypot(dxBtn, dyBtn) || 1;
+                const insetPx = 6;
+                const tBtn = Math.min(0.99, Math.max(0.75, 1 - (insetPx / lenBtn)));
+                const mx = a.x + dxBtn * tBtn;
+                const my = a.y + dyBtn * tBtn;
+                const localX = Math.max(8, Math.min(w - 8, mx));
+                const localY = Math.max(8, Math.min(h - 8, my));
+                btn.style.left = Math.round(localX - 8) + 'px';
+                btn.style.top = Math.round(localY - 8) + 'px';
+                btn.style.display = 'flex';
+            }
         });
     };
 
