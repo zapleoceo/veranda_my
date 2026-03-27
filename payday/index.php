@@ -2690,7 +2690,7 @@ $fmtVnd = function (int $v): string {
         .muted { color: #777; font-size: 12px; }
         .sum { font-weight: 900; white-space: nowrap; }
         .nowrap { white-space: nowrap; }
-        .anchor { display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #9aa4b2; vertical-align: middle; }
+        .anchor { display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #9aa4b2; vertical-align: middle; line-height: 0; }
         tr.row-green .anchor { background: #2e7d32; }
         tr.row-yellow .anchor { background: #f6c026; }
         tr.row-blue .anchor { background: #1a73e8; }
@@ -3250,6 +3250,14 @@ $fmtVnd = function (int $v): string {
             return num.toFixed(2) + ' ₫';
         }
     };
+    const fmtVnd0 = (v) => {
+        try {
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0)) + ' ₫';
+        } catch (_) {
+            const num = Math.round(Number(v) || 0);
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ₫';
+        }
+    };
     const getDateRange = () => {
         const dfEl = document.querySelector('input[name="dateFrom"]');
         const dtEl = document.querySelector('input[name="dateTo"]');
@@ -3348,11 +3356,13 @@ $fmtVnd = function (int $v): string {
             (j.rows || []).forEach((row) => {
                 const amountVnd = posterMinorToVnd(Math.abs(Number(row.amount || 0)));
                 const balanceVnd = posterMinorToVnd(Math.abs(Number(row.balance || 0)));
+                const amountInt = Math.round(amountVnd);
+                const balanceInt = Math.round(balanceVnd);
                 const userName = String(emps && emps[Number(row.user_id || 0)] ? emps[Number(row.user_id || 0)] : row.user_id || '');
                 const catName = String(cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : row.category_id || '');
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
-                tr.setAttribute('data-sum', String(amountVnd));
+                tr.setAttribute('data-sum', String(amountInt));
                 tr.innerHTML = `
                     <td class="col-out-anchor2"><span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
                     <td class="nowrap col-out-select2"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
@@ -3360,8 +3370,8 @@ $fmtVnd = function (int $v): string {
                     <td class="col-out-user">${escapeHtml(userName)}</td>
                     <td class="col-out-category">${escapeHtml(catName)}</td>
                     <td class="col-out-type">${Number(row.type || 0)}</td>
-                    <td class="sum col-out-amount">${fmtVnd2(amountVnd)}</td>
-                    <td class="sum col-out-balance">${fmtVnd2(balanceVnd)}</td>
+                    <td class="sum col-out-amount">${fmtVnd0(amountInt)}</td>
+                    <td class="sum col-out-balance">${fmtVnd0(balanceInt)}</td>
                     <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
                 `;
                 tbody.appendChild(tr);
@@ -4134,8 +4144,10 @@ $fmtVnd = function (int $v): string {
 
     const getAnchorPoint = (el, side, rootRect) => {
         const r = el.getBoundingClientRect();
-        const x = (r.left + r.width / 2) - rootRect.left;
-        const y = (r.top + r.height / 2) - rootRect.top;
+        const cx = (r.left + r.width / 2) - rootRect.left;
+        const cy = (r.top + r.height / 2) - rootRect.top;
+        const x = Math.round(cx) + 0.5;
+        const y = Math.round(cy) + 0.5;
         return { x, y };
     };
 
