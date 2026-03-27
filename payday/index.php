@@ -668,7 +668,7 @@ try {
                    AND p.pay_type IN (2,3)
                    AND (p.payed_card + p.payed_third_party) > 0
                    AND p.tip_sum > 0
-                   AND p.poster_payment_method_id <> 11",
+                   AND COALESCE(p.poster_payment_method_id, 0) <> 11",
                 [$dateFrom, $dateTo, $dateFrom, $dateTo]
             )->fetchColumn();
         }
@@ -826,7 +826,7 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
                    AND p.pay_type IN (2,3)
                    AND (p.payed_card + p.payed_third_party) > 0
                    AND p.tip_sum > 0
-                   AND p.poster_payment_method_id <> 11",
+                   AND COALESCE(p.poster_payment_method_id, 0) <> 11",
                 [$dFrom, $dTo, $dFrom, $dTo]
             )->fetchColumn();
         }
@@ -2053,7 +2053,7 @@ try {
            AND p.pay_type IN (2,3)
            AND (p.payed_card + p.payed_third_party) > 0
            AND p.tip_sum > 0
-           AND p.poster_payment_method_id <> 11",
+           AND COALESCE(p.poster_payment_method_id, 0) <> 11",
         [$dateFrom, $dateTo, $dateFrom, $dateTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
