@@ -960,57 +960,11 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             'sum' => $amountVnd,
         ], 'POST');
 
-        $created = null;
-        try {
-            $txs2 = [];
-            try {
-                $txs2 = $api->request('finance.getTransactions', [
-                    'dateFrom' => date('dmY', $startTs),
-                    'dateTo' => date('dmY', $endTs),
-                ]);
-            } catch (\Throwable $e) {
-                $txs2 = [];
-            }
-            if (!is_array($txs2)) $txs2 = [];
-            foreach ($txs2 as $row) {
-                if (!is_array($row)) continue;
-                $type = (int)($row['type'] ?? 0);
-                if ($type !== 0 && $type !== 1) continue;
-                $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
-                $ts = null;
-                if (is_numeric($dRaw)) {
-                    $n = (int)$dRaw;
-                    if ($n > 2000000000000) $n = (int)round($n / 1000);
-                    if ($n > 0) $ts = $n;
-                } elseif (is_string($dRaw) && trim($dRaw) !== '') {
-                    $t = strtotime($dRaw);
-                    if ($t !== false && $t > 0) $ts = $t;
-                }
-                if ($ts === null) continue;
-                if ($ts < $startTs || $ts > $endTs) continue;
-                $accRaw = $row['account_id'] ?? $row['accountId'] ?? $row['account_from_id'] ?? $row['account_from'] ?? $row['accountFromId'] ?? $row['accountFrom'] ?? 0;
-                if (is_array($accRaw)) $accRaw = $accRaw['account_id'] ?? $accRaw['id'] ?? 0;
-                $accId = (int)$accRaw;
-                $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
-                $sumMaybe = $normMoney($sumRaw);
-                if (abs($sumMaybe) !== $amountVnd) continue;
-                $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
-                if ($normText($cmt !== '' ? $cmt : $comment) !== $normText($comment)) continue;
-                $isMatch = false;
-                if ($type === 0 && $sumMaybe < 0 && $accId === 1) $isMatch = true;
-                if ($type === 1 && $sumMaybe > 0 && $accId === $accountTo) $isMatch = true;
-                if (!$isMatch) continue;
-                $created = ['ts' => $ts];
-                break;
-            }
-        } catch (\Throwable $e) {
-        }
-
         echo json_encode([
             'ok' => true,
             'already' => false,
-            'date' => date('d.m.Y', (int)(($created['ts'] ?? null) ?: time())),
-            'time' => date('H:i:s', (int)(($created['ts'] ?? null) ?: time())),
+            'date' => date('d.m.Y', strtotime($targetDate) ?: time()),
+            'time' => '23:55:00',
             'sum' => (int)$amountVnd,
             'user' => '#' . (string)$expectedUserId,
             'comment' => $comment,
