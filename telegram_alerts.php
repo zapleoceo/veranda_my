@@ -253,20 +253,17 @@ try {
         $prevStatusId = (int)$getMeta('telegram_status_msg_id', '0');
         $prevStatusHash = (string)$getMeta('telegram_status_msg_hash', '');
 
-        // Revert to editing status message instead of deleting
-        if ($prevStatusId > 0 && $prevStatusHash === $statusHash) {
-            // Nothing changed, don't update
-        } elseif ($prevStatusId > 0) {
+        // Always ensure status message exists: try to edit; if edit fails or message missing, send new
+        if ($prevStatusId > 0) {
             $ok = $bot->editMessageText($prevStatusId, $statusText, null);
-            if (!$ok) {
-                // If edit fails (e.g. message deleted), send new
+            if ($ok) {
+                $setMeta('telegram_status_msg_hash', $statusHash);
+            } else {
                 $newId = $bot->sendMessageGetId($statusText, $tgThreadId);
                 if ($newId) {
                     $setMeta('telegram_status_msg_id', (string)$newId);
                     $setMeta('telegram_status_msg_hash', $statusHash);
                 }
-            } else {
-                $setMeta('telegram_status_msg_hash', $statusHash);
             }
         } else {
             $newId = $bot->sendMessageGetId($statusText, $tgThreadId);
