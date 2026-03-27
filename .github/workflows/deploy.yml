@@ -47,6 +47,13 @@ jobs:
             -e "ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" \
             ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
 
+      - name: Remove debug files (server)
+        shell: bash
+        run: |
+          ssh -p "${{ secrets.SSH_PORT }}" -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "rm -f '${{ secrets.DEPLOY_PATH }}/mail.php'"
+
       - name: Verify PHP syntax (server)
         shell: bash
         run: |

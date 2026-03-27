@@ -33,6 +33,9 @@ $monthEndTs = strtotime('+1 month', $monthStartTs);
 $monthEndTs = $monthEndTs !== false ? strtotime('-1 day', $monthEndTs) : false;
 $monthEnd = $monthEndTs !== false ? date('Y-m-d', $monthEndTs) : $monthStart;
 
+$barCond = "(station = '3' OR station = 3 OR station = 'Bar Veranda')";
+$kitchenCond = "(station = '2' OR station = 2 OR station = 'Kitchen' OR station = 'Main')";
+
 $baseWhere = "transaction_date BETWEEN ? AND ?
               AND ticket_sent_at IS NOT NULL
               AND COALESCE(was_deleted, 0) = 0
@@ -52,12 +55,12 @@ if (($_GET['ajax'] ?? '') === 'day') {
                 COUNT(*) total,
                 SUM(CASE WHEN ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_cnt,
                 SUM(CASE WHEN ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_cnt,
-                SUM(CASE WHEN COALESCE(station, 1) = 2 THEN 1 ELSE 0 END) total_bar,
-                SUM(CASE WHEN COALESCE(station, 1) = 2 AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_bar,
-                SUM(CASE WHEN COALESCE(station, 1) = 2 AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_bar,
-                SUM(CASE WHEN COALESCE(station, 1) <> 2 THEN 1 ELSE 0 END) total_kitchen,
-                SUM(CASE WHEN COALESCE(station, 1) <> 2 AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_kitchen,
-                SUM(CASE WHEN COALESCE(station, 1) <> 2 AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_kitchen
+                SUM(CASE WHEN {$barCond} THEN 1 ELSE 0 END) total_bar,
+                SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_bar,
+                SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_bar,
+                SUM(CASE WHEN {$kitchenCond} THEN 1 ELSE 0 END) total_kitchen,
+                SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_kitchen,
+                SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_kitchen
              FROM {$ks}
              WHERE transaction_date = ?
                AND ticket_sent_at IS NOT NULL
@@ -119,12 +122,12 @@ $monthRow = $db->query(
         COUNT(*) total,
         SUM(CASE WHEN ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_cnt,
         SUM(CASE WHEN ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_cnt,
-        SUM(CASE WHEN COALESCE(station, 1) = 2 THEN 1 ELSE 0 END) total_bar,
-        SUM(CASE WHEN COALESCE(station, 1) = 2 AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_bar,
-        SUM(CASE WHEN COALESCE(station, 1) = 2 AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_bar,
-        SUM(CASE WHEN COALESCE(station, 1) <> 2 THEN 1 ELSE 0 END) total_kitchen,
-        SUM(CASE WHEN COALESCE(station, 1) <> 2 AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_kitchen,
-        SUM(CASE WHEN COALESCE(station, 1) <> 2 AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_kitchen
+        SUM(CASE WHEN {$barCond} THEN 1 ELSE 0 END) total_bar,
+        SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_bar,
+        SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_bar,
+        SUM(CASE WHEN {$kitchenCond} THEN 1 ELSE 0 END) total_kitchen,
+        SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_kitchen,
+        SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_kitchen
      FROM {$ks}
      WHERE {$baseWhere}",
     [$monthStart, $monthEnd]
@@ -163,12 +166,12 @@ try {
             COUNT(*) total,
             SUM(CASE WHEN ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_cnt,
             SUM(CASE WHEN ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_cnt,
-            SUM(CASE WHEN COALESCE(station, 1) = 2 THEN 1 ELSE 0 END) total_bar,
-            SUM(CASE WHEN COALESCE(station, 1) = 2 AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_bar,
-            SUM(CASE WHEN COALESCE(station, 1) = 2 AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_bar,
-            SUM(CASE WHEN COALESCE(station, 1) <> 2 THEN 1 ELSE 0 END) total_kitchen,
-            SUM(CASE WHEN COALESCE(station, 1) <> 2 AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_kitchen,
-            SUM(CASE WHEN COALESCE(station, 1) <> 2 AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_kitchen
+            SUM(CASE WHEN {$barCond} THEN 1 ELSE 0 END) total_bar,
+            SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_bar,
+            SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_bar,
+            SUM(CASE WHEN {$kitchenCond} THEN 1 ELSE 0 END) total_kitchen,
+            SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_kitchen,
+            SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_kitchen
          FROM {$ks}
          WHERE transaction_date = ?
            AND ticket_sent_at IS NOT NULL
@@ -330,12 +333,12 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                     <div class="muted">готово: <span id="kpiReady"><?= (int)$initial['ready'] ?></span> · без: <span id="kpiMissing"><?= (int)$initial['missing'] ?></span></div>
                 </div>
                 <div class="kpi">
-                    <div class="label">Бар (station=2)</div>
+                    <div class="label">Бар (station=3)</div>
                     <div class="val" id="kpiBarTotal"><?= (int)$initial['stations']['bar']['total'] ?></div>
                     <div class="muted">готово: <span id="kpiBarReady"><?= (int)$initial['stations']['bar']['ready'] ?></span> · без: <span id="kpiBarMissing"><?= (int)$initial['stations']['bar']['missing'] ?></span></div>
                 </div>
                 <div class="kpi">
-                    <div class="label">Кухня (прочие станции)</div>
+                    <div class="label">Кухня (station=2)</div>
                     <div class="val" id="kpiKitchenTotal"><?= (int)$initial['stations']['kitchen']['total'] ?></div>
                     <div class="muted">готово: <span id="kpiKitchenReady"><?= (int)$initial['stations']['kitchen']['ready'] ?></span> · без: <span id="kpiKitchenMissing"><?= (int)$initial['stations']['kitchen']['missing'] ?></span></div>
                 </div>
@@ -419,4 +422,3 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
 </script>
 </body>
 </html>
-
