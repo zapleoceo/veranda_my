@@ -35,7 +35,6 @@ if (!function_exists('veranda_get_user_permissions')) {
             'rawdata' => true,
             'kitchen_online' => true,
             'admin' => true,
-            'access_admin' => false,
             'exclude_toggle' => true,
             'telegram_ack' => false,
             'payday' => false,
@@ -57,9 +56,6 @@ if (!function_exists('veranda_get_user_permissions')) {
             if (!empty($out['exclude_toggle']) || !empty($out['telegram_ack'])) {
                 $out['exclude_toggle'] = true;
                 $out['telegram_ack'] = true;
-            }
-            if (!empty($out['admin'])) {
-                $out['access_admin'] = true;
             }
             return $out;
         } catch (\Exception $e) {
