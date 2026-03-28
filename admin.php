@@ -51,6 +51,7 @@ $permissionKeys = [
     'kitchen_online' => 'КухняOnline',
     'payday' => 'Payday',
     'admin' => 'УПРАВЛЕНИЕ',
+    'roma' => 'Roma (кальяны)',
     'exclude_toggle' => 'Игнор + ✅ Принято (Telegram)',
     'telegram_ack' => '✅ Принято (Telegram)',
 ];

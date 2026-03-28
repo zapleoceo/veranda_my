@@ -1,17 +1,11 @@
 <?php
+require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
-if (file_exists(__DIR__ . '/.env')) {
-    $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
-        $t = trim($line);
-        if ($t === '' || strpos($t, '#') === 0) continue;
-        if (strpos($line, '=') === false) continue;
-        [$name, $value] = explode('=', $line, 2);
-        $_ENV[$name] = trim($value);
-    }
+if (!veranda_can('admin')) {
+    veranda_require('roma');
 }
 
 $token = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
@@ -280,4 +274,3 @@ $firstOfMonth = date('Y-m-01');
 </script>
 </body>
 </html>
-
