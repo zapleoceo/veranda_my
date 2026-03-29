@@ -179,7 +179,9 @@ try {
     $cutoffTime = date('Y-m-d H:i:s', strtotime("-{$waitLimit} minutes"));
 
     $excludeSql = $useLogicalClose
-        ? " AND COALESCE(exclude_from_dashboard, 0) = 0 "
+        ? " AND COALESCE(exclude_from_dashboard, 0) = 0
+            AND prob_close_at IS NULL
+            AND (transaction_closed_at IS NULL OR transaction_closed_at < '2000-01-01') "
         : " AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0) ";
 
     $overdueAll = 0;
@@ -190,7 +192,7 @@ try {
     $queueKitchen = 0;
     try {
         $queueRows = $db->query(
-            "SELECT COALESCE(station, 1) as st, COUNT(*) as cnt
+            "SELECT station as st, COUNT(*) as cnt
              FROM {$ks}
              WHERE ready_pressed_at IS NULL
                AND ticket_sent_at IS NOT NULL
@@ -199,15 +201,16 @@ try {
                AND COALESCE(was_deleted, 0) = 0
                {$excludeSql}
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-             GROUP BY COALESCE(station, 1)",
+             GROUP BY station",
             [$today]
         )->fetchAll();
         
         foreach ($queueRows as $r) {
-            $st = (int)$r['st'];
+            $stRaw = $r['st'] ?? null;
+            $st = is_int($stRaw) ? (string)$stRaw : (string)$stRaw;
             $c = (int)$r['cnt'];
             $queueAll += $c;
-            if ($st === 2) {
+            if ($st === '3' || $st === 'Bar Veranda') {
                 $queueBar += $c;
             } else {
                 $queueKitchen += $c;
@@ -215,7 +218,7 @@ try {
         }
         
         $overdueRows = $db->query(
-            "SELECT COALESCE(station, 1) as st, COUNT(*) as cnt
+            "SELECT station as st, COUNT(*) as cnt
              FROM {$ks}
              WHERE ready_pressed_at IS NULL
                AND ticket_sent_at IS NOT NULL
@@ -225,15 +228,16 @@ try {
                {$excludeSql}
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ticket_sent_at < ?
-             GROUP BY COALESCE(station, 1)",
+             GROUP BY station",
             [$today, $cutoffTime]
         )->fetchAll();
         
         foreach ($overdueRows as $r) {
-            $st = (int)$r['st'];
+            $stRaw = $r['st'] ?? null;
+            $st = is_int($stRaw) ? (string)$stRaw : (string)$stRaw;
             $c = (int)$r['cnt'];
             $overdueAll += $c;
-            if ($st === 2) {
+            if ($st === '3' || $st === 'Bar Veranda') {
                 $overdueBar += $c;
             } else {
                 $overdueKitchen += $c;
@@ -243,6 +247,12 @@ try {
     }
 
     try {
+        $gotLockRow = $db->query("SELECT GET_LOCK('tg_status_msg', 0) AS l")->fetch();
+        $gotLock = (int)($gotLockRow['l'] ?? 0) === 1;
+        if (!$gotLock) {
+            throw new \Exception('LOCK_BUSY');
+        }
+
         $lastPosterSync = $getMeta('poster_last_sync_at', '');
         $statusText = 'Открыто чеков: ' . htmlspecialchars($openChecksDisplay) . "\n";
         $statusText .= 'Лимит времени: ' . (int)$waitLimit . " мин\n";
@@ -263,6 +273,7 @@ try {
                 if ($newId) {
                     $setMeta('telegram_status_msg_id', (string)$newId);
                     $setMeta('telegram_status_msg_hash', $statusHash);
+                    $bot->deleteMessage($prevStatusId);
                 } else {
                     // If both edit and send failed, clear meta to force retry next run
                     $setMeta('telegram_status_msg_id', '0');
@@ -280,8 +291,9 @@ try {
                 $setMeta('telegram_status_msg_hash', '');
             }
         }
+        $db->query("SELECT RELEASE_LOCK('tg_status_msg')");
     } catch (\Throwable $e) {
-        $logLine('STATUS_FAIL ' . $e->getMessage());
+        if ($e->getMessage() !== 'LOCK_BUSY') $logLine('STATUS_FAIL ' . $e->getMessage());
     }
 
     try {

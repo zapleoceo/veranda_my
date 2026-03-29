@@ -444,6 +444,8 @@ if ($isAjax) {
                        AND status = 1
                        AND ready_pressed_at IS NULL
                        AND ticket_sent_at IS NOT NULL
+                       AND prob_close_at IS NULL
+                       AND (transaction_closed_at IS NULL OR transaction_closed_at < '2000-01-01')
                        AND COALESCE(exclude_from_dashboard, 0) = 0
                        AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)"
                     : "SELECT id, dish_id, was_deleted, ticket_sent_at
@@ -508,7 +510,9 @@ if ($isAjax) {
 
         try {
             $excludeSql = $useLogicalClose
-                ? " AND COALESCE(ks.exclude_from_dashboard, 0) = 0 "
+                ? " AND COALESCE(ks.exclude_from_dashboard, 0) = 0
+                    AND ks.prob_close_at IS NULL
+                    AND (ks.transaction_closed_at IS NULL OR ks.transaction_closed_at < '2000-01-01') "
                 : " AND NOT (COALESCE(ks.exclude_from_dashboard, 0) = 1 AND COALESCE(ks.exclude_auto, 0) = 0) ";
             $rows = $db->query(
                 "SELECT
@@ -542,7 +546,9 @@ if ($isAjax) {
             )->fetchAll();
         } catch (\Throwable $e) {
             $excludeSql = $useLogicalClose
-                ? " AND COALESCE(ks.exclude_from_dashboard, 0) = 0 "
+                ? " AND COALESCE(ks.exclude_from_dashboard, 0) = 0
+                    AND ks.prob_close_at IS NULL
+                    AND (ks.transaction_closed_at IS NULL OR ks.transaction_closed_at < '2000-01-01') "
                 : " AND NOT (COALESCE(ks.exclude_from_dashboard, 0) = 1 AND COALESCE(ks.exclude_auto, 0) = 0) ";
             $rows = $db->query(
                 "SELECT
