@@ -190,7 +190,7 @@ try {
     $queueKitchen = 0;
     try {
         $queueRows = $db->query(
-            "SELECT COALESCE(station, 1) as st, COUNT(*) as cnt
+            "SELECT station as st, COUNT(*) as cnt
              FROM {$ks}
              WHERE ready_pressed_at IS NULL
                AND ticket_sent_at IS NOT NULL
@@ -199,23 +199,22 @@ try {
                AND COALESCE(was_deleted, 0) = 0
                {$excludeSql}
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-             GROUP BY COALESCE(station, 1)",
+             GROUP BY station",
             [$today]
         )->fetchAll();
         
         foreach ($queueRows as $r) {
-            $st = (int)$r['st'];
+            $st = (string)($r['st'] ?? '');
             $c = (int)$r['cnt'];
             $queueAll += $c;
-            if ($st === 2) {
-                $queueBar += $c;
-            } else {
-                $queueKitchen += $c;
-            }
+            $isBar = ($st === '3' || $st === 'Bar Veranda');
+            $isKitchen = ($st === '2' || $st === 'Kitchen' || $st === 'Main');
+            if ($isBar) $queueBar += $c;
+            else $queueKitchen += $c;
         }
         
         $overdueRows = $db->query(
-            "SELECT COALESCE(station, 1) as st, COUNT(*) as cnt
+            "SELECT station as st, COUNT(*) as cnt
              FROM {$ks}
              WHERE ready_pressed_at IS NULL
                AND ticket_sent_at IS NOT NULL
@@ -225,19 +224,18 @@ try {
                {$excludeSql}
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ticket_sent_at < ?
-             GROUP BY COALESCE(station, 1)",
+             GROUP BY station",
             [$today, $cutoffTime]
         )->fetchAll();
         
         foreach ($overdueRows as $r) {
-            $st = (int)$r['st'];
+            $st = (string)($r['st'] ?? '');
             $c = (int)$r['cnt'];
             $overdueAll += $c;
-            if ($st === 2) {
-                $overdueBar += $c;
-            } else {
-                $overdueKitchen += $c;
-            }
+            $isBar = ($st === '3' || $st === 'Bar Veranda');
+            $isKitchen = ($st === '2' || $st === 'Kitchen' || $st === 'Main');
+            if ($isBar) $overdueBar += $c;
+            else $overdueKitchen += $c;
         }
     } catch (\Throwable $e) {
     }
