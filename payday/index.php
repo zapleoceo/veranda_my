@@ -3478,7 +3478,8 @@ $fmtVnd = function (int $v): string {
                 const amountInt = Math.round(amountVnd);
                 const balanceInt = Math.round(balanceVnd);
                 const userName = String(emps && emps[Number(row.user_id || 0)] ? emps[Number(row.user_id || 0)] : row.user_id || '');
-                const catName = String(cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : row.category_id || '');
+                let catName = String(cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : row.category_id || '');
+                if (catName === 'book_category_action_supplies') catName = 'поставки';
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
                 tr.setAttribute('data-sum', String(amountInt));
