@@ -3188,9 +3188,6 @@ $fmtVnd = function (int $v): string {
                 <div style="padding: 0 12px 6px;">
                     <div style="font-weight:900;">Poster Finance (IN)</div>
                     <div class="muted">Положительные транзакции (курсивом)</div>
-                    <div style="margin-top:8px;">
-                        <button type="button" class="btn" id="financeInBtn">Обновить Finance (IN)</button>
-                    </div>
                 </div>
                 <div id="posterFinanceInScroll" style="max-height: 22vh; overflow:auto;">
                     <table id="posterFinanceInTable">
@@ -3429,7 +3426,6 @@ $fmtVnd = function (int $v): string {
     const outSepayTable = document.getElementById('outSepayTable');
     const outPosterTable = document.getElementById('outPosterTable');
     const posterFinanceInTable = document.getElementById('posterFinanceInTable');
-    const financeInBtn = document.getElementById('financeInBtn');
     const fetchJsonSafe = (url) => fetch(url).then(async (r) => { const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('Bad JSON: ' + (txt || '(empty)')); } return j; });
     const posterMinorToVnd = (n) => {
         const x = Number(n || 0);
@@ -3488,19 +3484,12 @@ $fmtVnd = function (int $v): string {
         if (sepaySyncForm) sepaySyncForm.style.display = inOn ? '' : 'none';
         if (clearDayForm) clearDayForm.style.display = inOn ? '' : 'none';
         activeTab = inOn ? 'in' : 'out';
-        if (inOn) loadInFinance(false).catch(() => {});
+        if (inOn) loadInFinance().catch(() => {});
         if (!inOn) outScheduleRelayout();
     };
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
     if (tabOut) tabOut.addEventListener('click', () => setTab('out'));
     setTab('in');
-    if (financeInBtn) financeInBtn.addEventListener('click', () => {
-        const orig = financeInBtn.textContent;
-        financeInBtn.classList.add('loading'); financeInBtn.textContent = 'Обновление…'; financeInBtn.disabled = true;
-        loadInFinance(true)
-            .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
-            .finally(() => { financeInBtn.classList.remove('loading'); financeInBtn.textContent = orig; financeInBtn.disabled = false; });
-    });
     const loadOutMail = () => {
         const { dateFrom, dateTo } = getDateRange();
         const qs = new URLSearchParams({ dateFrom, dateTo });
@@ -3559,15 +3548,9 @@ $fmtVnd = function (int $v): string {
                 return categoriesMap;
             });
     };
-    let inFinanceLastKey = '';
-    function loadInFinance(force = false) {
+    function loadInFinance() {
         if (!posterFinanceInTable) return Promise.resolve();
         const { dateFrom, dateTo } = getDateRange();
-        const key = String(dateFrom || '') + '|' + String(dateTo || '');
-        if (!force && inFinanceLastKey === key && posterFinanceInTable.tBodies[0] && posterFinanceInTable.tBodies[0].rows.length > 0) {
-            return Promise.resolve();
-        }
-        inFinanceLastKey = key;
         const qs = new URLSearchParams({ dateFrom, dateTo });
         return Promise.all([
             ensureCategories(),
