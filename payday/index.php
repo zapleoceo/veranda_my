@@ -3471,7 +3471,9 @@ $fmtVnd = function (int $v): string {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_out');
             const tbody = outPosterTable.tBodies[0]; tbody.innerHTML = '';
             (j.rows || []).forEach((row) => {
-                const amountVnd = posterMinorToVnd(Math.abs(Number(row.amount || 0)));
+                const rawAmount = Number(row.amount || 0);
+                const sign = rawAmount > 0 ? '+' : (rawAmount < 0 ? '−' : '');
+                const amountVnd = posterMinorToVnd(Math.abs(rawAmount));
                 const balanceVnd = posterMinorToVnd(Math.abs(Number(row.balance || 0)));
                 const amountInt = Math.round(amountVnd);
                 const balanceInt = Math.round(balanceVnd);
@@ -3488,7 +3490,7 @@ $fmtVnd = function (int $v): string {
                     <td class="col-out-user">${escapeHtml(userName)}</td>
                     <td class="col-out-category">${escapeHtml(catName)}</td>
                     <td class="col-out-type">${Number(row.type || 0)}</td>
-                    <td class="sum col-out-amount">${fmtVnd0(amountInt)}</td>
+                    <td class="sum col-out-amount">${sign}${fmtVnd0(amountInt)}</td>
                     <td class="sum col-out-balance">${fmtVnd0(balanceInt)}</td>
                     <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
                 `;
