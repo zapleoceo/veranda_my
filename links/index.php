@@ -48,7 +48,7 @@ $t = [
             ['title' => 'Telegram группа', 'subtitle' => '@gamezone_vietnam'],
             ['title' => 'Instagram', 'subtitle' => '@veranda.my'],
             ['title' => 'Онлайн меню', 'subtitle' => 'Сайт'],
-            ['title' => 'Связаться с менеджером', 'subtitle' => '@Veranda_my'],
+            ['title' => 'Связаться с директором', 'subtitle' => '@Veranda_my'],
             ['title' => 'Google Карта', 'subtitle' => 'Как добраться'],
         ],
     ],
