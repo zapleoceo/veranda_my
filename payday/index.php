@@ -1770,73 +1770,6 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
         $out = [];
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
-            if ((int)($r['type'] ?? 0) !== 0) continue;
-            $catId = (int)($r['category_id'] ?? 0);
-            if ($catId > 0 && !empty($excludeCatIds[$catId])) continue;
-            $dateStr = (string)($r['date'] ?? '');
-            $ts = $dateStr !== '' ? strtotime($dateStr) : false;
-            if ($ts === false) continue;
-            if ($fromTs !== false && $ts < $fromTs) continue;
-            if ($toTs !== false && $ts > $toTs) continue;
-            $out[] = [
-                'transaction_id' => (int)($r['transaction_id'] ?? 0),
-                'user_id' => (int)($r['user_id'] ?? 0),
-                'category_id' => (int)($r['category_id'] ?? 0),
-                'type' => (int)($r['type'] ?? 0),
-                'amount' => (int)($r['amount'] ?? 0),
-                'balance' => (int)($r['balance'] ?? 0),
-                'date' => $dateStr,
-                'comment' => (string)($r['comment'] ?? ''),
-            ];
-        }
-        echo json_encode(['ok' => true, 'rows' => $out], JSON_UNESCAPED_UNICODE);
-    } catch (\Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-    }
-    exit;
-}
-
-if (($_GET['ajax'] ?? '') === 'finance_in') {
-    header('Content-Type: application/json; charset=utf-8');
-    $dFrom = trim((string)($_GET['dateFrom'] ?? ''));
-    $dTo = trim((string)($_GET['dateTo'] ?? ''));
-    if ($dTo === '') {
-        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    try {
-        $fromDate = $dFrom !== '' ? $dFrom : $dTo;
-        $fromTs = strtotime($fromDate . ' 00:00:00');
-        $toTs = strtotime($dTo . ' 23:59:59');
-
-        $apiIn = new \App\Classes\PosterAPI((string)$token);
-        $excludeCatIds = [];
-        try {
-            $catRows = $apiIn->request('finance.getCategories', []);
-            if (!is_array($catRows)) $catRows = [];
-            foreach ($catRows as $cr) {
-                if (!is_array($cr)) continue;
-                $cid = (int)($cr['category_id'] ?? 0);
-                $action = (int)($cr['action'] ?? $cr['category_action'] ?? 0);
-                if ($action === 14) $excludeCatIds[$cid] = true;
-            }
-            $excludeCatIds[4] = true;
-        } catch (\Throwable $e) {
-            $excludeCatIds = [4 => true];
-        }
-        $rows = $apiIn->request('finance.getTransactions', [
-            'dateFrom' => date('Ymd', strtotime($fromDate)),
-            'dateTo' => date('Ymd', strtotime($dTo)),
-            'account_type' => 1,
-            'timezone' => 'client',
-        ]);
-        if (!is_array($rows)) $rows = [];
-
-        $out = [];
-        foreach ($rows as $r) {
-            if (!is_array($r)) continue;
-            if ((int)($r['type'] ?? 0) !== 1) continue;
             $catId = (int)($r['category_id'] ?? 0);
             if ($catId > 0 && !empty($excludeCatIds[$catId])) continue;
             $dateStr = (string)($r['date'] ?? '');
@@ -2834,7 +2767,6 @@ $fmtVnd = function (int $v): string {
         #sepayTable th, #sepayTable td,
         #posterTable th, #posterTable td { padding: 6px 8px; vertical-align: middle; }
         #sepayTable td, #posterTable td { font-size: 13px; line-height: 1.2; }
-        #posterFinanceInTable td { font-style: italic; }
         #sepayTable .col-sepay-cb, #sepayTable .col-sepay-hide, #sepayTable .col-sepay-dot { width: 1%; padding-left: 6px; padding-right: 6px; text-align: center; }
         #sepayTable .col-sepay-hide, #sepayTable .col-sepay-dot { padding-left: 4px; padding-right: 4px; }
         #sepayTable .col-sepay-content { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
@@ -3184,24 +3116,6 @@ $fmtVnd = function (int $v): string {
                         </tbody>
                     </table>
                 </div>
-                <div class="divider" style="margin: 10px 12px;"></div>
-                <div style="padding: 0 12px 6px;">
-                    <div style="font-weight:900;">Poster Finance (IN)</div>
-                    <div class="muted">Положительные транзакции (курсивом)</div>
-                </div>
-                <div id="posterFinanceInScroll" style="max-height: 22vh; overflow:auto;">
-                    <table id="posterFinanceInTable">
-                        <thead>
-                            <tr>
-                                <th class="nowrap col-out-date">Дата</th>
-                                <th class="col-out-category">Category</th>
-                                <th class="nowrap col-out-amount">Amount</th>
-                                <th class="col-out-comment">Comment</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
                 <div class="muted" style="padding: 10px 12px; font-weight: 900;">
                     Итого: <span id="posterTotal"><?= htmlspecialchars($fmtVnd((int)$posterTotalVnd)) ?></span>
                     • Tips: <span id="posterTipsLinked">—</span>
@@ -3425,7 +3339,6 @@ $fmtVnd = function (int $v): string {
     const outFinanceBtn = document.getElementById('outFinanceBtn');
     const outSepayTable = document.getElementById('outSepayTable');
     const outPosterTable = document.getElementById('outPosterTable');
-    const posterFinanceInTable = document.getElementById('posterFinanceInTable');
     const fetchJsonSafe = (url) => fetch(url).then(async (r) => { const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('Bad JSON: ' + (txt || '(empty)')); } return j; });
     const posterMinorToVnd = (n) => {
         const x = Number(n || 0);
@@ -3484,7 +3397,6 @@ $fmtVnd = function (int $v): string {
         if (sepaySyncForm) sepaySyncForm.style.display = inOn ? '' : 'none';
         if (clearDayForm) clearDayForm.style.display = inOn ? '' : 'none';
         activeTab = inOn ? 'in' : 'out';
-        if (inOn) loadInFinance().catch(() => {});
         if (!inOn) outScheduleRelayout();
     };
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
@@ -3548,32 +3460,6 @@ $fmtVnd = function (int $v): string {
                 return categoriesMap;
             });
     };
-    function loadInFinance() {
-        if (!posterFinanceInTable) return Promise.resolve();
-        const { dateFrom, dateTo } = getDateRange();
-        const qs = new URLSearchParams({ dateFrom, dateTo });
-        return Promise.all([
-            ensureCategories(),
-            fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=finance_in'),
-        ]).then(([cats, j]) => {
-            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_in');
-            const tbody = posterFinanceInTable.tBodies[0]; tbody.innerHTML = '';
-            (j.rows || []).forEach((row) => {
-                const amountVnd = posterMinorToVnd(Number(row.amount || 0));
-                const amountInt = Math.round(amountVnd);
-                const catName = String(cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : row.category_id || '');
-                const dt2 = formatOutDT('', row.date);
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="nowrap"><div class="col-out-date-date">${escapeHtml(dt2.date)}</div><div class="col-out-date-time">${escapeHtml(dt2.time)}</div></td>
-                    <td>${escapeHtml(catName)}</td>
-                    <td class="sum" style="text-align:right;">${fmtVnd0(amountInt)}</td>
-                    <td>${escapeHtml(row.comment || '')}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        });
-    }
     const loadOutFinance = () => {
         const { dateFrom, dateTo } = getDateRange();
         const qs = new URLSearchParams({ dateFrom, dateTo });
