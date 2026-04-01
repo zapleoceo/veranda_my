@@ -52,6 +52,7 @@ $permissionKeys = [
     'payday' => 'Payday',
     'admin' => 'УПРАВЛЕНИЕ',
     'roma' => 'Roma (кальяны)',
+    'banya' => 'Отчет баня',
     'exclude_toggle' => 'Игнор + ✅ Принято (Telegram)',
     'telegram_ack' => '✅ Принято (Telegram)',
 ];
@@ -2470,6 +2471,8 @@ if ($tab === 'menu' || $tab === 'categories') {
                 kitchen_online: true,
                 payday: false,
                 admin: true,
+                roma: false,
+                banya: false,
                 exclude_toggle: true,
             };
 
@@ -2480,9 +2483,9 @@ if ($tab === 'menu' || $tab === 'categories') {
                 const p = Object.assign({}, defaultPerms, perms || {});
                 if (p.telegram_ack && !p.exclude_toggle) p.exclude_toggle = true;
                 p.telegram_ack = !!p.exclude_toggle;
-                Object.keys(defaultPerms).forEach((k) => {
-                    const cb = document.getElementById('perm_' + k);
-                    if (cb) cb.checked = !!p[k];
+                Array.from(form.querySelectorAll('input[type="checkbox"][id^="perm_"]')).forEach((cb) => {
+                    const k = String(cb.id).slice('perm_'.length);
+                    cb.checked = !!p[k];
                 });
                 modal.style.display = 'flex';
             };

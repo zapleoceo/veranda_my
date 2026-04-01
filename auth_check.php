@@ -36,6 +36,7 @@ if (!function_exists('veranda_get_user_permissions')) {
             'kitchen_online' => true,
             'admin' => true,
             'roma' => false,
+            'banya' => false,
             'exclude_toggle' => true,
             'telegram_ack' => false,
             'payday' => false,
@@ -60,6 +61,7 @@ if (!function_exists('veranda_get_user_permissions')) {
             }
             if (!empty($out['admin'])) {
                 $out['roma'] = true;
+                $out['banya'] = true;
             }
             return $out;
         } catch (\Exception $e) {
