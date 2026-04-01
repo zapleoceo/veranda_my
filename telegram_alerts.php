@@ -241,6 +241,12 @@ try {
     }
 
     try {
+        $lockRow = $db->query("SELECT GET_LOCK('tg_status_msg', 0) AS l")->fetch();
+        $locked = (int)($lockRow['l'] ?? 0) === 1;
+        if (!$locked) {
+            throw new \Exception('LOCK_BUSY');
+        }
+
         $lastPosterSync = $getMeta('poster_last_sync_at', '');
         $statusText = 'Открыто чеков: ' . htmlspecialchars($openChecksDisplay) . "\n";
         $statusText .= 'Лимит времени: ' . (int)$waitLimit . " мин\n";
@@ -250,6 +256,10 @@ try {
         $statusHash = sha1($statusText);
         $prevStatusId = (int)$getMeta('telegram_status_msg_id', '0');
         $prevStatusHash = (string)$getMeta('telegram_status_msg_hash', '');
+        $prevIdsRaw = (string)$getMeta('telegram_status_msg_ids_json', '[]');
+        $prevIds = json_decode($prevIdsRaw, true);
+        if (!is_array($prevIds)) $prevIds = [];
+        $prevIds = array_values(array_filter($prevIds, fn($v) => is_numeric($v) && (int)$v > 0));
 
         // Always ensure status message exists: try to edit; if edit fails or message missing, send new
         if ($prevStatusId > 0) {
@@ -261,6 +271,7 @@ try {
                 if ($newId) {
                     $setMeta('telegram_status_msg_id', (string)$newId);
                     $setMeta('telegram_status_msg_hash', $statusHash);
+                    $bot->deleteMessage($prevStatusId);
                 } else {
                     // If both edit and send failed, clear meta to force retry next run
                     $setMeta('telegram_status_msg_id', '0');
@@ -278,8 +289,23 @@ try {
                 $setMeta('telegram_status_msg_hash', '');
             }
         }
+
+        $currentId = (int)$getMeta('telegram_status_msg_id', '0');
+        if ($currentId > 0) {
+            $prevIds[] = $currentId;
+        }
+        $prevIds = array_values(array_unique(array_map(fn($v) => (int)$v, $prevIds)));
+        $prevIds = array_slice($prevIds, -10);
+        $setMeta('telegram_status_msg_ids_json', json_encode($prevIds, JSON_UNESCAPED_UNICODE));
+        foreach ($prevIds as $id) {
+            if ($currentId > 0 && (int)$id === $currentId) continue;
+            $bot->deleteMessage((int)$id);
+        }
+        $db->query("SELECT RELEASE_LOCK('tg_status_msg')");
     } catch (\Throwable $e) {
-        $logLine('STATUS_FAIL ' . $e->getMessage());
+        if ($e->getMessage() !== 'LOCK_BUSY') {
+            $logLine('STATUS_FAIL ' . $e->getMessage());
+        }
     }
 
     try {
