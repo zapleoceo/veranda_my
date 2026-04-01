@@ -71,6 +71,8 @@ if (($_GET['ajax'] ?? '') === 'load') {
         $productMap = $loadProductMap($api);
 
         $nextTr = null;
+        $prevNextTr = null;
+        $page = 0;
         $items = [];
 
         $totalChecks = 0;
@@ -78,6 +80,8 @@ if (($_GET['ajax'] ?? '') === 'load') {
         $hookahSumMinor = 0;
 
         do {
+            $page++;
+            if ($page > 3000) break;
             $params = [
                 'dateFrom' => str_replace('-', '', $dateFrom),
                 'dateTo' => str_replace('-', '', $dateTo),
@@ -90,6 +94,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
             $count = count($batch);
             if ($count > 0) {
                 $last = end($batch);
+                $prevNextTr = $nextTr;
                 $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
             }
 
@@ -98,9 +103,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 $tableId = (int)($tx['table_id'] ?? 0);
                 $spotId = (int)($tx['spot_id'] ?? 0);
                 $hallId = isset($tx['hall_id']) ? (int)$tx['hall_id'] : 0;
-                $tableNameForFilter = (string)($tx['table_name'] ?? '');
-                $isNameBanya = stripos($tableNameForFilter, 'banya') !== false;
-                if ($spotId !== BANYA_HALL_ID && $hallId !== BANYA_HALL_ID && !$isNameBanya) continue;
+                $hall = $hallId > 0 ? (string)$hallId : ($spotId > 0 ? (string)$spotId : '');
 
                 $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
                 $detailRows = [];
@@ -139,6 +142,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
 
                 $items[] = [
                     'date' => $dateStr,
+                    'hall' => $hall,
                     'table' => $tableName,
                     'receipt' => $receipt,
                     'sum' => $fmtVnd($sumMinor),
@@ -154,6 +158,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 $totalSumMinor += $sumMinor;
                 $hookahSumMinor += $hookahMinorInCheck;
             }
+            if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
         } while ($count > 0 && $nextTr !== null);
 
         usort($items, function ($a, $b) {
@@ -227,7 +232,7 @@ $firstOfMonth = date('Y-m-01');
         <div class="row">
             <div style="min-width: 260px;">
                 <h1>Отчет баня</h1>
-                <div class="muted">ID зоны: <?= (int)BANYA_HALL_ID ?> (ищем и по spot_id, и по hall_id) · кальяны: категория <?= (int)HOOKAH_CATEGORY_ID ?></div>
+                <div class="muted">Фильтры: выключены · кальяны: категория <?= (int)HOOKAH_CATEGORY_ID ?></div>
             </div>
             <label>
                 Дата начала
@@ -248,6 +253,7 @@ $firstOfMonth = date('Y-m-01');
             <thead>
                 <tr>
                     <th style="width:170px;">Дата</th>
+                    <th style="width:80px;">Hall</th>
                     <th style="width:120px;">Стол</th>
                     <th style="width:120px;">Чек</th>
                     <th>Официант</th>
@@ -321,7 +327,7 @@ $firstOfMonth = date('Y-m-01');
 
     const openDetails = (row) => {
         modalTitle.textContent = `Детали чека ${row.receipt || ''}`;
-        modalMeta.textContent = `${row.date || ''} · стол ${row.table || ''} · официант ${row.waiter || ''} · сумма ${row.sum || ''}`;
+        modalMeta.textContent = `${row.date || ''} · hall ${row.hall || ''} · стол ${row.table || ''} · официант ${row.waiter || ''} · сумма ${row.sum || ''}`;
         modalBody.innerHTML = '';
         (row.details || []).forEach((d) => {
             const tr = document.createElement('tr');
@@ -363,6 +369,7 @@ $firstOfMonth = date('Y-m-01');
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${esc(row.date || '')}</td>
+                    <td>${esc(row.hall || '')}</td>
                     <td>${esc(row.table || '')}</td>
                     <td>${esc(row.receipt || '')}</td>
                     <td>${esc(row.waiter || '')}</td>
