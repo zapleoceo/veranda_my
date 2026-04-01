@@ -256,9 +256,9 @@ if (($_GET['ajax'] ?? '') === 'tx') {
         $productMap = $loadProductMap($api);
         $txArr = $api->request('dash.getTransaction', [
             'transaction_id' => $trId,
-            'include_products' => 1,
-            'include_history' => 0,
-            'include_delivery' => 0,
+            'include_products' => 'true',
+            'include_history' => 'false',
+            'include_delivery' => 'false',
         ], 'GET');
         $tx = is_array($txArr) && isset($txArr[0]) && is_array($txArr[0]) ? $txArr[0] : (is_array($txArr) ? $txArr : []);
         $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
