@@ -47,32 +47,6 @@ $loadProductMap = function (\App\Classes\PosterAPI $api): array {
     return $map;
 };
 
-$getTableHallMap = function (\App\Classes\PosterAPI $api): array {
-    $methods = [
-        'tables.getTables',
-        'spots.getTables',
-        'restaurant.getTables',
-        'settings.getTables',
-        'access.getTables',
-    ];
-    foreach ($methods as $m) {
-        try {
-            $rows = $api->request($m, []);
-            if (!is_array($rows) || count($rows) === 0) continue;
-            $map = [];
-            foreach ($rows as $r) {
-                if (!is_array($r)) continue;
-                $tid = (int)($r['table_id'] ?? $r['id'] ?? 0);
-                $hid = (int)($r['hall_id'] ?? $r['hallId'] ?? $r['hall'] ?? 0);
-                if ($tid > 0 && $hid > 0) $map[$tid] = $hid;
-            }
-            if ($map) return $map;
-        } catch (\Throwable $e) {
-        }
-    }
-    return [];
-};
-
 if (($_GET['ajax'] ?? '') === 'load') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -95,7 +69,6 @@ if (($_GET['ajax'] ?? '') === 'load') {
     $api = new \App\Classes\PosterAPI($token);
     try {
         $productMap = $loadProductMap($api);
-        $tableHallMap = $getTableHallMap($api);
 
         $offset = 0;
         $limit = 100;
@@ -124,17 +97,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 $tableId = (int)($tx['table_id'] ?? 0);
                 $spotId = (int)($tx['spot_id'] ?? 0);
                 $hallId = isset($tx['hall_id']) ? (int)$tx['hall_id'] : 0;
-                if ($hallId <= 0 && $tableId > 0 && isset($tableHallMap[$tableId])) {
-                    $hallId = (int)$tableHallMap[$tableId];
-                }
-
-                $isHallMatch = false;
-                if ($hallId > 0) {
-                    $isHallMatch = ($hallId === BANYA_HALL_ID);
-                } else {
-                    $isHallMatch = ($spotId === BANYA_HALL_ID);
-                }
-                if (!$isHallMatch) continue;
+                if ($spotId !== BANYA_HALL_ID && $hallId !== BANYA_HALL_ID) continue;
 
                 $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
                 $detailRows = [];
@@ -179,6 +142,8 @@ if (($_GET['ajax'] ?? '') === 'load') {
                     'sum_minor' => $sumMinor,
                     'hookah_sum_minor' => $hookahMinorInCheck,
                     'waiter' => $waiter,
+                    'spot_id' => $spotId,
+                    'hall_id' => $hallId,
                     'details' => $detailRows,
                 ];
 
@@ -259,7 +224,7 @@ $firstOfMonth = date('Y-m-01');
         <div class="row">
             <div style="min-width: 260px;">
                 <h1>Отчет баня</h1>
-                <div class="muted">Hall ID: <?= (int)BANYA_HALL_ID ?> · кальяны: категория <?= (int)HOOKAH_CATEGORY_ID ?></div>
+                <div class="muted">ID зоны: <?= (int)BANYA_HALL_ID ?> (ищем и по spot_id, и по hall_id) · кальяны: категория <?= (int)HOOKAH_CATEGORY_ID ?></div>
             </div>
             <label>
                 Дата начала
@@ -421,4 +386,3 @@ $firstOfMonth = date('Y-m-01');
 </script>
 </body>
 </html>
-
