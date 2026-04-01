@@ -66,6 +66,42 @@ function banya_load_table_halls(\App\Classes\PosterAPI $api, int $spotId): array
     return $map;
 }
 
+function banya_load_spot_ids(\App\Classes\PosterAPI $api): array {
+    $rows = $api->request('access.getSpots', [], 'GET');
+    if (!is_array($rows)) $rows = [];
+    $ids = [];
+    foreach ($rows as $r) {
+        if (!is_array($r)) continue;
+        $sid = (int)($r['spot_id'] ?? $r['id'] ?? 0);
+        if ($sid > 0) $ids[] = $sid;
+    }
+    $ids = array_values(array_unique($ids));
+    sort($ids);
+    return $ids;
+}
+
+function banya_load_tables_for_hall(\App\Classes\PosterAPI $api, int $spotId, int $hallId): array {
+    if ($spotId <= 0 || $hallId <= 0) return [];
+    $rows = $api->request('spots.getTableHallTables', [
+        'spot_id' => $spotId,
+        'hall_id' => $hallId,
+        'without_deleted' => BANYA_TABLES_WITHOUT_DELETED,
+    ], 'GET');
+    if (!is_array($rows)) $rows = [];
+    $out = [];
+    foreach ($rows as $r) {
+        if (!is_array($r)) continue;
+        $tid = (int)($r['table_id'] ?? 0);
+        if ($tid <= 0) continue;
+        $out[] = [
+            'table_id' => $tid,
+            'table_num' => (string)($r['table_num'] ?? ''),
+            'table_title' => (string)($r['table_title'] ?? ''),
+        ];
+    }
+    return $out;
+}
+
 if (($_GET['ajax'] ?? '') === 'load') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -88,51 +124,42 @@ if (($_GET['ajax'] ?? '') === 'load') {
     $api = new \App\Classes\PosterAPI($token);
     try {
         $productMap = $loadProductMap($api);
-
-        $nextTr = null;
-        $prevNextTr = null;
-        $page = 0;
         $items = [];
-        $tableHallMapBySpot = [];
+        $seenTx = [];
 
         $totalChecks = 0;
         $totalSumMinor = 0;
         $hookahSumMinor = 0;
 
-        do {
-            $page++;
-            if ($page > 3000) break;
-            $params = [
+        $spotIds = banya_load_spot_ids($api);
+        if (!$spotIds) $spotIds = [1];
+
+        $hallTables = [];
+        foreach ($spotIds as $sid) {
+            $rows = banya_load_tables_for_hall($api, (int)$sid, BANYA_HALL_ID);
+            foreach ($rows as $r) $hallTables[] = ['spot_id' => (int)$sid] + $r;
+        }
+
+        foreach ($hallTables as $t) {
+            $spotId = (int)($t['spot_id'] ?? 0);
+            $tableId = (int)($t['table_id'] ?? 0);
+            if ($spotId <= 0 || $tableId <= 0) continue;
+
+            $batch = $api->request('dash.getTransactions', [
                 'dateFrom' => str_replace('-', '', $dateFrom),
                 'dateTo' => str_replace('-', '', $dateTo),
                 'include_products' => 'true',
                 'status' => 0,
-            ];
-            if ($nextTr !== null) $params['next_tr'] = $nextTr;
-            $batch = $api->request('dash.getTransactions', $params, 'GET');
+                'table_id' => $tableId,
+            ], 'GET');
             if (!is_array($batch)) $batch = [];
-            $count = count($batch);
-            if ($count > 0) {
-                $last = end($batch);
-                $prevNextTr = $nextTr;
-                $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
-            }
 
             foreach ($batch as $tx) {
                 if (!is_array($tx)) continue;
-                $tableId = (int)($tx['table_id'] ?? 0);
-                $spotId = (int)($tx['spot_id'] ?? 0);
-                $hallId = isset($tx['hall_id']) ? (int)$tx['hall_id'] : 0;
-
-                if ($spotId > 0 && !isset($tableHallMapBySpot[$spotId])) {
-                    $tableHallMapBySpot[$spotId] = banya_load_table_halls($api, $spotId);
-                }
-                $hallByTable = 0;
-                if ($spotId > 0 && $tableId > 0 && isset($tableHallMapBySpot[$spotId][$tableId])) {
-                    $hallByTable = (int)$tableHallMapBySpot[$spotId][$tableId];
-                }
-                $hall = $hallByTable > 0 ? (string)$hallByTable : ($hallId > 0 ? (string)$hallId : '');
-                if ((int)$hall !== BANYA_HALL_ID) continue;
+                $txId = (int)($tx['transaction_id'] ?? 0);
+                if ($txId <= 0) continue;
+                if (isset($seenTx[$txId])) continue;
+                $seenTx[$txId] = true;
 
                 $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
                 $hookahMinorInCheck = 0;
@@ -157,7 +184,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 if ($dateStr === '') $dateStr = '';
 
                 $receipt = (string)($tx['receipt_number'] ?? $tx['transaction_id'] ?? '');
-                $tableName = (string)($tx['table_name'] ?? $tx['table_id'] ?? '');
+                $tableName = (string)($tx['table_name'] ?? $t['table_title'] ?? $t['table_num'] ?? $tx['table_id'] ?? '');
                 $waiter = (string)($tx['name'] ?? $tx['employee_name'] ?? '');
 
                 if ($sumMinor <= 0) {
@@ -165,7 +192,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 }
                 $items[] = [
                     'date' => $dateStr,
-                    'hall' => $hall,
+                    'hall' => (string)BANYA_HALL_ID,
                     'spot_id' => $spotId,
                     'table_id' => $tableId,
                     'table' => $tableName,
@@ -174,16 +201,14 @@ if (($_GET['ajax'] ?? '') === 'load') {
                     'sum_minor' => $sumMinor,
                     'hookah_sum_minor' => $hookahMinorInCheck,
                     'waiter' => $waiter,
-                    'hall_id' => $hallId,
-                    'transaction_id' => (int)($tx['transaction_id'] ?? 0),
+                    'transaction_id' => $txId,
                 ];
 
                 $totalChecks++;
                 $totalSumMinor += $sumMinor;
                 $hookahSumMinor += $hookahMinorInCheck;
             }
-            if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
-        } while ($count > 0 && $nextTr !== null);
+        }
 
         usort($items, function ($a, $b) {
             return strcmp((string)$a['date'], (string)$b['date']);
@@ -427,7 +452,7 @@ $firstOfMonth = date('Y-m-01');
         tbody.innerHTML = '';
         slice.forEach((row) => {
             const tr = document.createElement('tr');
-            const txId = Number(row.transaction_id || row.receipt || 0);
+            const txId = Number(row.transaction_id || 0);
             tr.innerHTML = `
                 <td>${esc(row.date || '')}</td>
                 <td>${esc(row.hall || '')}</td>
@@ -469,7 +494,8 @@ $firstOfMonth = date('Y-m-01');
                                 box.appendChild(line);
                             });
                         }
-                        trD.firstChild.replaceWith(box);
+                        const td = trD.querySelector('td');
+                        if (td) { td.innerHTML = ''; td.appendChild(box); }
                     } catch (e) {
                         trD.innerHTML = `<td colspan="7"><div class="details-box" style="color:#b91c1c; font-weight:700;">${esc(e && e.message ? e.message : 'Ошибка')}</div></td>`;
                     }
