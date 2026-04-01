@@ -325,6 +325,10 @@ $firstOfMonth = date('Y-m-01');
         .detail-line { display:flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed rgba(17,24,39,0.10); }
         .detail-line:last-child { border-bottom: 0; }
         .detail-sum { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 900; }
+        .pager { display:flex; align-items:center; gap: 6px; flex-wrap: wrap; }
+        .page-btn { border: 1px solid rgba(182,89,48,0.25); background: #fff; color: var(--brand-text); padding: 4px 9px; border-radius: 10px; font-weight: 900; cursor: pointer; }
+        .page-btn.active { background: var(--brand-bg); border-color: rgba(182,89,48,0.35); }
+        .page-dots { color: rgba(182,89,48,0.75); padding: 0 4px; font-weight: 900; }
     </style>
 </head>
 <body>
@@ -333,7 +337,6 @@ $firstOfMonth = date('Y-m-01');
         <div class="row">
             <div style="min-width: 260px;">
                 <h1>Отчет баня</h1>
-                <div class="muted">Фильтр: Hall ID <?= (int)BANYA_HALL_ID ?> · кальяны: категория <?= (int)HOOKAH_CATEGORY_ID ?></div>
             </div>
             <label>
                 Дата начала
@@ -346,19 +349,11 @@ $firstOfMonth = date('Y-m-01');
             <div style="display:flex; align-items:center; gap:10px; flex-wrap: wrap;">
                 <button id="loadBtn" type="button">ЗАГРУЗИТЬ</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
-                <div class="muted" id="pageInfo"></div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <button class="secondary" id="pagePrev" type="button">Назад</button>
-                    <button class="secondary" id="pageNext" type="button">Вперёд</button>
-                    <label class="muted">на странице
-                        <select id="pageSize">
-                            <option value="10">10</option>
-                            <option value="20" selected>20</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
-                    </label>
-                </div>
+                <label class="muted" style="flex-direction: row; align-items:center; gap: 8px;">
+                    <input type="checkbox" id="noPages">
+                    без страниц
+                </label>
+                <div class="pager" id="pagerTop"></div>
             </div>
         </div>
         <div class="error" id="err" style="display:none;"></div>
@@ -377,6 +372,9 @@ $firstOfMonth = date('Y-m-01');
             </thead>
             <tbody id="tbody"></tbody>
         </table>
+        <div style="display:flex; justify-content:flex-end; margin-top: 10px;">
+            <div class="pager" id="pagerBottom"></div>
+        </div>
 
         <div class="totals">
             <div class="pill" id="totChecks">Итого чеков: 0</div>
@@ -384,6 +382,7 @@ $firstOfMonth = date('Y-m-01');
             <div class="pill bad" id="totHookah">Сумма кальянов: 0</div>
             <div class="pill ok" id="totWithout">Сумма без кальянов: 0</div>
         </div>
+        <div class="muted" style="margin-top: 8px; text-align:right;">Включены только столы Бани · кальяны: категория <?= (int)HOOKAH_CATEGORY_ID ?></div>
     </div>
 </div>
 
@@ -413,16 +412,16 @@ $firstOfMonth = date('Y-m-01');
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
     // Пагинация и сортировка
-    const pagePrev = document.getElementById('pagePrev');
-    const pageNext = document.getElementById('pageNext');
-    const pageInfo = document.getElementById('pageInfo');
-    const pageSizeSel = document.getElementById('pageSize');
+    const pagerTop = document.getElementById('pagerTop');
+    const pagerBottom = document.getElementById('pagerBottom');
+    const noPagesCb = document.getElementById('noPages');
     const ths = Array.from(document.querySelectorAll('th[data-sort]'));
     let dataItems = [];
     let sortBy = 'date';
     let sortDir = 'asc';
     let page = 1;
-    let pageSize = Number(pageSizeSel.value);
+    const pageSize = 20;
+    let noPages = false;
 
     const applySort = (arr) => {
         const coll = new Intl.Collator('ru', {numeric:true, sensitivity:'base'});
@@ -441,13 +440,52 @@ $firstOfMonth = date('Y-m-01');
         });
     };
 
+    const buildPageList = (pages, current) => {
+        if (pages <= 1) return [1];
+        const keep = new Set([1, pages, current, current - 1, current - 2, current + 1, current + 2]);
+        const out = [];
+        let last = 0;
+        for (let i = 1; i <= pages; i++) {
+            if (!keep.has(i)) continue;
+            if (last && i - last > 1) out.push('…');
+            out.push(i);
+            last = i;
+        }
+        return out;
+    };
+
+    const renderPager = (el, pages, current) => {
+        if (!el) return;
+        if (noPages || pages <= 1) {
+            el.innerHTML = '';
+            return;
+        }
+        const items = buildPageList(pages, current);
+        el.innerHTML = '';
+        items.forEach((it) => {
+            if (it === '…') {
+                const span = document.createElement('span');
+                span.className = 'page-dots';
+                span.textContent = '…';
+                el.appendChild(span);
+                return;
+            }
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'page-btn' + (it === current ? ' active' : '');
+            b.textContent = String(it);
+            b.setAttribute('data-page', String(it));
+            el.appendChild(b);
+        });
+    };
+
     const renderTable = () => {
         const items = applySort(dataItems);
         const total = items.length;
-        const pages = Math.max(1, Math.ceil(total / pageSize));
+        const pages = noPages ? 1 : Math.max(1, Math.ceil(total / pageSize));
         if (page > pages) page = pages;
-        const start = (page - 1) * pageSize;
-        const slice = items.slice(start, start + pageSize);
+        const start = noPages ? 0 : (page - 1) * pageSize;
+        const slice = noPages ? items : items.slice(start, start + pageSize);
 
         tbody.innerHTML = '';
         slice.forEach((row) => {
@@ -502,14 +540,25 @@ $firstOfMonth = date('Y-m-01');
                 });
             }
         });
-        pageInfo.textContent = `Страница ${page} из ${pages} · всего записей: ${total}`;
-        pagePrev.disabled = page <= 1;
-        pageNext.disabled = page >= pages;
+        renderPager(pagerTop, pages, page);
+        renderPager(pagerBottom, pages, page);
     };
 
-    pagePrev.addEventListener('click', () => { if (page > 1) { page--; renderTable(); } });
-    pageNext.addEventListener('click', () => { page++; renderTable(); });
-    pageSizeSel.addEventListener('change', () => { pageSize = Number(pageSizeSel.value || 20); page = 1; renderTable(); });
+    const onPagerClick = (e) => {
+        const btn = e.target.closest?.('.page-btn');
+        if (!btn) return;
+        const p = Number(btn.getAttribute('data-page') || 0);
+        if (!p) return;
+        page = p;
+        renderTable();
+    };
+    if (pagerTop) pagerTop.addEventListener('click', onPagerClick);
+    if (pagerBottom) pagerBottom.addEventListener('click', onPagerClick);
+    if (noPagesCb) noPagesCb.addEventListener('change', () => {
+        noPages = !!noPagesCb.checked;
+        page = 1;
+        renderTable();
+    });
     ths.forEach((th) => {
         th.addEventListener('click', () => {
             const key = th.getAttribute('data-sort');
