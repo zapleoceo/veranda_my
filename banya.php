@@ -329,6 +329,7 @@ $firstOfMonth = date('Y-m-01');
         .page-btn { border: 1px solid rgba(182,89,48,0.25); background: #fff; color: var(--brand-text); padding: 4px 9px; border-radius: 10px; font-weight: 900; cursor: pointer; }
         .page-btn.active { background: var(--brand-bg); border-color: rgba(182,89,48,0.35); }
         .page-dots { color: rgba(182,89,48,0.75); padding: 0 4px; font-weight: 900; }
+        .hookah-ico { width: 18px; height: 18px; vertical-align: middle; margin-left: 8px; }
     </style>
 </head>
 <body>
@@ -410,6 +411,7 @@ $firstOfMonth = date('Y-m-01');
     };
 
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const hookahSvg = '<svg class="hookah-ico" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 2h2l-1 3h2l-2 5" stroke="#b65930" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.2 10.8c1-.9 4.6-.9 5.6 0 1 .9.8 2.6.3 3.4-.6 1-1 1.6-1 2.8 0 1.9-1.3 3-2.1 3s-2.1-1.1-2.1-3c0-1.2-.4-1.8-1-2.8-.5-.8-.7-2.5.3-3.4Z" stroke="#b65930" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.8 13.8h2.6c1.2 0 2.1 1 2.1 2.2v3.1c0 1.1-.9 2-2 2h-3.7" stroke="#b65930" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 20h8" stroke="#b65930" stroke-width="1.8" stroke-linecap="round"/><path d="M18.5 16.2h-1.6" stroke="#b65930" stroke-width="1.8" stroke-linecap="round"/></svg>';
 
     // Пагинация и сортировка
     const pagerTop = document.getElementById('pagerTop');
@@ -491,6 +493,7 @@ $firstOfMonth = date('Y-m-01');
         slice.forEach((row) => {
             const tr = document.createElement('tr');
             const txId = Number(row.transaction_id || 0);
+            const hasHookah = Number(row.hookah_sum_minor || 0) > 0;
             tr.innerHTML = `
                 <td>${esc(row.date || '')}</td>
                 <td>${esc(row.hall || '')}</td>
@@ -498,7 +501,7 @@ $firstOfMonth = date('Y-m-01');
                 <td>${esc(row.receipt || '')}</td>
                 <td>${esc(row.waiter || '')}</td>
                 <td class="num">${esc(row.sum || '')}</td>
-                    <td><button type="button" class="secondary small" data-tx="${esc(txId)}">Детали</button></td>
+                <td><button type="button" class="secondary small" data-tx="${esc(txId)}">Детали</button>${hasHookah ? hookahSvg : ''}</td>
             `;
             tbody.appendChild(tr);
 
