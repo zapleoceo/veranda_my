@@ -341,9 +341,22 @@ $firstOfMonth = date('Y-m-01');
                 Дата конца
                 <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>">
             </label>
-            <div style="display:flex; align-items:center;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap: wrap;">
                 <button id="loadBtn" type="button">ЗАГРУЗИТЬ</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
+                <div class="muted" id="pageInfo"></div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button class="secondary" id="pagePrev" type="button">Назад</button>
+                    <button class="secondary" id="pageNext" type="button">Вперёд</button>
+                    <label class="muted">на странице
+                        <select id="pageSize">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </label>
+                </div>
             </div>
         </div>
         <div class="error" id="err" style="display:none;"></div>
@@ -362,21 +375,6 @@ $firstOfMonth = date('Y-m-01');
             </thead>
             <tbody id="tbody"></tbody>
         </table>
-        <div class="row" style="justify-content: space-between; align-items:center; margin-top: 10px;">
-            <div class="muted" id="pageInfo"></div>
-            <div style="display:flex; gap:8px; align-items:center;">
-                <button class="secondary" id="pagePrev" type="button">Назад</button>
-                <button class="secondary" id="pageNext" type="button">Вперёд</button>
-                <label class="muted">на странице
-                    <select id="pageSize">
-                        <option value="10">10</option>
-                        <option value="20" selected>20</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select>
-                </label>
-            </div>
-        </div>
 
         <div class="totals">
             <div class="pill" id="totChecks">Итого чеков: 0</div>
