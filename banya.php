@@ -268,11 +268,14 @@ if (($_GET['ajax'] ?? '') === 'tx') {
             $pid = (int)($p['product_id'] ?? 0);
             $numRaw = $p['num'] ?? $p['count'] ?? 0;
             $num = is_numeric($numRaw) ? (float)$numRaw : 0;
-            $priceMinor = (int)($p['product_price'] ?? 0);
-            $lineMinor = (int)round($priceMinor * $num);
+            $lineMinor = isset($p['payed_sum']) ? (int)$p['payed_sum'] : (int)($p['product_sum'] ?? 0);
+            if ($lineMinor <= 0) {
+                $lineMinor = (int)($p['product_price'] ?? 0);
+            }
             $name = (string)($productMap[$pid]['name'] ?? ('#' . $pid));
             $lines[] = [
                 'name' => $name,
+                'qty' => $num,
                 'sum' => $fmtVnd($lineMinor),
                 'sum_minor' => $lineMinor,
             ];
@@ -531,7 +534,9 @@ $firstOfMonth = date('Y-m-01');
                             lines.forEach((ln) => {
                                 const line = document.createElement('div');
                                 line.className = 'detail-line';
-                                line.innerHTML = `<div>${esc(ln.name || '')}</div><div class="detail-sum">${esc(ln.sum || '0')}</div>`;
+                                const qty = Number(ln.qty || 0);
+                                const qtyTxt = (qty && Math.abs(qty - Math.round(qty)) < 0.0001) ? String(Math.round(qty)) : String(qty);
+                                line.innerHTML = `<div>${esc(ln.name || '')}${qty ? ' × ' + esc(qtyTxt) : ''}</div><div class="detail-sum">${esc(ln.sum || '0')}</div>`;
                                 box.appendChild(line);
                             });
                         }
