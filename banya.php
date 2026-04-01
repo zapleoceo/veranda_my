@@ -295,31 +295,33 @@ $firstOfMonth = date('Y-m-01');
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Отчет баня</title>
     <style>
-        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f5f5f5; color:#111827; }
+        :root { --brand-text: #b65930; --brand-bg: #efdbce; }
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #fbf4ef; color:#1f2937; }
         .wrap { max-width: 1200px; margin: 0 auto; padding: 16px; }
-        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
+        .card { background: #fff; border: 1px solid rgba(182,89,48,0.20); border-radius: 14px; padding: 12px; box-shadow: 0 6px 16px rgba(182,89,48,0.10); }
         h1 { margin: 0; font-size: 20px; }
         .muted { color:#6b7280; font-size: 12px; }
         .row { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; }
         label { font-size: 12px; color:#6b7280; display:flex; flex-direction: column; gap: 6px; }
-        input[type="date"] { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; }
-        button { padding: 10px 14px; border-radius: 10px; border: 1px solid #111827; background:#111827; color:#fff; font-weight: 800; cursor:pointer; }
-        button.secondary { background:#fff; color:#111827; }
+        input[type="date"], select { padding: 7px 10px; border: 1px solid rgba(182,89,48,0.25); border-radius: 10px; font-size: 14px; background:#fff; color:#1f2937; }
+        button { padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(182,89,48,0.35); background: var(--brand-bg); color: var(--brand-text); font-weight: 900; cursor:pointer; }
+        button.secondary { background:#fff; color: var(--brand-text); border-color: rgba(182,89,48,0.25); }
+        button.small { padding: 5px 10px; border-radius: 9px; font-weight: 900; }
         button:disabled { opacity: 0.6; cursor: default; }
         .loader { display:none; align-items:center; gap: 10px; margin-left: 10px; }
-        .spinner { width: 16px; height: 16px; border: 2px solid rgba(17,24,39,0.20); border-top-color: rgba(17,24,39,0.85); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .spinner { width: 16px; height: 16px; border: 2px solid rgba(182,89,48,0.25); border-top-color: rgba(182,89,48,0.95); border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         table { width:100%; border-collapse: collapse; margin-top: 12px; }
-        th, td { padding: 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
-        th { text-align:left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color:#6b7280; background:#f9fafb; }
+        th, td { padding: 7px 10px; border-bottom: 1px solid rgba(182,89,48,0.14); vertical-align: top; }
+        th { text-align:left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-text); background: rgba(239,219,206,0.55); }
         td.num { text-align:right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .totals { margin-top: 12px; display:flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
-        .pill { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px 12px; background:#fff; font-weight: 900; }
-        .pill.bad { border-color: rgba(211,47,47,0.35); background: rgba(211,47,47,0.08); }
-        .pill.ok { border-color: rgba(46,125,50,0.35); background: rgba(46,125,50,0.08); }
+        .pill { border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; padding: 10px 12px; background:#fff; font-weight: 900; }
+        .pill.bad { border-color: rgba(182,89,48,0.40); background: rgba(239,219,206,0.55); color: var(--brand-text); }
+        .pill.ok { border-color: rgba(182,89,48,0.22); background: rgba(239,219,206,0.25); color: #1f2937; }
         .error { margin-top: 10px; color:#b91c1c; font-weight: 700; }
         .details-row td { background: rgba(17,24,39,0.02); }
-        .details-box { padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; }
+        .details-box { padding: 10px 12px; border: 1px solid rgba(182,89,48,0.18); border-radius: 12px; background: #fff; }
         .detail-line { display:flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed rgba(17,24,39,0.10); }
         .detail-line:last-child { border-bottom: 0; }
         .detail-sum { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 900; }
@@ -331,7 +333,7 @@ $firstOfMonth = date('Y-m-01');
         <div class="row">
             <div style="min-width: 260px;">
                 <h1>Отчет баня</h1>
-                <div class="muted">Фильтры: выключены · кальяны: категория <?= (int)HOOKAH_CATEGORY_ID ?></div>
+                <div class="muted">Фильтр: Hall ID <?= (int)BANYA_HALL_ID ?> · кальяны: категория <?= (int)HOOKAH_CATEGORY_ID ?></div>
             </div>
             <label>
                 Дата начала
@@ -458,7 +460,7 @@ $firstOfMonth = date('Y-m-01');
                 <td>${esc(row.receipt || '')}</td>
                 <td>${esc(row.waiter || '')}</td>
                 <td class="num">${esc(row.sum || '')}</td>
-                <td><button type="button" class="secondary" data-tx="${esc(txId)}">Детали</button></td>
+                    <td><button type="button" class="secondary small" data-tx="${esc(txId)}">Детали</button></td>
             `;
             tbody.appendChild(tr);
 
