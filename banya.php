@@ -132,6 +132,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
                     $hallByTable = (int)$tableHallMapBySpot[$spotId][$tableId];
                 }
                 $hall = $hallByTable > 0 ? (string)$hallByTable : ($hallId > 0 ? (string)$hallId : '');
+                if ((int)$hall !== BANYA_HALL_ID) continue;
 
                 $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
                 $hookahMinorInCheck = 0;
@@ -159,6 +160,9 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 $tableName = (string)($tx['table_name'] ?? $tx['table_id'] ?? '');
                 $waiter = (string)($tx['name'] ?? $tx['employee_name'] ?? '');
 
+                if ($sumMinor <= 0) {
+                    continue;
+                }
                 $items[] = [
                     'date' => $dateStr,
                     'hall' => $hall,
@@ -322,17 +326,32 @@ $firstOfMonth = date('Y-m-01');
         <table>
             <thead>
                 <tr>
-                    <th style="width:170px;">Дата</th>
-                    <th style="width:80px;">Hall</th>
-                    <th style="width:120px;">Стол</th>
-                    <th style="width:120px;">Чек</th>
-                    <th>Официант</th>
-                    <th style="width:140px; text-align:right;">Сумма</th>
+                    <th id="thDate" data-sort="date" style="width:170px; cursor:pointer;">Дата</th>
+                    <th id="thHall" data-sort="hall" style="width:80px; cursor:pointer;">Hall</th>
+                    <th id="thTable" data-sort="table" style="width:120px; cursor:pointer;">Стол</th>
+                    <th id="thReceipt" data-sort="receipt" style="width:120px; cursor:pointer;">Чек</th>
+                    <th id="thWaiter" data-sort="waiter" style="cursor:pointer;">Официант</th>
+                    <th id="thSum" data-sort="sum_minor" style="width:140px; text-align:right; cursor:pointer;">Сумма</th>
                     <th style="width:120px;"></th>
                 </tr>
             </thead>
             <tbody id="tbody"></tbody>
         </table>
+        <div class="row" style="justify-content: space-between; align-items:center; margin-top: 10px;">
+            <div class="muted" id="pageInfo"></div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <button class="secondary" id="pagePrev" type="button">Назад</button>
+                <button class="secondary" id="pageNext" type="button">Вперёд</button>
+                <label class="muted">на странице
+                    <select id="pageSize">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </label>
+            </div>
+        </div>
 
         <div class="totals">
             <div class="pill" id="totChecks">Итого чеков: 0</div>
@@ -368,6 +387,113 @@ $firstOfMonth = date('Y-m-01');
 
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+    // Пагинация и сортировка
+    const pagePrev = document.getElementById('pagePrev');
+    const pageNext = document.getElementById('pageNext');
+    const pageInfo = document.getElementById('pageInfo');
+    const pageSizeSel = document.getElementById('pageSize');
+    const ths = Array.from(document.querySelectorAll('th[data-sort]'));
+    let dataItems = [];
+    let sortBy = 'date';
+    let sortDir = 'asc';
+    let page = 1;
+    let pageSize = Number(pageSizeSel.value);
+
+    const applySort = (arr) => {
+        const coll = new Intl.Collator('ru', {numeric:true, sensitivity:'base'});
+        const dir = sortDir === 'desc' ? -1 : 1;
+        const get = (o, k) => (o && Object.prototype.hasOwnProperty.call(o, k)) ? o[k] : '';
+        return arr.slice().sort((a, b) => {
+            const av = get(a, sortBy);
+            const bv = get(b, sortBy);
+            if (typeof av === 'number' || typeof bv === 'number') {
+                const an = Number(av || 0), bn = Number(bv || 0);
+                if (an === bn) return 0;
+                return an < bn ? -1*dir : 1*dir;
+            }
+            const s = coll.compare(String(av || ''), String(bv || ''));
+            return s * dir;
+        });
+    };
+
+    const renderTable = () => {
+        const items = applySort(dataItems);
+        const total = items.length;
+        const pages = Math.max(1, Math.ceil(total / pageSize));
+        if (page > pages) page = pages;
+        const start = (page - 1) * pageSize;
+        const slice = items.slice(start, start + pageSize);
+
+        tbody.innerHTML = '';
+        slice.forEach((row) => {
+            const tr = document.createElement('tr');
+            const txId = Number(row.transaction_id || row.receipt || 0);
+            tr.innerHTML = `
+                <td>${esc(row.date || '')}</td>
+                <td>${esc(row.hall || '')}</td>
+                <td>${esc(row.table || '')}</td>
+                <td>${esc(row.receipt || '')}</td>
+                <td>${esc(row.waiter || '')}</td>
+                <td class="num">${esc(row.sum || '')}</td>
+                <td><button type="button" class="secondary" data-tx="${esc(txId)}">Детали</button></td>
+            `;
+            tbody.appendChild(tr);
+
+            const trD = document.createElement('tr');
+            trD.className = 'details-row';
+            trD.style.display = 'none';
+            trD.innerHTML = `<td colspan="7"><div class="details-box muted">Загрузка…</div></td>`;
+            tbody.appendChild(trD);
+
+            const btnDetails = tr.querySelector('button');
+            if (btnDetails) {
+                btnDetails.addEventListener('click', async () => {
+                    const isOpen = trD.style.display !== 'none';
+                    if (isOpen) {
+                        trD.style.display = 'none';
+                        return;
+                    }
+                    trD.style.display = '';
+                    const tx = Number(btnDetails.getAttribute('data-tx') || 0);
+                    try {
+                        const lines = await loadDetails(tx);
+                        const box = document.createElement('div');
+                        box.className = 'details-box';
+                        if (!lines.length) {
+                            box.innerHTML = `<div class="muted">Нет данных</div>`;
+                        } else {
+                            lines.forEach((ln) => {
+                                const line = document.createElement('div');
+                                line.className = 'detail-line';
+                                line.innerHTML = `<div>${esc(ln.name || '')}</div><div class="detail-sum">${esc(ln.sum || '0')}</div>`;
+                                box.appendChild(line);
+                            });
+                        }
+                        trD.firstChild.replaceWith(box);
+                    } catch (e) {
+                        trD.innerHTML = `<td colspan="7"><div class="details-box" style="color:#b91c1c; font-weight:700;">${esc(e && e.message ? e.message : 'Ошибка')}</div></td>`;
+                    }
+                });
+            }
+        });
+        pageInfo.textContent = `Страница ${page} из ${pages} · всего записей: ${total}`;
+        pagePrev.disabled = page <= 1;
+        pageNext.disabled = page >= pages;
+    };
+
+    pagePrev.addEventListener('click', () => { if (page > 1) { page--; renderTable(); } });
+    pageNext.addEventListener('click', () => { page++; renderTable(); });
+    pageSizeSel.addEventListener('change', () => { pageSize = Number(pageSizeSel.value || 20); page = 1; renderTable(); });
+    ths.forEach((th) => {
+        th.addEventListener('click', () => {
+            const key = th.getAttribute('data-sort');
+            if (!key) return;
+            if (sortBy === key) sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
+            else { sortBy = key; sortDir = 'asc'; }
+            renderTable();
+        });
+    });
+
     const loadDetails = async (transactionId) => {
         const url = new URL(location.href);
         url.searchParams.set('ajax', 'tx');
@@ -399,57 +525,9 @@ $firstOfMonth = date('Y-m-01');
             try { j = JSON.parse(txt); } catch (_) {}
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка загрузки');
 
-            (j.items || []).forEach((row) => {
-                const tr = document.createElement('tr');
-                const txId = Number(row.transaction_id || row.receipt || 0);
-                tr.innerHTML = `
-                    <td>${esc(row.date || '')}</td>
-                    <td>${esc(row.hall || '')}</td>
-                    <td>${esc(row.table || '')}</td>
-                    <td>${esc(row.receipt || '')}</td>
-                    <td>${esc(row.waiter || '')}</td>
-                    <td class="num">${esc(row.sum || '')}</td>
-                    <td><button type="button" class="secondary" data-tx="${esc(txId)}">Детали</button></td>
-                `;
-                tbody.appendChild(tr);
-
-                const trD = document.createElement('tr');
-                trD.className = 'details-row';
-                trD.style.display = 'none';
-                trD.innerHTML = `<td colspan="7"><div class="details-box muted">Загрузка…</div></td>`;
-                tbody.appendChild(trD);
-
-                const btnDetails = tr.querySelector('button');
-                if (btnDetails) {
-                    btnDetails.addEventListener('click', async () => {
-                        const isOpen = trD.style.display !== 'none';
-                        if (isOpen) {
-                            trD.style.display = 'none';
-                            return;
-                        }
-                        trD.style.display = '';
-                        const tx = Number(btnDetails.getAttribute('data-tx') || 0);
-                        try {
-                            const lines = await loadDetails(tx);
-                            const box = document.createElement('div');
-                            box.className = 'details-box';
-                            if (!lines.length) {
-                                box.innerHTML = `<div class="muted">Нет данных</div>`;
-                            } else {
-                                lines.forEach((ln) => {
-                                    const line = document.createElement('div');
-                                    line.className = 'detail-line';
-                                    line.innerHTML = `<div>${esc(ln.name || '')}</div><div class="detail-sum">${esc(ln.sum || '0')}</div>`;
-                                    box.appendChild(line);
-                                });
-                            }
-                            trD.firstChild.replaceWith(box);
-                        } catch (e) {
-                            trD.innerHTML = `<td colspan="7"><div class="details-box" style="color:#b91c1c; font-weight:700;">${esc(e && e.message ? e.message : 'Ошибка')}</div></td>`;
-                        }
-                    });
-                }
-            });
+            dataItems = j.items || [];
+            page = 1;
+            renderTable();
 
             totChecks.textContent = `Итого чеков: ${String(j.totals?.checks || 0)}`;
             totSum.textContent = `Итого сумма: ${String(j.totals?.sum || '0')}`;
@@ -463,7 +541,6 @@ $firstOfMonth = date('Y-m-01');
     };
 
     btn.addEventListener('click', load);
-    load();
 </script>
 </body>
 </html>
