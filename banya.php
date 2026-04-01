@@ -416,6 +416,39 @@ $firstOfMonth = date('Y-m-01');
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const hookahSvg = '<svg class="hookah-ico" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 2h2l-1 3h2l-2 5" stroke="#b65930" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.2 10.8c1-.9 4.6-.9 5.6 0 1 .9.8 2.6.3 3.4-.6 1-1 1.6-1 2.8 0 1.9-1.3 3-2.1 3s-2.1-1.1-2.1-3c0-1.2-.4-1.8-1-2.8-.5-.8-.7-2.5.3-3.4Z" stroke="#b65930" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.8 13.8h2.6c1.2 0 2.1 1 2.1 2.2v3.1c0 1.1-.9 2-2 2h-3.7" stroke="#b65930" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 20h8" stroke="#b65930" stroke-width="1.8" stroke-linecap="round"/><path d="M18.5 16.2h-1.6" stroke="#b65930" stroke-width="1.8" stroke-linecap="round"/></svg>';
 
+    const PREFS_COOKIE = 'banya_prefs_v1';
+    const getCookie = (name) => {
+        const parts = String(document.cookie || '').split(';').map(s => s.trim());
+        for (const p of parts) {
+            if (!p) continue;
+            const eq = p.indexOf('=');
+            if (eq < 0) continue;
+            const k = p.slice(0, eq).trim();
+            if (k !== name) continue;
+            return decodeURIComponent(p.slice(eq + 1));
+        }
+        return '';
+    };
+    const setCookie = (name, value, days = 180) => {
+        const maxAge = Math.max(0, Math.round(days * 24 * 60 * 60));
+        document.cookie = `${name}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+    };
+    const loadPrefs = () => {
+        try {
+            const raw = getCookie(PREFS_COOKIE);
+            if (!raw) return null;
+            const obj = JSON.parse(raw);
+            return (obj && typeof obj === 'object') ? obj : null;
+        } catch (_) {
+            return null;
+        }
+    };
+    const savePrefs = (prefs) => {
+        try {
+            setCookie(PREFS_COOKIE, JSON.stringify(prefs || {}));
+        } catch (_) {}
+    };
+
     // Пагинация и сортировка
     const pagerTop = document.getElementById('pagerTop');
     const pagerBottom = document.getElementById('pagerBottom');
@@ -427,6 +460,30 @@ $firstOfMonth = date('Y-m-01');
     let page = 1;
     const pageSize = 20;
     let noPages = false;
+
+    const applyPrefsToUi = () => {
+        const p = loadPrefs();
+        if (!p) return;
+        if (typeof p.date_from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date_from)) elFrom.value = p.date_from;
+        if (typeof p.date_to === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date_to)) elTo.value = p.date_to;
+        if (typeof p.no_pages === 'boolean') {
+            noPages = p.no_pages;
+            if (noPagesCb) noPagesCb.checked = !!p.no_pages;
+        }
+        if (typeof p.sort_by === 'string') sortBy = p.sort_by;
+        if (p.sort_dir === 'asc' || p.sort_dir === 'desc') sortDir = p.sort_dir;
+        if (typeof p.page === 'number' && isFinite(p.page) && p.page > 0) page = Math.floor(p.page);
+    };
+    const persistPrefsFromUi = () => {
+        savePrefs({
+            date_from: elFrom.value,
+            date_to: elTo.value,
+            no_pages: !!noPages,
+            sort_by: sortBy,
+            sort_dir: sortDir,
+            page: page,
+        });
+    };
 
     const applySort = (arr) => {
         const coll = new Intl.Collator('ru', {numeric:true, sensitivity:'base'});
@@ -550,6 +607,7 @@ $firstOfMonth = date('Y-m-01');
         });
         renderPager(pagerTop, pages, page);
         renderPager(pagerBottom, pages, page);
+        persistPrefsFromUi();
     };
 
     const onPagerClick = (e) => {
@@ -576,6 +634,9 @@ $firstOfMonth = date('Y-m-01');
             renderTable();
         });
     });
+
+    elFrom.addEventListener('change', () => persistPrefsFromUi());
+    elTo.addEventListener('change', () => persistPrefsFromUi());
 
     const loadDetails = async (transactionId) => {
         const url = new URL(location.href);
@@ -616,6 +677,7 @@ $firstOfMonth = date('Y-m-01');
             totSum.textContent = `Итого сумма: ${String(j.totals?.sum || '0')}`;
             totHookah.textContent = `Сумма кальянов: ${String(j.totals?.hookah_sum || '0')}`;
             totWithout.textContent = `Сумма без кальянов: ${String(j.totals?.without_hookah_sum || '0')}`;
+            persistPrefsFromUi();
         } catch (e) {
             setError(e && e.message ? e.message : 'Ошибка');
         } finally {
@@ -624,6 +686,8 @@ $firstOfMonth = date('Y-m-01');
     };
 
     btn.addEventListener('click', load);
+    applyPrefsToUi();
+    persistPrefsFromUi();
 </script>
 </body>
 </html>
