@@ -47,6 +47,25 @@ $loadProductMap = function (\App\Classes\PosterAPI $api): array {
     return $map;
 };
 
+const BANYA_TABLES_WITHOUT_DELETED = 1;
+
+function banya_load_table_halls(\App\Classes\PosterAPI $api, int $spotId): array {
+    if ($spotId <= 0) return [];
+    $rows = $api->request('spots.getTableHallTables', [
+        'spot_id' => $spotId,
+        'without_deleted' => BANYA_TABLES_WITHOUT_DELETED,
+    ], 'GET');
+    if (!is_array($rows)) $rows = [];
+    $map = [];
+    foreach ($rows as $r) {
+        if (!is_array($r)) continue;
+        $tid = (int)($r['table_id'] ?? 0);
+        $hid = (int)($r['hall_id'] ?? 0);
+        if ($tid > 0 && $hid > 0) $map[$tid] = $hid;
+    }
+    return $map;
+}
+
 if (($_GET['ajax'] ?? '') === 'load') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -74,6 +93,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
         $prevNextTr = null;
         $page = 0;
         $items = [];
+        $tableHallMapBySpot = [];
 
         $totalChecks = 0;
         $totalSumMinor = 0;
@@ -103,10 +123,17 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 $tableId = (int)($tx['table_id'] ?? 0);
                 $spotId = (int)($tx['spot_id'] ?? 0);
                 $hallId = isset($tx['hall_id']) ? (int)$tx['hall_id'] : 0;
-                $hall = $hallId > 0 ? (string)$hallId : ($spotId > 0 ? (string)$spotId : '');
+
+                if ($spotId > 0 && !isset($tableHallMapBySpot[$spotId])) {
+                    $tableHallMapBySpot[$spotId] = banya_load_table_halls($api, $spotId);
+                }
+                $hallByTable = 0;
+                if ($spotId > 0 && $tableId > 0 && isset($tableHallMapBySpot[$spotId][$tableId])) {
+                    $hallByTable = (int)$tableHallMapBySpot[$spotId][$tableId];
+                }
+                $hall = $hallByTable > 0 ? (string)$hallByTable : ($hallId > 0 ? (string)$hallId : '');
 
                 $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
-                $detailRows = [];
                 $hookahMinorInCheck = 0;
 
                 foreach ($products as $p) {
@@ -121,14 +148,6 @@ if (($_GET['ajax'] ?? '') === 'load') {
                     $sub = (int)($productMap[$pid]['sub_category_id'] ?? 0);
                     $isHookah = ($cat === HOOKAH_CATEGORY_ID || $sub === HOOKAH_CATEGORY_ID);
                     if ($isHookah) $hookahMinorInCheck += $lineMinor;
-
-                    $detailRows[] = [
-                        'name' => $name,
-                        'qty' => $num,
-                        'price' => $fmtVnd($priceMinor),
-                        'sum' => $fmtVnd($lineMinor),
-                        'is_hookah' => $isHookah,
-                    ];
                 }
 
                 $sumMinor = (int)($tx['payed_sum'] ?? $tx['sum'] ?? 0);
@@ -143,15 +162,16 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 $items[] = [
                     'date' => $dateStr,
                     'hall' => $hall,
+                    'spot_id' => $spotId,
+                    'table_id' => $tableId,
                     'table' => $tableName,
                     'receipt' => $receipt,
                     'sum' => $fmtVnd($sumMinor),
                     'sum_minor' => $sumMinor,
                     'hookah_sum_minor' => $hookahMinorInCheck,
                     'waiter' => $waiter,
-                    'spot_id' => $spotId,
                     'hall_id' => $hallId,
-                    'details' => $detailRows,
+                    'transaction_id' => (int)($tx['transaction_id'] ?? 0),
                 ];
 
                 $totalChecks++;
@@ -179,6 +199,56 @@ if (($_GET['ajax'] ?? '') === 'load') {
             ]
         ];
         echo json_encode($out, JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'tx') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+
+    if ($token === '') {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $trId = (int)($_GET['transaction_id'] ?? 0);
+    if ($trId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $api = new \App\Classes\PosterAPI($token);
+    try {
+        $productMap = $loadProductMap($api);
+        $txArr = $api->request('dash.getTransaction', [
+            'transaction_id' => $trId,
+            'include_products' => 1,
+            'include_history' => 0,
+            'include_delivery' => 0,
+        ], 'GET');
+        $tx = is_array($txArr) && isset($txArr[0]) && is_array($txArr[0]) ? $txArr[0] : (is_array($txArr) ? $txArr : []);
+        $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
+        $lines = [];
+        foreach ($products as $p) {
+            if (!is_array($p)) continue;
+            $pid = (int)($p['product_id'] ?? 0);
+            $numRaw = $p['num'] ?? $p['count'] ?? 0;
+            $num = is_numeric($numRaw) ? (float)$numRaw : 0;
+            $priceMinor = (int)($p['product_price'] ?? 0);
+            $lineMinor = (int)round($priceMinor * $num);
+            $name = (string)($productMap[$pid]['name'] ?? ('#' . $pid));
+            $lines[] = [
+                'name' => $name,
+                'sum' => $fmtVnd($lineMinor),
+                'sum_minor' => $lineMinor,
+            ];
+        }
+        echo json_encode(['ok' => true, 'transaction_id' => $trId, 'lines' => $lines], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -219,11 +289,11 @@ $firstOfMonth = date('Y-m-01');
         .pill.bad { border-color: rgba(211,47,47,0.35); background: rgba(211,47,47,0.08); }
         .pill.ok { border-color: rgba(46,125,50,0.35); background: rgba(46,125,50,0.08); }
         .error { margin-top: 10px; color:#b91c1c; font-weight: 700; }
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; padding: 14px; }
-        .modal-inner { width: min(860px, 100%); max-height: min(78vh, 720px); overflow:auto; }
-        .modal-title { font-weight: 900; font-size: 16px; }
-        .detail-table td { padding: 8px 10px; }
-        .hookah { color:#b91c1c; font-weight: 900; }
+        .details-row td { background: rgba(17,24,39,0.02); }
+        .details-box { padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; }
+        .detail-line { display:flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed rgba(17,24,39,0.10); }
+        .detail-line:last-child { border-bottom: 0; }
+        .detail-sum { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 900; }
     </style>
 </head>
 <body>
@@ -273,27 +343,6 @@ $firstOfMonth = date('Y-m-01');
     </div>
 </div>
 
-<div class="modal" id="modal">
-    <div class="card modal-inner">
-        <div style="display:flex; justify-content: space-between; gap: 10px; align-items:center;">
-            <div class="modal-title" id="modalTitle">Детали</div>
-            <button type="button" class="secondary" id="modalClose">Закрыть</button>
-        </div>
-        <div class="muted" id="modalMeta" style="margin-top: 6px;"></div>
-        <table class="detail-table" style="margin-top: 10px;">
-            <thead>
-                <tr>
-                    <th>Блюдо</th>
-                    <th style="width: 90px; text-align:right;">Кол‑во</th>
-                    <th style="width: 140px; text-align:right;">Цена</th>
-                    <th style="width: 140px; text-align:right;">Сумма</th>
-                </tr>
-            </thead>
-            <tbody id="modalBody"></tbody>
-        </table>
-    </div>
-</div>
-
 <script>
     const elFrom = document.getElementById('dateFrom');
     const elTo = document.getElementById('dateTo');
@@ -305,12 +354,6 @@ $firstOfMonth = date('Y-m-01');
     const totSum = document.getElementById('totSum');
     const totHookah = document.getElementById('totHookah');
     const totWithout = document.getElementById('totWithout');
-
-    const modal = document.getElementById('modal');
-    const modalClose = document.getElementById('modalClose');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalMeta = document.getElementById('modalMeta');
-    const modalBody = document.getElementById('modalBody');
 
     const setLoading = (on) => {
         btn.disabled = on;
@@ -325,26 +368,17 @@ $firstOfMonth = date('Y-m-01');
 
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-    const openDetails = (row) => {
-        modalTitle.textContent = `Детали чека ${row.receipt || ''}`;
-        modalMeta.textContent = `${row.date || ''} · hall ${row.hall || ''} · стол ${row.table || ''} · официант ${row.waiter || ''} · сумма ${row.sum || ''}`;
-        modalBody.innerHTML = '';
-        (row.details || []).forEach((d) => {
-            const tr = document.createElement('tr');
-            const cls = d.is_hookah ? 'hookah' : '';
-            tr.innerHTML = `
-                <td class="${cls}">${esc(d.name || '')}</td>
-                <td class="num">${esc(d.qty || '')}</td>
-                <td class="num">${esc(d.price || '')}</td>
-                <td class="num">${esc(d.sum || '')}</td>
-            `;
-            modalBody.appendChild(tr);
-        });
-        modal.style.display = 'flex';
+    const loadDetails = async (transactionId) => {
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'tx');
+        url.searchParams.set('transaction_id', String(transactionId || ''));
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        const txt = await res.text();
+        let j = null;
+        try { j = JSON.parse(txt); } catch (_) {}
+        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка деталей');
+        return j.lines || [];
     };
-
-    modalClose.addEventListener('click', () => { modal.style.display = 'none'; });
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
 
     const load = async () => {
         setError('');
@@ -367,6 +401,7 @@ $firstOfMonth = date('Y-m-01');
 
             (j.items || []).forEach((row) => {
                 const tr = document.createElement('tr');
+                const txId = Number(row.transaction_id || row.receipt || 0);
                 tr.innerHTML = `
                     <td>${esc(row.date || '')}</td>
                     <td>${esc(row.hall || '')}</td>
@@ -374,10 +409,46 @@ $firstOfMonth = date('Y-m-01');
                     <td>${esc(row.receipt || '')}</td>
                     <td>${esc(row.waiter || '')}</td>
                     <td class="num">${esc(row.sum || '')}</td>
-                    <td><button type="button" class="secondary">Детали</button></td>
+                    <td><button type="button" class="secondary" data-tx="${esc(txId)}">Детали</button></td>
                 `;
-                tr.querySelector('button')?.addEventListener('click', () => openDetails(row));
                 tbody.appendChild(tr);
+
+                const trD = document.createElement('tr');
+                trD.className = 'details-row';
+                trD.style.display = 'none';
+                trD.innerHTML = `<td colspan="7"><div class="details-box muted">Загрузка…</div></td>`;
+                tbody.appendChild(trD);
+
+                const btnDetails = tr.querySelector('button');
+                if (btnDetails) {
+                    btnDetails.addEventListener('click', async () => {
+                        const isOpen = trD.style.display !== 'none';
+                        if (isOpen) {
+                            trD.style.display = 'none';
+                            return;
+                        }
+                        trD.style.display = '';
+                        const tx = Number(btnDetails.getAttribute('data-tx') || 0);
+                        try {
+                            const lines = await loadDetails(tx);
+                            const box = document.createElement('div');
+                            box.className = 'details-box';
+                            if (!lines.length) {
+                                box.innerHTML = `<div class="muted">Нет данных</div>`;
+                            } else {
+                                lines.forEach((ln) => {
+                                    const line = document.createElement('div');
+                                    line.className = 'detail-line';
+                                    line.innerHTML = `<div>${esc(ln.name || '')}</div><div class="detail-sum">${esc(ln.sum || '0')}</div>`;
+                                    box.appendChild(line);
+                                });
+                            }
+                            trD.firstChild.replaceWith(box);
+                        } catch (e) {
+                            trD.innerHTML = `<td colspan="7"><div class="details-box" style="color:#b91c1c; font-weight:700;">${esc(e && e.message ? e.message : 'Ошибка')}</div></td>`;
+                        }
+                    });
+                }
             });
 
             totChecks.textContent = `Итого чеков: ${String(j.totals?.checks || 0)}`;
