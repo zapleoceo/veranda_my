@@ -70,8 +70,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
     try {
         $productMap = $loadProductMap($api);
 
-        $offset = 0;
-        $limit = 100;
+        $nextTr = null;
         $items = [];
 
         $totalChecks = 0;
@@ -84,20 +83,24 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 'dateTo' => str_replace('-', '', $dateTo),
                 'include_products' => 'true',
                 'status' => 0,
-                'limit' => $limit,
-                'offset' => $offset,
             ];
+            if ($nextTr !== null) $params['next_tr'] = $nextTr;
             $batch = $api->request('dash.getTransactions', $params, 'GET');
             if (!is_array($batch)) $batch = [];
             $count = count($batch);
-            $offset += $limit;
+            if ($count > 0) {
+                $last = end($batch);
+                $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
+            }
 
             foreach ($batch as $tx) {
                 if (!is_array($tx)) continue;
                 $tableId = (int)($tx['table_id'] ?? 0);
                 $spotId = (int)($tx['spot_id'] ?? 0);
                 $hallId = isset($tx['hall_id']) ? (int)$tx['hall_id'] : 0;
-                if ($spotId !== BANYA_HALL_ID && $hallId !== BANYA_HALL_ID) continue;
+                $tableNameForFilter = (string)($tx['table_name'] ?? '');
+                $isNameBanya = stripos($tableNameForFilter, 'banya') !== false;
+                if ($spotId !== BANYA_HALL_ID && $hallId !== BANYA_HALL_ID && !$isNameBanya) continue;
 
                 $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
                 $detailRows = [];
@@ -151,7 +154,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 $totalSumMinor += $sumMinor;
                 $hookahSumMinor += $hookahMinorInCheck;
             }
-        } while ($count === $limit);
+        } while ($count > 0 && $nextTr !== null);
 
         usort($items, function ($a, $b) {
             return strcmp((string)$a['date'], (string)$b['date']);
