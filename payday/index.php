@@ -3897,7 +3897,7 @@ $fmtVnd = function (int $v): string {
         const pairs = [];
         mailRows.forEach((tr) => {
             const uid = Number(tr.getAttribute('data-mail-uid') || 0);
-            if (!uid) return;
+            if (!uid || outLinkByMail.has(uid)) return;
             const sum = Number(tr.getAttribute('data-sum') || 0);
             const arr = finBySum.get(sum);
             if (!arr || arr.length === 0) return;
@@ -3905,6 +3905,10 @@ $fmtVnd = function (int $v): string {
             const lt = (arr.length === 0) ? 'auto_green' : 'auto_yellow';
             pairs.push({ mail_uid: uid, finance_id: fid, link_type: lt });
         });
+        if (pairs.length === 0) {
+            alert('Нет совпадений для автосвязи по сумме');
+            return;
+        }
         const { dateTo } = getDateRange();
         fetch(location.pathname + '?ajax=out_auto_link', {
             method: 'POST',
@@ -3925,8 +3929,10 @@ $fmtVnd = function (int $v): string {
                 const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: !!l.is_manual };
                 if (!link.mail_uid || !link.finance_id) return;
                 outLinks.push(link);
-                outLinkByMail.set(link.mail_uid, link);
-                outLinkByFin.set(link.finance_id, link);
+                if (!outLinkByMail.has(link.mail_uid)) outLinkByMail.set(link.mail_uid, []);
+                if (!outLinkByFin.has(link.finance_id)) outLinkByFin.set(link.finance_id, []);
+                outLinkByMail.get(link.mail_uid).push(link);
+                outLinkByFin.get(link.finance_id).push(link);
             });
             applyOutRowClasses();
             applyOutHideLinked();
