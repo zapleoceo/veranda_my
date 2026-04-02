@@ -1917,46 +1917,25 @@ if (($_GET['ajax'] ?? '') === 'out_manual_link') {
     }
     $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
     try {
-        $uids = [];
-        $fids = [];
-        $seenU = [];
-        $seenF = [];
+        $normalized = [];
+        $seenPair = [];
         foreach ($pairs as $p) {
             $uid = (int)($p['mail_uid'] ?? 0);
             $fid = (int)($p['finance_id'] ?? 0);
             if ($uid <= 0 || $fid <= 0) continue;
-            if (isset($seenU[$uid]) || isset($seenF[$fid])) {
-                echo json_encode(['ok' => false, 'error' => 'В запросе есть дубликаты связей'], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
-            $seenU[$uid] = true;
-            $seenF[$fid] = true;
-            $uids[] = $uid;
-            $fids[] = $fid;
+            $k = $uid . ':' . $fid;
+            if (isset($seenPair[$k])) continue;
+            $seenPair[$k] = true;
+            $normalized[] = [$uid, $fid];
         }
-        if (!$uids || !$fids) {
+        if (!$normalized) {
             http_response_code(400);
             echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        $placeU = implode(',', array_fill(0, count($uids), '?'));
-        $placeF = implode(',', array_fill(0, count($fids), '?'));
-        $exists = $db->query(
-            "SELECT mail_uid, finance_id
-             FROM {$ol}
-             WHERE date_to = ?
-               AND (mail_uid IN ({$placeU}) OR finance_id IN ({$placeF}))
-             LIMIT 1",
-            array_merge([$dTo], $uids, $fids)
-        )->fetch();
-        if ($exists) {
-            echo json_encode(['ok' => false, 'error' => 'Нельзя связать: один из элементов уже связан'], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-        foreach ($pairs as $p) {
-            $uid = (int)($p['mail_uid'] ?? 0);
-            $fid = (int)($p['finance_id'] ?? 0);
-            if ($uid <= 0 || $fid <= 0) continue;
+        foreach ($normalized as $pair) {
+            $uid = (int)$pair[0];
+            $fid = (int)$pair[1];
             $db->query(
                 "INSERT INTO {$ol} (date_to, mail_uid, finance_id, link_type, is_manual, created_by)
                  VALUES (?, ?, ?, ?, ?, ?)
@@ -1995,48 +1974,28 @@ if (($_GET['ajax'] ?? '') === 'out_auto_link') {
     }
     $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
     try {
-        $uids = [];
-        $fids = [];
-        $seenU = [];
-        $seenF = [];
+        $normalized = [];
+        $seenPair = [];
         foreach ($pairs as $p) {
             $uid = (int)($p['mail_uid'] ?? 0);
             $fid = (int)($p['finance_id'] ?? 0);
             if ($uid <= 0 || $fid <= 0) continue;
-            if (isset($seenU[$uid]) || isset($seenF[$fid])) {
-                echo json_encode(['ok' => false, 'error' => 'В запросе есть дубликаты связей'], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
-            $seenU[$uid] = true;
-            $seenF[$fid] = true;
-            $uids[] = $uid;
-            $fids[] = $fid;
+            $lt = (string)($p['link_type'] ?? 'auto_green');
+            if ($lt !== 'auto_green' && $lt !== 'auto_yellow') $lt = 'auto_green';
+            $k = $uid . ':' . $fid;
+            if (isset($seenPair[$k])) continue;
+            $seenPair[$k] = true;
+            $normalized[] = [$uid, $fid, $lt];
         }
-        if (!$uids || !$fids) {
+        if (!$normalized) {
             http_response_code(400);
             echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        $placeU = implode(',', array_fill(0, count($uids), '?'));
-        $placeF = implode(',', array_fill(0, count($fids), '?'));
-        $exists = $db->query(
-            "SELECT mail_uid, finance_id
-             FROM {$ol}
-             WHERE date_to = ?
-               AND (mail_uid IN ({$placeU}) OR finance_id IN ({$placeF}))
-             LIMIT 1",
-            array_merge([$dTo], $uids, $fids)
-        )->fetch();
-        if ($exists) {
-            echo json_encode(['ok' => false, 'error' => 'Нельзя связать: один из элементов уже связан'], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-        foreach ($pairs as $p) {
-            $uid = (int)($p['mail_uid'] ?? 0);
-            $fid = (int)($p['finance_id'] ?? 0);
-            $lt = (string)($p['link_type'] ?? 'auto_green');
-            if ($uid <= 0 || $fid <= 0) continue;
-            if ($lt !== 'auto_green' && $lt !== 'auto_yellow') $lt = 'auto_green';
+        foreach ($normalized as $pair) {
+            $uid = (int)$pair[0];
+            $fid = (int)$pair[1];
+            $lt = (string)$pair[2];
             $db->query(
                 "INSERT INTO {$ol} (date_to, mail_uid, finance_id, link_type, is_manual, created_by)
                  VALUES (?, ?, ?, ?, ?, ?)
@@ -3433,8 +3392,10 @@ $fmtVnd = function (int $v): string {
                 const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: !!l.is_manual };
                 if (!link.mail_uid || !link.finance_id) return;
                 outLinks.push(link);
-                outLinkByMail.set(link.mail_uid, link);
-                outLinkByFin.set(link.finance_id, link);
+                if (!outLinkByMail.has(link.mail_uid)) outLinkByMail.set(link.mail_uid, []);
+                if (!outLinkByFin.has(link.finance_id)) outLinkByFin.set(link.finance_id, []);
+                outLinkByMail.get(link.mail_uid).push(link);
+                outLinkByFin.get(link.finance_id).push(link);
             });
             applyOutRowClasses();
             outScheduleRelayout();
@@ -3574,8 +3535,10 @@ $fmtVnd = function (int $v): string {
                     };
                     if (!link.mail_uid || !link.finance_id) return;
                     outLinks.push(link);
-                    outLinkByMail.set(link.mail_uid, link);
-                    outLinkByFin.set(link.finance_id, link);
+                    if (!outLinkByMail.has(link.mail_uid)) outLinkByMail.set(link.mail_uid, []);
+                    if (!outLinkByFin.has(link.finance_id)) outLinkByFin.set(link.finance_id, []);
+                    outLinkByMail.get(link.mail_uid).push(link);
+                    outLinkByFin.get(link.finance_id).push(link);
                 });
                 applyOutRowClasses();
                 applyOutHideLinked();
@@ -3778,9 +3741,11 @@ $fmtVnd = function (int $v): string {
             tr.classList.remove('row-red', 'row-gray', 'row-green', 'row-yellow');
             const uid = Number(tr.getAttribute('data-mail-uid') || 0);
             if (uid && outLinkByMail.has(uid)) {
-                const l = outLinkByMail.get(uid);
-                if (l && (l.is_manual || l.link_type === 'manual')) tr.classList.add('row-gray');
-                else if (l && l.link_type === 'auto_yellow') tr.classList.add('row-yellow');
+                const arr = outLinkByMail.get(uid) || [];
+                const hasManual = arr.some((l) => l && (l.is_manual || l.link_type === 'manual'));
+                const hasYellow = arr.some((l) => l && l.link_type === 'auto_yellow');
+                if (hasManual) tr.classList.add('row-gray');
+                else if (hasYellow) tr.classList.add('row-yellow');
                 else tr.classList.add('row-green');
             } else {
                 tr.classList.add('row-red');
@@ -3791,9 +3756,11 @@ $fmtVnd = function (int $v): string {
             tr.classList.remove('row-red', 'row-gray', 'row-green', 'row-yellow');
             const fid = Number(tr.getAttribute('data-finance-id') || 0);
             if (fid && outLinkByFin.has(fid)) {
-                const l = outLinkByFin.get(fid);
-                if (l && (l.is_manual || l.link_type === 'manual')) tr.classList.add('row-gray');
-                else if (l && l.link_type === 'auto_yellow') tr.classList.add('row-yellow');
+                const arr = outLinkByFin.get(fid) || [];
+                const hasManual = arr.some((l) => l && (l.is_manual || l.link_type === 'manual'));
+                const hasYellow = arr.some((l) => l && l.link_type === 'auto_yellow');
+                if (hasManual) tr.classList.add('row-gray');
+                else if (hasYellow) tr.classList.add('row-yellow');
                 else tr.classList.add('row-green');
             } else {
                 tr.classList.add('row-red');
@@ -3836,13 +3803,26 @@ $fmtVnd = function (int $v): string {
     if (outLinkMakeBtn) outLinkMakeBtn.addEventListener('click', () => {
         const mails = Array.from(outSelectedMail);
         const fins = Array.from(outSelectedFin);
-        const n = Math.min(mails.length, fins.length);
         const pairs = [];
-        for (let i = 0; i < n; i++) {
-            const uid = mails[i], fid = fins[i];
-            if (!uid || !fid) continue;
-            if (outLinkByMail.has(uid) || outLinkByFin.has(fid)) continue;
-            pairs.push({ mail_uid: uid, finance_id: fid });
+        if (mails.length === 1 && fins.length >= 1) {
+            const uid = mails[0];
+            fins.forEach((fid) => {
+                if (!uid || !fid) return;
+                pairs.push({ mail_uid: uid, finance_id: fid });
+            });
+        } else if (fins.length === 1 && mails.length >= 1) {
+            const fid = fins[0];
+            mails.forEach((uid) => {
+                if (!uid || !fid) return;
+                pairs.push({ mail_uid: uid, finance_id: fid });
+            });
+        } else {
+            const n = Math.min(mails.length, fins.length);
+            for (let i = 0; i < n; i++) {
+                const uid = mails[i], fid = fins[i];
+                if (!uid || !fid) continue;
+                pairs.push({ mail_uid: uid, finance_id: fid });
+            }
         }
         const { dateTo } = getDateRange();
         fetch(location.pathname + '?ajax=out_manual_link', {
@@ -3864,8 +3844,10 @@ $fmtVnd = function (int $v): string {
                 const link = { mail_uid: Number(l.mail_uid || 0), finance_id: Number(l.finance_id || 0), link_type: String(l.link_type || ''), is_manual: !!l.is_manual };
                 if (!link.mail_uid || !link.finance_id) return;
                 outLinks.push(link);
-                outLinkByMail.set(link.mail_uid, link);
-                outLinkByFin.set(link.finance_id, link);
+                if (!outLinkByMail.has(link.mail_uid)) outLinkByMail.set(link.mail_uid, []);
+                if (!outLinkByFin.has(link.finance_id)) outLinkByFin.set(link.finance_id, []);
+                outLinkByMail.get(link.mail_uid).push(link);
+                outLinkByFin.get(link.finance_id).push(link);
             });
             applyOutRowClasses();
             applyOutHideLinked();
@@ -3915,7 +3897,7 @@ $fmtVnd = function (int $v): string {
         const pairs = [];
         mailRows.forEach((tr) => {
             const uid = Number(tr.getAttribute('data-mail-uid') || 0);
-            if (!uid || outLinkByMail.has(uid)) return;
+            if (!uid) return;
             const sum = Number(tr.getAttribute('data-sum') || 0);
             const arr = finBySum.get(sum);
             if (!arr || arr.length === 0) return;
