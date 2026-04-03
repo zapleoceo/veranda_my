@@ -208,7 +208,7 @@ $firstOfMonth = date('Y-m-01');
                     <th>role_name</th>
                     <th style="text-align:right;">Чеков</th>
                     <th style="text-align:right;">ЧасыРаботы</th>
-                    <th style="text-align:right;">Salaey</th>
+                    <th style="text-align:right;">Salary</th>
                 </tr>
                 </thead>
                 <tbody id="tbody"></tbody>
