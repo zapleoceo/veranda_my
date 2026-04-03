@@ -100,7 +100,9 @@ if (($_GET['ajax'] ?? '') === 'load') {
         ], 'GET');
         if (!is_array($rows)) $rows = [];
 
-        $tipsCardByWaiter = [];
+        $tipsMode = null;
+        $tipsByUserId = [];
+        $tipsByName = [];
         $seenTx = [];
         $nextTr = null;
         $prevNextTr = null;
@@ -112,6 +114,9 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 'dateFrom' => str_replace('-', '', $dateFrom),
                 'dateTo' => str_replace('-', '', $dateTo),
                 'status' => 2,
+                'include_history' => 'false',
+                'include_products' => 'false',
+                'include_delivery' => 'false',
             ];
             if ($nextTr !== null) $params['next_tr'] = $nextTr;
             $batch = $api->request('dash.getTransactions', $params, 'GET');
@@ -128,21 +133,29 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 if ($txId <= 0 || isset($seenTx[$txId])) continue;
                 $seenTx[$txId] = true;
 
-                $txArr = $api->request('dash.getTransaction', [
-                    'transaction_id' => $txId,
-                    'include_history' => 'false',
-                    'include_products' => 'false',
-                    'include_delivery' => 'false',
-                ], 'GET');
-                $txFull = is_array($txArr) && isset($txArr[0]) && is_array($txArr[0]) ? $txArr[0] : (is_array($txArr) ? $txArr : []);
-                $wName = trim((string)($txFull['name'] ?? $tx['name'] ?? ''));
-                if ($wName === '') continue;
-                $k = mb_strtolower($wName, 'UTF-8');
-                $tipsCard = (int)($txFull['tips_card'] ?? 0);
-                if (!isset($tipsCardByWaiter[$k])) {
-                    $tipsCardByWaiter[$k] = ['name' => $wName, 'tips_card' => 0];
+                if ($tipsMode === null) {
+                    if (array_key_exists('tips_card', $tx)) $tipsMode = 'tips_card';
+                    elseif (array_key_exists('tip_sum', $tx)) $tipsMode = 'tip_sum';
+                    else $tipsMode = 'none';
                 }
-                $tipsCardByWaiter[$k]['tips_card'] += $tipsCard;
+                $val = 0;
+                if ($tipsMode === 'tips_card') {
+                    $val = (int)($tx['tips_card'] ?? 0);
+                } elseif ($tipsMode === 'tip_sum') {
+                    $val = (int)($tx['tip_sum'] ?? 0);
+                }
+                if ($val <= 0) continue;
+
+                $uidTx = (int)($tx['user_id'] ?? 0);
+                $wName = trim((string)($tx['name'] ?? ''));
+                if ($uidTx > 0) {
+                    if (!isset($tipsByUserId[$uidTx])) $tipsByUserId[$uidTx] = 0;
+                    $tipsByUserId[$uidTx] += $val;
+                } elseif ($wName !== '') {
+                    $k = mb_strtolower($wName, 'UTF-8');
+                    if (!isset($tipsByName[$k])) $tipsByName[$k] = 0;
+                    $tipsByName[$k] += $val;
+                }
             }
             if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
         } while ($count > 0 && $nextTr !== null);
@@ -162,14 +175,14 @@ if (($_GET['ajax'] ?? '') === 'load') {
             $workedHours = $workedMin > 0 ? round($workedMin / 60, 2) : 0;
             $role = $uid > 0 ? (string)($roleByUser[$uid] ?? '') : '';
             $nk = mb_strtolower(trim($name), 'UTF-8');
-            $tips = $tipsCardByWaiter[$nk] ?? null;
+            $tipsMinor = $uid > 0 && isset($tipsByUserId[$uid]) ? (int)$tipsByUserId[$uid] : (int)($tipsByName[$nk] ?? 0);
             $out[] = [
                 'user_id' => $uid,
                 'name' => $name,
                 'role_name' => $role,
                 'checks' => $clients,
                 'worked_hours' => $workedHours,
-                'tips_card' => (int)($tips['tips_card'] ?? 0),
+                'tips_card' => $tipsMinor,
             ];
         }
         $rateByUser = [];
@@ -192,7 +205,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
         }
         unset($row);
         usort($out, fn($a, $b) => ($b['checks'] <=> $a['checks']));
-        echo json_encode(['ok' => true, 'rows' => $out], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => true, 'rows' => $out, 'tips_mode' => ($tipsMode ?? 'none')], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -248,6 +261,7 @@ $firstOfMonth = date('Y-m-01');
             </div>
         </div>
         <div class="error" id="err" style="display:none;"></div>
+        <div class="muted" id="tipsMode" style="margin-top: 10px; display:none;"></div>
         <div class="table-wrap" style="margin-top: 12px;">
             <table>
                 <thead>
@@ -276,6 +290,7 @@ $firstOfMonth = date('Y-m-01');
     const loader = document.getElementById('loader');
     const err = document.getElementById('err');
     const tbody = document.getElementById('tbody');
+    const tipsModeEl = document.getElementById('tipsMode');
 
     const setLoading = (on) => {
         btn.disabled = on;
@@ -312,6 +327,18 @@ $firstOfMonth = date('Y-m-01');
             let j = null;
             try { j = JSON.parse(txt); } catch (_) {}
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            if (tipsModeEl) {
+                const m = String(j.tips_mode || '');
+                if (m) {
+                    tipsModeEl.style.display = 'block';
+                    tipsModeEl.textContent = m === 'tips_card'
+                        ? 'Tips: берутся из dash.getTransactions.tips_card'
+                        : (m === 'tip_sum' ? 'Tips: берутся из dash.getTransactions.tip_sum (в getTransactions нет tips_card)' : 'Tips: не найдены в dash.getTransactions');
+                } else {
+                    tipsModeEl.style.display = 'none';
+                    tipsModeEl.textContent = '';
+                }
+            }
             (j.rows || []).forEach((r) => {
                 const tr = document.createElement('tr');
                 const rate = Number(r.rate || 0);
