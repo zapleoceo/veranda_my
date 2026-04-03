@@ -3231,7 +3231,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;">
                             <span id="balAndrey" data-cents="<?= $posterBalanceAndrey !== null ? (int)$posterBalanceAndrey : '' ?>"><?= $posterBalanceAndrey !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceAndrey)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balAndreyActual" type="text" inputmode="decimal" placeholder="0.00" style="text-align:right;"></td>
+                        <td style="text-align:right;"><input id="balAndreyActual" type="text" inputmode="numeric" placeholder="0" style="text-align:right;"></td>
                         <td style="text-align:right;"><span id="balAndreyDiff">—</span></td>
                     </tr>
                     <tr data-key="vietnam">
@@ -3239,7 +3239,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;">
                             <span id="balVietnam" data-cents="<?= $posterBalanceVietnam !== null ? (int)$posterBalanceVietnam : '' ?>"><?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceVietnam)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balVietnamActual" type="text" inputmode="decimal" placeholder="0.00" style="text-align:right;"></td>
+                        <td style="text-align:right;"><input id="balVietnamActual" type="text" inputmode="numeric" placeholder="0" style="text-align:right;"></td>
                         <td style="text-align:right;"><span id="balVietnamDiff">—</span></td>
                     </tr>
                     <tr data-key="cash">
@@ -3247,7 +3247,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;">
                             <span id="balCash" data-cents="<?= $posterBalanceCash !== null ? (int)$posterBalanceCash : '' ?>"><?= $posterBalanceCash !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceCash)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balCashActual" type="text" inputmode="decimal" placeholder="0.00" style="text-align:right;"></td>
+                        <td style="text-align:right;"><input id="balCashActual" type="text" inputmode="numeric" placeholder="0" style="text-align:right;"></td>
                         <td style="text-align:right;"><span id="balCashDiff">—</span></td>
                     </tr>
                     <tr data-key="total">
@@ -3255,7 +3255,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;">
                             <span id="balTotal" data-cents="<?= $posterBalanceTotal !== null ? (int)$posterBalanceTotal : '' ?>"><?= $posterBalanceTotal !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceTotal)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balTotalActual" type="text" inputmode="decimal" placeholder="0.00" style="text-align:right;" readonly></td>
+                        <td style="text-align:right;"><input id="balTotalActual" type="text" inputmode="numeric" placeholder="0" style="text-align:right;" readonly></td>
                         <td style="text-align:right;"><span id="balTotalDiff">—</span></td>
                     </tr>
                     </tbody>
@@ -4044,17 +4044,23 @@ $fmtVnd = function (int $v): string {
         return Math.round(n * 100);
     };
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
-    const sanitizeInputDigits = (el) => {
+    const fmtDigitsSpaces = (digits) => {
+        const d = String(digits || '').replace(/\D+/g, '');
+        if (!d) return '';
+        const norm = d.replace(/^0+(?=\d)/, '');
+        return norm.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    };
+    const sanitizeInputVndInt = (el) => {
         if (!el) return;
         const v = digitsOnly(el.value);
-        el.value = v;
+        el.value = fmtDigitsSpaces(v);
     };
     const updateTotalActual = () => {
         const a = Number(digitsOnly(balAndreyActualEl ? balAndreyActualEl.value : '')) || 0;
         const v = Number(digitsOnly(balVietnamActualEl ? balVietnamActualEl.value : '')) || 0;
         const c = Number(digitsOnly(balCashActualEl ? balCashActualEl.value : '')) || 0;
         const sum = a + v + c;
-        if (balTotalActualEl) balTotalActualEl.value = String(sum);
+        if (balTotalActualEl) balTotalActualEl.value = fmtDigitsSpaces(String(sum));
     };
 
     const setDiff = (el, diffCents) => {
@@ -4155,26 +4161,20 @@ $fmtVnd = function (int $v): string {
         if (balCashActualEl) balCashActualEl.value = localStorage.getItem('payday_bal_cash') || '';
         if (balTotalActualEl) balTotalActualEl.value = localStorage.getItem('payday_bal_total') || '';
     } catch (_) {}
-    sanitizeInputDigits(balAndreyActualEl);
-    sanitizeInputDigits(balVietnamActualEl);
-    sanitizeInputDigits(balCashActualEl);
+    sanitizeInputVndInt(balAndreyActualEl);
+    sanitizeInputVndInt(balVietnamActualEl);
+    sanitizeInputVndInt(balCashActualEl);
     updateTotalActual();
     updateBalanceDiffs();
 
     [balAndreyActualEl, balVietnamActualEl, balCashActualEl].forEach((el) => {
         if (!el) return;
         el.addEventListener('input', () => {
-            sanitizeInputDigits(el);
+            sanitizeInputVndInt(el);
             updateTotalActual();
             updateBalanceDiffs();
         }, { passive: true });
     });
-    if (balTotalActualEl) {
-        balTotalActualEl.addEventListener('input', () => {
-            sanitizeInputDigits(balTotalActualEl);
-            updateBalanceDiffs();
-        }, { passive: true });
-    }
 
     if (balanceSyncBtn) {
         balanceSyncBtn.addEventListener('click', () => {
