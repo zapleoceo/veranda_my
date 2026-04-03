@@ -329,7 +329,7 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
             $type = (string)($t['type'] ?? '');
             if ($type !== '0' && $type !== 'expense' && $type !== 'out') continue;
             $uid = (int)($t['user_id'] ?? 0);
-            if ($uid !== 10) continue;
+            if ($uid !== 10 && $uid !== 4) continue;
             $comment = trim((string)($t['comment'] ?? ''));
             if ($comment === '' || stripos($comment, 'TIPS') !== 0) continue;
             if (!preg_match('/\bID\s*=\s*(\d+)\b/i', $comment, $m)) continue;
