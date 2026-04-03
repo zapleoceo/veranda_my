@@ -1,5 +1,11 @@
 <?php
-require_once __DIR__ . '/auth_check.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-header('Location: dashboard.php');
+if (!empty($_SESSION['user_email'])) {
+    header('Location: /dashboard.php');
+} else {
+    header('Location: /links/');
+}
 exit;
