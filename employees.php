@@ -526,12 +526,13 @@ $firstOfMonth = date('Y-m-01');
                 cleanup();
                 if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка подготовки');
                 currentJobId = String(j2.job_id || '');
-                prog.style.display = 'flex';
-                loader.style.display = 'none';
-                progBar.style.width = '0%';
-                progLabel.textContent = '0%';
                 const total = Number(j2.total || 0);
-                progDesc.textContent = `Подготовка… дней: 0 из ${total}`;
+                if (basePct < 25) {
+                    basePct = 25;
+                    progBar.style.width = basePct + '%';
+                    progLabel.textContent = basePct + '%';
+                }
+                progDesc.textContent = `Подготовка Tips… дней: 0 из ${total}`;
                 return j2;
             };
             const run = async (jobId, total) => {
@@ -558,7 +559,7 @@ $firstOfMonth = date('Y-m-01');
                     if (mode) tipsMode = mode;
                     aggUser = j3.agg_user || aggUser;
                     aggName = j3.agg_name || aggName;
-                    const pct = total ? (20 + Math.round((done / total) * 80)) : 100;
+                    const pct = total ? (25 + Math.round((done / total) * 75)) : 100;
                     progBar.style.width = pct + '%';
                     progLabel.textContent = pct + '%';
                     progDesc.textContent = `Дни: ${done} из ${total}`;
