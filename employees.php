@@ -501,6 +501,37 @@ $firstOfMonth = date('Y-m-01');
     const ths = Array.from(document.querySelectorAll('th[data-sort]'));
     ths.forEach((th) => th.addEventListener('click', () => setSort(th.getAttribute('data-sort') || '')));
     let dataRows = [];
+    function renderTable() {
+        const coll = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
+        const dir = sortDir === 'desc' ? -1 : 1;
+        const items = dataRows.slice().sort((a, b) => {
+            const av = a[sortBy];
+            const bv = b[sortBy];
+            if (typeof av === 'number' || typeof bv === 'number') {
+                const an = Number(av || 0), bn = Number(bv || 0);
+                if (an === bn) return 0;
+                return an < bn ? -1 * dir : 1 * dir;
+            }
+            const s = coll.compare(String(av || ''), String(bv || ''));
+            return s * dir;
+        });
+        tbody.innerHTML = '';
+        items.forEach((r) => {
+            const tipsVnd = vndFromMinor(r.tips_minor || 0);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${esc(r.user_id)}</td>
+                <td>${esc(r.name)}</td>
+                <td style="text-align:right;"><input class="rate-input" inputmode="numeric" data-user-id="${esc(r.user_id)}" data-hours="${esc(r.worked_hours)}" data-rate="${esc(r.rate)}" value="${esc(fmtSpaces(String(r.rate || '')))}"></td>
+                <td>${esc(r.role_name)}</td>
+                <td style="text-align:right;">${esc(r.checks)}</td>
+                <td style="text-align:right;">${esc(r.worked_hours)}</td>
+                <td style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
+                <td style="text-align:right;" class="salary-cell" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(r.salary_minor))}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
 
     const withTimeout = (ms = 30000) => {
         const ctrl = new AbortController();
@@ -512,6 +543,13 @@ $firstOfMonth = date('Y-m-01');
         setError('');
         setLoading(true);
         tbody.innerHTML = '';
+        prog.style.display = 'flex';
+        loader.style.display = 'none';
+        progBar.style.width = '0%';
+        progLabel.textContent = '0%';
+        progDesc.textContent = 'Загрузка данных официантов…';
+        cancelBtn.style.display = 'inline-block';
+        cancelBtn.disabled = false;
         try {
             const url = new URL(location.href);
             url.searchParams.set('ajax', 'load');
@@ -696,39 +734,6 @@ $firstOfMonth = date('Y-m-01');
         setLoading(false);
     });
 })();
-function renderTable() {
-    const tbody = document.getElementById('tbody');
-    if (!tbody) return;
-    const coll = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
-    const dir = sortDir === 'desc' ? -1 : 1;
-    const items = dataRows.slice().sort((a, b) => {
-        const av = a[sortBy];
-        const bv = b[sortBy];
-        if (typeof av === 'number' || typeof bv === 'number') {
-            const an = Number(av || 0), bn = Number(bv || 0);
-            if (an === bn) return 0;
-            return an < bn ? -1 * dir : 1 * dir;
-        }
-        const s = coll.compare(String(av || ''), String(bv || ''));
-        return s * dir;
-    });
-    tbody.innerHTML = '';
-    items.forEach((r) => {
-        const tipsVnd = vndFromMinor(r.tips_minor || 0);
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${esc(r.user_id)}</td>
-            <td>${esc(r.name)}</td>
-            <td style="text-align:right;"><input class="rate-input" inputmode="numeric" data-user-id="${esc(r.user_id)}" data-hours="${esc(r.worked_hours)}" data-rate="${esc(r.rate)}" value="${esc(fmtSpaces(String(r.rate || '')))}"></td>
-            <td>${esc(r.role_name)}</td>
-            <td style="text-align:right;">${esc(r.checks)}</td>
-            <td style="text-align:right;">${esc(r.worked_hours)}</td>
-            <td style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
-            <td style="text-align:right;" class="salary-cell" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(r.salary_minor))}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-}
 </script>
 <script src="/assets/user_menu.js" defer></script>
 </body>
