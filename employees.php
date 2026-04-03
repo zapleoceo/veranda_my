@@ -346,6 +346,20 @@ if (($_GET['ajax'] ?? '') === 'tips_run') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'tips_cancel') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    $jobId = (string)($_GET['job_id'] ?? '');
+    if ($jobId !== '' && isset($_SESSION[$jobId])) {
+        $_SESSION[$jobId]['canceled'] = 1;
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    } else {
+        echo json_encode(['ok' => false], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 $today = date('Y-m-d');
 $firstOfMonth = date('Y-m-01');
 
@@ -368,10 +382,11 @@ $firstOfMonth = date('Y-m-01');
         .error { margin-top: 10px; color:#b91c1c; font-weight: 800; }
         .table-wrap { overflow:auto; }
         .rate-input { width: 120px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
-        .progress { display:none; align-items:center; gap: 10px; margin-top: 10px; }
+        .progress { display:none; align-items:center; gap: 10px; margin-left: 10px; }
         .progress .bar { width: 240px; height: 10px; border-radius: 999px; background: #eee; overflow: hidden; }
         .progress .bar > span { display:block; height: 100%; width: 0; background: #1a73e8; transition: width 0.15s ease; }
-        .progress .label { font-size: 12px; color:#6b7280; font-weight: 800; }
+        .progress .label { font-size: 12px; color:#1f2937; font-weight: 800; }
+        .progress .desc { font-size: 12px; color:#6b7280; }
     </style>
 </head>
 <body>
@@ -392,17 +407,19 @@ $firstOfMonth = date('Y-m-01');
                 Дата конца
                 <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>">
             </label>
-            <div style="display:flex; gap: 10px; align-items:center;">
+            <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
                 <button type="button" id="loadBtn">ЗАГРУЗИТЬ</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
+                <button type="button" class="secondary" id="cancelBtn" style="display:none;">Отменить</button>
+                <div class="progress" id="prog">
+                    <div class="bar"><span id="progBar"></span></div>
+                    <div class="label" id="progLabel">0%</div>
+                    <div class="desc" id="progDesc"></div>
+                </div>
             </div>
         </div>
         <div class="error" id="err" style="display:none;"></div>
         <div class="muted" id="tipsMode" style="margin-top: 10px; display:none;"></div>
-        <div class="progress" id="prog">
-            <div class="bar"><span id="progBar"></span></div>
-            <div class="label" id="progLabel">0%</div>
-        </div>
         <div class="table-wrap" style="margin-top: 12px;">
             <table>
                 <thead>
@@ -435,6 +452,9 @@ $firstOfMonth = date('Y-m-01');
     const prog = document.getElementById('prog');
     const progBar = document.getElementById('progBar');
     const progLabel = document.getElementById('progLabel');
+    const progDesc = document.getElementById('progDesc');
+    const cancelBtn = document.getElementById('cancelBtn');
+    let runAbort = null;
 
     const setLoading = (on) => {
         btn.disabled = on;
@@ -456,6 +476,12 @@ $firstOfMonth = date('Y-m-01');
     const fmtMoney = (n) => fmtSpaces(String(Math.round(Number(n || 0))));
     const calcSalary = (rate, hours) => Math.round(Number(rate || 0) * Number(hours || 0));
     const vndFromMinor = (minor) => Math.round(Number(minor || 0) / 100);
+
+    const withTimeout = (ms = 30000) => {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort('timeout'), ms);
+        return { signal: ctrl.signal, cleanup: () => clearTimeout(t), controller: ctrl };
+    };
 
     const load = async () => {
         setError('');
@@ -480,25 +506,34 @@ $firstOfMonth = date('Y-m-01');
                 url.searchParams.set('ajax', 'tips_prepare');
                 url.searchParams.set('date_from', dateFrom.value);
                 url.searchParams.set('date_to', dateTo.value);
-                const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                const { signal, cleanup } = withTimeout(20000);
+                const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal });
                 const t = await res.text();
                 let j2 = null;
                 try { j2 = JSON.parse(t); } catch (_) {}
+                cleanup();
                 if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка подготовки');
                 return j2;
             };
             const run = async (jobId, total) => {
                 let done = 0;
                 prog.style.display = 'flex';
+                cancelBtn.style.display = 'inline-block';
+                cancelBtn.disabled = false;
+                runAbort = new AbortController();
+                const abortSignal = runAbort.signal;
                 while (done < total) {
+                    if (abortSignal.aborted) break;
                     const url = new URL(location.href);
                     url.searchParams.set('ajax', 'tips_run');
                     url.searchParams.set('job_id', jobId);
                     url.searchParams.set('batch', '12');
-                    const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                    const { signal, cleanup } = withTimeout(30000);
+                    const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal });
                     const t = await res.text();
                     let j3 = null;
                     try { j3 = JSON.parse(t); } catch (_) {}
+                    cleanup();
                     if (!j3 || !j3.ok) throw new Error((j3 && j3.error) ? j3.error : 'Ошибка загрузки чаевых');
                     done = Number(j3.done || 0);
                     const mode = String(j3.tips_mode || '');
@@ -508,8 +543,11 @@ $firstOfMonth = date('Y-m-01');
                     const pct = total ? Math.round((done / total) * 100) : 100;
                     progBar.style.width = pct + '%';
                     progLabel.textContent = pct + '%';
+                    progDesc.textContent = `Дни: ${done} из ${total}`;
                 }
                 prog.style.display = 'none';
+                cancelBtn.style.display = 'none';
+                runAbort = null;
             };
             const p = await prepare();
             await run(p.job_id, Number(p.total || 0));
@@ -613,6 +651,22 @@ $firstOfMonth = date('Y-m-01');
     };
 
     btn.addEventListener('click', load);
+    cancelBtn.addEventListener('click', async () => {
+        try {
+            cancelBtn.disabled = true;
+            if (runAbort) {
+                runAbort.abort('user-cancel');
+            }
+            const url = new URL(location.href);
+            url.searchParams.set('ajax', 'tips_cancel');
+            url.searchParams.set('job_id', progDesc.textContent || '');
+            // best-effort cancel (no need to await)
+            fetch(url.toString(), { headers: { 'Accept': 'application/json' } }).catch(() => {});
+        } catch (_) {}
+        prog.style.display = 'none';
+        cancelBtn.style.display = 'none';
+        setLoading(false);
+    });
 })();
 </script>
 <script src="/assets/user_menu.js" defer></script>
