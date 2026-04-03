@@ -100,66 +100,6 @@ if (($_GET['ajax'] ?? '') === 'load') {
         ], 'GET');
         if (!is_array($rows)) $rows = [];
 
-        $tipsMode = null;
-        $tipsByUserId = [];
-        $tipsByName = [];
-        $seenTx = [];
-        $nextTr = null;
-        $prevNextTr = null;
-        $page = 0;
-        do {
-            $page++;
-            if ($page > 2000) break;
-            $params = [
-                'dateFrom' => str_replace('-', '', $dateFrom),
-                'dateTo' => str_replace('-', '', $dateTo),
-                'status' => 2,
-                'include_history' => 'false',
-                'include_products' => 'false',
-                'include_delivery' => 'false',
-            ];
-            if ($nextTr !== null) $params['next_tr'] = $nextTr;
-            $batch = $api->request('dash.getTransactions', $params, 'GET');
-            if (!is_array($batch)) $batch = [];
-            $count = count($batch);
-            if ($count > 0) {
-                $last = end($batch);
-                $prevNextTr = $nextTr;
-                $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
-            }
-            foreach ($batch as $tx) {
-                if (!is_array($tx)) continue;
-                $txId = (int)($tx['transaction_id'] ?? 0);
-                if ($txId <= 0 || isset($seenTx[$txId])) continue;
-                $seenTx[$txId] = true;
-
-                if ($tipsMode === null) {
-                    if (array_key_exists('tips_card', $tx)) $tipsMode = 'tips_card';
-                    elseif (array_key_exists('tip_sum', $tx)) $tipsMode = 'tip_sum';
-                    else $tipsMode = 'none';
-                }
-                $val = 0;
-                if ($tipsMode === 'tips_card') {
-                    $val = (int)($tx['tips_card'] ?? 0);
-                } elseif ($tipsMode === 'tip_sum') {
-                    $val = (int)($tx['tip_sum'] ?? 0);
-                }
-                if ($val <= 0) continue;
-
-                $uidTx = (int)($tx['user_id'] ?? 0);
-                $wName = trim((string)($tx['name'] ?? ''));
-                if ($uidTx > 0) {
-                    if (!isset($tipsByUserId[$uidTx])) $tipsByUserId[$uidTx] = 0;
-                    $tipsByUserId[$uidTx] += $val;
-                } elseif ($wName !== '') {
-                    $k = mb_strtolower($wName, 'UTF-8');
-                    if (!isset($tipsByName[$k])) $tipsByName[$k] = 0;
-                    $tipsByName[$k] += $val;
-                }
-            }
-            if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
-        } while ($count > 0 && $nextTr !== null);
-
         $out = [];
         $uids = [];
         foreach ($rows as $r) {
@@ -174,15 +114,13 @@ if (($_GET['ajax'] ?? '') === 'load') {
             $workedMin = is_numeric($worked) ? (int)round((float)$worked) : 0;
             $workedHours = $workedMin > 0 ? round($workedMin / 60, 2) : 0;
             $role = $uid > 0 ? (string)($roleByUser[$uid] ?? '') : '';
-            $nk = mb_strtolower(trim($name), 'UTF-8');
-            $tipsMinor = $uid > 0 && isset($tipsByUserId[$uid]) ? (int)$tipsByUserId[$uid] : (int)($tipsByName[$nk] ?? 0);
             $out[] = [
                 'user_id' => $uid,
                 'name' => $name,
                 'role_name' => $role,
                 'checks' => $clients,
                 'worked_hours' => $workedHours,
-                'tips_card' => $tipsMinor,
+                'tips_card' => 0,
             ];
         }
         $rateByUser = [];
@@ -205,7 +143,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
         }
         unset($row);
         usort($out, fn($a, $b) => ($b['checks'] <=> $a['checks']));
-        echo json_encode(['ok' => true, 'rows' => $out, 'tips_mode' => ($tipsMode ?? 'none')], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => true, 'rows' => $out, 'tips_mode' => 'client'], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -387,7 +325,7 @@ $firstOfMonth = date('Y-m-01');
         .table-wrap { overflow:auto; }
         .rate-input { width: 120px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
         .progress { display:none; align-items:center; gap: 10px; margin-left: 10px; }
-        .progress .bar { width: 240px; height: 10px; border-radius: 999px; background: #eee; overflow: hidden; }
+        .progress .bar { width: 160px; height: 10px; border-radius: 999px; background: #eee; overflow: hidden; }
         .progress .bar > span { display:block; height: 100%; width: 0; background: #1a73e8; transition: width 0.15s ease; }
         .progress .label { font-size: 12px; color:#1f2937; font-weight: 800; }
         .progress .desc { font-size: 12px; color:#6b7280; }
@@ -550,6 +488,13 @@ $firstOfMonth = date('Y-m-01');
         progDesc.textContent = 'Загрузка данных официантов…';
         cancelBtn.style.display = 'inline-block';
         cancelBtn.disabled = false;
+        let basePct = 0;
+        const tick = setInterval(() => {
+            if (basePct >= 20) return;
+            basePct += 1;
+            progBar.style.width = basePct + '%';
+            progLabel.textContent = basePct + '%';
+        }, 300);
         try {
             const url = new URL(location.href);
             url.searchParams.set('ajax', 'load');
@@ -560,6 +505,10 @@ $firstOfMonth = date('Y-m-01');
             let j = null;
             try { j = JSON.parse(txt); } catch (_) {}
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            clearInterval(tick);
+            progBar.style.width = '20%';
+            progLabel.textContent = '20%';
+            progDesc.textContent = 'Подготовка загрузки Tips…';
             const rows = j.rows || [];
             let aggUser = {};
             let aggName = {};
@@ -609,7 +558,7 @@ $firstOfMonth = date('Y-m-01');
                     if (mode) tipsMode = mode;
                     aggUser = j3.agg_user || aggUser;
                     aggName = j3.agg_name || aggName;
-                    const pct = total ? Math.round((done / total) * 100) : 100;
+                    const pct = total ? (20 + Math.round((done / total) * 80)) : 100;
                     progBar.style.width = pct + '%';
                     progLabel.textContent = pct + '%';
                     progDesc.textContent = `Дни: ${done} из ${total}`;
@@ -710,6 +659,7 @@ $firstOfMonth = date('Y-m-01');
                 });
             });
         } catch (e) {
+            try { clearInterval(tick); } catch (_) {}
             setError(e && e.message ? e.message : 'Ошибка');
         } finally {
             setLoading(false);
