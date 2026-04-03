@@ -700,6 +700,7 @@ $dashboardQuery = http_build_query([
     </div>
 
     <script src="assets/app.js" defer></script>
+    <script src="assets/user_menu.js" defer></script>
     <script>
 
         const cardsEl = document.getElementById('cards');

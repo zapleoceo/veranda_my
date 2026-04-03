@@ -2521,25 +2521,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 if (e.key === 'Escape') close();
             });
         })();
-
-        (() => {
-            const menu = document.querySelector('.user-menu');
-            if (!menu) return;
-            let t = null;
-            const open = () => {
-                if (t) { clearTimeout(t); t = null; }
-                menu.classList.add('open');
-            };
-            const scheduleClose = () => {
-                if (t) clearTimeout(t);
-                t = setTimeout(() => {
-                    menu.classList.remove('open');
-                    t = null;
-                }, 700);
-            };
-            menu.addEventListener('mouseenter', open);
-            menu.addEventListener('mouseleave', scheduleClose);
-        })();
     </script>
+    <script src="/assets/user_menu.js" defer></script>
 </body>
 </html>

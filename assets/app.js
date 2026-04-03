@@ -18,26 +18,3 @@
     setTimeout(fire, 300);
   });
 })();
-
-(() => {
-  const menu = document.querySelector('.user-menu');
-  if (!menu) return;
-  let t = null;
-  const open = () => {
-    if (t) {
-      clearTimeout(t);
-      t = null;
-    }
-    menu.classList.add('open');
-  };
-  const scheduleClose = () => {
-    if (t) clearTimeout(t);
-    t = setTimeout(() => {
-      menu.classList.remove('open');
-      t = null;
-    }, 700);
-  };
-  menu.addEventListener('mouseenter', open);
-  menu.addEventListener('mouseleave', scheduleClose);
-})();
-

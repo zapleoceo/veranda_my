@@ -338,6 +338,7 @@ try {
     </div>
 
     <script src="assets/app.js" defer></script>
+    <script src="assets/user_menu.js" defer></script>
     <script src="assets/datepicker-range-dialog.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', () => {

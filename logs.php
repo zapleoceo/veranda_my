@@ -224,5 +224,6 @@ $fileInfo = function (string $filePath): array {
     </div>
 </div>
 <script src="assets/app.js" defer></script>
+<script src="assets/user_menu.js" defer></script>
 </body>
 </html>

@@ -198,5 +198,6 @@ $firstOfMonth = date('Y-m-01');
     btn.addEventListener('click', load);
 })();
 </script>
+<script src="/assets/user_menu.js" defer></script>
 </body>
 </html>
