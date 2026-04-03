@@ -100,7 +100,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
         ], 'GET');
         if (!is_array($rows)) $rows = [];
 
-        $tipsByWaiter = [];
+        $tipsCardByWaiter = [];
         $seenTx = [];
         $nextTr = null;
         $prevNextTr = null;
@@ -138,15 +138,11 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 $wName = trim((string)($txFull['name'] ?? $tx['name'] ?? ''));
                 if ($wName === '') continue;
                 $k = mb_strtolower($wName, 'UTF-8');
-                $tipSum = (int)($txFull['tip_sum'] ?? 0);
                 $tipsCard = (int)($txFull['tips_card'] ?? 0);
-                $tipsCash = (int)($txFull['tips_cash'] ?? 0);
-                if (!isset($tipsByWaiter[$k])) {
-                    $tipsByWaiter[$k] = ['name' => $wName, 'tip_sum' => 0, 'tips_card' => 0, 'tips_cash' => 0];
+                if (!isset($tipsCardByWaiter[$k])) {
+                    $tipsCardByWaiter[$k] = ['name' => $wName, 'tips_card' => 0];
                 }
-                $tipsByWaiter[$k]['tip_sum'] += $tipSum;
-                $tipsByWaiter[$k]['tips_card'] += $tipsCard;
-                $tipsByWaiter[$k]['tips_cash'] += $tipsCash;
+                $tipsCardByWaiter[$k]['tips_card'] += $tipsCard;
             }
             if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
         } while ($count > 0 && $nextTr !== null);
@@ -166,16 +162,14 @@ if (($_GET['ajax'] ?? '') === 'load') {
             $workedHours = $workedMin > 0 ? round($workedMin / 60, 2) : 0;
             $role = $uid > 0 ? (string)($roleByUser[$uid] ?? '') : '';
             $nk = mb_strtolower(trim($name), 'UTF-8');
-            $tips = $tipsByWaiter[$nk] ?? null;
+            $tips = $tipsCardByWaiter[$nk] ?? null;
             $out[] = [
                 'user_id' => $uid,
                 'name' => $name,
                 'role_name' => $role,
                 'checks' => $clients,
                 'worked_hours' => $workedHours,
-                'tip_sum' => (int)($tips['tip_sum'] ?? 0),
                 'tips_card' => (int)($tips['tips_card'] ?? 0),
-                'tips_cash' => (int)($tips['tips_cash'] ?? 0),
             ];
         }
         $rateByUser = [];
@@ -323,10 +317,8 @@ $firstOfMonth = date('Y-m-01');
                 const rate = Number(r.rate || 0);
                 const hours = Number(r.worked_hours || 0);
                 const salary = calcSalary(rate, hours);
-                const tipSum = vndFromMinor(r.tip_sum || 0);
-                const tipsCash = vndFromMinor(r.tips_cash || 0);
                 const tipsCard = vndFromMinor(r.tips_card || 0);
-                const tipsTxt = `${fmtMoney(tipSum)} (нал ${fmtMoney(tipsCash)}, карта ${fmtMoney(tipsCard)})`;
+                const tipsTxt = `${fmtMoney(tipsCard)}`;
                 tr.innerHTML = `
                     <td>${esc(r.user_id)}</td>
                     <td>${esc(r.name)}</td>
