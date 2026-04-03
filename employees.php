@@ -516,6 +516,8 @@ $firstOfMonth = date('Y-m-01');
         .modal .btn2 { padding: 10px 14px; border-radius: 10px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; }
         .modal .btn2.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
         .modal .btn2:disabled { opacity: 0.6; cursor: default; }
+        .help-btn { width: 28px; height: 28px; border-radius: 999px; border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: #1a73e8; font-weight: 900; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; line-height: 1; padding: 0; }
+        .help-btn:hover { background: rgba(26,115,232,0.12); }
         .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color:#374151; }
         .toggle-wrap .toggle-text { user-select:none; }
         .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
@@ -550,6 +552,7 @@ $firstOfMonth = date('Y-m-01');
             </label>
             <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
                 <button type="button" id="loadBtn">ЗАГРУЗИТЬ</button>
+                <button type="button" class="help-btn" id="helpBtn" title="Инструкция">?</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
                 <button type="button" class="secondary" id="cancelBtn" style="display:none;">Отменить</button>
                 <div class="progress" id="prog">
@@ -612,6 +615,39 @@ $firstOfMonth = date('Y-m-01');
     </div>
 </div>
 
+<div class="modal-backdrop" id="helpModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <h3 id="helpTitle">Инструкция</h3>
+        <div class="body">
+            <div style="margin-bottom: 10px;">
+                <b>ЗАГРУЗИТЬ</b> — загружает данные по официантам за выбранный период и считает Tips.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>Отменить</b> — останавливает текущую загрузку, если долго ждём.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>Lite / Full</b> — переключает вид таблицы: Lite показывает только самое важное (name, Rate, Tips, Salary).
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>Скрыть нулевые</b> — скрывает строки, где ЧасыРаботы = 0.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>Rate</b> — ставка. Можно редактировать, сохраняется автоматически при выходе из поля или по Enter.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>PAID</b> — создаёт финансовую транзакцию “выплата типсов” на сумму Tips для выбранного сотрудника.
+                Перед созданием надо подтвердить чекбоксом “да проверил”.
+            </div>
+            <div>
+                <b>LTP</b> — дата и сумма последней выплаты типсов по этому сотруднику (берётся из финансовых транзакций Poster).
+            </div>
+        </div>
+        <div class="actions">
+            <button type="button" class="btn2 primary" id="helpClose">OK</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (() => {
     const dateFrom = document.getElementById('dateFrom');
@@ -634,6 +670,9 @@ $firstOfMonth = date('Y-m-01');
     const paidChecked = document.getElementById('paidChecked');
     const paidCancel = document.getElementById('paidCancel');
     const paidOk = document.getElementById('paidOk');
+    const helpBtn = document.getElementById('helpBtn');
+    const helpModal = document.getElementById('helpModal');
+    const helpClose = document.getElementById('helpClose');
     let runAbort = null;
     let currentJobId = '';
     let paidResolve = null;
@@ -1010,6 +1049,15 @@ $firstOfMonth = date('Y-m-01');
     if (paidModal) {
         paidModal.addEventListener('click', (e) => { if (e.target === paidModal) closePaidConfirm(false); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && paidModal.style.display === 'flex') closePaidConfirm(false); });
+    }
+
+    const openHelp = () => { if (helpModal) helpModal.style.display = 'flex'; };
+    const closeHelp = () => { if (helpModal) helpModal.style.display = 'none'; };
+    if (helpBtn) helpBtn.addEventListener('click', openHelp);
+    if (helpClose) helpClose.addEventListener('click', closeHelp);
+    if (helpModal) {
+        helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeHelp(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && helpModal.style.display === 'flex') closeHelp(); });
     }
 
     const loadPayMeta = async () => {
