@@ -100,6 +100,57 @@ if (($_GET['ajax'] ?? '') === 'load') {
         ], 'GET');
         if (!is_array($rows)) $rows = [];
 
+        $tipsByWaiter = [];
+        $seenTx = [];
+        $nextTr = null;
+        $prevNextTr = null;
+        $page = 0;
+        do {
+            $page++;
+            if ($page > 2000) break;
+            $params = [
+                'dateFrom' => str_replace('-', '', $dateFrom),
+                'dateTo' => str_replace('-', '', $dateTo),
+                'status' => 2,
+            ];
+            if ($nextTr !== null) $params['next_tr'] = $nextTr;
+            $batch = $api->request('dash.getTransactions', $params, 'GET');
+            if (!is_array($batch)) $batch = [];
+            $count = count($batch);
+            if ($count > 0) {
+                $last = end($batch);
+                $prevNextTr = $nextTr;
+                $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
+            }
+            foreach ($batch as $tx) {
+                if (!is_array($tx)) continue;
+                $txId = (int)($tx['transaction_id'] ?? 0);
+                if ($txId <= 0 || isset($seenTx[$txId])) continue;
+                $seenTx[$txId] = true;
+
+                $txArr = $api->request('dash.getTransaction', [
+                    'transaction_id' => $txId,
+                    'include_history' => 'false',
+                    'include_products' => 'false',
+                    'include_delivery' => 'false',
+                ], 'GET');
+                $txFull = is_array($txArr) && isset($txArr[0]) && is_array($txArr[0]) ? $txArr[0] : (is_array($txArr) ? $txArr : []);
+                $wName = trim((string)($txFull['name'] ?? $tx['name'] ?? ''));
+                if ($wName === '') continue;
+                $k = mb_strtolower($wName, 'UTF-8');
+                $tipSum = (int)($txFull['tip_sum'] ?? 0);
+                $tipsCard = (int)($txFull['tips_card'] ?? 0);
+                $tipsCash = (int)($txFull['tips_cash'] ?? 0);
+                if (!isset($tipsByWaiter[$k])) {
+                    $tipsByWaiter[$k] = ['name' => $wName, 'tip_sum' => 0, 'tips_card' => 0, 'tips_cash' => 0];
+                }
+                $tipsByWaiter[$k]['tip_sum'] += $tipSum;
+                $tipsByWaiter[$k]['tips_card'] += $tipsCard;
+                $tipsByWaiter[$k]['tips_cash'] += $tipsCash;
+            }
+            if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
+        } while ($count > 0 && $nextTr !== null);
+
         $out = [];
         $uids = [];
         foreach ($rows as $r) {
@@ -114,12 +165,17 @@ if (($_GET['ajax'] ?? '') === 'load') {
             $workedMin = is_numeric($worked) ? (int)round((float)$worked) : 0;
             $workedHours = $workedMin > 0 ? round($workedMin / 60, 2) : 0;
             $role = $uid > 0 ? (string)($roleByUser[$uid] ?? '') : '';
+            $nk = mb_strtolower(trim($name), 'UTF-8');
+            $tips = $tipsByWaiter[$nk] ?? null;
             $out[] = [
                 'user_id' => $uid,
                 'name' => $name,
                 'role_name' => $role,
                 'checks' => $clients,
                 'worked_hours' => $workedHours,
+                'tip_sum' => (int)($tips['tip_sum'] ?? 0),
+                'tips_card' => (int)($tips['tips_card'] ?? 0),
+                'tips_cash' => (int)($tips['tips_cash'] ?? 0),
             ];
         }
         $rateByUser = [];
@@ -208,6 +264,7 @@ $firstOfMonth = date('Y-m-01');
                     <th>role_name</th>
                     <th style="text-align:right;">Чеков</th>
                     <th style="text-align:right;">ЧасыРаботы</th>
+                    <th style="text-align:right;">Tips</th>
                     <th style="text-align:right;">Salary</th>
                 </tr>
                 </thead>
@@ -245,6 +302,7 @@ $firstOfMonth = date('Y-m-01');
     };
     const fmtMoney = (n) => fmtSpaces(String(Math.round(Number(n || 0))));
     const calcSalary = (rate, hours) => Math.round(Number(rate || 0) * Number(hours || 0));
+    const vndFromMinor = (minor) => Math.round(Number(minor || 0) / 100);
 
     const load = async () => {
         setError('');
@@ -265,6 +323,10 @@ $firstOfMonth = date('Y-m-01');
                 const rate = Number(r.rate || 0);
                 const hours = Number(r.worked_hours || 0);
                 const salary = calcSalary(rate, hours);
+                const tipSum = vndFromMinor(r.tip_sum || 0);
+                const tipsCash = vndFromMinor(r.tips_cash || 0);
+                const tipsCard = vndFromMinor(r.tips_card || 0);
+                const tipsTxt = `${fmtMoney(tipSum)} (нал ${fmtMoney(tipsCash)}, карта ${fmtMoney(tipsCard)})`;
                 tr.innerHTML = `
                     <td>${esc(r.user_id)}</td>
                     <td>${esc(r.name)}</td>
@@ -272,6 +334,7 @@ $firstOfMonth = date('Y-m-01');
                     <td>${esc(r.role_name)}</td>
                     <td style="text-align:right;">${esc(r.checks)}</td>
                     <td style="text-align:right;">${esc(r.worked_hours)}</td>
+                    <td style="text-align:right;">${esc(tipsTxt)}</td>
                     <td style="text-align:right;" class="salary-cell" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(salary))}</td>
                 `;
                 tbody.appendChild(tr);
