@@ -302,6 +302,114 @@ if (($_GET['ajax'] ?? '') === 'tips_cancel') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'ltp_load') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+
+    $dateFrom = $parseDate((string)($_GET['date_from'] ?? ''));
+    $dateTo = $parseDate((string)($_GET['date_to'] ?? ''));
+    if ($dateFrom === null || $dateTo === null || $dateFrom > $dateTo) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Некорректный период'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $txs = $api->request('finance.getTransactions', [
+            'dateFrom' => str_replace('-', '', $dateFrom),
+            'dateTo' => str_replace('-', '', $dateTo),
+            'type' => 0,
+        ], 'GET');
+        if (!is_array($txs)) $txs = [];
+
+        $latest = [];
+        foreach ($txs as $t) {
+            if (!is_array($t)) continue;
+            $type = (string)($t['type'] ?? '');
+            if ($type !== '0' && $type !== 'expense' && $type !== 'out') continue;
+            $uid = (int)($t['user_id'] ?? 0);
+            if ($uid !== 10) continue;
+            $comment = trim((string)($t['comment'] ?? ''));
+            if ($comment === '' || stripos($comment, 'TIPS') !== 0) continue;
+            if (!preg_match('/\bID\s*=\s*(\d+)\b/i', $comment, $m)) continue;
+            $waiterId = (int)$m[1];
+            if ($waiterId <= 0) continue;
+            $dt = (string)($t['date'] ?? '');
+            $ts = $dt !== '' ? strtotime($dt) : false;
+            if ($ts === false || $ts <= 0) continue;
+            $amount = (int)($t['amount'] ?? 0);
+            $cur = $latest[$waiterId] ?? null;
+            if (!$cur || (int)$cur['ts'] < $ts) {
+                $latest[$waiterId] = ['ts' => $ts, 'date' => date('Y-m-d H:i:s', $ts), 'amount' => $amount];
+            }
+        }
+        $out = [];
+        foreach ($latest as $wid => $v) {
+            $out[(string)$wid] = ['date' => (string)$v['date'], 'amount' => (int)$v['amount']];
+        }
+        echo json_encode(['ok' => true, 'items' => $out], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'pay_tips') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    if (!veranda_can('admin')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $raw = file_get_contents('php://input');
+    $j = json_decode((string)$raw, true);
+    if (!is_array($j)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $waiterId = (int)($j['waiter_id'] ?? 0);
+    $tipsMinor = (int)($j['tips_minor'] ?? 0);
+    if ($waiterId <= 0 || $tipsMinor <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $amount = (int)round($tipsMinor / 100);
+    if ($amount <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    try {
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $now = date('Y-m-d H:i:s');
+        $comment = 'TIPS ID=' . $waiterId;
+        $res = $api->request('finance.createTransactions', [
+            'id' => (int)(time() * 1000 + random_int(0, 999)),
+            'type' => 0,
+            'category' => 4,
+            'user_id' => 10,
+            'amount_from' => $amount,
+            'account_from' => 8,
+            'date' => $now,
+            'comment' => $comment,
+        ], 'POST');
+        echo json_encode(['ok' => true, 'created_id' => (int)$res, 'date' => $now, 'amount' => -abs($tipsMinor), 'waiter_id' => $waiterId], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 $today = date('Y-m-d');
 $firstOfMonth = date('Y-m-01');
 
@@ -330,6 +438,9 @@ $firstOfMonth = date('Y-m-01');
         .progress .label { font-size: 12px; color:#1f2937; font-weight: 800; }
         .progress .desc { font-size: 12px; color:#6b7280; }
         #totals { white-space: nowrap; overflow-x: auto; }
+        .ltp { margin-top: 2px; font-size: 11px; color: #6b7280; font-weight: 800; white-space: nowrap; }
+        .paid-btn { border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: #1a73e8; border-radius: 8px; padding: 2px 7px; font-weight: 900; font-size: 11px; cursor: pointer; line-height: 1.2; }
+        .paid-btn:disabled { opacity: 0.6; cursor: default; }
         .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color:#374151; }
         .toggle-wrap .toggle-text { user-select:none; }
         .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
@@ -485,6 +596,7 @@ $firstOfMonth = date('Y-m-01');
     const ths = Array.from(document.querySelectorAll('th[data-sort]'));
     ths.forEach((th) => th.addEventListener('click', () => setSort(th.getAttribute('data-sort') || '')));
     let dataRows = [];
+    let ltpById = {};
     const boundRateIds = new Set();
     function bindRateInputs() {
         Array.from(tbody.querySelectorAll('.rate-input')).forEach((inp) => {
@@ -580,19 +692,30 @@ $firstOfMonth = date('Y-m-01');
         let totSalary = 0;
         items.forEach((r) => {
             const tipsVnd = vndFromMinor(r.tips_minor || 0);
+            const ltp = ltpById[String(r.user_id)] || null;
+            const ltpAmtMinor = ltp ? Number(ltp.amount || 0) : 0;
+            const ltpDate = ltp && ltp.date ? String(ltp.date) : '';
+            const ltpAmt = (ltpAmtMinor && isFinite(ltpAmtMinor)) ? fmtMoney(vndFromMinor(Math.abs(ltpAmtMinor))) : '';
+            const ltpHtml = (ltpDate && ltpAmt) ? `<div class="ltp" title="Сумма и дата последней выплаты типсов">LTP ${esc(ltpDate)} · ${esc(ltpAmt)}</div>` : '';
             const tr = document.createElement('tr');
             totChecks += Number(r.checks || 0);
             totHours += Number(r.worked_hours || 0);
             totTipsMinor += Number(r.tips_minor || 0);
             totSalary += Number(r.salary_minor || 0);
+            const paidDisabled = Number(r.tips_minor || 0) <= 0 ? 'disabled' : '';
             tr.innerHTML = `
                 <td class="col-id">${esc(r.user_id)}</td>
-                <td class="col-name">${esc(r.name)}</td>
+                <td class="col-name"><div>${esc(r.name)}</div>${ltpHtml}</td>
                 <td class="col-rate" style="text-align:right;"><input class="rate-input" inputmode="numeric" data-user-id="${esc(r.user_id)}" data-hours="${esc(r.worked_hours)}" data-rate="${esc(r.rate)}" value="${esc(fmtSpaces(String(r.rate || '')))}"></td>
                 <td class="col-role">${esc(r.role_name)}</td>
                 <td class="col-checks" style="text-align:right;">${esc(r.checks)}</td>
                 <td class="col-hours" style="text-align:right;">${esc(r.worked_hours)}</td>
-                <td class="col-tips" style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
+                <td class="col-tips" style="text-align:right;">
+                    <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
+                        <span>${esc(fmtMoney(tipsVnd))}</span>
+                        <button type="button" class="paid-btn" data-user-id="${esc(r.user_id)}" ${paidDisabled}>PAID</button>
+                    </div>
+                </td>
                 <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(r.salary_minor))}</td>
             `;
             tbody.appendChild(tr);
@@ -701,12 +824,37 @@ $firstOfMonth = date('Y-m-01');
                     progLabel.textContent = pct + '%';
                     progDesc.textContent = `Дни: ${done} из ${total}`;
                 }
-                prog.style.display = 'none';
-                cancelBtn.style.display = 'none';
                 runAbort = null;
             };
             const p = await prepare();
             await run(p.job_id, Number(p.total || 0));
+
+            try {
+                progBar.style.width = '98%';
+                progLabel.textContent = '98%';
+                progDesc.textContent = 'Загрузка LTP…';
+                const urlLtp = new URL(location.href);
+                urlLtp.searchParams.set('ajax', 'ltp_load');
+                urlLtp.searchParams.set('date_from', dateFrom.value);
+                urlLtp.searchParams.set('date_to', dateTo.value);
+                const { signal, cleanup } = withTimeout(20000);
+                const resLtp = await fetch(urlLtp.toString(), { headers: { 'Accept': 'application/json' }, signal });
+                const txtLtp = await resLtp.text();
+                cleanup();
+                let jLtp = null;
+                try { jLtp = JSON.parse(txtLtp); } catch (_) {}
+                if (jLtp && jLtp.ok && jLtp.items) {
+                    ltpById = jLtp.items || {};
+                } else {
+                    ltpById = {};
+                }
+            } catch (_) {
+                ltpById = {};
+            }
+
+            progBar.style.width = '100%';
+            progLabel.textContent = '100%';
+            progDesc.textContent = 'Готово';
             dataRows = rows.map((r) => {
                 const rate = Number(r.rate || 0);
                 const hours = Number(r.worked_hours || 0);
@@ -724,6 +872,8 @@ $firstOfMonth = date('Y-m-01');
                 };
             });
             renderTable();
+            prog.style.display = 'none';
+            cancelBtn.style.display = 'none';
         } catch (e) {
             try { clearInterval(tick); } catch (_) {}
             setError(e && e.message ? e.message : 'Ошибка');
@@ -733,6 +883,38 @@ $firstOfMonth = date('Y-m-01');
     };
 
     btn.addEventListener('click', load);
+    tbody.addEventListener('click', async (e) => {
+        const b = e.target && e.target.closest ? e.target.closest('.paid-btn') : null;
+        if (!b) return;
+        const uid = Number(b.getAttribute('data-user-id') || 0);
+        if (!uid) return;
+        const row = dataRows.find((x) => Number(x.user_id) === uid);
+        if (!row) return;
+        const tipsMinor = Number(row.tips_minor || 0);
+        if (tipsMinor <= 0) return;
+        const tipsVnd = vndFromMinor(tipsMinor);
+        if (!confirm(`Создать транзакцию выплаты типсов?\nID=${uid}\nСумма=${fmtMoney(tipsVnd)}`)) return;
+        b.disabled = true;
+        try {
+            const url = new URL(location.href);
+            url.searchParams.set('ajax', 'pay_tips');
+            const res = await fetch(url.toString(), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ waiter_id: uid, tips_minor: tipsMinor }),
+            });
+            const txt = await res.text();
+            let j = null;
+            try { j = JSON.parse(txt); } catch (_) {}
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            ltpById[String(uid)] = { date: String(j.date || ''), amount: Number(j.amount || 0) };
+            row.tips_minor = 0;
+            renderTable();
+        } catch (err) {
+            setError(err && err.message ? err.message : 'Ошибка');
+            b.disabled = false;
+        }
+    });
     cancelBtn.addEventListener('click', async () => {
         try {
             cancelBtn.disabled = true;
