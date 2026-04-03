@@ -421,6 +421,36 @@ if (($_GET['ajax'] ?? '') === 'pay_meta') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'employee_lookup') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    $userId = (int)($_GET['user_id'] ?? 0);
+    if ($userId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $emps = $api->request('access.getEmployees', [], 'GET');
+        if (!is_array($emps)) $emps = [];
+        $name = '';
+        foreach ($emps as $e) {
+            if (!is_array($e)) continue;
+            if ((int)($e['user_id'] ?? 0) === $userId) {
+                $name = trim((string)($e['name'] ?? ''));
+                break;
+            }
+        }
+        echo json_encode(['ok' => true, 'user_id' => $userId, 'name' => $name], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'pay_tips') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -1077,6 +1107,26 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         return payMeta;
     };
 
+    const empNameById = {};
+    const loadEmployeeName = async (id) => {
+        const uid = Number(id || 0);
+        if (!uid) return '';
+        if (Object.prototype.hasOwnProperty.call(empNameById, String(uid))) return String(empNameById[String(uid)] || '');
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'employee_lookup');
+        url.searchParams.set('user_id', String(uid));
+        const { signal, cleanup } = withTimeout(15000);
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal });
+        const txt = await res.text();
+        cleanup();
+        let j = null;
+        try { j = JSON.parse(txt); } catch (_) {}
+        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        const name = String(j.name || '').trim();
+        empNameById[String(uid)] = name;
+        return name;
+    };
+
     tbody.addEventListener('click', async (e) => {
         const b = e.target && e.target.closest ? e.target.closest('.paid-btn') : null;
         if (!b) return;
@@ -1087,7 +1137,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const tipsMinor = Number(row.tips_minor || 0);
         if (tipsMinor <= 0) return;
         const tipsVnd = vndFromMinor(tipsMinor);
-        const empName = String(row.name || '').trim();
+        let empName = '';
+        try { empName = await loadEmployeeName(uid); } catch (_) { empName = ''; }
+        if (!empName) empName = String(row.name || '').trim();
         let meta = null;
         try { meta = await loadPayMeta(); } catch (_) { meta = null; }
         const catName = meta && meta.category && meta.category.name ? String(meta.category.name) : '#4';
