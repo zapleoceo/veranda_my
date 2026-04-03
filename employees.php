@@ -323,12 +323,17 @@ $firstOfMonth = date('Y-m-01');
         @keyframes spin { to { transform: rotate(360deg); } }
         .error { margin-top: 10px; color:#b91c1c; font-weight: 800; }
         .table-wrap { overflow:auto; }
-        .rate-input { width: 72px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
+        .rate-input { width: 58px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
         .progress { display:none; align-items:center; gap: 10px; margin-left: 10px; }
         .progress .bar { width: 160px; height: 10px; border-radius: 999px; background: #eee; overflow: hidden; }
         .progress .bar > span { display:block; height: 100%; width: 0; background: #1a73e8; transition: width 0.15s ease; }
         .progress .label { font-size: 12px; color:#1f2937; font-weight: 800; }
         .progress .desc { font-size: 12px; color:#6b7280; }
+        #totals { white-space: nowrap; overflow-x: auto; }
+        #empTable.lite .col-id,
+        #empTable.lite .col-role,
+        #empTable.lite .col-checks,
+        #empTable.lite .col-hours { display: none; }
     </style>
 </head>
 <body>
@@ -353,6 +358,11 @@ $firstOfMonth = date('Y-m-01');
                 <input type="checkbox" id="hideZero">
                 Скрыть нулевые
             </label>
+            <label style="flex-direction: row; align-items:center; gap: 8px; padding-bottom: 4px;">
+                <span class="muted">Full</span>
+                <input type="checkbox" id="modeLite">
+                <span class="muted">Lite</span>
+            </label>
             <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
                 <button type="button" id="loadBtn">ЗАГРУЗИТЬ</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
@@ -367,17 +377,17 @@ $firstOfMonth = date('Y-m-01');
         <div class="error" id="err" style="display:none;"></div>
         <div class="muted" id="tipsMode" style="margin-top: 10px; display:none;"></div>
         <div class="table-wrap" style="margin-top: 12px;">
-            <table>
+            <table id="empTable">
                 <thead>
                 <tr>
-                    <th id="thUid" data-sort="user_id" style="cursor:pointer;">ID</th>
-                    <th id="thName" data-sort="name" style="cursor:pointer;">name</th>
-                    <th id="thRate" data-sort="rate" style="text-align:right; cursor:pointer;">Ставка</th>
-                    <th id="thRole" data-sort="role_name" style="cursor:pointer;">role_name</th>
-                    <th id="thChecks" data-sort="checks" style="text-align:right; cursor:pointer;">Чеков</th>
-                    <th id="thHours" data-sort="worked_hours" style="text-align:right; cursor:pointer;">ЧасыРаботы</th>
-                    <th id="thTips" data-sort="tips_minor" style="text-align:right; cursor:pointer;">Tips</th>
-                    <th id="thSalary" data-sort="salary_minor" style="text-align:right; cursor:pointer;">Salary</th>
+                    <th id="thUid" class="col-id" data-sort="user_id" style="cursor:pointer;">ID</th>
+                    <th id="thName" class="col-name" data-sort="name" style="cursor:pointer;">name</th>
+                    <th id="thRate" class="col-rate" data-sort="rate" style="text-align:right; cursor:pointer;">Rate</th>
+                    <th id="thRole" class="col-role" data-sort="role_name" style="cursor:pointer;">role_name</th>
+                    <th id="thChecks" class="col-checks" data-sort="checks" style="text-align:right; cursor:pointer;">Чеков</th>
+                    <th id="thHours" class="col-hours" data-sort="worked_hours" style="text-align:right; cursor:pointer;">ЧасыРаботы</th>
+                    <th id="thTips" class="col-tips" data-sort="tips_minor" style="text-align:right; cursor:pointer;">Tips</th>
+                    <th id="thSalary" class="col-salary" data-sort="salary_minor" style="text-align:right; cursor:pointer;">Salary</th>
                 </tr>
                 </thead>
                 <tbody id="tbody"></tbody>
@@ -402,7 +412,9 @@ $firstOfMonth = date('Y-m-01');
     const progDesc = document.getElementById('progDesc');
     const cancelBtn = document.getElementById('cancelBtn');
     const hideZeroCb = document.getElementById('hideZero');
+    const modeLiteCb = document.getElementById('modeLite');
     const totalsEl = document.getElementById('totals');
+    const empTable = document.getElementById('empTable');
     let runAbort = null;
     let currentJobId = '';
 
@@ -434,11 +446,20 @@ $firstOfMonth = date('Y-m-01');
     if (prefs.date_to) dateTo.value = prefs.date_to;
     let hideZero = !!prefs.hide_zero;
     if (hideZeroCb) hideZeroCb.checked = hideZero;
+    let viewMode = (prefs.view_mode === 'lite') ? 'lite' : 'full';
+    if (modeLiteCb) modeLiteCb.checked = viewMode === 'lite';
+    if (empTable) empTable.classList.toggle('lite', viewMode === 'lite');
     dateFrom.addEventListener('change', () => { const p = loadPrefs(); p.date_from = dateFrom.value; savePrefs(p); });
     dateTo.addEventListener('change', () => { const p = loadPrefs(); p.date_to = dateTo.value; savePrefs(p); });
     if (hideZeroCb) hideZeroCb.addEventListener('change', () => {
         hideZero = !!hideZeroCb.checked;
         const p = loadPrefs(); p.hide_zero = hideZero; savePrefs(p);
+        renderTable();
+    });
+    if (modeLiteCb) modeLiteCb.addEventListener('change', () => {
+        viewMode = modeLiteCb.checked ? 'lite' : 'full';
+        const p = loadPrefs(); p.view_mode = viewMode; savePrefs(p);
+        if (empTable) empTable.classList.toggle('lite', viewMode === 'lite');
         renderTable();
     });
     let sortBy = prefs.sort_by || 'checks';
@@ -554,21 +575,25 @@ $firstOfMonth = date('Y-m-01');
             totTipsMinor += Number(r.tips_minor || 0);
             totSalary += Number(r.salary_minor || 0);
             tr.innerHTML = `
-                <td>${esc(r.user_id)}</td>
-                <td>${esc(r.name)}</td>
-                <td style="text-align:right;"><input class="rate-input" inputmode="numeric" data-user-id="${esc(r.user_id)}" data-hours="${esc(r.worked_hours)}" data-rate="${esc(r.rate)}" value="${esc(fmtSpaces(String(r.rate || '')))}"></td>
-                <td>${esc(r.role_name)}</td>
-                <td style="text-align:right;">${esc(r.checks)}</td>
-                <td style="text-align:right;">${esc(r.worked_hours)}</td>
-                <td style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
-                <td style="text-align:right;" class="salary-cell" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(r.salary_minor))}</td>
+                <td class="col-id">${esc(r.user_id)}</td>
+                <td class="col-name">${esc(r.name)}</td>
+                <td class="col-rate" style="text-align:right;"><input class="rate-input" inputmode="numeric" data-user-id="${esc(r.user_id)}" data-hours="${esc(r.worked_hours)}" data-rate="${esc(r.rate)}" value="${esc(fmtSpaces(String(r.rate || '')))}"></td>
+                <td class="col-role">${esc(r.role_name)}</td>
+                <td class="col-checks" style="text-align:right;">${esc(r.checks)}</td>
+                <td class="col-hours" style="text-align:right;">${esc(r.worked_hours)}</td>
+                <td class="col-tips" style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
+                <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(r.salary_minor))}</td>
             `;
             tbody.appendChild(tr);
         });
         bindRateInputs();
         if (totalsEl) {
-            const hoursTxt = (Math.round(totHours * 100) / 100).toFixed(2).replace(/\.00$/, '');
-            totalsEl.textContent = `Итого: Чеков ${fmtMoney(totChecks)} · ЧасыРаботы ${hoursTxt} · Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · Salary ${fmtMoney(totSalary)}`;
+            if (viewMode === 'lite') {
+                totalsEl.textContent = `Итого: Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · Salary ${fmtMoney(totSalary)}`;
+            } else {
+                const hoursTxt = (Math.round(totHours * 100) / 100).toFixed(2).replace(/\.00$/, '');
+                totalsEl.textContent = `Итого: Чеков ${fmtMoney(totChecks)} · ЧасыРаботы ${hoursTxt} · Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · Salary ${fmtMoney(totSalary)}`;
+            }
         }
     }
 
