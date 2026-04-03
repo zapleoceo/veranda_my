@@ -272,6 +272,10 @@ if (($_GET['ajax'] ?? '') === 'tips_run') {
     $aggUser = (array)($st['agg_user'] ?? []);
     $aggName = (array)($st['agg_name'] ?? []);
     $tipsMode = $st['tips_mode'] ?? null;
+    if (!empty($st['canceled'])) {
+        echo json_encode(['ok' => true, 'done' => $idx, 'total' => count($days), 'finished' => true, 'tips_mode' => ($tipsMode ?? 'none'), 'agg_user' => $aggUser, 'agg_name' => $aggName], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if ($idx >= count($days)) {
         echo json_encode(['ok' => true, 'done' => $idx, 'total' => count($days), 'finished' => true], JSON_UNESCAPED_UNICODE);
         exit;
@@ -455,6 +459,7 @@ $firstOfMonth = date('Y-m-01');
     const progDesc = document.getElementById('progDesc');
     const cancelBtn = document.getElementById('cancelBtn');
     let runAbort = null;
+    let currentJobId = '';
 
     const setLoading = (on) => {
         btn.disabled = on;
@@ -513,11 +518,17 @@ $firstOfMonth = date('Y-m-01');
                 try { j2 = JSON.parse(t); } catch (_) {}
                 cleanup();
                 if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка подготовки');
+                currentJobId = String(j2.job_id || '');
+                prog.style.display = 'flex';
+                loader.style.display = 'none';
+                progBar.style.width = '0%';
+                progLabel.textContent = '0%';
+                const total = Number(j2.total || 0);
+                progDesc.textContent = `Подготовка… дней: 0 из ${total}`;
                 return j2;
             };
             const run = async (jobId, total) => {
                 let done = 0;
-                prog.style.display = 'flex';
                 cancelBtn.style.display = 'inline-block';
                 cancelBtn.disabled = false;
                 runAbort = new AbortController();
@@ -659,7 +670,7 @@ $firstOfMonth = date('Y-m-01');
             }
             const url = new URL(location.href);
             url.searchParams.set('ajax', 'tips_cancel');
-            url.searchParams.set('job_id', progDesc.textContent || '');
+            url.searchParams.set('job_id', currentJobId || '');
             // best-effort cancel (no need to await)
             fetch(url.toString(), { headers: { 'Accept': 'application/json' } }).catch(() => {});
         } catch (_) {}
