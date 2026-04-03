@@ -213,6 +213,139 @@ if (($_GET['ajax'] ?? '') === 'load') {
     exit;
 }
 
+$mkDays = function (string $from, string $to): array {
+    $out = [];
+    $t1 = strtotime($from . ' 00:00:00');
+    $t2 = strtotime($to . ' 00:00:00');
+    if ($t1 === false || $t2 === false) return $out;
+    if ($t2 < $t1) return $out;
+    for ($t = $t1; $t <= $t2; $t += 86400) {
+        $out[] = date('Y-m-d', $t);
+    }
+    return $out;
+};
+
+if (($_GET['ajax'] ?? '') === 'tips_prepare') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    $dateFrom = $parseDate((string)($_GET['date_from'] ?? ''));
+    $dateTo = $parseDate((string)($_GET['date_to'] ?? ''));
+    if ($dateFrom === null || $dateTo === null || $dateFrom > $dateTo) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Некорректный период'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $days = $mkDays($dateFrom, $dateTo);
+    if (!$days) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Нет дней'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $jobId = 'tips_' . uniqid('', true);
+    $_SESSION[$jobId] = [
+        'days' => $days,
+        'index' => 0,
+        'agg_user' => [],
+        'agg_name' => [],
+        'tips_mode' => null,
+    ];
+    echo json_encode(['ok' => true, 'job_id' => $jobId, 'total' => count($days)], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'tips_run') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    @set_time_limit(120);
+    $jobId = (string)($_GET['job_id'] ?? '');
+    $batchSize = max(1, min(20, (int)($_GET['batch'] ?? 12)));
+    if ($jobId === '' || !isset($_SESSION[$jobId])) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad job'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $st = $_SESSION[$jobId];
+    $days = (array)($st['days'] ?? []);
+    $idx = (int)($st['index'] ?? 0);
+    $aggUser = (array)($st['agg_user'] ?? []);
+    $aggName = (array)($st['agg_name'] ?? []);
+    $tipsMode = $st['tips_mode'] ?? null;
+    if ($idx >= count($days)) {
+        echo json_encode(['ok' => true, 'done' => $idx, 'total' => count($days), 'finished' => true], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $apiBase = 'https://joinposter.com/api/dash.getTransactions';
+    $token = $posterToken;
+    $chs = [];
+    $map = [];
+    $end = min(count($days), $idx + $batchSize);
+    for ($i = $idx; $i < $end; $i++) {
+        $d = str_replace('-', '', $days[$i]);
+        $url = $apiBase . '?token=' . urlencode($token) . '&dateFrom=' . $d . '&dateTo=' . $d . '&status=2&include_history=false&include_products=false&include_delivery=false';
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        $chs[] = $ch;
+        $map[(int)$i] = $ch;
+    }
+    $mh = curl_multi_init();
+    foreach ($chs as $ch) curl_multi_add_handle($mh, $ch);
+    do {
+        $status = curl_multi_exec($mh, $active);
+        if ($active) curl_multi_select($mh, 0.2);
+    } while ($active && $status == CURLM_OK);
+    foreach ($map as $i => $ch) {
+        $body = curl_multi_getcontent($ch);
+        curl_multi_remove_handle($mh, $ch);
+        curl_close($ch);
+        if (!is_string($body) || $body === '') continue;
+        $data = json_decode($body, true);
+        $resp = is_array($data) && isset($data['response']) ? $data['response'] : $data;
+        if (!is_array($resp)) continue;
+        foreach ($resp as $tx) {
+            if (!is_array($tx)) continue;
+            if ($tipsMode === null) {
+                $tipsMode = array_key_exists('tips_card', $tx) ? 'tips_card' : 'none';
+            }
+            $val = (int)($tx['tips_card'] ?? 0);
+            if ($val <= 0) continue;
+            $uidTx = (int)($tx['user_id'] ?? 0);
+            $wName = trim((string)($tx['name'] ?? ''));
+            if ($uidTx > 0) {
+                if (!isset($aggUser[$uidTx])) $aggUser[$uidTx] = 0;
+                $aggUser[$uidTx] += $val;
+            } elseif ($wName !== '') {
+                $k = mb_strtolower($wName, 'UTF-8');
+                if (!isset($aggName[$k])) $aggName[$k] = 0;
+                $aggName[$k] += $val;
+            }
+        }
+    }
+    curl_multi_close($mh);
+    $idx = $end;
+    $_SESSION[$jobId] = [
+        'days' => $days,
+        'index' => $idx,
+        'agg_user' => $aggUser,
+        'agg_name' => $aggName,
+        'tips_mode' => $tipsMode,
+    ];
+    echo json_encode([
+        'ok' => true,
+        'done' => $idx,
+        'total' => count($days),
+        'finished' => ($idx >= count($days)),
+        'tips_mode' => $tipsMode,
+        'agg_user' => $aggUser,
+        'agg_name' => $aggName,
+        'job_id' => $jobId,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $today = date('Y-m-d');
 $firstOfMonth = date('Y-m-01');
 
@@ -235,6 +368,10 @@ $firstOfMonth = date('Y-m-01');
         .error { margin-top: 10px; color:#b91c1c; font-weight: 800; }
         .table-wrap { overflow:auto; }
         .rate-input { width: 120px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
+        .progress { display:none; align-items:center; gap: 10px; margin-top: 10px; }
+        .progress .bar { width: 240px; height: 10px; border-radius: 999px; background: #eee; overflow: hidden; }
+        .progress .bar > span { display:block; height: 100%; width: 0; background: #1a73e8; transition: width 0.15s ease; }
+        .progress .label { font-size: 12px; color:#6b7280; font-weight: 800; }
     </style>
 </head>
 <body>
@@ -262,6 +399,10 @@ $firstOfMonth = date('Y-m-01');
         </div>
         <div class="error" id="err" style="display:none;"></div>
         <div class="muted" id="tipsMode" style="margin-top: 10px; display:none;"></div>
+        <div class="progress" id="prog">
+            <div class="bar"><span id="progBar"></span></div>
+            <div class="label" id="progLabel">0%</div>
+        </div>
         <div class="table-wrap" style="margin-top: 12px;">
             <table>
                 <thead>
@@ -291,6 +432,9 @@ $firstOfMonth = date('Y-m-01');
     const err = document.getElementById('err');
     const tbody = document.getElementById('tbody');
     const tipsModeEl = document.getElementById('tipsMode');
+    const prog = document.getElementById('prog');
+    const progBar = document.getElementById('progBar');
+    const progLabel = document.getElementById('progLabel');
 
     const setLoading = (on) => {
         btn.disabled = on;
@@ -327,8 +471,50 @@ $firstOfMonth = date('Y-m-01');
             let j = null;
             try { j = JSON.parse(txt); } catch (_) {}
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            const rows = j.rows || [];
+            let aggUser = {};
+            let aggName = {};
+            let tipsMode = '';
+            const prepare = async () => {
+                const url = new URL(location.href);
+                url.searchParams.set('ajax', 'tips_prepare');
+                url.searchParams.set('date_from', dateFrom.value);
+                url.searchParams.set('date_to', dateTo.value);
+                const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                const t = await res.text();
+                let j2 = null;
+                try { j2 = JSON.parse(t); } catch (_) {}
+                if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка подготовки');
+                return j2;
+            };
+            const run = async (jobId, total) => {
+                let done = 0;
+                prog.style.display = 'flex';
+                while (done < total) {
+                    const url = new URL(location.href);
+                    url.searchParams.set('ajax', 'tips_run');
+                    url.searchParams.set('job_id', jobId);
+                    url.searchParams.set('batch', '12');
+                    const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                    const t = await res.text();
+                    let j3 = null;
+                    try { j3 = JSON.parse(t); } catch (_) {}
+                    if (!j3 || !j3.ok) throw new Error((j3 && j3.error) ? j3.error : 'Ошибка загрузки чаевых');
+                    done = Number(j3.done || 0);
+                    const mode = String(j3.tips_mode || '');
+                    if (mode) tipsMode = mode;
+                    aggUser = j3.agg_user || aggUser;
+                    aggName = j3.agg_name || aggName;
+                    const pct = total ? Math.round((done / total) * 100) : 100;
+                    progBar.style.width = pct + '%';
+                    progLabel.textContent = pct + '%';
+                }
+                prog.style.display = 'none';
+            };
+            const p = await prepare();
+            await run(p.job_id, Number(p.total || 0));
             if (tipsModeEl) {
-                const m = String(j.tips_mode || '');
+                const m = String(tipsMode || '');
                 if (m) {
                     tipsModeEl.style.display = 'block';
                     tipsModeEl.textContent = m === 'tips_card'
@@ -339,12 +525,13 @@ $firstOfMonth = date('Y-m-01');
                     tipsModeEl.textContent = '';
                 }
             }
-            (j.rows || []).forEach((r) => {
+            rows.forEach((r) => {
                 const tr = document.createElement('tr');
                 const rate = Number(r.rate || 0);
                 const hours = Number(r.worked_hours || 0);
                 const salary = calcSalary(rate, hours);
-                const tipsCard = vndFromMinor(r.tips_card || 0);
+                const tipsMinor = (r.user_id && aggUser[String(r.user_id)]) ? Number(aggUser[String(r.user_id)]) : Number(aggName[String((r.name || '').toLowerCase())] || 0);
+                const tipsCard = vndFromMinor(tipsMinor || 0);
                 const tipsTxt = `${fmtMoney(tipsCard)}`;
                 tr.innerHTML = `
                     <td>${esc(r.user_id)}</td>
