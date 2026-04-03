@@ -1087,6 +1087,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const tipsMinor = Number(row.tips_minor || 0);
         if (tipsMinor <= 0) return;
         const tipsVnd = vndFromMinor(tipsMinor);
+        const empName = String(row.name || '').trim();
         let meta = null;
         try { meta = await loadPayMeta(); } catch (_) { meta = null; }
         const catName = meta && meta.category && meta.category.name ? String(meta.category.name) : '#4';
@@ -1096,7 +1097,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const creatorLabel = creatorEmail ? creatorEmail : '—';
         const ok = await openPaidConfirm(
             `Будет создана транзакция расхода на выплату типсов.<br>` +
-            `ID сотрудника: <b>${esc(uid)}</b><br>` +
+            `Сотрудник: <b>${esc(empName || ('#' + String(uid)))}</b><br>` +
             `Сумма: <b>${esc(fmtMoney(tipsVnd))}</b><br>` +
             `Категория: <b>${esc(catName)}</b><br>` +
             `Исполнитель: <b>${esc(payerName)}</b><br>` +
