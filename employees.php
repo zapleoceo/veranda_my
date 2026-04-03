@@ -516,8 +516,9 @@ $firstOfMonth = date('Y-m-01');
         .modal .btn2 { padding: 10px 14px; border-radius: 10px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; }
         .modal .btn2.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
         .modal .btn2:disabled { opacity: 0.6; cursor: default; }
-        .help-btn { width: 28px; height: 28px; border-radius: 999px; border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: #1a73e8; font-weight: 900; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; line-height: 1; padding: 0; }
-        .help-btn:hover { background: rgba(26,115,232,0.12); }
+        .help-btn { width: 24px; height: 24px; border-radius: 999px; border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: #1a73e8; font-weight: 900; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; line-height: 1; padding: 0; animation: helpPulse 1200ms ease-in-out infinite; }
+        .help-btn:hover { box-shadow: 0 0 0 2px rgba(26,115,232,0.35); }
+        @keyframes helpPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
         .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color:#374151; }
         .toggle-wrap .toggle-text { user-select:none; }
         .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
@@ -552,7 +553,6 @@ $firstOfMonth = date('Y-m-01');
             </label>
             <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
                 <button type="button" id="loadBtn">ЗАГРУЗИТЬ</button>
-                <button type="button" class="help-btn" id="helpBtn" title="Инструкция">?</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
                 <button type="button" class="secondary" id="cancelBtn" style="display:none;">Отменить</button>
                 <div class="progress" id="prog">
@@ -560,6 +560,7 @@ $firstOfMonth = date('Y-m-01');
                     <div class="label" id="progLabel">0%</div>
                     <div class="desc" id="progDesc"></div>
                 </div>
+                <button type="button" class="help-btn" id="helpBtn" title="Инструкция" style="margin-left:auto;">?</button>
             </div>
         </div>
         <div class="error" id="err" style="display:none;"></div>
@@ -706,8 +707,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     if (prefs.date_to) dateTo.value = prefs.date_to;
     let hideZero = !!prefs.hide_zero;
     if (hideZeroCb) hideZeroCb.checked = hideZero;
-    let viewMode = (prefs.view_mode === 'lite') ? 'lite' : 'full';
-    if (modeLiteCb) modeLiteCb.checked = viewMode === 'lite';
+    let viewMode = (prefs.view_mode === 'full') ? 'full' : 'lite';
+    if (modeLiteCb) modeLiteCb.checked = viewMode === 'full';
     if (empTable) empTable.classList.toggle('lite', viewMode === 'lite');
     dateFrom.addEventListener('change', () => { const p = loadPrefs(); p.date_from = dateFrom.value; savePrefs(p); });
     dateTo.addEventListener('change', () => { const p = loadPrefs(); p.date_to = dateTo.value; savePrefs(p); });
@@ -717,7 +718,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         renderTable();
     });
     if (modeLiteCb) modeLiteCb.addEventListener('change', () => {
-        viewMode = modeLiteCb.checked ? 'lite' : 'full';
+        viewMode = modeLiteCb.checked ? 'full' : 'lite';
         const p = loadPrefs(); p.view_mode = viewMode; savePrefs(p);
         if (empTable) empTable.classList.toggle('lite', viewMode === 'lite');
         renderTable();
