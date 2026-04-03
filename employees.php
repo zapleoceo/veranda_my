@@ -356,6 +356,71 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'pay_meta') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    try {
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $categoryName = '';
+        $accountName = '';
+        $payerName = '';
+
+        try {
+            $cats = $api->request('finance.getCategories', [], 'GET');
+            if (is_array($cats)) {
+                foreach ($cats as $c) {
+                    if (!is_array($c)) continue;
+                    if ((int)($c['category_id'] ?? 0) === 4) {
+                        $categoryName = trim((string)($c['name'] ?? ''));
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        try {
+            $accs = $api->request('finance.getAccounts', [], 'GET');
+            if (is_array($accs)) {
+                foreach ($accs as $a) {
+                    if (!is_array($a)) continue;
+                    if ((int)($a['account_id'] ?? $a['id'] ?? 0) === 8) {
+                        $accountName = trim((string)($a['name'] ?? $a['title'] ?? ''));
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        try {
+            $emps = $api->request('access.getEmployees', [], 'GET');
+            if (is_array($emps)) {
+                foreach ($emps as $e) {
+                    if (!is_array($e)) continue;
+                    if ((int)($e['user_id'] ?? 0) === 10) {
+                        $payerName = trim((string)($e['name'] ?? ''));
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'category' => ['id' => 4, 'name' => $categoryName],
+            'account_from' => ['id' => 8, 'name' => $accountName],
+            'payer' => ['id' => 10, 'name' => $payerName],
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'pay_tips') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -630,6 +695,7 @@ $firstOfMonth = date('Y-m-01');
     ths.forEach((th) => th.addEventListener('click', () => setSort(th.getAttribute('data-sort') || '')));
     let dataRows = [];
     let ltpById = {};
+    let payMeta = null;
     const boundRateIds = new Set();
     function bindRateInputs() {
         Array.from(tbody.querySelectorAll('.rate-input')).forEach((inp) => {
@@ -885,6 +951,11 @@ $firstOfMonth = date('Y-m-01');
                 ltpById = {};
             }
 
+            try {
+                await loadPayMeta();
+            } catch (_) {
+            }
+
             progBar.style.width = '100%';
             progLabel.textContent = '100%';
             progDesc.textContent = 'Готово';
@@ -941,6 +1012,21 @@ $firstOfMonth = date('Y-m-01');
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && paidModal.style.display === 'flex') closePaidConfirm(false); });
     }
 
+    const loadPayMeta = async () => {
+        if (payMeta) return payMeta;
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'pay_meta');
+        const { signal, cleanup } = withTimeout(15000);
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal });
+        const txt = await res.text();
+        cleanup();
+        let j = null;
+        try { j = JSON.parse(txt); } catch (_) {}
+        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        payMeta = j;
+        return payMeta;
+    };
+
     tbody.addEventListener('click', async (e) => {
         const b = e.target && e.target.closest ? e.target.closest('.paid-btn') : null;
         if (!b) return;
@@ -951,11 +1037,18 @@ $firstOfMonth = date('Y-m-01');
         const tipsMinor = Number(row.tips_minor || 0);
         if (tipsMinor <= 0) return;
         const tipsVnd = vndFromMinor(tipsMinor);
+        let meta = null;
+        try { meta = await loadPayMeta(); } catch (_) { meta = null; }
+        const catName = meta && meta.category && meta.category.name ? String(meta.category.name) : '#4';
+        const accName = meta && meta.account_from && meta.account_from.name ? String(meta.account_from.name) : '#8';
+        const payerName = meta && meta.payer && meta.payer.name ? String(meta.payer.name) : '#10';
         const ok = await openPaidConfirm(
             `Будет создана транзакция расхода на выплату типсов.<br>` +
             `ID сотрудника: <b>${esc(uid)}</b><br>` +
             `Сумма: <b>${esc(fmtMoney(tipsVnd))}</b><br>` +
-            `Категория: <b>4</b>, user_id: <b>10</b>, account_from: <b>8</b><br>` +
+            `Категория: <b>${esc(catName)}</b><br>` +
+            `Исполнитель: <b>${esc(payerName)}</b><br>` +
+            `Счет списания: <b>${esc(accName)}</b><br>` +
             `Комментарий: <b>TIPS ID=${esc(uid)}</b> + email создателя`
         );
         if (!ok) return;
