@@ -336,6 +336,15 @@ $firstOfMonth = date('Y-m-01');
     </style>
 </head>
 <body>
+<div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 16px;">
+    <div class="top-nav" style="display:flex; justify-content: space-between; align-items:center; gap: 16px; flex-wrap: wrap; padding: 12px 0;">
+        <div class="nav-left" style="display:flex; gap: 14px; align-items:center; flex-wrap: wrap;">
+            <div class="nav-title" style="font-weight: 800; color: var(--brand-text);">Отчет баня</div>
+        </div>
+        <div class="nav-mid"></div>
+        <?php require __DIR__ . '/partials/user_menu.php'; ?>
+    </div>
+</div>
 <div class="wrap">
     <div class="card">
         <div class="row">
@@ -689,5 +698,6 @@ $firstOfMonth = date('Y-m-01');
     applyPrefsToUi();
     persistPrefsFromUi();
 </script>
+<script src="/assets/user_menu.js" defer></script>
 </body>
 </html>

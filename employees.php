@@ -323,7 +323,7 @@ $firstOfMonth = date('Y-m-01');
         @keyframes spin { to { transform: rotate(360deg); } }
         .error { margin-top: 10px; color:#b91c1c; font-weight: 800; }
         .table-wrap { overflow:auto; }
-        .rate-input { width: 120px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
+        .rate-input { width: 72px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
         .progress { display:none; align-items:center; gap: 10px; margin-left: 10px; }
         .progress .bar { width: 160px; height: 10px; border-radius: 999px; background: #eee; overflow: hidden; }
         .progress .bar > span { display:block; height: 100%; width: 0; background: #1a73e8; transition: width 0.15s ease; }
