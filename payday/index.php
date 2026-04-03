@@ -2296,7 +2296,7 @@ $sepayRows = $db->query(
 $posterRows = $db->query(
     "SELECT p.transaction_id, p.receipt_number, p.date_close, p.payed_card, p.payed_third_party, p.tip_sum,
             pm.title AS payment_method_display,
-            p.waiter_name, p.table_id, p.poster_payment_method_id
+            p.waiter_name, p.table_id, p.spot_id, p.poster_payment_method_id
      FROM {$pc} p
      LEFT JOIN {$ppm} pm ON pm.payment_method_id = p.poster_payment_method_id
      WHERE p.day_date BETWEEN ? AND ?
@@ -3033,6 +3033,35 @@ $fmtVnd = function (int $v): string {
                                 $pid = (int)$r['transaction_id'];
                                 $receiptNumber = (int)($r['receipt_number'] ?? 0);
                                 if ($receiptNumber <= 0) $receiptNumber = $pid;
+                                $spotIdRow = (int)($r['spot_id'] ?? 0);
+                                $tableIdRow = (int)($r['table_id'] ?? 0);
+                                $tableNumCache = $tableNumCache ?? [];
+                                $getTableNum = $getTableNum ?? function (int $spotId, int $tableId) use (&$tableNumCache, $token): ?int {
+                                    if ($spotId <= 0 || $tableId <= 0) return null;
+                                    if (!isset($tableNumCache[$spotId])) {
+                                        try {
+                                            $apiTables = new \App\Classes\PosterAPI((string)$token);
+                                            $rows = $apiTables->request('spots.getTableHallTables', [
+                                                'spot_id' => $spotId,
+                                                'without_deleted' => 0,
+                                            ], 'GET');
+                                            if (!is_array($rows)) $rows = [];
+                                            $m = [];
+                                            foreach ($rows as $t) {
+                                                if (!is_array($t)) continue;
+                                                $tid = (int)($t['table_id'] ?? 0);
+                                                $tn = (int)($t['table_num'] ?? 0);
+                                                if ($tid > 0 && $tn > 0) $m[$tid] = $tn;
+                                            }
+                                            $tableNumCache[$spotId] = $m;
+                                        } catch (\Throwable $e) {
+                                            $tableNumCache[$spotId] = [];
+                                        }
+                                    }
+                                    return isset($tableNumCache[$spotId][$tableId]) ? (int)$tableNumCache[$spotId][$tableId] : null;
+                                };
+                                $tableNum = $getTableNum($spotIdRow, $tableIdRow);
+                                $tableDisplay = $tableNum !== null ? (string)$tableNum : (string)$tableIdRow;
                                 $linkList = $linkByPoster[$pid] ?? [];
                                 $cls = 'row-red';
                                 if ($linkList) {
@@ -3060,7 +3089,7 @@ $fmtVnd = function (int $v): string {
                                 $tipVnd = $posterCentsToVnd($tipCents);
                                 $tsRow = strtotime($r['date_close']) ?: 0;
                             ?>
-                            <tr class="<?= $cls ?>" data-poster-id="<?= $pid ?>" data-vietnam="<?= $isVietnam ? '1' : '0' ?>" data-num="<?= (int)$receiptNumber ?>" data-ts="<?= (int)$tsRow ?>" data-card="<?= (int)$cardVnd ?>" data-tips="<?= (int)$tipVnd ?>" data-total="<?= (int)($cardVnd + $tipVnd) ?>" data-method="<?= htmlspecialchars(mb_strtolower($pm, 'UTF-8')) ?>" data-waiter="<?= htmlspecialchars(mb_strtolower((string)($r['waiter_name'] ?? ''), 'UTF-8')) ?>" data-table="<?= (int)($r['table_id'] ?? 0) ?>">
+                            <tr class="<?= $cls ?>" data-poster-id="<?= $pid ?>" data-vietnam="<?= $isVietnam ? '1' : '0' ?>" data-num="<?= (int)$receiptNumber ?>" data-ts="<?= (int)$tsRow ?>" data-card="<?= (int)$cardVnd ?>" data-tips="<?= (int)$tipVnd ?>" data-total="<?= (int)($cardVnd + $tipVnd) ?>" data-method="<?= htmlspecialchars(mb_strtolower($pm, 'UTF-8')) ?>" data-waiter="<?= htmlspecialchars(mb_strtolower((string)($r['waiter_name'] ?? ''), 'UTF-8')) ?>" data-table="<?= (int)($tableNum !== null ? $tableNum : ($r['table_id'] ?? 0)) ?>">
                                 <td><div class="cell-anchor"><span class="anchor" id="poster-<?= $pid ?>"></span><input type="checkbox" class="poster-cb" data-id="<?= $pid ?>"></div></td>
                                 <td class="nowrap col-poster-num"><?= htmlspecialchars((string)$receiptNumber) ?></td>
                                 <td class="nowrap col-poster-time"><?= date('H:i:s', strtotime($r['date_close'])) ?></td>
@@ -3069,7 +3098,7 @@ $fmtVnd = function (int $v): string {
                                 <td class="sum col-poster-total"><?= htmlspecialchars($fmtVnd($cardVnd + $tipVnd)) ?></td>
                                 <td class="nowrap col-poster-method"><span class="pm-full"><?= htmlspecialchars($pmFull) ?></span><span class="pm-lite"><?= htmlspecialchars($pmLite) ?></span></td>
                                 <td class="col-poster-waiter"><?= htmlspecialchars((string)($r['waiter_name'] ?? '')) ?></td>
-                                <td class="nowrap col-poster-table"><?= htmlspecialchars((string)($r['table_id'] ?? '')) ?></td>
+                                <td class="nowrap col-poster-table"><?= htmlspecialchars($tableDisplay) ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
