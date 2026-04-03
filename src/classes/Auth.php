@@ -104,8 +104,19 @@ class Auth {
         $user = $this->db->query("SELECT * FROM {$users} WHERE email = ? AND is_active = 1", [$email])->fetch();
 
         if ($user) {
+            $name = trim((string)($userData['name'] ?? ''));
+            if ($name !== '') {
+                try {
+                    $this->db->query("ALTER TABLE {$users} ADD COLUMN name VARCHAR(255) NULL");
+                } catch (\Throwable $e) {
+                }
+                try {
+                    $this->db->query("UPDATE {$users} SET name = ? WHERE email = ? LIMIT 1", [$name, $email]);
+                } catch (\Throwable $e) {
+                }
+            }
             $_SESSION['user_email'] = $email;
-            $_SESSION['user_name'] = $userData['name'] ?? $email;
+            $_SESSION['user_name'] = $name !== '' ? $name : ($userData['name'] ?? $email);
             $pic = (string)($userData['picture'] ?? '');
             if ($pic !== '' && preg_match('/^https:\\/\\//i', $pic)) {
                 $_SESSION['user_avatar'] = $pic;

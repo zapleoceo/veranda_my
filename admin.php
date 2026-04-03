@@ -45,6 +45,14 @@ try {
     $usersCols = [];
 }
 
+try {
+    if (empty($usersCols['name'])) {
+        $db->query("ALTER TABLE {$usersTable} ADD COLUMN name VARCHAR(255) NULL");
+        $usersCols['name'] = true;
+    }
+} catch (\Throwable $e) {
+}
+
 $permissionKeys = [
     'dashboard' => 'Дашборд',
     'rawdata' => 'Сырые данные',
@@ -155,6 +163,7 @@ if (isset($_GET['delete'])) {
 $users = [];
 try {
     $select = ['email'];
+    if (!empty($usersCols['name'])) $select[] = 'name';
     if (!empty($usersCols['telegram_username'])) $select[] = 'telegram_username';
     if (!empty($usersCols['permissions_json'])) $select[] = 'permissions_json';
     if (!empty($usersCols['created_at'])) {
@@ -1627,6 +1636,7 @@ if ($tab === 'menu' || $tab === 'categories') {
             <table>
                 <thead>
                     <tr>
+                        <th>Имя</th>
                         <th>Email</th>
                         <th>Telegram</th>
                         <th>Дата добавления</th>
@@ -1636,6 +1646,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 <tbody>
                     <?php foreach ($users as $user): ?>
                     <tr>
+                        <td><?= htmlspecialchars((string)($user['name'] ?? '')) ?></td>
                         <td><?= htmlspecialchars($user['email']) ?></td>
                         <td><?= htmlspecialchars((string)($user['telegram_username'] ?? '')) ?></td>
                         <td><?php
