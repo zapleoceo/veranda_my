@@ -330,6 +330,14 @@ $firstOfMonth = date('Y-m-01');
         .progress .label { font-size: 12px; color:#1f2937; font-weight: 800; }
         .progress .desc { font-size: 12px; color:#6b7280; }
         #totals { white-space: nowrap; overflow-x: auto; }
+        .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color:#374151; }
+        .toggle-wrap .toggle-text { user-select:none; }
+        .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#d1d5db; transition: 180ms; border-radius: 999px; }
+        .slider:before { position:absolute; content:""; height: 22px; width: 22px; left: 3px; bottom: 3px; background: #fff; transition: 180ms; border-radius: 999px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+        .switch input:checked + .slider { background:#1a73e8; }
+        .switch input:checked + .slider:before { transform: translateX(24px); }
         #empTable.lite .col-id,
         #empTable.lite .col-role,
         #empTable.lite .col-checks,
@@ -354,15 +362,6 @@ $firstOfMonth = date('Y-m-01');
                 Дата конца
                 <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>">
             </label>
-            <label style="flex-direction: row; align-items:center; gap: 8px; padding-bottom: 4px;">
-                <input type="checkbox" id="hideZero">
-                Скрыть нулевые
-            </label>
-            <label style="flex-direction: row; align-items:center; gap: 8px; padding-bottom: 4px;">
-                <span class="muted">Full</span>
-                <input type="checkbox" id="modeLite">
-                <span class="muted">Lite</span>
-            </label>
             <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
                 <button type="button" id="loadBtn">ЗАГРУЗИТЬ</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
@@ -375,7 +374,20 @@ $firstOfMonth = date('Y-m-01');
             </div>
         </div>
         <div class="error" id="err" style="display:none;"></div>
-        <div class="muted" id="tipsMode" style="margin-top: 10px; display:none;"></div>
+        <div style="display:flex; gap: 14px; align-items:center; flex-wrap: wrap; margin-top: 10px;">
+            <label class="muted" style="display:flex; align-items:center; gap: 8px; margin: 0;">
+                <input type="checkbox" id="hideZero">
+                Скрыть нулевые
+            </label>
+            <div class="toggle-wrap" title="Lite/Full">
+                <span class="toggle-text">Lite</span>
+                <label class="switch">
+                    <input type="checkbox" id="modeLite">
+                    <span class="slider"></span>
+                </label>
+                <span class="toggle-text">Full</span>
+            </div>
+        </div>
         <div class="table-wrap" style="margin-top: 12px;">
             <table id="empTable">
                 <thead>
@@ -405,7 +417,6 @@ $firstOfMonth = date('Y-m-01');
     const loader = document.getElementById('loader');
     const err = document.getElementById('err');
     const tbody = document.getElementById('tbody');
-    const tipsModeEl = document.getElementById('tipsMode');
     const prog = document.getElementById('prog');
     const progBar = document.getElementById('progBar');
     const progLabel = document.getElementById('progLabel');
@@ -696,18 +707,6 @@ $firstOfMonth = date('Y-m-01');
             };
             const p = await prepare();
             await run(p.job_id, Number(p.total || 0));
-            if (tipsModeEl) {
-                const m = String(tipsMode || '');
-                if (m) {
-                    tipsModeEl.style.display = 'block';
-                    tipsModeEl.textContent = m === 'tips_card'
-                        ? 'Tips: берутся из dash.getTransactions.tips_card'
-                        : (m === 'tip_sum' ? 'Tips: берутся из dash.getTransactions.tip_sum (в getTransactions нет tips_card)' : 'Tips: не найдены в dash.getTransactions');
-                } else {
-                    tipsModeEl.style.display = 'none';
-                    tipsModeEl.textContent = '';
-                }
-            }
             dataRows = rows.map((r) => {
                 const rate = Number(r.rate || 0);
                 const hours = Number(r.worked_hours || 0);
