@@ -349,6 +349,10 @@ $firstOfMonth = date('Y-m-01');
                 Дата конца
                 <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>">
             </label>
+            <label style="flex-direction: row; align-items:center; gap: 8px; padding-bottom: 4px;">
+                <input type="checkbox" id="hideZero">
+                Скрыть нулевые
+            </label>
             <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
                 <button type="button" id="loadBtn">ЗАГРУЗИТЬ</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
@@ -366,9 +370,9 @@ $firstOfMonth = date('Y-m-01');
             <table>
                 <thead>
                 <tr>
-                    <th id="thUid" data-sort="user_id" style="cursor:pointer;">user_id</th>
+                    <th id="thUid" data-sort="user_id" style="cursor:pointer;">ID</th>
                     <th id="thName" data-sort="name" style="cursor:pointer;">name</th>
-                    <th style="text-align:right;">Ставка</th>
+                    <th id="thRate" data-sort="rate" style="text-align:right; cursor:pointer;">Ставка</th>
                     <th id="thRole" data-sort="role_name" style="cursor:pointer;">role_name</th>
                     <th id="thChecks" data-sort="checks" style="text-align:right; cursor:pointer;">Чеков</th>
                     <th id="thHours" data-sort="worked_hours" style="text-align:right; cursor:pointer;">ЧасыРаботы</th>
@@ -379,6 +383,7 @@ $firstOfMonth = date('Y-m-01');
                 <tbody id="tbody"></tbody>
             </table>
         </div>
+        <div class="muted" id="totals" style="margin-top: 10px; text-align:right; font-weight:900;">Итого: Чеков 0 · ЧасыРаботы 0 · Tips 0 · Salary 0</div>
     </div>
 </div>
 
@@ -396,6 +401,8 @@ $firstOfMonth = date('Y-m-01');
     const progLabel = document.getElementById('progLabel');
     const progDesc = document.getElementById('progDesc');
     const cancelBtn = document.getElementById('cancelBtn');
+    const hideZeroCb = document.getElementById('hideZero');
+    const totalsEl = document.getElementById('totals');
     let runAbort = null;
     let currentJobId = '';
 
@@ -425,8 +432,15 @@ $firstOfMonth = date('Y-m-01');
     const prefs = loadPrefs();
     if (prefs.date_from) dateFrom.value = prefs.date_from;
     if (prefs.date_to) dateTo.value = prefs.date_to;
+    let hideZero = !!prefs.hide_zero;
+    if (hideZeroCb) hideZeroCb.checked = hideZero;
     dateFrom.addEventListener('change', () => { const p = loadPrefs(); p.date_from = dateFrom.value; savePrefs(p); });
     dateTo.addEventListener('change', () => { const p = loadPrefs(); p.date_to = dateTo.value; savePrefs(p); });
+    if (hideZeroCb) hideZeroCb.addEventListener('change', () => {
+        hideZero = !!hideZeroCb.checked;
+        const p = loadPrefs(); p.hide_zero = hideZero; savePrefs(p);
+        renderTable();
+    });
     let sortBy = prefs.sort_by || 'checks';
     let sortDir = prefs.sort_dir || 'desc';
     const setSort = (by) => {
@@ -439,10 +453,84 @@ $firstOfMonth = date('Y-m-01');
     const ths = Array.from(document.querySelectorAll('th[data-sort]'));
     ths.forEach((th) => th.addEventListener('click', () => setSort(th.getAttribute('data-sort') || '')));
     let dataRows = [];
+    const boundRateIds = new Set();
+    function bindRateInputs() {
+        Array.from(tbody.querySelectorAll('.rate-input')).forEach((inp) => {
+            const key = inp.getAttribute('data-user-id') || '';
+            if (!key) return;
+            if (inp.getAttribute('data-bound') === '1') return;
+            inp.setAttribute('data-bound', '1');
+
+            let saving = false;
+            const applyFormat = () => {
+                inp.value = fmtSpaces(digitsOnly(inp.value));
+            };
+            const updateSalary = (rateVal) => {
+                const uid = inp.getAttribute('data-user-id') || '';
+                const hours = Number(inp.getAttribute('data-hours') || 0);
+                const salary = calcSalary(rateVal, hours);
+                const cell = tbody.querySelector(`.salary-cell[data-user-id="${CSS.escape(uid)}"]`);
+                if (cell) cell.textContent = fmtMoney(salary);
+            };
+            const save = async () => {
+                if (saving) return;
+                const uid = Number(inp.getAttribute('data-user-id') || 0);
+                if (!uid) return;
+                const prev = Number(inp.getAttribute('data-rate') || 0);
+                const next = Number(digitsOnly(inp.value) || 0);
+                if (prev === next) { updateSalary(next); return; }
+                saving = true;
+                inp.disabled = true;
+                try {
+                    const url = new URL(location.href);
+                    url.searchParams.set('ajax', 'save_rate');
+                    const res = await fetch(url.toString(), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify({ user_id: uid, rate: String(next) }),
+                    });
+                    const txt = await res.text();
+                    let j = null;
+                    try { j = JSON.parse(txt); } catch (_) {}
+                    if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка сохранения');
+                    const saved = Number(j.rate || 0);
+                    inp.setAttribute('data-rate', String(saved));
+                    inp.value = fmtSpaces(String(saved));
+                    const row = dataRows.find((x) => Number(x.user_id) === uid);
+                    if (row) {
+                        row.rate = saved;
+                        row.salary_minor = calcSalary(saved, row.worked_hours);
+                    }
+                    updateSalary(saved);
+                    renderTable();
+                } catch (e) {
+                    setError(e && e.message ? e.message : 'Ошибка сохранения');
+                    inp.value = fmtSpaces(String(prev));
+                    updateSalary(prev);
+                } finally {
+                    inp.disabled = false;
+                    saving = false;
+                }
+            };
+
+            inp.addEventListener('input', () => {
+                applyFormat();
+                updateSalary(Number(digitsOnly(inp.value) || 0));
+            }, { passive: true });
+            inp.addEventListener('blur', () => { save(); });
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    save();
+                }
+            });
+        });
+    }
     function renderTable() {
         const coll = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
         const dir = sortDir === 'desc' ? -1 : 1;
-        const items = dataRows.slice().sort((a, b) => {
+        const filtered = hideZero ? dataRows.filter((r) => Number(r.worked_hours || 0) > 0) : dataRows.slice();
+        const items = filtered.slice().sort((a, b) => {
             const av = a[sortBy];
             const bv = b[sortBy];
             if (typeof av === 'number' || typeof bv === 'number') {
@@ -454,9 +542,17 @@ $firstOfMonth = date('Y-m-01');
             return s * dir;
         });
         tbody.innerHTML = '';
+        let totChecks = 0;
+        let totHours = 0;
+        let totTipsMinor = 0;
+        let totSalary = 0;
         items.forEach((r) => {
             const tipsVnd = vndFromMinor(r.tips_minor || 0);
             const tr = document.createElement('tr');
+            totChecks += Number(r.checks || 0);
+            totHours += Number(r.worked_hours || 0);
+            totTipsMinor += Number(r.tips_minor || 0);
+            totSalary += Number(r.salary_minor || 0);
             tr.innerHTML = `
                 <td>${esc(r.user_id)}</td>
                 <td>${esc(r.name)}</td>
@@ -469,6 +565,11 @@ $firstOfMonth = date('Y-m-01');
             `;
             tbody.appendChild(tr);
         });
+        bindRateInputs();
+        if (totalsEl) {
+            const hoursTxt = (Math.round(totHours * 100) / 100).toFixed(2).replace(/\.00$/, '');
+            totalsEl.textContent = `Итого: Чеков ${fmtMoney(totChecks)} · ЧасыРаботы ${hoursTxt} · Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · Salary ${fmtMoney(totSalary)}`;
+        }
     }
 
     const withTimeout = (ms = 30000) => {
@@ -599,66 +700,6 @@ $firstOfMonth = date('Y-m-01');
                 };
             });
             renderTable();
-
-            Array.from(tbody.querySelectorAll('.rate-input')).forEach((inp) => {
-                let saving = false;
-                const applyFormat = () => {
-                    inp.value = fmtSpaces(digitsOnly(inp.value));
-                };
-                const updateSalary = (rateVal) => {
-                    const uid = inp.getAttribute('data-user-id') || '';
-                    const hours = Number(inp.getAttribute('data-hours') || 0);
-                    const salary = calcSalary(rateVal, hours);
-                    const cell = tbody.querySelector(`.salary-cell[data-user-id="${CSS.escape(uid)}"]`);
-                    if (cell) cell.textContent = fmtMoney(salary);
-                };
-                const save = async () => {
-                    if (saving) return;
-                    const uid = Number(inp.getAttribute('data-user-id') || 0);
-                    if (!uid) return;
-                    const prev = Number(inp.getAttribute('data-rate') || 0);
-                    const next = Number(digitsOnly(inp.value) || 0);
-                    if (prev === next) { updateSalary(next); return; }
-                    saving = true;
-                    inp.disabled = true;
-                    try {
-                        const url = new URL(location.href);
-                        url.searchParams.set('ajax', 'save_rate');
-                        const res = await fetch(url.toString(), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                            body: JSON.stringify({ user_id: uid, rate: String(next) }),
-                        });
-                        const txt = await res.text();
-                        let j = null;
-                        try { j = JSON.parse(txt); } catch (_) {}
-                        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка сохранения');
-                        const saved = Number(j.rate || 0);
-                        inp.setAttribute('data-rate', String(saved));
-                        inp.value = fmtSpaces(String(saved));
-                        updateSalary(saved);
-                    } catch (e) {
-                        setError(e && e.message ? e.message : 'Ошибка сохранения');
-                        inp.value = fmtSpaces(String(prev));
-                        updateSalary(prev);
-                    } finally {
-                        inp.disabled = false;
-                        saving = false;
-                    }
-                };
-
-                inp.addEventListener('input', () => {
-                    applyFormat();
-                    updateSalary(Number(digitsOnly(inp.value) || 0));
-                }, { passive: true });
-                inp.addEventListener('blur', () => { save(); });
-                inp.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        save();
-                    }
-                });
-            });
         } catch (e) {
             try { clearInterval(tick); } catch (_) {}
             setError(e && e.message ? e.message : 'Ошибка');
