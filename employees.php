@@ -391,7 +391,8 @@ if (($_GET['ajax'] ?? '') === 'pay_tips') {
     try {
         $api = new \App\Classes\PosterAPI($posterToken);
         $now = date('Y-m-d H:i:s');
-        $comment = 'TIPS ID=' . $waiterId;
+        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+        $comment = 'TIPS ID=' . $waiterId . ($by !== '' ? (' by ' . $by) : '');
         $res = $api->request('finance.createTransactions', [
             'id' => (int)(time() * 1000 + random_int(0, 999)),
             'type' => 0,
@@ -441,6 +442,15 @@ $firstOfMonth = date('Y-m-01');
         .ltp { margin-top: 2px; font-size: 11px; color: #6b7280; font-weight: 800; white-space: nowrap; }
         .paid-btn { border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: #1a73e8; border-radius: 8px; padding: 2px 7px; font-weight: 900; font-size: 11px; cursor: pointer; line-height: 1.2; }
         .paid-btn:disabled { opacity: 0.6; cursor: default; }
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.55); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
+        .modal { width: 100%; max-width: 460px; background: #fff; border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 18px 45px rgba(0,0,0,0.22); padding: 14px; }
+        .modal h3 { margin: 0 0 10px; font-size: 16px; }
+        .modal .body { color: #111827; font-weight: 700; line-height: 1.35; }
+        .modal .sub { margin-top: 10px; color: #6b7280; font-weight: 800; font-size: 12px; }
+        .modal .actions { display:flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+        .modal .btn2 { padding: 10px 14px; border-radius: 10px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; }
+        .modal .btn2.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
+        .modal .btn2:disabled { opacity: 0.6; cursor: default; }
         .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color:#374151; }
         .toggle-wrap .toggle-text { user-select:none; }
         .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
@@ -520,6 +530,23 @@ $firstOfMonth = date('Y-m-01');
     </div>
 </div>
 
+<div class="modal-backdrop" id="paidModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="paidTitle">
+        <h3 id="paidTitle">Подтверждение</h3>
+        <div class="body" id="paidText"></div>
+        <div class="sub">
+            <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
+                <input type="checkbox" id="paidChecked">
+                да проверил
+            </label>
+        </div>
+        <div class="actions">
+            <button type="button" class="btn2" id="paidCancel">Отмена</button>
+            <button type="button" class="btn2 primary" id="paidOk" disabled>OK</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (() => {
     const dateFrom = document.getElementById('dateFrom');
@@ -537,8 +564,14 @@ $firstOfMonth = date('Y-m-01');
     const modeLiteCb = document.getElementById('modeLite');
     const totalsEl = document.getElementById('totals');
     const empTable = document.getElementById('empTable');
+    const paidModal = document.getElementById('paidModal');
+    const paidText = document.getElementById('paidText');
+    const paidChecked = document.getElementById('paidChecked');
+    const paidCancel = document.getElementById('paidCancel');
+    const paidOk = document.getElementById('paidOk');
     let runAbort = null;
     let currentJobId = '';
+    let paidResolve = null;
 
     const setLoading = (on) => {
         btn.disabled = on;
@@ -883,6 +916,31 @@ $firstOfMonth = date('Y-m-01');
     };
 
     btn.addEventListener('click', load);
+
+    const openPaidConfirm = (html) => new Promise((resolve) => {
+        if (!paidModal || !paidText || !paidChecked || !paidCancel || !paidOk) return resolve(false);
+        paidResolve = resolve;
+        paidText.innerHTML = html;
+        paidChecked.checked = false;
+        paidOk.disabled = true;
+        paidModal.style.display = 'flex';
+        paidCancel.focus();
+    });
+    const closePaidConfirm = (ok) => {
+        if (!paidModal) return;
+        paidModal.style.display = 'none';
+        const r = paidResolve;
+        paidResolve = null;
+        if (r) r(!!ok);
+    };
+    if (paidChecked) paidChecked.addEventListener('change', () => { if (paidOk) paidOk.disabled = !paidChecked.checked; });
+    if (paidCancel) paidCancel.addEventListener('click', () => closePaidConfirm(false));
+    if (paidOk) paidOk.addEventListener('click', () => closePaidConfirm(true));
+    if (paidModal) {
+        paidModal.addEventListener('click', (e) => { if (e.target === paidModal) closePaidConfirm(false); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && paidModal.style.display === 'flex') closePaidConfirm(false); });
+    }
+
     tbody.addEventListener('click', async (e) => {
         const b = e.target && e.target.closest ? e.target.closest('.paid-btn') : null;
         if (!b) return;
@@ -893,7 +951,14 @@ $firstOfMonth = date('Y-m-01');
         const tipsMinor = Number(row.tips_minor || 0);
         if (tipsMinor <= 0) return;
         const tipsVnd = vndFromMinor(tipsMinor);
-        if (!confirm(`Создать транзакцию выплаты типсов?\nID=${uid}\nСумма=${fmtMoney(tipsVnd)}`)) return;
+        const ok = await openPaidConfirm(
+            `Будет создана транзакция расхода на выплату типсов.<br>` +
+            `ID сотрудника: <b>${esc(uid)}</b><br>` +
+            `Сумма: <b>${esc(fmtMoney(tipsVnd))}</b><br>` +
+            `Категория: <b>4</b>, user_id: <b>10</b>, account_from: <b>8</b><br>` +
+            `Комментарий: <b>TIPS ID=${esc(uid)}</b> + email создателя`
+        );
+        if (!ok) return;
         b.disabled = true;
         try {
             const url = new URL(location.href);

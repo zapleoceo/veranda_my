@@ -891,6 +891,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $comment = $kind === 'vietnam'
             ? 'Перевод чеков вьетнаской компании'
             : 'Перевод типсов';
+        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+        if ($by !== '') $comment .= ' by ' . $by;
         $expectedUserId = 4;
 
         $txs = [];
@@ -2217,6 +2219,10 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
         $amount = sprintf('%.2f', abs($diffCents) / 100);
         $accountId = 8;
         $comment = 'Коррекция излишек - недостачи за счет чая';
+        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+        if ($by !== '') $comment .= ' by ' . $by;
+        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+        if ($by !== '') $comment .= ' by ' . $by;
 
         $api3 = new \App\Classes\PosterAPI((string)$token);
         try {
