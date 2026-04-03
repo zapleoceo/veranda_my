@@ -11,11 +11,38 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
         <span><?= htmlspecialchars($userLabel) ?></span>
     </div>
     <div class="user-dropdown">
-        <?php if (function_exists('veranda_can') && veranda_can('dashboard')): ?><a href="/dashboard.php<?= $dashboardQuery !== '' ? ('?' . htmlspecialchars($dashboardQuery)) : '' ?>">Дашборд</a><?php endif; ?>
-        <?php if (function_exists('veranda_can') && veranda_can('rawdata')): ?><a href="/rawdata.php<?= $rawDataQuery !== '' ? ('?' . htmlspecialchars($rawDataQuery)) : '' ?>">Таблица</a><?php endif; ?>
-        <?php if (function_exists('veranda_can') && veranda_can('kitchen_online')): ?><a href="/kitchen_online.php">КухняОнлайн</a><?php endif; ?>
-        <?php if (function_exists('veranda_can') && veranda_can('payday')): ?><a href="/payday">Payday</a><?php endif; ?>
-        <?php if (function_exists('veranda_can') && veranda_can('admin')): ?><a href="/admin.php">Управление</a><?php endif; ?>
+        <?php
+            $canDashboard = function_exists('veranda_can') && veranda_can('dashboard');
+            $canRaw = function_exists('veranda_can') && veranda_can('rawdata');
+            $canKitchen = function_exists('veranda_can') && veranda_can('kitchen_online');
+            $canBanya = function_exists('veranda_can') && veranda_can('banya');
+            $canRoma = function_exists('veranda_can') && veranda_can('roma');
+            $canEmployees = function_exists('veranda_can') && veranda_can('employees');
+            $canPayday = function_exists('veranda_can') && veranda_can('payday');
+            $canAdmin = function_exists('veranda_can') && veranda_can('admin');
+            $hasReports = $canDashboard || $canRaw || $canKitchen || $canBanya || $canRoma || $canEmployees;
+        ?>
+
+        <?php if ($hasReports): ?>
+            <div class="ud-title">Отчеты</div>
+
+            <?php if ($canKitchen || $canDashboard || $canRaw): ?>
+                <div class="ud-subtitle">Кухня</div>
+                <?php if ($canKitchen): ?><a class="ud-link ud-l2" href="/kitchen_online.php">Онлайн</a><?php endif; ?>
+                <?php if ($canDashboard): ?><a class="ud-link ud-l2" href="/dashboard.php<?= $dashboardQuery !== '' ? ('?' . htmlspecialchars($dashboardQuery)) : '' ?>">Дашборд</a><?php endif; ?>
+                <?php if ($canRaw): ?><a class="ud-link ud-l2" href="/rawdata.php<?= $rawDataQuery !== '' ? ('?' . htmlspecialchars($rawDataQuery)) : '' ?>">Таблица</a><?php endif; ?>
+            <?php endif; ?>
+
+            <?php if ($canBanya): ?><a class="ud-link ud-l1" href="/banya.php">Баня</a><?php endif; ?>
+            <?php if ($canRoma): ?><a class="ud-link ud-l1" href="/roma.php">Кальяны</a><?php endif; ?>
+            <?php if ($canEmployees): ?><a class="ud-link ud-l1" href="/employees.php">ЗП сотрудников</a><?php endif; ?>
+
+            <div class="ud-sep"></div>
+        <?php endif; ?>
+
+        <?php if ($canPayday): ?><a class="ud-link" href="/payday">PayDay</a><?php endif; ?>
+        <?php if ($canAdmin): ?><a class="ud-link" href="/admin.php">Управление</a><?php endif; ?>
+        <div class="ud-sep"></div>
         <a href="/logout.php">Выход</a>
     </div>
 </div>

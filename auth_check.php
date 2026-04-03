@@ -37,6 +37,7 @@ if (!function_exists('veranda_get_user_permissions')) {
             'admin' => true,
             'roma' => false,
             'banya' => false,
+            'employees' => false,
             'exclude_toggle' => true,
             'telegram_ack' => false,
             'payday' => false,
@@ -62,6 +63,7 @@ if (!function_exists('veranda_get_user_permissions')) {
             if (!empty($out['admin'])) {
                 $out['roma'] = true;
                 $out['banya'] = true;
+                $out['employees'] = true;
             }
             return $out;
         } catch (\Exception $e) {

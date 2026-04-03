@@ -49,6 +49,7 @@ $permissionKeys = [
     'dashboard' => 'Дашборд',
     'rawdata' => 'Сырые данные',
     'kitchen_online' => 'КухняOnline',
+    'employees' => 'ЗП сотрудников',
     'payday' => 'Payday',
     'admin' => 'УПРАВЛЕНИЕ',
     'roma' => 'Roma (кальяны)',
@@ -95,7 +96,19 @@ if (isset($_POST['add_email'])) {
     $email = trim($_POST['email']);
     if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
         try {
-            $db->query("INSERT INTO {$usersTable} (email) VALUES (?)", [$email]);
+            if (!empty($usersCols['permissions_json'])) {
+                $emptyPerms = [];
+                foreach ($permissionKeys as $k => $_label) {
+                    $emptyPerms[$k] = 0;
+                }
+                $emptyPerms['telegram_ack'] = 0;
+                $db->query(
+                    "INSERT INTO {$usersTable} (email, permissions_json) VALUES (?, ?)",
+                    [$email, json_encode($emptyPerms, JSON_UNESCAPED_UNICODE)]
+                );
+            } else {
+                $db->query("INSERT INTO {$usersTable} (email) VALUES (?)", [$email]);
+            }
             $message = "Пользователь $email успешно добавлен.";
         } catch (\Exception $e) {
             $error = "Ошибка при добавлении: " . $e->getMessage();
@@ -2466,14 +2479,15 @@ if ($tab === 'menu' || $tab === 'categories') {
             if (!modal || !form || !emailEl || !tgEl || !cancel) return;
 
             const defaultPerms = {
-                dashboard: true,
-                rawdata: true,
-                kitchen_online: true,
+                dashboard: false,
+                rawdata: false,
+                kitchen_online: false,
+                employees: false,
                 payday: false,
-                admin: true,
+                admin: false,
                 roma: false,
                 banya: false,
-                exclude_toggle: true,
+                exclude_toggle: false,
             };
 
             const close = () => { modal.style.display = 'none'; };

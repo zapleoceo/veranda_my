@@ -17,6 +17,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .user-menu.open .user-dropdown { display: block; }
 .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: #37474f; text-decoration: none; font-weight: 600; }
 .user-dropdown a:hover { background: #f4f7f6; }
+.user-dropdown .ud-title { padding: 6px 10px 4px; color: #9aa0a6; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; }
+.user-dropdown .ud-subtitle { padding: 6px 10px 4px; color: #6b7280; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; }
+.user-dropdown .ud-link.ud-l1 { padding-left: 18px; }
+.user-dropdown .ud-link.ud-l2 { padding-left: 32px; }
+.user-dropdown .ud-sep { height: 1px; background: #eee; margin: 6px 8px; border-radius: 999px; }
 .tab-links { text-align: center; margin: -10px 0 24px; }
 .tab-links a { display: inline-block; padding: 8px 14px; border-radius: 999px; margin: 0 6px; text-decoration: none; font-weight: 700; color: #1a73e8; background: rgba(26,115,232,0.08); }
 .tab-links a.active { color: #fff; background: #1a73e8; }
