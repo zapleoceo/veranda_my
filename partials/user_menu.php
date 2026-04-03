@@ -27,10 +27,12 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
             <div class="ud-title">Отчеты</div>
 
             <?php if ($canKitchen || $canDashboard || $canRaw): ?>
-                <div class="ud-subtitle">Кухня</div>
-                <?php if ($canKitchen): ?><a class="ud-link ud-l2" href="/kitchen_online.php">Онлайн</a><?php endif; ?>
-                <?php if ($canDashboard): ?><a class="ud-link ud-l2" href="/dashboard.php<?= $dashboardQuery !== '' ? ('?' . htmlspecialchars($dashboardQuery)) : '' ?>">Дашборд</a><?php endif; ?>
-                <?php if ($canRaw): ?><a class="ud-link ud-l2" href="/rawdata.php<?= $rawDataQuery !== '' ? ('?' . htmlspecialchars($rawDataQuery)) : '' ?>">Таблица</a><?php endif; ?>
+                <details class="ud-details">
+                    <summary class="ud-summary">Кухня</summary>
+                    <?php if ($canKitchen): ?><a class="ud-link ud-l2" href="/kitchen_online.php">Онлайн</a><?php endif; ?>
+                    <?php if ($canDashboard): ?><a class="ud-link ud-l2" href="/dashboard.php<?= $dashboardQuery !== '' ? ('?' . htmlspecialchars($dashboardQuery)) : '' ?>">Дашборд</a><?php endif; ?>
+                    <?php if ($canRaw): ?><a class="ud-link ud-l2" href="/rawdata.php<?= $rawDataQuery !== '' ? ('?' . htmlspecialchars($rawDataQuery)) : '' ?>">Таблица</a><?php endif; ?>
+                </details>
             <?php endif; ?>
 
             <?php if ($canBanya): ?><a class="ud-link ud-l1" href="/banya.php">Баня</a><?php endif; ?>

@@ -22,6 +22,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .user-dropdown .ud-link.ud-l1 { padding-left: 18px; }
 .user-dropdown .ud-link.ud-l2 { padding-left: 32px; }
 .user-dropdown .ud-sep { height: 1px; background: #eee; margin: 6px 8px; border-radius: 999px; }
+.user-dropdown .ud-details { margin: 2px 0; }
+.user-dropdown .ud-summary { list-style: none; padding: 8px 10px; border-radius: 8px; color: #37474f; font-weight: 800; cursor: pointer; user-select: none; }
+.user-dropdown .ud-summary::-webkit-details-marker { display: none; }
+.user-dropdown details[open] .ud-summary { background: #f4f7f6; }
+.user-dropdown .ud-summary::after { content: "›"; float: right; color: #9aa0a6; font-weight: 900; }
+.user-dropdown details[open] .ud-summary::after { content: "⌄"; }
 .tab-links { text-align: center; margin: -10px 0 24px; }
 .tab-links a { display: inline-block; padding: 8px 14px; border-radius: 999px; margin: 0 6px; text-decoration: none; font-weight: 700; color: #1a73e8; background: rgba(26,115,232,0.08); }
 .tab-links a.active { color: #fff; background: #1a73e8; }

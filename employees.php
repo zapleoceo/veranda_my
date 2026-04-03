@@ -35,6 +35,15 @@ if (($_GET['ajax'] ?? '') === 'load') {
 
     try {
         $api = new \App\Classes\PosterAPI($posterToken);
+        $emps = $api->request('access.getEmployees', [], 'GET');
+        if (!is_array($emps)) $emps = [];
+        $roleByUser = [];
+        foreach ($emps as $e) {
+            if (!is_array($e)) continue;
+            $uid = (int)($e['user_id'] ?? 0);
+            if ($uid <= 0) continue;
+            $roleByUser[$uid] = (string)($e['role_name'] ?? '');
+        }
         $rows = $api->request('dash.getWaitersSales', [
             'dateFrom' => str_replace('-', '', $dateFrom),
             'dateTo' => str_replace('-', '', $dateTo),
@@ -51,14 +60,17 @@ if (($_GET['ajax'] ?? '') === 'load') {
             if ($worked === null) $worked = $r['workedTime'] ?? null;
             if ($worked === null) $worked = $r['middle_time'] ?? null;
             $workedMin = is_numeric($worked) ? (int)round((float)$worked) : 0;
+            $workedHours = $workedMin > 0 ? round($workedMin / 60, 2) : 0;
+            $role = $uid > 0 ? (string)($roleByUser[$uid] ?? '') : '';
             $out[] = [
                 'user_id' => $uid,
                 'name' => $name,
-                'rclients' => $clients,
-                'worked_time' => $workedMin,
+                'role_name' => $role,
+                'checks' => $clients,
+                'worked_hours' => $workedHours,
             ];
         }
-        usort($out, fn($a, $b) => ($b['rclients'] <=> $a['rclients']));
+        usort($out, fn($a, $b) => ($b['checks'] <=> $a['checks']));
         echo json_encode(['ok' => true, 'rows' => $out], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
@@ -120,8 +132,9 @@ $firstOfMonth = date('Y-m-01');
                 <tr>
                     <th>user_id</th>
                     <th>name</th>
-                    <th style="text-align:right;">rclients</th>
-                    <th style="text-align:right;">worked_time (мин)</th>
+                    <th>role_name</th>
+                    <th style="text-align:right;">Чеков</th>
+                    <th style="text-align:right;">ЧасыРаботы</th>
                 </tr>
                 </thead>
                 <tbody id="tbody"></tbody>
@@ -169,8 +182,9 @@ $firstOfMonth = date('Y-m-01');
                 tr.innerHTML = `
                     <td>${esc(r.user_id)}</td>
                     <td>${esc(r.name)}</td>
-                    <td style="text-align:right;">${esc(r.rclients)}</td>
-                    <td style="text-align:right;">${esc(r.worked_time)}</td>
+                    <td>${esc(r.role_name)}</td>
+                    <td style="text-align:right;">${esc(r.checks)}</td>
+                    <td style="text-align:right;">${esc(r.worked_hours)}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -186,4 +200,3 @@ $firstOfMonth = date('Y-m-01');
 </script>
 </body>
 </html>
-
