@@ -649,6 +649,7 @@ $firstOfMonth = date('Y-m-01');
 </div>
 
 <script>
+window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 (() => {
     const dateFrom = document.getElementById('dateFrom');
     const dateTo = document.getElementById('dateTo');
@@ -1090,6 +1091,8 @@ $firstOfMonth = date('Y-m-01');
         const catName = meta && meta.category && meta.category.name ? String(meta.category.name) : '#4';
         const accName = meta && meta.account_from && meta.account_from.name ? String(meta.account_from.name) : '#8';
         const payerName = meta && meta.payer && meta.payer.name ? String(meta.payer.name) : '#10';
+        const creatorEmail = String((window.__USER_EMAIL__ || '')).trim();
+        const creatorLabel = creatorEmail ? creatorEmail : '—';
         const ok = await openPaidConfirm(
             `Будет создана транзакция расхода на выплату типсов.<br>` +
             `ID сотрудника: <b>${esc(uid)}</b><br>` +
@@ -1097,7 +1100,7 @@ $firstOfMonth = date('Y-m-01');
             `Категория: <b>${esc(catName)}</b><br>` +
             `Исполнитель: <b>${esc(payerName)}</b><br>` +
             `Счет списания: <b>${esc(accName)}</b><br>` +
-            `Комментарий: <b>TIPS ID=${esc(uid)}</b> + email создателя`
+            `Комментарий: <b>TIPS ID=${esc(uid)}</b> by <b>${esc(creatorLabel)}</b>`
         );
         if (!ok) return;
         b.disabled = true;
