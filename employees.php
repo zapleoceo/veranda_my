@@ -428,14 +428,14 @@ $firstOfMonth = date('Y-m-01');
             <table>
                 <thead>
                 <tr>
-                    <th>user_id</th>
-                    <th>name</th>
+                    <th id="thUid" data-sort="user_id" style="cursor:pointer;">user_id</th>
+                    <th id="thName" data-sort="name" style="cursor:pointer;">name</th>
                     <th style="text-align:right;">Ставка</th>
-                    <th>role_name</th>
-                    <th style="text-align:right;">Чеков</th>
-                    <th style="text-align:right;">ЧасыРаботы</th>
-                    <th style="text-align:right;">Tips</th>
-                    <th style="text-align:right;">Salary</th>
+                    <th id="thRole" data-sort="role_name" style="cursor:pointer;">role_name</th>
+                    <th id="thChecks" data-sort="checks" style="text-align:right; cursor:pointer;">Чеков</th>
+                    <th id="thHours" data-sort="worked_hours" style="text-align:right; cursor:pointer;">ЧасыРаботы</th>
+                    <th id="thTips" data-sort="tips_minor" style="text-align:right; cursor:pointer;">Tips</th>
+                    <th id="thSalary" data-sort="salary_minor" style="text-align:right; cursor:pointer;">Salary</th>
                 </tr>
                 </thead>
                 <tbody id="tbody"></tbody>
@@ -481,6 +481,26 @@ $firstOfMonth = date('Y-m-01');
     const fmtMoney = (n) => fmtSpaces(String(Math.round(Number(n || 0))));
     const calcSalary = (rate, hours) => Math.round(Number(rate || 0) * Number(hours || 0));
     const vndFromMinor = (minor) => Math.round(Number(minor || 0) / 100);
+    const LS_KEY = 'employees_prefs_v1';
+    const savePrefs = (obj) => { try { localStorage.setItem(LS_KEY, JSON.stringify(obj || {})); } catch (_) {} };
+    const loadPrefs = () => { try { const raw = localStorage.getItem(LS_KEY) || ''; return raw ? JSON.parse(raw) : {}; } catch (_) { return {}; } };
+    const prefs = loadPrefs();
+    if (prefs.date_from) dateFrom.value = prefs.date_from;
+    if (prefs.date_to) dateTo.value = prefs.date_to;
+    dateFrom.addEventListener('change', () => { const p = loadPrefs(); p.date_from = dateFrom.value; savePrefs(p); });
+    dateTo.addEventListener('change', () => { const p = loadPrefs(); p.date_to = dateTo.value; savePrefs(p); });
+    let sortBy = prefs.sort_by || 'checks';
+    let sortDir = prefs.sort_dir || 'desc';
+    const setSort = (by) => {
+        if (!by) return;
+        if (sortBy === by) sortDir = (sortDir === 'asc' ? 'desc' : 'asc');
+        else { sortBy = by; sortDir = 'asc'; }
+        const p = loadPrefs(); p.sort_by = sortBy; p.sort_dir = sortDir; savePrefs(p);
+        renderTable();
+    };
+    const ths = Array.from(document.querySelectorAll('th[data-sort]'));
+    ths.forEach((th) => th.addEventListener('click', () => setSort(th.getAttribute('data-sort') || '')));
+    let dataRows = [];
 
     const withTimeout = (ms = 30000) => {
         const ctrl = new AbortController();
@@ -574,26 +594,23 @@ $firstOfMonth = date('Y-m-01');
                     tipsModeEl.textContent = '';
                 }
             }
-            rows.forEach((r) => {
-                const tr = document.createElement('tr');
+            dataRows = rows.map((r) => {
                 const rate = Number(r.rate || 0);
                 const hours = Number(r.worked_hours || 0);
                 const salary = calcSalary(rate, hours);
                 const tipsMinor = (r.user_id && aggUser[String(r.user_id)]) ? Number(aggUser[String(r.user_id)]) : Number(aggName[String((r.name || '').toLowerCase())] || 0);
-                const tipsCard = vndFromMinor(tipsMinor || 0);
-                const tipsTxt = `${fmtMoney(tipsCard)}`;
-                tr.innerHTML = `
-                    <td>${esc(r.user_id)}</td>
-                    <td>${esc(r.name)}</td>
-                    <td style="text-align:right;"><input class="rate-input" inputmode="numeric" data-user-id="${esc(r.user_id)}" data-hours="${esc(hours)}" data-rate="${esc(rate)}" value="${esc(fmtSpaces(String(rate || '')))}"></td>
-                    <td>${esc(r.role_name)}</td>
-                    <td style="text-align:right;">${esc(r.checks)}</td>
-                    <td style="text-align:right;">${esc(r.worked_hours)}</td>
-                    <td style="text-align:right;">${esc(tipsTxt)}</td>
-                    <td style="text-align:right;" class="salary-cell" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(salary))}</td>
-                `;
-                tbody.appendChild(tr);
+                return {
+                    user_id: Number(r.user_id || 0),
+                    name: String(r.name || ''),
+                    role_name: String(r.role_name || ''),
+                    rate,
+                    checks: Number(r.checks || 0),
+                    worked_hours: hours,
+                    tips_minor: tipsMinor,
+                    salary_minor: salary,
+                };
             });
+            renderTable();
 
             Array.from(tbody.querySelectorAll('.rate-input')).forEach((inp) => {
                 let saving = false;
@@ -679,6 +696,39 @@ $firstOfMonth = date('Y-m-01');
         setLoading(false);
     });
 })();
+function renderTable() {
+    const tbody = document.getElementById('tbody');
+    if (!tbody) return;
+    const coll = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
+    const dir = sortDir === 'desc' ? -1 : 1;
+    const items = dataRows.slice().sort((a, b) => {
+        const av = a[sortBy];
+        const bv = b[sortBy];
+        if (typeof av === 'number' || typeof bv === 'number') {
+            const an = Number(av || 0), bn = Number(bv || 0);
+            if (an === bn) return 0;
+            return an < bn ? -1 * dir : 1 * dir;
+        }
+        const s = coll.compare(String(av || ''), String(bv || ''));
+        return s * dir;
+    });
+    tbody.innerHTML = '';
+    items.forEach((r) => {
+        const tipsVnd = vndFromMinor(r.tips_minor || 0);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${esc(r.user_id)}</td>
+            <td>${esc(r.name)}</td>
+            <td style="text-align:right;"><input class="rate-input" inputmode="numeric" data-user-id="${esc(r.user_id)}" data-hours="${esc(r.worked_hours)}" data-rate="${esc(r.rate)}" value="${esc(fmtSpaces(String(r.rate || '')))}"></td>
+            <td>${esc(r.role_name)}</td>
+            <td style="text-align:right;">${esc(r.checks)}</td>
+            <td style="text-align:right;">${esc(r.worked_hours)}</td>
+            <td style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
+            <td style="text-align:right;" class="salary-cell" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(r.salary_minor))}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
 </script>
 <script src="/assets/user_menu.js" defer></script>
 </body>
