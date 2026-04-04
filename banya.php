@@ -137,9 +137,18 @@ if (($_GET['ajax'] ?? '') === 'load') {
 
         $hallByTable = [];
         foreach ($spotIds as $sid) {
-            $map = banya_load_table_halls($api, (int)$sid);
-            foreach ($map as $tid => $hid) {
-                $hallByTable[(int)$tid] = (int)$hid;
+            $rows = $api->request('spots.getTableHallTables', [
+                'spot_id' => (int)$sid,
+                'without_deleted' => 0,
+            ], 'GET');
+            if (!is_array($rows)) $rows = [];
+            foreach ($rows as $r) {
+                if (!is_array($r)) continue;
+                $tid = (int)($r['table_id'] ?? 0);
+                if ($tid <= 0) continue;
+                $hid = (int)($r['hall_id'] ?? $r['table_hall_id'] ?? 0);
+                if ($hid <= 0) continue;
+                $hallByTable[$tid] = $hid;
             }
         }
 
