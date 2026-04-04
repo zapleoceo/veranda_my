@@ -149,7 +149,7 @@ if (($_GET['ajax'] ?? '') === 'day') {
     try {
         $catByPid = $loadProductCategoryMap($db, $api);
 
-        $txIds = [];
+        $txRowsById = [];
         $nextTr = null;
         $prevNextTr = null;
         $guard = 0;
@@ -175,19 +175,31 @@ if (($_GET['ajax'] ?? '') === 'day') {
             foreach ($batch as $tx) {
                 if (!is_array($tx)) continue;
                 $id = (int)($tx['transaction_id'] ?? 0);
-                if ($id > 0) $txIds[$id] = true;
+                if ($id > 0) $txRowsById[$id] = $tx;
             }
             if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
         } while ($count > 0 && $nextTr !== null);
 
-        $total = count($txIds);
+        $total = count($txRowsById);
         $missing = 0;
+        $hours = array_fill(0, 24, ['total' => 0, 'missing' => 0]);
 
-        foreach (array_keys($txIds) as $txId) {
+        foreach ($txRowsById as $txId => $tx0) {
+            $h = -1;
+            if (is_array($tx0)) {
+                $dateClose = (string)($tx0['date_close_date'] ?? '');
+                if ($dateClose !== '') {
+                    $ts = strtotime($dateClose);
+                    if ($ts !== false) $h = (int)date('G', $ts);
+                }
+            }
+            if ($h < 0 || $h > 23) $h = 0;
+
             $history = $api->request('dash.getTransactionHistory', ['transaction_id' => (int)$txId], 'GET');
             if (!is_array($history)) $history = [];
 
             $sent = $extractSentCounts($history, $catByPid);
+            $hours[$h]['total'] = (int)$hours[$h]['total'] + 1;
             if (!$sent) continue;
             $finished = $extractFinishedCounts($history, $catByPid);
             $deleted = $extractDeletedCounts($history, $catByPid);
@@ -203,6 +215,7 @@ if (($_GET['ajax'] ?? '') === 'day') {
                 }
             }
             if ($isMissing) $missing++;
+            if ($isMissing) $hours[$h]['missing'] = (int)$hours[$h]['missing'] + 1;
         }
 
         echo json_encode([
@@ -210,7 +223,137 @@ if (($_GET['ajax'] ?? '') === 'day') {
             'date' => $date,
             'total' => $total,
             'missing' => $missing,
+            'hours' => $hours,
         ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'day_checks') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+
+    $date = $parseDate((string)($_GET['date'] ?? ''));
+    if ($date === null) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($posterToken === '') {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $api = new \App\Classes\PosterAPI($posterToken);
+    try {
+        $catByPid = $loadProductCategoryMap($db, $api);
+
+        $txRowsById = [];
+        $nextTr = null;
+        $prevNextTr = null;
+        $guard = 0;
+        do {
+            $guard++;
+            if ($guard > 20000) break;
+            $params = [
+                'dateFrom' => str_replace('-', '', $date),
+                'dateTo' => str_replace('-', '', $date),
+                'include_products' => 'false',
+                'include_history' => 'false',
+                'status' => 2,
+            ];
+            if ($nextTr !== null) $params['next_tr'] = $nextTr;
+            $batch = $api->request('dash.getTransactions', $params, 'GET');
+            if (!is_array($batch)) $batch = [];
+            $count = count($batch);
+            if ($count > 0) {
+                $last = end($batch);
+                $prevNextTr = $nextTr;
+                $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
+            }
+            foreach ($batch as $tx) {
+                if (!is_array($tx)) continue;
+                $id = (int)($tx['transaction_id'] ?? 0);
+                if ($id > 0) $txRowsById[$id] = $tx;
+            }
+            if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
+        } while ($count > 0 && $nextTr !== null);
+
+        $checks = [];
+        foreach ($txRowsById as $txId => $tx) {
+            $history = $api->request('dash.getTransactionHistory', ['transaction_id' => (int)$txId], 'GET');
+            if (!is_array($history)) $history = [];
+
+            $sent = $extractSentCounts($history, $catByPid);
+            $missing = false;
+            if ($sent) {
+                $finished = $extractFinishedCounts($history, $catByPid);
+                $deleted = $extractDeletedCounts($history, $catByPid);
+                foreach ($sent as $pid => $cnt) {
+                    $eff = $cnt - (int)($deleted[$pid] ?? 0);
+                    if ($eff < 0) $eff = 0;
+                    if ($eff <= 0) continue;
+                    if (((int)($finished[$pid] ?? 0)) < $eff) {
+                        $missing = true;
+                        break;
+                    }
+                }
+            }
+
+            $checks[] = [
+                'transaction_id' => (int)$txId,
+                'receipt' => (string)($tx['receipt_number'] ?? ''),
+                'date_close' => (string)($tx['date_close_date'] ?? ''),
+                'table' => (string)($tx['table_name'] ?? ''),
+                'table_id' => (int)($tx['table_id'] ?? 0),
+                'waiter' => (string)($tx['name'] ?? ''),
+                'sum_minor' => (int)($tx['payed_sum'] ?? $tx['sum'] ?? 0),
+                'missing' => $missing,
+            ];
+        }
+
+        usort($checks, function ($a, $b) {
+            return strcmp((string)($a['date_close'] ?? ''), (string)($b['date_close'] ?? ''));
+        });
+
+        echo json_encode([
+            'ok' => true,
+            'date' => $date,
+            'checks' => $checks,
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'tx_history') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+
+    $txId = (int)($_GET['transaction_id'] ?? 0);
+    if ($txId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($posterToken === '') {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $api = new \App\Classes\PosterAPI($posterToken);
+    try {
+        $history = $api->request('dash.getTransactionHistory', ['transaction_id' => (int)$txId], 'GET');
+        if (!is_array($history)) $history = [];
+        echo json_encode(['ok' => true, 'transaction_id' => $txId, 'history' => $history], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -242,15 +385,17 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         h1 { margin: 0; font-size: 20px; }
         .controls { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
-        .grid { display:grid; grid-template-columns: 572px 1fr; gap: 12px; align-items:start; margin-top: 12px; }
+        .grid { display:grid; grid-template-columns: 515px 1fr; gap: 12px; align-items: stretch; margin-top: 12px; }
         .muted { color:#6b7280; font-size: 12px; }
-        .cal { display:grid; grid-template-columns: repeat(7, 1fr); gap: 8px; overflow-x: auto; min-width: 660px; }
+        .cal { display:grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; width: 100%; }
         .cal .dow { font-size: 12px; color:#6b7280; text-align:center; }
         .day { border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px; background: #fff; cursor:pointer; min-height: 45px; display:flex; flex-direction: column; gap: 4px; min-width: 0; }
         .day.disabled { opacity: 0.35; cursor: default; }
         .day.active { outline: 2px solid #1a73e8; outline-offset: -2px; }
-        .day .num { font-weight: 900; }
-        .day .mini { font-size: 10px; color:#374151; display:flex; align-items:center; gap: 4px; justify-content: flex-start; white-space: nowrap; }
+        .day .num { font-weight: 900; display:flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+        .day .pct { font-size: 10px; font-weight: 900; color:#6b7280; }
+        .day .pct.bad { color:#b91c1c; }
+        .day .mini { font-size: 10px; color:#374151; display:flex; align-items:center; gap: 4px; justify-content: flex-start; white-space: normal; line-height: 1.1; }
         .day .sep { color:#9ca3af; font-weight: 900; }
         .day .miss { color:#b91c1c; }
         .kpis { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
@@ -278,6 +423,21 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         .pmeta .pct { font-weight: 900; color:#111827; }
         .pmeta .desc { font-weight: 800; color:#6b7280; font-size: 12px; min-width: 0; }
         .err { color:#b91c1c; font-weight: 800; font-size: 12px; margin-top: 10px; }
+        .checks { margin-top: 12px; border-top: 1px solid #eef2f7; padding-top: 12px; }
+        .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color:#374151; }
+        .toggle-wrap .toggle-text { user-select:none; }
+        .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#d1d5db; transition: 180ms; border-radius: 999px; }
+        .slider:before { position:absolute; content:""; height: 22px; width: 22px; left: 3px; bottom: 3px; background: #fff; transition: 180ms; border-radius: 999px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+        .switch input:checked + .slider { background:#1a73e8; }
+        .switch input:checked + .slider:before { transform: translateX(24px); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 7px 10px; border-bottom: 1px solid #eef2f7; vertical-align: top; }
+        th { text-align:left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color:#111827; background: rgba(17,24,39,0.02); }
+        td.num { text-align:right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        tr.bad { background: rgba(211,47,47,0.08); }
+        .hist { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; color:#111827; }
         @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -292,7 +452,6 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
             <form method="get" class="card" id="controlsForm" style="display:flex; gap:8px; align-items:center; padding:8px 10px;">
                 <span class="muted">Месяц</span>
                 <input type="month" name="ym" value="<?= htmlspecialchars($ym) ?>" />
-                <button type="submit">Ок</button>
                 <button type="button" id="loadBtn">Загрузить</button>
             </form>
         </div>
@@ -317,7 +476,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                     for ($d = 1; $d <= $daysInMonth; $d++) {
                         $date = sprintf('%s-%02d', $ym, $d);
                         echo '<div class="day" data-date="' . htmlspecialchars($date) . '">';
-                        echo '<div class="num">' . $d . '</div>';
+                        echo '<div class="num"><span>' . $d . '</span><span class="pct">—%</span></div>';
                         echo '<div class="mini" title="X — всего чеков, Y — без cooked"><b>—</b><span class="sep">|</span><b class="miss">—</b></div>';
                         echo '</div>';
                     }
@@ -355,9 +514,36 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                 </div>
             </div>
 
-            <div style="margin-top: 12px; font-weight:900;">График по дням</div>
+            <div style="margin-top: 12px; font-weight:900;">График по часам (09:00–23:59)</div>
             <div class="chart-wrap">
-                <div class="chart" id="dayChart"></div>
+                <div class="chart" id="hourChart"></div>
+            </div>
+
+            <div class="checks">
+                <div style="display:flex; align-items:center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                    <div style="font-weight:900;">Чеки дня</div>
+                    <div class="toggle-wrap" title="Показывать только проблемные чеки">
+                        <span class="toggle-text">проблемные</span>
+                        <label class="switch">
+                            <input type="checkbox" id="onlyBad">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="muted" id="checksHint" style="margin-top:6px;">Нажми на чек, чтобы раскрыть историю.</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:170px;">Дата</th>
+                            <th style="width:120px;">Чек</th>
+                            <th>Стол</th>
+                            <th>Официант</th>
+                            <th style="width:120px; text-align:right;">Сумма</th>
+                            <th style="width:120px;">Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody id="checksBody"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -422,11 +608,20 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     };
 
     const monthData = new Map();
+    let dayChecks = [];
+    let onlyBad = false;
 
     const updateCalendarCell = (date, total, missing) => {
         const el = document.querySelector(`.day[data-date="${date}"]`);
         if (!el) return;
+        const num = el.querySelector('.num .pct');
         const mini = el.querySelector('.mini');
+        const pct = total > 0 ? Math.round((missing / total) * 100) : 0;
+        if (num) {
+            num.textContent = pct + '%';
+            num.classList.toggle('bad', pct > 0);
+            num.title = 'Процент чеков без cooked';
+        }
         if (!mini) return;
         mini.title = 'X — всего чеков, Y — чеков без cooked';
         mini.innerHTML = `<b title="Всего чеков">${String(total)}</b><span class="sep">|</span><b class="${missing > 0 ? 'miss' : ''}" title="Без cooked">${String(missing)}</b>`;
@@ -439,18 +634,17 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         if (kpiReady) kpiReady.textContent = String(Math.max(0, (total || 0) - (missing || 0)));
     };
 
-    const renderChart = () => {
-        const el = document.getElementById('dayChart');
+    const renderHourChart = (hours, date) => {
+        const el = document.getElementById('hourChart');
         if (!el) return;
         el.innerHTML = '';
-        const rows = dateList.map((d) => ({ date: d, ...(monthData.get(d) || { total: 0, missing: 0 }) }));
-        const maxTotal = Math.max(1, ...rows.map(x => Number(x.total || 0)));
-        rows.forEach((row, idx) => {
-            const total = Number(row.total || 0);
-            const missing = Number(row.missing || 0);
+        const maxTotal = Math.max(1, ...hours.map(x => Number(x.total || 0)));
+        for (let h = 9; h < 24; h++) {
+            const total = Number(hours[h]?.total || 0);
+            const missing = Number(hours[h]?.missing || 0);
             const bar = document.createElement('div');
             bar.className = 'bar';
-            bar.title = `${row.date} — всего ${total} | без cooked ${missing}`;
+            bar.title = `${String(date || '')} ${String(h).padStart(2,'0')}:00 — всего ${total} | без cooked ${missing}`;
             const heightPct = (total / maxTotal) * 100;
             bar.style.height = `calc(${heightPct}% + 2px)`;
             const miss = document.createElement('div');
@@ -459,16 +653,79 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
             bar.appendChild(miss);
             const lab = document.createElement('div');
             lab.className = 'label';
-            const dayNum = idx + 1;
-            lab.textContent = (dayNum % 2 === 0) ? String(dayNum) : '';
+            lab.textContent = (h % 2 === 0) ? String(h) : '';
             bar.appendChild(lab);
-            bar.addEventListener('click', () => {
-                document.querySelectorAll('.day.active').forEach(x => x.classList.remove('active'));
-                const cell = document.querySelector(`.day[data-date="${row.date}"]`);
-                if (cell) cell.classList.add('active');
-                setDayKpis(row.date, total, missing);
-            });
             el.appendChild(bar);
+        }
+    };
+
+    const fmtVnd = (minor) => {
+        const vnd = Math.round(Number(minor || 0) / 100);
+        return String(vnd).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    };
+
+    const renderChecks = () => {
+        const tbody = document.getElementById('checksBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        const rows = onlyBad ? dayChecks.filter((x) => !!x.missing) : dayChecks.slice();
+        rows.forEach((r) => {
+            const tr = document.createElement('tr');
+            if (r.missing) tr.className = 'bad';
+            tr.innerHTML = `
+                <td>${String(r.date_close || '')}</td>
+                <td><button type="button" class="secondary small" data-tx="${String(r.transaction_id || '')}">${String(r.receipt || r.transaction_id || '')}</button></td>
+                <td>${String(r.table || '')}</td>
+                <td>${String(r.waiter || '')}</td>
+                <td class="num">${fmtVnd(r.sum_minor || 0)}</td>
+                <td>${r.missing ? '<span style="color:#b91c1c; font-weight:900;">ошибка</span>' : '<span style="color:#16a34a; font-weight:900;">ок</span>'}</td>
+            `;
+            tbody.appendChild(tr);
+            const trD = document.createElement('tr');
+            trD.style.display = 'none';
+            trD.innerHTML = `<td colspan="6"><div class="hist muted">Загрузка…</div></td>`;
+            tbody.appendChild(trD);
+
+            const btn = tr.querySelector('button');
+            if (btn) {
+                btn.addEventListener('click', async () => {
+                    const isOpen = trD.style.display !== 'none';
+                    if (isOpen) { trD.style.display = 'none'; return; }
+                    trD.style.display = '';
+                    try {
+                        const txId = Number(btn.getAttribute('data-tx') || 0);
+                        const url = new URL(location.href);
+                        url.searchParams.set('ym', ym);
+                        url.searchParams.set('ajax', 'tx_history');
+                        url.searchParams.set('transaction_id', String(txId));
+                        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                        const j = await res.json();
+                        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                        const h = Array.isArray(j.history) ? j.history : [];
+                        const out = h.map((ev) => {
+                            const type = String(ev.type_history || '');
+                            const timeMs = Number(ev.time || 0);
+                            const dt = timeMs ? new Date(timeMs).toISOString().replace('T', ' ').slice(0, 19) : '';
+                            const v = [ev.value, ev.value2, ev.value3, ev.value4, ev.value5].filter((x) => x !== undefined && x !== null && String(x) !== '').map((x) => String(x)).join(' | ');
+                            let vt = ev.value_text;
+                            if (typeof vt === 'string' && vt.length > 0) {
+                                try {
+                                    const decoded = JSON.parse(vt);
+                                    vt = JSON.stringify(decoded, null, 2);
+                                } catch (_) {}
+                            } else if (vt && typeof vt === 'object') {
+                                try { vt = JSON.stringify(vt, null, 2); } catch (_) { vt = String(vt); }
+                            } else {
+                                vt = '';
+                            }
+                            return [dt, type, v, vt].filter((x) => String(x).trim() !== '').join('\n');
+                        }).join('\n\n');
+                        trD.innerHTML = `<td colspan="6"><div class="hist">${out ? out.replace(/</g,'&lt;') : 'Нет данных'}</div></td>`;
+                    } catch (e) {
+                        trD.innerHTML = `<td colspan="6"><div class="hist" style="color:#b91c1c; font-weight:800;">${String(e && e.message ? e.message : 'Ошибка')}</div></td>`;
+                    }
+                });
+            }
         });
     };
 
@@ -484,8 +741,23 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка загрузки');
         const total = Number(j.total || 0);
         const missing = Number(j.missing || 0);
-        monthData.set(date, { total, missing });
+        const hours = Array.isArray(j.hours) ? j.hours : new Array(24).fill({ total: 0, missing: 0 });
+        monthData.set(date, { total, missing, hours });
         return monthData.get(date);
+    };
+
+    const fetchDayChecks = async (date) => {
+        const url = new URL(location.href);
+        url.searchParams.set('ym', ym);
+        url.searchParams.set('ajax', 'day_checks');
+        url.searchParams.set('date', date);
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const j = await res.json();
+        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка загрузки');
+        const checks = Array.isArray(j.checks) ? j.checks : [];
+        dayChecks = checks;
+        renderChecks();
     };
 
     const loadMonth = async () => {
@@ -522,11 +794,12 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
             });
             if (monthTotal) monthTotal.textContent = String(totalSum);
             if (monthMissing) monthMissing.textContent = String(missingSum);
-            renderChart();
             const firstDay = dateList[0] || '';
             if (firstDay) {
-                const r = monthData.get(firstDay) || { total: 0, missing: 0 };
+                const r = monthData.get(firstDay) || { total: 0, missing: 0, hours: [] };
                 setDayKpis(firstDay, r.total, r.missing);
+                renderHourChart(r.hours || [], firstDay);
+                fetchDayChecks(firstDay).catch(() => {});
                 const cell = document.querySelector(`.day[data-date="${firstDay}"]`);
                 if (cell) cell.classList.add('active');
             }
@@ -547,6 +820,8 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         (async () => {
             const r = await fetchDay(date);
             setDayKpis(date, r.total, r.missing);
+            renderHourChart(r.hours || [], date);
+            await fetchDayChecks(date);
         })().catch((err) => alert(err && err.message ? err.message : 'Ошибка'));
     });
 
@@ -554,6 +829,14 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         e.preventDefault();
         loadMonth();
     });
+
+    const onlyBadCb = document.getElementById('onlyBad');
+    if (onlyBadCb) {
+        onlyBadCb.addEventListener('change', () => {
+            onlyBad = !!onlyBadCb.checked;
+            renderChecks();
+        });
+    }
 </script>
 </body>
 </html>
