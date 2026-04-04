@@ -714,7 +714,7 @@ $firstOfMonth = date('Y-m-01');
 <div class="wrap">
     <div class="card">
         <div class="row">
-            <div style="min-width: 260px;">
+            <div style="width: max-content;">
                 <h1>Отчет баня</h1>
             </div>
             <label>
