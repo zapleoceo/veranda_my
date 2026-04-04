@@ -245,13 +245,15 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         .kpi .label { font-size: 12px; color:#6b7280; }
         .kpi .val { font-weight: 900; font-size: 18px; margin-top: 6px; }
         .muted { color:#6b7280; font-size: 12px; }
-        .cal { display:grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+        .cal { display:grid; grid-template-columns: repeat(7, 1fr); gap: 8px; overflow-x: auto; }
         .cal .dow { font-size: 12px; color:#6b7280; text-align:center; }
-        .day { border: 1px solid #e5e7eb; border-radius: 12px; padding: 8px; background: #fff; cursor:pointer; min-height: 56px; display:flex; flex-direction: column; gap: 6px; }
+        .day { border: 1px solid #e5e7eb; border-radius: 12px; padding: 8px; background: #fff; cursor:pointer; min-height: 56px; display:flex; flex-direction: column; gap: 6px; min-width: 0; }
         .day.disabled { opacity: 0.35; cursor: default; }
         .day.active { outline: 2px solid #1a73e8; outline-offset: -2px; }
         .day .num { font-weight: 900; }
-        .day .mini { font-size: 12px; color:#374151; display:flex; justify-content: space-between; }
+        .day .mini { font-size: 12px; color:#374151; display:flex; align-items:center; gap: 4px; justify-content: flex-start; white-space: nowrap; }
+        .day .sep { color:#9ca3af; font-weight: 900; }
+        .day .miss { color:#b91c1c; }
         .pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding: 4px 8px; border-radius: 999px; border:1px solid #e5e7eb; background:#fff; }
         .pill.bad { border-color: rgba(211,47,47,0.35); background: rgba(211,47,47,0.08); }
         .pill.ok { border-color: rgba(46,125,50,0.35); background: rgba(46,125,50,0.08); }
@@ -288,8 +290,8 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
             <div style="display:flex; align-items:center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
                 <div style="font-weight:900;">Календарь</div>
                 <div class="pill <?= ((int)($monthRow['missing_cnt'] ?? 0) > 0) ? 'bad' : 'ok' ?>">
-                    <span class="dot miss"></span><span>без отметки: <b id="monthMissing"><?= (int)($monthRow['missing_cnt'] ?? 0) ?></b></span>
-                    <span class="dot total"></span><span>всего: <b id="monthTotal"><?= (int)($monthRow['total'] ?? 0) ?></b></span>
+                    <span class="dot miss"></span><span>без отметки: <b id="monthMissing" title="Без отметки о готовности"><?= (int)($monthRow['missing_cnt'] ?? 0) ?></b></span>
+                    <span class="dot total"></span><span>всего: <b id="monthTotal" title="Всего чеков"><?= (int)($monthRow['total'] ?? 0) ?></b></span>
                 </div>
             </div>
             <div class="muted" style="margin-top:6px;">Клик по дню — график по часам (всего / без отметки о готовности).</div>
@@ -306,8 +308,10 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                         $cls = 'day' . ($isActive ? ' active' : '');
                         echo '<div class="' . $cls . '" data-date="' . htmlspecialchars($date) . '">';
                         echo '<div class="num">' . $d . '</div>';
-                        echo '<div class="mini"><span>всего</span><b>' . (int)$info['total'] . '</b></div>';
-                        echo '<div class="mini"><span>без</span><b style="color:' . ((int)$info['missing'] > 0 ? '#b91c1c' : '#374151') . ';">' . (int)$info['missing'] . '</b></div>';
+                        $t = (int)$info['total'];
+                        $m = (int)$info['missing'];
+                        $missCls = $m > 0 ? ' miss' : '';
+                        echo '<div class="mini" title="X — всего чеков, Y — без отметки о готовности"><b title="Всего чеков">' . $t . '</b><span class="sep">|</span><b class="' . trim($missCls) . '" title="Без отметки о готовности">' . $m . '</b></div>';
                         echo '</div>';
                     }
                 ?>
@@ -356,7 +360,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     const initial = <?= json_encode($initial, JSON_UNESCAPED_UNICODE) ?>;
     const ym = <?= json_encode($ym, JSON_UNESCAPED_UNICODE) ?>;
 
-    const renderChart = (hours) => {
+    const renderChart = (hours, date) => {
         const el = document.getElementById('hourChart');
         if (!el) return;
         el.innerHTML = '';
@@ -366,7 +370,8 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
             const missing = Number(hours[h]?.missing || 0);
             const bar = document.createElement('div');
             bar.className = 'bar';
-            bar.title = `${String(h).padStart(2,'0')}:00 — всего ${total}, без ${missing}`;
+            const d = String(date || '');
+            bar.title = `${d} ${String(h).padStart(2,'0')}:00 — всего ${total} | без ${missing}`;
             const heightPct = (total / maxTotal) * 100;
             bar.style.height = `calc(${heightPct}% + 2px)`;
             const miss = document.createElement('div');
@@ -392,7 +397,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         document.getElementById('kpiKitchenTotal').textContent = String(data.stations?.kitchen?.total || 0);
         document.getElementById('kpiKitchenReady').textContent = String(data.stations?.kitchen?.ready || 0);
         document.getElementById('kpiKitchenMissing').textContent = String(data.stations?.kitchen?.missing || 0);
-        renderChart(data.hours || []);
+        renderChart(data.hours || [], data.date || '');
     };
 
     const loadDay = async (date) => {
