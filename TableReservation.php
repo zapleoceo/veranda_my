@@ -106,13 +106,10 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
     echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
     exit;
   }
-  if ($duration < 1800) $duration = 7200;
   if ($spotId <= 0) $spotId = 1;
 
   $dayStart = date('Y-m-d 00:00:00', $ts);
   $dayEnd = date('Y-m-d 23:59:59', $ts);
-  $selectedStart = date('Y-m-d H:i:s', $ts);
-  $selectedEnd = date('Y-m-d H:i:s', $ts + $duration);
 
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
@@ -170,51 +167,42 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       return $out;
     };
 
-    $selectedStartTs = strtotime($selectedStart);
-    $selectedEndTs = strtotime($selectedEnd);
-
-    $maxDetails = 120;
-    $countDetails = 0;
     foreach ($rows as $row) {
       if (!is_array($row)) continue;
-      if ($countDetails >= $maxDetails) break;
-
       $status = (int)($row['status'] ?? 0);
       if ($status === 7) continue;
 
-      $incomingOrderId = trim((string)($row['incoming_order_id'] ?? ''));
-      if ($incomingOrderId === '') continue;
-
-      $detail = $api->request('incomingOrders.getReservation', [
-        'incoming_order_id' => $incomingOrderId,
-      ], 'GET');
-      $countDetails++;
-      if (!is_array($detail)) continue;
-
-      $start = trim((string)($detail['date_reservation'] ?? $row['date_reservation'] ?? ''));
-      $dur = (int)($detail['duration'] ?? $row['duration'] ?? 0);
-      $guestsCount = trim((string)($detail['guests_count'] ?? $row['guests_count'] ?? ''));
+      $start = trim((string)($row['date_reservation'] ?? ''));
+      $dur = (int)($row['duration'] ?? 0);
+      $guestsCount = trim((string)($row['guests_count'] ?? ''));
       $startTs = $start !== '' ? strtotime($start) : false;
       if ($startTs === false) continue;
       $endTs = $dur > 0 ? $startTs + $dur : $startTs;
-
-      if ($selectedStartTs !== false && $selectedEndTs !== false) {
-        if ($startTs >= $selectedEndTs || $endTs <= $selectedStartTs) continue;
-      }
-
-      $guestName = trim(((string)($detail['first_name'] ?? $row['first_name'] ?? '')) . ' ' . ((string)($detail['last_name'] ?? $row['last_name'] ?? '')));
+      $guestName = trim(((string)($row['first_name'] ?? '')) . ' ' . ((string)($row['last_name'] ?? '')));
       if ($guestName === '') $guestName = '—';
 
       $tableCandidates = [];
       foreach (['table_id', 'table_ids', 'tables', 'table'] as $k) {
-        if (!array_key_exists($k, $detail)) continue;
-        foreach ($extractNums($detail[$k]) as $n) $tableCandidates[] = $n;
+        if (!array_key_exists($k, $row)) continue;
+        foreach ($extractNums($row[$k]) as $n) $tableCandidates[] = $n;
       }
       $tableIds = [];
       foreach ($tableCandidates as $n) {
         $id = (string)$n;
         if ($id === '' || isset($tableIds[$id])) continue;
         $tableIds[$id] = true;
+      }
+
+      if (!$tableIds) {
+        $items[] = [
+          'table_id' => '—',
+          'table_title' => '—',
+          'guest_name' => $guestName,
+          'date_start' => date('Y-m-d H:i:s', $startTs),
+          'date_end' => date('Y-m-d H:i:s', $endTs),
+          'guests_count' => $guestsCount,
+        ];
+        continue;
       }
 
       foreach (array_keys($tableIds) as $tableId) {
@@ -235,8 +223,6 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       'request' => [
         'date_from' => $dayStart,
         'date_to' => $dayEnd,
-        'selected_start' => $selectedStart,
-        'selected_end' => $selectedEnd,
         'spot_id' => $spotId,
         'hall_id' => $hallId,
       ],
