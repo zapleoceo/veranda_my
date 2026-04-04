@@ -134,137 +134,103 @@ if (($_GET['ajax'] ?? '') === 'load') {
         $spotIds = banya_load_spot_ids($api);
         if (!$spotIds) $spotIds = [1];
 
-        $hallTables = [];
+        $hallByTable = [];
         foreach ($spotIds as $sid) {
-            $rows = banya_load_tables_for_hall($api, (int)$sid, BANYA_HALL_ID);
-            foreach ($rows as $r) $hallTables[] = ['spot_id' => (int)$sid] + $r;
-        }
-        $extraTables = [];
-        $extraById = [];
-        foreach ($spotIds as $sid) {
-            $all = $api->request('spots.getTableHallTables', [
-                'spot_id' => (int)$sid,
-                'without_deleted' => BANYA_TABLES_WITHOUT_DELETED,
-            ], 'GET');
-            if (!is_array($all)) $all = [];
-            foreach ($all as $r) {
-                if (!is_array($r)) continue;
-                $tid = (int)($r['table_id'] ?? 0);
-                if ($tid <= 0) continue;
-                $num = trim((string)($r['table_num'] ?? ''));
-                $title = trim((string)($r['table_title'] ?? ''));
-                $match = ($tid === 141);
-                if (!$match) {
-                    $hay = $num . ' ' . $title;
-                    $match = (bool)preg_match('/\b141\b/u', $hay);
-                }
-                if (!$match) continue;
-                if (isset($extraById[$tid])) continue;
-                $extraById[$tid] = true;
-                $extraTables[] = [
-                    'spot_id' => (int)$sid,
-                    'table_id' => $tid,
-                    'table_num' => $num,
-                    'table_title' => $title,
-                ];
-            }
-        }
-        if ($extraTables) {
-            $seen = [];
-            foreach ($hallTables as $t) $seen[(int)($t['table_id'] ?? 0)] = true;
-            foreach ($extraTables as $t) {
-                $tid = (int)($t['table_id'] ?? 0);
-                if ($tid <= 0 || isset($seen[$tid])) continue;
-                $hallTables[] = $t;
+            $map = banya_load_table_halls($api, (int)$sid);
+            foreach ($map as $tid => $hid) {
+                $hallByTable[(int)$tid] = (int)$hid;
             }
         }
 
-        foreach ($hallTables as $t) {
-            $spotId = (int)($t['spot_id'] ?? 0);
-            $tableId = (int)($t['table_id'] ?? 0);
-            if ($spotId <= 0 || $tableId <= 0) continue;
+        $txPool = [];
+        $nextTr = null;
+        $prevNextTr = null;
+        $guard = 0;
+        do {
+            $guard++;
+            if ($guard > 20000) break;
+            $params = [
+                'dateFrom' => str_replace('-', '', $dateFrom),
+                'dateTo' => str_replace('-', '', $dateTo),
+                'include_products' => 'true',
+                'status' => 0,
+            ];
+            if ($nextTr !== null) $params['next_tr'] = $nextTr;
+            $batch = $api->request('dash.getTransactions', $params, 'GET');
+            if (!is_array($batch)) $batch = [];
+            $count = count($batch);
+            if ($count > 0) {
+                $last = end($batch);
+                $prevNextTr = $nextTr;
+                $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
+            }
 
-            $nextTr = null;
-            $prevNextTr = null;
-            $guard = 0;
-            do {
-                $guard++;
-                if ($guard > 2000) break;
-                $params = [
-                    'dateFrom' => str_replace('-', '', $dateFrom),
-                    'dateTo' => str_replace('-', '', $dateTo),
-                    'include_products' => 'true',
-                    'status' => 0,
-                    'table_id' => $tableId,
-                ];
-                if ($nextTr !== null) $params['next_tr'] = $nextTr;
-                $batch = $api->request('dash.getTransactions', $params, 'GET');
-                if (!is_array($batch)) $batch = [];
-                $count = count($batch);
-                if ($count > 0) {
-                    $last = end($batch);
-                    $prevNextTr = $nextTr;
-                    $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
-                }
+            foreach ($batch as $tx) {
+                if (!is_array($tx)) continue;
+                $txId = (int)($tx['transaction_id'] ?? 0);
+                if ($txId <= 0) continue;
+                if (isset($seenTx[$txId])) continue;
+                $seenTx[$txId] = true;
+                $tableIdRow = (int)($tx['table_id'] ?? 0);
+                if ($tableIdRow <= 0) continue;
+                $hallIdRow = (int)($hallByTable[$tableIdRow] ?? 0);
+                if ($hallIdRow !== BANYA_HALL_ID && $tableIdRow !== 141) continue;
+                $txPool[] = ['tx' => $tx, 'hall_id' => $hallIdRow];
+            }
 
-                foreach ($batch as $tx) {
-                    if (!is_array($tx)) continue;
-                    $txId = (int)($tx['transaction_id'] ?? 0);
-                    if ($txId <= 0) continue;
-                    if (isset($seenTx[$txId])) continue;
-                    $seenTx[$txId] = true;
+            if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
+        } while ($count > 0 && $nextTr !== null);
 
-                    $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
-                    $hookahMinorInCheck = 0;
+        foreach ($txPool as $row) {
+            $tx = $row['tx'];
+            $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
+            $hookahMinorInCheck = 0;
 
-                    foreach ($products as $p) {
-                        if (!is_array($p)) continue;
-                        $pid = (int)($p['product_id'] ?? 0);
-                        $numRaw = $p['num'] ?? $p['count'] ?? 0;
-                        $num = is_numeric($numRaw) ? (float)$numRaw : 0;
-                        $priceMinor = (int)($p['product_price'] ?? 0);
-                        $lineMinor = (int)round($priceMinor * $num);
-                        $name = (string)($productMap[$pid]['name'] ?? $p['product_name'] ?? ('#' . $pid));
-                        $cat = (int)($productMap[$pid]['category_id'] ?? 0);
-                        $sub = (int)($productMap[$pid]['sub_category_id'] ?? 0);
-                        $isHookah = ($cat === HOOKAH_CATEGORY_ID || $sub === HOOKAH_CATEGORY_ID);
-                        if ($isHookah) $hookahMinorInCheck += $lineMinor;
-                    }
+            foreach ($products as $p) {
+                if (!is_array($p)) continue;
+                $pid = (int)($p['product_id'] ?? 0);
+                $numRaw = $p['num'] ?? $p['count'] ?? 0;
+                $num = is_numeric($numRaw) ? (float)$numRaw : 0;
+                $priceMinor = (int)($p['product_price'] ?? 0);
+                $lineMinor = (int)round($priceMinor * $num);
+                $cat = (int)($productMap[$pid]['category_id'] ?? 0);
+                $sub = (int)($productMap[$pid]['sub_category_id'] ?? 0);
+                $isHookah = ($cat === HOOKAH_CATEGORY_ID || $sub === HOOKAH_CATEGORY_ID);
+                if ($isHookah) $hookahMinorInCheck += $lineMinor;
+            }
 
-                    $sumMinor = (int)($tx['payed_sum'] ?? $tx['sum'] ?? 0);
-                    $dateCloseStr = (string)($tx['date_close_date'] ?? '');
-                    $dateStr = $dateCloseStr !== '' ? $dateCloseStr : $fmtTs(isset($tx['date_start']) ? (int)$tx['date_start'] : 0);
-                    if ($dateStr === '') $dateStr = '';
+            $sumMinor = (int)($tx['payed_sum'] ?? $tx['sum'] ?? 0);
+            $dateCloseStr = (string)($tx['date_close_date'] ?? '');
+            $dateStr = $dateCloseStr !== '' ? $dateCloseStr : $fmtTs(isset($tx['date_start']) ? (int)$tx['date_start'] : 0);
+            if ($dateStr === '') $dateStr = '';
 
-                    $receipt = (string)($tx['receipt_number'] ?? $tx['transaction_id'] ?? '');
-                    $spotIdRow = (int)($tx['spot_id'] ?? $spotId);
-                    $tableIdRow = (int)($tx['table_id'] ?? $tableId);
-                    $tableName = (string)($tx['table_name'] ?? $t['table_title'] ?? $t['table_num'] ?? $tableIdRow);
-                    $waiter = (string)($tx['name'] ?? $tx['employee_name'] ?? '');
+            $txId = (int)($tx['transaction_id'] ?? 0);
+            $receipt = (string)($tx['receipt_number'] ?? $tx['transaction_id'] ?? '');
+            $spotIdRow = (int)($tx['spot_id'] ?? 0);
+            $tableIdRow = (int)($tx['table_id'] ?? 0);
+            $tableName = (string)($tx['table_name'] ?? $tableIdRow);
+            $waiter = (string)($tx['name'] ?? $tx['employee_name'] ?? '');
 
-                    if ($sumMinor <= 0) {
-                        continue;
-                    }
-                    $items[] = [
-                        'date' => $dateStr,
-                        'hall' => (string)BANYA_HALL_ID,
-                        'spot_id' => $spotIdRow,
-                        'table_id' => $tableIdRow,
-                        'table' => $tableName,
-                        'receipt' => $receipt,
-                        'sum' => $fmtVnd($sumMinor),
-                        'sum_minor' => $sumMinor,
-                        'hookah_sum_minor' => $hookahMinorInCheck,
-                        'waiter' => $waiter,
-                        'transaction_id' => $txId,
-                    ];
+            if ($sumMinor <= 0) {
+                continue;
+            }
+            $items[] = [
+                'date' => $dateStr,
+                'hall' => (string)BANYA_HALL_ID,
+                'spot_id' => $spotIdRow,
+                'table_id' => $tableIdRow,
+                'table' => $tableName,
+                'receipt' => $receipt,
+                'sum' => $fmtVnd($sumMinor),
+                'sum_minor' => $sumMinor,
+                'hookah_sum_minor' => $hookahMinorInCheck,
+                'waiter' => $waiter,
+                'transaction_id' => $txId,
+            ];
 
-                    $totalChecks++;
-                    $totalSumMinor += $sumMinor;
-                    $hookahSumMinor += $hookahMinorInCheck;
-                }
-                if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
-            } while ($count > 0 && $nextTr !== null);
+            $totalChecks++;
+            $totalSumMinor += $sumMinor;
+            $hookahSumMinor += $hookahMinorInCheck;
         }
 
         usort($items, function ($a, $b) {
