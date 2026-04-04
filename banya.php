@@ -8,6 +8,10 @@ if (!veranda_can('admin')) {
     veranda_require('banya');
 }
 
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+
 const BANYA_HALL_ID = 9;
 const HOOKAH_CATEGORY_ID = 47;
 
@@ -550,7 +554,7 @@ $firstOfMonth = date('Y-m-01');
             <div style="display:flex; align-items:center; gap:10px; flex-wrap: wrap;">
                 <button id="loadBtn" type="button">ЗАГРУЗИТЬ</button>
                 <div class="progress" id="prog" style="display:none; align-items:center; gap: 10px; margin-left: 10px;">
-                    <div class="bar" style="width: 180px; height: 10px; border-radius: 999px; background: rgba(182,89,48,0.12); overflow: hidden;">
+                    <div class="bar" style="width: 130px; height: 10px; border-radius: 999px; background: rgba(182,89,48,0.12); overflow: hidden;">
                         <span id="progBar" style="display:block; height:100%; width:0; background: rgba(182,89,48,0.95); transition: width 0.15s ease;"></span>
                     </div>
                     <div class="label" id="progLabel" style="font-size: 12px; color:#1f2937; font-weight: 900; min-width: 44px;">0%</div>
@@ -1015,7 +1019,7 @@ $firstOfMonth = date('Y-m-01');
             })();
             if (!dayList.length) throw new Error('Некорректный период');
 
-            const concurrency = 4;
+            const concurrency = 6;
             const base = new URL(location.href);
             base.searchParams.set('ajax', 'load_day');
             const seen = new Set();
