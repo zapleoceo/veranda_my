@@ -501,7 +501,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         <div class="controls">
             <form method="get" class="card" id="controlsForm" style="display:flex; gap:8px; align-items:center; padding:8px 10px;">
                 <span class="muted">Месяц</span>
-                <input type="month" name="ym" value="<?= htmlspecialchars($ym) ?>" />
+                <input type="month" id="ymInput" name="ym" value="<?= htmlspecialchars($ym) ?>" />
                 <button type="button" id="loadBtn">Загрузить</button>
             </form>
         </div>
@@ -615,6 +615,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     const ym = <?= json_encode($ym, JSON_UNESCAPED_UNICODE) ?>;
     const monthStart = <?= json_encode($monthStart, JSON_UNESCAPED_UNICODE) ?>;
     const monthEnd = <?= json_encode($monthEnd, JSON_UNESCAPED_UNICODE) ?>;
+    const ymInput = document.getElementById('ymInput');
 
     const overlay = document.getElementById('overlay');
     const pbarFill = document.getElementById('pbarFill');
@@ -815,8 +816,13 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         setOverlay(true);
         setProgress(0, 'Подготовка…');
         let done = 0;
-        const concurrency = Math.min(12, Math.max(6, dateList.length));
-        const queue = dateList.slice();
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const allDays = Array.from(document.querySelectorAll('.day[data-date]')).map((x) => String(x.getAttribute('data-date') || '')).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x));
+        const fetchDays = allDays.filter((d) => d <= todayStr);
+        const futureDays = allDays.filter((d) => d > todayStr);
+        futureDays.forEach((d) => updateCalendarCell(d, 0, 0));
+        const concurrency = Math.min(12, Math.max(6, fetchDays.length));
+        const queue = fetchDays.slice();
 
         const worker = async () => {
             while (queue.length) {
@@ -828,15 +834,23 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                 done++;
                 const dd = String(d).slice(8, 10);
                 const mm = String(d).slice(5, 7);
-                setProgress(Math.round((done / dateList.length) * 100), `- день ${done}/${dateList.length} (${dd}/${mm})`);
+                const den = fetchDays.length || 1;
+                setProgress(Math.round((done / den) * 100), `- день ${done}/${fetchDays.length} (${dd}/${mm})`);
             }
         };
 
         try {
+            if (!fetchDays.length) {
+                if (monthTotal) monthTotal.textContent = '0';
+                if (monthMissing) monthMissing.textContent = '0';
+                setProgress(100, 'Нет дней для загрузки');
+                setTimeout(() => setOverlay(false), 250);
+                return;
+            }
             await Promise.all(new Array(Math.min(concurrency, queue.length)).fill(0).map(worker));
             let totalSum = 0;
             let missingSum = 0;
-            dateList.forEach((d) => {
+            allDays.forEach((d) => {
                 const r = monthData.get(d);
                 if (!r) return;
                 totalSum += Number(r.total || 0);
@@ -879,6 +893,17 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         e.preventDefault();
         loadMonth();
     });
+
+    if (ymInput) {
+        ymInput.addEventListener('change', () => {
+            const val = String(ymInput.value || '').trim();
+            if (!/^\d{4}-\d{2}$/.test(val)) return;
+            const url = new URL(location.href);
+            url.searchParams.set('ym', val);
+            url.searchParams.delete('ajax');
+            location.href = url.toString();
+        });
+    }
 
     const onlyBadCb = document.getElementById('onlyBad');
     if (onlyBadCb) {
