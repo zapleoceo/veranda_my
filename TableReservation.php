@@ -146,11 +146,11 @@
 
     .grass-area {
       position: absolute;
-      left: -22px;
-      top: -28px;
-      width: 620px;
-      height: 220px;
-      border-radius: 44px;
+      left: -42px;
+      top: -40px;
+      width: 860px;
+      height: 340px;
+      border-radius: 140px 90px 150px 110px;
       background:
         radial-gradient(circle at 12% 24%, rgba(147,196,125,0.20), transparent 58%),
         radial-gradient(circle at 78% 30%, rgba(92,162,92,0.22), transparent 62%),
@@ -165,6 +165,30 @@
       pointer-events: none;
       opacity: 0.98;
       filter: saturate(1.35) contrast(1.05);
+    }
+    .grass-area::before,
+    .grass-area::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: 180px 110px 160px 140px;
+    }
+    .grass-area::before {
+      transform: rotate(-2deg) translate(-14px, 10px);
+      background:
+        radial-gradient(circle at 22% 58%, rgba(52,116,52,0.20), transparent 58%),
+        radial-gradient(circle at 60% 18%, rgba(147,196,125,0.14), transparent 60%),
+        radial-gradient(circle at 88% 62%, rgba(34,88,34,0.16), transparent 60%);
+      opacity: 0.85;
+      filter: blur(0.2px);
+    }
+    .grass-area::after {
+      transform: rotate(1.4deg) translate(18px, -10px);
+      background:
+        radial-gradient(circle at 10% 26%, rgba(255,255,255,0.06), transparent 52%),
+        radial-gradient(circle at 74% 78%, rgba(0,0,0,0.18), transparent 62%);
+      opacity: 0.65;
     }
   
     .table .cap {
