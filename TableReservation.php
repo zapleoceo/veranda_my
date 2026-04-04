@@ -393,7 +393,7 @@
           <div class="map" aria-label="Схема столов ресторана">
             <div class="grass-area" aria-hidden="true"></div>
             <button class="table large" style="left: 0px; top: 24px;" data-table="1">1<span class="cap">до 8</span></button>
-            <button class="table large" style="left: 0px; top: 94px;" data-table="2">2<span class="cap">до 8</span></button>
+            <button class="table large" style="left: 0px; top: 150px;" data-table="2">2<span class="cap">до 8</span></button>
             <button class="table large" style="left: 0px; top: 276px;" data-table="3">3<span class="cap">до 8</span></button>
   
             <button class="table small-vertical" style="left: 200px; top: 0px;" data-table="4">4<span class="cap">до 5</span></button>
