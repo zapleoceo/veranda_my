@@ -658,12 +658,22 @@ $firstOfMonth = date('Y-m-01');
         th { text-align:left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-text); background: rgba(239,219,206,0.55); }
         td.num { text-align:right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .sort-arrow { margin-left: 6px; color: rgba(182,89,48,0.85); font-weight: 900; }
+        .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color:#374151; }
+        .toggle-wrap .toggle-text { user-select:none; }
+        .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#d1d5db; transition: 180ms; border-radius: 999px; }
+        .slider:before { position:absolute; content:""; height: 22px; width: 22px; left: 3px; bottom: 3px; background: #fff; transition: 180ms; border-radius: 999px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+        .switch input:checked + .slider { background:#1a73e8; }
+        .switch input:checked + .slider:before { transform: translateX(24px); }
         .table-filter { position: relative; display: inline-flex; align-items: center; gap: 8px; }
         .table-filter-btn { width: 18px; height: 18px; border-radius: 8px; padding: 0; background: transparent; border: 1px solid rgba(182,89,48,0.22); color: rgba(182,89,48,0.85); font-weight: 900; line-height: 1; cursor: pointer; }
         .table-filter-btn:hover { border-color: rgba(182,89,48,0.42); }
         .table-filter-pop { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; box-shadow: 0 10px 24px rgba(182,89,48,0.18); padding: 8px; min-width: 240px; max-height: 280px; overflow: auto; z-index: 50; text-transform: none; letter-spacing: 0; }
         .table-filter-pop label:hover { background: rgba(239,219,206,0.35); }
         .day-group td { background: rgba(239,219,206,0.55); color: var(--brand-text); font-weight: 900; }
+        .day-toggle { border: 0; background: transparent; color: var(--brand-text); font-weight: 900; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
+        .day-toggle:hover { background: rgba(182,89,48,0.10); }
         .totals { margin-top: 12px; display:flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
         .pill { border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; padding: 10px 12px; background:#fff; font-weight: 900; }
         .pill.bad { border-color: rgba(182,89,48,0.40); background: rgba(239,219,206,0.55); color: var(--brand-text); }
@@ -735,14 +745,20 @@ $firstOfMonth = date('Y-m-01');
                     <div class="desc" id="progDesc" style="font-size: 12px; color:#6b7280; font-weight: 800;"></div>
                 </div>
                 <div class="loader" id="loader" style="display:none;"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
-                <label class="muted" style="flex-direction: row; align-items:center; gap: 8px;">
-                    <input type="checkbox" id="noPages">
-                    страницы
-                </label>
-                <label class="muted" style="flex-direction: row; align-items:center; gap: 8px;">
-                    <input type="checkbox" id="groupByDay">
-                    по дням
-                </label>
+                <div class="toggle-wrap" title="Страницы">
+                    <span class="toggle-text">страницы</span>
+                    <label class="switch">
+                        <input type="checkbox" id="noPages">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-wrap" title="Группировать по дням">
+                    <span class="toggle-text">по дням</span>
+                    <label class="switch">
+                        <input type="checkbox" id="groupByDay">
+                        <span class="slider"></span>
+                    </label>
+                </div>
                 <div class="pager" id="pagerTop"></div>
             </div>
         </div>
@@ -869,6 +885,7 @@ $firstOfMonth = date('Y-m-01');
     let tableFilterIds = [];
     let tableFilterIdsAll = [];
     let groupByDay = false;
+    const collapsedDays = new Set();
 
     const applyPrefsToUi = () => {
         const p = loadPrefs();
@@ -1066,13 +1083,27 @@ $firstOfMonth = date('Y-m-01');
                 if (day && day !== lastDay) {
                     lastDay = day;
                     const st = dayStats[day] || { checks: 0, sum_minor: 0 };
+                    const isCollapsed = collapsedDays.has(day);
                     const trG = document.createElement('tr');
                     trG.className = 'day-group';
-                    trG.innerHTML = `<td colspan="7">${esc(day)} · чеков ${esc(String(st.checks))} · сумма ${esc(fmtVnd(st.sum_minor))}</td>`;
+                    trG.innerHTML = `<td colspan="7"><button type="button" class="day-toggle" data-day="${esc(day)}">${isCollapsed ? '▸' : '▾'}</button>${esc(day)} · чеков ${esc(String(st.checks))} · сумма ${esc(fmtVnd(st.sum_minor))}</td>`;
                     tbody.appendChild(trG);
+                    const btn = trG.querySelector('button.day-toggle');
+                    if (btn) {
+                        btn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const d = String(btn.getAttribute('data-day') || '');
+                            if (!d) return;
+                            if (collapsedDays.has(d)) collapsedDays.delete(d);
+                            else collapsedDays.add(d);
+                            renderTable();
+                        });
+                    }
                 }
 
                 const tr = document.createElement('tr');
+                tr.setAttribute('data-day', day);
                 const txId = Number(row.transaction_id || 0);
                 const hasHookah = Number(row.hookah_sum_minor || 0) > 0;
                 tr.innerHTML = `
@@ -1084,9 +1115,12 @@ $firstOfMonth = date('Y-m-01');
                     <td class="num">${esc(row.sum || '')}</td>
                     <td><button type="button" class="secondary small" data-tx="${esc(txId)}">Детали</button>${hasHookah ? hookahSvg : ''}</td>
                 `;
+                const isCollapsed = day ? collapsedDays.has(day) : false;
+                tr.style.display = isCollapsed ? 'none' : '';
                 tbody.appendChild(tr);
 
                 const trD = document.createElement('tr');
+                trD.setAttribute('data-day', day);
                 trD.className = 'details-row';
                 trD.style.display = 'none';
                 trD.innerHTML = `<td colspan="7"><div class="details-box muted">Загрузка…</div></td>`;
@@ -1095,6 +1129,7 @@ $firstOfMonth = date('Y-m-01');
                 const btnDetails = tr.querySelector('button');
                 if (btnDetails) {
                     btnDetails.addEventListener('click', async () => {
+                        if (day && collapsedDays.has(day)) return;
                         const isOpen = trD.style.display !== 'none';
                         if (isOpen) {
                             trD.style.display = 'none';
