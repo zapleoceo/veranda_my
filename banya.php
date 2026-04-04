@@ -139,12 +139,45 @@ if (($_GET['ajax'] ?? '') === 'load') {
             $rows = banya_load_tables_for_hall($api, (int)$sid, BANYA_HALL_ID);
             foreach ($rows as $r) $hallTables[] = ['spot_id' => (int)$sid] + $r;
         }
-        $hallTables[] = ['spot_id' => 0, 'table_id' => 141, 'table_title' => '141', 'table_num' => '141'];
+        $extraTables = [];
+        $extraById = [];
+        foreach ($spotIds as $sid) {
+            $all = $api->request('spots.getTableHallTables', [
+                'spot_id' => (int)$sid,
+                'without_deleted' => BANYA_TABLES_WITHOUT_DELETED,
+            ], 'GET');
+            if (!is_array($all)) $all = [];
+            foreach ($all as $r) {
+                if (!is_array($r)) continue;
+                $tid = (int)($r['table_id'] ?? 0);
+                if ($tid <= 0) continue;
+                $num = trim((string)($r['table_num'] ?? ''));
+                $title = trim((string)($r['table_title'] ?? ''));
+                if ($num !== '141' && $title !== '141') continue;
+                if (isset($extraById[$tid])) continue;
+                $extraById[$tid] = true;
+                $extraTables[] = [
+                    'spot_id' => (int)$sid,
+                    'table_id' => $tid,
+                    'table_num' => $num,
+                    'table_title' => $title,
+                ];
+            }
+        }
+        if ($extraTables) {
+            $seen = [];
+            foreach ($hallTables as $t) $seen[(int)($t['table_id'] ?? 0)] = true;
+            foreach ($extraTables as $t) {
+                $tid = (int)($t['table_id'] ?? 0);
+                if ($tid <= 0 || isset($seen[$tid])) continue;
+                $hallTables[] = $t;
+            }
+        }
 
         foreach ($hallTables as $t) {
             $spotId = (int)($t['spot_id'] ?? 0);
             $tableId = (int)($t['table_id'] ?? 0);
-            if ($tableId <= 0) continue;
+            if ($spotId <= 0 || $tableId <= 0) continue;
 
             $batch = $api->request('dash.getTransactions', [
                 'dateFrom' => str_replace('-', '', $dateFrom),
