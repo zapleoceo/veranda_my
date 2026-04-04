@@ -1,4 +1,90 @@
-<!doctype html>
+<?php
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
+if (file_exists(__DIR__ . '/.env')) {
+  $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+  foreach ($lines as $line) {
+    $t = trim($line);
+    if ($t === '' || strpos($t, '#') === 0) continue;
+    if (strpos($t, '=') === false) continue;
+    [$name, $value] = explode('=', $line, 2);
+    $_ENV[$name] = trim($value);
+  }
+}
+
+require_once __DIR__ . '/src/classes/PosterAPI.php';
+
+$posterToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
+
+if (($_GET['ajax'] ?? '') === 'free_tables') {
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+
+  if ($posterToken === '') {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $dateReservation = trim((string)($_GET['date_reservation'] ?? ''));
+  $duration = (int)($_GET['duration'] ?? 0);
+  $guests = (int)($_GET['guests_count'] ?? 0);
+  $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
+
+  $ts = strtotime($dateReservation);
+  if ($ts === false || $dateReservation === '') {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if ($duration < 1800) $duration = 7200;
+  if ($guests <= 0) $guests = 2;
+  if ($spotId <= 0) $spotId = 1;
+
+  $api = new \App\Classes\PosterAPI($posterToken);
+  try {
+    $resp = $api->request('incomingOrders.getTablesForReservation', [
+      'date_reservation' => date('Y-m-d H:i:s', $ts),
+      'duration' => $duration,
+      'spot_id' => $spotId,
+      'guests_count' => $guests,
+    ], 'GET');
+
+    $free = is_array($resp) && isset($resp['freeTables']) && is_array($resp['freeTables']) ? $resp['freeTables'] : [];
+    $filtered = [];
+    $nums = [];
+    foreach ($free as $row) {
+      if (!is_array($row)) continue;
+      if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
+      $num = trim((string)($row['table_num'] ?? ''));
+      if ($num === '') continue;
+      $filtered[] = $row;
+      $nums[$num] = true;
+    }
+
+    echo json_encode([
+      'ok' => true,
+      'request' => [
+        'date_reservation' => date('Y-m-d H:i:s', $ts),
+        'duration' => $duration,
+        'spot_id' => $spotId,
+        'guests_count' => $guests,
+        'hall_id' => $hallId,
+      ],
+      'free_table_nums' => array_values(array_keys($nums)),
+      'free_tables' => $filtered,
+      'raw' => $resp,
+    ], JSON_UNESCAPED_UNICODE);
+  } catch (\Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+  }
+  exit;
+}
+
+?><!doctype html>
 <html lang="ru" data-theme="dark">
 <head>
   <meta charset="UTF-8">
@@ -340,6 +426,55 @@
       margin: 0;
     }
   
+    label {
+      display: grid;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
+      margin-top: var(--space-3);
+    }
+    input[type="datetime-local"], input[type="number"] {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--color-border);
+      background: rgba(255,255,255,0.04);
+      color: var(--color-text);
+      padding: 0.85rem 0.9rem;
+      font-size: var(--text-sm);
+      outline: none;
+    }
+    input[type="datetime-local"] {
+      padding-left: 2.4rem;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M8 3v3M16 3v3' stroke='rgba(245,238,228,0.72)' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M4 9h16' stroke='rgba(245,238,228,0.38)' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M6 6h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z' stroke='rgba(245,238,228,0.48)' stroke-width='2'/%3E%3Cpath d='M8 13h2M12 13h2M16 13h0M8 17h2M12 17h2' stroke='rgba(245,238,228,0.62)' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 0.85rem 50%;
+      background-size: 18px 18px;
+    }
+    input[type="number"] { padding-left: 2.4rem; }
+    input[type="number"] {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' stroke='rgba(245,238,228,0.48)' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='9' cy='7' r='4' stroke='rgba(245,238,228,0.62)' stroke-width='2'/%3E%3Cpath d='M22 21v-2a4 4 0 0 0-3-3.87' stroke='rgba(245,238,228,0.38)' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M19 3.13a4 4 0 0 1 0 7.75' stroke='rgba(245,238,228,0.38)' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 0.85rem 50%;
+      background-size: 18px 18px;
+    }
+    input[type="datetime-local"]:focus, input[type="number"]:focus {
+      border-color: rgba(213,156,90,0.55);
+      box-shadow: 0 0 0 4px rgba(213,156,90,0.12);
+    }
+    textarea {
+      width: 100%;
+      min-height: 220px;
+      border-radius: 14px;
+      border: 1px solid var(--color-border);
+      background: rgba(0,0,0,0.12);
+      color: var(--color-text);
+      padding: 0.85rem 0.9rem;
+      font-size: 12px;
+      line-height: 1.35;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
     .selected-output {
       margin-top: var(--space-4);
       padding: var(--space-4);
@@ -387,6 +522,15 @@
     .stats { display: none; }
     .stat { display: none; }
     .footer-note { display: none; }
+
+    .table.free {
+      outline: 2px solid rgba(79,123,75,0.85);
+      outline-offset: 2px;
+    }
+    .table.busy {
+      opacity: 0.5;
+      filter: grayscale(0.2);
+    }
   
     @media (max-width: 980px) {
       .layout { grid-template-columns: 1fr; }
@@ -473,15 +617,28 @@
   
         <aside class="sidebar">
           <div class="card">
-            <h2>Выбор столов</h2>
-            <p>Нажимайте на столы прямо на схеме. Сейчас можно выбирать несколько столов - удобно для будущей логики бронирования, фильтров или статусов.</p>
-            <div class="selected-output">
-              <div>Выбрано столов: <strong id="selectedCount">0</strong></div>
-              <div class="selected-list" id="selectedList"><span style="color:var(--color-text-muted);font-size:var(--text-sm);">Пока ничего не выбрано</span></div>
+            <h2>Бронь</h2>
+            <label>
+              Дата и время
+              <input type="datetime-local" id="resDate">
+            </label>
+            <div id="stepGuests" hidden>
+              <label>
+                Гостей
+                <input type="number" id="resGuests" min="1" max="30" value="2">
+              </label>
             </div>
-            <div class="actions">
-              <button class="btn btn-primary" id="bookBtn" type="button">Забронировать</button>
-              <button class="btn btn-secondary" id="clearBtn" type="button">Очистить</button>
+            <div class="actions" id="stepCheck" hidden>
+              <button class="btn btn-primary" id="checkBtn" type="button">Проверить свободные столы</button>
+            </div>
+            <div class="selected-output">
+              <div style="display:flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap;">
+                <div>Стол: <strong id="selectedTable">—</strong></div>
+                <div style="color:var(--color-text-muted); font-size: var(--text-sm);" id="statusLine">—</div>
+              </div>
+              <div style="margin-top: var(--space-3);">
+                <textarea id="resultText" readonly></textarea>
+              </div>
             </div>
           </div>
   
@@ -504,49 +661,201 @@
       toggle.textContent = next === 'dark' ? '☀️' : '🌙';
     });
   
-    const selected = new Set();
-    const countEl = document.getElementById('selectedCount');
-    const listEl = document.getElementById('selectedList');
     const tables = Array.from(document.querySelectorAll('.table'));
-  
-    function renderSelected() {
-      const arr = Array.from(selected).sort((a, b) => Number(a) - Number(b));
-      countEl.textContent = arr.length;
-      listEl.innerHTML = arr.length
-        ? arr.map(n => `<span class="pill">Стол ${n}</span>`).join('')
-        : '<span style="color:var(--color-text-muted);font-size:var(--text-sm);">Пока ничего не выбрано</span>';
-    }
-  
-    tables.forEach(table => {
-      table.addEventListener('click', () => {
-        const id = table.dataset.table;
-        if (selected.has(id)) {
-          selected.delete(id);
-          table.classList.remove('selected');
-        } else {
-          selected.add(id);
-          table.classList.add('selected');
-        }
-        renderSelected();
-      });
-    });
-  
-    document.getElementById('clearBtn').addEventListener('click', () => {
-      selected.clear();
-      tables.forEach(t => t.classList.remove('selected'));
-      renderSelected();
-    });
-  
-    document.getElementById('bookBtn').addEventListener('click', () => {
-      const arr = Array.from(selected).sort((a, b) => Number(a) - Number(b));
-      if (!arr.length) {
-        alert('Сначала выберите хотя бы один стол.');
+    const resDate = document.getElementById('resDate');
+    const resGuests = document.getElementById('resGuests');
+    const checkBtn = document.getElementById('checkBtn');
+    const resultText = document.getElementById('resultText');
+    const selectedTableEl = document.getElementById('selectedTable');
+    const statusLine = document.getElementById('statusLine');
+    const stepGuests = document.getElementById('stepGuests');
+    const stepCheck = document.getElementById('stepCheck');
+
+    let last = null;
+    let freeNums = new Set();
+    let lastKey = '';
+    let selectedTableNum = '';
+    let isLoading = false;
+
+    const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const fmtJson = (x) => {
+      try { return JSON.stringify(x, null, 2); } catch (_) { return String(x); }
+    };
+
+    const setOutput = (obj) => {
+      if (!resultText) return;
+      resultText.value = fmtJson(obj);
+    };
+
+    const setStatus = (tableNum) => {
+      if (selectedTableEl) selectedTableEl.textContent = tableNum ? String(tableNum) : '—';
+      if (!tableNum) {
+        if (statusLine) statusLine.textContent = '—';
         return;
       }
-      alert(`Здесь можно подвязать реальную бронь. Сейчас выбрано: ${arr.join(', ')}`);
-    });
+      if (isLoading) {
+        if (statusLine) statusLine.textContent = 'Проверяю…';
+        return;
+      }
+      if (!last) {
+        if (statusLine) statusLine.textContent = 'Нажми "Проверить свободные столы"';
+        return;
+      }
+      const isFree = freeNums.has(String(tableNum));
+      if (statusLine) statusLine.textContent = isFree ? 'Свободен' : 'Занят';
+    };
+
+    const applyAvailabilityStyles = () => {
+      tables.forEach((t) => {
+        const n = String(t.dataset.table || '');
+        t.classList.remove('free', 'busy');
+        if (!last) return;
+        if (freeNums.has(n)) t.classList.add('free');
+        else t.classList.add('busy');
+      });
+    };
+
+    const getCurrentRequest = () => {
+      const dtRaw = resDate ? String(resDate.value || '').trim() : '';
+      const guestsRaw = resGuests ? Number(resGuests.value || 0) : 0;
+      if (!dtRaw) return null;
+      const dt = dtRaw.replace('T', ' ') + ':00';
+      const guests = isFinite(guestsRaw) && guestsRaw > 0 ? Math.floor(guestsRaw) : 2;
+      return { dt, guests };
+    };
+
+    const invalidateLast = () => {
+      last = null;
+      freeNums = new Set();
+      lastKey = '';
+      applyAvailabilityStyles();
+      renderSelectedTable();
+    };
+
+    const renderSelectedTable = () => {
+      setStatus(selectedTableNum);
+      if (!selectedTableNum) return;
+      if (!last) {
+        setOutput({ selected_table: selectedTableNum, ok: false, message: 'Нажми "Проверить свободные столы"' });
+        return;
+      }
+      const freeTables = Array.isArray(last.free_tables) ? last.free_tables : [];
+      const row = freeTables.find((r) => String(r && r.table_num != null ? r.table_num : '') === selectedTableNum) || null;
+      setOutput({
+        selected_table: selectedTableNum,
+        is_free: freeNums.has(selectedTableNum),
+        table_info: row,
+        request: last.request,
+        raw: last.raw
+      });
+    };
   
-    renderSelected();
+    tables.forEach(table => {
+      table.addEventListener('click', async () => {
+        const id = String(table.dataset.table || '');
+        selectedTableNum = id;
+        tables.forEach((t) => t.classList.remove('selected'));
+        table.classList.add('selected');
+
+        const current = getCurrentRequest();
+        if (!current) {
+          setStatus(id);
+          setOutput({ ok: false, error: 'Выбери дату и время' });
+          return;
+        }
+
+        const key = current.dt + '|' + String(current.guests);
+        if ((!last || lastKey !== key) && !isLoading) {
+          try {
+            await loadFree(true);
+          } catch (e) {
+            setOutput({ ok: false, error: String(e && e.message ? e.message : e) });
+            return;
+          }
+        }
+
+        renderSelectedTable();
+      });
+    });
+
+    const initDate = () => {
+      if (!resDate) return;
+      resDate.value = '';
+    };
+
+    const syncSteps = () => {
+      const hasDate = !!(resDate && String(resDate.value || '').trim());
+      if (stepGuests) stepGuests.hidden = !hasDate;
+      if (stepCheck) stepCheck.hidden = !hasDate;
+      if (!hasDate) invalidateLast();
+    };
+
+    const loadFree = async (silent) => {
+      if (isLoading) return;
+      const current = getCurrentRequest();
+      if (!current) {
+        setOutput({ ok: false, error: 'Выбери дату и время' });
+        return;
+      }
+
+      const dt = current.dt;
+      const guests = current.guests;
+      const key = dt + '|' + String(guests);
+
+      isLoading = true;
+      if (statusLine) statusLine.textContent = 'Проверяю…';
+      if (checkBtn) checkBtn.disabled = true;
+
+      const url = new URL(location.href);
+      url.searchParams.set('ajax', 'free_tables');
+      url.searchParams.set('date_reservation', dt);
+      url.searchParams.set('duration', '7200');
+      url.searchParams.set('spot_id', '1');
+      url.searchParams.set('guests_count', String(guests));
+
+      try {
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok) {
+          last = null;
+          freeNums = new Set();
+          lastKey = '';
+          applyAvailabilityStyles();
+          setOutput(j || { ok: false, error: 'Ошибка запроса' });
+          renderSelectedTable();
+          return;
+        }
+
+        last = j;
+        lastKey = key;
+        freeNums = new Set(Array.isArray(j.free_table_nums) ? j.free_table_nums.map(String) : []);
+        applyAvailabilityStyles();
+        if (!silent) setOutput(j);
+        renderSelectedTable();
+      } finally {
+        isLoading = false;
+        if (checkBtn) checkBtn.disabled = false;
+        setStatus(selectedTableNum);
+      }
+    };
+
+    if (checkBtn) {
+      checkBtn.addEventListener('click', () => {
+        loadFree(false).catch((e) => setOutput({ ok: false, error: String(e && e.message ? e.message : e) }));
+      });
+    }
+
+    initDate();
+    syncSteps();
+    if (resDate) {
+      resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); });
+      resDate.addEventListener('change', () => { syncSteps(); invalidateLast(); });
+    }
+    if (resGuests) {
+      resGuests.addEventListener('input', invalidateLast);
+      resGuests.addEventListener('change', invalidateLast);
+    }
+    setOutput({ info: 'Выбери дату. Потом укажи гостей и нажми "Проверить свободные столы". После этого кликай по столам.' });
   </script>
 </body>
 </html>
