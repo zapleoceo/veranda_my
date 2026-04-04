@@ -183,7 +183,9 @@ $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg'
             z-index: -1;
         }
         .wrap { max-width: 920px; margin: 0 auto; padding: 26px 18px 40px; }
-        .header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+        .header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+        .header-top { width: 100%; }
+        .header-main { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
         .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
         .logo {
             width: 42px; height: 42px;
@@ -195,7 +197,7 @@ $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg'
             flex: 0 0 auto;
         }
         .logo span { color: var(--accent); font-weight: 800; letter-spacing: 0.06em; font-size: 14px; }
-        h1 { margin: 0; font-size: 20px; line-height: 1.15; }
+        h1 { margin: 0; font-size: 20px; line-height: 1.15; width: 100%; }
         .subtitle { margin-top: 4px; color: var(--muted); font-size: 13px; }
         .lang {
             display: inline-flex;
@@ -291,25 +293,30 @@ $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg'
         }
         .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .muted { color: var(--muted); font-size: 12px; }
+        @media (max-width: 520px) {
+            .subtitle { display: none; }
+        }
     </style>
 </head>
 <body>
     <div class="parallax-bg" aria-hidden="true"></div>
     <div class="wrap">
         <div class="header">
-            <div class="brand">
-                <a class="back" href="/links/?lang=<?= urlencode($lang) ?>">←</a>
-                <div class="logo"><span>V</span></div>
-                <div style="min-width:0;">
-                    <h1><?= htmlspecialchars($pageTitle) ?></h1>
-                    <div class="subtitle"><?= htmlspecialchars($lang === 'ru' ? 'Меню по категориям' : ($lang === 'vi' ? 'Thực đơn theo danh mục' : ($lang === 'ko' ? '카테고리별 메뉴' : 'Menu by categories'))) ?></div>
-                </div>
+            <div class="header-top">
+                <h1><?= htmlspecialchars($pageTitle) ?></h1>
+                <div class="subtitle"><?= htmlspecialchars($lang === 'ru' ? 'Меню по категориям' : ($lang === 'vi' ? 'Thực đơn theo danh mục' : ($lang === 'ko' ? '카테고리별 메뉴' : 'Menu by categories'))) ?></div>
             </div>
-            <div class="lang" aria-label="Language">
-                <a href="?lang=ru" class="<?= $lang === 'ru' ? 'active' : '' ?>">RU</a>
-                <a href="?lang=en" class="<?= $lang === 'en' ? 'active' : '' ?>">EN</a>
-                <a href="?lang=vi" class="<?= $lang === 'vi' ? 'active' : '' ?>">VI</a>
-                <a href="?lang=ko" class="<?= $lang === 'ko' ? 'active' : '' ?>">KO</a>
+            <div class="header-main">
+                <div class="brand">
+                    <a class="back" href="/links/?lang=<?= urlencode($lang) ?>">←</a>
+                    <div class="logo"><span>V</span></div>
+                </div>
+                <div class="lang" aria-label="Language">
+                    <a href="?lang=ru" class="<?= $lang === 'ru' ? 'active' : '' ?>">RU</a>
+                    <a href="?lang=en" class="<?= $lang === 'en' ? 'active' : '' ?>">EN</a>
+                    <a href="?lang=vi" class="<?= $lang === 'vi' ? 'active' : '' ?>">VI</a>
+                    <a href="?lang=ko" class="<?= $lang === 'ko' ? 'active' : '' ?>">KO</a>
+                </div>
             </div>
         </div>
 
