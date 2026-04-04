@@ -409,12 +409,12 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       opacity: 0.92;
     }
     @keyframes koiOrbit1 {
-      from { transform: translate(-50%, -50%) rotate(0deg) translate(22px); }
-      to { transform: translate(-50%, -50%) rotate(360deg) translate(22px); }
+      from { transform: translate(-50%, -50%) rotate(0deg) translate(22px) rotate(90deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg) translate(22px) rotate(90deg); }
     }
     @keyframes koiOrbit2 {
-      from { transform: translate(-50%, -50%) rotate(180deg) translate(20px); }
-      to { transform: translate(-50%, -50%) rotate(-180deg) translate(20px); }
+      from { transform: translate(-50%, -50%) rotate(180deg) translate(20px) rotate(90deg); }
+      to { transform: translate(-50%, -50%) rotate(-180deg) translate(20px) rotate(90deg); }
     }
   
     .table {
