@@ -464,15 +464,12 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         .bar .label { position:absolute; left:50%; transform: translateX(-50%); bottom: -18px; font-size: 10px; color:#6b7280; white-space: nowrap; }
         .chart-wrap { position: relative; padding-bottom: 22px; }
         .legend { display:flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
-        .overlay { position: fixed; inset: 0; background: rgba(17,24,39,0.55); display:none; align-items: center; justify-content: center; padding: 16px; z-index: 3000; }
-        .modal { width: 100%; max-width: 520px; background: #fff; border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 18px 45px rgba(0,0,0,0.22); padding: 14px; }
-        .modal h3 { margin: 0 0 10px; font-size: 16px; color: #111827; }
-        .pbar { width: 100%; height: 10px; border-radius: 999px; background: rgba(17,24,39,0.08); overflow: hidden; }
-        .pbar > div { height: 100%; width: 0; background: rgba(26,115,232,0.95); transition: width 0.15s ease; }
-        .pmeta { display:flex; justify-content: space-between; gap: 10px; margin-top: 10px; align-items:center; }
-        .pmeta .pct { font-weight: 900; color:#111827; }
-        .pmeta .desc { font-weight: 800; color:#6b7280; font-size: 12px; min-width: 0; }
         .err { color:#b91c1c; font-weight: 800; font-size: 12px; margin-top: 10px; }
+        .prog-inline { display:none; align-items:center; gap: 10px; min-width: 0; }
+        .prog-inline .pbar { width: 140px; height: 10px; border-radius: 999px; background: rgba(17,24,39,0.08); overflow: hidden; }
+        .prog-inline .pbar > div { height: 100%; width: 0; background: rgba(26,115,232,0.95); transition: width 0.15s ease; }
+        .prog-inline .pct { font-weight: 900; color:#111827; font-size: 12px; min-width: 40px; }
+        .prog-inline .desc { font-weight: 800; color:#6b7280; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .checks { margin-top: 12px; border-top: 1px solid #eef2f7; padding-top: 12px; }
         .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color:#374151; }
         .toggle-wrap .toggle-text { user-select:none; }
@@ -487,7 +484,13 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         th { text-align:left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color:#111827; background: rgba(17,24,39,0.02); }
         td.num { text-align:right; white-space: nowrap; font-variant-numeric: tabular-nums; }
         tr.bad { background: rgba(211,47,47,0.08); }
-        .hist { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; color:#111827; }
+        .hist { font-size: 12px; color:#111827; }
+        .hist-item { border-bottom: 1px dashed rgba(17,24,39,0.12); padding: 8px 0; }
+        .hist-item:last-child { border-bottom: 0; }
+        .hist-head { display:flex; justify-content: space-between; gap: 10px; align-items: baseline; font-weight: 900; }
+        .hist-time { color:#6b7280; font-weight: 800; font-size: 12px; }
+        .hist-type { color:#111827; font-weight: 900; font-size: 12px; }
+        .hist-body { margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; white-space: pre-wrap; word-break: break-word; color:#111827; }
         @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -503,6 +506,11 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                 <span class="muted">Месяц</span>
                 <input type="month" id="ymInput" name="ym" value="<?= htmlspecialchars($ym) ?>" />
                 <button type="button" id="loadBtn">Загрузить</button>
+                <div class="prog-inline" id="monthProg">
+                    <div class="pbar"><div id="monthProgFill"></div></div>
+                    <div class="pct" id="monthProgPct">0%</div>
+                    <div class="desc" id="monthProgDesc"></div>
+                </div>
             </form>
         </div>
     </div>
@@ -581,6 +589,11 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                     </div>
                 </div>
                 <div class="muted" id="checksHint" style="margin-top:6px;">Нажми на чек, чтобы раскрыть историю.</div>
+                <div class="prog-inline" id="checksProg" style="margin-top: 8px;">
+                    <div class="pbar"><div id="checksProgFill"></div></div>
+                    <div class="pct" id="checksProgPct">0%</div>
+                    <div class="desc" id="checksProgDesc"></div>
+                </div>
                 <table>
                     <thead>
                         <tr>
@@ -599,29 +612,20 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     </div>
 </div>
 
-<div class="overlay" id="overlay">
-    <div class="modal" role="dialog" aria-modal="true" aria-label="Загрузка">
-        <h3>Загрузка…</h3>
-        <div class="pbar"><div id="pbarFill"></div></div>
-        <div class="pmeta">
-            <div class="pct" id="pbarPct">0%</div>
-            <div class="desc" id="pbarDesc"></div>
-        </div>
-        <div class="err" id="pbarErr" style="display:none;"></div>
-    </div>
-</div>
-
 <script>
     const ym = <?= json_encode($ym, JSON_UNESCAPED_UNICODE) ?>;
     const monthStart = <?= json_encode($monthStart, JSON_UNESCAPED_UNICODE) ?>;
     const monthEnd = <?= json_encode($monthEnd, JSON_UNESCAPED_UNICODE) ?>;
     const ymInput = document.getElementById('ymInput');
 
-    const overlay = document.getElementById('overlay');
-    const pbarFill = document.getElementById('pbarFill');
-    const pbarPct = document.getElementById('pbarPct');
-    const pbarDesc = document.getElementById('pbarDesc');
-    const pbarErr = document.getElementById('pbarErr');
+    const monthProg = document.getElementById('monthProg');
+    const monthProgFill = document.getElementById('monthProgFill');
+    const monthProgPct = document.getElementById('monthProgPct');
+    const monthProgDesc = document.getElementById('monthProgDesc');
+    const checksProg = document.getElementById('checksProg');
+    const checksProgFill = document.getElementById('checksProgFill');
+    const checksProgPct = document.getElementById('checksProgPct');
+    const checksProgDesc = document.getElementById('checksProgDesc');
 
     const dayLabel = document.getElementById('dayLabel');
     const kpiTotal = document.getElementById('kpiTotal');
@@ -642,27 +646,32 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         return out;
     })();
 
-    const setOverlay = (on) => {
-        if (!overlay) return;
-        overlay.style.display = on ? 'flex' : 'none';
+    const setMonthLoading = (on) => {
+        if (!monthProg) return;
+        monthProg.style.display = on ? 'inline-flex' : 'none';
     };
-    const setProgress = (pct, desc) => {
+    const setMonthProgress = (pct, desc) => {
         const p = Math.max(0, Math.min(100, Math.round(Number(pct || 0))));
-        if (pbarFill) pbarFill.style.width = p + '%';
-        if (pbarPct) pbarPct.textContent = p + '%';
-        if (pbarDesc) pbarDesc.textContent = String(desc || '');
+        if (monthProgFill) monthProgFill.style.width = p + '%';
+        if (monthProgPct) monthProgPct.textContent = p + '%';
+        if (monthProgDesc) monthProgDesc.textContent = String(desc || '');
     };
-    const setErr = (msg) => {
-        if (!pbarErr) return;
-        if (!msg) { pbarErr.style.display = 'none'; pbarErr.textContent = ''; return; }
-        pbarErr.style.display = '';
-        pbarErr.textContent = String(msg);
+    const setChecksLoading = (on) => {
+        if (!checksProg) return;
+        checksProg.style.display = on ? 'inline-flex' : 'none';
+    };
+    const setChecksProgress = (pct, desc) => {
+        const p = Math.max(0, Math.min(100, Math.round(Number(pct || 0))));
+        if (checksProgFill) checksProgFill.style.width = p + '%';
+        if (checksProgPct) checksProgPct.textContent = p + '%';
+        if (checksProgDesc) checksProgDesc.textContent = String(desc || '');
     };
 
     const monthData = new Map();
     let dayChecks = [];
     let onlyBad = false;
     let checksAbort = null;
+    let checksProgressTimer = null;
 
     const updateCalendarCell = (date, total, missing) => {
         const el = document.querySelector(`.day[data-date="${date}"]`);
@@ -761,25 +770,38 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                         const j = await res.json();
                         if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
                         const h = Array.isArray(j.history) ? j.history : [];
-                        const out = h.map((ev) => {
+                        const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                        const typeTitle = (t) => ({
+                            open: 'Открыт чек',
+                            close: 'Закрыт чек',
+                            print: 'Печать',
+                            additem: 'Добавлен товар',
+                            deleteitem: 'Удалён товар',
+                            changeitemcount: 'Изменено количество',
+                            settable: 'Смена стола',
+                            sendtokitchen: 'Отправлено на кухню',
+                            finishedcooking: 'Готово (cooked)',
+                            delete: 'Удаление',
+                        }[t] || t);
+                        const html = h.map((ev) => {
                             const type = String(ev.type_history || '');
                             const timeMs = Number(ev.time || 0);
                             const dt = timeMs ? new Date(timeMs).toISOString().replace('T', ' ').slice(0, 19) : '';
-                            const v = [ev.value, ev.value2, ev.value3, ev.value4, ev.value5].filter((x) => x !== undefined && x !== null && String(x) !== '').map((x) => String(x)).join(' | ');
+                            const v = [ev.value, ev.value2, ev.value3, ev.value4, ev.value5]
+                                .filter((x) => x !== undefined && x !== null && String(x) !== '')
+                                .map((x) => String(x)).join(' | ');
                             let vt = ev.value_text;
                             if (typeof vt === 'string' && vt.length > 0) {
-                                try {
-                                    const decoded = JSON.parse(vt);
-                                    vt = JSON.stringify(decoded, null, 2);
-                                } catch (_) {}
+                                try { vt = JSON.stringify(JSON.parse(vt), null, 2); } catch (_) {}
                             } else if (vt && typeof vt === 'object') {
                                 try { vt = JSON.stringify(vt, null, 2); } catch (_) { vt = String(vt); }
                             } else {
                                 vt = '';
                             }
-                            return [dt, type, v, vt].filter((x) => String(x).trim() !== '').join('\n');
-                        }).join('\n\n');
-                        trD.innerHTML = `<td colspan="6"><div class="hist">${out ? out.replace(/</g,'&lt;') : 'Нет данных'}</div></td>`;
+                            const body = [v ? ('value: ' + v) : '', vt ? ('value_text:\n' + vt) : ''].filter(Boolean).join('\n');
+                            return `<div class="hist-item"><div class="hist-head"><div class="hist-type">${esc(typeTitle(type))}</div><div class="hist-time">${esc(dt)}</div></div><div class="hist-body">${esc(body)}</div></div>`;
+                        }).join('');
+                        trD.innerHTML = `<td colspan="6"><div class="hist">${html || '<div class="muted">Нет данных</div>'}</div></td>`;
                     } catch (e) {
                         trD.innerHTML = `<td colspan="6"><div class="hist" style="color:#b91c1c; font-weight:800;">${String(e && e.message ? e.message : 'Ошибка')}</div></td>`;
                     }
@@ -816,6 +838,14 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         }
         dayChecks = [];
         renderChecks();
+        setChecksLoading(true);
+        setChecksProgress(0, '');
+        if (checksProgressTimer) clearInterval(checksProgressTimer);
+        let fake = 0;
+        checksProgressTimer = setInterval(() => {
+            fake = Math.min(90, fake + 3);
+            setChecksProgress(fake, '');
+        }, 180);
 
         const url = new URL(location.href);
         url.searchParams.set('ym', ym);
@@ -828,6 +858,9 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         const checks = Array.isArray(j.checks) ? j.checks : [];
         dayChecks = checks;
         renderChecks();
+        setChecksProgress(100, 'Готово');
+        if (checksProgressTimer) clearInterval(checksProgressTimer);
+        setTimeout(() => setChecksLoading(false), 250);
         if (checksHint) {
             const bad = checks.filter((x) => !!x.missing).length;
             checksHint.style.color = '#6b7280';
@@ -836,9 +869,8 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     };
 
     const loadMonth = async () => {
-        setErr('');
-        setOverlay(true);
-        setProgress(0, 'Подготовка…');
+        setMonthLoading(true);
+        setMonthProgress(0, 'Подготовка…');
         let done = 0;
         const todayStr = new Date().toISOString().slice(0, 10);
         const allDays = Array.from(document.querySelectorAll('.day[data-date]')).map((x) => String(x.getAttribute('data-date') || '')).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x));
@@ -859,7 +891,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                 const dd = String(d).slice(8, 10);
                 const mm = String(d).slice(5, 7);
                 const den = fetchDays.length || 1;
-                setProgress(Math.round((done / den) * 100), `- день ${done}/${fetchDays.length} (${dd}/${mm})`);
+                setMonthProgress(Math.round((done / den) * 100), `- день ${done}/${fetchDays.length} (${dd}/${mm})`);
             }
         };
 
@@ -867,8 +899,8 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
             if (!fetchDays.length) {
                 if (monthTotal) monthTotal.textContent = '0';
                 if (monthMissing) monthMissing.textContent = '0';
-                setProgress(100, 'Нет дней для загрузки');
-                setTimeout(() => setOverlay(false), 250);
+                setMonthProgress(100, 'Нет дней для загрузки');
+                setTimeout(() => setMonthLoading(false), 250);
                 return;
             }
             await Promise.all(new Array(Math.min(concurrency, queue.length)).fill(0).map(worker));
@@ -896,10 +928,11 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                 const cell = document.querySelector(`.day[data-date="${firstDay}"]`);
                 if (cell) cell.classList.add('active');
             }
-            setProgress(100, 'Готово');
-            setTimeout(() => setOverlay(false), 250);
+            setMonthProgress(100, 'Готово');
+            setTimeout(() => setMonthLoading(false), 250);
         } catch (e) {
-            setErr(e && e.message ? e.message : 'Failed to fetch');
+            setMonthProgress(0, e && e.message ? e.message : 'Failed to fetch');
+            setTimeout(() => setMonthLoading(false), 250);
         }
     };
 
