@@ -150,6 +150,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
 
     $rows = is_array($resp) ? $resp : [];
     $filtered = [];
+    $items = [];
 
     $extractNums = function ($value) {
       $out = [];
@@ -199,6 +200,28 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       if (!$tables) continue;
       $row['_tables'] = $tables;
       $filtered[] = $row;
+
+      $start = trim((string)($row['date_reservation'] ?? ''));
+      $dur = (int)($row['duration'] ?? 0);
+      $end = '';
+      $startTs = $start !== '' ? strtotime($start) : false;
+      if ($startTs !== false && $dur > 0) {
+        $end = date('Y-m-d H:i:s', $startTs + $dur);
+      }
+      $guestName = trim(((string)($row['first_name'] ?? '')) . ' ' . ((string)($row['last_name'] ?? '')));
+      if ($guestName === '') $guestName = '—';
+      $guestsCount = trim((string)($row['guests_count'] ?? ''));
+
+      foreach ($tables as $t) {
+        $items[] = [
+          'table_id' => (string)($t['table_id'] ?? ''),
+          'table_title' => (string)($t['table_title'] ?? ''),
+          'guest_name' => $guestName,
+          'date_start' => $start,
+          'date_end' => $end,
+          'guests_count' => $guestsCount,
+        ];
+      }
     }
 
     echo json_encode([
@@ -209,13 +232,8 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         'spot_id' => $spotId,
         'hall_id' => $hallId,
       ],
-      'available_tables' => $availableList,
-      'available_by_title' => $availableByTitle,
-      'reservations' => $filtered,
-      'raw' => [
-        'reservations' => $resp,
-        'tables' => $tablesResp,
-      ],
+      'reservations_items' => $items,
+      'raw' => $resp,
     ], JSON_UNESCAPED_UNICODE);
   } catch (\Throwable $e) {
     http_response_code(500);
@@ -900,137 +918,31 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       resultText.value = fmtJson(obj);
     };
 
-    const formatAvailabilityText = (j, selectedNum) => {
-      if (!j || typeof j !== 'object') return 'Нет данных';
-
-      const req = (j && typeof j.request === 'object' && j.request) ? j.request : {};
-      const numsRaw = Array.isArray(j.free_table_nums) ? j.free_table_nums.map(String) : [];
-      const nums = numsRaw
-        .filter((x) => x !== '')
-        .slice()
-        .sort((a, b) => (Number(a) || 0) - (Number(b) || 0));
-
-      const selected = selectedNum ? String(selectedNum) : '';
-      const isFree = selected ? nums.includes(selected) : false;
-      const freeTables = Array.isArray(j.free_tables) ? j.free_tables : [];
-      const row = selected ? (freeTables.find((r) => r && String(r.table_num ?? '') === selected) || null) : null;
-
+    const formatReservationsOnlyText = (items, meta) => {
+      const list = Array.isArray(items) ? items : [];
       const lines = [];
-      lines.push('Результат проверки свободных столов');
-      lines.push('');
-      lines.push('Запрос:');
-      lines.push(`- date_reservation: ${String(req.date_reservation ?? '')}`);
-      lines.push(`- duration: ${String(req.duration ?? '')}`);
-      lines.push(`- guests_count: ${String(req.guests_count ?? '')}`);
-      lines.push(`- spot_id: ${String(req.spot_id ?? '')}`);
-      lines.push(`- hall_id: ${String(req.hall_id ?? '')}`);
-      lines.push('');
-      lines.push(`Свободных столов (hall_id=${String(req.hall_id ?? '')}): ${nums.length}`);
-      lines.push(`Номера: ${nums.length ? nums.join(', ') : '—'}`);
-
-      if (selected) {
-        lines.push('');
-        lines.push(`Выбранный стол: ${selected}`);
-        lines.push(`Статус: ${isFree ? 'СВОБОДЕН' : 'ЗАНЯТ'}`);
-        if (row) {
-          lines.push('');
-          lines.push('Данные по столу из API (freeTables):');
-          Object.keys(row).sort().forEach((k) => {
-            const v = row[k];
-            lines.push(`- ${k}: ${typeof v === 'object' ? fmtJson(v) : String(v)}`);
-          });
+      lines.push('Текущие брони (incomingOrders.getReservations)');
+      if (meta && typeof meta === 'object') {
+        if (meta.date_from || meta.date_to) {
+          lines.push(`Интервал: ${String(meta.date_from || '')} — ${String(meta.date_to || '')}`);
         }
       }
-
-      const reservations = Array.isArray(j.reservations) ? j.reservations : [];
-
-      if (reservations.length) {
-        lines.push('');
-        lines.push('Текущие брони:');
-        const rReq = (j && typeof j.reservations_request === 'object' && j.reservations_request) ? j.reservations_request : null;
-        if (rReq) {
-          lines.push(`- интервал: ${String(rReq.date_from ?? '')} — ${String(rReq.date_to ?? '')}`);
-          lines.push(`- hall_id: ${String(rReq.hall_id ?? '')}`);
-        }
-        lines.push('');
-        lines.push('Формат: table_title | ID стола | имя гостя | начало брони | конец брони');
-
-        const parseDt = (s) => {
-          const str = String(s || '').trim();
-          if (!str) return NaN;
-          const d = new Date(str.replace(' ', 'T'));
-          const t = d.getTime();
-          return Number.isFinite(t) ? t : NaN;
-        };
-        const reqStart = parseDt(req.date_reservation);
-        const reqEnd = Number.isFinite(reqStart) ? (reqStart + (Number(req.duration || 0) * 1000)) : NaN;
-
-        const withRanges = reservations.map((r) => {
-          const startStr = String(r.date_reservation ?? '');
-          const start = parseDt(startStr);
-          const durS = Number(r.duration || 0);
-          const end = Number.isFinite(start) ? start + durS * 1000 : NaN;
-          return { r, start, end, startStr, durS };
-        });
-
-        const current = withRanges.filter((x) => {
-          if (!Number.isFinite(reqStart) || !Number.isFinite(reqEnd)) return true;
-          if (!Number.isFinite(x.start) || !Number.isFinite(x.end)) return true;
-          return x.start < reqEnd && x.end > reqStart;
-        }).sort((a, b) => (a.start || 0) - (b.start || 0));
-
-        const fmtEnd = (x) => {
-          if (!Number.isFinite(x.end)) return '';
-          const d = new Date(x.end);
-          const yyyy = String(d.getFullYear());
-          const mm = String(d.getMonth() + 1).padStart(2, '0');
-          const dd = String(d.getDate()).padStart(2, '0');
-          const hh = String(d.getHours()).padStart(2, '0');
-          const mi = String(d.getMinutes()).padStart(2, '0');
-          const ss = String(d.getSeconds()).padStart(2, '0');
-          return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
-        };
-
-        current.slice(0, 80).forEach((x) => {
-          const r = x.r || {};
-          const name = (String(r.first_name ?? '') + ' ' + String(r.last_name ?? '')).trim() || '—';
-          const tables = Array.isArray(r._tables) ? r._tables : [];
-          if (!tables.length) {
-            lines.push(`— | — | ${name} | ${x.startStr || '—'} | ${fmtEnd(x) || '—'}`);
-            return;
-          }
-          tables.forEach((t) => {
-            const title = String(t.table_title ?? '—');
-            const id = String(t.table_id ?? '—');
-            lines.push(`${title} | ${id} | ${name} | ${x.startStr || '—'} | ${fmtEnd(x) || '—'}`);
-          });
-        });
-        if (current.length > 80) lines.push(`… ещё ${current.length - 80}`);
+      lines.push('');
+      lines.push('Формат: ID стола | Имя стола | Имя | Старт брони | Конец брони | Кол-во человек');
+      if (!list.length) {
+        lines.push('—');
+        return lines.join('\n');
       }
-
-      const availableTables = Array.isArray(j.available_tables) ? j.available_tables : [];
-      if (availableTables.length) {
-        lines.push('');
-        lines.push('Доступные столы для брони (table_title 1–20):');
-        availableTables
-          .slice()
-          .sort((a, b) => (Number(a.table_title) || 0) - (Number(b.table_title) || 0))
-          .forEach((t) => {
-            lines.push(`- table_title=${String(t.table_title ?? '—')} | table_id=${String(t.table_id ?? '—')} | table_num=${String(t.table_num ?? '—')}`);
-          });
-      }
-
-      if (j.raw) {
-        lines.push('');
-        lines.push('RAW (как вернул Poster):');
-        lines.push(fmtJson(j.raw));
-      }
-      if (j.reservations_raw) {
-        lines.push('');
-        lines.push('RAW брони (incomingOrders.getReservations):');
-        lines.push(fmtJson(j.reservations_raw));
-      }
-
+      list.slice(0, 120).forEach((it) => {
+        const tableId = String(it.table_id ?? '—');
+        const tableTitle = String(it.table_title ?? '—');
+        const name = String(it.guest_name ?? '—');
+        const start = String(it.date_start ?? '—');
+        const end = String(it.date_end ?? '—');
+        const guests = String(it.guests_count ?? '—');
+        lines.push(`${tableId} | ${tableTitle} | ${name} | ${start} | ${end} | ${guests}`);
+      });
+      if (list.length > 120) lines.push(`… ещё ${list.length - 120}`);
       return lines.join('\n');
     };
 
@@ -1086,7 +998,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         setOutput('Нажми "Проверить свободные столы"');
         return;
       }
-      setOutput(formatAvailabilityText(last, selectedTableNum));
+      setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
     };
   
     tables.forEach(table => {
@@ -1184,16 +1096,14 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         const r = await loadReservations().catch(() => null);
         if (r) {
           last.reservations_request = r.request;
-          last.reservations = r.reservations;
           last.reservations_raw = r.raw;
-          last.available_tables = r.available_tables;
+          last.reservations_items = r.reservations_items;
         } else {
           last.reservations_request = null;
-          last.reservations = [];
           last.reservations_raw = null;
-          last.available_tables = null;
+          last.reservations_items = [];
         }
-        if (!silent) setOutput(formatAvailabilityText(j, selectedTableNum));
+        if (!silent) setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
         renderSelectedTable();
       } finally {
         isLoading = false;
