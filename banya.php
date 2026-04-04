@@ -645,6 +645,10 @@ $firstOfMonth = date('Y-m-01');
         .muted { color:#6b7280; font-size: 12px; }
         .row { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; }
         .row > * { min-width: 0; }
+        .controls { display:flex; align-items:center; gap:10px; flex-wrap: wrap; min-width: 0; }
+        .controls > * { min-width: 0; }
+        #prog { min-width: 0; }
+        #progDesc { min-width: 0; }
         label { font-size: 12px; color:#6b7280; display:flex; flex-direction: column; gap: 6px; }
         input[type="date"], select { padding: 7px 10px; border: 1px solid rgba(182,89,48,0.25); border-radius: 10px; font-size: 14px; background:#fff; color:#1f2937; }
         button { padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(182,89,48,0.35); background: var(--brand-bg); color: var(--brand-text); font-weight: 900; cursor:pointer; }
@@ -736,7 +740,7 @@ $firstOfMonth = date('Y-m-01');
                 Дата конца
                 <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>">
             </label>
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap: wrap;">
+            <div class="controls">
                 <button id="loadBtn" type="button">ЗАГРУЗИТЬ</button>
                 <div class="progress" id="prog" style="display:none; align-items:center; gap: 10px; margin-left: 10px;">
                     <div class="bar" style="width: 104px; height: 10px; border-radius: 999px; background: rgba(182,89,48,0.12); overflow: hidden;">
