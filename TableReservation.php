@@ -67,7 +67,7 @@
     }
   
     .panel {
-      width: min(1200px, 100%);
+      width: min(1320px, 100%);
       background: linear-gradient(180deg, rgba(255,255,255,.35), transparent), var(--color-surface);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-lg);
@@ -149,8 +149,8 @@
       left: -42px;
       top: -40px;
       width: 860px;
-      height: 340px;
-      border-radius: 140px 90px 150px 110px;
+      height: 430px;
+      clip-path: polygon(0 0, 100% 0, 100% 128px, 240px 128px, 240px 100%, 0 100%);
       background:
         radial-gradient(circle at 12% 24%, rgba(147,196,125,0.20), transparent 58%),
         radial-gradient(circle at 78% 30%, rgba(92,162,92,0.22), transparent 62%),
@@ -172,7 +172,7 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
-      border-radius: 180px 110px 160px 140px;
+      clip-path: polygon(0 0, 100% 0, 100% 128px, 240px 128px, 240px 100%, 0 100%);
     }
     .grass-area::before {
       transform: rotate(-2deg) translate(-14px, 10px);
@@ -389,7 +389,7 @@
       </div>
   
       <section class="layout">
-        <div class="map-shell" style="transform: scaleX(0.9); transform-origin: top left;">
+        <div class="map-shell">
           <div class="map" aria-label="Схема столов ресторана">
             <div class="grass-area" aria-hidden="true"></div>
             <button class="table large" style="left: 0px; top: 24px;" data-table="1">1<span class="cap">до 8</span></button>
