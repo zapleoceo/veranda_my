@@ -333,6 +333,26 @@ $firstOfMonth = date('Y-m-01');
         .page-btn.active { background: var(--brand-bg); border-color: rgba(182,89,48,0.35); }
         .page-dots { color: rgba(182,89,48,0.75); padding: 0 4px; font-weight: 900; }
         .hookah-ico { width: 18px; height: 18px; vertical-align: middle; margin-left: 8px; }
+
+        .user-menu { position: relative; }
+        .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid rgba(182,89,48,0.22); border-radius: 999px; background: #fff; color: #1f2937; font-weight: 900; cursor: default; }
+        .user-icon { width: 22px; height: 22px; border-radius: 50%; background: rgba(239,219,206,0.75); display: inline-flex; align-items: center; justify-content: center; color: var(--brand-text); font-weight: 900; font-size: 12px; overflow: hidden; }
+        .user-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; box-shadow: 0 10px 24px rgba(182,89,48,0.18); padding: 8px; min-width: 220px; display: none; z-index: 1000; }
+        .user-menu.open .user-dropdown { display: block; }
+        .user-dropdown a { display: block; padding: 8px 10px; border-radius: 10px; color: #1f2937; text-decoration: none; font-weight: 900; }
+        .user-dropdown a:hover { background: rgba(239,219,206,0.55); }
+        .user-dropdown .ud-title { padding: 6px 10px 4px; color: rgba(107,114,128,0.9); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; }
+        .user-dropdown .ud-subtitle { padding: 6px 10px 4px; color: var(--brand-text); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; }
+        .user-dropdown .ud-link.ud-l1 { padding-left: 18px; }
+        .user-dropdown .ud-link.ud-l2 { padding-left: 32px; }
+        .user-dropdown .ud-sep { height: 1px; background: rgba(182,89,48,0.14); margin: 6px 8px; border-radius: 999px; }
+        .user-dropdown .ud-details { margin: 2px 0; }
+        .user-dropdown .ud-summary { list-style: none; padding: 8px 10px; border-radius: 10px; color: #1f2937; font-weight: 900; cursor: pointer; user-select: none; }
+        .user-dropdown .ud-summary::-webkit-details-marker { display: none; }
+        .user-dropdown details[open] .ud-summary { background: rgba(239,219,206,0.55); }
+        .user-dropdown .ud-summary::after { content: "›"; float: right; color: rgba(182,89,48,0.65); font-weight: 900; }
+        .user-dropdown details[open] .ud-summary::after { content: "⌄"; }
     </style>
 </head>
 <body>
