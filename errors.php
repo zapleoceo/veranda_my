@@ -420,6 +420,11 @@ $monthEndTs = $monthEndTs !== false ? strtotime('-1 day', $monthEndTs) : false;
 $monthEnd = $monthEndTs !== false ? date('Y-m-d', $monthEndTs) : $monthStart;
 $firstDow = (int)date('N', strtotime($monthStart));
 $daysInMonth = (int)date('t', strtotime($monthStart));
+$dateList = [];
+for ($d = 1; $d <= $daysInMonth; $d++) {
+    $dateList[] = sprintf('%s-%02d', $ym, $d);
+}
+$todayStr = date('Y-m-d');
 
 ?><!doctype html>
 <html lang="ru">
@@ -616,6 +621,8 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     const ym = <?= json_encode($ym, JSON_UNESCAPED_UNICODE) ?>;
     const monthStart = <?= json_encode($monthStart, JSON_UNESCAPED_UNICODE) ?>;
     const monthEnd = <?= json_encode($monthEnd, JSON_UNESCAPED_UNICODE) ?>;
+    const dateList = <?= json_encode($dateList, JSON_UNESCAPED_UNICODE) ?>;
+    const todayStr = <?= json_encode($todayStr, JSON_UNESCAPED_UNICODE) ?>;
     const ymInput = document.getElementById('ymInput');
 
     const monthProg = document.getElementById('monthProg');
@@ -634,17 +641,6 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     const monthMissing = document.getElementById('monthMissing');
     const monthTotal = document.getElementById('monthTotal');
     const checksHint = document.getElementById('checksHint');
-
-    const dateList = (() => {
-        const out = [];
-        const a = new Date(String(monthStart) + 'T00:00:00Z');
-        const b = new Date(String(monthEnd) + 'T00:00:00Z');
-        if (isNaN(a.getTime()) || isNaN(b.getTime()) || a.getTime() > b.getTime()) return out;
-        for (let t = a.getTime(); t <= b.getTime(); t += 86400000) {
-            out.push(new Date(t).toISOString().slice(0, 10));
-        }
-        return out;
-    })();
 
     const setMonthLoading = (on) => {
         if (!monthProg) return;
@@ -786,7 +782,14 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                         const html = h.map((ev) => {
                             const type = String(ev.type_history || '');
                             const timeMs = Number(ev.time || 0);
-                            const dt = timeMs ? new Date(timeMs).toISOString().replace('T', ' ').slice(0, 19) : '';
+                            let dt = '';
+                            if (timeMs) {
+                                try {
+                                    dt = new Date(timeMs).toLocaleString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
+                                } catch (_) {
+                                    dt = new Date(timeMs).toISOString().replace('T', ' ').slice(0, 19);
+                                }
+                            }
                             const v = [ev.value, ev.value2, ev.value3, ev.value4, ev.value5]
                                 .filter((x) => x !== undefined && x !== null && String(x) !== '')
                                 .map((x) => String(x)).join(' | ');
@@ -872,7 +875,6 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         setMonthLoading(true);
         setMonthProgress(0, 'Подготовка…');
         let done = 0;
-        const todayStr = new Date().toISOString().slice(0, 10);
         const allDays = Array.from(document.querySelectorAll('.day[data-date]')).map((x) => String(x.getAttribute('data-date') || '')).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x));
         const fetchDays = allDays.filter((d) => d <= todayStr);
         const futureDays = allDays.filter((d) => d > todayStr);
