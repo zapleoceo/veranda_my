@@ -135,140 +135,52 @@ if (($_GET['ajax'] ?? '') === 'load') {
         $spotIds = banya_load_spot_ids($api);
         if (!$spotIds) $spotIds = [1];
 
-        $tablesSeen = [];
-        $tablesToQuery = [];
-
+        $hallByTable = [];
         foreach ($spotIds as $sid) {
-            $all = $api->request('spots.getTableHallTables', [
-                'spot_id' => (int)$sid,
-                'without_deleted' => 0,
-            ], 'GET');
-            if (!is_array($all)) $all = [];
-            foreach ($all as $r) {
-                if (!is_array($r)) continue;
-                $tid = (int)($r['table_id'] ?? 0);
-                if ($tid <= 0) continue;
-                $hallId = (int)($r['hall_id'] ?? $r['table_hall_id'] ?? 0);
-                $num = trim((string)($r['table_num'] ?? ''));
-                $title = trim((string)($r['table_title'] ?? ''));
-                $hay = $num . ' ' . $title;
-                $is141 = ($tid === 141) || (bool)preg_match('/\b141\b/u', $hay);
-                $isHall = ($hallId === (int)BANYA_HALL_ID);
-                if (!$isHall && !$is141) continue;
-                if (isset($tablesSeen[$tid])) continue;
-                $tablesSeen[$tid] = true;
-                $tablesToQuery[] = ['table_id' => $tid];
+            $map = banya_load_table_halls($api, (int)$sid);
+            foreach ($map as $tid => $hid) {
+                $hallByTable[(int)$tid] = (int)$hid;
             }
-        }
-
-        if (!isset($tablesSeen[141])) {
-            $tablesSeen[141] = true;
-            $tablesToQuery[] = ['table_id' => 141];
         }
 
         $txBase = [];
-        if ($tablesToQuery) {
-            $states = [];
-            foreach ($tablesToQuery as $t) {
-                $states[] = [
-                    'table_id' => (int)$t['table_id'],
-                    'next_tr' => null,
-                    'prev_next_tr' => null,
-                    'done' => false,
-                ];
+        $nextTr = null;
+        $prevNextTr = null;
+        $guard = 0;
+        do {
+            $guard++;
+            if ($guard > 20000) break;
+            $params = [
+                'dateFrom' => str_replace('-', '', $dateFrom),
+                'dateTo' => str_replace('-', '', $dateTo),
+                'include_products' => 'false',
+                'status' => 2,
+            ];
+            if ($nextTr !== null) $params['next_tr'] = $nextTr;
+            $batch = $api->request('dash.getTransactions', $params, 'GET');
+            if (!is_array($batch)) $batch = [];
+            $count = count($batch);
+            if ($count > 0) {
+                $last = end($batch);
+                $prevNextTr = $nextTr;
+                $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
             }
 
-            $apiBase = 'https://joinposter.com/api/dash.getTransactions';
-            $maxParallel = 10;
-            $rounds = 0;
-            while (true) {
-                $rounds++;
-                if ($rounds > 20000) break;
-                $mh = curl_multi_init();
-                $handleToIdx = [];
-                $handles = [];
-                $inFlight = 0;
-
-                foreach ($states as $i => $st) {
-                    if (!empty($st['done'])) continue;
-                    if ($inFlight >= $maxParallel) break;
-                    $params = [
-                        'token' => $token,
-                        'dateFrom' => str_replace('-', '', $dateFrom),
-                        'dateTo' => str_replace('-', '', $dateTo),
-                        'include_products' => 'false',
-                        'status' => 2,
-                        'table_id' => (int)$st['table_id'],
-                    ];
-                    if (!empty($st['next_tr'])) $params['next_tr'] = $st['next_tr'];
-                    $url = $apiBase . '?' . http_build_query($params);
-                    $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_URL, $url);
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-                    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-                    curl_setopt($ch, CURLOPT_ENCODING, '');
-                    $handles[] = $ch;
-                    $handleToIdx[(int)$ch] = (int)$i;
-                    curl_multi_add_handle($mh, $ch);
-                    $inFlight++;
-                }
-
-                if ($inFlight === 0) {
-                    curl_multi_close($mh);
-                    break;
-                }
-
-                do {
-                    $status = curl_multi_exec($mh, $active);
-                    if ($active) curl_multi_select($mh, 0.2);
-                } while ($active && $status == CURLM_OK);
-
-                foreach ($handles as $ch) {
-                    $idx = $handleToIdx[(int)$ch] ?? null;
-                    $body = curl_multi_getcontent($ch);
-                    curl_multi_remove_handle($mh, $ch);
-                    curl_close($ch);
-                    if ($idx === null) continue;
-
-                    $data = json_decode((string)$body, true);
-                    if (!is_array($data)) {
-                        $states[$idx]['done'] = true;
-                        continue;
-                    }
-                    if (isset($data['error'])) {
-                        $states[$idx]['done'] = true;
-                        continue;
-                    }
-                    $resp = $data['response'] ?? $data;
-                    if (!is_array($resp)) {
-                        $states[$idx]['done'] = true;
-                        continue;
-                    }
-                    $count = count($resp);
-                    if ($count <= 0) {
-                        $states[$idx]['done'] = true;
-                        continue;
-                    }
-                    $last = end($resp);
-                    $states[$idx]['prev_next_tr'] = $states[$idx]['next_tr'];
-                    $states[$idx]['next_tr'] = is_array($last) ? ($last['transaction_id'] ?? null) : null;
-                    if ($states[$idx]['next_tr'] === null) {
-                        $states[$idx]['done'] = true;
-                    } elseif ($states[$idx]['prev_next_tr'] !== null && (string)$states[$idx]['next_tr'] === (string)$states[$idx]['prev_next_tr']) {
-                        $states[$idx]['done'] = true;
-                    }
-                    foreach ($resp as $tx) {
-                        if (!is_array($tx)) continue;
-                        $txId = (int)($tx['transaction_id'] ?? 0);
-                        if ($txId <= 0) continue;
-                        if (isset($txBase[$txId])) continue;
-                        $txBase[$txId] = $tx;
-                    }
-                }
-                curl_multi_close($mh);
+            foreach ($batch as $tx) {
+                if (!is_array($tx)) continue;
+                $txId = (int)($tx['transaction_id'] ?? 0);
+                if ($txId <= 0) continue;
+                if (isset($seenTx[$txId])) continue;
+                $seenTx[$txId] = true;
+                $tableIdRow = (int)($tx['table_id'] ?? 0);
+                if ($tableIdRow <= 0) continue;
+                $hallIdRow = (int)($hallByTable[$tableIdRow] ?? 0);
+                if ($hallIdRow !== (int)BANYA_HALL_ID && $tableIdRow !== 141) continue;
+                $txBase[$txId] = $tx;
             }
-        }
+
+            if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
+        } while ($count > 0 && $nextTr !== null);
 
         $detailsById = [];
         if ($txBase) {
@@ -712,7 +624,7 @@ $firstOfMonth = date('Y-m-01');
             '<div style="font-weight:900; margin-bottom: 6px; color: rgba(182,89,48,0.95);">Фильтр столов</div>',
             entries.map(([id, label]) => {
                 const checked = isAll || selected.has(String(id)) ? 'checked' : '';
-                return `<label style="display:flex; align-items:center; justify-content: space-between; gap: 10px; padding: 5px 6px; border-radius: 10px; cursor: pointer; white-space: nowrap;"><span>${esc(label)}</span><input type="checkbox" class="tf-cb" data-id="${esc(id)}" ${checked} style="margin:0;"></label>`;
+                return `<label style="display:flex; align-items:center; gap: 10px; padding: 5px 6px; border-radius: 10px; cursor: pointer; white-space: nowrap; flex-wrap: nowrap;"><span style="flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;">${esc(label)}</span><input type="checkbox" class="tf-cb" data-id="${esc(id)}" ${checked} style="margin:0; flex: 0 0 auto;"></label>`;
             }).join(''),
             '<div style="margin-top: 8px; display:flex; gap: 8px; justify-content:flex-end;">' +
                 '<button type="button" class="secondary small" id="tfAllBtn">Все</button>' +
