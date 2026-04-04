@@ -241,6 +241,21 @@
       letter-spacing: 0.06em;
       text-transform: uppercase;
     }
+
+    .fountain {
+      position: absolute;
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55), rgba(255,255,255,0.10) 42%, transparent 56%),
+        radial-gradient(circle at 50% 55%, rgba(90,180,255,0.55), rgba(35,110,180,0.30) 55%, rgba(10,40,70,0.18) 100%),
+        rgba(35,110,180,0.18);
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: 0 16px 30px rgba(0,0,0,0.22), inset 0 2px 8px rgba(255,255,255,0.10);
+      pointer-events: none;
+      z-index: 1;
+    }
   
     .table {
       position: absolute;
@@ -403,8 +418,9 @@
   
             <button class="table wide" style="left: 286px; top: 142px;" data-table="8">8<span class="cap">2 чел</span></button>
             <button class="table wide" style="left: 408px; top: 142px;" data-table="9">9<span class="cap">2 чел</span></button>
-            <button class="table wide" style="left: 634px; top: 142px;" data-table="10">10<span class="cap">2 чел</span></button>
-            <button class="table wide" style="left: 756px; top: 142px;" data-table="11">11<span class="cap">2 чел</span></button>
+            <div class="fountain" style="left: 202px; top: 128px;" aria-hidden="true"></div>
+            <button class="table wide" style="left: 606px; top: 142px;" data-table="10">10<span class="cap">2 чел</span></button>
+            <button class="table wide" style="left: 728px; top: 142px;" data-table="11">11<span class="cap">2 чел</span></button>
   
             <button class="table" style="left: 344px; top: 242px;" data-table="12">12<span class="cap">до 3</span></button>
             <button class="table" style="left: 472px; top: 242px;" data-table="13">13<span class="cap">до 3</span></button>
