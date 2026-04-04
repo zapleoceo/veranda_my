@@ -135,10 +135,11 @@ if (($_GET['ajax'] ?? '') === 'load') {
         $spotIds = banya_load_spot_ids($api);
         if (!$spotIds) $spotIds = [1];
 
-        $hallByTable = [];
+        $allowedTables = [];
         foreach ($spotIds as $sid) {
             $rows = $api->request('spots.getTableHallTables', [
                 'spot_id' => (int)$sid,
+                'hall_id' => (int)BANYA_HALL_ID,
                 'without_deleted' => 0,
             ], 'GET');
             if (!is_array($rows)) $rows = [];
@@ -146,50 +147,50 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 if (!is_array($r)) continue;
                 $tid = (int)($r['table_id'] ?? 0);
                 if ($tid <= 0) continue;
-                $hid = (int)($r['hall_id'] ?? $r['table_hall_id'] ?? 0);
-                if ($hid <= 0) continue;
-                $hallByTable[$tid] = $hid;
+                $allowedTables[$tid] = true;
             }
         }
+        $allowedTables[141] = true;
 
         $txBase = [];
-        $nextTr = null;
-        $prevNextTr = null;
-        $guard = 0;
-        do {
-            $guard++;
-            if ($guard > 20000) break;
-            $params = [
-                'dateFrom' => str_replace('-', '', $dateFrom),
-                'dateTo' => str_replace('-', '', $dateTo),
-                'include_products' => 'true',
-                'status' => 2,
-            ];
-            if ($nextTr !== null) $params['next_tr'] = $nextTr;
-            $batch = $api->request('dash.getTransactions', $params, 'GET');
-            if (!is_array($batch)) $batch = [];
-            $count = count($batch);
-            if ($count > 0) {
-                $last = end($batch);
-                $prevNextTr = $nextTr;
-                $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
-            }
+        foreach (array_keys($allowedTables) as $tableId) {
+            $nextTr = null;
+            $prevNextTr = null;
+            $guard = 0;
+            do {
+                $guard++;
+                if ($guard > 20000) break;
+                $params = [
+                    'dateFrom' => str_replace('-', '', $dateFrom),
+                    'dateTo' => str_replace('-', '', $dateTo),
+                    'include_products' => 'true',
+                    'status' => 2,
+                    'table_id' => (int)$tableId,
+                ];
+                if ($nextTr !== null) $params['next_tr'] = $nextTr;
+                $batch = $api->request('dash.getTransactions', $params, 'GET');
+                if (!is_array($batch)) $batch = [];
+                $count = count($batch);
+                if ($count > 0) {
+                    $last = end($batch);
+                    $prevNextTr = $nextTr;
+                    $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
+                }
 
-            foreach ($batch as $tx) {
-                if (!is_array($tx)) continue;
-                $txId = (int)($tx['transaction_id'] ?? 0);
-                if ($txId <= 0) continue;
-                if (isset($seenTx[$txId])) continue;
-                $seenTx[$txId] = true;
-                $tableIdRow = (int)($tx['table_id'] ?? 0);
-                if ($tableIdRow <= 0) continue;
-                $hallIdRow = (int)($hallByTable[$tableIdRow] ?? 0);
-                if ($hallIdRow !== (int)BANYA_HALL_ID && $tableIdRow !== 141) continue;
-                $txBase[$txId] = $tx;
-            }
+                foreach ($batch as $tx) {
+                    if (!is_array($tx)) continue;
+                    $txId = (int)($tx['transaction_id'] ?? 0);
+                    if ($txId <= 0) continue;
+                    if (isset($seenTx[$txId])) continue;
+                    $seenTx[$txId] = true;
+                    $tableIdRow = (int)($tx['table_id'] ?? 0);
+                    if ($tableIdRow !== (int)$tableId) continue;
+                    $txBase[$txId] = $tx;
+                }
 
-            if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
-        } while ($count > 0 && $nextTr !== null);
+                if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
+            } while ($count > 0 && $nextTr !== null);
+        }
 
         foreach ($txBase as $txId => $tx) {
             $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
