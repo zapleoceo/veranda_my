@@ -332,9 +332,9 @@
         <div class="map-shell">
           <div class="map" aria-label="Схема столов ресторана">
             <div class="grass-area" aria-hidden="true"></div>
-            <button class="table small-vertical" style="left: 0px; top: 18px;" data-table="1">1</button>
-            <button class="table small-vertical" style="left: 0px; top: 124px;" data-table="2">2</button>
-            <button class="table small-vertical" style="left: 0px; top: 230px;" data-table="3">3</button>
+            <button class="table large" style="left: 0px; top: 24px;" data-table="1">1</button>
+            <button class="table large" style="left: 0px; top: 150px;" data-table="2">2</button>
+            <button class="table large" style="left: 0px; top: 276px;" data-table="3">3</button>
   
             <button class="table" style="left: 144px; top: 0px;" data-table="4">4</button>
             <button class="table" style="left: 252px; top: 0px;" data-table="5">5</button>
@@ -350,11 +350,11 @@
             <button class="table" style="left: 248px; top: 214px;" data-table="13">13</button>
             <button class="table" style="left: 472px; top: 214px;" data-table="14">14</button>
   
-            <button class="table small-vertical" style="left: 18px; top: 336px;" data-table="15">15</button>
-            <button class="table small-vertical" style="left: 120px; top: 336px;" data-table="16">16</button>
-            <button class="table small-vertical" style="left: 248px; top: 336px;" data-table="17">17</button>
-            <button class="table small-vertical" style="left: 472px; top: 336px;" data-table="18">18</button>
-            <button class="table small-vertical" style="left: 560px; top: 336px;" data-table="19">19</button>
+            <button class="table small-vertical" style="left: 158px; top: 336px;" data-table="15">15</button>
+            <button class="table small-vertical" style="left: 258px; top: 336px;" data-table="16">16</button>
+            <button class="table small-vertical" style="left: 358px; top: 336px;" data-table="17">17</button>
+            <button class="table small-vertical" style="left: 458px; top: 336px;" data-table="18">18</button>
+            <button class="table small-vertical" style="left: 558px; top: 336px;" data-table="19">19</button>
             <button class="table large" style="left: 646px; top: 314px;" data-table="20">20</button>
   
             <div class="bar">BAR</div>
