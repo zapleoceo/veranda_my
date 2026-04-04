@@ -259,8 +259,6 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       pointer-events: none;
       opacity: 0.98;
       filter: saturate(1.35) contrast(1.05);
-      transform: scale(var(--mx), var(--my));
-      transform-origin: center;
     }
     .grass-area::before,
     .grass-area::after {
@@ -622,9 +620,9 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
             <button class="table large" style="left: 758px; top: 258px;" data-table="20">20<span class="cap">до 15</span></button>
   
             <div class="bar-row" aria-hidden="true">
-              <div class="side-station">Касса</div>
-              <div class="bar">BAR</div>
               <div class="side-station">Музыканты</div>
+              <div class="bar">BAR</div>
+              <div class="side-station">Касса</div>
             </div>
           </div>
         </div>
