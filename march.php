@@ -247,11 +247,11 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         .muted { color:#6b7280; font-size: 12px; }
         .cal { display:grid; grid-template-columns: repeat(7, 1fr); gap: 8px; overflow-x: auto; min-width: 660px; }
         .cal .dow { font-size: 12px; color:#6b7280; text-align:center; }
-        .day { border: 1px solid #e5e7eb; border-radius: 12px; padding: 8px; background: #fff; cursor:pointer; min-height: 56px; display:flex; flex-direction: column; gap: 6px; min-width: 0; }
+        .day { border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px; background: #fff; cursor:pointer; min-height: 45px; display:flex; flex-direction: column; gap: 4px; min-width: 0; }
         .day.disabled { opacity: 0.35; cursor: default; }
         .day.active { outline: 2px solid #1a73e8; outline-offset: -2px; }
         .day .num { font-weight: 900; }
-        .day .mini { font-size: 12px; color:#374151; display:flex; align-items:center; gap: 4px; justify-content: flex-start; white-space: nowrap; }
+        .day .mini { font-size: 10px; color:#374151; display:flex; align-items:center; gap: 4px; justify-content: flex-start; white-space: nowrap; }
         .day .sep { color:#9ca3af; font-weight: 900; }
         .day .miss { color:#b91c1c; }
         .pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding: 4px 8px; border-radius: 999px; border:1px solid #e5e7eb; background:#fff; }
