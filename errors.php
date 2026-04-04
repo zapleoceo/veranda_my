@@ -124,6 +124,56 @@ $extractDeletedCounts = function (array $history, array $catByPid): array {
     return $del;
 };
 
+$fetchHistoriesBatch = function (string $posterToken, array $txIds, int $batchSize): array {
+    $out = [];
+    $ids = [];
+    foreach ($txIds as $id) {
+        $tid = (int)$id;
+        if ($tid > 0) $ids[] = $tid;
+    }
+    if (!$ids) return $out;
+    $batch = max(1, (int)$batchSize);
+    $apiBase = 'https://joinposter.com/api/dash.getTransactionHistory';
+    $chunks = array_chunk($ids, $batch);
+    foreach ($chunks as $chunk) {
+        $mh = curl_multi_init();
+        $handles = [];
+        foreach ($chunk as $tid) {
+            $url = $apiBase . '?token=' . urlencode($posterToken) . '&transaction_id=' . urlencode((string)$tid);
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 25);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_ENCODING, '');
+            $handles[(int)$tid] = $ch;
+            curl_multi_add_handle($mh, $ch);
+        }
+        do {
+            $status = curl_multi_exec($mh, $active);
+            if ($active) curl_multi_select($mh, 0.2);
+        } while ($active && $status == CURLM_OK);
+        foreach ($handles as $tid => $ch) {
+            $body = curl_multi_getcontent($ch);
+            curl_multi_remove_handle($mh, $ch);
+            curl_close($ch);
+            $data = is_string($body) && $body !== '' ? json_decode($body, true) : null;
+            if (!is_array($data)) {
+                $out[(int)$tid] = [];
+                continue;
+            }
+            if (isset($data['error']) || isset($data['error_code'])) {
+                $out[(int)$tid] = [];
+                continue;
+            }
+            $resp = $data['response'] ?? $data;
+            $out[(int)$tid] = is_array($resp) ? $resp : [];
+        }
+        curl_multi_close($mh);
+    }
+    return $out;
+};
+
 if (session_status() === PHP_SESSION_ACTIVE) {
     session_write_close();
 }
@@ -184,6 +234,7 @@ if (($_GET['ajax'] ?? '') === 'day') {
         $missing = 0;
         $hours = array_fill(0, 24, ['total' => 0, 'missing' => 0]);
 
+        $historyByTx = $fetchHistoriesBatch($posterToken, array_keys($txRowsById), 10);
         foreach ($txRowsById as $txId => $tx0) {
             $h = -1;
             if (is_array($tx0)) {
@@ -195,8 +246,7 @@ if (($_GET['ajax'] ?? '') === 'day') {
             }
             if ($h < 0 || $h > 23) $h = 0;
 
-            $history = $api->request('dash.getTransactionHistory', ['transaction_id' => (int)$txId], 'GET');
-            if (!is_array($history)) $history = [];
+            $history = $historyByTx[(int)$txId] ?? [];
 
             $sent = $extractSentCounts($history, $catByPid);
             $hours[$h]['total'] = (int)$hours[$h]['total'] + 1;
@@ -284,10 +334,10 @@ if (($_GET['ajax'] ?? '') === 'day_checks') {
             if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
         } while ($count > 0 && $nextTr !== null);
 
+        $historyByTx = $fetchHistoriesBatch($posterToken, array_keys($txRowsById), 10);
         $checks = [];
         foreach ($txRowsById as $txId => $tx) {
-            $history = $api->request('dash.getTransactionHistory', ['transaction_id' => (int)$txId], 'GET');
-            if (!is_array($history)) $history = [];
+            $history = $historyByTx[(int)$txId] ?? [];
 
             $sent = $extractSentCounts($history, $catByPid);
             $missing = false;
