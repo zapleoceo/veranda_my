@@ -143,6 +143,25 @@
       min-height: 620px;
       border-radius: var(--radius-md);
     }
+
+    .grass-area {
+      position: absolute;
+      left: -22px;
+      top: -28px;
+      width: 860px;
+      height: 240px;
+      border-radius: 44px;
+      background:
+        radial-gradient(circle at 18% 35%, rgba(79,123,75,0.28), transparent 58%),
+        radial-gradient(circle at 70% 40%, rgba(79,123,75,0.20), transparent 62%),
+        radial-gradient(circle at 46% 72%, rgba(200,154,99,0.12), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.08)),
+        rgba(79,123,75,0.10);
+      border: 1px solid rgba(255,255,255,0.10);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+      pointer-events: none;
+      opacity: 0.95;
+    }
   
     .bar {
       position: absolute;
@@ -281,32 +300,9 @@
     .btn-primary { background: var(--color-primary); color: #fffaf4; }
     .btn-secondary { background: transparent; color: var(--color-text); border: 1px solid var(--color-border); }
   
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-3);
-      margin-top: var(--space-3);
-    }
-  
-    .stat {
-      padding: var(--space-4);
-      border-radius: var(--radius-md);
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-    }
-  
-    .stat strong {
-      display: block;
-      font-family: var(--font-display);
-      font-size: 1.5rem;
-      margin-bottom: var(--space-1);
-    }
-  
-    .footer-note {
-      padding: 0 var(--space-6) var(--space-6);
-      color: var(--color-text-muted);
-      font-size: var(--text-sm);
-    }
+    .stats { display: none; }
+    .stat { display: none; }
+    .footer-note { display: none; }
   
     @media (max-width: 980px) {
       .layout { grid-template-columns: 1fr; }
@@ -326,10 +322,8 @@
       <div class="topbar">
         <div class="title-wrap">
           <h1>Схема бронирования</h1>
-          <p>Кликабельные столы ресторана 1-20. Исключены крест в центре, 30_ROOM, 40_ROOM, 21 и 22.</p>
         </div>
         <div class="controls">
-          <div class="legend">Свободный - коричневый • Выбранный - зелёный</div>
           <button class="theme-toggle" type="button" data-theme-toggle aria-label="Переключить тему">☀️</button>
         </div>
       </div>
@@ -337,13 +331,14 @@
       <section class="layout">
         <div class="map-shell">
           <div class="map" aria-label="Схема столов ресторана">
+            <div class="grass-area" aria-hidden="true"></div>
             <button class="table small-vertical" style="left: 0px; top: 18px;" data-table="1">1</button>
             <button class="table small-vertical" style="left: 0px; top: 124px;" data-table="2">2</button>
             <button class="table small-vertical" style="left: 0px; top: 230px;" data-table="3">3</button>
   
             <button class="table" style="left: 144px; top: 0px;" data-table="4">4</button>
-            <button class="table" style="left: 252px; top: -22px;" data-table="5">5</button>
-            <button class="table" style="left: 568px; top: -16px;" data-table="6">6</button>
+            <button class="table" style="left: 252px; top: 0px;" data-table="5">5</button>
+            <button class="table" style="left: 568px; top: 0px;" data-table="6">6</button>
             <button class="table" style="left: 700px; top: 0px;" data-table="7">7</button>
   
             <button class="table wide" style="left: 174px; top: 86px;" data-table="8">8</button>
@@ -380,24 +375,9 @@
             </div>
           </div>
   
-          <div class="card">
-            <h2>Что уже готово</h2>
-            <div class="stats">
-              <div class="stat"><strong>20</strong><span>столов для брони</span></div>
-              <div class="stat"><strong>HTML</strong><span>без сложной сборки</span></div>
-              <div class="stat"><strong>1 клик</strong><span>на выбор стола</span></div>
-              <div class="stat"><strong>Responsive</strong><span>работает и на телефоне</span></div>
-            </div>
-          </div>
   
-          <div class="card">
-            <h2>Как доработать</h2>
-            <p>Сюда легко добавить статусы занято/резерв/VIP, окно брони, сохранение в API или всплывающую карточку гостя. Каркас уже аккуратный, дальше можно развивать без костылей.</p>
-          </div>
         </aside>
       </section>
-  
-      <div class="footer-note">Если хочешь, следующим сообщением я могу сразу сделать вторую версию - с формой гостя, временем брони и статусами столов.</div>
     </main>
   </div>
   
