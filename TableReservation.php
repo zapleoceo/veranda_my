@@ -217,6 +217,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
         linear-gradient(90deg, var(--color-border) 1px, transparent 1px),
         var(--color-surface-2);
       background-size: 28px 28px;
+      background-position: 56px 56px, 56px 56px, 0 0;
       border-radius: calc(var(--radius-lg) - 8px);
       padding: var(--space-6);
       border: 1px solid var(--color-border);
