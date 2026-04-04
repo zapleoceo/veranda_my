@@ -171,6 +171,13 @@ if (($_GET['ajax'] ?? '') === 'load') {
             }
         }
 
+        if (!isset($tablesSeen[141])) {
+            $tablesSeen[141] = true;
+            $tablesToQuery[] = [
+                'table_id' => 141,
+            ];
+        }
+
         $txBase = [];
         if ($tablesToQuery) {
             $states = [];
