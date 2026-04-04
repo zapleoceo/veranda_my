@@ -2719,6 +2719,15 @@ $fmtVnd = function (int $v): string {
         .slider:before { position:absolute; content:""; height: 22px; width: 22px; left: 3px; bottom: 3px; background: #fff; transition: 180ms; border-radius: 999px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
         .switch input:checked + .slider { background:#1a73e8; }
         .switch input:checked + .slider:before { transform: translateX(24px); }
+        .confirm-backdrop { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.55); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
+        .confirm-modal { width: 100%; max-width: 520px; background: #fff; border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 18px 45px rgba(0,0,0,0.22); padding: 14px; }
+        .confirm-modal h3 { margin: 0 0 10px; font-size: 16px; color: #111827; }
+        .confirm-modal .body { color: #111827; font-weight: 700; line-height: 1.35; }
+        .confirm-modal .sub { margin-top: 10px; color: #6b7280; font-weight: 800; font-size: 12px; }
+        .confirm-modal .actions { display:flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+        .confirm-modal .btn2 { padding: 10px 14px; border-radius: 10px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; }
+        .confirm-modal .btn2.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
+        .confirm-modal .btn2:disabled { opacity: 0.6; cursor: default; }
         .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .grid { display:grid; grid-template-columns: 1fr 104px 1fr; gap: 12px; align-items:start; }
         
@@ -2930,6 +2939,22 @@ $fmtVnd = function (int $v): string {
         </div>
 
         <div class="grid" id="tablesRoot">
+            <div class="confirm-backdrop" id="financeConfirm">
+                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="financeConfirmTitle">
+                    <h3 id="financeConfirmTitle">Подтверждение</h3>
+                    <div class="body" id="financeConfirmText"></div>
+                    <div class="sub">
+                        <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
+                            <input type="checkbox" id="financeConfirmChecked">
+                            проверил
+                        </label>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn2" id="financeConfirmCancel">Отмена</button>
+                        <button type="button" class="btn2 primary" id="financeConfirmOk" disabled>OK</button>
+                    </div>
+                </div>
+            </div>
             <div id="lineLayer"></div>
             <div class="card" style="padding: 0;">
                 <div style="padding: 12px 12px 6px;">
@@ -3148,7 +3173,16 @@ $fmtVnd = function (int $v): string {
                     <div style="font-weight:900;">Vietnam Company — Card payments</div>
                     <div class="muted"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
                 </div>
-                <form method="POST" class="finance-transfer" data-kind="vietnam" data-date-from="<?= htmlspecialchars($dateFrom) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
+                <form method="POST" class="finance-transfer"
+                      data-kind="vietnam"
+                      data-date-from="<?= htmlspecialchars($dateFrom) ?>"
+                      data-date-to="<?= htmlspecialchars($dateTo) ?>"
+                      data-account-from-id="1"
+                      data-account-to-id="9"
+                      data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
+                      data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[9]['name'] ?? '#9')) ?>"
+                      data-sum-vnd="<?= htmlspecialchars((string)($vietnamVnd !== null ? (int)$vietnamVnd : 0)) ?>"
+                      style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="vietnam">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
@@ -3183,7 +3217,16 @@ $fmtVnd = function (int $v): string {
                     <div style="font-weight:900;">Card tips per shift</div>
                     <div class="muted"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
                 </div>
-                <form method="POST" class="finance-transfer" data-kind="tips" data-date-from="<?= htmlspecialchars($dateFrom) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
+                <form method="POST" class="finance-transfer"
+                      data-kind="tips"
+                      data-date-from="<?= htmlspecialchars($dateFrom) ?>"
+                      data-date-to="<?= htmlspecialchars($dateTo) ?>"
+                      data-account-from-id="1"
+                      data-account-to-id="8"
+                      data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
+                      data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[8]['name'] ?? '#8')) ?>"
+                      data-sum-vnd="<?= htmlspecialchars((string)($tipsVnd !== null ? (int)$tipsVnd : 0)) ?>"
+                      style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="tips">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
@@ -3303,6 +3346,7 @@ $fmtVnd = function (int $v): string {
 </div>
 
 <script>
+window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 (() => {
     let links = <?= json_encode(array_values(array_map(function ($l) {
         return [
@@ -4944,37 +4988,89 @@ $fmtVnd = function (int $v): string {
             const dateFrom = String(form.getAttribute('data-date-from') || '');
             const dateTo = String(form.getAttribute('data-date-to') || '');
             if (!kind || !dateFrom || !dateTo) return;
-            if (btn) {
-                btn.classList.add('loading');
-                btn.disabled = true;
-            }
-            fetch('?ajax=create_transfer', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ kind, dateFrom, dateTo }),
-            })
-            .then((r) => r.json())
-            .then((j) => {
-                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                const who = String(j.user || '').trim();
-                const whoPart = who ? ` - ${who}` : '';
-                const line = `${j.date || ''} - ${j.time || ''} - ${Number(j.sum || 0).toLocaleString('en-US')} ₫${whoPart} - ${j.comment || ''}`.trim();
-                if (statusEl) {
-                    const label = j.already ? 'Найдена транзакция:' : 'Транзакция создана:';
-                    statusEl.innerHTML = `<span style="color:#16a34a; font-weight:900;">${label}</span> <span>${line}</span>`;
-                }
+            const creatorEmail = String(window.__USER_EMAIL__ || '').trim();
+            const commentBase = (kind === 'vietnam') ? 'Перевод чеков вьетнаской компании' : 'Перевод типсов';
+            const comment = creatorEmail ? (commentBase + ' by ' + creatorEmail) : commentBase;
+            const accFromName = String(form.getAttribute('data-account-from-name') || '#1');
+            const accToName = String(form.getAttribute('data-account-to-name') || (kind === 'vietnam' ? '#9' : '#8'));
+            const sumVnd = Number(form.getAttribute('data-sum-vnd') || 0);
+            const sumTxt = sumVnd ? (Number(sumVnd).toLocaleString('en-US') + ' ₫') : '—';
+
+            const openConfirm = () => new Promise((resolve) => {
+                const backdrop = document.getElementById('financeConfirm');
+                const text = document.getElementById('financeConfirmText');
+                const cb = document.getElementById('financeConfirmChecked');
+                const ok = document.getElementById('financeConfirmOk');
+                const cancel = document.getElementById('financeConfirmCancel');
+                if (!backdrop || !text || !cb || !ok || !cancel) return resolve(false);
+                text.innerHTML =
+                    `Будет создан перевод в Poster.<br>` +
+                    `Счет списания: <b>${esc(accFromName)}</b><br>` +
+                    `Счет зачисления: <b>${esc(accToName)}</b><br>` +
+                    `Сумма: <b>${esc(sumTxt)}</b><br>` +
+                    `Комментарий: <b>${esc(comment)}</b><br>` +
+                    `Создатель: <b>${esc(creatorEmail || '—')}</b>`;
+                cb.checked = false;
+                ok.disabled = true;
+                backdrop.style.display = 'flex';
+
+                const close = (v) => {
+                    backdrop.style.display = 'none';
+                    cancel.removeEventListener('click', onCancel);
+                    ok.removeEventListener('click', onOk);
+                    cb.removeEventListener('change', onCb);
+                    backdrop.removeEventListener('click', onBg);
+                    document.removeEventListener('keydown', onEsc, true);
+                    resolve(v);
+                };
+                const onCb = () => { ok.disabled = !cb.checked; };
+                const onCancel = () => close(false);
+                const onOk = () => close(true);
+                const onBg = (ev) => { if (ev.target === backdrop) close(false); };
+                const onEsc = (ev) => { if (ev.key === 'Escape' && backdrop.style.display === 'flex') close(false); };
+
+                cb.addEventListener('change', onCb);
+                cancel.addEventListener('click', onCancel);
+                ok.addEventListener('click', onOk);
+                backdrop.addEventListener('click', onBg);
+                document.addEventListener('keydown', onEsc, true);
+                cancel.focus();
+            });
+
+            openConfirm().then((confirmed) => {
+                if (!confirmed) return;
                 if (btn) {
-                    btn.classList.remove('loading');
+                    btn.classList.add('loading');
                     btn.disabled = true;
                 }
-            })
-            .catch((err) => {
-                const msg = err && err.message ? err.message : 'Ошибка';
-                if (statusEl) statusEl.textContent = msg;
-                if (btn) {
-                    btn.classList.remove('loading');
-                    btn.disabled = false;
-                }
+                fetch('?ajax=create_transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ kind, dateFrom, dateTo }),
+                })
+                .then((r) => r.json())
+                .then((j) => {
+                    if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                    const who = String(j.user || '').trim();
+                    const whoPart = who ? ` - ${who}` : '';
+                    const line = `${j.date || ''} - ${j.time || ''} - ${Number(j.sum || 0).toLocaleString('en-US')} ₫${whoPart} - ${j.comment || ''}`.trim();
+                    if (statusEl) {
+                        const label = j.already ? 'Найдена транзакция:' : 'Транзакция создана:';
+                        statusEl.innerHTML = `<span style="color:#16a34a; font-weight:900;">${label}</span> <span>${line}</span>`;
+                    }
+                    if (btn) {
+                        btn.classList.remove('loading');
+                        btn.disabled = true;
+                    }
+                })
+                .catch((err) => {
+                    const msg = err && err.message ? err.message : 'Ошибка';
+                    if (statusEl) statusEl.textContent = msg;
+                    if (btn) {
+                        btn.classList.remove('loading');
+                        btn.disabled = false;
+                    }
+                });
             });
         });
     });
