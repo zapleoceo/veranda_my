@@ -340,6 +340,132 @@ if (($_GET['ajax'] ?? '') === 'tables_map') {
   exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'busy_ranges') {
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+
+  if ($posterToken === '') {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
+  $date = trim((string)($_GET['date'] ?? ''));
+  if ($spotId <= 0) $spotId = 1;
+  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $allowed = $allowedSchemeNums;
+  $allowedNums = [];
+  if (is_array($allowed) && count($allowed) > 0) {
+    foreach ($allowed as $v) {
+      $n = (int)$v;
+      if ($n >= 1 && $n <= 500) $allowedNums[(string)$n] = true;
+    }
+  } else {
+    for ($i = 1; $i <= 20; $i++) $allowedNums[(string)$i] = true;
+  }
+
+  $allowedList = array_values(array_keys($allowedNums));
+  usort($allowedList, fn($a, $b) => (int)$a <=> (int)$b);
+
+  $api = new \App\Classes\PosterAPI($posterToken);
+  $step = 1800;
+  $duration = 1800;
+  $guests = 1;
+
+  $startMin = 9 * 60;
+  $endMin = 23 * 60;
+  $slots = [];
+  for ($m = $startMin; $m < $endMin; $m += 30) {
+    $hh = str_pad((string)floor($m / 60), 2, '0', STR_PAD_LEFT);
+    $mm = str_pad((string)($m % 60), 2, '0', STR_PAD_LEFT);
+    $slots[] = $date . ' ' . $hh . ':' . $mm . ':00';
+  }
+
+  $busyByNum = [];
+  $slotStarts = [];
+  $errors = [];
+  foreach ($allowedList as $n) $busyByNum[$n] = [];
+
+  foreach ($slots as $idx => $slotStart) {
+    try {
+      $resp = $api->request('incomingOrders.getTablesForReservation', [
+        'date_reservation' => $slotStart,
+        'duration' => $duration,
+        'spot_id' => $spotId,
+        'guests_count' => $guests,
+      ], 'GET');
+
+      $free = is_array($resp) && isset($resp['freeTables']) && is_array($resp['freeTables']) ? $resp['freeTables'] : [];
+      $freeSet = [];
+      foreach ($free as $row) {
+        if (!is_array($row)) continue;
+        if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
+        $num = trim((string)($row['table_num'] ?? ''));
+        if ($num === '') continue;
+        $freeSet[$num] = true;
+      }
+
+      $slotStarts[$idx] = $slotStart;
+      foreach ($allowedList as $n) {
+        if (!isset($freeSet[$n])) $busyByNum[$n][] = $idx;
+      }
+    } catch (\Throwable $e) {
+      $errors[] = ['slot' => $slotStart, 'error' => $e->getMessage()];
+    }
+  }
+
+  $ranges = [];
+  foreach ($allowedList as $n) {
+    $ids = $busyByNum[$n];
+    sort($ids);
+    $out = [];
+    $runStart = null;
+    $prev = null;
+    foreach ($ids as $i) {
+      if ($runStart === null) { $runStart = $i; $prev = $i; continue; }
+      if ($i === $prev + 1) { $prev = $i; continue; }
+      $out[] = [$runStart, $prev];
+      $runStart = $i;
+      $prev = $i;
+    }
+    if ($runStart !== null) $out[] = [$runStart, $prev];
+
+    $txt = [];
+    foreach ($out as [$a, $b]) {
+      if (!isset($slotStarts[$a]) || !isset($slotStarts[$b])) continue;
+      $aTs = strtotime($slotStarts[$a]);
+      $bTs = strtotime($slotStarts[$b]);
+      if ($aTs === false || $bTs === false) continue;
+      $startStr = date('H:i', $aTs);
+      $endStr = date('H:i', $bTs + $step);
+      $txt[] = $startStr . '-' . $endStr;
+    }
+    $ranges[$n] = $txt;
+  }
+
+  echo json_encode([
+    'ok' => true,
+    'request' => [
+      'date' => $date,
+      'spot_id' => $spotId,
+      'hall_id' => $hallId,
+      'duration' => $duration,
+      'guests_count' => $guests,
+    ],
+    'ranges_by_table_num' => $ranges,
+    'errors' => $errors,
+  ], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
 ?><!doctype html>
 <html lang="ru" data-theme="dark">
 <head>
@@ -730,6 +856,23 @@ if (($_GET['ajax'] ?? '') === 'tables_map') {
       pointer-events: none;
       text-shadow: 0 1px 0 rgba(0,0,0,0.22);
     }
+    .table .res-time {
+      position: absolute;
+      top: 26px;
+      left: 10px;
+      right: 10px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: rgba(255,250,244,0.78);
+      font-family: var(--font-body);
+      pointer-events: none;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.22);
+      line-height: 1.15;
+      text-align: left;
+      max-height: 2.4em;
+      overflow: hidden;
+    }
 
     .table.disabled {
       opacity: 0.22;
@@ -1033,6 +1176,26 @@ if (($_GET['ajax'] ?? '') === 'tables_map') {
       });
     };
 
+    const applyBusyRanges = (rangesByNum) => {
+      const map = (rangesByNum && typeof rangesByNum === 'object') ? rangesByNum : {};
+      tables.forEach((t) => {
+        const n = String(t.dataset.table || '');
+        const ranges = Array.isArray(map[n]) ? map[n].slice(0, 2) : [];
+        const txt = ranges.length ? ranges.join('\n') : '';
+        let el = t.querySelector('.res-time');
+        if (!txt) {
+          if (el) el.remove();
+          return;
+        }
+        if (!el) {
+          el = document.createElement('div');
+          el.className = 'res-time';
+          t.insertBefore(el, t.firstChild);
+        }
+        el.textContent = txt;
+      });
+    };
+
     (() => {
       const url = new URL(location.href);
       url.searchParams.set('ajax', 'tables_map');
@@ -1042,6 +1205,18 @@ if (($_GET['ajax'] ?? '') === 'tables_map') {
         .then((j) => { if (j && j.ok) applyTableIds(j.map); })
         .catch(() => null);
     })();
+
+    const loadBusyForDate = (dateStr) => {
+      if (!dateStr) return;
+      const url = new URL(location.href);
+      url.searchParams.set('ajax', 'busy_ranges');
+      url.searchParams.set('spot_id', '1');
+      url.searchParams.set('date', dateStr);
+      fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
+        .then((r) => r.json().catch(() => null))
+        .then((j) => { if (j && j.ok) applyBusyRanges(j.ranges_by_table_num); })
+        .catch(() => null);
+    };
     const resDate = document.getElementById('resDate');
     const resGuests = document.getElementById('resGuests');
     const checkBtn = document.getElementById('checkBtn');
@@ -1185,7 +1360,20 @@ if (($_GET['ajax'] ?? '') === 'tables_map') {
 
     const initDate = () => {
       if (!resDate) return;
-      resDate.value = '';
+      const d = new Date();
+      const rounded = new Date(d.getTime());
+      rounded.setSeconds(0, 0);
+      const m = rounded.getMinutes();
+      const next = Math.ceil(m / 15) * 15;
+      if (next === 60) {
+        rounded.setHours(rounded.getHours() + 1);
+        rounded.setMinutes(0);
+      } else {
+        rounded.setMinutes(next);
+      }
+      rounded.setMinutes(rounded.getMinutes() - rounded.getTimezoneOffset());
+      resDate.value = rounded.toISOString().slice(0, 16);
+      loadBusyForDate(String(resDate.value).slice(0, 10));
     };
 
     const syncSteps = () => {
@@ -1273,8 +1461,8 @@ if (($_GET['ajax'] ?? '') === 'tables_map') {
     initDate();
     syncSteps();
     if (resDate) {
-      resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); });
-      resDate.addEventListener('change', () => { syncSteps(); invalidateLast(); });
+      resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); loadBusyForDate(String(resDate.value || '').slice(0, 10)); });
+      resDate.addEventListener('change', () => { syncSteps(); invalidateLast(); loadBusyForDate(String(resDate.value || '').slice(0, 10)); });
     }
     if (resGuests) {
       resGuests.addEventListener('input', invalidateLast);
