@@ -282,6 +282,64 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'tables_map') {
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+
+  if ($posterToken === '') {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
+  if ($spotId <= 0) $spotId = 1;
+  $allowed = $allowedSchemeNums;
+  $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
+
+  $api = new \App\Classes\PosterAPI($posterToken);
+  try {
+    $tablesResp = $api->request('spots.getTableHallTables', [
+      'spot_id' => $spotId,
+      'hall_id' => $hallId,
+      'without_deleted' => 1,
+    ], 'GET');
+
+    $rows = is_array($tablesResp) ? $tablesResp : [];
+    $map = [];
+    foreach ($rows as $r) {
+      if (!is_array($r)) continue;
+      $tableId = trim((string)($r['table_id'] ?? ''));
+      if ($tableId === '') continue;
+      $num = trim((string)($r['table_num'] ?? ''));
+      $title = trim((string)($r['table_title'] ?? ''));
+      $scheme = '';
+      if (preg_match('/^\d+$/', $title)) $scheme = $title;
+      elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
+      if ($scheme === '') continue;
+      $sInt = (int)$scheme;
+      if ($sInt < 1 || $sInt > 20) continue;
+      if (is_array($allowedSet) && !isset($allowedSet[(string)$sInt])) continue;
+      $map[(string)$sInt] = $tableId;
+    }
+
+    echo json_encode([
+      'ok' => true,
+      'request' => [
+        'spot_id' => $spotId,
+        'hall_id' => $hallId,
+      ],
+      'map' => $map,
+    ], JSON_UNESCAPED_UNICODE);
+  } catch (\Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+  }
+  exit;
+}
+
 ?><!doctype html>
 <html lang="ru" data-theme="dark">
 <head>
@@ -660,6 +718,19 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       box-shadow: 0 18px 34px rgba(43, 89, 50, .28);
     }
   
+    .table .tid {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: rgba(255,250,244,0.82);
+      font-family: var(--font-body);
+      pointer-events: none;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.22);
+    }
+
     .table.disabled {
       opacity: 0.22;
       filter: grayscale(0.35);
@@ -947,6 +1018,30 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         }
       });
     }
+
+    const applyTableIds = (map) => {
+      if (!map || typeof map !== 'object') return;
+      tables.forEach((t) => {
+        const n = String(t.dataset.table || '');
+        const id = map[n];
+        if (!id) return;
+        if (t.querySelector('.tid')) return;
+        const el = document.createElement('div');
+        el.className = 'tid';
+        el.textContent = String(id);
+        t.prepend(el);
+      });
+    };
+
+    (() => {
+      const url = new URL(location.href);
+      url.searchParams.set('ajax', 'tables_map');
+      url.searchParams.set('spot_id', '1');
+      fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
+        .then((r) => r.json().catch(() => null))
+        .then((j) => { if (j && j.ok) applyTableIds(j.map); })
+        .catch(() => null);
+    })();
     const resDate = document.getElementById('resDate');
     const resGuests = document.getElementById('resGuests');
     const checkBtn = document.getElementById('checkBtn');
