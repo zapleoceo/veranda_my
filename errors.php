@@ -765,7 +765,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         setOverlay(true);
         setProgress(0, 'Подготовка…');
         let done = 0;
-        const concurrency = 4;
+        const concurrency = Math.min(12, Math.max(6, dateList.length));
         const queue = dateList.slice();
 
         const worker = async () => {
