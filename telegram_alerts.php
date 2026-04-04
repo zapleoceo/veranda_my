@@ -106,8 +106,12 @@ try {
     try {
         $webhookInfo = $bot->getWebhookInfo();
         $currentUrl = is_array($webhookInfo) ? (string)($webhookInfo['url'] ?? '') : '';
+        $allowed = is_array($webhookInfo) && isset($webhookInfo['allowed_updates']) && is_array($webhookInfo['allowed_updates'])
+            ? array_map('strval', $webhookInfo['allowed_updates'])
+            : [];
+        $needMessage = !in_array('message', $allowed, true);
         $targetUrl = 'https://veranda.my/telegram_webhook.php';
-        if ($currentUrl !== $targetUrl) {
+        if ($currentUrl !== $targetUrl || $needMessage) {
             $bot->setWebhook($targetUrl);
         }
     } catch (\Throwable $e) {

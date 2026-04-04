@@ -204,7 +204,7 @@ class TelegramBot {
         $url = "https://api.telegram.org/bot{$this->token}/setWebhook";
         $params = [
             'url' => $webhookUrl,
-            'allowed_updates' => json_encode(['callback_query'], JSON_UNESCAPED_UNICODE),
+            'allowed_updates' => json_encode(['message', 'callback_query'], JSON_UNESCAPED_UNICODE),
         ];
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);

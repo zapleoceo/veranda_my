@@ -25,6 +25,69 @@ $tgTokenMissing = empty($tgToken);
 $raw = file_get_contents('php://input');
 $update = json_decode($raw, true);
 
+if ($tgTokenMissing) {
+    error_log('telegram_webhook: TELEGRAM_BOT_TOKEN is not set');
+    echo 'ok';
+    exit;
+}
+
+$apiBase = "https://api.telegram.org/bot{$tgToken}";
+$postJson = function (string $method, array $payload) use ($apiBase): ?array {
+    $ch = curl_init("{$apiBase}/{$method}");
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    $resp = curl_exec($ch);
+    curl_close($ch);
+    if ($resp === false || $resp === null || $resp === '') return null;
+    $data = json_decode($resp, true);
+    return is_array($data) ? $data : null;
+};
+
+if (!empty($update['message'])) {
+    $msg = $update['message'];
+    $chat = is_array($msg['chat'] ?? null) ? $msg['chat'] : [];
+    $chatId = isset($chat['id']) ? (string)$chat['id'] : '';
+    $chatType = (string)($chat['type'] ?? '');
+    $text = trim((string)($msg['text'] ?? ''));
+    $cmd = strtolower(preg_replace('/\s+.*/', '', $text));
+    if ($cmd === '/start' || $cmd === '/menu') {
+        if ($chatId !== '') {
+            if ($chatType !== 'private') {
+                $postJson('sendMessage', [
+                    'chat_id' => $chatId,
+                    'text' => 'Напиши мне в личку: @VerandamyBot',
+                ]);
+            } else {
+                $postJson('sendMessage', [
+                    'chat_id' => $chatId,
+                    'text' => "Выбери действие:",
+                    'reply_markup' => [
+                        'inline_keyboard' => [
+                            [
+                                [
+                                    'text' => 'Посмотреть меню',
+                                    'web_app' => ['url' => 'https://veranda.my/links/menu-beta.php'],
+                                ],
+                            ],
+                            [
+                                [
+                                    'text' => 'Как добраться',
+                                    'url' => 'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9',
+                                ],
+                            ],
+                        ],
+                    ],
+                ]);
+            }
+        }
+    }
+    echo 'ok';
+    exit;
+}
+
 if (empty($update['callback_query'])) {
     echo 'ok';
     exit;
@@ -36,12 +99,6 @@ $data = $callback['data'] ?? '';
 $message = $callback['message'] ?? [];
 $messageId = isset($message['message_id']) ? (int)$message['message_id'] : 0;
 $chatId = isset($message['chat']['id']) ? (string)$message['chat']['id'] : '';
-
-if ($tgTokenMissing) {
-    error_log('telegram_webhook: TELEGRAM_BOT_TOKEN is not set');
-    echo 'ok';
-    exit;
-}
 
 if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx):(\d+)$/', $data, $m)) {
     echo 'ok';
@@ -80,17 +137,6 @@ try {
     }
     if (!$isAllowed) {
         if ($callbackId !== '') {
-            $apiBase = "https://api.telegram.org/bot{$tgToken}";
-            $postJson = function (string $method, array $payload) use ($apiBase): void {
-                $ch = curl_init("{$apiBase}/{$method}");
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                curl_exec($ch);
-                curl_close($ch);
-            };
             $postJson('answerCallbackQuery', [
                 'callback_query_id' => $callbackId,
                 'text' => 'Эта кнопка только для уважаемых людей',
@@ -130,17 +176,6 @@ try {
                        AND transaction_id = ?",
                     [$txDate, $txId]
                 )->fetchAll();
-                $apiBase = "https://api.telegram.org/bot{$tgToken}";
-                $postJson = function (string $method, array $payload) use ($apiBase): void {
-                    $ch = curl_init("{$apiBase}/{$method}");
-                    curl_setopt($ch, CURLOPT_POST, true);
-                    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                    curl_exec($ch);
-                    curl_close($ch);
-                };
                 foreach ($rows as $r) {
                     $mid = (int)($r['message_id'] ?? 0);
                     if ($mid > 0 && $chatId !== '') {
@@ -175,15 +210,7 @@ try {
             )->fetch();
             $mid = (int)($row['message_id'] ?? 0);
             if ($mid > 0 && $chatId !== '') {
-                $apiBase = "https://api.telegram.org/bot{$tgToken}";
-                $ch = curl_init("{$apiBase}/deleteMessage");
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['chat_id' => $chatId, 'message_id' => $mid], JSON_UNESCAPED_UNICODE));
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                curl_exec($ch);
-                curl_close($ch);
+                $postJson('deleteMessage', ['chat_id' => $chatId, 'message_id' => $mid]);
             }
             $db->query("DELETE FROM {$itemsTable} WHERE kitchen_stats_id = ? AND transaction_date = ?", [$itemId, (string)($row['transaction_date'] ?? $dRow['transaction_date'] ?? date('Y-m-d'))]);
         } catch (\Throwable $eDel) {
@@ -248,19 +275,6 @@ try {
     }
 } catch (\Exception $e) {
 }
-
-$apiBase = "https://api.telegram.org/bot{$tgToken}";
-
-$postJson = function (string $method, array $payload) use ($apiBase): void {
-    $ch = curl_init("{$apiBase}/{$method}");
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_exec($ch);
-    curl_close($ch);
-};
 
 if ($callbackId !== '') {
     $postJson('answerCallbackQuery', [
