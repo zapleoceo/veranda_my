@@ -139,11 +139,12 @@ if (($_GET['ajax'] ?? '') === 'load') {
             $rows = banya_load_tables_for_hall($api, (int)$sid, BANYA_HALL_ID);
             foreach ($rows as $r) $hallTables[] = ['spot_id' => (int)$sid] + $r;
         }
+        $hallTables[] = ['spot_id' => 0, 'table_id' => 141, 'table_title' => '141', 'table_num' => '141'];
 
         foreach ($hallTables as $t) {
             $spotId = (int)($t['spot_id'] ?? 0);
             $tableId = (int)($t['table_id'] ?? 0);
-            if ($spotId <= 0 || $tableId <= 0) continue;
+            if ($tableId <= 0) continue;
 
             $batch = $api->request('dash.getTransactions', [
                 'dateFrom' => str_replace('-', '', $dateFrom),
@@ -184,7 +185,9 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 if ($dateStr === '') $dateStr = '';
 
                 $receipt = (string)($tx['receipt_number'] ?? $tx['transaction_id'] ?? '');
-                $tableName = (string)($tx['table_name'] ?? $t['table_title'] ?? $t['table_num'] ?? $tx['table_id'] ?? '');
+                $spotIdRow = (int)($tx['spot_id'] ?? $spotId);
+                $tableIdRow = (int)($tx['table_id'] ?? $tableId);
+                $tableName = (string)($tx['table_name'] ?? $t['table_title'] ?? $t['table_num'] ?? $tableIdRow);
                 $waiter = (string)($tx['name'] ?? $tx['employee_name'] ?? '');
 
                 if ($sumMinor <= 0) {
@@ -193,8 +196,8 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 $items[] = [
                     'date' => $dateStr,
                     'hall' => (string)BANYA_HALL_ID,
-                    'spot_id' => $spotId,
-                    'table_id' => $tableId,
+                    'spot_id' => $spotIdRow,
+                    'table_id' => $tableIdRow,
                     'table' => $tableName,
                     'receipt' => $receipt,
                     'sum' => $fmtVnd($sumMinor),
