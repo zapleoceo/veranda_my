@@ -224,10 +224,18 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     }
   
     .map {
+      --mx: 1;
+      --my: 1;
       position: relative;
       min-width: 820px;
       min-height: 620px;
       border-radius: var(--radius-md);
+    }
+    .map.is-mirrored {
+      --mx: -1;
+      --my: -1;
+      transform: scale(var(--mx), var(--my));
+      transform-origin: center;
     }
 
     .grass-area {
@@ -251,6 +259,8 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       pointer-events: none;
       opacity: 0.98;
       filter: saturate(1.35) contrast(1.05);
+      transform: scale(var(--mx), var(--my));
+      transform-origin: center;
     }
     .grass-area::before,
     .grass-area::after {
@@ -291,7 +301,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       position: absolute;
       left: 50%;
       bottom: 28px;
-      transform: translateX(-50%);
+      transform: translateX(-50%) scale(var(--mx), var(--my));
       display: flex;
       align-items: center;
       gap: 56px;
@@ -341,6 +351,8 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       box-shadow: 0 16px 30px rgba(0,0,0,0.22), inset 0 2px 8px rgba(255,255,255,0.10);
       pointer-events: none;
       z-index: 1;
+      transform: scale(var(--mx), var(--my));
+      transform-origin: center;
     }
     .fountain svg {
       position: absolute;
@@ -370,6 +382,8 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       cursor: pointer;
       transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
       user-select: none;
+      transform: scale(var(--mx), var(--my));
+      transform-origin: center;
     }
   
     .table::after {
@@ -384,7 +398,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     }
   
     .table:hover, .table:focus-visible {
-      transform: translateY(-3px) scale(1.02);
+      transform: translateY(-3px) scale(1.02) scale(var(--mx), var(--my));
       box-shadow: 0 18px 34px rgba(84, 49, 20, .3);
       filter: saturate(1.05);
       outline: none;
@@ -558,7 +572,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   
       <section class="layout">
         <div class="map-shell">
-          <div class="map" aria-label="Схема столов ресторана">
+          <div class="map is-mirrored" aria-label="Схема столов ресторана">
             <div class="grass-area" aria-hidden="true"></div>
             <button class="table large" style="left: 0px; top: 24px;" data-table="1">1<span class="cap">до 8</span></button>
             <button class="table large" style="left: 0px; top: 150px;" data-table="2">2<span class="cap">до 8</span></button>
