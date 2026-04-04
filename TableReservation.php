@@ -84,6 +84,106 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'reservations') {
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+
+  if ($posterToken === '') {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $dateReservation = trim((string)($_GET['date_reservation'] ?? ''));
+  $duration = (int)($_GET['duration'] ?? 0);
+  $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
+
+  $ts = strtotime($dateReservation);
+  if ($ts === false || $dateReservation === '') {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if ($duration < 1800) $duration = 7200;
+  if ($spotId <= 0) $spotId = 1;
+
+  $dateFrom = date('Y-m-d H:i:s', $ts - 21600);
+  $dateTo = date('Y-m-d H:i:s', $ts + $duration + 21600);
+
+  $api = new \App\Classes\PosterAPI($posterToken);
+  try {
+    $resp = $api->request('incomingOrders.getReservations', [
+      'date_from' => $dateFrom,
+      'date_to' => $dateTo,
+    ], 'GET');
+
+    $rows = is_array($resp) ? $resp : [];
+    $filtered = [];
+    $occupied = [];
+
+    $extractNums = function ($value) {
+      $out = [];
+      if (is_int($value) || is_float($value)) {
+        $s = (string)$value;
+        if ($s !== '') $out[] = $s;
+        return $out;
+      }
+      if (is_string($value)) {
+        if (preg_match_all('/\b\d+\b/u', $value, $m)) {
+          foreach ($m[0] as $n) $out[] = (string)$n;
+        }
+        return $out;
+      }
+      if (is_array($value)) {
+        foreach ($value as $v) {
+          foreach ($extractNums($v) as $n) $out[] = $n;
+        }
+        return $out;
+      }
+      return $out;
+    };
+
+    foreach ($rows as $row) {
+      if (!is_array($row)) continue;
+      $status = (int)($row['status'] ?? 0);
+      if ($status === 7) continue;
+
+      $rowHall = isset($row['hall_id']) ? (int)$row['hall_id'] : null;
+      if ($rowHall !== null && $rowHall !== $hallId) continue;
+
+      $filtered[] = $row;
+
+      $candidates = [];
+      foreach (['table_num', 'table', 'tables', 'tables_num', 'table_nums', 'table_id', 'table_ids'] as $k) {
+        if (!array_key_exists($k, $row)) continue;
+        foreach ($extractNums($row[$k]) as $n) $candidates[] = $n;
+      }
+      foreach ($candidates as $n) {
+        $occupied[(string)$n] = true;
+      }
+    }
+
+    echo json_encode([
+      'ok' => true,
+      'request' => [
+        'date_from' => $dateFrom,
+        'date_to' => $dateTo,
+        'spot_id' => $spotId,
+        'hall_id' => $hallId,
+      ],
+      'occupied_table_nums' => array_values(array_keys($occupied)),
+      'reservations' => $filtered,
+      'raw' => $resp,
+    ], JSON_UNESCAPED_UNICODE);
+  } catch (\Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+  }
+  exit;
+}
+
 ?><!doctype html>
 <html lang="ru" data-theme="dark">
 <head>
@@ -402,15 +502,15 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       border-radius: 2px;
       opacity: 0.95;
     }
-    .koi.koi-1 { animation: koiOrbit1 2.6s linear infinite; }
+    .koi.koi-1 { animation: koiOrbit1 10.4s linear infinite; }
     .koi.koi-2 {
-      animation: koiOrbit2 3.1s linear infinite;
+      animation: koiOrbit2 9.3s linear infinite;
       filter: hue-rotate(-8deg) saturate(1.1);
       opacity: 0.92;
     }
     @keyframes koiOrbit1 {
-      from { transform: translate(-50%, -50%) rotate(0deg) translate(22px) rotate(90deg); }
-      to { transform: translate(-50%, -50%) rotate(360deg) translate(22px) rotate(90deg); }
+      from { transform: translate(-50%, -50%) rotate(0deg) translate(22px) rotate(270deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg) translate(22px) rotate(270deg); }
     }
     @keyframes koiOrbit2 {
       from { transform: translate(-50%, -50%) rotate(180deg) translate(20px) rotate(90deg); }
@@ -802,10 +902,52 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
         }
       }
 
+      const reservations = Array.isArray(j.reservations) ? j.reservations : [];
+      const occNumsRaw = Array.isArray(j.occupied_table_nums) ? j.occupied_table_nums.map(String) : [];
+      const occNums = occNumsRaw
+        .filter((x) => x !== '')
+        .slice()
+        .sort((a, b) => (Number(a) || 0) - (Number(b) || 0));
+
+      if (reservations.length || occNums.length) {
+        lines.push('');
+        lines.push('Брони (incomingOrders.getReservations):');
+        const rReq = (j && typeof j.reservations_request === 'object' && j.reservations_request) ? j.reservations_request : null;
+        if (rReq) {
+          lines.push(`- интервал: ${String(rReq.date_from ?? '')} — ${String(rReq.date_to ?? '')}`);
+          lines.push(`- hall_id: ${String(rReq.hall_id ?? '')}`);
+        }
+        lines.push(`- найдено броней (без отменённых): ${reservations.length}`);
+        lines.push(`- номера столов из броней (если Poster их отдаёт): ${occNums.length ? occNums.join(', ') : '—'}`);
+
+        const show = reservations.slice(0, 30);
+        show.forEach((r, idx) => {
+          const status = String(r.status ?? '');
+          const dt = String(r.date_reservation ?? '');
+          const dur = String(r.duration ?? '');
+          const guests = String(r.guests_count ?? '');
+          const name = (String(r.first_name ?? '') + ' ' + String(r.last_name ?? '')).trim();
+          const phone = String(r.phone ?? '');
+          const tableFields = [];
+          ['table_num', 'table', 'tables', 'tables_num', 'table_nums', 'table_id', 'table_ids', 'hall_id'].forEach((k) => {
+            if (r && Object.prototype.hasOwnProperty.call(r, k)) tableFields.push(`${k}=${fmtJson(r[k])}`);
+          });
+          lines.push(`  ${idx + 1}) ${dt} | dur=${dur} | guests=${guests} | status=${status} | ${name || '—'} | ${phone || '—'}${tableFields.length ? ' | ' + tableFields.join(' | ') : ''}`);
+        });
+        if (reservations.length > show.length) {
+          lines.push(`  … ещё ${reservations.length - show.length}`);
+        }
+      }
+
       if (j.raw) {
         lines.push('');
         lines.push('RAW (как вернул Poster):');
         lines.push(fmtJson(j.raw));
+      }
+      if (j.reservations_raw) {
+        lines.push('');
+        lines.push('RAW брони (incomingOrders.getReservations):');
+        lines.push(fmtJson(j.reservations_raw));
       }
 
       return lines.join('\n');
@@ -929,6 +1071,18 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       url.searchParams.set('spot_id', '1');
       url.searchParams.set('guests_count', String(guests));
 
+      const loadReservations = async () => {
+        const rUrl = new URL(location.href);
+        rUrl.searchParams.set('ajax', 'reservations');
+        rUrl.searchParams.set('date_reservation', dt);
+        rUrl.searchParams.set('duration', '7200');
+        rUrl.searchParams.set('spot_id', '1');
+        const rRes = await fetch(rUrl.toString(), { headers: { 'Accept': 'application/json' } });
+        const rJ = await rRes.json().catch(() => null);
+        if (!rRes.ok || !rJ || !rJ.ok) return null;
+        return rJ;
+      };
+
       try {
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
         const j = await res.json().catch(() => null);
@@ -946,6 +1100,18 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
         lastKey = key;
         freeNums = new Set(Array.isArray(j.free_table_nums) ? j.free_table_nums.map(String) : []);
         applyAvailabilityStyles();
+        const r = await loadReservations().catch(() => null);
+        if (r) {
+          last.reservations_request = r.request;
+          last.reservations = r.reservations;
+          last.occupied_table_nums = r.occupied_table_nums;
+          last.reservations_raw = r.raw;
+        } else {
+          last.reservations_request = null;
+          last.reservations = [];
+          last.occupied_table_nums = [];
+          last.reservations_raw = null;
+        }
         if (!silent) setOutput(formatAvailabilityText(j, selectedTableNum));
         renderSelectedTable();
       } finally {
