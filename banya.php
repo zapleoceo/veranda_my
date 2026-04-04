@@ -139,43 +139,31 @@ if (($_GET['ajax'] ?? '') === 'load') {
         $tablesToQuery = [];
 
         foreach ($spotIds as $sid) {
-            $rows = banya_load_tables_for_hall($api, (int)$sid, BANYA_HALL_ID);
-            foreach ($rows as $r) {
-                $tid = (int)($r['table_id'] ?? 0);
-                if ($tid <= 0 || isset($tablesSeen[$tid])) continue;
-                $tablesSeen[$tid] = true;
-                $tablesToQuery[] = [
-                    'table_id' => $tid,
-                ];
-            }
-        }
-
-        foreach ($spotIds as $sid) {
             $all = $api->request('spots.getTableHallTables', [
                 'spot_id' => (int)$sid,
-                'without_deleted' => BANYA_TABLES_WITHOUT_DELETED,
+                'without_deleted' => 0,
             ], 'GET');
             if (!is_array($all)) $all = [];
             foreach ($all as $r) {
                 if (!is_array($r)) continue;
                 $tid = (int)($r['table_id'] ?? 0);
-                if ($tid <= 0 || isset($tablesSeen[$tid])) continue;
+                if ($tid <= 0) continue;
+                $hallId = (int)($r['hall_id'] ?? $r['table_hall_id'] ?? 0);
                 $num = trim((string)($r['table_num'] ?? ''));
                 $title = trim((string)($r['table_title'] ?? ''));
                 $hay = $num . ' ' . $title;
-                if (!preg_match('/\b141\b/u', $hay) && $tid !== 141) continue;
+                $is141 = ($tid === 141) || (bool)preg_match('/\b141\b/u', $hay);
+                $isHall = ($hallId === (int)BANYA_HALL_ID);
+                if (!$isHall && !$is141) continue;
+                if (isset($tablesSeen[$tid])) continue;
                 $tablesSeen[$tid] = true;
-                $tablesToQuery[] = [
-                    'table_id' => $tid,
-                ];
+                $tablesToQuery[] = ['table_id' => $tid];
             }
         }
 
         if (!isset($tablesSeen[141])) {
             $tablesSeen[141] = true;
-            $tablesToQuery[] = [
-                'table_id' => 141,
-            ];
+            $tablesToQuery[] = ['table_id' => 141];
         }
 
         $txBase = [];
@@ -724,7 +712,7 @@ $firstOfMonth = date('Y-m-01');
             '<div style="font-weight:900; margin-bottom: 6px; color: rgba(182,89,48,0.95);">Фильтр столов</div>',
             entries.map(([id, label]) => {
                 const checked = isAll || selected.has(String(id)) ? 'checked' : '';
-                return `<label style="display:flex; align-items:center; gap: 8px; padding: 5px 6px; border-radius: 10px; cursor: pointer; white-space: nowrap;"><input type="checkbox" class="tf-cb" data-id="${esc(id)}" ${checked}> <span>${esc(label)}</span></label>`;
+                return `<label style="display:flex; align-items:center; justify-content: space-between; gap: 10px; padding: 5px 6px; border-radius: 10px; cursor: pointer; white-space: nowrap;"><span>${esc(label)}</span><input type="checkbox" class="tf-cb" data-id="${esc(id)}" ${checked} style="margin:0;"></label>`;
             }).join(''),
             '<div style="margin-top: 8px; display:flex; gap: 8px; justify-content:flex-end;">' +
                 '<button type="button" class="secondary small" id="tfAllBtn">Все</button>' +
