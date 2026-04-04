@@ -256,31 +256,14 @@
       pointer-events: none;
       z-index: 1;
     }
-    .fountain::before {
-      content: '';
+    .fountain svg {
       position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 18px;
-      height: 18px;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.9), rgba(255,255,255,0.25) 60%, rgba(35,110,180,0.15) 100%);
-      box-shadow: 0 0 0 6px rgba(90,180,255,0.10), 0 0 0 12px rgba(90,180,255,0.06);
-      opacity: 0.95;
-    }
-    .fountain::after {
-      content: '';
-      position: absolute;
-      left: 50%;
-      top: 10px;
-      width: 4px;
-      height: 30px;
-      transform: translateX(-50%);
-      border-radius: 999px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.65), rgba(90,180,255,0.20), transparent);
-      filter: blur(0.2px);
-      opacity: 0.9;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.92;
+      filter: drop-shadow(0 8px 16px rgba(0,0,0,0.22));
+      pointer-events: none;
     }
   
     .table {
@@ -444,7 +427,28 @@
   
             <button class="table wide" style="left: 286px; top: 142px;" data-table="8">8<span class="cap">2 чел</span></button>
             <button class="table wide" style="left: 408px; top: 142px;" data-table="9">9<span class="cap">2 чел</span></button>
-            <div class="fountain" style="left: 174px; top: 128px;" aria-hidden="true"></div>
+            <div class="fountain" style="left: 174px; top: 128px;" aria-hidden="true">
+              <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                  <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="rgba(255,255,255,0.85)"/>
+                    <stop offset="1" stop-color="rgba(90,180,255,0.10)"/>
+                  </linearGradient>
+                  <linearGradient id="fBowl" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="rgba(255,255,255,0.35)"/>
+                    <stop offset="1" stop-color="rgba(0,0,0,0.35)"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="32" cy="44" r="16" fill="rgba(35,110,180,0.20)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+                <path d="M18 44c4-6 24-6 28 0" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round"/>
+                <path d="M22 44c3-4 17-4 20 0" stroke="rgba(90,180,255,0.30)" stroke-width="2" stroke-linecap="round"/>
+                <path d="M32 18c0 10-6 12-6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
+                <path d="M32 18c0 10 6 12 6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
+                <path d="M32 14c0 10 0 14 0 24" stroke="rgba(255,255,255,0.78)" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="32" cy="14" r="3" fill="rgba(255,255,255,0.75)"/>
+                <path d="M24 40h16c0 0 2 0 2 2s-2 2-2 2H24c0 0-2 0-2-2s2-2 2-2Z" fill="url(#fBowl)" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
+              </svg>
+            </div>
             <button class="table wide" style="left: 606px; top: 142px;" data-table="10">10<span class="cap">2 чел</span></button>
             <button class="table wide" style="left: 728px; top: 142px;" data-table="11">11<span class="cap">2 чел</span></button>
   
