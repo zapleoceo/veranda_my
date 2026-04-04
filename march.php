@@ -234,18 +234,18 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     <title>March Test Dashboard</title>
     <style>
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f5f5f5; color:#111827; }
-        .wrap { max-width: 1180px; margin: 0 auto; padding: 16px; }
+        .wrap { max-width: 1320px; margin: 0 auto; padding: 16px; }
         .top { display:flex; align-items:flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         h1 { margin: 0; font-size: 20px; }
         .controls { display:flex; gap: 10px; align-items:center; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
-        .grid { display:grid; grid-template-columns: 420px 1fr; gap: 12px; align-items:start; margin-top: 12px; }
+        .grid { display:grid; grid-template-columns: 520px 1fr; gap: 12px; align-items:start; margin-top: 12px; }
         .kpis { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         .kpi { border: 1px solid #eef2f7; border-radius: 12px; padding: 10px; background: #fff; }
         .kpi .label { font-size: 12px; color:#6b7280; }
         .kpi .val { font-weight: 900; font-size: 18px; margin-top: 6px; }
         .muted { color:#6b7280; font-size: 12px; }
-        .cal { display:grid; grid-template-columns: repeat(7, 1fr); gap: 8px; overflow-x: auto; }
+        .cal { display:grid; grid-template-columns: repeat(7, 1fr); gap: 8px; overflow-x: auto; min-width: 600px; }
         .cal .dow { font-size: 12px; color:#6b7280; text-align:center; }
         .day { border: 1px solid #e5e7eb; border-radius: 12px; padding: 8px; background: #fff; cursor:pointer; min-height: 56px; display:flex; flex-direction: column; gap: 6px; min-width: 0; }
         .day.disabled { opacity: 0.35; cursor: default; }
