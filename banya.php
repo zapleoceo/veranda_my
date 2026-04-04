@@ -644,6 +644,7 @@ $firstOfMonth = date('Y-m-01');
         h1 { margin: 0; font-size: 20px; }
         .muted { color:#6b7280; font-size: 12px; }
         .row { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; }
+        .row > * { min-width: 0; }
         label { font-size: 12px; color:#6b7280; display:flex; flex-direction: column; gap: 6px; }
         input[type="date"], select { padding: 7px 10px; border: 1px solid rgba(182,89,48,0.25); border-radius: 10px; font-size: 14px; background:#fff; color:#1f2937; }
         button { padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(182,89,48,0.35); background: var(--brand-bg); color: var(--brand-text); font-weight: 900; cursor:pointer; }
@@ -886,6 +887,7 @@ $firstOfMonth = date('Y-m-01');
     let tableFilterIdsAll = [];
     let groupByDay = false;
     const collapsedDays = new Set();
+    let collapseAllDaysOnNextRender = false;
 
     const applyPrefsToUi = () => {
         const p = loadPrefs();
@@ -1077,6 +1079,11 @@ $firstOfMonth = date('Y-m-01');
                 dayStats[day].checks += 1;
                 dayStats[day].sum_minor += Number(row.sum_minor || 0);
             });
+            if (collapseAllDaysOnNextRender) {
+                collapsedDays.clear();
+                Object.keys(dayStats).forEach((d) => collapsedDays.add(d));
+                collapseAllDaysOnNextRender = false;
+            }
             let lastDay = '';
             slice.forEach((row) => {
                 const day = String(row.date || '').slice(0, 10);
@@ -1297,6 +1304,12 @@ $firstOfMonth = date('Y-m-01');
     if (groupByDayCb) {
         groupByDayCb.addEventListener('change', () => {
             groupByDay = !!groupByDayCb.checked;
+            if (groupByDay) {
+                collapseAllDaysOnNextRender = true;
+            } else {
+                collapsedDays.clear();
+                collapseAllDaysOnNextRender = false;
+            }
             page = 1;
             renderTable();
         });
