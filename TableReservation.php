@@ -152,15 +152,19 @@
       height: 240px;
       border-radius: 44px;
       background:
-        radial-gradient(circle at 18% 35%, rgba(79,123,75,0.28), transparent 58%),
-        radial-gradient(circle at 70% 40%, rgba(79,123,75,0.20), transparent 62%),
-        radial-gradient(circle at 46% 72%, rgba(200,154,99,0.12), transparent 60%),
-        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.08)),
-        rgba(79,123,75,0.10);
-      border: 1px solid rgba(255,255,255,0.10);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+        radial-gradient(circle at 12% 24%, rgba(147,196,125,0.20), transparent 58%),
+        radial-gradient(circle at 78% 30%, rgba(92,162,92,0.22), transparent 62%),
+        radial-gradient(circle at 44% 78%, rgba(200,154,99,0.10), transparent 60%),
+        repeating-linear-gradient(115deg, rgba(34,88,34,0.22) 0 2px, rgba(52,116,52,0.18) 2px 5px),
+        repeating-linear-gradient(25deg, rgba(72,148,72,0.16) 0 3px, rgba(28,84,28,0.14) 3px 7px),
+        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.10)),
+        rgba(52,116,52,0.12);
+      background-blend-mode: screen, screen, normal, overlay, overlay, normal, normal;
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -18px 30px rgba(0,0,0,0.20);
       pointer-events: none;
-      opacity: 0.95;
+      opacity: 0.98;
+      filter: saturate(1.35) contrast(1.05);
     }
   
     .bar {
