@@ -372,9 +372,9 @@
             <button class="table large" style="left: 0px; top: 150px;" data-table="2">2<span class="cap">до 8</span></button>
             <button class="table large" style="left: 0px; top: 276px;" data-table="3">3<span class="cap">до 8</span></button>
   
-            <button class="table" style="left: 200px; top: 56px;" data-table="4">4</button>
-            <button class="table" style="left: 308px; top: 56px;" data-table="5">5</button>
-            <button class="table" style="left: 512px; top: 56px;" data-table="6">6</button>
+            <button class="table" style="left: 200px; top: 0px;" data-table="4">4</button>
+            <button class="table" style="left: 364px; top: 0px;" data-table="5">5</button>
+            <button class="table" style="left: 512px; top: 0px;" data-table="6">6</button>
             <button class="table large" style="left: 700px; top: 0px;" data-table="7">7<span class="cap">до 8</span></button>
   
             <button class="table wide" style="left: 174px; top: 142px;" data-table="8">8</button>
