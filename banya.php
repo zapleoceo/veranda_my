@@ -858,7 +858,7 @@ $firstOfMonth = date('Y-m-01');
             tr.innerHTML = `
                 <td>${esc(row.date || '')}</td>
                 <td>${esc(row.hall || '')}</td>
-                <td>${esc(row.table || '')}</td>
+                <td>${esc(row.table || '')} <span class="muted">#${esc(row.table_id || '')}</span></td>
                 <td>${esc(row.receipt || '')}</td>
                 <td>${esc(row.waiter || '')}</td>
                 <td class="num">${esc(row.sum || '')}</td>
