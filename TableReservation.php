@@ -119,6 +119,22 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       'date_to' => $dateTo,
     ], 'GET');
 
+    $tablesResp = $api->request('spots.getTableHallTables', [
+      'spot_id' => $spotId,
+      'hall_id' => $hallId,
+      'without_deleted' => 1,
+    ], 'GET');
+
+    $tableRows = is_array($tablesResp) ? $tablesResp : [];
+    $tableTitlesByNum = [];
+    foreach ($tableRows as $tr) {
+      if (!is_array($tr)) continue;
+      $num = trim((string)($tr['table_num'] ?? ''));
+      if ($num === '') continue;
+      $title = trim((string)($tr['table_title'] ?? ''));
+      $tableTitlesByNum[$num] = $title;
+    }
+
     $rows = is_array($resp) ? $resp : [];
     $filtered = [];
     $occupied = [];
@@ -153,16 +169,20 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       $rowHall = isset($row['hall_id']) ? (int)$row['hall_id'] : null;
       if ($rowHall !== null && $rowHall !== $hallId) continue;
 
-      $filtered[] = $row;
-
       $candidates = [];
       foreach (['table_num', 'table', 'tables', 'tables_num', 'table_nums', 'table_id', 'table_ids'] as $k) {
         if (!array_key_exists($k, $row)) continue;
         foreach ($extractNums($row[$k]) as $n) $candidates[] = $n;
       }
+      $tableNums = [];
       foreach ($candidates as $n) {
-        $occupied[(string)$n] = true;
+        $nn = (string)$n;
+        $occupied[$nn] = true;
+        $tableNums[$nn] = true;
       }
+
+      $row['_table_nums'] = array_values(array_keys($tableNums));
+      $filtered[] = $row;
     }
 
     echo json_encode([
@@ -173,9 +193,14 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         'spot_id' => $spotId,
         'hall_id' => $hallId,
       ],
+      'table_titles_by_num' => $tableTitlesByNum,
+      'tables' => $tableRows,
       'occupied_table_nums' => array_values(array_keys($occupied)),
       'reservations' => $filtered,
-      'raw' => $resp,
+      'raw' => [
+        'reservations' => $resp,
+        'tables' => $tablesResp,
+      ],
     ], JSON_UNESCAPED_UNICODE);
   } catch (\Throwable $e) {
     http_response_code(500);
@@ -911,32 +936,78 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
 
       if (reservations.length || occNums.length) {
         lines.push('');
-        lines.push('Брони (incomingOrders.getReservations):');
+        lines.push('Текущие брони:');
         const rReq = (j && typeof j.reservations_request === 'object' && j.reservations_request) ? j.reservations_request : null;
         if (rReq) {
           lines.push(`- интервал: ${String(rReq.date_from ?? '')} — ${String(rReq.date_to ?? '')}`);
           lines.push(`- hall_id: ${String(rReq.hall_id ?? '')}`);
         }
-        lines.push(`- найдено броней (без отменённых): ${reservations.length}`);
-        lines.push(`- номера столов из броней (если Poster их отдаёт): ${occNums.length ? occNums.join(', ') : '—'}`);
+        lines.push('');
+        lines.push('Формат: Стол | Начало | Конец | Имя | Гостей');
 
-        const show = reservations.slice(0, 30);
-        show.forEach((r, idx) => {
-          const status = String(r.status ?? '');
-          const dt = String(r.date_reservation ?? '');
-          const dur = String(r.duration ?? '');
-          const guests = String(r.guests_count ?? '');
-          const name = (String(r.first_name ?? '') + ' ' + String(r.last_name ?? '')).trim();
-          const phone = String(r.phone ?? '');
-          const tableFields = [];
-          ['table_num', 'table', 'tables', 'tables_num', 'table_nums', 'table_id', 'table_ids', 'hall_id'].forEach((k) => {
-            if (r && Object.prototype.hasOwnProperty.call(r, k)) tableFields.push(`${k}=${fmtJson(r[k])}`);
-          });
-          lines.push(`  ${idx + 1}) ${dt} | dur=${dur} | guests=${guests} | status=${status} | ${name || '—'} | ${phone || '—'}${tableFields.length ? ' | ' + tableFields.join(' | ') : ''}`);
+        const titles = (j && typeof j.table_titles_by_num === 'object' && j.table_titles_by_num) ? j.table_titles_by_num : {};
+        const parseDt = (s) => {
+          const str = String(s || '').trim();
+          if (!str) return NaN;
+          const d = new Date(str.replace(' ', 'T'));
+          const t = d.getTime();
+          return Number.isFinite(t) ? t : NaN;
+        };
+        const reqStart = parseDt(req.date_reservation);
+        const reqEnd = Number.isFinite(reqStart) ? (reqStart + (Number(req.duration || 0) * 1000)) : NaN;
+
+        const withRanges = reservations.map((r) => {
+          const startStr = String(r.date_reservation ?? '');
+          const start = parseDt(startStr);
+          const durS = Number(r.duration || 0);
+          const end = Number.isFinite(start) ? start + durS * 1000 : NaN;
+          return { r, start, end, startStr, durS };
         });
-        if (reservations.length > show.length) {
-          lines.push(`  … ещё ${reservations.length - show.length}`);
+
+        const current = withRanges.filter((x) => {
+          if (!Number.isFinite(reqStart) || !Number.isFinite(reqEnd)) return true;
+          if (!Number.isFinite(x.start) || !Number.isFinite(x.end)) return true;
+          return x.start < reqEnd && x.end > reqStart;
+        }).sort((a, b) => (a.start || 0) - (b.start || 0));
+
+        const fmtEnd = (x) => {
+          if (!Number.isFinite(x.end)) return '';
+          const d = new Date(x.end);
+          const yyyy = String(d.getFullYear());
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mi = String(d.getMinutes()).padStart(2, '0');
+          const ss = String(d.getSeconds()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+        };
+
+        if (!current.length) {
+          lines.push('—');
+        } else {
+          current.slice(0, 60).forEach((x) => {
+            const r = x.r || {};
+            const name = (String(r.first_name ?? '') + ' ' + String(r.last_name ?? '')).trim() || '—';
+            const guests = String(r.guests_count ?? '—');
+            const nums = Array.isArray(r._table_nums) ? r._table_nums.map(String).filter(Boolean) : [];
+            const tableLabel = nums.length
+              ? nums.map((n) => `№${n}${(titles && titles[n]) ? ' — ' + String(titles[n]) : ''}`).join(', ')
+              : '—';
+            lines.push(`${tableLabel} | ${x.startStr || '—'} | ${fmtEnd(x) || '—'} | ${name} | ${guests}`);
+          });
+          if (current.length > 60) lines.push(`… ещё ${current.length - 60}`);
         }
+      }
+
+      const titles = (j && typeof j.table_titles_by_num === 'object' && j.table_titles_by_num) ? j.table_titles_by_num : {};
+      if (titles && typeof titles === 'object') {
+        lines.push('');
+        lines.push('Названия столов (hall_id=' + String(req.hall_id ?? '') + '):');
+        const schemeNums = Array.from({ length: 20 }, (_, i) => String(i + 1));
+        schemeNums.forEach((n) => {
+          const t = Object.prototype.hasOwnProperty.call(titles, n) ? String(titles[n] || '') : '';
+          lines.push(`- №${n}: ${t || '—'}`);
+        });
       }
 
       if (j.raw) {
@@ -1106,11 +1177,15 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
           last.reservations = r.reservations;
           last.occupied_table_nums = r.occupied_table_nums;
           last.reservations_raw = r.raw;
+          last.table_titles_by_num = r.table_titles_by_num;
+          last.tables = r.tables;
         } else {
           last.reservations_request = null;
           last.reservations = [];
           last.occupied_table_nums = [];
           last.reservations_raw = null;
+          last.table_titles_by_num = null;
+          last.tables = null;
         }
         if (!silent) setOutput(formatAvailabilityText(j, selectedTableNum));
         renderSelectedTable();
