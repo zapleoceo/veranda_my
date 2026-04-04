@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/src/classes/PosterAPI.php';
+require_once __DIR__ . '/src/classes/Database.php';
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
@@ -14,7 +14,13 @@ if (file_exists(__DIR__ . '/.env')) {
     }
 }
 
-$token = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
+$dbHost = $_ENV['DB_HOST'] ?? 'localhost';
+$dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
+$dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
+$dbPass = $_ENV['DB_PASS'] ?? '';
+$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
+$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+$ks = $db->t('kitchen_stats');
 
 $ym = (string)($_GET['ym'] ?? '');
 if (!preg_match('/^\d{4}-\d{2}$/', $ym)) {
@@ -27,7 +33,13 @@ $monthEndTs = strtotime('+1 month', $monthStartTs);
 $monthEndTs = $monthEndTs !== false ? strtotime('-1 day', $monthEndTs) : false;
 $monthEnd = $monthEndTs !== false ? date('Y-m-d', $monthEndTs) : $monthStart;
 
-const HOOKAH_CATEGORY_ID = 47;
+$barCond = "(station = '3' OR station = 3 OR station = 'Bar Veranda')";
+$kitchenCond = "(station = '2' OR station = 2 OR station = 'Kitchen' OR station = 'Main')";
+
+$baseWhere = "transaction_date BETWEEN ? AND ?
+              AND ticket_sent_at IS NOT NULL
+              AND COALESCE(was_deleted, 0) = 0
+              AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)";
 
 if (($_GET['ajax'] ?? '') === 'day') {
     header('Content-Type: application/json; charset=utf-8');
@@ -37,134 +49,66 @@ if (($_GET['ajax'] ?? '') === 'day') {
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    if ($token === '') {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    $api = new \App\Classes\PosterAPI($token);
     try {
-        $products = $api->request('menu.getProducts', [], 'GET');
-        if (!is_array($products)) $products = [];
-        $catByPid = [];
-        foreach ($products as $p) {
-            if (!is_array($p)) continue;
-            $pid = (int)($p['product_id'] ?? 0);
-            if ($pid <= 0) continue;
-            $catByPid[$pid] = (int)($p['menu_category_id'] ?? $p['category_id'] ?? $p['main_category_id'] ?? 0);
+        $row = $db->query(
+            "SELECT
+                COUNT(*) total,
+                SUM(CASE WHEN ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_cnt,
+                SUM(CASE WHEN ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_cnt,
+                SUM(CASE WHEN {$barCond} THEN 1 ELSE 0 END) total_bar,
+                SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_bar,
+                SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_bar,
+                SUM(CASE WHEN {$kitchenCond} THEN 1 ELSE 0 END) total_kitchen,
+                SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_kitchen,
+                SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_kitchen
+             FROM {$ks}
+             WHERE transaction_date = ?
+               AND ticket_sent_at IS NOT NULL
+               AND COALESCE(was_deleted, 0) = 0
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
+            [$date]
+        )->fetch();
+        $row = is_array($row) ? $row : [];
+        $hours = $db->query(
+            "SELECT
+                HOUR(ticket_sent_at) h,
+                COUNT(*) total,
+                SUM(CASE WHEN ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing
+             FROM {$ks}
+             WHERE transaction_date = ?
+               AND ticket_sent_at IS NOT NULL
+               AND COALESCE(was_deleted, 0) = 0
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
+             GROUP BY HOUR(ticket_sent_at)
+             ORDER BY h ASC",
+            [$date]
+        )->fetchAll();
+        if (!is_array($hours)) $hours = [];
+        $hMap = array_fill(0, 24, ['total' => 0, 'missing' => 0]);
+        foreach ($hours as $hRow) {
+            $h = (int)($hRow['h'] ?? -1);
+            if ($h < 0 || $h > 23) continue;
+            $hMap[$h] = ['total' => (int)($hRow['total'] ?? 0), 'missing' => (int)($hRow['missing'] ?? 0)];
         }
-
-        $txIds = [];
-        $nextTr = null;
-        $prevNextTr = null;
-        $guard = 0;
-        do {
-            $guard++;
-            if ($guard > 20000) break;
-            $params = [
-                'dateFrom' => str_replace('-', '', $date),
-                'dateTo' => str_replace('-', '', $date),
-                'include_products' => 'false',
-                'include_history' => 'false',
-                'status' => 2,
-            ];
-            if ($nextTr !== null) $params['next_tr'] = $nextTr;
-            $batch = $api->request('dash.getTransactions', $params, 'GET');
-            if (!is_array($batch)) $batch = [];
-            $count = count($batch);
-            if ($count > 0) {
-                $last = end($batch);
-                $prevNextTr = $nextTr;
-                $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
-            }
-            foreach ($batch as $tx) {
-                if (!is_array($tx)) continue;
-                $id = (int)($tx['transaction_id'] ?? 0);
-                if ($id > 0) $txIds[$id] = true;
-            }
-            if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
-        } while ($count > 0 && $nextTr !== null);
-
-        $totalChecks = count($txIds);
-        $missingChecks = 0;
-
-        foreach (array_keys($txIds) as $txId) {
-            $history = $api->request('dash.getTransactionHistory', ['transaction_id' => (int)$txId], 'GET');
-            if (!is_array($history)) $history = [];
-
-            $send = [];
-            $finished = [];
-            $deleted = [];
-
-            foreach ($history as $ev) {
-                if (!is_array($ev)) continue;
-                $type = (string)($ev['type_history'] ?? '');
-                if ($type === 'sendtokitchen') {
-                    $items = $ev['value_text'] ?? null;
-                    if (is_string($items)) {
-                        $decoded = json_decode($items, true);
-                        $items = is_array($decoded) ? $decoded : null;
-                    }
-                    if (!is_array($items)) continue;
-                    foreach ($items as $it) {
-                        if (!is_array($it)) continue;
-                        $pid = (int)($it['product_id'] ?? 0);
-                        if ($pid <= 0) continue;
-                        $cat = (int)($catByPid[$pid] ?? 0);
-                        if ($cat === HOOKAH_CATEGORY_ID) continue;
-                        $cnt = isset($it['count']) ? (int)$it['count'] : 1;
-                        if ($cnt <= 0) continue;
-                        $send[$pid] = ($send[$pid] ?? 0) + $cnt;
-                    }
-                    continue;
-                }
-                if ($type === 'finishedcooking') {
-                    $pid = (int)($ev['value'] ?? 0);
-                    if ($pid <= 0) continue;
-                    $cat = (int)($catByPid[$pid] ?? 0);
-                    if ($cat === HOOKAH_CATEGORY_ID) continue;
-                    $finished[$pid] = ($finished[$pid] ?? 0) + 1;
-                    continue;
-                }
-                if ($type === 'deleteitem' || $type === 'delete') {
-                    $pid = (int)($ev['value'] ?? 0);
-                    if ($pid <= 0) continue;
-                    $cat = (int)($catByPid[$pid] ?? 0);
-                    if ($cat === HOOKAH_CATEGORY_ID) continue;
-                    $deleted[$pid] = ($deleted[$pid] ?? 0) + 1;
-                    continue;
-                }
-                if ($type === 'changeitemcount') {
-                    $pid = (int)($ev['value'] ?? 0);
-                    if ($pid <= 0) continue;
-                    $cat = (int)($catByPid[$pid] ?? 0);
-                    if ($cat === HOOKAH_CATEGORY_ID) continue;
-                    $cnt = (int)($ev['value2'] ?? 0);
-                    if ($cnt <= 0) $deleted[$pid] = ($deleted[$pid] ?? 0) + 1;
-                    continue;
-                }
-            }
-
-            $isMissing = false;
-            foreach ($send as $pid => $cnt) {
-                $eff = $cnt - (int)($deleted[$pid] ?? 0);
-                if ($eff < 0) $eff = 0;
-                if ($eff <= 0) continue;
-                $fin = (int)($finished[$pid] ?? 0);
-                if ($fin < $eff) {
-                    $isMissing = true;
-                    break;
-                }
-            }
-            if ($isMissing) $missingChecks++;
-        }
-
         echo json_encode([
             'ok' => true,
             'date' => $date,
-            'total' => $totalChecks,
-            'missing' => $missingChecks,
-            'ready' => max(0, $totalChecks - $missingChecks),
+            'total' => (int)($row['total'] ?? 0),
+            'ready' => (int)($row['ready_cnt'] ?? 0),
+            'missing' => (int)($row['missing_cnt'] ?? 0),
+            'stations' => [
+                'bar' => [
+                    'total' => (int)($row['total_bar'] ?? 0),
+                    'ready' => (int)($row['ready_bar'] ?? 0),
+                    'missing' => (int)($row['missing_bar'] ?? 0),
+                ],
+                'kitchen' => [
+                    'total' => (int)($row['total_kitchen'] ?? 0),
+                    'ready' => (int)($row['ready_kitchen'] ?? 0),
+                    'missing' => (int)($row['missing_kitchen'] ?? 0),
+                ]
+            ],
+            'hours' => $hMap,
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
@@ -173,8 +117,41 @@ if (($_GET['ajax'] ?? '') === 'day') {
     exit;
 }
 
-$monthRow = ['total' => 0, 'missing_cnt' => 0];
+$monthRow = $db->query(
+    "SELECT
+        COUNT(*) total,
+        SUM(CASE WHEN ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_cnt,
+        SUM(CASE WHEN ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_cnt,
+        SUM(CASE WHEN {$barCond} THEN 1 ELSE 0 END) total_bar,
+        SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_bar,
+        SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_bar,
+        SUM(CASE WHEN {$kitchenCond} THEN 1 ELSE 0 END) total_kitchen,
+        SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_kitchen,
+        SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_kitchen
+     FROM {$ks}
+     WHERE {$baseWhere}",
+    [$monthStart, $monthEnd]
+)->fetch();
+$monthRow = is_array($monthRow) ? $monthRow : [];
+
+$daysRows = $db->query(
+    "SELECT
+        transaction_date d,
+        COUNT(*) total,
+        SUM(CASE WHEN ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing
+     FROM {$ks}
+     WHERE {$baseWhere}
+     GROUP BY transaction_date
+     ORDER BY transaction_date ASC",
+    [$monthStart, $monthEnd]
+)->fetchAll();
+if (!is_array($daysRows)) $daysRows = [];
 $daysMap = [];
+foreach ($daysRows as $r) {
+    $d = (string)($r['d'] ?? '');
+    if ($d === '') continue;
+    $daysMap[$d] = ['total' => (int)($r['total'] ?? 0), 'missing' => (int)($r['missing'] ?? 0)];
+}
 
 $selected = (string)($_GET['date'] ?? '');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selected) || $selected < $monthStart || $selected > $monthEnd) {
@@ -182,7 +159,69 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $selected) || $selected < $monthStart |
     $selected = ($today >= $monthStart && $today <= $monthEnd) ? $today : $monthStart;
 }
 
-$initial = ['date' => $selected, 'total' => 0, 'ready' => 0, 'missing' => 0];
+$initial = ['date' => $selected, 'total' => 0, 'ready' => 0, 'missing' => 0, 'stations' => ['bar' => ['total' => 0, 'ready' => 0, 'missing' => 0], 'kitchen' => ['total' => 0, 'ready' => 0, 'missing' => 0]], 'hours' => array_fill(0, 24, ['total' => 0, 'missing' => 0])];
+try {
+    $row = $db->query(
+        "SELECT
+            COUNT(*) total,
+            SUM(CASE WHEN ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_cnt,
+            SUM(CASE WHEN ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_cnt,
+            SUM(CASE WHEN {$barCond} THEN 1 ELSE 0 END) total_bar,
+            SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_bar,
+            SUM(CASE WHEN {$barCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_bar,
+            SUM(CASE WHEN {$kitchenCond} THEN 1 ELSE 0 END) total_kitchen,
+            SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NOT NULL THEN 1 ELSE 0 END) ready_kitchen,
+            SUM(CASE WHEN {$kitchenCond} AND ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing_kitchen
+         FROM {$ks}
+         WHERE transaction_date = ?
+           AND ticket_sent_at IS NOT NULL
+           AND COALESCE(was_deleted, 0) = 0
+           AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
+        [$selected]
+    )->fetch();
+    $row = is_array($row) ? $row : [];
+    $hours = $db->query(
+        "SELECT
+            HOUR(ticket_sent_at) h,
+            COUNT(*) total,
+            SUM(CASE WHEN ready_pressed_at IS NULL THEN 1 ELSE 0 END) missing
+         FROM {$ks}
+         WHERE transaction_date = ?
+           AND ticket_sent_at IS NOT NULL
+           AND COALESCE(was_deleted, 0) = 0
+           AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
+         GROUP BY HOUR(ticket_sent_at)
+         ORDER BY h ASC",
+        [$selected]
+    )->fetchAll();
+    if (!is_array($hours)) $hours = [];
+    $hMap = array_fill(0, 24, ['total' => 0, 'missing' => 0]);
+    foreach ($hours as $hRow) {
+        $h = (int)($hRow['h'] ?? -1);
+        if ($h < 0 || $h > 23) continue;
+        $hMap[$h] = ['total' => (int)($hRow['total'] ?? 0), 'missing' => (int)($hRow['missing'] ?? 0)];
+    }
+    $initial = [
+        'date' => $selected,
+        'total' => (int)($row['total'] ?? 0),
+        'ready' => (int)($row['ready_cnt'] ?? 0),
+        'missing' => (int)($row['missing_cnt'] ?? 0),
+        'stations' => [
+            'bar' => [
+                'total' => (int)($row['total_bar'] ?? 0),
+                'ready' => (int)($row['ready_bar'] ?? 0),
+                'missing' => (int)($row['missing_bar'] ?? 0),
+            ],
+            'kitchen' => [
+                'total' => (int)($row['total_kitchen'] ?? 0),
+                'ready' => (int)($row['ready_kitchen'] ?? 0),
+                'missing' => (int)($row['missing_kitchen'] ?? 0),
+            ],
+        ],
+        'hours' => $hMap,
+    ];
+} catch (\Throwable $e) {
+}
 
 $firstDow = (int)date('N', strtotime($monthStart));
 $daysInMonth = (int)date('t', strtotime($monthStart));
@@ -235,7 +274,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     <div class="top">
         <div>
             <h1>/march.php — тестовый дашборд без авторизации</h1>
-            <div class="muted">Период: <?= htmlspecialchars($monthStart) ?> — <?= htmlspecialchars($monthEnd) ?> · источник: Poster (dash.getTransactions + dash.getTransactionHistory)</div>
+            <div class="muted">Период: <?= htmlspecialchars($monthStart) ?> — <?= htmlspecialchars($monthEnd) ?> · источник: kitchen_stats</div>
         </div>
         <div class="controls">
             <form method="get" class="card" style="display:flex; gap:8px; align-items:center; padding:8px 10px;">
@@ -255,7 +294,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                     <span class="dot total"></span><span>всего: <b id="monthTotal" title="Всего чеков"><?= (int)($monthRow['total'] ?? 0) ?></b></span>
                 </div>
             </div>
-            <div class="muted" style="margin-top:6px;">X|Y: X — всего чеков, Y — чеков без отметки о готовности блюд.</div>
+            <div class="muted" style="margin-top:6px;">Клик по дню — график по часам (всего / без отметки о готовности).</div>
             <div style="margin-top:10px;" class="cal" id="calGrid">
                 <?php
                     $dows = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
@@ -283,7 +322,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
             <div style="display:flex; align-items:flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
                 <div>
                     <div style="font-weight:900;">День: <span id="dayLabel"><?= htmlspecialchars($selected) ?></span></div>
-                    <div class="muted">Готовность: в истории чека должны быть finishedcooking по всем отправленным на кухню позициям.</div>
+                    <div class="muted">Отметка о готовности: поле ready_pressed_at</div>
                 </div>
                 <div class="legend">
                     <span class="pill"><span class="dot total"></span>всего</span>
@@ -293,25 +332,25 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
 
             <div class="kpis" style="margin-top: 10px;">
                 <div class="kpi">
-                    <div class="label">Всего чеков</div>
+                    <div class="label">Всего</div>
                     <div class="val" id="kpiTotal"><?= (int)$initial['total'] ?></div>
                     <div class="muted">готово: <span id="kpiReady"><?= (int)$initial['ready'] ?></span> · без: <span id="kpiMissing"><?= (int)$initial['missing'] ?></span></div>
                 </div>
                 <div class="kpi">
-                    <div class="label">Готово</div>
-                    <div class="val" id="kpiReadyCard"><?= (int)$initial['ready'] ?></div>
-                    <div class="muted">чеки без пропусков cooked</div>
+                    <div class="label">Бар (station=3)</div>
+                    <div class="val" id="kpiBarTotal"><?= (int)$initial['stations']['bar']['total'] ?></div>
+                    <div class="muted">готово: <span id="kpiBarReady"><?= (int)$initial['stations']['bar']['ready'] ?></span> · без: <span id="kpiBarMissing"><?= (int)$initial['stations']['bar']['missing'] ?></span></div>
                 </div>
                 <div class="kpi">
-                    <div class="label">Без отметки</div>
-                    <div class="val" id="kpiMissingCard"><?= (int)$initial['missing'] ?></div>
-                    <div class="muted">есть позиции без finishedcooking</div>
+                    <div class="label">Кухня (station=2)</div>
+                    <div class="val" id="kpiKitchenTotal"><?= (int)$initial['stations']['kitchen']['total'] ?></div>
+                    <div class="muted">готово: <span id="kpiKitchenReady"><?= (int)$initial['stations']['kitchen']['ready'] ?></span> · без: <span id="kpiKitchenMissing"><?= (int)$initial['stations']['kitchen']['missing'] ?></span></div>
                 </div>
             </div>
 
-            <div style="margin-top: 12px; font-weight:900;">График по дням</div>
+            <div style="margin-top: 12px; font-weight:900;">График по часам</div>
             <div class="chart-wrap">
-                <div class="chart" id="dayChart"></div>
+                <div class="chart" id="hourChart"></div>
             </div>
         </div>
     </div>
@@ -320,35 +359,19 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
 <script>
     const initial = <?= json_encode($initial, JSON_UNESCAPED_UNICODE) ?>;
     const ym = <?= json_encode($ym, JSON_UNESCAPED_UNICODE) ?>;
-    const monthStart = <?= json_encode($monthStart, JSON_UNESCAPED_UNICODE) ?>;
-    const monthEnd = <?= json_encode($monthEnd, JSON_UNESCAPED_UNICODE) ?>;
-    const selectedInitial = <?= json_encode($selected, JSON_UNESCAPED_UNICODE) ?>;
 
-    const dateList = (() => {
-        const out = [];
-        const a = new Date(String(monthStart) + 'T00:00:00Z');
-        const b = new Date(String(monthEnd) + 'T00:00:00Z');
-        if (isNaN(a.getTime()) || isNaN(b.getTime()) || a.getTime() > b.getTime()) return out;
-        for (let t = a.getTime(); t <= b.getTime(); t += 86400000) {
-            out.push(new Date(t).toISOString().slice(0, 10));
-        }
-        return out;
-    })();
-
-    const monthData = new Map();
-
-    const renderChart = () => {
-        const el = document.getElementById('dayChart');
+    const renderChart = (hours, date) => {
+        const el = document.getElementById('hourChart');
         if (!el) return;
         el.innerHTML = '';
-        const rows = dateList.map((d) => ({ date: d, ...(monthData.get(d) || { total: 0, missing: 0 }) }));
-        const maxTotal = Math.max(1, ...rows.map(x => Number(x.total || 0)));
-        rows.forEach((row, idx) => {
-            const total = Number(row.total || 0);
-            const missing = Number(row.missing || 0);
+        const maxTotal = Math.max(1, ...hours.map(x => Number(x.total || 0)));
+        for (let h = 9; h < 24; h++) {
+            const total = Number(hours[h]?.total || 0);
+            const missing = Number(hours[h]?.missing || 0);
             const bar = document.createElement('div');
             bar.className = 'bar';
-            bar.title = `${row.date} — всего ${total} | без ${missing}`;
+            const d = String(date || '');
+            bar.title = `${d} ${String(h).padStart(2,'0')}:00 — всего ${total} | без ${missing}`;
             const heightPct = (total / maxTotal) * 100;
             bar.style.height = `calc(${heightPct}% + 2px)`;
             const miss = document.createElement('div');
@@ -357,17 +380,10 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
             bar.appendChild(miss);
             const lab = document.createElement('div');
             lab.className = 'label';
-            const dayNum = idx + 1;
-            lab.textContent = (dayNum % 2 === 0) ? String(dayNum) : '';
+            lab.textContent = (h % 2 === 0) ? String(h) : '';
             bar.appendChild(lab);
-            bar.addEventListener('click', () => {
-                document.querySelectorAll('.day.active').forEach(x => x.classList.remove('active'));
-                const cell = document.querySelector(`.day[data-date="${row.date}"]`);
-                if (cell) cell.classList.add('active');
-                setKpis({ date: row.date, total, missing, ready: Math.max(0, total - missing) });
-            });
             el.appendChild(bar);
-        });
+        }
     };
 
     const setKpis = (data) => {
@@ -375,12 +391,16 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         document.getElementById('kpiTotal').textContent = String(data.total || 0);
         document.getElementById('kpiReady').textContent = String(data.ready || 0);
         document.getElementById('kpiMissing').textContent = String(data.missing || 0);
-        document.getElementById('kpiReadyCard').textContent = String(data.ready || 0);
-        document.getElementById('kpiMissingCard').textContent = String(data.missing || 0);
+        document.getElementById('kpiBarTotal').textContent = String(data.stations?.bar?.total || 0);
+        document.getElementById('kpiBarReady').textContent = String(data.stations?.bar?.ready || 0);
+        document.getElementById('kpiBarMissing').textContent = String(data.stations?.bar?.missing || 0);
+        document.getElementById('kpiKitchenTotal').textContent = String(data.stations?.kitchen?.total || 0);
+        document.getElementById('kpiKitchenReady').textContent = String(data.stations?.kitchen?.ready || 0);
+        document.getElementById('kpiKitchenMissing').textContent = String(data.stations?.kitchen?.missing || 0);
+        renderChart(data.hours || [], data.date || '');
     };
 
     const loadDay = async (date) => {
-        if (monthData.has(date)) return monthData.get(date);
         const url = new URL(location.href);
         url.searchParams.set('ym', ym);
         url.searchParams.set('ajax', 'day');
@@ -390,52 +410,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         let j = null;
         try { j = JSON.parse(txt); } catch (_) {}
         if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка загрузки');
-        monthData.set(date, { total: Number(j.total || 0), missing: Number(j.missing || 0), ready: Number(j.ready || 0) });
-        return monthData.get(date);
-    };
-
-    const updateCalendarCell = (date, total, missing) => {
-        const el = document.querySelector(`.day[data-date="${date}"]`);
-        if (!el) return;
-        const mini = el.querySelector('.mini');
-        if (!mini) return;
-        mini.title = 'X — всего чеков, Y — чеков без отметки о готовности блюд';
-        mini.innerHTML = `<b title="Всего чеков">${String(total)}</b><span class="sep">|</span><b class="${missing > 0 ? 'miss' : ''}" title="Без отметки о готовности">${String(missing)}</b>`;
-    };
-
-    const loadMonth = async () => {
-        const monthMissingEl = document.getElementById('monthMissing');
-        const monthTotalEl = document.getElementById('monthTotal');
-        let done = 0;
-        let totalSum = 0;
-        let missingSum = 0;
-        const concurrency = 4;
-
-        const worker = async (queue) => {
-            while (queue.length) {
-                const d = queue.shift();
-                if (!d) continue;
-                const r = await loadDay(d);
-                const total = Number(r?.total || 0);
-                const missing = Number(r?.missing || 0);
-                updateCalendarCell(d, total, missing);
-                done++;
-            }
-        };
-
-        const queue = dateList.slice();
-        const workers = new Array(Math.min(concurrency, queue.length)).fill(0).map(() => worker(queue));
-        await Promise.all(workers);
-
-        dateList.forEach((d) => {
-            const r = monthData.get(d);
-            if (!r) return;
-            totalSum += Number(r.total || 0);
-            missingSum += Number(r.missing || 0);
-        });
-        if (monthMissingEl) monthMissingEl.textContent = String(missingSum);
-        if (monthTotalEl) monthTotalEl.textContent = String(totalSum);
-        renderChart();
+        setKpis(j);
     };
 
     document.getElementById('calGrid')?.addEventListener('click', (e) => {
@@ -445,19 +420,10 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         if (!date) return;
         document.querySelectorAll('.day.active').forEach(x => x.classList.remove('active'));
         t.classList.add('active');
-        (async () => {
-            const r = await loadDay(date);
-            setKpis({ date, total: r.total, missing: r.missing, ready: Math.max(0, r.total - r.missing) });
-        })().catch((err) => alert(err && err.message ? err.message : 'Ошибка'));
+        loadDay(date).catch((err) => alert(err && err.message ? err.message : 'Ошибка'));
     });
 
     setKpis(initial);
-    loadMonth()
-        .then(async () => {
-            const r = await loadDay(selectedInitial);
-            setKpis({ date: selectedInitial, total: r.total, missing: r.missing, ready: Math.max(0, r.total - r.missing) });
-        })
-        .catch((err) => alert(err && err.message ? err.message : 'Ошибка'));
 </script>
 </body>
 </html>
