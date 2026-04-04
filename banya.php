@@ -153,8 +153,12 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 if ($tid <= 0) continue;
                 $num = trim((string)($r['table_num'] ?? ''));
                 $title = trim((string)($r['table_title'] ?? ''));
-                $hay = $num . ' ' . $title;
-                if (!preg_match('/\b141\b/u', $hay)) continue;
+                $match = ($tid === 141);
+                if (!$match) {
+                    $hay = $num . ' ' . $title;
+                    $match = (bool)preg_match('/\b141\b/u', $hay);
+                }
+                if (!$match) continue;
                 if (isset($extraById[$tid])) continue;
                 $extraById[$tid] = true;
                 $extraTables[] = [
