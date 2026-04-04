@@ -657,11 +657,13 @@ $firstOfMonth = date('Y-m-01');
         th, td { padding: 7px 10px; border-bottom: 1px solid rgba(182,89,48,0.14); vertical-align: top; }
         th { text-align:left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-text); background: rgba(239,219,206,0.55); }
         td.num { text-align:right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .sort-arrow { margin-left: 6px; color: rgba(182,89,48,0.85); font-weight: 900; }
         .table-filter { position: relative; display: inline-flex; align-items: center; gap: 8px; }
         .table-filter-btn { width: 18px; height: 18px; border-radius: 8px; padding: 0; background: transparent; border: 1px solid rgba(182,89,48,0.22); color: rgba(182,89,48,0.85); font-weight: 900; line-height: 1; cursor: pointer; }
         .table-filter-btn:hover { border-color: rgba(182,89,48,0.42); }
         .table-filter-pop { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; box-shadow: 0 10px 24px rgba(182,89,48,0.18); padding: 8px; min-width: 240px; max-height: 280px; overflow: auto; z-index: 50; text-transform: none; letter-spacing: 0; }
         .table-filter-pop label:hover { background: rgba(239,219,206,0.35); }
+        .day-group td { background: rgba(239,219,206,0.55); color: var(--brand-text); font-weight: 900; }
         .totals { margin-top: 12px; display:flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
         .pill { border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; padding: 10px 12px; background:#fff; font-weight: 900; }
         .pill.bad { border-color: rgba(182,89,48,0.40); background: rgba(239,219,206,0.55); color: var(--brand-text); }
@@ -735,7 +737,11 @@ $firstOfMonth = date('Y-m-01');
                 <div class="loader" id="loader" style="display:none;"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
                 <label class="muted" style="flex-direction: row; align-items:center; gap: 8px;">
                     <input type="checkbox" id="noPages">
-                    без страниц
+                    страницы
+                </label>
+                <label class="muted" style="flex-direction: row; align-items:center; gap: 8px;">
+                    <input type="checkbox" id="groupByDay">
+                    по дням
                 </label>
                 <div class="pager" id="pagerTop"></div>
             </div>
@@ -745,18 +751,18 @@ $firstOfMonth = date('Y-m-01');
         <table>
             <thead>
                 <tr>
-                    <th id="thDate" data-sort="date" style="width:170px; cursor:pointer;">Дата</th>
-                    <th id="thHall" data-sort="hall" style="width:80px; cursor:pointer;">Hall</th>
+                    <th id="thDate" data-sort="date" style="width:170px; cursor:pointer;">Дата<span class="sort-arrow"></span></th>
+                    <th id="thHall" data-sort="hall" style="width:80px; cursor:pointer;">Hall<span class="sort-arrow"></span></th>
                     <th id="thTable" data-sort="table" style="width:140px; cursor:pointer;">
                         <div class="table-filter">
-                            <span>Стол</span>
+                            <span>Стол</span><span class="sort-arrow"></span>
                             <button type="button" id="tableFilterBtn" class="table-filter-btn" title="Фильтр столов" aria-label="Фильтр столов">▾</button>
                             <div id="tableFilterPop" class="table-filter-pop" style="display:none;"></div>
                         </div>
                     </th>
-                    <th id="thReceipt" data-sort="receipt" style="width:120px; cursor:pointer;">Чек</th>
-                    <th id="thWaiter" data-sort="waiter" style="cursor:pointer;">Официант</th>
-                    <th id="thSum" data-sort="sum_minor" style="width:140px; text-align:right; cursor:pointer;">Сумма</th>
+                    <th id="thReceipt" data-sort="receipt" style="width:120px; cursor:pointer;">Чек<span class="sort-arrow"></span></th>
+                    <th id="thWaiter" data-sort="waiter" style="cursor:pointer;">Официант<span class="sort-arrow"></span></th>
+                    <th id="thSum" data-sort="sum_minor" style="width:140px; text-align:right; cursor:pointer;">Сумма<span class="sort-arrow"></span></th>
                     <th style="width:120px;"></th>
                 </tr>
             </thead>
@@ -850,6 +856,7 @@ $firstOfMonth = date('Y-m-01');
     const pagerTop = document.getElementById('pagerTop');
     const pagerBottom = document.getElementById('pagerBottom');
     const noPagesCb = document.getElementById('noPages');
+    const groupByDayCb = document.getElementById('groupByDay');
     const tableFilterBtn = document.getElementById('tableFilterBtn');
     const tableFilterPop = document.getElementById('tableFilterPop');
     const ths = Array.from(document.querySelectorAll('th[data-sort]'));
@@ -858,18 +865,25 @@ $firstOfMonth = date('Y-m-01');
     let sortDir = 'asc';
     let page = 1;
     const pageSize = 20;
-    let noPages = false;
+    let pagesOn = true;
     let tableFilterIds = [];
     let tableFilterIdsAll = [];
+    let groupByDay = false;
 
     const applyPrefsToUi = () => {
         const p = loadPrefs();
         if (!p) return;
         if (typeof p.date_from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date_from)) elFrom.value = p.date_from;
         if (typeof p.date_to === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.date_to)) elTo.value = p.date_to;
-        if (typeof p.no_pages === 'boolean') {
-            noPages = p.no_pages;
-            if (noPagesCb) noPagesCb.checked = !!p.no_pages;
+        if (typeof p.pages_on === 'boolean') {
+            pagesOn = !!p.pages_on;
+        } else if (typeof p.no_pages === 'boolean') {
+            pagesOn = !p.no_pages;
+        }
+        if (noPagesCb) noPagesCb.checked = !!pagesOn;
+        if (typeof p.group_by_day === 'boolean') {
+            groupByDay = !!p.group_by_day;
+            if (groupByDayCb) groupByDayCb.checked = groupByDay;
         }
         if (typeof p.sort_by === 'string') sortBy = p.sort_by;
         if (p.sort_dir === 'asc' || p.sort_dir === 'desc') sortDir = p.sort_dir;
@@ -884,11 +898,25 @@ $firstOfMonth = date('Y-m-01');
         savePrefs({
             date_from: elFrom.value,
             date_to: elTo.value,
-            no_pages: !!noPages,
+            pages_on: !!pagesOn,
             sort_by: sortBy,
             sort_dir: sortDir,
             page: page,
             table_filter_ids: tableFilterIds,
+            group_by_day: !!groupByDay,
+        });
+    };
+
+    const updateSortIndicators = () => {
+        ths.forEach((th) => {
+            const arrow = th.querySelector('.sort-arrow');
+            if (!arrow) return;
+            const k = th.getAttribute('data-sort') || '';
+            if (!k || k !== sortBy) {
+                arrow.textContent = '';
+                return;
+            }
+            arrow.textContent = (sortDir === 'asc') ? '▲' : '▼';
         });
     };
 
@@ -989,7 +1017,7 @@ $firstOfMonth = date('Y-m-01');
 
     const renderPager = (el, pages, current) => {
         if (!el) return;
-        if (noPages || pages <= 1) {
+        if (!pagesOn || pages <= 1) {
             el.innerHTML = '';
             return;
         }
@@ -1017,20 +1045,96 @@ $firstOfMonth = date('Y-m-01');
         const base = useFilter ? dataItems.filter((x) => tableFilterIds.includes(String(x.table_id || ''))) : dataItems;
         const items = applySort(base);
         const total = items.length;
-        const pages = noPages ? 1 : Math.max(1, Math.ceil(total / pageSize));
+        const pages = pagesOn ? Math.max(1, Math.ceil(total / pageSize)) : 1;
         if (page > pages) page = pages;
-        const start = noPages ? 0 : (page - 1) * pageSize;
-        const slice = noPages ? items : items.slice(start, start + pageSize);
+        const start = pagesOn ? (page - 1) * pageSize : 0;
+        const slice = pagesOn ? items.slice(start, start + pageSize) : items;
 
         tbody.innerHTML = '';
-        slice.forEach((row) => {
+        if (groupByDay) {
+            const dayStats = {};
+            items.forEach((row) => {
+                const day = String(row.date || '').slice(0, 10);
+                if (!day) return;
+                if (!dayStats[day]) dayStats[day] = { checks: 0, sum_minor: 0 };
+                dayStats[day].checks += 1;
+                dayStats[day].sum_minor += Number(row.sum_minor || 0);
+            });
+            let lastDay = '';
+            slice.forEach((row) => {
+                const day = String(row.date || '').slice(0, 10);
+                if (day && day !== lastDay) {
+                    lastDay = day;
+                    const st = dayStats[day] || { checks: 0, sum_minor: 0 };
+                    const trG = document.createElement('tr');
+                    trG.className = 'day-group';
+                    trG.innerHTML = `<td colspan="7">${esc(day)} · чеков ${esc(String(st.checks))} · сумма ${esc(fmtVnd(st.sum_minor))}</td>`;
+                    tbody.appendChild(trG);
+                }
+
+                const tr = document.createElement('tr');
+                const txId = Number(row.transaction_id || 0);
+                const hasHookah = Number(row.hookah_sum_minor || 0) > 0;
+                tr.innerHTML = `
+                    <td>${esc(row.date || '')}</td>
+                    <td>${esc(row.hall || '')}</td>
+                    <td>${esc(row.table || '')}</td>
+                    <td>${esc(row.receipt || '')}</td>
+                    <td>${esc(row.waiter || '')}</td>
+                    <td class="num">${esc(row.sum || '')}</td>
+                    <td><button type="button" class="secondary small" data-tx="${esc(txId)}">Детали</button>${hasHookah ? hookahSvg : ''}</td>
+                `;
+                tbody.appendChild(tr);
+
+                const trD = document.createElement('tr');
+                trD.className = 'details-row';
+                trD.style.display = 'none';
+                trD.innerHTML = `<td colspan="7"><div class="details-box muted">Загрузка…</div></td>`;
+                tbody.appendChild(trD);
+
+                const btnDetails = tr.querySelector('button');
+                if (btnDetails) {
+                    btnDetails.addEventListener('click', async () => {
+                        const isOpen = trD.style.display !== 'none';
+                        if (isOpen) {
+                            trD.style.display = 'none';
+                            return;
+                        }
+                        trD.style.display = '';
+                        const tx = Number(btnDetails.getAttribute('data-tx') || 0);
+                        try {
+                            const lines = await loadDetails(tx);
+                            const box = document.createElement('div');
+                            box.className = 'details-box';
+                            if (!lines.length) {
+                                box.innerHTML = `<div class="muted">Нет данных</div>`;
+                            } else {
+                                lines.forEach((ln) => {
+                                    const line = document.createElement('div');
+                                    line.className = 'detail-line';
+                                    const qty = Number(ln.qty || 0);
+                                    const qtyTxt = (qty && Math.abs(qty - Math.round(qty)) < 0.0001) ? String(Math.round(qty)) : String(qty);
+                                    line.innerHTML = `<div>${esc(ln.name || '')}${qty ? ' × ' + esc(qtyTxt) : ''}</div><div class="detail-sum">${esc(ln.sum || '0')}</div>`;
+                                    box.appendChild(line);
+                                });
+                            }
+                            const td = trD.querySelector('td');
+                            if (td) { td.innerHTML = ''; td.appendChild(box); }
+                        } catch (e) {
+                            trD.innerHTML = `<td colspan="7"><div class="details-box" style="color:#b91c1c; font-weight:700;">${esc(e && e.message ? e.message : 'Ошибка')}</div></td>`;
+                        }
+                    });
+                }
+            });
+        } else {
+            slice.forEach((row) => {
             const tr = document.createElement('tr');
             const txId = Number(row.transaction_id || 0);
             const hasHookah = Number(row.hookah_sum_minor || 0) > 0;
             tr.innerHTML = `
                 <td>${esc(row.date || '')}</td>
                 <td>${esc(row.hall || '')}</td>
-                <td>${esc(row.table || '')} <span class="muted">#${esc(row.table_id || '')}</span></td>
+                <td>${esc(row.table || '')}</td>
                 <td>${esc(row.receipt || '')}</td>
                 <td>${esc(row.waiter || '')}</td>
                 <td class="num">${esc(row.sum || '')}</td>
@@ -1077,7 +1181,8 @@ $firstOfMonth = date('Y-m-01');
                     }
                 });
             }
-        });
+            });
+        }
         renderPager(pagerTop, pages, page);
         renderPager(pagerBottom, pages, page);
         try {
@@ -1093,6 +1198,7 @@ $firstOfMonth = date('Y-m-01');
             totHookah.textContent = `Сумма кальянов: ${fmtVnd(hookahMinor)}`;
             totWithout.textContent = `Сумма без кальянов: ${fmtVnd(sumMinor - hookahMinor)}`;
         } catch (_) {}
+        updateSortIndicators();
         persistPrefsFromUi();
     };
 
@@ -1106,17 +1212,13 @@ $firstOfMonth = date('Y-m-01');
     };
     if (pagerTop) pagerTop.addEventListener('click', onPagerClick);
     if (pagerBottom) pagerBottom.addEventListener('click', onPagerClick);
-    if (noPagesCb) noPagesCb.addEventListener('change', () => {
-        noPages = !!noPagesCb.checked;
-        page = 1;
-        renderTable();
-    });
     ths.forEach((th) => {
         th.addEventListener('click', () => {
             const key = th.getAttribute('data-sort');
             if (!key) return;
             if (sortBy === key) sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
             else { sortBy = key; sortDir = 'asc'; }
+            page = 1;
             renderTable();
         });
     });
@@ -1148,6 +1250,21 @@ $firstOfMonth = date('Y-m-01');
         tableFilterPop.addEventListener('click', (e) => e.stopPropagation());
         document.addEventListener('click', () => closeTableFilter());
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTableFilter(); });
+    }
+
+    if (noPagesCb) {
+        noPagesCb.addEventListener('change', () => {
+            pagesOn = !!noPagesCb.checked;
+            page = 1;
+            renderTable();
+        });
+    }
+    if (groupByDayCb) {
+        groupByDayCb.addEventListener('change', () => {
+            groupByDay = !!groupByDayCb.checked;
+            page = 1;
+            renderTable();
+        });
     }
 
     elFrom.addEventListener('change', () => persistPrefsFromUi());
