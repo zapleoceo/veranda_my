@@ -150,7 +150,7 @@
       top: -40px;
       width: 944px;
       height: 430px;
-      clip-path: polygon(0 0, 100% 0, 100% 184px, 140px 184px, 140px 100%, 0 100%);
+      clip-path: polygon(0 0, 100% 0, 100% 184px, 224px 184px, 224px 100%, 0 100%);
       background:
         radial-gradient(circle at 12% 24%, rgba(147,196,125,0.20), transparent 58%),
         radial-gradient(circle at 78% 30%, rgba(92,162,92,0.22), transparent 62%),
@@ -172,7 +172,7 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
-      clip-path: polygon(0 0, 100% 0, 100% 184px, 140px 184px, 140px 100%, 0 100%);
+      clip-path: polygon(0 0, 100% 0, 100% 184px, 224px 184px, 224px 100%, 0 100%);
     }
     .grass-area::before {
       transform: rotate(-2deg) translate(-14px, 10px);
@@ -248,13 +248,39 @@
       height: 84px;
       border-radius: 50%;
       background:
-        radial-gradient(circle at 35% 35%, rgba(255,255,255,0.55), rgba(255,255,255,0.10) 42%, transparent 56%),
-        radial-gradient(circle at 50% 55%, rgba(90,180,255,0.55), rgba(35,110,180,0.30) 55%, rgba(10,40,70,0.18) 100%),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.40), rgba(255,255,255,0.08) 38%, transparent 58%),
+        radial-gradient(circle at 50% 55%, rgba(90,180,255,0.62), rgba(35,110,180,0.34) 55%, rgba(10,40,70,0.20) 100%),
         rgba(35,110,180,0.18);
       border: 1px solid rgba(255,255,255,0.16);
       box-shadow: 0 16px 30px rgba(0,0,0,0.22), inset 0 2px 8px rgba(255,255,255,0.10);
       pointer-events: none;
       z-index: 1;
+    }
+    .fountain::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.9), rgba(255,255,255,0.25) 60%, rgba(35,110,180,0.15) 100%);
+      box-shadow: 0 0 0 6px rgba(90,180,255,0.10), 0 0 0 12px rgba(90,180,255,0.06);
+      opacity: 0.95;
+    }
+    .fountain::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 10px;
+      width: 4px;
+      height: 30px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.65), rgba(90,180,255,0.20), transparent);
+      filter: blur(0.2px);
+      opacity: 0.9;
     }
   
     .table {
@@ -418,7 +444,7 @@
   
             <button class="table wide" style="left: 286px; top: 142px;" data-table="8">8<span class="cap">2 чел</span></button>
             <button class="table wide" style="left: 408px; top: 142px;" data-table="9">9<span class="cap">2 чел</span></button>
-            <div class="fountain" style="left: 202px; top: 128px;" aria-hidden="true"></div>
+            <div class="fountain" style="left: 174px; top: 128px;" aria-hidden="true"></div>
             <button class="table wide" style="left: 606px; top: 142px;" data-table="10">10<span class="cap">2 чел</span></button>
             <button class="table wide" style="left: 728px; top: 142px;" data-table="11">11<span class="cap">2 чел</span></button>
   
@@ -431,7 +457,7 @@
             <button class="table small-vertical" style="left: 470px; top: 336px;" data-table="17">17<span class="cap">до 5</span></button>
             <button class="table small-vertical" style="left: 570px; top: 336px;" data-table="18">18<span class="cap">до 5</span></button>
             <button class="table small-vertical" style="left: 670px; top: 336px;" data-table="19">19<span class="cap">до 5</span></button>
-            <button class="table large" style="left: 758px; top: 314px;" data-table="20">20<span class="cap">до 15</span></button>
+            <button class="table large" style="left: 758px; top: 258px;" data-table="20">20<span class="cap">до 15</span></button>
   
             <div class="bar-row" aria-hidden="true">
               <div class="side-station">Касса</div>
