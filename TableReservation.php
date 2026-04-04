@@ -370,7 +370,8 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     }
   }
 
-  $ranges = [];
+  $rangesServer = [];
+  $rangesTs = [];
   foreach ($allowedList as $n) {
     $ids = $busyByNum[$n];
     sort($ids);
@@ -387,6 +388,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     if ($runStart !== null) $out[] = [$runStart, $prev];
 
     $txt = [];
+    $tsOut = [];
     foreach ($out as [$a, $b]) {
       if (!isset($slotStarts[$a]) || !isset($slotStarts[$b])) continue;
       $aTs = strtotime($slotStarts[$a]);
@@ -395,8 +397,10 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       $startStr = date('H:i', $aTs);
       $endStr = date('H:i', $bTs + $step);
       $txt[] = $startStr . '-' . $endStr;
+      $tsOut[] = [$aTs, $bTs + $step];
     }
-    $ranges[$n] = $txt;
+    $rangesServer[$n] = $txt;
+    $rangesTs[$n] = $tsOut;
   }
 
   echo json_encode([
@@ -408,7 +412,9 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       'duration' => $duration,
       'guests_count' => $guests,
     ],
-    'ranges_by_table_num' => $ranges,
+    'ranges_by_table_num_server' => $rangesServer,
+    'ranges_ts_by_table_num' => $rangesTs,
+    'server_timezone' => date_default_timezone_get(),
     'errors' => $errors,
   ], JSON_UNESCAPED_UNICODE);
   exit;
@@ -660,15 +666,18 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.10)), rgba(255,255,255,0.04);
       box-shadow: 0 12px 20px rgba(0,0,0,0.22);
       color: rgba(245,238,228,0.92);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      gap: 2px;
+      display: grid;
+      place-items: center;
       font-family: var(--font-display);
       font-size: 1.05rem;
       letter-spacing: 0.06em;
       text-transform: uppercase;
+    }
+    .station-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
     }
     .station-sub {
       font-family: var(--font-body);
@@ -1043,8 +1052,8 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
             <button class="table large" style="left: 758px; top: 258px;" data-table="20">20<span class="cap">до 15</span></button>
   
             <div class="bar-row" aria-hidden="true">
-              <div class="side-station">
-                <div>Музыканты</div>
+              <div class="station-wrap">
+                <div class="side-station">Музыканты</div>
                 <div class="station-sub" id="busyDateLabel">Данные на — дату</div>
               </div>
               <div class="bar">BAR</div>
@@ -1114,12 +1123,37 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       });
     }
 
-    const applyBusyRanges = (rangesByNum) => {
-      const map = (rangesByNum && typeof rangesByNum === 'object') ? rangesByNum : {};
+    const applyBusyRanges = (payload) => {
+      const tsMap = payload && typeof payload === 'object' && payload.ranges_ts_by_table_num && typeof payload.ranges_ts_by_table_num === 'object'
+        ? payload.ranges_ts_by_table_num
+        : null;
+      const strMap = payload && typeof payload === 'object' && payload.ranges_by_table_num_server && typeof payload.ranges_by_table_num_server === 'object'
+        ? payload.ranges_by_table_num_server
+        : null;
+
+      const fmtTime = (tsSec) => {
+        const d = new Date(Number(tsSec) * 1000);
+        if (!Number.isFinite(d.getTime())) return '';
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      };
+
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
-        const ranges = Array.isArray(map[n]) ? map[n].slice(0, 2) : [];
-        const txt = ranges.length ? ranges.join('\n') : '';
+        let lines = [];
+        const tsRanges = tsMap && Array.isArray(tsMap[n]) ? tsMap[n].slice(0, 2) : [];
+        if (tsRanges.length) {
+          lines = tsRanges.map((pair) => {
+            const a = Array.isArray(pair) ? pair[0] : null;
+            const b = Array.isArray(pair) ? pair[1] : null;
+            const s = fmtTime(a);
+            const e = fmtTime(b);
+            return (s && e) ? (s + '-' + e) : '';
+          }).filter(Boolean);
+        } else if (strMap && Array.isArray(strMap[n])) {
+          lines = strMap[n].slice(0, 2).map(String).filter(Boolean);
+        }
+
+        const txt = lines.length ? lines.join('\n') : '';
         let el = t.querySelector('.res-time');
         if (!txt) {
           if (el) el.remove();
@@ -1144,7 +1178,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       url.searchParams.set('date', dateStr);
       fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
         .then((r) => r.json().catch(() => null))
-        .then((j) => { if (j && j.ok) applyBusyRanges(j.ranges_by_table_num); })
+        .then((j) => { if (j && j.ok) applyBusyRanges(j); })
         .catch(() => null);
     };
     const resDate = document.getElementById('resDate');
