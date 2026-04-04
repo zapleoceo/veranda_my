@@ -338,18 +338,18 @@
         <div class="map-shell">
           <div class="map" aria-label="Схема столов ресторана">
             <button class="table small-vertical" style="left: 0px; top: 18px;" data-table="1">1</button>
-            <button class="table small-vertical" style="left: 0px; top: 0px; transform: translateY(-76px);" data-table="2">2</button>
-            <button class="table small-vertical" style="left: 0px; top: 0px; transform: translateY(-152px);" data-table="3">3</button>
+            <button class="table small-vertical" style="left: 0px; top: 124px;" data-table="2">2</button>
+            <button class="table small-vertical" style="left: 0px; top: 230px;" data-table="3">3</button>
   
-            <button class="table" style="left: 88px; top: 0px;" data-table="4">4</button>
-            <button class="table" style="left: 196px; top: -22px;" data-table="5">5</button>
-            <button class="table" style="left: 512px; top: -16px;" data-table="6">6</button>
-            <button class="table" style="left: 644px; top: 0px;" data-table="7">7</button>
+            <button class="table" style="left: 144px; top: 0px;" data-table="4">4</button>
+            <button class="table" style="left: 252px; top: -22px;" data-table="5">5</button>
+            <button class="table" style="left: 568px; top: -16px;" data-table="6">6</button>
+            <button class="table" style="left: 700px; top: 0px;" data-table="7">7</button>
   
-            <button class="table wide" style="left: 118px; top: 86px;" data-table="8">8</button>
-            <button class="table wide" style="left: 212px; top: 86px;" data-table="9">9</button>
-            <button class="table wide" style="left: 466px; top: 86px;" data-table="10">10</button>
-            <button class="table wide" style="left: 560px; top: 86px;" data-table="11">11</button>
+            <button class="table wide" style="left: 174px; top: 86px;" data-table="8">8</button>
+            <button class="table wide" style="left: 296px; top: 86px;" data-table="9">9</button>
+            <button class="table wide" style="left: 522px; top: 86px;" data-table="10">10</button>
+            <button class="table wide" style="left: 644px; top: 86px;" data-table="11">11</button>
   
             <button class="table" style="left: 120px; top: 214px;" data-table="12">12</button>
             <button class="table" style="left: 248px; top: 214px;" data-table="13">13</button>
@@ -460,4 +460,3 @@
   </script>
 </body>
 </html>
-
