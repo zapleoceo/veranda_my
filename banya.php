@@ -41,6 +41,7 @@ $loadProductMap = function (\App\Classes\PosterAPI $api): array {
         $map[$pid] = [
             'name' => (string)($p['product_name'] ?? ''),
             'category_id' => (int)($p['category_id'] ?? $p['menu_category_id'] ?? $p['main_category_id'] ?? 0),
+            'menu_category_id' => (int)($p['menu_category_id'] ?? $p['category_id'] ?? $p['main_category_id'] ?? 0),
             'sub_category_id' => (int)($p['sub_category_id'] ?? $p['menu_category_id2'] ?? $p['category2_id'] ?? 0),
         ];
     }
@@ -142,7 +143,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
             }
         }
 
-        $txPool = [];
+        $txBase = [];
         $nextTr = null;
         $prevNextTr = null;
         $guard = 0;
@@ -152,8 +153,8 @@ if (($_GET['ajax'] ?? '') === 'load') {
             $params = [
                 'dateFrom' => str_replace('-', '', $dateFrom),
                 'dateTo' => str_replace('-', '', $dateTo),
-                'include_products' => 'true',
-                'status' => 0,
+                'include_products' => 'false',
+                'status' => 2,
             ];
             if ($nextTr !== null) $params['next_tr'] = $nextTr;
             $batch = $api->request('dash.getTransactions', $params, 'GET');
@@ -175,41 +176,76 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 if ($tableIdRow <= 0) continue;
                 $hallIdRow = (int)($hallByTable[$tableIdRow] ?? 0);
                 if ($hallIdRow !== BANYA_HALL_ID && $tableIdRow !== 141) continue;
-                $txPool[] = ['tx' => $tx, 'hall_id' => $hallIdRow];
+                $txBase[$txId] = $tx;
             }
 
             if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
         } while ($count > 0 && $nextTr !== null);
 
-        foreach ($txPool as $row) {
-            $tx = $row['tx'];
-            $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
+        $detailsById = [];
+        if ($txBase) {
+            $ids = array_keys($txBase);
+            $chunks = array_chunk($ids, 12);
+            foreach ($chunks as $chunk) {
+                $mh = curl_multi_init();
+                $handles = [];
+                foreach ($chunk as $tid) {
+                    $url = 'https://joinposter.com/api/dash.getTransaction?token=' . urlencode($token)
+                        . '&transaction_id=' . urlencode((string)$tid)
+                        . '&include_products=true&include_history=false&include_delivery=false';
+                    $ch = curl_init();
+                    curl_setopt($ch, CURLOPT_URL, $url);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                    $handles[(int)$tid] = $ch;
+                    curl_multi_add_handle($mh, $ch);
+                }
+                do {
+                    $status = curl_multi_exec($mh, $active);
+                    if ($active) curl_multi_select($mh, 0.2);
+                } while ($active && $status == CURLM_OK);
+                foreach ($handles as $tid => $ch) {
+                    $body = curl_multi_getcontent($ch);
+                    curl_multi_remove_handle($mh, $ch);
+                    curl_close($ch);
+                    if (!is_string($body) || $body === '') continue;
+                    $data = json_decode($body, true);
+                    $resp = is_array($data) && isset($data['response']) ? $data['response'] : $data;
+                    $txFull = is_array($resp) && isset($resp[0]) && is_array($resp[0]) ? $resp[0] : null;
+                    if (is_array($txFull)) $detailsById[(int)$tid] = $txFull;
+                }
+                curl_multi_close($mh);
+            }
+        }
+
+        foreach ($txBase as $txId => $tx) {
+            $txFull = $detailsById[(int)$txId] ?? null;
+            if (!is_array($txFull)) continue;
+            $products = is_array($txFull['products'] ?? null) ? $txFull['products'] : [];
             $hookahMinorInCheck = 0;
 
             foreach ($products as $p) {
                 if (!is_array($p)) continue;
                 $pid = (int)($p['product_id'] ?? 0);
+                if ($pid <= 0) continue;
+                $menuCat = (int)($productMap[$pid]['menu_category_id'] ?? 0);
+                if ($menuCat !== HOOKAH_CATEGORY_ID) continue;
                 $numRaw = $p['num'] ?? $p['count'] ?? 0;
                 $num = is_numeric($numRaw) ? (float)$numRaw : 0;
-                $priceMinor = (int)($p['product_price'] ?? 0);
-                $lineMinor = (int)round($priceMinor * $num);
-                $cat = (int)($productMap[$pid]['category_id'] ?? 0);
-                $sub = (int)($productMap[$pid]['sub_category_id'] ?? 0);
-                $isHookah = ($cat === HOOKAH_CATEGORY_ID || $sub === HOOKAH_CATEGORY_ID);
-                if ($isHookah) $hookahMinorInCheck += $lineMinor;
+                $lineMinor = isset($p['payed_sum']) ? (int)$p['payed_sum'] : (int)round(((int)($p['product_price'] ?? 0)) * $num);
+                if ($lineMinor > 0) $hookahMinorInCheck += $lineMinor;
             }
 
-            $sumMinor = (int)($tx['payed_sum'] ?? $tx['sum'] ?? 0);
-            $dateCloseStr = (string)($tx['date_close_date'] ?? '');
-            $dateStr = $dateCloseStr !== '' ? $dateCloseStr : $fmtTs(isset($tx['date_start']) ? (int)$tx['date_start'] : 0);
+            $sumMinor = (int)($txFull['payed_sum'] ?? $tx['payed_sum'] ?? $tx['sum'] ?? 0);
+            $dateCloseStr = (string)($txFull['date_close_date'] ?? $tx['date_close_date'] ?? '');
+            $dateStr = $dateCloseStr !== '' ? $dateCloseStr : $fmtTs(isset($txFull['date_start']) ? (int)$txFull['date_start'] : (isset($tx['date_start']) ? (int)$tx['date_start'] : 0));
             if ($dateStr === '') $dateStr = '';
 
-            $txId = (int)($tx['transaction_id'] ?? 0);
-            $receipt = (string)($tx['receipt_number'] ?? $tx['transaction_id'] ?? '');
-            $spotIdRow = (int)($tx['spot_id'] ?? 0);
-            $tableIdRow = (int)($tx['table_id'] ?? 0);
-            $tableName = (string)($tx['table_name'] ?? $tableIdRow);
-            $waiter = (string)($tx['name'] ?? $tx['employee_name'] ?? '');
+            $receipt = (string)($txFull['receipt_number'] ?? $tx['receipt_number'] ?? $tx['transaction_id'] ?? '');
+            $spotIdRow = (int)($txFull['spot_id'] ?? $tx['spot_id'] ?? 0);
+            $tableIdRow = (int)($txFull['table_id'] ?? $tx['table_id'] ?? 0);
+            $tableName = (string)($txFull['table_name'] ?? $tx['table_name'] ?? $tableIdRow);
+            $waiter = (string)($txFull['name'] ?? $tx['name'] ?? $tx['employee_name'] ?? '');
 
             if ($sumMinor <= 0) {
                 continue;
@@ -225,7 +261,7 @@ if (($_GET['ajax'] ?? '') === 'load') {
                 'sum_minor' => $sumMinor,
                 'hookah_sum_minor' => $hookahMinorInCheck,
                 'waiter' => $waiter,
-                'transaction_id' => $txId,
+                'transaction_id' => (int)$txId,
             ];
 
             $totalChecks++;
