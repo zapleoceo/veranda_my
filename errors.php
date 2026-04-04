@@ -289,10 +289,11 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
             <div class="muted">Источник: Poster (dash.getTransactions + dash.getTransactionHistory)</div>
         </div>
         <div class="controls">
-            <form method="get" class="card" style="display:flex; gap:8px; align-items:center; padding:8px 10px;">
+            <form method="get" class="card" id="controlsForm" style="display:flex; gap:8px; align-items:center; padding:8px 10px;">
                 <span class="muted">Месяц</span>
                 <input type="month" name="ym" value="<?= htmlspecialchars($ym) ?>" />
                 <button type="submit">Ок</button>
+                <button type="button" id="loadBtn">Загрузить</button>
             </form>
         </div>
     </div>
@@ -549,7 +550,10 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         })().catch((err) => alert(err && err.message ? err.message : 'Ошибка'));
     });
 
-    loadMonth();
+    document.getElementById('loadBtn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        loadMonth();
+    });
 </script>
 </body>
 </html>
