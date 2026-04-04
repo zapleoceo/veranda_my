@@ -15,6 +15,12 @@ if (file_exists(__DIR__ . '/.env')) {
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 
 $posterToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
+$now = new DateTimeImmutable('now');
+$roundedNow = $now->setTime((int)$now->format('H'), (int)$now->format('i'), 0);
+$m = (int)$roundedNow->format('i');
+$add = (15 - ($m % 15)) % 15;
+if ($add > 0) $roundedNow = $roundedNow->modify('+' . $add . ' minutes');
+$defaultResDateLocal = $roundedNow->format('Y-m-d\TH:i');
 $hallIdForSettings = 2;
 $allowedSchemeNums = null;
 try {
@@ -1148,6 +1154,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       toggle.textContent = next === 'dark' ? '☀️' : '🌙';
     });
   
+    const defaultResDateLocal = <?= json_encode($defaultResDateLocal, JSON_UNESCAPED_UNICODE) ?>;
     const allowedTableNums = <?= json_encode($allowedSchemeNums, JSON_UNESCAPED_UNICODE) ?>;
     const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
 
@@ -1360,20 +1367,8 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
 
     const initDate = () => {
       if (!resDate) return;
-      const d = new Date();
-      const rounded = new Date(d.getTime());
-      rounded.setSeconds(0, 0);
-      const m = rounded.getMinutes();
-      const next = Math.ceil(m / 15) * 15;
-      if (next === 60) {
-        rounded.setHours(rounded.getHours() + 1);
-        rounded.setMinutes(0);
-      } else {
-        rounded.setMinutes(next);
-      }
-      rounded.setMinutes(rounded.getMinutes() - rounded.getTimezoneOffset());
-      resDate.value = rounded.toISOString().slice(0, 16);
-      loadBusyForDate(String(resDate.value).slice(0, 10));
+      resDate.value = defaultResDateLocal || '';
+      loadBusyForDate(String(resDate.value || '').slice(0, 10));
     };
 
     const syncSteps = () => {
