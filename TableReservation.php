@@ -150,7 +150,7 @@
       top: -40px;
       width: 860px;
       height: 430px;
-      clip-path: polygon(0 0, 100% 0, 100% 128px, 240px 128px, 240px 100%, 0 100%);
+      clip-path: polygon(0 0, 100% 0, 100% 128px, 140px 128px, 140px 100%, 0 100%);
       background:
         radial-gradient(circle at 12% 24%, rgba(147,196,125,0.20), transparent 58%),
         radial-gradient(circle at 78% 30%, rgba(92,162,92,0.22), transparent 62%),
@@ -172,7 +172,7 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
-      clip-path: polygon(0 0, 100% 0, 100% 128px, 240px 128px, 240px 100%, 0 100%);
+      clip-path: polygon(0 0, 100% 0, 100% 128px, 140px 128px, 140px 100%, 0 100%);
     }
     .grass-area::before {
       transform: rotate(-2deg) translate(-14px, 10px);
@@ -396,14 +396,14 @@
             <button class="table large" style="left: 0px; top: 150px;" data-table="2">2<span class="cap">до 8</span></button>
             <button class="table large" style="left: 0px; top: 276px;" data-table="3">3<span class="cap">до 8</span></button>
   
-            <button class="table" style="left: 200px; top: 0px;" data-table="4">4</button>
-            <button class="table" style="left: 364px; top: 0px;" data-table="5">5</button>
-            <button class="table" style="left: 512px; top: 0px;" data-table="6">6</button>
+            <button class="table small-vertical" style="left: 200px; top: 0px;" data-table="4">4</button>
+            <button class="table small-vertical" style="left: 364px; top: 0px;" data-table="5">5</button>
+            <button class="table small-vertical" style="left: 512px; top: 0px;" data-table="6">6</button>
             <button class="table large" style="left: 700px; top: 0px;" data-table="7">7<span class="cap">до 8</span></button>
   
-            <button class="table wide" style="left: 174px; top: 142px;" data-table="8">8</button>
-            <button class="table wide" style="left: 296px; top: 142px;" data-table="9">9</button>
-            <button class="table wide" style="left: 522px; top: 142px;" data-table="10">10</button>
+            <button class="table wide" style="left: 174px; top: 142px;" data-table="8">8<span class="cap">2 чел</span></button>
+            <button class="table wide" style="left: 296px; top: 142px;" data-table="9">9<span class="cap">2 чел</span></button>
+            <button class="table wide" style="left: 522px; top: 142px;" data-table="10">10<span class="cap">2 чел</span></button>
             <button class="table wide" style="left: 644px; top: 142px;" data-table="11">11</button>
   
             <button class="table" style="left: 232px; top: 242px;" data-table="12">12</button>
