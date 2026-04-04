@@ -251,6 +251,153 @@ if (($_GET['ajax'] ?? '') === 'load') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'load_day') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+
+    if ($token === '') {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $date = $parseDate((string)($_GET['date'] ?? ''));
+    if ($date === null) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $api = new \App\Classes\PosterAPI($token);
+    try {
+        $productMap = $loadProductMap($api);
+        $spotIds = banya_load_spot_ids($api);
+        if (!$spotIds) $spotIds = [1];
+
+        $hallByTable = [];
+        foreach ($spotIds as $sid) {
+            $rows = $api->request('spots.getTableHallTables', [
+                'spot_id' => (int)$sid,
+                'without_deleted' => 0,
+            ], 'GET');
+            if (!is_array($rows)) $rows = [];
+            foreach ($rows as $r) {
+                if (!is_array($r)) continue;
+                $tid = (int)($r['table_id'] ?? 0);
+                if ($tid <= 0) continue;
+                $hid = (int)($r['hall_id'] ?? $r['table_hall_id'] ?? 0);
+                if ($hid <= 0) continue;
+                $hallByTable[$tid] = $hid;
+            }
+        }
+
+        $seenTx = [];
+        $items = [];
+        $totalChecks = 0;
+        $totalSumMinor = 0;
+        $hookahSumMinor = 0;
+
+        $nextTr = null;
+        $prevNextTr = null;
+        $guard = 0;
+        do {
+            $guard++;
+            if ($guard > 20000) break;
+            $params = [
+                'dateFrom' => str_replace('-', '', $date),
+                'dateTo' => str_replace('-', '', $date),
+                'include_products' => 'true',
+                'status' => 2,
+            ];
+            if ($nextTr !== null) $params['next_tr'] = $nextTr;
+            $batch = $api->request('dash.getTransactions', $params, 'GET');
+            if (!is_array($batch)) $batch = [];
+            $count = count($batch);
+            if ($count > 0) {
+                $last = end($batch);
+                $prevNextTr = $nextTr;
+                $nextTr = is_array($last) ? ($last['transaction_id'] ?? null) : null;
+            }
+
+            foreach ($batch as $tx) {
+                if (!is_array($tx)) continue;
+                $txId = (int)($tx['transaction_id'] ?? 0);
+                if ($txId <= 0) continue;
+                if (isset($seenTx[$txId])) continue;
+                $seenTx[$txId] = true;
+
+                $tableIdRow = (int)($tx['table_id'] ?? 0);
+                if ($tableIdRow <= 0) continue;
+                $hallIdRow = (int)($hallByTable[$tableIdRow] ?? 0);
+                if ($hallIdRow !== (int)BANYA_HALL_ID && $tableIdRow !== 141) continue;
+
+                $products = is_array($tx['products'] ?? null) ? $tx['products'] : [];
+                $hookahMinorInCheck = 0;
+                foreach ($products as $p) {
+                    if (!is_array($p)) continue;
+                    $pid = (int)($p['product_id'] ?? 0);
+                    if ($pid <= 0) continue;
+                    $menuCat = (int)($productMap[$pid]['menu_category_id'] ?? 0);
+                    if ($menuCat !== HOOKAH_CATEGORY_ID) continue;
+                    $numRaw = $p['num'] ?? $p['count'] ?? 0;
+                    $num = is_numeric($numRaw) ? (float)$numRaw : 0;
+                    $lineMinor = isset($p['payed_sum']) ? (int)$p['payed_sum'] : (int)($p['product_sum'] ?? 0);
+                    if ($lineMinor <= 0) {
+                        $lineMinor = (int)round(((int)($p['product_price'] ?? 0)) * $num);
+                    }
+                    if ($lineMinor > 0) $hookahMinorInCheck += $lineMinor;
+                }
+
+                $sumMinor = (int)($tx['payed_sum'] ?? $tx['sum'] ?? 0);
+                if ($sumMinor <= 0) continue;
+                $dateCloseStr = (string)($tx['date_close_date'] ?? '');
+                $dateStr = $dateCloseStr !== '' ? $dateCloseStr : $fmtTs(isset($tx['date_start']) ? (int)$tx['date_start'] : 0);
+                if ($dateStr === '') $dateStr = '';
+                $receipt = (string)($tx['receipt_number'] ?? $tx['transaction_id'] ?? '');
+                $spotIdRow = (int)($tx['spot_id'] ?? 0);
+                $tableName = (string)($tx['table_name'] ?? $tableIdRow);
+                $waiter = (string)($tx['name'] ?? $tx['employee_name'] ?? '');
+
+                $items[] = [
+                    'date' => $dateStr,
+                    'hall' => (string)BANYA_HALL_ID,
+                    'spot_id' => $spotIdRow,
+                    'table_id' => $tableIdRow,
+                    'table' => $tableName,
+                    'receipt' => $receipt,
+                    'sum' => $fmtVnd($sumMinor),
+                    'sum_minor' => $sumMinor,
+                    'hookah_sum_minor' => $hookahMinorInCheck,
+                    'waiter' => $waiter,
+                    'transaction_id' => $txId,
+                ];
+
+                $totalChecks++;
+                $totalSumMinor += $sumMinor;
+                $hookahSumMinor += $hookahMinorInCheck;
+            }
+
+            if ($nextTr !== null && $prevNextTr !== null && (string)$nextTr === (string)$prevNextTr) break;
+        } while ($count > 0 && $nextTr !== null);
+
+        echo json_encode([
+            'ok' => true,
+            'date' => $date,
+            'items' => $items,
+            'totals' => [
+                'checks' => (int)$totalChecks,
+                'sum_minor' => (int)$totalSumMinor,
+                'hookah_sum_minor' => (int)$hookahSumMinor,
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'tx') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -402,7 +549,14 @@ $firstOfMonth = date('Y-m-01');
             </label>
             <div style="display:flex; align-items:center; gap:10px; flex-wrap: wrap;">
                 <button id="loadBtn" type="button">ЗАГРУЗИТЬ</button>
-                <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
+                <div class="progress" id="prog" style="display:none; align-items:center; gap: 10px; margin-left: 10px;">
+                    <div class="bar" style="width: 180px; height: 10px; border-radius: 999px; background: rgba(182,89,48,0.12); overflow: hidden;">
+                        <span id="progBar" style="display:block; height:100%; width:0; background: rgba(182,89,48,0.95); transition: width 0.15s ease;"></span>
+                    </div>
+                    <div class="label" id="progLabel" style="font-size: 12px; color:#1f2937; font-weight: 900; min-width: 44px;">0%</div>
+                    <div class="desc" id="progDesc" style="font-size: 12px; color:#6b7280; font-weight: 800;"></div>
+                </div>
+                <div class="loader" id="loader" style="display:none;"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
                 <label class="muted" style="flex-direction: row; align-items:center; gap: 8px;">
                     <input type="checkbox" id="noPages">
                     без страниц
@@ -451,6 +605,10 @@ $firstOfMonth = date('Y-m-01');
     const elTo = document.getElementById('dateTo');
     const btn = document.getElementById('loadBtn');
     const loader = document.getElementById('loader');
+    const prog = document.getElementById('prog');
+    const progBar = document.getElementById('progBar');
+    const progLabel = document.getElementById('progLabel');
+    const progDesc = document.getElementById('progDesc');
     const err = document.getElementById('err');
     const tbody = document.getElementById('tbody');
     const totChecks = document.getElementById('totChecks');
@@ -460,7 +618,14 @@ $firstOfMonth = date('Y-m-01');
 
     const setLoading = (on) => {
         btn.disabled = on;
-        loader.style.display = on ? 'inline-flex' : 'none';
+        if (loader) loader.style.display = 'none';
+        if (prog) prog.style.display = on ? 'inline-flex' : 'none';
+    };
+    const setProgress = (pct, desc) => {
+        const p = Math.max(0, Math.min(100, Math.round(Number(pct || 0))));
+        if (progBar) progBar.style.width = p + '%';
+        if (progLabel) progLabel.textContent = p + '%';
+        if (progDesc) progDesc.textContent = String(desc || '');
     };
 
     const setError = (msg) => {
@@ -827,23 +992,71 @@ $firstOfMonth = date('Y-m-01');
     const load = async () => {
         setError('');
         setLoading(true);
+        setProgress(0, 'Подготовка…');
         tbody.innerHTML = '';
         totChecks.textContent = 'Итого чеков: 0';
         totSum.textContent = 'Итого сумма: 0';
         totHookah.textContent = 'Сумма кальянов: 0';
         totWithout.textContent = 'Сумма без кальянов: 0';
         try {
-            const url = new URL(location.href);
-            url.searchParams.set('ajax', 'load');
-            url.searchParams.set('date_from', elFrom.value);
-            url.searchParams.set('date_to', elTo.value);
-            const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
-            const txt = await res.text();
-            let j = null;
-            try { j = JSON.parse(txt); } catch (_) {}
-            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка загрузки');
+            const from = String(elFrom.value || '');
+            const to = String(elTo.value || '');
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new Error('Некорректный период');
 
-            dataItems = j.items || [];
+            const dayList = (() => {
+                const out = [];
+                const a = new Date(from + 'T00:00:00Z');
+                const b = new Date(to + 'T00:00:00Z');
+                if (isNaN(a.getTime()) || isNaN(b.getTime()) || a.getTime() > b.getTime()) return out;
+                for (let t = a.getTime(); t <= b.getTime(); t += 86400000) {
+                    out.push(new Date(t).toISOString().slice(0, 10));
+                }
+                return out;
+            })();
+            if (!dayList.length) throw new Error('Некорректный период');
+
+            const concurrency = 4;
+            const base = new URL(location.href);
+            base.searchParams.set('ajax', 'load_day');
+            const seen = new Set();
+            const out = [];
+            let done = 0;
+
+            const fetchDay = async (d) => {
+                const url = new URL(base.toString());
+                url.searchParams.set('date', d);
+                const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                const txt = await res.text();
+                let j = null;
+                try { j = JSON.parse(txt); } catch (_) {}
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка загрузки');
+                const items = Array.isArray(j.items) ? j.items : [];
+                items.forEach((it) => {
+                    const tid = Number(it && it.transaction_id ? it.transaction_id : 0);
+                    if (!tid || seen.has(tid)) return;
+                    seen.add(tid);
+                    out.push(it);
+                });
+            };
+
+            const runPool = async () => {
+                let idx = 0;
+                const workers = new Array(Math.min(concurrency, dayList.length)).fill(0).map(async () => {
+                    while (idx < dayList.length) {
+                        const d = dayList[idx++];
+                        await fetchDay(d);
+                        done++;
+                        const pct = Math.max(1, Math.round((done / dayList.length) * 100));
+                        setProgress(pct, `Дни: ${done} из ${dayList.length} (${d})`);
+                    }
+                });
+                await Promise.all(workers);
+            };
+
+            setProgress(1, `Дни: 0 из ${dayList.length}`);
+            await runPool();
+
+            dataItems = out;
             rebuildTableFilter();
             page = 1;
             renderTable();
@@ -851,6 +1064,7 @@ $firstOfMonth = date('Y-m-01');
         } catch (e) {
             setError(e && e.message ? e.message : 'Ошибка');
         } finally {
+            setProgress(100, 'Готово');
             setLoading(false);
         }
     };
