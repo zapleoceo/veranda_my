@@ -1179,29 +1179,28 @@ $firstOfMonth = date('Y-m-01');
             const to = String(elTo.value || '');
             if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new Error('Некорректный период');
 
-            const tablesUrl = new URL(location.href);
-            tablesUrl.searchParams.set('ajax', 'tables_list');
-            const resTables = await fetch(tablesUrl.toString(), { headers: { 'Accept': 'application/json' } });
-            const txtTables = await resTables.text();
-            let jTables = null;
-            try { jTables = JSON.parse(txtTables); } catch (_) {}
-            if (!jTables || !jTables.ok) throw new Error((jTables && jTables.error) ? jTables.error : 'Ошибка загрузки столов');
-            const tables = Array.isArray(jTables.tables) ? jTables.tables : [];
-            const tableIds = tables.map((t) => Number(t && t.table_id ? t.table_id : 0)).filter((x) => x > 0);
-            if (!tableIds.length) throw new Error('Нет столов для загрузки');
-
             const concurrency = 6;
             const base = new URL(location.href);
-            base.searchParams.set('ajax', 'load_table');
-            base.searchParams.set('date_from', from);
-            base.searchParams.set('date_to', to);
+            base.searchParams.set('ajax', 'load_day');
             const seen = new Set();
             const out = [];
             let done = 0;
 
-            const fetchTable = async (tid) => {
+            const dayList = (() => {
+                const out = [];
+                const a = new Date(from + 'T00:00:00Z');
+                const b = new Date(to + 'T00:00:00Z');
+                if (isNaN(a.getTime()) || isNaN(b.getTime()) || a.getTime() > b.getTime()) return out;
+                for (let t = a.getTime(); t <= b.getTime(); t += 86400000) {
+                    out.push(new Date(t).toISOString().slice(0, 10));
+                }
+                return out;
+            })();
+            if (!dayList.length) throw new Error('Некорректный период');
+
+            const fetchDay = async (d) => {
                 const url = new URL(base.toString());
-                url.searchParams.set('table_id', String(tid));
+                url.searchParams.set('date', String(d));
                 const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
                 const txt = await res.text();
                 let j = null;
@@ -1218,19 +1217,21 @@ $firstOfMonth = date('Y-m-01');
 
             const runPool = async () => {
                 let idx = 0;
-                const workers = new Array(Math.min(concurrency, tableIds.length)).fill(0).map(async () => {
-                    while (idx < tableIds.length) {
-                        const tid = tableIds[idx++];
-                        await fetchTable(tid);
+                const workers = new Array(Math.min(concurrency, dayList.length)).fill(0).map(async () => {
+                    while (idx < dayList.length) {
+                        const d = dayList[idx++];
+                        await fetchDay(d);
                         done++;
-                        const pct = Math.max(1, Math.round((done / tableIds.length) * 100));
-                        setProgress(pct, `- стол ${done}/${tableIds.length} (#${tid})`);
+                        const pct = Math.max(1, Math.round((done / dayList.length) * 100));
+                        const dd = String(d).slice(8, 10);
+                        const mm = String(d).slice(5, 7);
+                        setProgress(pct, `- день ${done}/${dayList.length} (${dd}/${mm})`);
                     }
                 });
                 await Promise.all(workers);
             };
 
-            setProgress(1, `- стол 0/${tableIds.length}`);
+            setProgress(1, `- день 0/${dayList.length}`);
             await runPool();
 
             dataItems = out;
