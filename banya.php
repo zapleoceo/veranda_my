@@ -455,7 +455,14 @@ $firstOfMonth = date('Y-m-01');
                 <tr>
                     <th id="thDate" data-sort="date" style="width:170px; cursor:pointer;">Дата</th>
                     <th id="thHall" data-sort="hall" style="width:80px; cursor:pointer;">Hall</th>
-                    <th id="thTable" data-sort="table" style="width:120px; cursor:pointer;">Стол</th>
+                    <th id="thTable" data-sort="table" style="width:140px; cursor:pointer;">
+                        <div style="display:flex; align-items:center; justify-content: space-between; gap: 8px;">
+                            <span>Стол</span>
+                            <select id="tableFilter" style="max-width: 92px; padding: 4px 8px; border-radius: 10px; border: 1px solid rgba(182,89,48,0.22); background: #fff; color: var(--brand-text); font-weight: 900;">
+                                <option value="">Все</option>
+                            </select>
+                        </div>
+                    </th>
                     <th id="thReceipt" data-sort="receipt" style="width:120px; cursor:pointer;">Чек</th>
                     <th id="thWaiter" data-sort="waiter" style="cursor:pointer;">Официант</th>
                     <th id="thSum" data-sort="sum_minor" style="width:140px; text-align:right; cursor:pointer;">Сумма</th>
@@ -541,6 +548,7 @@ $firstOfMonth = date('Y-m-01');
     const pagerTop = document.getElementById('pagerTop');
     const pagerBottom = document.getElementById('pagerBottom');
     const noPagesCb = document.getElementById('noPages');
+    const tableFilterEl = document.getElementById('tableFilter');
     const ths = Array.from(document.querySelectorAll('th[data-sort]'));
     let dataItems = [];
     let sortBy = 'date';
@@ -548,6 +556,7 @@ $firstOfMonth = date('Y-m-01');
     let page = 1;
     const pageSize = 20;
     let noPages = false;
+    let tableFilter = '';
 
     const applyPrefsToUi = () => {
         const p = loadPrefs();
@@ -561,6 +570,7 @@ $firstOfMonth = date('Y-m-01');
         if (typeof p.sort_by === 'string') sortBy = p.sort_by;
         if (p.sort_dir === 'asc' || p.sort_dir === 'desc') sortDir = p.sort_dir;
         if (typeof p.page === 'number' && isFinite(p.page) && p.page > 0) page = Math.floor(p.page);
+        if (typeof p.table_filter === 'string') tableFilter = p.table_filter;
     };
     const persistPrefsFromUi = () => {
         savePrefs({
@@ -570,7 +580,34 @@ $firstOfMonth = date('Y-m-01');
             sort_by: sortBy,
             sort_dir: sortDir,
             page: page,
+            table_filter: tableFilter,
         });
+    };
+
+    const fmtVnd = (minor) => {
+        const vnd = Math.round(Number(minor || 0) / 100);
+        return String(vnd).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    };
+
+    const rebuildTableFilter = () => {
+        if (!tableFilterEl) return;
+        const prev = String(tableFilter || '');
+        const set = new Map();
+        dataItems.forEach((it) => {
+            const id = String(it.table_id || '');
+            if (!id) return;
+            const label = String(it.table || it.table_id || '').trim();
+            if (!set.has(id)) set.set(id, label || id);
+        });
+        const entries = Array.from(set.entries()).sort((a, b) => {
+            const an = Number(a[0] || 0);
+            const bn = Number(b[0] || 0);
+            if (an && bn) return an - bn;
+            return String(a[1]).localeCompare(String(b[1]), 'ru');
+        });
+        tableFilterEl.innerHTML = '<option value="">Все</option>' + entries.map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`).join('');
+        if (prev && set.has(prev)) tableFilterEl.value = prev;
+        else { tableFilter = ''; tableFilterEl.value = ''; }
     };
 
     const applySort = (arr) => {
@@ -630,7 +667,8 @@ $firstOfMonth = date('Y-m-01');
     };
 
     const renderTable = () => {
-        const items = applySort(dataItems);
+        const base = tableFilter ? dataItems.filter((x) => String(x.table_id || '') === String(tableFilter)) : dataItems;
+        const items = applySort(base);
         const total = items.length;
         const pages = noPages ? 1 : Math.max(1, Math.ceil(total / pageSize));
         if (page > pages) page = pages;
@@ -695,6 +733,19 @@ $firstOfMonth = date('Y-m-01');
         });
         renderPager(pagerTop, pages, page);
         renderPager(pagerBottom, pages, page);
+        try {
+            const checks = total;
+            let sumMinor = 0;
+            let hookahMinor = 0;
+            items.forEach((r) => {
+                sumMinor += Number(r.sum_minor || 0);
+                hookahMinor += Number(r.hookah_sum_minor || 0);
+            });
+            totChecks.textContent = `Итого чеков: ${String(checks)}`;
+            totSum.textContent = `Итого сумма: ${fmtVnd(sumMinor)}`;
+            totHookah.textContent = `Сумма кальянов: ${fmtVnd(hookahMinor)}`;
+            totWithout.textContent = `Сумма без кальянов: ${fmtVnd(sumMinor - hookahMinor)}`;
+        } catch (_) {}
         persistPrefsFromUi();
     };
 
@@ -722,6 +773,14 @@ $firstOfMonth = date('Y-m-01');
             renderTable();
         });
     });
+    if (tableFilterEl) {
+        tableFilterEl.addEventListener('click', (e) => e.stopPropagation());
+        tableFilterEl.addEventListener('change', () => {
+            tableFilter = String(tableFilterEl.value || '');
+            page = 1;
+            renderTable();
+        });
+    }
 
     elFrom.addEventListener('change', () => persistPrefsFromUi());
     elTo.addEventListener('change', () => persistPrefsFromUi());
@@ -758,13 +817,9 @@ $firstOfMonth = date('Y-m-01');
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка загрузки');
 
             dataItems = j.items || [];
+            rebuildTableFilter();
             page = 1;
             renderTable();
-
-            totChecks.textContent = `Итого чеков: ${String(j.totals?.checks || 0)}`;
-            totSum.textContent = `Итого сумма: ${String(j.totals?.sum || '0')}`;
-            totHookah.textContent = `Сумма кальянов: ${String(j.totals?.hookah_sum || '0')}`;
-            totWithout.textContent = `Сумма без кальянов: ${String(j.totals?.without_hookah_sum || '0')}`;
             persistPrefsFromUi();
         } catch (e) {
             setError(e && e.message ? e.message : 'Ошибка');
