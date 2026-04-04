@@ -217,7 +217,6 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
         linear-gradient(90deg, var(--color-border) 1px, transparent 1px),
         var(--color-surface-2);
       background-size: 28px 28px;
-      background-position: 56px 56px, 56px 56px, 0 0;
       border-radius: calc(var(--radius-lg) - 8px);
       padding: var(--space-6);
       border: 1px solid var(--color-border);
@@ -227,16 +226,18 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     .map {
       --mx: 1;
       --my: 1;
+      --sx: -56px;
+      --sy: -56px;
       position: relative;
       min-width: 820px;
       min-height: 620px;
       border-radius: var(--radius-md);
+      transform: translate(var(--sx), var(--sy)) scale(var(--mx), var(--my));
+      transform-origin: center;
     }
     .map.is-mirrored {
       --mx: -1;
       --my: -1;
-      transform: scale(var(--mx), var(--my));
-      transform-origin: center;
     }
 
     .grass-area {
@@ -408,12 +409,12 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       opacity: 0.92;
     }
     @keyframes koiOrbit1 {
-      from { transform: translate(-50%, -50%) rotate(0deg) translate(22px) rotate(90deg); }
-      to { transform: translate(-50%, -50%) rotate(360deg) translate(22px) rotate(450deg); }
+      from { transform: translate(-50%, -50%) rotate(0deg) translate(22px); }
+      to { transform: translate(-50%, -50%) rotate(360deg) translate(22px); }
     }
     @keyframes koiOrbit2 {
-      from { transform: translate(-50%, -50%) rotate(180deg) translate(20px) rotate(-90deg); }
-      to { transform: translate(-50%, -50%) rotate(540deg) translate(20px) rotate(270deg); }
+      from { transform: translate(-50%, -50%) rotate(180deg) translate(20px); }
+      to { transform: translate(-50%, -50%) rotate(-180deg) translate(20px); }
     }
   
     .table {
