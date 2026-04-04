@@ -5005,11 +5005,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 if (!backdrop || !text || !cb || !ok || !cancel) return resolve(false);
                 text.innerHTML =
                     `Будет создан перевод в Poster.<br>` +
-                    `Счет списания: <b>${esc(accFromName)}</b><br>` +
-                    `Счет зачисления: <b>${esc(accToName)}</b><br>` +
-                    `Сумма: <b>${esc(sumTxt)}</b><br>` +
-                    `Комментарий: <b>${esc(comment)}</b><br>` +
-                    `Создатель: <b>${esc(creatorEmail || '—')}</b>`;
+                    `Счет списания: <b>${escapeHtml(accFromName)}</b><br>` +
+                    `Счет зачисления: <b>${escapeHtml(accToName)}</b><br>` +
+                    `Сумма: <b>${escapeHtml(sumTxt)}</b><br>` +
+                    `Комментарий: <b>${escapeHtml(comment)}</b><br>` +
+                    `Создатель: <b>${escapeHtml(creatorEmail || '—')}</b>`;
                 cb.checked = false;
                 ok.disabled = true;
                 backdrop.style.display = 'flex';
