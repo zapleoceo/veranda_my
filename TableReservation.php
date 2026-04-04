@@ -148,8 +148,8 @@
       position: absolute;
       left: -22px;
       top: -28px;
-      width: 860px;
-      height: 240px;
+      width: 620px;
+      height: 220px;
       border-radius: 44px;
       background:
         radial-gradient(circle at 12% 24%, rgba(147,196,125,0.20), transparent 58%),
@@ -167,6 +167,16 @@
       filter: saturate(1.35) contrast(1.05);
     }
   
+    .table .cap {
+      display: block;
+      font-size: 0.75rem;
+      letter-spacing: 0;
+      font-weight: 700;
+      opacity: 0.85;
+      margin-top: 2px;
+      font-family: var(--font-body);
+    }
+
     .bar-row {
       position: absolute;
       left: 50%;
@@ -355,17 +365,17 @@
       </div>
   
       <section class="layout">
-        <div class="map-shell">
+        <div class="map-shell" style="transform: scaleX(0.9); transform-origin: top left;">
           <div class="map" aria-label="Схема столов ресторана">
             <div class="grass-area" aria-hidden="true"></div>
-            <button class="table large" style="left: 0px; top: 24px;" data-table="1">1</button>
-            <button class="table large" style="left: 0px; top: 150px;" data-table="2">2</button>
-            <button class="table large" style="left: 0px; top: 276px;" data-table="3">3</button>
+            <button class="table large" style="left: 0px; top: 24px;" data-table="1">1<span class="cap">до 8</span></button>
+            <button class="table large" style="left: 0px; top: 150px;" data-table="2">2<span class="cap">до 8</span></button>
+            <button class="table large" style="left: 0px; top: 276px;" data-table="3">3<span class="cap">до 8</span></button>
   
             <button class="table" style="left: 200px; top: 56px;" data-table="4">4</button>
             <button class="table" style="left: 308px; top: 56px;" data-table="5">5</button>
             <button class="table" style="left: 512px; top: 56px;" data-table="6">6</button>
-            <button class="table large" style="left: 700px; top: 0px;" data-table="7">7</button>
+            <button class="table large" style="left: 700px; top: 0px;" data-table="7">7<span class="cap">до 8</span></button>
   
             <button class="table wide" style="left: 174px; top: 142px;" data-table="8">8</button>
             <button class="table wide" style="left: 296px; top: 142px;" data-table="9">9</button>
@@ -381,7 +391,7 @@
             <button class="table small-vertical" style="left: 358px; top: 336px;" data-table="17">17</button>
             <button class="table small-vertical" style="left: 458px; top: 336px;" data-table="18">18</button>
             <button class="table small-vertical" style="left: 558px; top: 336px;" data-table="19">19</button>
-            <button class="table large" style="left: 646px; top: 314px;" data-table="20">20</button>
+            <button class="table large" style="left: 646px; top: 314px;" data-table="20">20<span class="cap">до 15</span></button>
   
             <div class="bar-row" aria-hidden="true">
               <div class="side-station">Касса</div>
