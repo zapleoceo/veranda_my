@@ -362,6 +362,59 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       filter: drop-shadow(0 8px 16px rgba(0,0,0,0.22));
       pointer-events: none;
     }
+    .koi {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 16px;
+      height: 10px;
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at 25% 45%, rgba(255,255,255,0.92), rgba(255,255,255,0) 52%),
+        radial-gradient(circle at 60% 55%, rgba(255,255,255,0.20), rgba(255,255,255,0) 62%),
+        linear-gradient(180deg, #ffb14a, #e87422);
+      box-shadow: 0 6px 10px rgba(0,0,0,0.18);
+      transform-origin: center;
+      opacity: 0.95;
+    }
+    .koi::before {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 50%;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.5);
+      transform: translateY(-50%);
+    }
+    .koi::after {
+      content: '';
+      position: absolute;
+      right: -6px;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      background: linear-gradient(180deg, rgba(255,190,90,0.9), rgba(232,116,34,0.9));
+      clip-path: polygon(0 50%, 100% 0, 100% 100%);
+      transform: translateY(-50%);
+      border-radius: 2px;
+      opacity: 0.95;
+    }
+    .koi.koi-1 { animation: koiOrbit1 2.6s linear infinite; }
+    .koi.koi-2 {
+      animation: koiOrbit2 3.1s linear infinite;
+      filter: hue-rotate(-8deg) saturate(1.1);
+      opacity: 0.92;
+    }
+    @keyframes koiOrbit1 {
+      from { transform: translate(-50%, -50%) rotate(0deg) translate(22px) rotate(90deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg) translate(22px) rotate(450deg); }
+    }
+    @keyframes koiOrbit2 {
+      from { transform: translate(-50%, -50%) rotate(180deg) translate(20px) rotate(-90deg); }
+      to { transform: translate(-50%, -50%) rotate(540deg) translate(20px) rotate(270deg); }
+    }
   
     .table {
       position: absolute;
@@ -605,6 +658,8 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
                 <circle cx="32" cy="14" r="3" fill="rgba(255,255,255,0.75)"/>
                 <path d="M24 40h16c0 0 2 0 2 2s-2 2-2 2H24c0 0-2 0-2-2s2-2 2-2Z" fill="url(#fBowl)" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
               </svg>
+              <div class="koi koi-1"></div>
+              <div class="koi koi-2"></div>
             </div>
             <button class="table wide" style="left: 606px; top: 142px;" data-table="10">10<span class="cap">2 чел</span></button>
             <button class="table wide" style="left: 728px; top: 142px;" data-table="11">11<span class="cap">2 чел</span></button>
@@ -697,7 +752,62 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
 
     const setOutput = (obj) => {
       if (!resultText) return;
+      if (typeof obj === 'string') {
+        resultText.value = obj;
+        return;
+      }
       resultText.value = fmtJson(obj);
+    };
+
+    const formatAvailabilityText = (j, selectedNum) => {
+      if (!j || typeof j !== 'object') return 'Нет данных';
+
+      const req = (j && typeof j.request === 'object' && j.request) ? j.request : {};
+      const numsRaw = Array.isArray(j.free_table_nums) ? j.free_table_nums.map(String) : [];
+      const nums = numsRaw
+        .filter((x) => x !== '')
+        .slice()
+        .sort((a, b) => (Number(a) || 0) - (Number(b) || 0));
+
+      const selected = selectedNum ? String(selectedNum) : '';
+      const isFree = selected ? nums.includes(selected) : false;
+      const freeTables = Array.isArray(j.free_tables) ? j.free_tables : [];
+      const row = selected ? (freeTables.find((r) => r && String(r.table_num ?? '') === selected) || null) : null;
+
+      const lines = [];
+      lines.push('Результат проверки свободных столов');
+      lines.push('');
+      lines.push('Запрос:');
+      lines.push(`- date_reservation: ${String(req.date_reservation ?? '')}`);
+      lines.push(`- duration: ${String(req.duration ?? '')}`);
+      lines.push(`- guests_count: ${String(req.guests_count ?? '')}`);
+      lines.push(`- spot_id: ${String(req.spot_id ?? '')}`);
+      lines.push(`- hall_id: ${String(req.hall_id ?? '')}`);
+      lines.push('');
+      lines.push(`Свободных столов (hall_id=${String(req.hall_id ?? '')}): ${nums.length}`);
+      lines.push(`Номера: ${nums.length ? nums.join(', ') : '—'}`);
+
+      if (selected) {
+        lines.push('');
+        lines.push(`Выбранный стол: ${selected}`);
+        lines.push(`Статус: ${isFree ? 'СВОБОДЕН' : 'ЗАНЯТ'}`);
+        if (row) {
+          lines.push('');
+          lines.push('Данные по столу из API (freeTables):');
+          Object.keys(row).sort().forEach((k) => {
+            const v = row[k];
+            lines.push(`- ${k}: ${typeof v === 'object' ? fmtJson(v) : String(v)}`);
+          });
+        }
+      }
+
+      if (j.raw) {
+        lines.push('');
+        lines.push('RAW (как вернул Poster):');
+        lines.push(fmtJson(j.raw));
+      }
+
+      return lines.join('\n');
     };
 
     const setStatus = (tableNum) => {
@@ -749,18 +859,10 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       setStatus(selectedTableNum);
       if (!selectedTableNum) return;
       if (!last) {
-        setOutput({ selected_table: selectedTableNum, ok: false, message: 'Нажми "Проверить свободные столы"' });
+        setOutput('Нажми "Проверить свободные столы"');
         return;
       }
-      const freeTables = Array.isArray(last.free_tables) ? last.free_tables : [];
-      const row = freeTables.find((r) => String(r && r.table_num != null ? r.table_num : '') === selectedTableNum) || null;
-      setOutput({
-        selected_table: selectedTableNum,
-        is_free: freeNums.has(selectedTableNum),
-        table_info: row,
-        request: last.request,
-        raw: last.raw
-      });
+      setOutput(formatAvailabilityText(last, selectedTableNum));
     };
   
     tables.forEach(table => {
@@ -834,7 +936,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
           freeNums = new Set();
           lastKey = '';
           applyAvailabilityStyles();
-          setOutput(j || { ok: false, error: 'Ошибка запроса' });
+          setOutput(j && typeof j === 'object' ? fmtJson(j) : 'Ошибка запроса');
           renderSelectedTable();
           return;
         }
@@ -843,7 +945,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
         lastKey = key;
         freeNums = new Set(Array.isArray(j.free_table_nums) ? j.free_table_nums.map(String) : []);
         applyAvailabilityStyles();
-        if (!silent) setOutput(j);
+        if (!silent) setOutput(formatAvailabilityText(j, selectedTableNum));
         renderSelectedTable();
       } finally {
         isLoading = false;
@@ -854,7 +956,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
 
     if (checkBtn) {
       checkBtn.addEventListener('click', () => {
-        loadFree(false).catch((e) => setOutput({ ok: false, error: String(e && e.message ? e.message : e) }));
+        loadFree(false).catch((e) => setOutput('Ошибка: ' + String(e && e.message ? e.message : e)));
       });
     }
 
@@ -868,7 +970,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       resGuests.addEventListener('input', invalidateLast);
       resGuests.addEventListener('change', invalidateLast);
     }
-    setOutput({ info: 'Выбери дату. Потом укажи гостей и нажми "Проверить свободные столы". После этого кликай по столам.' });
+    setOutput('Выбери дату. Потом укажи гостей и нажми "Проверить свободные столы". После этого кликай по столам.');
   </script>
 </body>
 </html>
