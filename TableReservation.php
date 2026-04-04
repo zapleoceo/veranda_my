@@ -167,11 +167,18 @@
       filter: saturate(1.35) contrast(1.05);
     }
   
-    .bar {
+    .bar-row {
       position: absolute;
       left: 50%;
       bottom: 28px;
       transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 56px;
+      user-select: none;
+    }
+
+    .bar {
       width: 260px;
       height: 72px;
       border-radius: 36px;
@@ -183,7 +190,22 @@
       font-size: 1.9rem;
       letter-spacing: 0.08em;
       box-shadow: var(--shadow-sm);
-      user-select: none;
+    }
+
+    .side-station {
+      width: 170px;
+      height: 58px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.10)), rgba(255,255,255,0.04);
+      box-shadow: 0 12px 20px rgba(0,0,0,0.22);
+      color: rgba(245,238,228,0.92);
+      display: grid;
+      place-items: center;
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
     }
   
     .table {
@@ -340,19 +362,19 @@
             <button class="table large" style="left: 0px; top: 150px;" data-table="2">2</button>
             <button class="table large" style="left: 0px; top: 276px;" data-table="3">3</button>
   
-            <button class="table" style="left: 144px; top: 0px;" data-table="4">4</button>
-            <button class="table" style="left: 252px; top: 0px;" data-table="5">5</button>
-            <button class="table" style="left: 568px; top: 0px;" data-table="6">6</button>
-            <button class="table" style="left: 700px; top: 0px;" data-table="7">7</button>
+            <button class="table" style="left: 200px; top: 56px;" data-table="4">4</button>
+            <button class="table" style="left: 308px; top: 56px;" data-table="5">5</button>
+            <button class="table" style="left: 512px; top: 56px;" data-table="6">6</button>
+            <button class="table large" style="left: 700px; top: 0px;" data-table="7">7</button>
   
-            <button class="table wide" style="left: 174px; top: 86px;" data-table="8">8</button>
-            <button class="table wide" style="left: 296px; top: 86px;" data-table="9">9</button>
-            <button class="table wide" style="left: 522px; top: 86px;" data-table="10">10</button>
-            <button class="table wide" style="left: 644px; top: 86px;" data-table="11">11</button>
+            <button class="table wide" style="left: 174px; top: 142px;" data-table="8">8</button>
+            <button class="table wide" style="left: 296px; top: 142px;" data-table="9">9</button>
+            <button class="table wide" style="left: 522px; top: 142px;" data-table="10">10</button>
+            <button class="table wide" style="left: 644px; top: 142px;" data-table="11">11</button>
   
-            <button class="table" style="left: 120px; top: 214px;" data-table="12">12</button>
-            <button class="table" style="left: 248px; top: 214px;" data-table="13">13</button>
-            <button class="table" style="left: 472px; top: 214px;" data-table="14">14</button>
+            <button class="table" style="left: 232px; top: 242px;" data-table="12">12</button>
+            <button class="table" style="left: 360px; top: 242px;" data-table="13">13</button>
+            <button class="table" style="left: 472px; top: 242px;" data-table="14">14</button>
   
             <button class="table small-vertical" style="left: 158px; top: 336px;" data-table="15">15</button>
             <button class="table small-vertical" style="left: 258px; top: 336px;" data-table="16">16</button>
@@ -361,7 +383,11 @@
             <button class="table small-vertical" style="left: 558px; top: 336px;" data-table="19">19</button>
             <button class="table large" style="left: 646px; top: 314px;" data-table="20">20</button>
   
-            <div class="bar">BAR</div>
+            <div class="bar-row" aria-hidden="true">
+              <div class="side-station">Касса</div>
+              <div class="bar">BAR</div>
+              <div class="side-station">Музыканты</div>
+            </div>
           </div>
         </div>
   
