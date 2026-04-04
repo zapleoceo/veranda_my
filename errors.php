@@ -629,6 +629,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     const kpiMissing = document.getElementById('kpiMissing');
     const monthMissing = document.getElementById('monthMissing');
     const monthTotal = document.getElementById('monthTotal');
+    const checksHint = document.getElementById('checksHint');
 
     const dateList = (() => {
         const out = [];
@@ -661,6 +662,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     const monthData = new Map();
     let dayChecks = [];
     let onlyBad = false;
+    let checksAbort = null;
 
     const updateCalendarCell = (date, total, missing) => {
         const el = document.querySelector(`.day[data-date="${date}"]`);
@@ -720,6 +722,12 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         if (!tbody) return;
         tbody.innerHTML = '';
         const rows = onlyBad ? dayChecks.filter((x) => !!x.missing) : dayChecks.slice();
+        if (!rows.length) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td colspan="6" class="muted">Нет данных</td>`;
+            tbody.appendChild(tr);
+            return;
+        }
         rows.forEach((r) => {
             const tr = document.createElement('tr');
             if (r.missing) tr.className = 'bad';
@@ -798,17 +806,33 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
     };
 
     const fetchDayChecks = async (date) => {
+        if (checksAbort) {
+            try { checksAbort.abort(); } catch (_) {}
+        }
+        try { checksAbort = new AbortController(); } catch (_) { checksAbort = null; }
+        if (checksHint) {
+            checksHint.style.color = '#6b7280';
+            checksHint.textContent = 'Загрузка чеков…';
+        }
+        dayChecks = [];
+        renderChecks();
+
         const url = new URL(location.href);
         url.searchParams.set('ym', ym);
         url.searchParams.set('ajax', 'day_checks');
         url.searchParams.set('date', date);
-        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal: checksAbort ? checksAbort.signal : undefined });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const j = await res.json();
         if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка загрузки');
         const checks = Array.isArray(j.checks) ? j.checks : [];
         dayChecks = checks;
         renderChecks();
+        if (checksHint) {
+            const bad = checks.filter((x) => !!x.missing).length;
+            checksHint.style.color = '#6b7280';
+            checksHint.textContent = `Чеков: ${checks.length} · проблемных: ${bad}`;
+        }
     };
 
     const loadMonth = async () => {
@@ -863,7 +887,12 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
                 const r = monthData.get(firstDay) || { total: 0, missing: 0, hours: [] };
                 setDayKpis(firstDay, r.total, r.missing);
                 renderHourChart(r.hours || [], firstDay);
-                fetchDayChecks(firstDay).catch(() => {});
+                fetchDayChecks(firstDay).catch((e) => {
+                    if (checksHint) {
+                        checksHint.style.color = '#b91c1c';
+                        checksHint.textContent = String(e && e.message ? e.message : 'Ошибка загрузки чеков');
+                    }
+                });
                 const cell = document.querySelector(`.day[data-date="${firstDay}"]`);
                 if (cell) cell.classList.add('active');
             }
