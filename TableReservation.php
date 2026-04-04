@@ -15,6 +15,46 @@ if (file_exists(__DIR__ . '/.env')) {
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 
 $posterToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
+$hallIdForSettings = 2;
+$allowedSchemeNums = null;
+try {
+  $dbHost = trim((string)($_ENV['DB_HOST'] ?? ''));
+  $dbName = trim((string)($_ENV['DB_NAME'] ?? ''));
+  $dbUser = trim((string)($_ENV['DB_USER'] ?? ''));
+  $dbPass = (string)($_ENV['DB_PASS'] ?? '');
+  $dbSuffix = trim((string)($_ENV['DB_TABLE_SUFFIX'] ?? ''));
+
+  if ($dbHost !== '' && $dbName !== '' && $dbUser !== '') {
+    require_once __DIR__ . '/src/classes/Database.php';
+    require_once __DIR__ . '/src/classes/MetaRepository.php';
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $dbSuffix);
+    $metaRepo = new \App\Classes\MetaRepository($db);
+    $key = 'reservations_allowed_scheme_nums_hall_' . $hallIdForSettings;
+    $vals = $metaRepo->getMany([$key]);
+    $stored = array_key_exists($key, $vals) ? trim((string)$vals[$key]) : '';
+    if ($stored !== '') {
+      $decoded = json_decode($stored, true);
+      $tmp = [];
+      if (is_array($decoded)) {
+        foreach ($decoded as $v) {
+          $n = (int)$v;
+          if ($n >= 1 && $n <= 500) $tmp[(string)$n] = true;
+        }
+      } else {
+        foreach (explode(',', $stored) as $part) {
+          $part = trim($part);
+          if ($part === '' || !preg_match('/^\d+$/', $part)) continue;
+          $n = (int)$part;
+          if ($n >= 1 && $n <= 500) $tmp[(string)$n] = true;
+        }
+      }
+      $allowedSchemeNums = array_values(array_keys($tmp));
+      usort($allowedSchemeNums, fn($a, $b) => (int)$a <=> (int)$b);
+    }
+  }
+} catch (\Throwable $e) {
+  $allowedSchemeNums = null;
+}
 
 if (($_GET['ajax'] ?? '') === 'free_tables') {
   header('Content-Type: application/json; charset=utf-8');
@@ -32,6 +72,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $guests = (int)($_GET['guests_count'] ?? 0);
   $spotId = (int)($_GET['spot_id'] ?? 1);
   $hallId = 2;
+  $allowed = $allowedSchemeNums;
 
   $ts = strtotime($dateReservation);
   if ($ts === false || $dateReservation === '') {
@@ -55,11 +96,13 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     $free = is_array($resp) && isset($resp['freeTables']) && is_array($resp['freeTables']) ? $resp['freeTables'] : [];
     $filtered = [];
     $nums = [];
+    $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
     foreach ($free as $row) {
       if (!is_array($row)) continue;
       if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
       $num = trim((string)($row['table_num'] ?? ''));
       if ($num === '') continue;
+      if (is_array($allowedSet) && !isset($allowedSet[$num])) continue;
       $filtered[] = $row;
       $nums[$num] = true;
     }
@@ -99,6 +142,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   $duration = (int)($_GET['duration'] ?? 0);
   $spotId = (int)($_GET['spot_id'] ?? 1);
   $hallId = 2;
+  $allowed = $allowedSchemeNums;
 
   $ts = strtotime($dateReservation);
   if ($ts === false || $dateReservation === '') {
@@ -127,6 +171,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
 
     $tableRows = is_array($tablesResp) ? $tablesResp : [];
     $tableNameById = [];
+    $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
     foreach ($tableRows as $tr) {
       if (!is_array($tr)) continue;
       $id = trim((string)($tr['table_id'] ?? ''));
@@ -139,6 +184,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       if ($scheme === '') continue;
       $sInt = (int)$scheme;
       if ($sInt < 1 || $sInt > 20) continue;
+      if (is_array($allowedSet) && !isset($allowedSet[(string)$sInt])) continue;
       $tableNameById[$id] = (string)$sInt;
     }
 
@@ -614,6 +660,12 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       box-shadow: 0 18px 34px rgba(43, 89, 50, .28);
     }
   
+    .table.disabled {
+      opacity: 0.22;
+      filter: grayscale(0.35);
+      pointer-events: none;
+    }
+  
     .table.small-vertical { width: 58px; height: 92px; border-radius: 18px; }
     .table.wide { width: 112px; height: 58px; border-radius: 18px; }
     .table.large { width: 108px; height: 108px; border-radius: 26px; }
@@ -882,7 +934,19 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       toggle.textContent = next === 'dark' ? '☀️' : '🌙';
     });
   
+    const allowedTableNums = <?= json_encode($allowedSchemeNums, JSON_UNESCAPED_UNICODE) ?>;
+    const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
+
     const tables = Array.from(document.querySelectorAll('.table'));
+    if (allowedSet !== null) {
+      tables.forEach((t) => {
+        const n = String(t.dataset.table || '');
+        if (!allowedSet.has(n)) {
+          t.classList.add('disabled');
+          t.disabled = true;
+        }
+      });
+    }
     const resDate = document.getElementById('resDate');
     const resGuests = document.getElementById('resGuests');
     const checkBtn = document.getElementById('checkBtn');

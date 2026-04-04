@@ -27,7 +27,7 @@ $error = '';
 
 $tab = (string)($_GET['tab'] ?? 'sync');
 if ($tab === 'main') $tab = 'access';
-if (!in_array($tab, ['sync', 'access', 'telegram', 'menu', 'categories'], true)) {
+if (!in_array($tab, ['sync', 'access', 'telegram', 'menu', 'categories', 'reservations'], true)) {
     $tab = 'sync';
 }
 
@@ -207,6 +207,98 @@ foreach ($settingKeys as $key => $default) {
     $settings[$key] = $row ? $row['meta_value'] : $default;
     if (is_numeric($default)) {
         $settings[$key] = (int)$settings[$key];
+    }
+}
+
+$resHallId = max(1, (int)($_GET['hall_id'] ?? 2));
+$resSpotId = max(1, (int)($_GET['spot_id'] ?? 1));
+$resMetaKey = 'reservations_allowed_scheme_nums_hall_' . $resHallId;
+$resAllowedNums = [];
+$resTables = [];
+
+if ($tab === 'reservations') {
+    $metaRepo = new \App\Classes\MetaRepository($db);
+
+    if (isset($_POST['save_reservation_tables'])) {
+        $resHallIdPost = max(1, (int)($_POST['hall_id'] ?? $resHallId));
+        $resSpotIdPost = max(1, (int)($_POST['spot_id'] ?? $resSpotId));
+        $resMetaKeyPost = 'reservations_allowed_scheme_nums_hall_' . $resHallIdPost;
+
+        $raw = $_POST['allowed_nums'] ?? [];
+        $nums = [];
+        if (is_array($raw)) {
+            foreach ($raw as $v) {
+                $s = trim((string)$v);
+                if (!preg_match('/^\d+$/', $s)) continue;
+                $n = (int)$s;
+                if ($n < 1 || $n > 500) continue;
+                $nums[$n] = true;
+            }
+        }
+        $nums = array_values(array_keys($nums));
+        sort($nums);
+
+        $db->query(
+            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+            [$resMetaKeyPost, json_encode($nums, JSON_UNESCAPED_UNICODE)]
+        );
+
+        $message = 'Список доступных столов сохранён.';
+        $resHallId = $resHallIdPost;
+        $resSpotId = $resSpotIdPost;
+        $resMetaKey = $resMetaKeyPost;
+    }
+
+    $saved = $metaRepo->getMany([$resMetaKey]);
+    $stored = array_key_exists($resMetaKey, $saved) ? trim((string)$saved[$resMetaKey]) : '';
+    if ($stored !== '') {
+        $decoded = json_decode($stored, true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $v) {
+                $n = (int)$v;
+                if ($n >= 1 && $n <= 500) $resAllowedNums[(string)$n] = true;
+            }
+        } else {
+            foreach (explode(',', $stored) as $part) {
+                $part = trim($part);
+                if ($part === '' || !preg_match('/^\d+$/', $part)) continue;
+                $n = (int)$part;
+                if ($n >= 1 && $n <= 500) $resAllowedNums[(string)$n] = true;
+            }
+        }
+    }
+
+    if ($posterToken === '') {
+        $error = $error ?: 'POSTER_API_TOKEN не задан.';
+    } else {
+        try {
+            $api = new \App\Classes\PosterAPI($posterToken);
+            $rows = $api->request('spots.getTableHallTables', [
+                'spot_id' => $resSpotId,
+                'hall_id' => $resHallId,
+                'without_deleted' => 1,
+            ], 'GET');
+            $rows = is_array($rows) ? $rows : [];
+            foreach ($rows as $r) {
+                if (!is_array($r)) continue;
+                $tableId = trim((string)($r['table_id'] ?? ''));
+                $tableNum = trim((string)($r['table_num'] ?? ''));
+                $tableTitle = trim((string)($r['table_title'] ?? ''));
+                $scheme = null;
+                if (preg_match('/^\d+$/', $tableTitle)) $scheme = (int)$tableTitle;
+                elseif (preg_match('/^\d+$/', $tableNum)) $scheme = (int)$tableNum;
+                $resTables[] = [
+                    'table_id' => $tableId,
+                    'table_num' => $tableNum,
+                    'table_title' => $tableTitle,
+                    'scheme_num' => $scheme !== null ? (string)$scheme : '',
+                    'is_allowed' => $scheme !== null && isset($resAllowedNums[(string)$scheme]) ? 1 : 0,
+                ];
+            }
+        } catch (\Throwable $e) {
+            $error = $error ?: ('Ошибка Poster API: ' . $e->getMessage());
+        }
     }
 }
 
@@ -1381,11 +1473,94 @@ if ($tab === 'menu' || $tab === 'categories') {
             <a href="admin.php?tab=sync" class="<?= $tab === 'sync' ? 'active' : '' ?>">Синки</a>
             <a href="admin.php?tab=access" class="<?= $tab === 'access' ? 'active' : '' ?>">Доступы</a>
             <a href="admin.php?tab=telegram" class="<?= $tab === 'telegram' ? 'active' : '' ?>">Telegram</a>
+            <a href="admin.php?tab=reservations" class="<?= $tab === 'reservations' ? 'active' : '' ?>">Брони</a>
             <a href="admin.php?tab=menu" class="<?= $tab === 'menu' ? 'active' : '' ?>">Меню</a>
             <a href="admin.php?tab=categories" class="<?= $tab === 'categories' ? 'active' : '' ?>">Категории</a>
             <a href="logs.php">Логи</a>
         </div>
-        <?php if ($tab === 'sync'): ?>
+        <?php if ($tab === 'reservations'): ?>
+            <div class="card" style="max-width: 1100px; margin: 0 auto;">
+                <h2 style="margin:0 0 10px;">Брони — доступные столы</h2>
+                <div class="small-muted" style="margin: 0 0 14px;">
+                    Здесь выбираются номера столов, которые доступны для бронирования в публичной форме.
+                </div>
+
+                <form method="post" action="admin.php?tab=reservations&hall_id=<?= (int)$resHallId ?>&spot_id=<?= (int)$resSpotId ?>" style="display:grid; gap: 12px;">
+                    <input type="hidden" name="save_reservation_tables" value="1">
+                    <div style="display:flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+                        <label style="display:grid; gap:6px;">
+                            <div class="small-muted">Spot ID</div>
+                            <input type="number" name="spot_id" value="<?= (int)$resSpotId ?>" min="1" style="width: 120px; padding: 8px 10px; border-radius: 10px; border: 1px solid #e5e7eb;">
+                        </label>
+                        <label style="display:grid; gap:6px;">
+                            <div class="small-muted">Hall ID</div>
+                            <input type="number" name="hall_id" value="<?= (int)$resHallId ?>" min="1" style="width: 120px; padding: 8px 10px; border-radius: 10px; border: 1px solid #e5e7eb;">
+                        </label>
+                        <div style="display:flex; gap: 10px; flex-wrap: wrap; align-items:center;">
+                            <button type="button" class="pill ok" data-select-all style="border:0; cursor:pointer;">Отметить все</button>
+                            <button type="button" class="pill warn" data-select-none style="border:0; cursor:pointer;">Снять все</button>
+                        </div>
+                        <div style="margin-left:auto;">
+                            <button type="submit" class="pill ok" style="border:0; cursor:pointer;">Сохранить</button>
+                        </div>
+                    </div>
+
+                    <?php if (empty($resTables)): ?>
+                        <div class="small-muted">Нет данных по столам (или ошибка Poster API).</div>
+                    <?php else: ?>
+                        <div style="overflow:auto; border:1px solid #e5e7eb; border-radius: 12px; background:#fff;">
+                            <table style="width:100%; border-collapse: collapse; min-width: 760px;">
+                                <thead>
+                                    <tr style="background:#f8fafc;">
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">Доступен</th>
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">Номер на схеме</th>
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">Table ID</th>
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">table_num</th>
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">table_title</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($resTables as $r): ?>
+                                        <tr>
+                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                                                <?php if (($r['scheme_num'] ?? '') !== ''): ?>
+                                                    <input type="checkbox" name="allowed_nums[]" value="<?= htmlspecialchars((string)$r['scheme_num']) ?>" <?= !empty($r['is_allowed']) ? 'checked' : '' ?>>
+                                                <?php else: ?>
+                                                    <span class="small-muted">—</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; font-weight:700;">
+                                                <?= htmlspecialchars((string)($r['scheme_num'] ?? '—')) ?>
+                                            </td>
+                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                                                <?= htmlspecialchars((string)($r['table_id'] ?? '—')) ?>
+                                            </td>
+                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                                                <?= htmlspecialchars((string)($r['table_num'] ?? '—')) ?>
+                                            </td>
+                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                                                <?= htmlspecialchars((string)($r['table_title'] ?? '—')) ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </form>
+            </div>
+
+            <script>
+                (() => {
+                    const root = document.currentScript && document.currentScript.parentElement ? document.currentScript.parentElement : document;
+                    const allBtn = document.querySelector('[data-select-all]');
+                    const noneBtn = document.querySelector('[data-select-none]');
+                    const boxes = () => Array.from(document.querySelectorAll('input[type="checkbox"][name="allowed_nums[]"]'));
+                    if (allBtn) allBtn.addEventListener('click', () => boxes().forEach((cb) => { cb.checked = true; }));
+                    if (noneBtn) noneBtn.addEventListener('click', () => boxes().forEach((cb) => { cb.checked = false; }));
+                })();
+            </script>
+        <?php elseif ($tab === 'sync'): ?>
             <?php
                 $syncDefs = [
                     [
