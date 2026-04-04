@@ -377,6 +377,11 @@ $firstOfMonth = date('Y-m-01');
         th, td { padding: 7px 10px; border-bottom: 1px solid rgba(182,89,48,0.14); vertical-align: top; }
         th { text-align:left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-text); background: rgba(239,219,206,0.55); }
         td.num { text-align:right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .table-filter { position: relative; display: inline-flex; align-items: center; gap: 8px; }
+        .table-filter-btn { width: 18px; height: 18px; border-radius: 8px; padding: 0; background: transparent; border: 1px solid rgba(182,89,48,0.22); color: rgba(182,89,48,0.85); font-weight: 900; line-height: 1; cursor: pointer; }
+        .table-filter-btn:hover { border-color: rgba(182,89,48,0.42); }
+        .table-filter-pop { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; box-shadow: 0 10px 24px rgba(182,89,48,0.18); padding: 8px; min-width: 240px; max-height: 280px; overflow: auto; z-index: 50; text-transform: none; letter-spacing: 0; }
+        .table-filter-pop label:hover { background: rgba(239,219,206,0.35); }
         .totals { margin-top: 12px; display:flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
         .pill { border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; padding: 10px 12px; background:#fff; font-weight: 900; }
         .pill.bad { border-color: rgba(182,89,48,0.40); background: rgba(239,219,206,0.55); color: var(--brand-text); }
@@ -456,11 +461,10 @@ $firstOfMonth = date('Y-m-01');
                     <th id="thDate" data-sort="date" style="width:170px; cursor:pointer;">Дата</th>
                     <th id="thHall" data-sort="hall" style="width:80px; cursor:pointer;">Hall</th>
                     <th id="thTable" data-sort="table" style="width:140px; cursor:pointer;">
-                        <div style="display:flex; align-items:center; justify-content: space-between; gap: 8px;">
+                        <div class="table-filter">
                             <span>Стол</span>
-                            <select id="tableFilter" style="max-width: 92px; padding: 4px 8px; border-radius: 10px; border: 1px solid rgba(182,89,48,0.22); background: #fff; color: var(--brand-text); font-weight: 900;">
-                                <option value="">Все</option>
-                            </select>
+                            <button type="button" id="tableFilterBtn" class="table-filter-btn" title="Фильтр столов" aria-label="Фильтр столов">▾</button>
+                            <div id="tableFilterPop" class="table-filter-pop" style="display:none;"></div>
                         </div>
                     </th>
                     <th id="thReceipt" data-sort="receipt" style="width:120px; cursor:pointer;">Чек</th>
@@ -548,7 +552,8 @@ $firstOfMonth = date('Y-m-01');
     const pagerTop = document.getElementById('pagerTop');
     const pagerBottom = document.getElementById('pagerBottom');
     const noPagesCb = document.getElementById('noPages');
-    const tableFilterEl = document.getElementById('tableFilter');
+    const tableFilterBtn = document.getElementById('tableFilterBtn');
+    const tableFilterPop = document.getElementById('tableFilterPop');
     const ths = Array.from(document.querySelectorAll('th[data-sort]'));
     let dataItems = [];
     let sortBy = 'date';
@@ -556,7 +561,8 @@ $firstOfMonth = date('Y-m-01');
     let page = 1;
     const pageSize = 20;
     let noPages = false;
-    let tableFilter = '';
+    let tableFilterIds = [];
+    let tableFilterIdsAll = [];
 
     const applyPrefsToUi = () => {
         const p = loadPrefs();
@@ -570,7 +576,11 @@ $firstOfMonth = date('Y-m-01');
         if (typeof p.sort_by === 'string') sortBy = p.sort_by;
         if (p.sort_dir === 'asc' || p.sort_dir === 'desc') sortDir = p.sort_dir;
         if (typeof p.page === 'number' && isFinite(p.page) && p.page > 0) page = Math.floor(p.page);
-        if (typeof p.table_filter === 'string') tableFilter = p.table_filter;
+        if (Array.isArray(p.table_filter_ids)) {
+            tableFilterIds = p.table_filter_ids.map((x) => String(x)).filter((x) => /^\d+$/.test(x));
+        } else if (typeof p.table_filter === 'string' && /^\d+$/.test(p.table_filter)) {
+            tableFilterIds = [String(p.table_filter)];
+        }
     };
     const persistPrefsFromUi = () => {
         savePrefs({
@@ -580,7 +590,7 @@ $firstOfMonth = date('Y-m-01');
             sort_by: sortBy,
             sort_dir: sortDir,
             page: page,
-            table_filter: tableFilter,
+            table_filter_ids: tableFilterIds,
         });
     };
 
@@ -590,8 +600,7 @@ $firstOfMonth = date('Y-m-01');
     };
 
     const rebuildTableFilter = () => {
-        if (!tableFilterEl) return;
-        const prev = String(tableFilter || '');
+        if (!tableFilterPop) return;
         const set = new Map();
         dataItems.forEach((it) => {
             const id = String(it.table_id || '');
@@ -605,9 +614,48 @@ $firstOfMonth = date('Y-m-01');
             if (an && bn) return an - bn;
             return String(a[1]).localeCompare(String(b[1]), 'ru');
         });
-        tableFilterEl.innerHTML = '<option value="">Все</option>' + entries.map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`).join('');
-        if (prev && set.has(prev)) tableFilterEl.value = prev;
-        else { tableFilter = ''; tableFilterEl.value = ''; }
+        tableFilterIdsAll = entries.map(([id]) => String(id));
+        tableFilterIds = (tableFilterIds || []).filter((id) => tableFilterIdsAll.includes(String(id)));
+        const isAll = tableFilterIds.length === 0;
+        const selected = new Set(tableFilterIds.map((x) => String(x)));
+        const html = [
+            '<div style="font-weight:900; margin-bottom: 6px; color: rgba(182,89,48,0.95);">Фильтр столов</div>',
+            entries.map(([id, label]) => {
+                const checked = isAll || selected.has(String(id)) ? 'checked' : '';
+                return `<label style="display:flex; align-items:center; gap: 8px; padding: 5px 6px; border-radius: 10px; cursor: pointer; white-space: nowrap;"><input type="checkbox" class="tf-cb" data-id="${esc(id)}" ${checked}> <span>${esc(label)}</span></label>`;
+            }).join(''),
+            '<div style="margin-top: 8px; display:flex; gap: 8px; justify-content:flex-end;">' +
+                '<button type="button" class="secondary small" id="tfAllBtn">Все</button>' +
+                '<button type="button" class="secondary small" id="tfClearBtn">Сброс</button>' +
+            '</div>',
+        ].join('');
+        tableFilterPop.innerHTML = html;
+        const applyFromDom = () => {
+            const ids = [];
+            tableFilterPop.querySelectorAll('input.tf-cb').forEach((cb) => {
+                if (cb.checked) ids.push(String(cb.getAttribute('data-id') || ''));
+            });
+            const uniq = Array.from(new Set(ids)).filter((x) => /^\d+$/.test(x));
+            if (uniq.length === tableFilterIdsAll.length) tableFilterIds = [];
+            else tableFilterIds = uniq;
+            page = 1;
+            renderTable();
+        };
+        tableFilterPop.querySelectorAll('input.tf-cb').forEach((cb) => cb.addEventListener('change', applyFromDom));
+        const allBtn = tableFilterPop.querySelector('#tfAllBtn');
+        if (allBtn) allBtn.addEventListener('click', () => {
+            tableFilterIds = [];
+            rebuildTableFilter();
+            page = 1;
+            renderTable();
+        });
+        const clearBtn = tableFilterPop.querySelector('#tfClearBtn');
+        if (clearBtn) clearBtn.addEventListener('click', () => {
+            tableFilterIds = [];
+            rebuildTableFilter();
+            page = 1;
+            renderTable();
+        });
     };
 
     const applySort = (arr) => {
@@ -667,7 +715,8 @@ $firstOfMonth = date('Y-m-01');
     };
 
     const renderTable = () => {
-        const base = tableFilter ? dataItems.filter((x) => String(x.table_id || '') === String(tableFilter)) : dataItems;
+        const useFilter = Array.isArray(tableFilterIds) && tableFilterIds.length > 0;
+        const base = useFilter ? dataItems.filter((x) => tableFilterIds.includes(String(x.table_id || ''))) : dataItems;
         const items = applySort(base);
         const total = items.length;
         const pages = noPages ? 1 : Math.max(1, Math.ceil(total / pageSize));
@@ -773,13 +822,34 @@ $firstOfMonth = date('Y-m-01');
             renderTable();
         });
     });
-    if (tableFilterEl) {
-        tableFilterEl.addEventListener('click', (e) => e.stopPropagation());
-        tableFilterEl.addEventListener('change', () => {
-            tableFilter = String(tableFilterEl.value || '');
-            page = 1;
-            renderTable();
+    const closeTableFilter = () => {
+        if (!tableFilterPop) return;
+        tableFilterPop.style.display = 'none';
+    };
+    const toggleTableFilter = () => {
+        if (!tableFilterPop) return;
+        const open = tableFilterPop.style.display !== 'none';
+        if (open) {
+            tableFilterPop.style.display = 'none';
+            return;
+        }
+        if (!String(tableFilterPop.innerHTML || '').trim()) {
+            if (Array.isArray(dataItems) && dataItems.length) rebuildTableFilter();
+            else tableFilterPop.innerHTML = '<div class="muted" style="padding: 6px 8px;">Сначала нажми «ЗАГРУЗИТЬ»</div>';
+        }
+        tableFilterPop.style.display = 'block';
+    };
+    if (tableFilterBtn) {
+        tableFilterBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleTableFilter();
         });
+    }
+    if (tableFilterPop) {
+        tableFilterPop.addEventListener('click', (e) => e.stopPropagation());
+        document.addEventListener('click', () => closeTableFilter());
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTableFilter(); });
     }
 
     elFrom.addEventListener('change', () => persistPrefsFromUi());
