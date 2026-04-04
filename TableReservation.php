@@ -148,9 +148,9 @@
       position: absolute;
       left: -42px;
       top: -40px;
-      width: 860px;
+      width: 944px;
       height: 430px;
-      clip-path: polygon(0 0, 100% 0, 100% 128px, 140px 128px, 140px 100%, 0 100%);
+      clip-path: polygon(0 0, 100% 0, 100% 184px, 140px 184px, 140px 100%, 0 100%);
       background:
         radial-gradient(circle at 12% 24%, rgba(147,196,125,0.20), transparent 58%),
         radial-gradient(circle at 78% 30%, rgba(92,162,92,0.22), transparent 62%),
@@ -172,7 +172,7 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
-      clip-path: polygon(0 0, 100% 0, 100% 128px, 140px 128px, 140px 100%, 0 100%);
+      clip-path: polygon(0 0, 100% 0, 100% 184px, 140px 184px, 140px 100%, 0 100%);
     }
     .grass-area::before {
       transform: rotate(-2deg) translate(-14px, 10px);
@@ -393,29 +393,29 @@
           <div class="map" aria-label="Схема столов ресторана">
             <div class="grass-area" aria-hidden="true"></div>
             <button class="table large" style="left: 0px; top: 24px;" data-table="1">1<span class="cap">до 8</span></button>
-            <button class="table large" style="left: 0px; top: 150px;" data-table="2">2<span class="cap">до 8</span></button>
+            <button class="table large" style="left: 0px; top: 94px;" data-table="2">2<span class="cap">до 8</span></button>
             <button class="table large" style="left: 0px; top: 276px;" data-table="3">3<span class="cap">до 8</span></button>
   
-            <button class="table small-vertical" style="left: 200px; top: 0px;" data-table="4">4</button>
-            <button class="table small-vertical" style="left: 364px; top: 0px;" data-table="5">5</button>
-            <button class="table small-vertical" style="left: 512px; top: 0px;" data-table="6">6</button>
+            <button class="table small-vertical" style="left: 200px; top: 0px;" data-table="4">4<span class="cap">до 5</span></button>
+            <button class="table small-vertical" style="left: 364px; top: 0px;" data-table="5">5<span class="cap">до 5</span></button>
+            <button class="table small-vertical" style="left: 512px; top: 0px;" data-table="6">6<span class="cap">до 5</span></button>
             <button class="table large" style="left: 700px; top: 0px;" data-table="7">7<span class="cap">до 8</span></button>
   
-            <button class="table wide" style="left: 174px; top: 142px;" data-table="8">8<span class="cap">2 чел</span></button>
-            <button class="table wide" style="left: 296px; top: 142px;" data-table="9">9<span class="cap">2 чел</span></button>
-            <button class="table wide" style="left: 522px; top: 142px;" data-table="10">10<span class="cap">2 чел</span></button>
-            <button class="table wide" style="left: 644px; top: 142px;" data-table="11">11</button>
+            <button class="table wide" style="left: 286px; top: 142px;" data-table="8">8<span class="cap">2 чел</span></button>
+            <button class="table wide" style="left: 408px; top: 142px;" data-table="9">9<span class="cap">2 чел</span></button>
+            <button class="table wide" style="left: 634px; top: 142px;" data-table="10">10<span class="cap">2 чел</span></button>
+            <button class="table wide" style="left: 756px; top: 142px;" data-table="11">11<span class="cap">2 чел</span></button>
   
-            <button class="table" style="left: 232px; top: 242px;" data-table="12">12</button>
-            <button class="table" style="left: 360px; top: 242px;" data-table="13">13</button>
-            <button class="table" style="left: 472px; top: 242px;" data-table="14">14</button>
+            <button class="table" style="left: 344px; top: 242px;" data-table="12">12<span class="cap">до 3</span></button>
+            <button class="table" style="left: 472px; top: 242px;" data-table="13">13<span class="cap">до 3</span></button>
+            <button class="table" style="left: 584px; top: 242px;" data-table="14">14<span class="cap">до 3</span></button>
   
-            <button class="table small-vertical" style="left: 158px; top: 336px;" data-table="15">15</button>
-            <button class="table small-vertical" style="left: 258px; top: 336px;" data-table="16">16</button>
-            <button class="table small-vertical" style="left: 358px; top: 336px;" data-table="17">17</button>
-            <button class="table small-vertical" style="left: 458px; top: 336px;" data-table="18">18</button>
-            <button class="table small-vertical" style="left: 558px; top: 336px;" data-table="19">19</button>
-            <button class="table large" style="left: 646px; top: 314px;" data-table="20">20<span class="cap">до 15</span></button>
+            <button class="table small-vertical" style="left: 270px; top: 336px;" data-table="15">15<span class="cap">до 5</span></button>
+            <button class="table small-vertical" style="left: 370px; top: 336px;" data-table="16">16<span class="cap">до 5</span></button>
+            <button class="table small-vertical" style="left: 470px; top: 336px;" data-table="17">17<span class="cap">до 5</span></button>
+            <button class="table small-vertical" style="left: 570px; top: 336px;" data-table="18">18<span class="cap">до 5</span></button>
+            <button class="table small-vertical" style="left: 670px; top: 336px;" data-table="19">19<span class="cap">до 5</span></button>
+            <button class="table large" style="left: 758px; top: 314px;" data-table="20">20<span class="cap">до 15</span></button>
   
             <div class="bar-row" aria-hidden="true">
               <div class="side-station">Касса</div>
