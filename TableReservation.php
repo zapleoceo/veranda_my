@@ -170,7 +170,6 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
     foreach ($rows as $row) {
       if (!is_array($row)) continue;
       $status = (int)($row['status'] ?? 0);
-      if ($status === 7) continue;
 
       $start = trim((string)($row['date_reservation'] ?? ''));
       $dur = (int)($row['duration'] ?? 0);
@@ -197,6 +196,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         $items[] = [
           'table_id' => '—',
           'table_title' => '—',
+          'status' => $status,
           'guest_name' => $guestName,
           'date_start' => date('Y-m-d H:i:s', $startTs),
           'date_end' => date('Y-m-d H:i:s', $endTs),
@@ -210,6 +210,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         $items[] = [
           'table_id' => $tableId,
           'table_title' => $tableNameById[$tableId],
+          'status' => $status,
           'guest_name' => $guestName,
           'date_start' => date('Y-m-d H:i:s', $startTs),
           'date_end' => date('Y-m-d H:i:s', $endTs),
@@ -921,7 +922,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         }
       }
       lines.push('');
-      lines.push('Формат: ID стола | Имя стола | Имя | Старт брони | Конец брони | Кол-во человек');
+      lines.push('Формат: ID стола | Имя стола | Статус | Имя | Старт брони | Конец брони | Кол-во человек');
       if (!list.length) {
         lines.push('—');
         return lines.join('\n');
@@ -929,11 +930,12 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       list.slice(0, 120).forEach((it) => {
         const tableId = String(it.table_id ?? '—');
         const tableTitle = String(it.table_title ?? '—');
+        const status = String(it.status ?? '—');
         const name = String(it.guest_name ?? '—');
         const start = String(it.date_start ?? '—');
         const end = String(it.date_end ?? '—');
         const guests = String(it.guests_count ?? '—');
-        lines.push(`${tableId} | ${tableTitle} | ${name} | ${start} | ${end} | ${guests}`);
+        lines.push(`${tableId} | ${tableTitle} | ${status} | ${name} | ${start} | ${end} | ${guests}`);
       });
       if (list.length > 120) lines.push(`… ещё ${list.length - 120}`);
       return lines.join('\n');
