@@ -2299,6 +2299,19 @@ $sepayRows = $db->query(
     [$periodFrom, $periodTo]
 )->fetchAll();
 
+$sepayHiddenRows = $db->query(
+    "SELECT s.sepay_id, s.transaction_date, s.transfer_amount, s.payment_method, s.content, s.reference_code,
+            h.comment AS hidden_comment
+     FROM {$st} s
+     JOIN {$sh} h ON h.sepay_id = s.sepay_id
+     WHERE s.transaction_date BETWEEN ? AND ?
+       AND s.transfer_type = 'in'
+       AND (s.payment_method IS NULL OR s.payment_method IN ('Card','Bybit'))
+       AND COALESCE(s.was_deleted, 0) = 0
+     ORDER BY s.transaction_date ASC",
+    [$periodFrom, $periodTo]
+)->fetchAll();
+
 $posterRows = $db->query(
     "SELECT p.transaction_id, p.receipt_number, p.date_close, p.payed_card, p.payed_third_party, p.tip_sum,
             pm.title AS payment_method_display,
@@ -2759,6 +2772,9 @@ $fmtVnd = function (int $v): string {
         tr.row-red { background: rgba(211, 47, 47, 0.08); }
         tr.row-blue { background: rgba(26, 115, 232, 0.10); }
         tr.row-gray { background: rgba(107, 114, 128, 0.10); }
+        tr.row-hidden { background: rgba(6, 78, 59, 0.22) !important; }
+        tr.row-hidden td { color: #064e3b; }
+        tr.row-hidden .col-sepay-content { font-weight: 900; }
         tr.row-selected { outline: 2px solid #1a73e8; outline-offset: -2px; }
         .muted { color: #777; font-size: 12px; }
         .sum { font-weight: 900; white-space: nowrap; }
@@ -2794,6 +2810,8 @@ $fmtVnd = function (int $v): string {
         .vc-subtitle { display:flex; align-items:center; gap: 8px; }
         .vc-toggle { display:inline-flex; align-items:center; justify-content:center; width: 22px; height: 22px; border-radius: 8px; border: 1px solid rgba(26, 115, 232, 0.35); background: rgba(26, 115, 232, 0.08); color: #1a73e8; cursor: pointer; font-weight: 900; line-height: 1; padding: 0; }
         .vc-toggle.on { border-color: #1a73e8; background: #1a73e8; color: #fff; }
+        .hidden-toggle { border-color: rgba(107, 114, 128, 0.45); background: rgba(107, 114, 128, 0.10); color: #6b7280; }
+        .hidden-toggle.on { border-color: #6b7280; background: #6b7280; color: #fff; }
         @media (max-width: 1050px) {
             .grid { grid-template-columns: 1fr 70px 1fr; }
             .mid-col { padding-top: 10px; gap: 6px; }
@@ -2959,7 +2977,10 @@ $fmtVnd = function (int $v): string {
             <div class="card" style="padding: 0;">
                 <div style="padding: 12px 12px 6px;">
                     <div style="font-weight:900;">SePay</div>
-                    <div class="muted">Приходы за день</div>
+                    <div class="muted vc-subtitle">
+                        <span>Приходы за день</span>
+                        <button type="button" class="vc-toggle hidden-toggle" id="toggleSepayHiddenBtn" title="Показать/скрыть скрытые транзакции">👁</button>
+                    </div>
                 </div>
                 <div id="sepayScroll" style="max-height: 56vh; overflow:auto;">
                     <table id="sepayTable">
@@ -2995,6 +3016,23 @@ $fmtVnd = function (int $v): string {
                             <tr class="<?= $cls ?>" data-sepay-id="<?= $sid ?>" data-ts="<?= (int)$tsRow ?>" data-sum="<?= (int)$r['transfer_amount'] ?>" data-content="<?= htmlspecialchars(mb_strtolower((string)($r['content'] ?? ''), 'UTF-8')) ?>">
                                 <td class="nowrap col-sepay-hide"><button type="button" class="sepay-hide" data-sepay-id="<?= $sid ?>" title="Скрыть (не чек)">−</button></td>
                                 <td class="col-sepay-content"><?= htmlspecialchars((string)($r['content'] ?? '')) ?></td>
+                                <td class="nowrap col-sepay-time"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
+                                <td class="sum col-sepay-sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
+                                <td class="col-sepay-cb"><input type="checkbox" class="sepay-cb" data-id="<?= $sid ?>"></td>
+                                <td class="nowrap col-sepay-dot"><span class="anchor" id="sepay-<?= $sid ?>"></span></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php foreach ($sepayHiddenRows as $r): ?>
+                            <?php
+                                $sid = (int)$r['sepay_id'];
+                                $pm = (string)($r['payment_method'] ?? '');
+                                $cmt = trim((string)($r['hidden_comment'] ?? ''));
+                                $contentShow = $cmt !== '' ? $cmt : ('Скрыто: ' . (string)($r['content'] ?? ''));
+                            ?>
+                            <?php $tsRow = strtotime($r['transaction_date']) ?: 0; ?>
+                            <tr class="row-hidden" data-hidden="1" data-sepay-id="<?= $sid ?>" data-ts="<?= (int)$tsRow ?>" data-sum="<?= (int)$r['transfer_amount'] ?>" data-content="<?= htmlspecialchars(mb_strtolower($contentShow, 'UTF-8')) ?>">
+                                <td class="nowrap col-sepay-hide"><button type="button" class="sepay-hide" data-sepay-id="<?= $sid ?>" title="Изменить комментарий скрытия">−</button></td>
+                                <td class="col-sepay-content"><?= htmlspecialchars($contentShow) ?></td>
                                 <td class="nowrap col-sepay-time"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
                                 <td class="sum col-sepay-sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
                                 <td class="col-sepay-cb"><input type="checkbox" class="sepay-cb" data-id="<?= $sid ?>"></td>
@@ -4484,6 +4522,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         let sepayUnlinked = 0;
         const sepaySumById = new Map();
         document.querySelectorAll('#sepayTable tbody tr[data-sepay-id]').forEach((tr) => {
+            if (tr.style && tr.style.display === 'none') return;
             const sid = Number(tr.getAttribute('data-sepay-id') || 0);
             const sum = Number(tr.getAttribute('data-sum') || 0) || 0;
             if (sid > 0) sepaySumById.set(sid, sum);
@@ -4498,6 +4537,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         let posterTipsLinked = 0;
         const posterVietnam = new Set();
         document.querySelectorAll('#posterTable tbody tr[data-poster-id]').forEach((tr) => {
+            if (tr.style && tr.style.display === 'none') return;
             const isVietnam = String(tr.getAttribute('data-vietnam') || '0') === '1';
             const pid = Number(tr.getAttribute('data-poster-id') || 0);
             const sum = Number(tr.getAttribute('data-total') || 0) || 0;
@@ -4782,6 +4822,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     let hideVietnam = false;
     try { hideVietnam = localStorage.getItem('payday_hide_vietnam') === '1'; } catch (e) {}
     const toggleVietnamBtn = document.getElementById('toggleVietnamBtn');
+    let showSepayHidden = false;
+    try { showSepayHidden = localStorage.getItem('payday_show_sepay_hidden') === '1'; } catch (e) {}
+    const toggleSepayHiddenBtn = document.getElementById('toggleSepayHiddenBtn');
 
     const updateSelectionSums = () => {
         let sSum = 0;
@@ -4824,6 +4867,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const updateVietnamButtonState = () => {
         if (!toggleVietnamBtn) return;
         toggleVietnamBtn.classList.toggle('on', hideVietnam);
+    };
+    const updateSepayHiddenButtonState = () => {
+        if (!toggleSepayHiddenBtn) return;
+        toggleSepayHiddenBtn.classList.toggle('on', showSepayHidden);
     };
 
     const clearCheckboxes = () => {
@@ -4919,7 +4966,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         document.querySelectorAll('#sepayTable tbody tr[data-sepay-id]').forEach((tr) => {
             const sid = Number(tr.getAttribute('data-sepay-id') || 0);
             const linked = state.sepay.has(sid);
-            const hidden = hideLinked && linked;
+            const isHiddenRow = String(tr.getAttribute('data-hidden') || '0') === '1';
+            const hidden = (hideLinked && linked) || (isHiddenRow && !showSepayHidden);
             tr.style.display = hidden ? 'none' : '';
             if (hidden) {
                 const cb = tr.querySelector('input.sepay-cb');
@@ -4940,6 +4988,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             }
         });
         updateLinkButtonState();
+        updateStats();
     };
 
     document.querySelectorAll('input.sepay-cb').forEach((cb) => {
@@ -4968,7 +5017,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             .then((j) => {
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
                 const tr = btn.closest('tr');
-                if (tr) tr.remove();
+                if (tr) {
+                    tr.classList.add('row-hidden');
+                    tr.setAttribute('data-hidden', '1');
+                    tr.setAttribute('data-content', String(c).toLowerCase());
+                    const td = tr.querySelector('td.col-sepay-content');
+                    if (td) td.textContent = c;
+                }
                 selectedSepay.delete(sepayId);
                 updateStats();
                 applyHideLinked();
@@ -5141,6 +5196,17 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             setTimeout(() => { positionLines(); positionWidgets(); }, 0);
         });
         updateVietnamButtonState();
+    }
+    if (toggleSepayHiddenBtn) {
+        toggleSepayHiddenBtn.addEventListener('click', () => {
+            showSepayHidden = !showSepayHidden;
+            try { localStorage.setItem('payday_show_sepay_hidden', showSepayHidden ? '1' : '0'); } catch (e) {}
+            updateSepayHiddenButtonState();
+            applyHideLinked();
+            drawLines();
+            setTimeout(() => { positionLines(); positionWidgets(); }, 0);
+        });
+        updateSepayHiddenButtonState();
     }
     if (linkAutoBtn) {
         linkAutoBtn.addEventListener('click', () => {
