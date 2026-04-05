@@ -1872,6 +1872,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 </div>
             <?php endif; ?>
 
+            <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
@@ -1918,6 +1919,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            </div>
             <div class="perm-modal" id="permModal" style="display:none;">
                 <div class="perm-modal-backdrop"></div>
                 <div class="perm-modal-card">

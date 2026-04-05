@@ -282,8 +282,9 @@ $defaultTo = $today;
         .btn { border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: rgba(255,250,244,0.92); border-radius: 10px; padding: 8px 10px; cursor: pointer; font-weight: 800; }
         .btn:disabled { opacity: 0.5; cursor: default; }
         input[type="date"] { border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: rgba(255,250,244,0.92); border-radius: 10px; padding: 7px 10px; }
-        .prog { display:none; align-items:center; gap: 10px; min-width: 280px; max-width: 520px; }
-        .prog.on { display:flex; }
+        .filters-card { position: relative; padding-bottom: 40px; }
+        .prog { position: absolute; left: 12px; right: 12px; bottom: 10px; display:flex; align-items:center; gap: 10px; opacity: 0; pointer-events: none; }
+        .prog.on { opacity: 1; }
         .progbar { height: 10px; flex: 1; border-radius: 999px; background: rgba(255,255,255,0.10); overflow: hidden; }
         .progbar > div { height: 100%; width: 0; background: rgba(255, 120, 120, 0.86); transition: width 0.15s ease; }
         .progPct { font-weight: 900; font-size: 12px; color: rgba(255,250,244,0.85); min-width: 40px; text-align: right; }
@@ -299,7 +300,7 @@ $defaultTo = $today;
             <div class="muted">Источник: Poster (dash.getTransactions), группировка по дню недели и часу открытия чека</div>
         </div>
         <div class="controls">
-            <div class="card" style="display:flex; gap: 10px; align-items:center; padding: 10px 12px;">
+            <div class="card filters-card" style="display:flex; gap: 10px; align-items:center; padding: 10px 12px;">
                 <span class="muted">С</span>
                 <input type="date" id="dateFrom" value="<?= htmlspecialchars($defaultFrom) ?>">
                 <span class="muted">По</span>
