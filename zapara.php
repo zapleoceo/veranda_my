@@ -269,10 +269,10 @@ $defaultTo = $today;
     <style>
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b0f16; color: rgba(255,250,244,0.92); }
         .wrap { max-width: 1450px; margin: 0 auto; padding: 16px; }
-        .top { display:flex; align-items:center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .top { display:flex; align-items:flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         h1 { margin: 0; font-size: 20px; }
         .muted { color: rgba(245,238,228,0.62); font-size: 12px; }
-        .controls { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
+        .controls { display:flex; gap: 10px; align-items:flex-start; flex-wrap: wrap; }
         .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
         .grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
         .chart { height: 160px; position: relative; }
@@ -284,6 +284,12 @@ $defaultTo = $today;
         input[type="date"] { border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: rgba(255,250,244,0.92); border-radius: 10px; padding: 7px 10px; }
         .filters-card { display:flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
         .filters-row { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
+        .chart-switch { display:inline-flex; align-items:center; gap: 8px; margin-left: 2px; }
+        .chart-switch span { font-size: 12px; font-weight: 800; color: rgba(245,238,228,0.62); user-select: none; }
+        .chart-switch input { display:none; }
+        .chart-switch .track { width: 40px; height: 22px; border-radius: 999px; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.14); position: relative; cursor: pointer; flex: 0 0 auto; }
+        .chart-switch .knob { width: 18px; height: 18px; border-radius: 999px; background: rgba(255,250,244,0.92); position: absolute; left: 2px; top: 1px; transition: left 0.15s ease, background 0.15s ease; }
+        .chart-switch input:checked + .track .knob { left: 20px; background: rgba(255, 120, 120, 0.90); }
         .prog { display:flex; align-items:center; gap: 10px; opacity: 0; pointer-events: none; height: 22px; }
         .prog.on { opacity: 1; }
         .progbar { height: 10px; flex: 1; border-radius: 999px; background: rgba(255,255,255,0.10); overflow: hidden; }
@@ -304,6 +310,12 @@ $defaultTo = $today;
                     <span class="muted">По</span>
                     <input type="date" id="dateTo" value="<?= htmlspecialchars($defaultTo) ?>">
                     <button class="btn" id="loadBtn">Загрузить</button>
+                    <label class="chart-switch">
+                        <span>Колонки</span>
+                        <input type="checkbox" id="chartTypeToggle">
+                        <span class="track"><span class="knob"></span></span>
+                        <span>Линия</span>
+                    </label>
                 </div>
                 <div class="prog" id="prog">
                     <div class="progbar"><div id="progFill"></div></div>
@@ -328,10 +340,25 @@ $defaultTo = $today;
     const dateFromEl = document.getElementById('dateFrom');
     const dateToEl = document.getElementById('dateTo');
     const loadBtn = document.getElementById('loadBtn');
+    const chartTypeToggle = document.getElementById('chartTypeToggle');
     const prog = document.getElementById('prog');
     const progFill = document.getElementById('progFill');
     const progPct = document.getElementById('progPct');
     const progText = document.getElementById('progText');
+    let chartType = 'bar';
+    let lastData = null;
+
+    try {
+        chartType = (localStorage.getItem('zapara_chart_type') || '') === 'line' ? 'line' : 'bar';
+    } catch (_) {}
+    if (chartTypeToggle) {
+        chartTypeToggle.checked = chartType === 'line';
+        chartTypeToggle.addEventListener('change', () => {
+            chartType = chartTypeToggle.checked ? 'line' : 'bar';
+            try { localStorage.setItem('zapara_chart_type', chartType); } catch (_) {}
+            if (lastData) render(lastData);
+        });
+    }
 
     const dows = [
         { key: '1', name: 'Пн' },
@@ -428,6 +455,83 @@ $defaultTo = $today;
         });
     };
 
+    const drawLine = (canvas, hours, countsByHour) => {
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        const padL = 44;
+        const padR = 16;
+        const padT = 12;
+        const padB = 28;
+        const iw = w - padL - padR;
+        const ih = h - padT - padB;
+
+        const vals = hours.map((hh) => Number(countsByHour[String(hh)] || 0));
+        const maxV = Math.max(1, ...vals);
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = padT + (ih * i / 4);
+            ctx.beginPath();
+            ctx.moveTo(padL, y);
+            ctx.lineTo(padL + iw, y);
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = 'rgba(245,238,228,0.62)';
+        ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        for (let i = 0; i <= 4; i++) {
+            const v = Math.round(maxV * (1 - i / 4));
+            const y = padT + (ih * i / 4);
+            ctx.fillText(String(v), padL - 8, y);
+        }
+
+        const stepX = iw / Math.max(1, (hours.length - 1));
+        const x0 = padL;
+
+        ctx.strokeStyle = 'rgba(255, 120, 120, 0.92)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        hours.forEach((hh, idx) => {
+            const v = vals[idx];
+            const x = x0 + stepX * idx;
+            const y = padT + ih - (v / maxV) * ih;
+            if (idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(255, 120, 120, 0.92)';
+        hours.forEach((hh, idx) => {
+            const v = vals[idx];
+            const x = x0 + stepX * idx;
+            const y = padT + ih - (v / maxV) * ih;
+            ctx.beginPath();
+            ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        hours.forEach((hh, idx) => {
+            if (hh % 2 !== 1) return;
+            const x = x0 + stepX * idx;
+            ctx.fillStyle = 'rgba(245,238,228,0.62)';
+            ctx.fillText(String(hh), x, padT + ih + 6);
+        });
+    };
+
+    const drawChart = (canvas, hours, countsByHour) => {
+        if (chartType === 'line') drawLine(canvas, hours, countsByHour);
+        else drawBars(canvas, hours, countsByHour);
+    };
+
     const hours = [];
     for (let hh = 9; hh <= 23; hh++) hours.push(hh);
 
@@ -446,16 +550,16 @@ $defaultTo = $today;
             avg[hk] = n > 0 ? (sum / n) : 0;
         });
 
-        {
-            const { wrap, canvas } = makeCanvasCard('Среднее');
-            chartsEl.appendChild(wrap);
-            drawBars(canvas, hours, avg);
-        }
         dows.forEach((d) => {
             const { wrap, canvas } = makeCanvasCard(d.name);
             chartsEl.appendChild(wrap);
-            drawBars(canvas, hours, counts[d.key] || {});
+            drawChart(canvas, hours, counts[d.key] || {});
         });
+        {
+            const { wrap, canvas } = makeCanvasCard('Среднее');
+            chartsEl.appendChild(wrap);
+            drawChart(canvas, hours, avg);
+        }
     };
 
     const setProgress = (done, total, text) => {
@@ -560,7 +664,8 @@ $defaultTo = $today;
 
             await Promise.all(workers);
             hideProgress();
-            render({ counts_by_dow: counts });
+            lastData = { counts_by_dow: counts };
+            render(lastData);
             if (errors.length) {
                 const head = errors.slice(0, 3).map((x) => x.date + ': ' + x.error).join('\n');
                 alert('Ошибки загрузки: ' + String(errors.length) + '\n' + head);
