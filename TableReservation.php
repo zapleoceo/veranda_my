@@ -971,6 +971,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     }
   
     .table.small-vertical { width: 58px; height: 92px; border-radius: 18px; }
+    .table.small-vertical.wide-1 { width: 86px; }
     .table.wide { width: 112px; height: 58px; border-radius: 18px; }
     .table.large { width: 108px; height: 108px; border-radius: 26px; }
   
@@ -1139,9 +1140,9 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
             <button class="table large" style="left: 0px; top: 150px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
             <button class="table large" style="left: 0px; top: 24px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
-            <button class="table small-vertical" style="left: 200px; top: 0px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 364px; top: 0px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 512px; top: 0px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 200px; top: 0px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 364px; top: 0px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 512px; top: 0px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
             <button class="table large" style="left: 700px; top: 0px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
   
             <button class="table wide" style="left: 286px; top: 142px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
@@ -1247,12 +1248,13 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
 
     const tables = Array.from(document.querySelectorAll('.table'));
-    if (allowedSet !== null) {
+    if (allowedSet !== null && allowedSet.size > 0) {
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
         if (!allowedSet.has(n)) {
           t.classList.add('disabled');
           t.disabled = true;
+          t.title = 'Отключено в настройках';
         }
       });
     }
