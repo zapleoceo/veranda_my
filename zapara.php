@@ -270,6 +270,11 @@ $defaultTo = $today;
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b0f16; color: rgba(255,250,244,0.92); }
         .wrap { max-width: 1450px; margin: 0 auto; padding: 16px; }
         .top { display:flex; align-items:flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        @media (max-width: 680px) {
+            .top { flex-direction: column; }
+            .top .user-menu { order: 1; align-self: flex-end; }
+            .top .controls { order: 2; width: 100%; }
+        }
         h1 { margin: 0; font-size: 20px; }
         .muted { color: rgba(245,238,228,0.62); font-size: 12px; }
         .controls { display:flex; gap: 10px; align-items:flex-start; flex-wrap: wrap; }
