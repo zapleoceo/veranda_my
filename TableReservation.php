@@ -985,17 +985,6 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       padding: 6px 4px 8px;
     }
   
-    .table::after {
-      content: '';
-      position: absolute;
-      inset: auto 10px 10px auto;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.35);
-      opacity: .6;
-    }
-  
     .table:hover, .table:focus-visible {
       transform: translateY(-3px) scale(1.02) scale(var(--mx), var(--my));
       box-shadow: 0 18px 34px rgba(84, 49, 20, .3);
@@ -1068,7 +1057,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     .table-toast .t-reason { margin-top: 6px; font-size: 12px; color: rgba(245, 238, 228, 0.78); }
     .table-toast .t-reason b { color: rgba(255, 250, 244, 0.94); }
   
-    .table.small-vertical { width: 58px; height: 92px; border-radius: 18px; }
+    .table.small-vertical { width: 75px; height: 92px; border-radius: 18px; }
     .table.small-vertical.wide-1 { width: 86px; }
     .table.wide { width: 112px; height: 58px; border-radius: 18px; }
     .table.large { width: 108px; height: 108px; border-radius: 26px; }
@@ -1275,11 +1264,11 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
             <button class="table" style="left: 472px; top: 242px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
             <button class="table" style="left: 584px; top: 242px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
   
-            <button class="table small-vertical" style="left: 270px; top: 336px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 370px; top: 336px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 470px; top: 336px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 570px; top: 336px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 670px; top: 336px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 213px; top: 336px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 328px; top: 336px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 439px; top: 336px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 551px; top: 336px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 663px; top: 336px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
             <button class="table large" style="left: 758px; top: 258px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
   
             <div class="bar-row" aria-hidden="true">
