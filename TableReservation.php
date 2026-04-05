@@ -1028,11 +1028,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     }
 
     .table.disabled {
-      opacity: 1;
-      filter: none;
-      background: linear-gradient(180deg, rgba(130, 130, 130, 0.65), rgba(95, 95, 95, 0.72));
-      color: rgba(255, 250, 244, 0.88);
-      border-color: rgba(255, 255, 255, 0.18);
+      background: linear-gradient(180deg, rgba(150, 150, 150, 0.75), rgba(95, 95, 95, 0.78));
       pointer-events: none;
     }
   
@@ -1170,7 +1166,6 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       outline-offset: 2px;
     }
     .table.busy {
-      opacity: 0.5;
       filter: grayscale(0.2);
     }
   
