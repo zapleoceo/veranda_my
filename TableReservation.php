@@ -22,6 +22,7 @@ if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true
 date_default_timezone_set($apiTzName);
 
 require_once __DIR__ . '/src/classes/PosterAPI.php';
+require_once __DIR__ . '/src/classes/TelegramBot.php';
 
 $posterToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
 $now = new DateTimeImmutable('now', new DateTimeZone($displayTzName));
@@ -517,6 +518,96 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
   }
+  exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'submit_booking') {
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+  if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
+  if (!is_array($payload)) $payload = [];
+
+  $tableNum = trim((string)($payload['table_num'] ?? ''));
+  $name = trim((string)($payload['name'] ?? ''));
+  $phone = trim((string)($payload['phone'] ?? ''));
+  $guests = (int)($payload['guests'] ?? 0);
+  $start = trim((string)($payload['start'] ?? ''));
+
+  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректный номер стола'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if ($guests <= 0 || $guests > 99) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректное кол-во гостей'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if ($name === '' || mb_strlen($name) > 80) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректное имя'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $phoneNorm = preg_replace('/[^\d\+\-\(\)\s]/u', '', $phone);
+  $phoneNorm = trim((string)$phoneNorm);
+  if ($phoneNorm === '' || mb_strlen($phoneNorm) > 40) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректный номер телефона'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $displayTz = new DateTimeZone($displayTzName);
+  $startDt = null;
+  try {
+    if (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/', $start)) {
+      $startDt = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $start, $displayTz) ?: null;
+    } elseif (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $start)) {
+      $startDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $start, $displayTz) ?: null;
+    } else {
+      $startDt = new DateTimeImmutable($start, $displayTz);
+    }
+  } catch (\Throwable $e) {
+    $startDt = null;
+  }
+  if (!$startDt) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректное время'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+  $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
+  if ($tgChatId === '') $tgChatId = '3397075474';
+  $tgThreadId = trim((string)($_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? ''));
+  $tgThreadNum = $tgThreadId !== '' ? (int)$tgThreadId : 0;
+  if ($tgToken === '' || $tgChatId === '') {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Telegram не настроен'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $text = '<b>Новая бронь с сайта</b>' . "\n";
+  $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
+  $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
+  $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
+  $text .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
+  $text .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
+  $text .= 'Номер телефона: <b>' . htmlspecialchars($phoneNorm) . '</b>';
+
+  $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
+  $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
+  if (!$ok) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение в Telegram'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
@@ -1255,7 +1346,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
               <div class="guest-row">
                 <label class="guest-label">
                   Гостей
-                  <input type="number" id="resGuests" min="1" max="30" placeholder="2" value="">
+                  <input type="number" id="resGuests" min="1" max="30" placeholder="1" value="1">
                 </label>
                 <button class="btn btn-primary" id="checkBtn" type="button">Проверить</button>
               </div>
@@ -1501,7 +1592,9 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       });
     }
 
-    const openRequestForm = ({ guests, start }) => {
+    let pendingBooking = null;
+    const openRequestForm = ({ tableNum, guests, start }) => {
+      pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqGuests) reqGuests.value = String(guests);
       if (reqStart) reqStart.value = String(start);
       if (reqName) reqName.value = '';
@@ -1511,10 +1604,37 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     };
 
     if (reqForm) {
-      reqForm.addEventListener('submit', (e) => {
+      reqForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        setModal(reqModal, false);
-        setOutput('Заявка отправлена.\n\nИмя: ' + String(reqName ? reqName.value : '') + '\nТелефон: ' + String(reqPhone ? reqPhone.value : '') + '\nГостей: ' + String(reqGuests ? reqGuests.value : '') + '\nСтарт: ' + String(reqStart ? reqStart.value : '') + '\n\nБронь держится 30 минут.');
+        const name = reqName ? String(reqName.value || '').trim() : '';
+        const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
+        const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
+        const start = reqStart ? String(reqStart.value || '').trim() : '';
+        const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
+        if (!tableNum) {
+          setOutput({ ok: false, error: 'Не выбран стол' });
+          return;
+        }
+        if (!name || !phone) {
+          setOutput({ ok: false, error: 'Заполни имя и телефон' });
+          return;
+        }
+
+        try {
+          const url = new URL(location.href);
+          url.searchParams.set('ajax', 'submit_booking');
+          const res = await fetch(url.toString(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone }),
+          });
+          const j = await res.json().catch(() => null);
+          if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+          setModal(reqModal, false);
+          setOutput('Заявка отправлена.\n\nДата: ' + String(start).slice(0, 10) + '\nВремя: ' + String(start).slice(11, 16) + '\nСтол: ' + tableNum + '\nГостей: ' + String(guests) + '\nИмя: ' + name + '\nТелефон: ' + phone + '\n\nБронь держится 30 минут.');
+        } catch (err) {
+          setOutput({ ok: false, error: String(err && err.message ? err.message : err) });
+        }
       });
     }
 
@@ -1649,7 +1769,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
           selectedTableNum = id;
           tables.forEach((t) => t.classList.remove('selected'));
           table.classList.add('selected');
-          openRequestForm({ guests: current.guests, start: current.dtRaw });
+          openRequestForm({ tableNum: id, guests: current.guests, start: current.dtRaw });
           return;
         }
 
@@ -1674,7 +1794,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     const initDate = () => {
       if (!resDate) return;
       resDate.value = defaultResDateLocal || '';
-      if (resGuests) resGuests.value = '';
+      if (resGuests) resGuests.value = '1';
       setBusyLabel(String(resDate.value || '').slice(0, 10));
       clearReservationsOnTables();
     };
@@ -1751,7 +1871,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
           last.reservations_items = [];
         }
         clearReservationsOnTables();
-        applyReservationsItemsToTables(last.reservations_items, dateStr);
+        applyReservationsItemsToTables(last.reservations_items, dateStr, dt);
         if (!silent) setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
         renderSelectedTable();
       } finally {
