@@ -625,12 +625,13 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   
     .table .cap {
       display: block;
-      font-size: 0.75rem;
+      font-size: 0.62rem;
       letter-spacing: 0;
       font-weight: 700;
       opacity: 0.85;
       margin-top: 2px;
       font-family: var(--font-body);
+      white-space: nowrap;
     }
 
     .bar-row {
@@ -814,20 +815,21 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   
     .table .res-time {
       position: absolute;
-      top: 8px;
-      left: 10px;
-      right: 10px;
-      font-size: 0.68rem;
+      top: 6px;
+      left: 6px;
+      right: 6px;
+      font-size: 0.5rem;
       font-weight: 600;
-      letter-spacing: 0.02em;
+      letter-spacing: -0.02em;
       color: rgba(255,250,244,0.78);
       font-family: var(--font-body);
       pointer-events: none;
       text-shadow: 0 1px 0 rgba(0,0,0,0.22);
-      line-height: 1.15;
+      line-height: 1.1;
       text-align: left;
-      max-height: 2.4em;
+      white-space: nowrap;
       overflow: hidden;
+      text-overflow: ellipsis;
     }
     .table .cap { margin-top: 30px; }
 
@@ -1153,7 +1155,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
           lines = strMap[n].slice(0, 2).map(String).filter(Boolean);
         }
 
-        const txt = lines.length ? lines.join('\n') : '';
+        const txt = lines.length ? lines.join(' · ') : '';
         let el = t.querySelector('.res-time');
         if (!txt) {
           if (el) el.remove();
