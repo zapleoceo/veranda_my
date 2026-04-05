@@ -282,8 +282,9 @@ $defaultTo = $today;
         .btn { border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); color: rgba(255,250,244,0.92); border-radius: 10px; padding: 8px 10px; cursor: pointer; font-weight: 800; }
         .btn:disabled { opacity: 0.5; cursor: default; }
         input[type="date"] { border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: rgba(255,250,244,0.92); border-radius: 10px; padding: 7px 10px; }
-        .filters-card { position: relative; padding-bottom: 40px; }
-        .prog { position: absolute; left: 12px; right: 12px; bottom: 10px; display:flex; align-items:center; gap: 10px; opacity: 0; pointer-events: none; }
+        .filters-card { display:flex; flex-direction: column; gap: 8px; padding: 10px 12px; }
+        .filters-row { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
+        .prog { display:flex; align-items:center; gap: 10px; opacity: 0; pointer-events: none; height: 22px; }
         .prog.on { opacity: 1; }
         .progbar { height: 10px; flex: 1; border-radius: 999px; background: rgba(255,255,255,0.10); overflow: hidden; }
         .progbar > div { height: 100%; width: 0; background: rgba(255, 120, 120, 0.86); transition: width 0.15s ease; }
@@ -300,12 +301,14 @@ $defaultTo = $today;
             <div class="muted">Источник: Poster (dash.getTransactions), группировка по дню недели и часу открытия чека</div>
         </div>
         <div class="controls">
-            <div class="card filters-card" style="display:flex; gap: 10px; align-items:center; padding: 10px 12px;">
-                <span class="muted">С</span>
-                <input type="date" id="dateFrom" value="<?= htmlspecialchars($defaultFrom) ?>">
-                <span class="muted">По</span>
-                <input type="date" id="dateTo" value="<?= htmlspecialchars($defaultTo) ?>">
-                <button class="btn" id="loadBtn">Загрузить</button>
+            <div class="card filters-card">
+                <div class="filters-row">
+                    <span class="muted">С</span>
+                    <input type="date" id="dateFrom" value="<?= htmlspecialchars($defaultFrom) ?>">
+                    <span class="muted">По</span>
+                    <input type="date" id="dateTo" value="<?= htmlspecialchars($defaultTo) ?>">
+                    <button class="btn" id="loadBtn">Загрузить</button>
+                </div>
                 <div class="prog" id="prog">
                     <div class="progbar"><div id="progFill"></div></div>
                     <div class="progPct" id="progPct">0%</div>
