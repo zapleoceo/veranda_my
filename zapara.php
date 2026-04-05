@@ -69,11 +69,16 @@ if (($_GET['ajax'] ?? '') === 'day') {
 
     $hours = [];
     for ($h = 9; $h <= 23; $h++) $hours[] = $h;
-    $countsByHour = [];
-    foreach ($hours as $h) $countsByHour[(string)$h] = 0;
+    $countsByHourChecks = [];
+    $countsByHourDishes = [];
+    foreach ($hours as $h) {
+        $countsByHourChecks[(string)$h] = 0;
+        $countsByHourDishes[(string)$h] = 0;
+    }
 
     $tz = new DateTimeZone('Asia/Ho_Chi_Minh');
-    $total = 0;
+    $totalChecks = 0;
+    $totalDishes = 0;
 
     try {
         $nextTr = null;
@@ -87,7 +92,7 @@ if (($_GET['ajax'] ?? '') === 'day') {
                 'dateFrom' => str_replace('-', '', $date),
                 'dateTo' => str_replace('-', '', $date),
                 'status' => 2,
-                'include_products' => 'false',
+                'include_products' => 'true',
                 'include_history' => 'false',
                 'include_delivery' => 'false',
                 'timezone' => 'client',
@@ -114,8 +119,26 @@ if (($_GET['ajax'] ?? '') === 'day') {
                 $dt = (new DateTimeImmutable('@' . $ts))->setTimezone($tz);
                 $hour = (int)$dt->format('G');
                 if ($hour < 9 || $hour > 23) continue;
-                $countsByHour[(string)$hour] += 1;
-                $total++;
+                $hourKey = (string)$hour;
+                $countsByHourChecks[$hourKey] += 1;
+                $totalChecks++;
+
+                $dishCount = 0;
+                $prods = $tx['products'] ?? null;
+                if (is_array($prods)) {
+                    foreach ($prods as $p) {
+                        if (!is_array($p)) continue;
+                        $c = $p['count'] ?? $p['quantity'] ?? 1;
+                        if (is_string($c)) $c = str_replace(',', '.', trim($c));
+                        $cn = is_numeric($c) ? (float)$c : 1.0;
+                        if ($cn <= 0) continue;
+                        $dishCount += (int)round($cn);
+                    }
+                }
+                if ($dishCount > 0) {
+                    $countsByHourDishes[$hourKey] += $dishCount;
+                    $totalDishes += $dishCount;
+                }
             }
 
             $prevNextTr = $nextTr;
@@ -131,8 +154,10 @@ if (($_GET['ajax'] ?? '') === 'day') {
             'dow' => $dow,
             'status' => 2,
             'hours' => $hours,
-            'counts_by_hour' => $countsByHour,
-            'total' => $total,
+            'counts_by_hour_checks' => $countsByHourChecks,
+            'counts_by_hour_dishes' => $countsByHourDishes,
+            'total_checks' => $totalChecks,
+            'total_dishes' => $totalDishes,
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
@@ -327,6 +352,12 @@ $defaultTo = $today;
                         <span class="track"><span class="knob"></span></span>
                         <span>Линия</span>
                     </label>
+                    <label class="chart-switch">
+                        <span>Чеки</span>
+                        <input type="checkbox" id="metricToggle">
+                        <span class="track"><span class="knob"></span></span>
+                        <span>Блюда</span>
+                    </label>
                 </div>
                 <div class="prog" id="prog">
                     <div class="progbar"><div id="progFill"></div></div>
@@ -352,21 +383,34 @@ $defaultTo = $today;
     const dateToEl = document.getElementById('dateTo');
     const loadBtn = document.getElementById('loadBtn');
     const chartTypeToggle = document.getElementById('chartTypeToggle');
+    const metricToggle = document.getElementById('metricToggle');
     const prog = document.getElementById('prog');
     const progFill = document.getElementById('progFill');
     const progPct = document.getElementById('progPct');
     const progText = document.getElementById('progText');
     let chartType = 'bar';
+    let metric = 'checks';
     let lastData = null;
 
     try {
         chartType = (localStorage.getItem('zapara_chart_type') || '') === 'line' ? 'line' : 'bar';
+    } catch (_) {}
+    try {
+        metric = (localStorage.getItem('zapara_metric') || '') === 'dishes' ? 'dishes' : 'checks';
     } catch (_) {}
     if (chartTypeToggle) {
         chartTypeToggle.checked = chartType === 'line';
         chartTypeToggle.addEventListener('change', () => {
             chartType = chartTypeToggle.checked ? 'line' : 'bar';
             try { localStorage.setItem('zapara_chart_type', chartType); } catch (_) {}
+            if (lastData) render(lastData);
+        });
+    }
+    if (metricToggle) {
+        metricToggle.checked = metric === 'dishes';
+        metricToggle.addEventListener('change', () => {
+            metric = metricToggle.checked ? 'dishes' : 'checks';
+            try { localStorage.setItem('zapara_metric', metric); } catch (_) {}
             if (lastData) render(lastData);
         });
     }
@@ -602,7 +646,9 @@ $defaultTo = $today;
 
     const render = (data) => {
         clearCharts();
-        const counts = (data && data.counts_by_dow) ? data.counts_by_dow : {};
+        const counts = metric === 'dishes'
+            ? ((data && data.counts_dishes_by_dow) ? data.counts_dishes_by_dow : {})
+            : ((data && data.counts_checks_by_dow) ? data.counts_checks_by_dow : ((data && data.counts_by_dow) ? data.counts_by_dow : {}));
         const daysByDow = (data && data.days_by_dow) ? data.days_by_dow : {};
         const daysTotal = Number((data && data.days_total) ? data.days_total : 0) || 0;
         const avgAll = {};
@@ -627,7 +673,8 @@ $defaultTo = $today;
             let dayAvgTotal = 0;
             hours.forEach((h) => { dayAvgTotal += Number(perDay[String(h)] || 0) || 0; });
             const dayAvgTxt = (Math.round(dayAvgTotal * 10) / 10).toFixed(1).replace(/\.0$/, '');
-            const meta = '09:00 — 24:00 · ср/день: ' + dayAvgTxt + (dCnt > 0 ? (' · ' + String(dCnt) + ' дн') : '');
+            const unit = metric === 'dishes' ? 'блюд' : 'чек';
+            const meta = '09:00 — 24:00 · ср/день: ' + dayAvgTxt + ' ' + unit + (dCnt > 0 ? (' · ' + String(dCnt) + ' дн') : '');
             const { wrap, canvas } = makeCanvasCard(d.name, meta);
             chartsEl.appendChild(wrap);
             if (chartType === 'line') drawLine(canvas, hours, perDay);
@@ -637,7 +684,8 @@ $defaultTo = $today;
             let avgAllTotal = 0;
             hours.forEach((h) => { avgAllTotal += Number(avgAll[String(h)] || 0) || 0; });
             const avgAllTxt = (Math.round(avgAllTotal * 10) / 10).toFixed(1).replace(/\.0$/, '');
-            const meta = '09:00 — 24:00 · ср/день: ' + avgAllTxt;
+            const unit = metric === 'dishes' ? 'блюд' : 'чек';
+            const meta = '09:00 — 24:00 · ср/день: ' + avgAllTxt + ' ' + unit;
             const { wrap, canvas } = makeCanvasCard('Среднее', meta);
             chartsEl.appendChild(wrap);
             if (chartType === 'line') drawLine(canvas, hours, avgAll);
@@ -695,10 +743,15 @@ $defaultTo = $today;
         clearCharts();
         chartsEl.innerHTML = '<div class="card muted" style="display:flex; align-items:center; justify-content:center; min-height: 120px;">Загрузка…</div>';
         try {
-            const counts = {};
+            const countsChecks = {};
+            const countsDishes = {};
             for (let dow = 1; dow <= 7; dow++) {
-                counts[String(dow)] = {};
-                hours.forEach((h) => { counts[String(dow)][String(h)] = 0; });
+                countsChecks[String(dow)] = {};
+                countsDishes[String(dow)] = {};
+                hours.forEach((h) => {
+                    countsChecks[String(dow)][String(h)] = 0;
+                    countsDishes[String(dow)][String(h)] = 0;
+                });
             }
             const daysByDow = {};
             for (let dow = 1; dow <= 7; dow++) daysByDow[String(dow)] = 0;
@@ -721,14 +774,17 @@ $defaultTo = $today;
                 try { j = JSON.parse(txt); } catch (_) {}
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : ('Ошибка (' + String(res.status) + ')'));
                 const dow = String(j.dow || '');
-                const byHour = j.counts_by_hour || {};
-                if (!counts[dow]) return;
+                const byHourChecks = j.counts_by_hour_checks || {};
+                const byHourDishes = j.counts_by_hour_dishes || {};
+                if (!countsChecks[dow]) return;
                 daysByDow[dow] = (Number(daysByDow[dow] || 0) || 0) + 1;
                 daysTotal += 1;
                 hours.forEach((h) => {
                     const hk = String(h);
-                    const v = Number(byHour[hk] || 0) || 0;
-                    counts[dow][hk] += v;
+                    const v1 = Number(byHourChecks[hk] || 0) || 0;
+                    const v2 = Number(byHourDishes[hk] || 0) || 0;
+                    countsChecks[dow][hk] += v1;
+                    countsDishes[dow][hk] += v2;
                 });
 
             };
@@ -753,7 +809,7 @@ $defaultTo = $today;
 
             await Promise.all(workers);
             hideProgress();
-            lastData = { counts_by_dow: counts, days_by_dow: daysByDow, days_total: daysTotal };
+            lastData = { counts_checks_by_dow: countsChecks, counts_dishes_by_dow: countsDishes, days_by_dow: daysByDow, days_total: daysTotal };
             render(lastData);
             if (errors.length) {
                 const head = errors.slice(0, 3).map((x) => x.date + ': ' + x.error).join('\n');
