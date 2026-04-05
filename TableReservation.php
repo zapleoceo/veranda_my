@@ -1029,8 +1029,44 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
 
     .table.disabled {
       background: linear-gradient(180deg, rgba(150, 150, 150, 0.75), rgba(95, 95, 95, 0.78));
-      pointer-events: none;
+      cursor: not-allowed;
     }
+
+    .table.busy { cursor: not-allowed; }
+
+    .table.disabled:hover, .table.disabled:focus-visible,
+    .table.busy:hover, .table.busy:focus-visible {
+      transform: scale(var(--mx), var(--my));
+      box-shadow: 0 14px 24px rgba(84, 49, 20, .22);
+      filter: none;
+    }
+
+    .table-toast {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 9999;
+      width: min(340px, calc(100vw - 24px));
+      background: rgba(17, 24, 39, 0.94);
+      color: rgba(255, 250, 244, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+      padding: 10px 12px;
+      transform: translate(-50%, calc(-100% - 12px)) scale(0.98);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.16s ease, transform 0.16s ease;
+    }
+
+    .table-toast.on {
+      opacity: 1;
+      transform: translate(-50%, calc(-100% - 12px)) scale(1);
+    }
+
+    .table-toast .t-title { font-weight: 900; font-size: 13px; }
+    .table-toast .t-reason { margin-top: 6px; font-size: 12px; color: rgba(245, 238, 228, 0.78); }
+    .table-toast .t-reason b { color: rgba(255, 250, 244, 0.94); }
   
     .table.small-vertical { width: 58px; height: 92px; border-radius: 18px; }
     .table.small-vertical.wide-1 { width: 86px; }
@@ -1289,6 +1325,11 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       </section>
     </main>
   </div>
+
+  <div class="table-toast" id="tableToast" aria-live="polite" aria-atomic="true">
+    <div class="t-title" id="toastTitle"></div>
+    <div class="t-reason" id="toastReason"></div>
+  </div>
   
   <script>
     const root = document.documentElement;
@@ -1316,7 +1357,6 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
         const n = String(t.dataset.table || '');
         if (!allowedSet.has(n)) {
           t.classList.add('disabled');
-          t.disabled = true;
           t.title = 'Отключено в настройках';
         }
       });
@@ -1392,6 +1432,8 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
         byTable[k] = merged;
       });
 
+      lastReservationsByTable = byTable;
+
       const pad2 = (x) => String(x).padStart(2, '0');
       const fmt = (m) => pad2(Math.floor(m / 60)) + ':' + pad2(m % 60);
 
@@ -1427,12 +1469,87 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     const statusLine = document.getElementById('statusLine');
     const stepGuests = document.getElementById('stepGuests');
     const stepCheck = document.getElementById('stepCheck');
+    const toastEl = document.getElementById('tableToast');
+    const toastTitleEl = document.getElementById('toastTitle');
+    const toastReasonEl = document.getElementById('toastReason');
 
     let last = null;
     let freeNums = new Set();
     let lastKey = '';
     let selectedTableNum = '';
     let isLoading = false;
+    let lastReservationsByTable = {};
+    let toastTimer = null;
+    let toastHideTimer = null;
+
+    const parseSel = (dtValue) => {
+      const dt = String(dtValue || '').trim();
+      const m = dt.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
+      if (!m) return null;
+      const hh = Number(m[2]);
+      const mm = Number(m[3]);
+      if (!isFinite(hh) || !isFinite(mm)) return null;
+      const day = m[1];
+      const selMin = (hh * 60) + mm;
+      const now = new Date();
+      const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      return { day, selMin, isToday: day === todayStr };
+    };
+
+    const fmtMin = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+
+    const getUnavailable = (tableNum, current) => {
+      const el = tables.find((x) => String(x.dataset.table || '') === String(tableNum));
+      if (!el) return null;
+      if (el.classList.contains('disabled')) {
+        return { reason: 'отключено в настройках', detail: '' };
+      }
+      if (!current || !last) return null;
+      const ps = parseSel(current.dt);
+      const ranges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
+      const overlaps = ps && ranges.length ? ranges.some(([s, e]) => ps.selMin >= s && ps.selMin < e) : false;
+      if (overlaps) {
+        const txt = ranges.slice(0, 2).map(([s, e]) => fmtMin(s) + '-' + fmtMin(e)).join(' · ');
+        return { reason: 'есть бронь', detail: txt };
+      }
+      const isFree = freeNums.has(String(tableNum));
+      if (!isFree) {
+        const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[String(tableNum)] != null ? Number(tableCapsByNum[String(tableNum)]) : null;
+        const guests = current.guests != null ? Number(current.guests) : null;
+        if (cap != null && isFinite(cap) && guests != null && isFinite(guests) && guests > cap) {
+          return { reason: 'нет мест', detail: 'гостей ' + String(guests) + ', вместимость ' + String(cap) };
+        }
+        if (ps && ps.isToday) return { reason: 'гости сейчас сидят', detail: '' };
+        return { reason: 'недоступен на это время', detail: '' };
+      }
+      return null;
+    };
+
+    const positionToast = (target) => {
+      if (!toastEl || !target) return;
+      const r = target.getBoundingClientRect();
+      const x = Math.round(r.left + (r.width / 2));
+      const y = Math.round(r.top);
+      toastEl.style.left = String(x) + 'px';
+      toastEl.style.top = String(y) + 'px';
+    };
+
+    const hideToast = () => {
+      if (!toastEl) return;
+      toastEl.classList.remove('on');
+      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    };
+
+    const showToast = (target, reason) => {
+      if (!toastEl || !toastTitleEl || !toastReasonEl || !reason) return;
+      if (toastHideTimer) { clearTimeout(toastHideTimer); toastHideTimer = null; }
+      positionToast(target);
+      toastTitleEl.textContent = 'Этот столик не доступен';
+      toastReasonEl.innerHTML = 'Причина: <b>' + esc(reason.reason) + '</b>' + (reason.detail ? (' · ' + esc(reason.detail)) : '');
+      toastEl.classList.add('on');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, 2200);
+    };
 
     const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const fmtJson = (x) => {
@@ -1535,13 +1652,39 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     };
   
     tables.forEach(table => {
+      const showIfUnavailable = () => {
+        const id = String(table.dataset.table || '');
+        const current = getCurrentRequest();
+        const un = getUnavailable(id, current);
+        if (un) showToast(table, un);
+        return !!un;
+      };
+
+      table.addEventListener('mouseenter', () => {
+        if (toastHideTimer) { clearTimeout(toastHideTimer); toastHideTimer = null; }
+        showIfUnavailable();
+      });
+      table.addEventListener('mouseleave', () => {
+        if (toastHideTimer) clearTimeout(toastHideTimer);
+        toastHideTimer = setTimeout(hideToast, 180);
+      });
+
       table.addEventListener('click', async () => {
         const id = String(table.dataset.table || '');
+
+        const current = getCurrentRequest();
+        const un = getUnavailable(id, current);
+        if (un) {
+          tables.forEach((t) => t.classList.remove('selected'));
+          selectedTableNum = '';
+          showToast(table, un);
+          return;
+        }
+
         selectedTableNum = id;
         tables.forEach((t) => t.classList.remove('selected'));
         table.classList.add('selected');
 
-        const current = getCurrentRequest();
         if (!current) {
           setStatus(id);
           setOutput({ ok: false, error: 'Выбери дату и время' });
