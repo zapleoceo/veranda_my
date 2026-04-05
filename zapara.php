@@ -269,7 +269,7 @@ $defaultTo = $today;
     <style>
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b0f16; color: rgba(255,250,244,0.92); }
         .wrap { max-width: 1450px; margin: 0 auto; padding: 16px; }
-        .top { display:flex; align-items:flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .top { display:flex; align-items:center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         h1 { margin: 0; font-size: 20px; }
         .muted { color: rgba(245,238,228,0.62); font-size: 12px; }
         .controls { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
@@ -296,10 +296,6 @@ $defaultTo = $today;
 <body>
 <div class="wrap">
     <div class="top">
-        <div>
-            <h1>Zapara</h1>
-            <div class="muted">Источник: Poster (dash.getTransactions), группировка по дню недели и часу открытия чека</div>
-        </div>
         <div class="controls">
             <div class="card filters-card">
                 <div class="filters-row">
@@ -315,8 +311,12 @@ $defaultTo = $today;
                     <div class="progText" id="progText">—</div>
                 </div>
             </div>
-            <?php require __DIR__ . '/partials/user_menu.php'; ?>
         </div>
+        <?php require __DIR__ . '/partials/user_menu.php'; ?>
+    </div>
+    <div style="margin-top: 12px;">
+        <h1>Zapara</h1>
+        <div class="muted">Источник: Poster (dash.getTransactions), группировка по дню недели и часу открытия чека</div>
     </div>
 
     <div class="grid" id="charts"><div class="card muted" style="display:flex; align-items:center; justify-content:center; min-height: 120px;">Выбери период и нажми «Загрузить»</div></div>
