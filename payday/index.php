@@ -1575,6 +1575,7 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
     header('Content-Type: application/json; charset=utf-8');
     $dFrom = trim((string)($_GET['dateFrom'] ?? ''));
     $dTo = trim((string)($_GET['dateTo'] ?? ''));
+    $includeHidden = (int)($_GET['include_hidden'] ?? 0) === 1;
     if ($dTo === '') {
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
         exit;
@@ -1627,9 +1628,10 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
     $toTs = strtotime($dTo . ' 23:59:59');
     $hidden = [];
     try {
-        $hRows = $db->query("SELECT mail_uid FROM {$mh} WHERE date_to = ?", [$dTo])->fetchAll();
+        $hRows = $db->query("SELECT mail_uid, comment FROM {$mh} WHERE date_to = ?", [$dTo])->fetchAll();
         foreach ($hRows as $hr) {
-            $hidden[(int)($hr['mail_uid'] ?? 0)] = true;
+            $uid = (int)($hr['mail_uid'] ?? 0);
+            if ($uid > 0) $hidden[$uid] = (string)($hr['comment'] ?? '');
         }
     } catch (\Throwable $e) {}
     $rows = [];
@@ -1687,10 +1689,21 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
         ];
     }
     @imap_close($inbox);
-    $rows = array_values(array_filter($rows, function ($r) use ($hidden) {
+    $rows = array_values(array_filter($rows, function ($r) {
         $uid = (int)($r['mail_uid'] ?? 0);
-        return $uid > 0 && empty($hidden[$uid]);
+        return $uid > 0;
     }));
+    foreach ($rows as &$r) {
+        $uid = (int)($r['mail_uid'] ?? 0);
+        $r['is_hidden'] = !empty($hidden[$uid]) ? 1 : 0;
+        $r['hidden_comment'] = isset($hidden[$uid]) ? (string)$hidden[$uid] : '';
+    }
+    unset($r);
+    if (!$includeHidden) {
+        $rows = array_values(array_filter($rows, function ($r) {
+            return empty($r['is_hidden']);
+        }));
+    }
     echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -2916,7 +2929,10 @@ $fmtVnd = function (int $v): string {
             <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; padding: 12px; position: relative;">
                 <div id="outLineLayer"></div>
                 <div class="card" style="padding:0;">
-                    <div style="padding:8px 12px; font-weight:900;">Sepay (Mail)</div>
+                    <div style="padding:8px 12px; font-weight:900;" class="vc-subtitle">
+                        <span>Sepay (Mail)</span>
+                        <button type="button" class="vc-toggle hidden-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
+                    </div>
                     <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
                         <table id="outSepayTable">
                             <thead><tr><th class="col-out-hide"></th><th class="col-out-content">Content</th><th class="nowrap col-out-time">Время</th><th class="nowrap col-out-sum">Сумма</th><th class="col-out-select"></th><th class="col-out-anchor"></th></tr></thead>
@@ -3416,6 +3432,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const outFinanceBtn = document.getElementById('outFinanceBtn');
     const outSepayTable = document.getElementById('outSepayTable');
     const outPosterTable = document.getElementById('outPosterTable');
+    const toggleOutMailHiddenBtn = document.getElementById('toggleOutMailHiddenBtn');
     const fetchJsonSafe = (url) => fetch(url).then(async (r) => { const txt = await r.text(); let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('Bad JSON: ' + (txt || '(empty)')); } return j; });
     const posterMinorToVnd = (n) => {
         const x = Number(n || 0);
@@ -3481,7 +3498,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     setTab('in');
     const loadOutMail = () => {
         const { dateFrom, dateTo } = getDateRange();
-        const qs = new URLSearchParams({ dateFrom, dateTo });
+        const qs = new URLSearchParams({ dateFrom, dateTo, include_hidden: '1' });
         return fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=mail_out').then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка mail_out');
             const tbody = outSepayTable.tBodies[0]; tbody.innerHTML = '';
@@ -3489,10 +3506,17 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-mail-uid', String(row.mail_uid || 0));
                 tr.setAttribute('data-sum', String(row.amount || 0));
+                const isHidden = Number(row.is_hidden || 0) === 1;
+                const hiddenComment = String(row.hidden_comment || '').trim();
+                if (isHidden) {
+                    tr.classList.add('row-hidden');
+                    tr.setAttribute('data-hidden', '1');
+                }
                 const dt = formatOutDT(row.tx_time, row.date);
+                const contentShow = (isHidden && hiddenComment) ? hiddenComment : String(row.content || '');
                 tr.innerHTML = `
                     <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
-                    <td class="col-out-content">${escapeHtml(row.content || '')}</td>
+                    <td class="col-out-content">${escapeHtml(contentShow)}</td>
                     <td class="nowrap col-out-time"><div class="col-out-date-part">${escapeHtml(dt.date)}</div><div class="col-out-time-part">${escapeHtml(dt.time)}</div></td>
                     <td class="sum col-out-sum">${Number(row.amount || 0).toLocaleString('en-US')} ₫</td>
                     <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
@@ -3516,6 +3540,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 outLinkByFin.get(link.finance_id).push(link);
             });
             applyOutRowClasses();
+            applyOutHideLinked();
             outScheduleRelayout();
         });
     };
@@ -3824,6 +3849,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     window.addEventListener('resize', () => outScheduleRelayout(), { passive: true });
 
     let outHideLinkedOn = false;
+    let showOutMailHidden = false;
+    try { showOutMailHidden = localStorage.getItem('payday_show_out_mail_hidden') === '1'; } catch (e) {}
     const outLinks = [];
     const outLinkByMail = new Map();
     const outLinkByFin = new Map();
@@ -3889,9 +3916,16 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const applyOutHideLinked = () => {
         const mailRows = Array.from(outSepayTable.tBodies[0]?.rows || []);
         mailRows.forEach((tr) => {
-            if (!outHideLinkedOn) { tr.style.display = ''; return; }
             const uid = Number(tr.getAttribute('data-mail-uid') || 0);
-            tr.style.display = (uid && outLinkByMail.has(uid)) ? 'none' : '';
+            const isHiddenRow = String(tr.getAttribute('data-hidden') || '0') === '1';
+            const isLinked = uid && outLinkByMail.has(uid);
+            const hidden = (outHideLinkedOn && isLinked) || (isHiddenRow && !showOutMailHidden);
+            tr.style.display = hidden ? 'none' : '';
+            if (hidden) {
+                const cb = tr.querySelector('input.out-sepay-cb');
+                if (cb) cb.checked = false;
+                outSelectedMail.delete(uid);
+            }
         });
         const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
         finRows.forEach((tr) => {
@@ -4001,6 +4035,17 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         outScheduleRelayout();
     });
 
+    if (toggleOutMailHiddenBtn) {
+        toggleOutMailHiddenBtn.classList.toggle('on', showOutMailHidden);
+        toggleOutMailHiddenBtn.addEventListener('click', () => {
+            showOutMailHidden = !showOutMailHidden;
+            try { localStorage.setItem('payday_show_out_mail_hidden', showOutMailHidden ? '1' : '0'); } catch (e) {}
+            toggleOutMailHiddenBtn.classList.toggle('on', showOutMailHidden);
+            applyOutHideLinked();
+            outScheduleRelayout();
+        });
+    }
+
     if (outLinkAutoBtn) outLinkAutoBtn.addEventListener('click', () => {
         const mailRows = Array.from(outSepayTable.tBodies[0]?.rows || []);
         const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
@@ -4069,18 +4114,31 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             if (!uid || !dateTo) return;
             const c = prompt('Комментарий (почему скрываем):', '');
             if (c === null) return;
+            const comment = String(c || '').trim();
             fetch(location.pathname + '?ajax=mail_hide', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mail_uid: uid, dateTo, comment: String(c || '').trim() }),
+                body: JSON.stringify({ mail_uid: uid, dateTo, comment }),
                 credentials: 'same-origin',
             })
                 .then((r) => r.json())
                 .then((j) => {
                     if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                    return loadOutMail();
+                    const tr = t.closest('tr');
+                    if (tr) {
+                        tr.classList.add('row-hidden');
+                        tr.setAttribute('data-hidden', '1');
+                        tr.setAttribute('data-content', comment.toLowerCase());
+                        const td = tr.querySelector('td.col-out-content');
+                        if (td) td.textContent = comment || 'Скрыто';
+                        const cb = tr.querySelector('input.out-sepay-cb');
+                        if (cb) cb.checked = false;
+                    }
+                    outSelectedMail.delete(uid);
+                    applyOutHideLinked();
+                    updateOutSelection();
+                    outScheduleRelayout();
                 })
-                .then(() => { applyOutRowClasses(); applyOutHideLinked(); updateOutSelection(); })
                 .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         }
     });
