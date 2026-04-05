@@ -589,20 +589,26 @@ $defaultTo = $today;
 
         dows.forEach((d) => {
             const dCnt = Number(daysByDow && daysByDow[d.key] ? daysByDow[d.key] : 0) || 0;
-            const meta = '09:00 — 24:00 · среднее/день' + (dCnt > 0 ? (' · ' + String(dCnt) + ' дн') : '');
-            const { wrap, canvas } = makeCanvasCard(d.name, meta);
-            chartsEl.appendChild(wrap);
             const perDay = {};
             hours.forEach((h) => {
                 const hk = String(h);
                 const v = counts && counts[d.key] ? Number(counts[d.key][hk] || 0) : 0;
                 perDay[hk] = dCnt > 0 ? (v / dCnt) : 0;
             });
+            let dayAvgTotal = 0;
+            hours.forEach((h) => { dayAvgTotal += Number(perDay[String(h)] || 0) || 0; });
+            const dayAvgTxt = (Math.round(dayAvgTotal * 10) / 10).toFixed(1).replace(/\.0$/, '');
+            const meta = '09:00 — 24:00 · ср/день: ' + dayAvgTxt + (dCnt > 0 ? (' · ' + String(dCnt) + ' дн') : '');
+            const { wrap, canvas } = makeCanvasCard(d.name, meta);
+            chartsEl.appendChild(wrap);
             if (chartType === 'line') drawLine(canvas, hours, perDay);
             else drawBars(canvas, hours, perDay, null, true);
         });
         {
-            const meta = '09:00 — 24:00 · среднее/день';
+            let avgAllTotal = 0;
+            hours.forEach((h) => { avgAllTotal += Number(avgAll[String(h)] || 0) || 0; });
+            const avgAllTxt = (Math.round(avgAllTotal * 10) / 10).toFixed(1).replace(/\.0$/, '');
+            const meta = '09:00 — 24:00 · ср/день: ' + avgAllTxt;
             const { wrap, canvas } = makeCanvasCard('Среднее', meta);
             chartsEl.appendChild(wrap);
             if (chartType === 'line') drawLine(canvas, hours, avgAll);
