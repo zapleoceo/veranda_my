@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
-veranda_require('dashboard');
+veranda_require('zapara');
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 $posterToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
@@ -178,13 +178,12 @@ $defaultTo = $today;
                 <span class="muted">По</span>
                 <input type="date" id="dateTo" value="<?= htmlspecialchars($defaultTo) ?>">
                 <button class="btn" id="loadBtn">Загрузить</button>
-                <span class="pill" id="totalPill">Всего: —</span>
             </div>
             <?php require __DIR__ . '/partials/user_menu.php'; ?>
         </div>
     </div>
 
-    <div class="grid" id="charts"></div>
+    <div class="grid" id="charts"><div class="card muted" style="display:flex; align-items:center; justify-content:center; min-height: 120px;">Выбери период и нажми «Загрузить»</div></div>
 </div>
 
 <script>
@@ -193,7 +192,6 @@ $defaultTo = $today;
     const dateFromEl = document.getElementById('dateFrom');
     const dateToEl = document.getElementById('dateTo');
     const loadBtn = document.getElementById('loadBtn');
-    const totalPill = document.getElementById('totalPill');
 
     const dows = [
         { key: '1', name: 'Пн' },
@@ -301,7 +299,6 @@ $defaultTo = $today;
             chartsEl.appendChild(wrap);
             drawBars(canvas, hours, counts[d.key] || {});
         });
-        if (totalPill) totalPill.textContent = 'Всего: ' + String((data && data.total) ? data.total : 0);
     };
 
     const load = async () => {
@@ -309,7 +306,6 @@ $defaultTo = $today;
         const dt = String(dateToEl.value || '').trim();
         if (!df || !dt) return;
         loadBtn.disabled = true;
-        if (totalPill) totalPill.textContent = 'Всего: …';
         try {
             const url = new URL(location.href);
             url.searchParams.set('ajax', 'data');
@@ -327,7 +323,6 @@ $defaultTo = $today;
     };
 
     loadBtn.addEventListener('click', load);
-    load().catch(() => null);
 })();
 </script>
 </body>

@@ -34,6 +34,8 @@ if (!function_exists('veranda_get_user_permissions')) {
             'dashboard' => true,
             'rawdata' => true,
             'kitchen_online' => true,
+            'errors' => false,
+            'zapara' => false,
             'admin' => true,
             'roma' => false,
             'banya' => false,
@@ -64,6 +66,8 @@ if (!function_exists('veranda_get_user_permissions')) {
                 $out['roma'] = true;
                 $out['banya'] = true;
                 $out['employees'] = true;
+                $out['errors'] = true;
+                $out['zapara'] = true;
             }
             return $out;
         } catch (\Exception $e) {

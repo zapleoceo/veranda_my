@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
-veranda_require('dashboard');
+veranda_require('errors');
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 

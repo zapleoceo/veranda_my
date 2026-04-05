@@ -15,24 +15,26 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
             $canDashboard = function_exists('veranda_can') && veranda_can('dashboard');
             $canRaw = function_exists('veranda_can') && veranda_can('rawdata');
             $canKitchen = function_exists('veranda_can') && veranda_can('kitchen_online');
+            $canCooked = function_exists('veranda_can') && veranda_can('errors');
+            $canZapara = function_exists('veranda_can') && veranda_can('zapara');
             $canBanya = function_exists('veranda_can') && veranda_can('banya');
             $canRoma = function_exists('veranda_can') && veranda_can('roma');
             $canEmployees = function_exists('veranda_can') && veranda_can('employees');
             $canPayday = function_exists('veranda_can') && veranda_can('payday');
             $canAdmin = function_exists('veranda_can') && veranda_can('admin');
-            $hasReports = $canDashboard || $canRaw || $canKitchen || $canBanya || $canRoma || $canEmployees;
+            $hasReports = $canDashboard || $canRaw || $canKitchen || $canCooked || $canZapara || $canBanya || $canRoma || $canEmployees;
         ?>
 
         <?php if ($hasReports): ?>
             <div class="ud-title">Отчеты</div>
 
-            <?php if ($canKitchen || $canDashboard || $canRaw): ?>
+            <?php if ($canKitchen || $canDashboard || $canRaw || $canCooked || $canZapara): ?>
                 <details class="ud-details">
                     <summary class="ud-summary">Кухня</summary>
                     <?php if ($canKitchen): ?><a class="ud-link ud-l2" href="/kitchen_online.php">Онлайн</a><?php endif; ?>
                     <?php if ($canDashboard): ?><a class="ud-link ud-l2" href="/dashboard.php<?= $dashboardQuery !== '' ? ('?' . htmlspecialchars($dashboardQuery)) : '' ?>">Дашборд</a><?php endif; ?>
-                    <?php if ($canDashboard): ?><a class="ud-link ud-l2" href="/errors.php">Cooked</a><?php endif; ?>
-                    <?php if ($canDashboard): ?><a class="ud-link ud-l2" href="/zapara.php">Zapara</a><?php endif; ?>
+                    <?php if ($canCooked): ?><a class="ud-link ud-l2" href="/errors.php">Cooked</a><?php endif; ?>
+                    <?php if ($canZapara): ?><a class="ud-link ud-l2" href="/zapara.php">Zapara</a><?php endif; ?>
                     <?php if ($canRaw): ?><a class="ud-link ud-l2" href="/rawdata.php<?= $rawDataQuery !== '' ? ('?' . htmlspecialchars($rawDataQuery)) : '' ?>">Таблица</a><?php endif; ?>
                 </details>
             <?php endif; ?>
