@@ -270,7 +270,7 @@ $defaultTo = $today;
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b0f16; color: rgba(255,250,244,0.92); }
         .wrap { max-width: 1450px; margin: 0 auto; padding: 16px; }
         .top { display:flex; align-items:flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-        @media (max-width: 680px) {
+        @media (max-width: 980px) {
             .top { flex-direction: column; }
             .top .user-menu { order: 1; align-self: flex-end; }
             .top .controls { order: 2; width: 100%; }
@@ -453,6 +453,17 @@ $defaultTo = $today;
 
             ctx.fillStyle = 'rgba(255, 120, 120, 0.86)';
             ctx.fillRect(x, y, barW, bh);
+
+            if (v > 0) {
+                ctx.save();
+                ctx.font = '800 11px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'rgba(11, 15, 22, 0.90)';
+                const ty = Math.max(y + 10, y + (bh / 2));
+                ctx.fillText(String(Math.round(v)), x + barW / 2, ty);
+                ctx.restore();
+            }
 
             const label = String(hh);
             ctx.fillStyle = 'rgba(245,238,228,0.62)';

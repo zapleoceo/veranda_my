@@ -6,9 +6,9 @@ $dashboardQuery = isset($dashboardQuery) ? (string)$dashboardQuery : '';
 $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
 ?>
 <div class="user-menu">
-    <div class="user-chip">
+    <div class="user-chip" data-name="<?= htmlspecialchars($userLabel, ENT_QUOTES) ?>">
         <span class="user-icon"><?php if ($avatar !== ''): ?><img src="<?= htmlspecialchars($avatar) ?>" alt=""><?php else: ?><?= htmlspecialchars($initial) ?><?php endif; ?></span>
-        <span><?= htmlspecialchars($userLabel) ?></span>
+        <span class="user-name"><?= htmlspecialchars($userLabel) ?></span>
     </div>
     <div class="user-dropdown">
         <?php
