@@ -1095,6 +1095,41 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       .guest-row { flex-direction: column; align-items: stretch; }
       .guest-label { flex-basis: auto; }
     }
+
+    .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 14px; z-index: 9998; }
+    .modal.on { display: flex; }
+    .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(2px); }
+    .modal-card {
+      position: relative;
+      width: min(520px, 100%);
+      background: rgba(17, 24, 39, 0.96);
+      color: rgba(255, 250, 244, 0.94);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      box-shadow: 0 26px 70px rgba(0,0,0,0.45);
+      padding: 14px 14px 12px;
+      transform: translateY(8px) scale(0.98);
+      opacity: 0;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .modal.on .modal-card { transform: translateY(0) scale(1); opacity: 1; }
+    .modal-title { font-weight: 900; font-size: 16px; font-family: var(--font-display); }
+    .modal-text { margin-top: 10px; color: rgba(245, 238, 228, 0.78); font-size: var(--text-sm); line-height: 1.35; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
+    .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .modal-label { display: grid; gap: 6px; font-size: 12px; color: rgba(245, 238, 228, 0.78); margin-top: 0; }
+    .modal input[type="text"], .modal input[type="tel"], .modal input[type="number"] {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255, 250, 244, 0.94);
+      padding: 0.75rem 0.85rem;
+      font-size: var(--text-sm);
+      outline: none;
+    }
+    .modal-note { margin-top: 10px; color: rgba(245, 238, 228, 0.70); font-size: 12px; line-height: 1.35; }
+    @media (max-width: 560px) { .modal-grid { grid-template-columns: 1fr; } }
   
     .btn {
       border: 0;
@@ -1220,7 +1255,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
               <div class="guest-row">
                 <label class="guest-label">
                   Гостей
-                  <input type="number" id="resGuests" min="1" max="30" value="2">
+                  <input type="number" id="resGuests" min="1" max="30" placeholder="2" value="">
                 </label>
                 <button class="btn btn-primary" id="checkBtn" type="button">Проверить</button>
               </div>
@@ -1241,6 +1276,50 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
         </aside>
       </section>
     </main>
+  </div>
+
+  <div class="modal" id="capModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close="capModal"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="capModalTitle">
+      <div class="modal-title" id="capModalTitle">Подтвердите</div>
+      <div class="modal-text" id="capModalText"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" type="button" id="capModalNo">Нет</button>
+        <button class="btn btn-primary" type="button" id="capModalYes">Да</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="reqModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close="reqModal"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle">
+      <div class="modal-title" id="reqModalTitle">Заявка на бронь</div>
+      <form id="reqForm">
+        <div class="modal-grid">
+          <label class="modal-label">
+            Ваше имя
+            <input type="text" id="reqName" autocomplete="name" required>
+          </label>
+          <label class="modal-label">
+            Ваш номер телефона
+            <input type="tel" id="reqPhone" autocomplete="tel" required>
+          </label>
+          <label class="modal-label">
+            Кол-во гостей
+            <input type="number" id="reqGuests" readonly>
+          </label>
+          <label class="modal-label">
+            Время старта брони
+            <input type="text" id="reqStart" readonly>
+          </label>
+        </div>
+        <div class="modal-note">Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.</div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" type="button" data-modal-close="reqModal">Закрыть</button>
+          <button class="btn btn-primary" type="submit">Отправить</button>
+        </div>
+      </form>
+    </div>
   </div>
   
   <script>
@@ -1359,12 +1438,85 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     const statusLine = document.getElementById('statusLine');
     const stepGuests = document.getElementById('stepGuests');
     const stepCheck = document.getElementById('stepCheck');
+    const capModal = document.getElementById('capModal');
+    const capModalText = document.getElementById('capModalText');
+    const capModalYes = document.getElementById('capModalYes');
+    const capModalNo = document.getElementById('capModalNo');
+    const reqModal = document.getElementById('reqModal');
+    const reqForm = document.getElementById('reqForm');
+    const reqName = document.getElementById('reqName');
+    const reqPhone = document.getElementById('reqPhone');
+    const reqGuests = document.getElementById('reqGuests');
+    const reqStart = document.getElementById('reqStart');
 
     let last = null;
     let freeNums = new Set();
     let lastKey = '';
     let selectedTableNum = '';
     let isLoading = false;
+    let capConfirmResolve = null;
+
+    const setModal = (el, on) => {
+      if (!el) return;
+      if (on) {
+        el.classList.add('on');
+        el.setAttribute('aria-hidden', 'false');
+      } else {
+        el.classList.remove('on');
+        el.setAttribute('aria-hidden', 'true');
+      }
+    };
+
+    document.querySelectorAll('[data-modal-close]').forEach((x) => {
+      x.addEventListener('click', () => {
+        const id = String(x.getAttribute('data-modal-close') || '');
+        if (!id) return;
+        const el = document.getElementById(id);
+        setModal(el, false);
+        if (id === 'capModal' && typeof capConfirmResolve === 'function') {
+          capConfirmResolve(false);
+          capConfirmResolve = null;
+        }
+      });
+    });
+
+    const confirmCapacity = (maxCap, guests) => new Promise((resolve) => {
+      capConfirmResolve = resolve;
+      if (capModalText) capModalText.textContent = `Вы хотите забронировать столик для ${maxCap} для ${guests} гостей?`;
+      setModal(capModal, true);
+    });
+
+    if (capModalYes) {
+      capModalYes.addEventListener('click', () => {
+        setModal(capModal, false);
+        if (typeof capConfirmResolve === 'function') capConfirmResolve(true);
+        capConfirmResolve = null;
+      });
+    }
+    if (capModalNo) {
+      capModalNo.addEventListener('click', () => {
+        setModal(capModal, false);
+        if (typeof capConfirmResolve === 'function') capConfirmResolve(false);
+        capConfirmResolve = null;
+      });
+    }
+
+    const openRequestForm = ({ guests, start }) => {
+      if (reqGuests) reqGuests.value = String(guests);
+      if (reqStart) reqStart.value = String(start);
+      if (reqName) reqName.value = '';
+      if (reqPhone) reqPhone.value = '';
+      setModal(reqModal, true);
+      if (reqName) reqName.focus();
+    };
+
+    if (reqForm) {
+      reqForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        setModal(reqModal, false);
+        setOutput('Заявка отправлена.\n\nИмя: ' + String(reqName ? reqName.value : '') + '\nТелефон: ' + String(reqPhone ? reqPhone.value : '') + '\nГостей: ' + String(reqGuests ? reqGuests.value : '') + '\nСтарт: ' + String(reqStart ? reqStart.value : '') + '\n\nБронь держится 30 минут.');
+      });
+    }
 
     const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const fmtJson = (x) => {
@@ -1439,11 +1591,14 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
 
     const getCurrentRequest = () => {
       const dtRaw = resDate ? String(resDate.value || '').trim() : '';
-      const guestsRaw = resGuests ? Number(resGuests.value || 0) : 0;
+      const guestsStr = resGuests ? String(resGuests.value || '').trim() : '';
       if (!dtRaw) return null;
+      if (!guestsStr) return null;
+      const guestsRaw = Number(guestsStr);
+      const guests = isFinite(guestsRaw) && guestsRaw > 0 ? Math.floor(guestsRaw) : null;
+      if (guests == null) return null;
       const dt = dtRaw.replace('T', ' ') + ':00';
-      const guests = isFinite(guestsRaw) && guestsRaw > 0 ? Math.floor(guestsRaw) : 2;
-      return { dt, guests };
+      return { dt, guests, dtRaw };
     };
 
     const invalidateLast = () => {
@@ -1468,16 +1623,39 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     tables.forEach(table => {
       table.addEventListener('click', async () => {
         const id = String(table.dataset.table || '');
+        const current = getCurrentRequest();
+        if (!current) {
+          if (!resDate || !String(resDate.value || '').trim()) {
+            setStatus(id);
+            setOutput({ ok: false, error: 'Выбери дату и время' });
+            return;
+          }
+          setStatus('');
+          setOutput({ ok: false, error: 'Укажи кол-во гостей' });
+          if (resGuests) { resGuests.focus(); resGuests.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+          return;
+        }
+
+        const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[id] != null ? Number(tableCapsByNum[id]) : null;
+        if (cap != null && isFinite(cap) && current.guests > cap) {
+          const ok = await confirmCapacity(Math.max(1, Math.floor(cap)), current.guests);
+          if (!ok) {
+            selectedTableNum = '';
+            tables.forEach((t) => t.classList.remove('selected'));
+            setOutput('Исправь кол-во гостей и выбери столик снова.');
+            if (resGuests) { resGuests.focus(); resGuests.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+            return;
+          }
+          selectedTableNum = id;
+          tables.forEach((t) => t.classList.remove('selected'));
+          table.classList.add('selected');
+          openRequestForm({ guests: current.guests, start: current.dtRaw });
+          return;
+        }
+
         selectedTableNum = id;
         tables.forEach((t) => t.classList.remove('selected'));
         table.classList.add('selected');
-
-        const current = getCurrentRequest();
-        if (!current) {
-          setStatus(id);
-          setOutput({ ok: false, error: 'Выбери дату и время' });
-          return;
-        }
 
         const key = current.dt + '|' + String(current.guests);
         if ((!last || lastKey !== key) && !isLoading) {
@@ -1496,6 +1674,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     const initDate = () => {
       if (!resDate) return;
       resDate.value = defaultResDateLocal || '';
+      if (resGuests) resGuests.value = '';
       setBusyLabel(String(resDate.value || '').slice(0, 10));
       clearReservationsOnTables();
     };
@@ -1511,7 +1690,8 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       if (isLoading) return;
       const current = getCurrentRequest();
       if (!current) {
-        setOutput({ ok: false, error: 'Выбери дату и время' });
+        if (!resDate || !String(resDate.value || '').trim()) setOutput({ ok: false, error: 'Выбери дату и время' });
+        else setOutput({ ok: false, error: 'Укажи кол-во гостей' });
         return;
       }
 
@@ -1599,9 +1779,9 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       resGuests.addEventListener('change', invalidateLast);
     }
     if (resDate && String(resDate.value || '').trim()) {
-      loadFree(true).catch(() => null);
+      if (resGuests && String(resGuests.value || '').trim()) loadFree(true).catch(() => null);
     }
-    setOutput('Выбери дату. Потом укажи гостей и нажми "Проверить свободные столы". После этого кликай по столам.');
+    setOutput('Выбери дату. Потом укажи гостей и нажми "Проверить". После этого кликай по столам.');
   </script>
 </body>
 </html>
