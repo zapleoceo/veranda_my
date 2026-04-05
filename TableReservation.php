@@ -1013,17 +1013,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       padding: 6px 4px 8px;
     }
   
-    .table::after {
-      content: '';
-      position: absolute;
-      inset: auto 10px 10px auto;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.35);
-      opacity: .6;
-    }
-  
     .table:hover, .table:focus-visible {
       transform: translateY(-3px) scale(1.02) scale(var(--mx), var(--my));
       box-shadow: 0 18px 34px rgba(84, 49, 20, .3);
@@ -1056,14 +1045,50 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     }
 
     .table.disabled {
-      opacity: 0.22;
-      filter: grayscale(0.35);
-      pointer-events: none;
+      background: linear-gradient(180deg, rgba(150, 150, 150, 0.75), rgba(95, 95, 95, 0.78));
+      cursor: not-allowed;
+    }
+
+    .table.busy { cursor: not-allowed; }
+
+    .table.disabled:hover, .table.disabled:focus-visible,
+    .table.busy:hover, .table.busy:focus-visible {
+      transform: scale(var(--mx), var(--my));
+      box-shadow: 0 14px 24px rgba(84, 49, 20, .22);
+      filter: none;
     }
   
-    .table.small-vertical { width: 58px; height: 92px; border-radius: 18px; }
+    .table.small-vertical { width: 75px; height: 92px; border-radius: 18px; }
+    .table.small-vertical.wide-1 { width: 86px; }
     .table.wide { width: 112px; height: 58px; border-radius: 18px; }
     .table.large { width: 108px; height: 108px; border-radius: 26px; }
+
+    .table-toast {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 9999;
+      width: min(340px, calc(100vw - 24px));
+      background: rgba(17, 24, 39, 0.94);
+      color: rgba(255, 250, 244, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+      padding: 10px 12px;
+      transform: translate(-50%, calc(-100% - 12px)) scale(0.98);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.16s ease, transform 0.16s ease;
+    }
+
+    .table-toast.on {
+      opacity: 1;
+      transform: translate(-50%, calc(-100% - 12px)) scale(1);
+    }
+
+    .table-toast .t-title { font-weight: 900; font-size: 13px; }
+    .table-toast .t-reason { margin-top: 6px; font-size: 12px; color: rgba(245, 238, 228, 0.78); }
+    .table-toast .t-reason b { color: rgba(255, 250, 244, 0.94); }
   
     .sidebar {
       display: grid;
@@ -1243,7 +1268,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       outline-offset: 2px;
     }
     .table.busy {
-      opacity: 0.5;
       filter: grayscale(0.2);
     }
   
@@ -1279,9 +1303,9 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
             <button class="table large" style="left: 0px; top: 150px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
             <button class="table large" style="left: 0px; top: 24px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
-            <button class="table small-vertical" style="left: 200px; top: 0px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 364px; top: 0px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 512px; top: 0px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 200px; top: 0px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 364px; top: 0px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 512px; top: 0px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
             <button class="table large" style="left: 700px; top: 0px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
   
             <button class="table wide" style="left: 286px; top: 142px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
@@ -1317,11 +1341,11 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
             <button class="table" style="left: 472px; top: 242px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
             <button class="table" style="left: 584px; top: 242px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
   
-            <button class="table small-vertical" style="left: 270px; top: 336px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 370px; top: 336px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 470px; top: 336px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 570px; top: 336px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 670px; top: 336px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 213px; top: 336px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 328px; top: 336px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 439px; top: 336px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 551px; top: 336px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 663px; top: 336px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
             <button class="table large" style="left: 758px; top: 258px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
   
             <div class="bar-row" aria-hidden="true">
@@ -1412,6 +1436,11 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       </form>
     </div>
   </div>
+
+  <div class="table-toast" id="tableToast" aria-live="polite" aria-atomic="true">
+    <div class="t-title" id="toastTitle"></div>
+    <div class="t-reason" id="toastReason"></div>
+  </div>
   
   <script>
     const root = document.documentElement;
@@ -1432,12 +1461,11 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
 
     const tables = Array.from(document.querySelectorAll('.table'));
-    if (allowedSet !== null) {
+    if (allowedSet !== null && allowedSet.size > 0) {
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
         if (!allowedSet.has(n)) {
           t.classList.add('disabled');
-          t.disabled = true;
         }
       });
     }
@@ -1467,16 +1495,28 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       });
     };
 
-    const applyReservationsItemsToTables = (items, dateStr) => {
+    let lastReservationsByTable = {};
+    const applyReservationsItemsToTables = (items, dateStr, dtValue) => {
       const list = Array.isArray(items) ? items : [];
       const day = String(dateStr || '').slice(0, 10);
       if (!day) return;
 
+      const dt = String(dtValue || '').trim();
+      const selMin = (() => {
+        const m = dt.match(/^\d{4}-\d{2}-\d{2}[ T](\d{2}):(\d{2})/);
+        if (!m) return null;
+        const hh = Number(m[1]);
+        const mm = Number(m[2]);
+        if (!isFinite(hh) || !isFinite(mm)) return null;
+        return (hh * 60) + mm;
+      })();
+      const today = new Date();
+      const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+      const isToday = day === todayStr;
+
       const byTable = {};
       list.forEach((it) => {
         if (!it || typeof it !== 'object') return;
-        const status = Number(it.status ?? 0);
-        if (status === 7) return;
         const t = String(it.table_title ?? '').trim();
         const s = String(it.date_start ?? '').trim();
         const e = String(it.date_end ?? '').trim();
@@ -1504,10 +1544,16 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       const pad2 = (x) => String(x).padStart(2, '0');
       const fmt = (m) => pad2(Math.floor(m / 60)) + ':' + pad2(m % 60);
 
+      lastReservationsByTable = byTable;
+
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
         const ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
-        const txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
+        const overlapsSel = selMin != null ? ranges.some(([s, e]) => selMin >= s && selMin < e) : false;
+        let txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
+        if (isToday && selMin != null && !overlapsSel && last && !freeNums.has(n)) {
+          txt = 'занят сейчас';
+        }
         let el = t.querySelector('.res-time');
         if (!txt) {
           if (el) el.remove();
@@ -1539,6 +1585,9 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const reqPhone = document.getElementById('reqPhone');
     const reqGuests = document.getElementById('reqGuests');
     const reqStart = document.getElementById('reqStart');
+    const toastEl = document.getElementById('tableToast');
+    const toastTitleEl = document.getElementById('toastTitle');
+    const toastReasonEl = document.getElementById('toastReason');
 
     let last = null;
     let freeNums = new Set();
@@ -1546,6 +1595,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     let selectedTableNum = '';
     let isLoading = false;
     let capConfirmResolve = null;
+    let toastTimer = null;
+    let toastHideTimer = null;
 
     const setModal = (el, on) => {
       if (!el) return;
@@ -1641,6 +1692,69 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const fmtJson = (x) => {
       try { return JSON.stringify(x, null, 2); } catch (_) { return String(x); }
+    };
+
+    const parseSel = (dtRaw) => {
+      const raw = String(dtRaw || '').trim();
+      const m = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
+      if (!m) return null;
+      const hh = Number(m[2]);
+      const mm = Number(m[3]);
+      if (!isFinite(hh) || !isFinite(mm)) return null;
+      const day = m[1];
+      const selMin = (hh * 60) + mm;
+      const now = new Date();
+      const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      return { day, selMin, isToday: day === todayStr };
+    };
+
+    const fmtMin = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+
+    const positionToast = (target) => {
+      if (!toastEl || !target) return;
+      const r = target.getBoundingClientRect();
+      const x = Math.round(r.left + (r.width / 2));
+      const y = Math.round(r.top);
+      toastEl.style.left = String(x) + 'px';
+      toastEl.style.top = String(y) + 'px';
+    };
+
+    const hideToast = () => {
+      if (!toastEl) return;
+      toastEl.classList.remove('on');
+      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    };
+
+    const showToast = (target, reason, detail) => {
+      if (!toastEl || !toastTitleEl || !toastReasonEl) return;
+      if (toastHideTimer) { clearTimeout(toastHideTimer); toastHideTimer = null; }
+      positionToast(target);
+      toastTitleEl.textContent = 'Этот столик не доступен';
+      toastReasonEl.innerHTML = 'Причина: <b>' + esc(reason) + '</b>' + (detail ? (' · ' + esc(detail)) : '');
+      toastEl.classList.add('on');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, 2200);
+    };
+
+    const getUnavailableReason = (tableNum, current) => {
+      const tEl = tables.find((x) => String(x.dataset.table || '') === String(tableNum));
+      if (!tEl) return null;
+      if (tEl.classList.contains('disabled')) return { reason: 'отключено в настройках', detail: '' };
+      if (!last || !current) return null;
+      const ps = parseSel(current.dtRaw);
+      const ranges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
+      if (ps && ranges.length) {
+        const overlaps = ranges.some(([s, e]) => ps.selMin >= s && ps.selMin < e);
+        if (overlaps) {
+          const txt = ranges.slice(0, 2).map(([s, e]) => fmtMin(s) + '-' + fmtMin(e)).join(' · ');
+          return { reason: 'там есть бронь', detail: txt };
+        }
+      }
+      if (!freeNums.has(String(tableNum))) {
+        if (ps && ps.isToday) return { reason: 'гости сейчас сидят', detail: '' };
+        return { reason: 'недоступен на это время', detail: '' };
+      }
+      return null;
     };
 
     const setOutput = (obj) => {
@@ -1741,6 +1855,17 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     };
   
     tables.forEach(table => {
+      table.addEventListener('mouseenter', () => {
+        const id = String(table.dataset.table || '');
+        const current = getCurrentRequest();
+        const un = getUnavailableReason(id, current);
+        if (un) showToast(table, un.reason, un.detail);
+      });
+      table.addEventListener('mouseleave', () => {
+        if (toastHideTimer) clearTimeout(toastHideTimer);
+        toastHideTimer = setTimeout(hideToast, 180);
+      });
+
       table.addEventListener('click', async () => {
         const id = String(table.dataset.table || '');
         const current = getCurrentRequest();
@@ -1756,27 +1881,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
           return;
         }
 
-        const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[id] != null ? Number(tableCapsByNum[id]) : null;
-        if (cap != null && isFinite(cap) && current.guests > cap) {
-          const ok = await confirmCapacity(Math.max(1, Math.floor(cap)), current.guests);
-          if (!ok) {
-            selectedTableNum = '';
-            tables.forEach((t) => t.classList.remove('selected'));
-            setOutput('Исправь кол-во гостей и выбери столик снова.');
-            if (resGuests) { resGuests.focus(); resGuests.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
-            return;
-          }
-          selectedTableNum = id;
-          tables.forEach((t) => t.classList.remove('selected'));
-          table.classList.add('selected');
-          openRequestForm({ tableNum: id, guests: current.guests, start: current.dtRaw });
-          return;
-        }
-
-        selectedTableNum = id;
-        tables.forEach((t) => t.classList.remove('selected'));
-        table.classList.add('selected');
-
         const key = current.dt + '|' + String(current.guests);
         if ((!last || lastKey !== key) && !isLoading) {
           try {
@@ -1787,7 +1891,30 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
           }
         }
 
-        renderSelectedTable();
+        const un = getUnavailableReason(id, current);
+        if (un) {
+          selectedTableNum = '';
+          tables.forEach((t) => t.classList.remove('selected'));
+          showToast(table, un.reason, un.detail);
+          return;
+        }
+
+        const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[id] != null ? Number(tableCapsByNum[id]) : null;
+        if (cap != null && isFinite(cap) && current.guests > cap) {
+          const ok = await confirmCapacity(Math.max(1, Math.floor(cap)), current.guests);
+          if (!ok) {
+            selectedTableNum = '';
+            tables.forEach((t) => t.classList.remove('selected'));
+            setOutput('Исправь кол-во гостей и выбери столик снова.');
+            if (resGuests) { resGuests.focus(); resGuests.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+            return;
+          }
+        }
+
+        selectedTableNum = id;
+        tables.forEach((t) => t.classList.remove('selected'));
+        table.classList.add('selected');
+        openRequestForm({ tableNum: id, guests: current.guests, start: current.dtRaw });
       });
     });
 
