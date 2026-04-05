@@ -1349,10 +1349,23 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       });
     };
 
-    const applyReservationsItemsToTables = (items, dateStr) => {
+    const applyReservationsItemsToTables = (items, dateStr, dtValue) => {
       const list = Array.isArray(items) ? items : [];
       const day = String(dateStr || '').slice(0, 10);
       if (!day) return;
+
+      const dt = String(dtValue || '').trim();
+      const selMin = (() => {
+        const m = dt.match(/^\d{4}-\d{2}-\d{2}[ T](\d{2}):(\d{2})/);
+        if (!m) return null;
+        const hh = Number(m[1]);
+        const mm = Number(m[2]);
+        if (!isFinite(hh) || !isFinite(mm)) return null;
+        return (hh * 60) + mm;
+      })();
+      const today = new Date();
+      const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+      const isToday = day === todayStr;
 
       const byTable = {};
       list.forEach((it) => {
@@ -1387,7 +1400,14 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
         const ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
-        const txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
+        const overlapsSel = selMin != null ? ranges.some(([s, e]) => selMin >= s && selMin < e) : false;
+        let txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
+        if (isToday && selMin != null && !overlapsSel && last && !freeNums.has(n)) {
+          const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[n] != null ? Number(tableCapsByNum[n]) : null;
+          const guests = resGuests && String(resGuests.value || '').trim() ? Number(resGuests.value) : null;
+          const capacityOk = cap == null || !isFinite(cap) || guests == null || !isFinite(guests) ? true : guests <= cap;
+          if (capacityOk) txt = 'занят сейчас';
+        }
         let el = t.querySelector('.res-time');
         if (!txt) {
           if (el) el.remove();
@@ -1622,7 +1642,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
           last.reservations_items = [];
         }
         clearReservationsOnTables();
-        applyReservationsItemsToTables(last.reservations_items, dateStr);
+        applyReservationsItemsToTables(last.reservations_items, dateStr, dt);
         if (!silent) setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
         renderSelectedTable();
       } finally {
