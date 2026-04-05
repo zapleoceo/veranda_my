@@ -431,6 +431,23 @@ $defaultTo = $today;
     const render = (data) => {
         clearCharts();
         const counts = (data && data.counts_by_dow) ? data.counts_by_dow : {};
+        const avg = {};
+        hours.forEach((h) => {
+            const hk = String(h);
+            let sum = 0;
+            let n = 0;
+            dows.forEach((d) => {
+                const v = counts && counts[d.key] ? Number(counts[d.key][hk] || 0) : 0;
+                if (isFinite(v)) { sum += v; n += 1; }
+            });
+            avg[hk] = n > 0 ? (sum / n) : 0;
+        });
+
+        {
+            const { wrap, canvas } = makeCanvasCard('Среднее');
+            chartsEl.appendChild(wrap);
+            drawBars(canvas, hours, avg);
+        }
         dows.forEach((d) => {
             const { wrap, canvas } = makeCanvasCard(d.name);
             chartsEl.appendChild(wrap);
