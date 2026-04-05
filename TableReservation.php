@@ -167,23 +167,30 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   $hallId = 2;
   $allowed = $allowedSchemeNums;
 
-  $ts = strtotime($dateReservation);
-  if ($ts === false || $dateReservation === '') {
+  $displayTz = new DateTimeZone($displayTzName);
+  $apiTz = new DateTimeZone($apiTzName);
+  $dateReservation = trim($dateReservation);
+  $dtDisplay = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $dateReservation, $displayTz);
+  if ($dtDisplay === false) {
+    try { $dtDisplay = new DateTimeImmutable($dateReservation, $displayTz); } catch (\Throwable $e) { $dtDisplay = false; }
+  }
+  if ($dtDisplay === false || $dateReservation === '') {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
     exit;
   }
   if ($spotId <= 0) $spotId = 1;
 
-  $dayStart = date('Y-m-d 00:00:00', $ts);
-  $dayEnd = date('Y-m-d 23:59:59', $ts);
+  $dayStartDisplay = $dtDisplay->setTime(0, 0, 0);
+  $dayEndDisplay = $dtDisplay->setTime(23, 59, 59);
+  $dayStartApi = $dayStartDisplay->setTimezone($apiTz);
+  $dayEndApi = $dayEndDisplay->setTimezone($apiTz);
 
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
     $resp = $api->request('incomingOrders.getReservations', [
-      'date_from' => $dayStart,
-      'date_to' => $dayEnd,
-      'timezone' => 'client',
+      'date_from' => $dayStartApi->format('Y-m-d H:i:s'),
+      'date_to' => $dayEndApi->format('Y-m-d H:i:s'),
     ], 'GET');
 
     $tablesResp = $api->request('spots.getTableHallTables', [
@@ -236,6 +243,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       return $out;
     };
 
+    $detailCache = [];
     foreach ($rows as $row) {
       if (!is_array($row)) continue;
       $status = (int)($row['status'] ?? 0);
@@ -243,9 +251,13 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       $start = trim((string)($row['date_reservation'] ?? ''));
       $dur = (int)($row['duration'] ?? 0);
       $guestsCount = trim((string)($row['guests_count'] ?? ''));
-      $startTs = $start !== '' ? strtotime($start) : false;
-      if ($startTs === false) continue;
-      $endTs = $dur > 0 ? $startTs + $dur : $startTs;
+      $startDtApi = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $start, $apiTz);
+      if ($startDtApi === false) {
+        try { $startDtApi = new DateTimeImmutable($start, $apiTz); } catch (\Throwable $e) { $startDtApi = false; }
+      }
+      if ($startDtApi === false) continue;
+      $startDt = $startDtApi->setTimezone($displayTz);
+      $endDt = $dur > 0 ? $startDt->modify('+' . $dur . ' seconds') : $startDt;
       $guestName = trim(((string)($row['first_name'] ?? '')) . ' ' . ((string)($row['last_name'] ?? '')));
       if ($guestName === '') $guestName = '—';
 
@@ -254,6 +266,27 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         if (!array_key_exists($k, $row)) continue;
         foreach ($extractNums($row[$k]) as $n) $tableCandidates[] = $n;
       }
+
+      $incomingOrderId = trim((string)($row['incoming_order_id'] ?? ''));
+      if ($incomingOrderId !== '' && count($tableCandidates) === 0) {
+        if (!array_key_exists($incomingOrderId, $detailCache)) {
+          try {
+            $detailCache[$incomingOrderId] = $api->request('incomingOrders.getReservation', [
+              'incoming_order_id' => $incomingOrderId,
+            ], 'GET');
+          } catch (\Throwable $e) {
+            $detailCache[$incomingOrderId] = null;
+          }
+        }
+        $detail = $detailCache[$incomingOrderId];
+        if (is_array($detail)) {
+          foreach (['table_id', 'table_ids', 'tables', 'table'] as $k) {
+            if (!array_key_exists($k, $detail)) continue;
+            foreach ($extractNums($detail[$k]) as $n) $tableCandidates[] = $n;
+          }
+        }
+      }
+
       $tableIds = [];
       foreach ($tableCandidates as $n) {
         $id = (string)$n;
@@ -267,8 +300,8 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
           'table_title' => '—',
           'status' => $status,
           'guest_name' => $guestName,
-          'date_start' => date('Y-m-d H:i:s', $startTs),
-          'date_end' => date('Y-m-d H:i:s', $endTs),
+          'date_start' => $startDt->format('Y-m-d H:i:s'),
+          'date_end' => $endDt->format('Y-m-d H:i:s'),
           'guests_count' => $guestsCount,
         ];
         continue;
@@ -281,8 +314,8 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
           'table_title' => $tableNameById[$tableId],
           'status' => $status,
           'guest_name' => $guestName,
-          'date_start' => date('Y-m-d H:i:s', $startTs),
-          'date_end' => date('Y-m-d H:i:s', $endTs),
+          'date_start' => $startDt->format('Y-m-d H:i:s'),
+          'date_end' => $endDt->format('Y-m-d H:i:s'),
           'guests_count' => $guestsCount,
         ];
       }
@@ -291,10 +324,15 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
     echo json_encode([
       'ok' => true,
       'request' => [
-        'date_from' => $dayStart,
-        'date_to' => $dayEnd,
+        'date_from' => $dayStartDisplay->format('Y-m-d H:i:s'),
+        'date_to' => $dayEndDisplay->format('Y-m-d H:i:s'),
+        'date_from_api' => $dayStartApi->format('Y-m-d H:i:s'),
+        'date_to_api' => $dayEndApi->format('Y-m-d H:i:s'),
         'spot_id' => $spotId,
         'hall_id' => $hallId,
+        'display_timezone' => $displayTzName,
+        'api_timezone' => $apiTzName,
+        'count_raw' => is_array($resp) ? count($resp) : 0,
       ],
       'reservations_items' => $items,
     ], JSON_UNESCAPED_UNICODE);
