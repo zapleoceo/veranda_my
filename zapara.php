@@ -79,13 +79,14 @@ if (($_GET['ajax'] ?? '') === 'day') {
         $nextTr = null;
         $prevNextTr = null;
         $guard = 0;
+        $seenTx = [];
         do {
             $guard++;
             if ($guard > 20000) break;
             $params = [
                 'dateFrom' => str_replace('-', '', $date),
                 'dateTo' => str_replace('-', '', $date),
-                'status' => 0,
+                'status' => 2,
                 'include_products' => 'false',
                 'include_history' => 'false',
                 'include_delivery' => 'false',
@@ -101,6 +102,10 @@ if (($_GET['ajax'] ?? '') === 'day') {
 
             foreach ($batch as $tx) {
                 if (!is_array($tx)) continue;
+                $txId = (int)($tx['transaction_id'] ?? 0);
+                if ($txId <= 0) continue;
+                if (isset($seenTx[$txId])) continue;
+                $seenTx[$txId] = true;
                 $v = $tx['date_start_new'] ?? $tx['date_start'] ?? null;
                 if ($v === null) continue;
                 $ts = (int)$v;
@@ -124,6 +129,7 @@ if (($_GET['ajax'] ?? '') === 'day') {
             'ok' => true,
             'date' => $date,
             'dow' => $dow,
+            'status' => 2,
             'hours' => $hours,
             'counts_by_hour' => $countsByHour,
             'total' => $total,
@@ -628,20 +634,17 @@ $defaultTo = $today;
 
         dows.forEach((d) => {
             const dCnt = Number(daysByDow && daysByDow[d.key] ? daysByDow[d.key] : 0) || 0;
-            const meta = '09:00 — 24:00' + (dCnt > 0 ? (' · ' + String(dCnt) + ' дн') : '');
+            const meta = '09:00 — 24:00 · среднее/день' + (dCnt > 0 ? (' · ' + String(dCnt) + ' дн') : '');
             const { wrap, canvas } = makeCanvasCard(d.name, meta);
             chartsEl.appendChild(wrap);
-            if (chartType === 'line') {
-                drawLine(canvas, hours, counts[d.key] || {});
-            } else {
-                const perDay = {};
-                hours.forEach((h) => {
-                    const hk = String(h);
-                    const v = counts && counts[d.key] ? Number(counts[d.key][hk] || 0) : 0;
-                    perDay[hk] = dCnt > 0 ? (v / dCnt) : 0;
-                });
-                drawBars(canvas, hours, counts[d.key] || {}, perDay, false);
-            }
+            const perDay = {};
+            hours.forEach((h) => {
+                const hk = String(h);
+                const v = counts && counts[d.key] ? Number(counts[d.key][hk] || 0) : 0;
+                perDay[hk] = dCnt > 0 ? (v / dCnt) : 0;
+            });
+            if (chartType === 'line') drawLine(canvas, hours, perDay);
+            else drawBars(canvas, hours, perDay, null, true);
         });
         {
             const meta = '09:00 — 24:00 · среднее/день';
