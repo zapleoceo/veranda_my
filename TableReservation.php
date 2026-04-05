@@ -307,6 +307,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   $spotId = (int)($_GET['spot_id'] ?? 1);
   $hallId = 2;
   $date = trim((string)($_GET['date'] ?? ''));
+  $tzParam = trim((string)($_GET['tz'] ?? ''));
   if ($spotId <= 0) $spotId = 1;
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     http_response_code(400);
@@ -328,7 +329,9 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   $allowedList = array_values(array_keys($allowedNums));
   usort($allowedList, fn($a, $b) => (int)$a <=> (int)$b);
 
-  $tzName = date_default_timezone_get();
+  $tzName = $tzParam !== '' && in_array($tzParam, timezone_identifiers_list(), true)
+    ? $tzParam
+    : date_default_timezone_get();
   $tzObj = new DateTimeZone($tzName);
 
   $api = new \App\Classes\PosterAPI($posterToken);
@@ -401,11 +404,13 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       $tsOut = [];
       foreach ($out as [$a, $b]) {
         if (!isset($slotStarts[$a]) || !isset($slotStarts[$b])) continue;
-        $aTs = strtotime($slotStarts[$a]);
-        $bTs = strtotime($slotStarts[$b]);
-        if ($aTs === false || $bTs === false) continue;
-        $startStr = date('H:i', $aTs);
-        $endStr = date('H:i', $bTs + $step);
+        $aDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $slotStarts[$a], $tzObj);
+        $bDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $slotStarts[$b], $tzObj);
+        if ($aDt === false || $bDt === false) continue;
+        $aTs = $aDt->getTimestamp();
+        $bTs = $bDt->getTimestamp();
+        $startStr = $aDt->format('H:i');
+        $endStr = (new DateTimeImmutable('@' . ($bTs + $step)))->setTimezone($tzObj)->format('H:i');
         $txt[] = $startStr . '-' . $endStr;
         $tsOut[] = [$aTs, $bTs + $step];
       }
@@ -1207,10 +1212,12 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       if (!dateStr) return;
       const busyDateLabel = document.getElementById('busyDateLabel');
       if (busyDateLabel) busyDateLabel.textContent = 'Данные на ' + dateStr + ' дату';
+      const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
       const url = new URL(location.href);
       url.searchParams.set('ajax', 'busy_ranges');
       url.searchParams.set('spot_id', '1');
       url.searchParams.set('date', dateStr);
+      if (browserTz) url.searchParams.set('tz', browserTz);
       fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
         .then((r) => r.json().catch(() => null))
         .then((j) => { if (j && j.ok) applyBusyRanges(j); })
