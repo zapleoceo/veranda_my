@@ -11,16 +11,20 @@ if (file_exists(__DIR__ . '/.env')) {
   }
 }
 
-$posterSpotTz = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
-if ($posterSpotTz === '' || !in_array($posterSpotTz, timezone_identifiers_list(), true)) {
-  $posterSpotTz = 'Europe/Moscow';
+$displayTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($displayTzName === '' || !in_array($displayTzName, timezone_identifiers_list(), true)) {
+  $displayTzName = 'Asia/Ho_Chi_Minh';
 }
-date_default_timezone_set($posterSpotTz);
+$apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
+if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
+  $apiTzName = 'Europe/Kyiv';
+}
+date_default_timezone_set($apiTzName);
 
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 
 $posterToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
-$now = new DateTimeImmutable('now');
+$now = new DateTimeImmutable('now', new DateTimeZone($displayTzName));
 $roundedNow = $now->setTime((int)$now->format('H'), (int)$now->format('i'), 0);
 $m = (int)$roundedNow->format('i');
 $add = (15 - ($m % 15)) % 15;
@@ -85,12 +89,19 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $hallId = 2;
   $allowed = $allowedSchemeNums;
 
-  $ts = strtotime($dateReservation);
-  if ($ts === false || $dateReservation === '') {
+  $dateReservation = trim($dateReservation);
+  $displayTz = new DateTimeZone($displayTzName);
+  $apiTz = new DateTimeZone($apiTzName);
+  $dtDisplay = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $dateReservation, $displayTz);
+  if ($dtDisplay === false) {
+    try { $dtDisplay = new DateTimeImmutable($dateReservation, $displayTz); } catch (\Throwable $e) { $dtDisplay = false; }
+  }
+  if ($dtDisplay === false || $dateReservation === '') {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
     exit;
   }
+  $dtApi = $dtDisplay->setTimezone($apiTz);
   if ($duration < 1800) $duration = 7200;
   if ($guests <= 0) $guests = 2;
   if ($spotId <= 0) $spotId = 1;
@@ -98,7 +109,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
     $resp = $api->request('incomingOrders.getTablesForReservation', [
-      'date_reservation' => date('Y-m-d H:i:s', $ts),
+      'date_reservation' => $dtApi->format('Y-m-d H:i:s'),
       'duration' => $duration,
       'spot_id' => $spotId,
       'guests_count' => $guests,
@@ -121,7 +132,8 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     echo json_encode([
       'ok' => true,
       'request' => [
-        'date_reservation' => date('Y-m-d H:i:s', $ts),
+        'date_reservation' => $dtDisplay->format('Y-m-d H:i:s'),
+        'date_reservation_api' => $dtApi->format('Y-m-d H:i:s'),
         'duration' => $duration,
         'spot_id' => $spotId,
         'guests_count' => $guests,
@@ -328,8 +340,9 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   $allowedList = array_values(array_keys($allowedNums));
   usort($allowedList, fn($a, $b) => (int)$a <=> (int)$b);
 
-  $tzName = date_default_timezone_get();
-  $tzObj = new DateTimeZone($tzName);
+  $displayTz = new DateTimeZone($displayTzName);
+  $apiTz = new DateTimeZone($apiTzName);
+  $tzName = $displayTzName;
 
   $api = new \App\Classes\PosterAPI($posterToken);
   $errors = [];
@@ -354,8 +367,11 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
 
     foreach ($slots as $idx => $slotStart) {
       try {
+        $slotDisplayDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $slotStart, $displayTz);
+        if ($slotDisplayDt === false) continue;
+        $slotApiDt = $slotDisplayDt->setTimezone($apiTz);
         $resp = $api->request('incomingOrders.getTablesForReservation', [
-          'date_reservation' => $slotStart,
+          'date_reservation' => $slotApiDt->format('Y-m-d H:i:s'),
           'duration' => $duration,
           'spot_id' => $spotId,
           'guests_count' => $guests,
@@ -401,13 +417,13 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       $tsOut = [];
       foreach ($out as [$a, $b]) {
         if (!isset($slotStarts[$a]) || !isset($slotStarts[$b])) continue;
-        $aDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $slotStarts[$a], $tzObj);
-        $bDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $slotStarts[$b], $tzObj);
+        $aDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $slotStarts[$a], $displayTz);
+        $bDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $slotStarts[$b], $displayTz);
         if ($aDt === false || $bDt === false) continue;
         $aTs = $aDt->getTimestamp();
         $bTs = $bDt->getTimestamp();
         $startStr = $aDt->format('H:i');
-        $endStr = (new DateTimeImmutable('@' . ($bTs + $slotStep)))->setTimezone($tzObj)->format('H:i');
+        $endStr = (new DateTimeImmutable('@' . ($bTs + $slotStep)))->setTimezone($displayTz)->format('H:i');
         $txt[] = $startStr . '-' . $endStr;
         $tsOut[] = [$aTs, $bTs + $slotStep];
       }
@@ -427,8 +443,8 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       ],
       'ranges_by_table_num_server' => $rangesServer,
       'ranges_ts_by_table_num' => $rangesTs,
-      'server_timezone' => $tzName,
-      'display_timezone' => $tzName,
+      'server_timezone' => $apiTzName,
+      'display_timezone' => $displayTzName,
       'errors' => $errors,
     ], JSON_UNESCAPED_UNICODE);
   } catch (\Throwable $e) {
@@ -1220,21 +1236,42 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       });
     };
 
-    const loadBusyForDate = (dateStr) => {
+    let busyLoadSeq = 0;
+    let busyAbort = null;
+    const loadBusyForDate = async (dateStr) => {
       if (!dateStr) return;
+      busyLoadSeq += 1;
+      const seq = busyLoadSeq;
+
       const busyDateLabel = document.getElementById('busyDateLabel');
       if (busyDateLabel) busyDateLabel.textContent = 'Данные на ' + dateStr;
+
       const busyDateLoader = document.getElementById('busyDateLoader');
-      if (busyDateLoader) busyDateLoader.hidden = false;
-      const url = new URL(location.href);
-      url.searchParams.set('ajax', 'busy_ranges');
-      url.searchParams.set('spot_id', '1');
-      url.searchParams.set('date', dateStr);
-      fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
-        .then((r) => r.json().catch(() => null))
-        .then((j) => { if (j && j.ok) applyBusyRanges(j); })
-        .catch(() => null)
-        .finally(() => { if (busyDateLoader) busyDateLoader.hidden = true; });
+      if (busyDateLoader) {
+        busyDateLoader.hidden = false;
+        busyDateLoader.style.display = 'inline-block';
+      }
+
+      try {
+        if (busyAbort) busyAbort.abort();
+        busyAbort = new AbortController();
+
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'busy_ranges');
+        url.searchParams.set('spot_id', '1');
+        url.searchParams.set('date', dateStr);
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal: busyAbort.signal });
+        const j = await res.json().catch(() => null);
+        if (seq !== busyLoadSeq) return;
+        if (j && j.ok) applyBusyRanges(j);
+      } catch (_) {
+      } finally {
+        if (seq !== busyLoadSeq) return;
+        if (busyDateLoader) {
+          busyDateLoader.hidden = true;
+          busyDateLoader.style.display = 'none';
+        }
+      }
     };
     const resDate = document.getElementById('resDate');
     const resGuests = document.getElementById('resGuests');
