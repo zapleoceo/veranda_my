@@ -137,6 +137,29 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
 
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
+    $tablesResp = $api->request('spots.getTableHallTables', [
+      'spot_id' => $spotId,
+      'hall_id' => $hallId,
+      'without_deleted' => 1,
+    ], 'GET');
+    $tableRows = is_array($tablesResp) ? $tablesResp : [];
+    $schemeById = [];
+    $schemeByTableNum = [];
+    foreach ($tableRows as $tr) {
+      if (!is_array($tr)) continue;
+      $id = trim((string)($tr['table_id'] ?? ''));
+      $num = trim((string)($tr['table_num'] ?? ''));
+      $title = trim((string)($tr['table_title'] ?? ''));
+      $scheme = '';
+      if (preg_match('/^\d+$/', $title)) $scheme = $title;
+      elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
+      if ($scheme === '') continue;
+      $sInt = (int)$scheme;
+      if ($sInt < 1 || $sInt > 500) continue;
+      if ($id !== '') $schemeById[$id] = (string)$sInt;
+      if ($num !== '') $schemeByTableNum[$num] = (string)$sInt;
+    }
+
     $resp = $api->request('incomingOrders.getTablesForReservation', [
       'date_reservation' => $dtApi->format('Y-m-d H:i:s'),
       'duration' => $duration,
@@ -151,11 +174,19 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     foreach ($free as $row) {
       if (!is_array($row)) continue;
       if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
-      $num = trim((string)($row['table_num'] ?? ''));
-      if ($num === '') continue;
-      if (is_array($allowedSet) && !isset($allowedSet[$num])) continue;
+      $tableId = trim((string)($row['table_id'] ?? ''));
+      $tableNum = trim((string)($row['table_num'] ?? ''));
+      $tableTitle = trim((string)($row['table_title'] ?? ''));
+      $scheme = '';
+      if ($tableId !== '' && isset($schemeById[$tableId])) $scheme = $schemeById[$tableId];
+      elseif ($tableNum !== '' && isset($schemeByTableNum[$tableNum])) $scheme = $schemeByTableNum[$tableNum];
+      elseif (preg_match('/^\d+$/', $tableTitle)) $scheme = $tableTitle;
+      elseif (preg_match('/^\d+$/', $tableNum)) $scheme = $tableNum;
+      if ($scheme === '') continue;
+      if (is_array($allowedSet) && !isset($allowedSet[$scheme])) continue;
+      $row['scheme_num'] = $scheme;
       $filtered[] = $row;
-      $nums[$num] = true;
+      $nums[$scheme] = true;
     }
 
     echo json_encode([
@@ -238,11 +269,11 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       $num = trim((string)($tr['table_num'] ?? ''));
       $title = trim((string)($tr['table_title'] ?? ''));
       $scheme = '';
-      if (preg_match('/^\d+$/', $num)) $scheme = $num;
-      elseif (preg_match('/^\d+$/', $title)) $scheme = $title;
+      if (preg_match('/^\d+$/', $title)) $scheme = $title;
+      elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
       if ($scheme === '') continue;
       $sInt = (int)$scheme;
-      if ($sInt < 1 || $sInt > 20) continue;
+      if ($sInt < 1 || $sInt > 500) continue;
       if (is_array($allowedSet) && !isset($allowedSet[(string)$sInt])) continue;
       $tableNameById[$id] = (string)$sInt;
     }
@@ -383,10 +414,11 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     exit;
   }
 
-  $spotId = (int)($_GET['spot_id'] ?? 1);
-  $hallId = 2;
+  $spotId = (int)($_GET['spot_id'] ?? $spotIdForSettings);
+  $hallId = (int)($_GET['hall_id'] ?? $hallIdForSettings);
   $date = trim((string)($_GET['date'] ?? ''));
   if ($spotId <= 0) $spotId = 1;
+  if ($hallId <= 0) $hallId = 2;
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
@@ -432,6 +464,29 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     $slotStarts = [];
     foreach ($allowedList as $n) $busyByNum[$n] = [];
 
+    $tablesResp = $api->request('spots.getTableHallTables', [
+      'spot_id' => $spotId,
+      'hall_id' => $hallId,
+      'without_deleted' => 1,
+    ], 'GET');
+    $tableRows = is_array($tablesResp) ? $tablesResp : [];
+    $schemeById = [];
+    $schemeByTableNum = [];
+    foreach ($tableRows as $tr) {
+      if (!is_array($tr)) continue;
+      $id = trim((string)($tr['table_id'] ?? ''));
+      $num = trim((string)($tr['table_num'] ?? ''));
+      $title = trim((string)($tr['table_title'] ?? ''));
+      $scheme = '';
+      if (preg_match('/^\d+$/', $title)) $scheme = $title;
+      elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
+      if ($scheme === '') continue;
+      $sInt = (int)$scheme;
+      if ($sInt < 1 || $sInt > 500) continue;
+      if ($id !== '') $schemeById[$id] = (string)$sInt;
+      if ($num !== '') $schemeByTableNum[$num] = (string)$sInt;
+    }
+
     foreach ($slots as $idx => $slotStart) {
       try {
         $slotDisplayDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $slotStart, $displayTz);
@@ -449,9 +504,16 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
         foreach ($free as $row) {
           if (!is_array($row)) continue;
           if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
-          $num = trim((string)($row['table_num'] ?? ''));
-          if ($num === '') continue;
-          $freeSet[$num] = true;
+          $tableId = trim((string)($row['table_id'] ?? ''));
+          $tableNum = trim((string)($row['table_num'] ?? ''));
+          $tableTitle = trim((string)($row['table_title'] ?? ''));
+          $scheme = '';
+          if ($tableId !== '' && isset($schemeById[$tableId])) $scheme = $schemeById[$tableId];
+          elseif ($tableNum !== '' && isset($schemeByTableNum[$tableNum])) $scheme = $schemeByTableNum[$tableNum];
+          elseif (preg_match('/^\d+$/', $tableTitle)) $scheme = $tableTitle;
+          elseif (preg_match('/^\d+$/', $tableNum)) $scheme = $tableNum;
+          if ($scheme === '') continue;
+          $freeSet[$scheme] = true;
         }
 
         $slotStarts[$idx] = $slotStart;
