@@ -375,7 +375,7 @@ $defaultTo = $today;
         { key: '7', name: 'Вс' },
     ];
 
-    const makeCanvasCard = (title) => {
+    const makeCanvasCard = (title, metaText) => {
         const wrap = document.createElement('div');
         wrap.className = 'card';
         const head = document.createElement('div');
@@ -385,7 +385,7 @@ $defaultTo = $today;
         t.style.fontWeight = '900';
         const meta = document.createElement('div');
         meta.className = 'muted';
-        meta.textContent = '09:00 — 24:00';
+        meta.textContent = metaText || '09:00 — 24:00';
         head.appendChild(t);
         head.appendChild(meta);
         const box = document.createElement('div');
@@ -401,7 +401,7 @@ $defaultTo = $today;
 
     const clearCharts = () => { chartsEl.innerHTML = ''; };
 
-    const drawBars = (canvas, hours, countsByHour) => {
+    const drawBars = (canvas, hours, countsByHour, avgByHour, isAvgChart) => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
         const w = canvas.width;
@@ -447,6 +447,7 @@ $defaultTo = $today;
         ctx.textBaseline = 'top';
         hours.forEach((hh, idx) => {
             const v = vals[idx];
+            const hk = String(hh);
             const x = startX + idx * (barW + barGap);
             const bh = Math.round((v / maxV) * ih);
             const y = padT + (ih - bh);
@@ -456,12 +457,25 @@ $defaultTo = $today;
 
             if (v > 0) {
                 ctx.save();
-                ctx.font = '800 11px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = 'rgba(11, 15, 22, 0.90)';
-                const ty = Math.max(y + 10, y + (bh / 2));
-                ctx.fillText(String(Math.round(v)), x + barW / 2, ty);
+                const mid = y + (bh / 2);
+                const top = y + 11;
+                const ty = Math.max(top, mid);
+                const vLabel = isAvgChart ? (Math.round(v * 10) / 10).toFixed(1).replace(/\.0$/, '') : String(Math.round(v));
+                const avgVal = avgByHour && avgByHour[hk] != null ? Number(avgByHour[hk] || 0) : null;
+                const showAvg = !isAvgChart && avgVal != null && isFinite(avgVal) && bh >= 32;
+                if (showAvg) {
+                    ctx.font = '900 11px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+                    ctx.fillText(vLabel, x + barW / 2, ty - 6);
+                    ctx.font = '800 10px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+                    const aLabel = (Math.round(avgVal * 10) / 10).toFixed(1).replace(/\.0$/, '');
+                    ctx.fillText('~' + aLabel, x + barW / 2, ty + 7);
+                } else {
+                    ctx.font = '900 11px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+                    ctx.fillText(vLabel, x + barW / 2, ty);
+                }
                 ctx.restore();
             }
 
@@ -545,7 +559,7 @@ $defaultTo = $today;
 
     const drawChart = (canvas, hours, countsByHour) => {
         if (chartType === 'line') drawLine(canvas, hours, countsByHour);
-        else drawBars(canvas, hours, countsByHour);
+        else drawBars(canvas, hours, countsByHour, null, false);
     };
 
     const hours = [];
@@ -554,27 +568,42 @@ $defaultTo = $today;
     const render = (data) => {
         clearCharts();
         const counts = (data && data.counts_by_dow) ? data.counts_by_dow : {};
-        const avg = {};
+        const daysByDow = (data && data.days_by_dow) ? data.days_by_dow : {};
+        const daysTotal = Number((data && data.days_total) ? data.days_total : 0) || 0;
+        const avgAll = {};
         hours.forEach((h) => {
             const hk = String(h);
             let sum = 0;
-            let n = 0;
             dows.forEach((d) => {
                 const v = counts && counts[d.key] ? Number(counts[d.key][hk] || 0) : 0;
-                if (isFinite(v)) { sum += v; n += 1; }
+                if (isFinite(v)) sum += v;
             });
-            avg[hk] = n > 0 ? (sum / n) : 0;
+            avgAll[hk] = daysTotal > 0 ? (sum / daysTotal) : 0;
         });
 
         dows.forEach((d) => {
-            const { wrap, canvas } = makeCanvasCard(d.name);
+            const dCnt = Number(daysByDow && daysByDow[d.key] ? daysByDow[d.key] : 0) || 0;
+            const meta = '09:00 — 24:00' + (dCnt > 0 ? (' · ' + String(dCnt) + ' дн') : '');
+            const { wrap, canvas } = makeCanvasCard(d.name, meta);
             chartsEl.appendChild(wrap);
-            drawChart(canvas, hours, counts[d.key] || {});
+            if (chartType === 'line') {
+                drawLine(canvas, hours, counts[d.key] || {});
+            } else {
+                const perDay = {};
+                hours.forEach((h) => {
+                    const hk = String(h);
+                    const v = counts && counts[d.key] ? Number(counts[d.key][hk] || 0) : 0;
+                    perDay[hk] = dCnt > 0 ? (v / dCnt) : 0;
+                });
+                drawBars(canvas, hours, counts[d.key] || {}, perDay, false);
+            }
         });
         {
-            const { wrap, canvas } = makeCanvasCard('Среднее');
+            const meta = '09:00 — 24:00 · среднее/день';
+            const { wrap, canvas } = makeCanvasCard('Среднее', meta);
             chartsEl.appendChild(wrap);
-            drawChart(canvas, hours, avg);
+            if (chartType === 'line') drawLine(canvas, hours, avgAll);
+            else drawBars(canvas, hours, avgAll, null, true);
         }
     };
 
@@ -633,6 +662,9 @@ $defaultTo = $today;
                 counts[String(dow)] = {};
                 hours.forEach((h) => { counts[String(dow)][String(h)] = 0; });
             }
+            const daysByDow = {};
+            for (let dow = 1; dow <= 7; dow++) daysByDow[String(dow)] = 0;
+            let daysTotal = 0;
 
             const errors = [];
             let done = 0;
@@ -653,6 +685,8 @@ $defaultTo = $today;
                 const dow = String(j.dow || '');
                 const byHour = j.counts_by_hour || {};
                 if (!counts[dow]) return;
+                daysByDow[dow] = (Number(daysByDow[dow] || 0) || 0) + 1;
+                daysTotal += 1;
                 hours.forEach((h) => {
                     const hk = String(h);
                     const v = Number(byHour[hk] || 0) || 0;
@@ -680,7 +714,7 @@ $defaultTo = $today;
 
             await Promise.all(workers);
             hideProgress();
-            lastData = { counts_by_dow: counts };
+            lastData = { counts_by_dow: counts, days_by_dow: daysByDow, days_total: daysTotal };
             render(lastData);
             if (errors.length) {
                 const head = errors.slice(0, 3).map((x) => x.date + ': ' + x.error).join('\n');
