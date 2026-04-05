@@ -30,7 +30,8 @@ $m = (int)$roundedNow->format('i');
 $add = (15 - ($m % 15)) % 15;
 if ($add > 0) $roundedNow = $roundedNow->modify('+' . $add . ' minutes');
 $defaultResDateLocal = $roundedNow->format('Y-m-d\TH:i');
-$hallIdForSettings = 2;
+$spotIdForSettings = max(1, (int)($_GET['spot_id'] ?? 1));
+$hallIdForSettings = max(1, (int)($_GET['hall_id'] ?? 2));
 $allowedSchemeNums = null;
 $tableCapsByNum = [
   '1' => 8, '2' => 8, '3' => 8,
@@ -113,8 +114,8 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $dateReservation = trim((string)($_GET['date_reservation'] ?? ''));
   $duration = (int)($_GET['duration'] ?? 0);
   $guests = (int)($_GET['guests_count'] ?? 0);
-  $spotId = (int)($_GET['spot_id'] ?? 1);
-  $hallId = 2;
+  $spotId = (int)($_GET['spot_id'] ?? $spotIdForSettings);
+  $hallId = $hallIdForSettings;
   $allowed = $allowedSchemeNums;
 
   $dateReservation = trim($dateReservation);
@@ -191,8 +192,8 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
 
   $dateReservation = trim((string)($_GET['date_reservation'] ?? ''));
   $duration = (int)($_GET['duration'] ?? 0);
-  $spotId = (int)($_GET['spot_id'] ?? 1);
-  $hallId = 2;
+  $spotId = (int)($_GET['spot_id'] ?? $spotIdForSettings);
+  $hallId = $hallIdForSettings;
   $allowed = $allowedSchemeNums;
 
   $displayTz = new DateTimeZone($displayTzName);
@@ -1243,6 +1244,8 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     });
   
     const defaultResDateLocal = <?= json_encode($defaultResDateLocal, JSON_UNESCAPED_UNICODE) ?>;
+    const defaultSpotId = <?= (int)$spotIdForSettings ?>;
+    const defaultHallId = <?= (int)$hallIdForSettings ?>;
     const allowedTableNums = <?= json_encode($allowedSchemeNums, JSON_UNESCAPED_UNICODE) ?>;
     const tableCapsByNum = <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>;
     const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
@@ -1416,6 +1419,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
 
     const applyAvailabilityStyles = () => {
       tables.forEach((t) => {
+        if (t.classList.contains('disabled') || t.disabled) return;
         const n = String(t.dataset.table || '');
         t.classList.remove('free', 'busy');
         if (!last) return;
@@ -1517,7 +1521,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       url.searchParams.set('ajax', 'free_tables');
       url.searchParams.set('date_reservation', dt);
       url.searchParams.set('duration', '7200');
-      url.searchParams.set('spot_id', '1');
+      url.searchParams.set('spot_id', String(defaultSpotId || 1));
       url.searchParams.set('guests_count', String(guests));
 
       const loadReservations = async () => {
@@ -1525,7 +1529,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
         rUrl.searchParams.set('ajax', 'reservations');
         rUrl.searchParams.set('date_reservation', dt);
         rUrl.searchParams.set('duration', '7200');
-        rUrl.searchParams.set('spot_id', '1');
+        rUrl.searchParams.set('spot_id', String(defaultSpotId || 1));
         const rRes = await fetch(rUrl.toString(), { headers: { 'Accept': 'application/json' } });
         const rJ = await rRes.json().catch(() => null);
         if (!rRes.ok || !rJ || !rJ.ok) return null;
