@@ -557,6 +557,7 @@ $firstOfMonth = date('Y-m-01');
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ЗП сотрудников</title>
     <link rel="stylesheet" href="/assets/app.css?v=1" />
+    <script src="/assets/app.js" defer></script>
     <style>
         .filters { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; }
         .filters label { font-size: 12px; color: #6b7280; display:flex; flex-direction: column; gap: 6px; }

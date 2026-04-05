@@ -636,6 +636,7 @@ $firstOfMonth = date('Y-m-01');
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Отчет баня</title>
+    <script src="/assets/app.js" defer></script>
     <style>
         :root { --brand-text: #b65930; --brand-bg: #efdbce; }
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #fbf4ef; color:#1f2937; }

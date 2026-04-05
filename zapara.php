@@ -144,6 +144,7 @@ $defaultTo = $today;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Zapara</title>
     <link rel="stylesheet" href="assets/app.css">
+    <script src="/assets/app.js" defer></script>
     <script src="assets/user_menu.js" defer></script>
     <style>
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b0f16; color: rgba(255,250,244,0.92); }

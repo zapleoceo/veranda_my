@@ -1441,6 +1441,7 @@ if ($tab === 'menu' || $tab === 'categories') {
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>УПРАВЛЕНИЕ - Kitchen Analytics</title>
     <link rel="stylesheet" href="assets/app.css">
+    <script src="/assets/app.js" defer></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 0; color: #1c1e21; }
         .container { width: 100%; max-width: 1800px; margin: 0 auto; padding: 12px; box-sizing: border-box; }
