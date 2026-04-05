@@ -1,5 +1,4 @@
 <?php
-date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 if (file_exists(__DIR__ . '/.env')) {
   $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -11,6 +10,12 @@ if (file_exists(__DIR__ . '/.env')) {
     $_ENV[$name] = trim($value);
   }
 }
+
+$posterSpotTz = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($posterSpotTz === '' || !in_array($posterSpotTz, timezone_identifiers_list(), true)) {
+  $posterSpotTz = 'Europe/Moscow';
+}
+date_default_timezone_set($posterSpotTz);
 
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 
@@ -323,100 +328,206 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   $allowedList = array_values(array_keys($allowedNums));
   usort($allowedList, fn($a, $b) => (int)$a <=> (int)$b);
 
-  $api = new \App\Classes\PosterAPI($posterToken);
-  $step = 1800;
-  $duration = 1800;
-  $guests = 1;
+  $tzName = date_default_timezone_get();
+  $tzObj = new DateTimeZone($tzName);
+  $dayStart = $date . ' 00:00:00';
+  $dayEnd = $date . ' 23:59:59';
 
-  $startMin = 9 * 60;
-  $endMin = 23 * 60;
-  $slots = [];
-  for ($m = $startMin; $m < $endMin; $m += 30) {
-    $hh = str_pad((string)floor($m / 60), 2, '0', STR_PAD_LEFT);
-    $mm = str_pad((string)($m % 60), 2, '0', STR_PAD_LEFT);
-    $slots[] = $date . ' ' . $hh . ':' . $mm . ':00';
-  }
-
-  $busyByNum = [];
-  $slotStarts = [];
-  $errors = [];
-  foreach ($allowedList as $n) $busyByNum[$n] = [];
-
-  foreach ($slots as $idx => $slotStart) {
-    try {
-      $resp = $api->request('incomingOrders.getTablesForReservation', [
-        'date_reservation' => $slotStart,
-        'duration' => $duration,
-        'spot_id' => $spotId,
-        'guests_count' => $guests,
-      ], 'GET');
-
-      $free = is_array($resp) && isset($resp['freeTables']) && is_array($resp['freeTables']) ? $resp['freeTables'] : [];
-      $freeSet = [];
-      foreach ($free as $row) {
-        if (!is_array($row)) continue;
-        if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
-        $num = trim((string)($row['table_num'] ?? ''));
-        if ($num === '') continue;
-        $freeSet[$num] = true;
-      }
-
-      $slotStarts[$idx] = $slotStart;
-      foreach ($allowedList as $n) {
-        if (!isset($freeSet[$n])) $busyByNum[$n][] = $idx;
-      }
-    } catch (\Throwable $e) {
-      $errors[] = ['slot' => $slotStart, 'error' => $e->getMessage()];
+  $mergeIntervals = static function (array $pairs): array {
+    if ($pairs === []) {
+      return [];
     }
-  }
-
-  $rangesServer = [];
-  $rangesTs = [];
-  foreach ($allowedList as $n) {
-    $ids = $busyByNum[$n];
-    sort($ids);
+    usort($pairs, static fn($a, $b) => $a[0] <=> $b[0]);
     $out = [];
-    $runStart = null;
-    $prev = null;
-    foreach ($ids as $i) {
-      if ($runStart === null) { $runStart = $i; $prev = $i; continue; }
-      if ($i === $prev + 1) { $prev = $i; continue; }
-      $out[] = [$runStart, $prev];
-      $runStart = $i;
-      $prev = $i;
+    foreach ($pairs as $pair) {
+      $s = (int)$pair[0];
+      $e = (int)$pair[1];
+      if ($e < $s) {
+        $t = $s;
+        $s = $e;
+        $e = $t;
+      }
+      if ($out === []) {
+        $out[] = [$s, $e];
+        continue;
+      }
+      $lastIdx = count($out) - 1;
+      if ($s <= $out[$lastIdx][1]) {
+        $out[$lastIdx][1] = max($out[$lastIdx][1], $e);
+      } else {
+        $out[] = [$s, $e];
+      }
     }
-    if ($runStart !== null) $out[] = [$runStart, $prev];
+    return $out;
+  };
 
-    $txt = [];
-    $tsOut = [];
-    foreach ($out as [$a, $b]) {
-      if (!isset($slotStarts[$a]) || !isset($slotStarts[$b])) continue;
-      $aTs = strtotime($slotStarts[$a]);
-      $bTs = strtotime($slotStarts[$b]);
-      if ($aTs === false || $bTs === false) continue;
-      $startStr = date('H:i', $aTs);
-      $endStr = date('H:i', $bTs + $step);
-      $txt[] = $startStr . '-' . $endStr;
-      $tsOut[] = [$aTs, $bTs + $step];
-    }
-    $rangesServer[$n] = $txt;
-    $rangesTs[$n] = $tsOut;
-  }
+  $api = new \App\Classes\PosterAPI($posterToken);
+  $errors = [];
 
-  echo json_encode([
-    'ok' => true,
-    'request' => [
-      'date' => $date,
+  try {
+    $resp = $api->request('incomingOrders.getReservations', [
+      'date_from' => $dayStart,
+      'date_to' => $dayEnd,
+      'timezone' => 'client',
+    ], 'GET');
+
+    $tablesResp = $api->request('spots.getTableHallTables', [
       'spot_id' => $spotId,
       'hall_id' => $hallId,
-      'duration' => $duration,
-      'guests_count' => $guests,
-    ],
-    'ranges_by_table_num_server' => $rangesServer,
-    'ranges_ts_by_table_num' => $rangesTs,
-    'server_timezone' => date_default_timezone_get(),
-    'errors' => $errors,
-  ], JSON_UNESCAPED_UNICODE);
+      'without_deleted' => 1,
+    ], 'GET');
+
+    $tableRows = is_array($tablesResp) ? $tablesResp : [];
+    $tableNameById = [];
+    $allowedSet = array_fill_keys(array_map('strval', $allowedList), true);
+    foreach ($tableRows as $tr) {
+      if (!is_array($tr)) {
+        continue;
+      }
+      $id = trim((string)($tr['table_id'] ?? ''));
+      if ($id === '') {
+        continue;
+      }
+      $num = trim((string)($tr['table_num'] ?? ''));
+      $title = trim((string)($tr['table_title'] ?? ''));
+      $scheme = '';
+      if (preg_match('/^\d+$/', $num)) {
+        $scheme = $num;
+      } elseif (preg_match('/^\d+$/', $title)) {
+        $scheme = $title;
+      }
+      if ($scheme === '') {
+        continue;
+      }
+      $sInt = (int)$scheme;
+      if ($sInt < 1 || $sInt > 20) {
+        continue;
+      }
+      if (!isset($allowedSet[(string)$sInt])) {
+        continue;
+      }
+      $tableNameById[$id] = (string)$sInt;
+    }
+
+    $extractNums = function ($value) use (&$extractNums) {
+      $out = [];
+      if (is_int($value) || is_float($value)) {
+        $s = (string)$value;
+        if ($s !== '') {
+          $out[] = $s;
+        }
+        return $out;
+      }
+      if (is_string($value)) {
+        if (preg_match_all('/\b\d+\b/u', $value, $m)) {
+          foreach ($m[0] as $n) {
+            $out[] = (string)$n;
+          }
+        }
+        return $out;
+      }
+      if (is_array($value)) {
+        foreach ($value as $v) {
+          foreach ($extractNums($v) as $n) {
+            $out[] = $n;
+          }
+        }
+        return $out;
+      }
+      return $out;
+    };
+
+    $rows = is_array($resp) ? $resp : [];
+    $intervalsByNum = [];
+    foreach ($allowedList as $n) {
+      $intervalsByNum[$n] = [];
+    }
+
+    foreach ($rows as $row) {
+      if (!is_array($row)) {
+        continue;
+      }
+      $start = trim((string)($row['date_reservation'] ?? ''));
+      if ($start === '') {
+        continue;
+      }
+      $dur = (int)($row['duration'] ?? 0);
+
+      $startDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $start, $tzObj);
+      if ($startDt === false) {
+        try {
+          $startDt = new DateTimeImmutable($start, $tzObj);
+        } catch (\Throwable $e) {
+          continue;
+        }
+      }
+      $startUnix = $startDt->getTimestamp();
+      $endUnix = $dur > 0 ? $startUnix + $dur : $startUnix;
+
+      $tableCandidates = [];
+      foreach (['table_id', 'table_ids', 'tables', 'table'] as $k) {
+        if (!array_key_exists($k, $row)) {
+          continue;
+        }
+        foreach ($extractNums($row[$k]) as $n) {
+          $tableCandidates[] = $n;
+        }
+      }
+      $tableIds = [];
+      foreach ($tableCandidates as $n) {
+        $id = (string)$n;
+        if ($id === '' || isset($tableIds[$id])) {
+          continue;
+        }
+        $tableIds[$id] = true;
+      }
+
+      foreach (array_keys($tableIds) as $tableId) {
+        if (!isset($tableNameById[$tableId])) {
+          continue;
+        }
+        $num = $tableNameById[$tableId];
+        if (!isset($intervalsByNum[$num])) {
+          continue;
+        }
+        $intervalsByNum[$num][] = [$startUnix, $endUnix];
+      }
+    }
+
+    $rangesServer = [];
+    $rangesTs = [];
+    foreach ($allowedList as $n) {
+      $merged = $mergeIntervals($intervalsByNum[$n]);
+      $txt = [];
+      $tsOut = [];
+      foreach ($merged as [$s, $e]) {
+        $ds = (new DateTimeImmutable('@' . $s))->setTimezone($tzObj);
+        $de = (new DateTimeImmutable('@' . $e))->setTimezone($tzObj);
+        $txt[] = $ds->format('H:i') . '-' . $de->format('H:i');
+        $tsOut[] = [$s, $e];
+      }
+      $rangesServer[$n] = $txt;
+      $rangesTs[$n] = $tsOut;
+    }
+
+    echo json_encode([
+      'ok' => true,
+      'request' => [
+        'date' => $date,
+        'spot_id' => $spotId,
+        'hall_id' => $hallId,
+        'source' => 'incomingOrders.getReservations',
+      ],
+      'ranges_by_table_num_server' => $rangesServer,
+      'ranges_ts_by_table_num' => $rangesTs,
+      'server_timezone' => $tzName,
+      'display_timezone' => $tzName,
+      'errors' => $errors,
+    ], JSON_UNESCAPED_UNICODE);
+  } catch (\Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+  }
   exit;
 }
 
@@ -777,8 +888,10 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       background: linear-gradient(180deg, #b58a63, #8b5e3b);
       color: #fffaf4;
       box-shadow: 0 14px 24px rgba(84, 49, 20, .22);
-      display: grid;
-      place-items: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       font-family: var(--font-display);
       font-size: 1.45rem;
       font-weight: 600;
@@ -788,6 +901,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       user-select: none;
       transform: scale(var(--mx), var(--my));
       transform-origin: center;
+      padding: 6px 4px 8px;
     }
   
     .table::after {
@@ -814,24 +928,26 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     }
   
     .table .res-time {
-      position: absolute;
-      top: 6px;
-      left: 6px;
-      right: 6px;
-      font-size: 0.5rem;
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      margin: 2px 0 0;
+      padding: 0 2px;
+      font-size: 0.42rem;
       font-weight: 600;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.03em;
       color: rgba(255,250,244,0.78);
       font-family: var(--font-body);
       pointer-events: none;
       text-shadow: 0 1px 0 rgba(0,0,0,0.22);
       line-height: 1.1;
-      text-align: left;
+      text-align: center;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      flex-shrink: 0;
     }
-    .table .cap { margin-top: 30px; }
+    .table .cap { margin-top: 2px; }
 
     .table.disabled {
       opacity: 0.22;
@@ -1126,6 +1242,9 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     }
 
     const applyBusyRanges = (payload) => {
+      const displayTz = payload && typeof payload.display_timezone === 'string' && payload.display_timezone.trim()
+        ? payload.display_timezone.trim()
+        : null;
       const tsMap = payload && typeof payload === 'object' && payload.ranges_ts_by_table_num && typeof payload.ranges_ts_by_table_num === 'object'
         ? payload.ranges_ts_by_table_num
         : null;
@@ -1136,23 +1255,27 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       const fmtTime = (tsSec) => {
         const d = new Date(Number(tsSec) * 1000);
         if (!Number.isFinite(d.getTime())) return '';
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        const opts = { hour: '2-digit', minute: '2-digit', hour12: false };
+        if (displayTz) opts.timeZone = displayTz;
+        return d.toLocaleTimeString('ru-RU', opts);
       };
 
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
         let lines = [];
-        const tsRanges = tsMap && Array.isArray(tsMap[n]) ? tsMap[n].slice(0, 2) : [];
-        if (tsRanges.length) {
-          lines = tsRanges.map((pair) => {
-            const a = Array.isArray(pair) ? pair[0] : null;
-            const b = Array.isArray(pair) ? pair[1] : null;
-            const s = fmtTime(a);
-            const e = fmtTime(b);
-            return (s && e) ? (s + '-' + e) : '';
-          }).filter(Boolean);
-        } else if (strMap && Array.isArray(strMap[n])) {
+        if (strMap && Array.isArray(strMap[n]) && strMap[n].length) {
           lines = strMap[n].slice(0, 2).map(String).filter(Boolean);
+        } else {
+          const tsRanges = tsMap && Array.isArray(tsMap[n]) ? tsMap[n].slice(0, 2) : [];
+          if (tsRanges.length) {
+            lines = tsRanges.map((pair) => {
+              const a = Array.isArray(pair) ? pair[0] : null;
+              const b = Array.isArray(pair) ? pair[1] : null;
+              const s = fmtTime(a);
+              const e = fmtTime(b);
+              return (s && e) ? (s + '-' + e) : '';
+            }).filter(Boolean);
+          }
         }
 
         const txt = lines.length ? lines.join(' · ') : '';
@@ -1161,12 +1284,17 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
           if (el) el.remove();
           return;
         }
+        const cap = t.querySelector('.cap');
         if (!el) {
           el = document.createElement('div');
           el.className = 'res-time';
-          t.insertBefore(el, t.firstChild);
         }
         el.textContent = txt;
+        if (cap) {
+          t.insertBefore(el, cap);
+        } else if (!t.contains(el)) {
+          t.appendChild(el);
+        }
       });
     };
 
