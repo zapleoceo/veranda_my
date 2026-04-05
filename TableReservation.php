@@ -30,8 +30,7 @@ $m = (int)$roundedNow->format('i');
 $add = (15 - ($m % 15)) % 15;
 if ($add > 0) $roundedNow = $roundedNow->modify('+' . $add . ' minutes');
 $defaultResDateLocal = $roundedNow->format('Y-m-d\TH:i');
-$spotIdForSettings = max(1, (int)($_GET['spot_id'] ?? 1));
-$hallIdForSettings = max(1, (int)($_GET['hall_id'] ?? 2));
+$hallIdForSettings = 2;
 $allowedSchemeNums = null;
 $tableCapsByNum = [
   '1' => 8, '2' => 8, '3' => 8,
@@ -114,8 +113,8 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $dateReservation = trim((string)($_GET['date_reservation'] ?? ''));
   $duration = (int)($_GET['duration'] ?? 0);
   $guests = (int)($_GET['guests_count'] ?? 0);
-  $spotId = (int)($_GET['spot_id'] ?? $spotIdForSettings);
-  $hallId = $hallIdForSettings;
+  $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
   $allowed = $allowedSchemeNums;
 
   $dateReservation = trim($dateReservation);
@@ -137,29 +136,6 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
 
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
-    $tablesResp = $api->request('spots.getTableHallTables', [
-      'spot_id' => $spotId,
-      'hall_id' => $hallId,
-      'without_deleted' => 1,
-    ], 'GET');
-    $tableRows = is_array($tablesResp) ? $tablesResp : [];
-    $schemeById = [];
-    $schemeByTableNum = [];
-    foreach ($tableRows as $tr) {
-      if (!is_array($tr)) continue;
-      $id = trim((string)($tr['table_id'] ?? ''));
-      $num = trim((string)($tr['table_num'] ?? ''));
-      $title = trim((string)($tr['table_title'] ?? ''));
-      $scheme = '';
-      if (preg_match('/^\d+$/', $title)) $scheme = $title;
-      elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
-      if ($scheme === '') continue;
-      $sInt = (int)$scheme;
-      if ($sInt < 1 || $sInt > 500) continue;
-      if ($id !== '') $schemeById[$id] = (string)$sInt;
-      if ($num !== '') $schemeByTableNum[$num] = (string)$sInt;
-    }
-
     $resp = $api->request('incomingOrders.getTablesForReservation', [
       'date_reservation' => $dtApi->format('Y-m-d H:i:s'),
       'duration' => $duration,
@@ -174,19 +150,11 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     foreach ($free as $row) {
       if (!is_array($row)) continue;
       if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
-      $tableId = trim((string)($row['table_id'] ?? ''));
-      $tableNum = trim((string)($row['table_num'] ?? ''));
-      $tableTitle = trim((string)($row['table_title'] ?? ''));
-      $scheme = '';
-      if ($tableId !== '' && isset($schemeById[$tableId])) $scheme = $schemeById[$tableId];
-      elseif ($tableNum !== '' && isset($schemeByTableNum[$tableNum])) $scheme = $schemeByTableNum[$tableNum];
-      elseif (preg_match('/^\d+$/', $tableTitle)) $scheme = $tableTitle;
-      elseif (preg_match('/^\d+$/', $tableNum)) $scheme = $tableNum;
-      if ($scheme === '') continue;
-      if (is_array($allowedSet) && !isset($allowedSet[$scheme])) continue;
-      $row['scheme_num'] = $scheme;
+      $num = trim((string)($row['table_num'] ?? ''));
+      if ($num === '') continue;
+      if (is_array($allowedSet) && !isset($allowedSet[$num])) continue;
       $filtered[] = $row;
-      $nums[$scheme] = true;
+      $nums[$num] = true;
     }
 
     echo json_encode([
@@ -223,8 +191,8 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
 
   $dateReservation = trim((string)($_GET['date_reservation'] ?? ''));
   $duration = (int)($_GET['duration'] ?? 0);
-  $spotId = (int)($_GET['spot_id'] ?? $spotIdForSettings);
-  $hallId = $hallIdForSettings;
+  $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
   $allowed = $allowedSchemeNums;
 
   $displayTz = new DateTimeZone($displayTzName);
@@ -269,11 +237,11 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       $num = trim((string)($tr['table_num'] ?? ''));
       $title = trim((string)($tr['table_title'] ?? ''));
       $scheme = '';
-      if (preg_match('/^\d+$/', $title)) $scheme = $title;
-      elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
+      if (preg_match('/^\d+$/', $num)) $scheme = $num;
+      elseif (preg_match('/^\d+$/', $title)) $scheme = $title;
       if ($scheme === '') continue;
       $sInt = (int)$scheme;
-      if ($sInt < 1 || $sInt > 500) continue;
+      if ($sInt < 1 || $sInt > 20) continue;
       if (is_array($allowedSet) && !isset($allowedSet[(string)$sInt])) continue;
       $tableNameById[$id] = (string)$sInt;
     }
@@ -414,11 +382,10 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     exit;
   }
 
-  $spotId = (int)($_GET['spot_id'] ?? $spotIdForSettings);
-  $hallId = (int)($_GET['hall_id'] ?? $hallIdForSettings);
+  $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
   $date = trim((string)($_GET['date'] ?? ''));
   if ($spotId <= 0) $spotId = 1;
-  if ($hallId <= 0) $hallId = 2;
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
@@ -464,29 +431,6 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     $slotStarts = [];
     foreach ($allowedList as $n) $busyByNum[$n] = [];
 
-    $tablesResp = $api->request('spots.getTableHallTables', [
-      'spot_id' => $spotId,
-      'hall_id' => $hallId,
-      'without_deleted' => 1,
-    ], 'GET');
-    $tableRows = is_array($tablesResp) ? $tablesResp : [];
-    $schemeById = [];
-    $schemeByTableNum = [];
-    foreach ($tableRows as $tr) {
-      if (!is_array($tr)) continue;
-      $id = trim((string)($tr['table_id'] ?? ''));
-      $num = trim((string)($tr['table_num'] ?? ''));
-      $title = trim((string)($tr['table_title'] ?? ''));
-      $scheme = '';
-      if (preg_match('/^\d+$/', $title)) $scheme = $title;
-      elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
-      if ($scheme === '') continue;
-      $sInt = (int)$scheme;
-      if ($sInt < 1 || $sInt > 500) continue;
-      if ($id !== '') $schemeById[$id] = (string)$sInt;
-      if ($num !== '') $schemeByTableNum[$num] = (string)$sInt;
-    }
-
     foreach ($slots as $idx => $slotStart) {
       try {
         $slotDisplayDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $slotStart, $displayTz);
@@ -504,16 +448,9 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
         foreach ($free as $row) {
           if (!is_array($row)) continue;
           if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
-          $tableId = trim((string)($row['table_id'] ?? ''));
-          $tableNum = trim((string)($row['table_num'] ?? ''));
-          $tableTitle = trim((string)($row['table_title'] ?? ''));
-          $scheme = '';
-          if ($tableId !== '' && isset($schemeById[$tableId])) $scheme = $schemeById[$tableId];
-          elseif ($tableNum !== '' && isset($schemeByTableNum[$tableNum])) $scheme = $schemeByTableNum[$tableNum];
-          elseif (preg_match('/^\d+$/', $tableTitle)) $scheme = $tableTitle;
-          elseif (preg_match('/^\d+$/', $tableNum)) $scheme = $tableNum;
-          if ($scheme === '') continue;
-          $freeSet[$scheme] = true;
+          $num = trim((string)($row['table_num'] ?? ''));
+          if ($num === '') continue;
+          $freeSet[$num] = true;
         }
 
         $slotStarts[$idx] = $slotStart;
@@ -985,6 +922,17 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       padding: 6px 4px 8px;
     }
   
+    .table::after {
+      content: '';
+      position: absolute;
+      inset: auto 10px 10px auto;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.35);
+      opacity: .6;
+    }
+  
     .table:hover, .table:focus-visible {
       transform: translateY(-3px) scale(1.02) scale(var(--mx), var(--my));
       box-shadow: 0 18px 34px rgba(84, 49, 20, .3);
@@ -1017,48 +965,12 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     }
 
     .table.disabled {
-      background: linear-gradient(180deg, rgba(150, 150, 150, 0.75), rgba(95, 95, 95, 0.78));
-      cursor: not-allowed;
-    }
-
-    .table.busy { cursor: not-allowed; }
-
-    .table.disabled:hover, .table.disabled:focus-visible,
-    .table.busy:hover, .table.busy:focus-visible {
-      transform: scale(var(--mx), var(--my));
-      box-shadow: 0 14px 24px rgba(84, 49, 20, .22);
-      filter: none;
-    }
-
-    .table-toast {
-      position: fixed;
-      left: 0;
-      top: 0;
-      z-index: 9999;
-      width: min(340px, calc(100vw - 24px));
-      background: rgba(17, 24, 39, 0.94);
-      color: rgba(255, 250, 244, 0.94);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 14px;
-      box-shadow: 0 18px 40px rgba(0,0,0,0.35);
-      padding: 10px 12px;
-      transform: translate(-50%, calc(-100% - 12px)) scale(0.98);
-      opacity: 0;
+      opacity: 0.22;
+      filter: grayscale(0.35);
       pointer-events: none;
-      transition: opacity 0.16s ease, transform 0.16s ease;
     }
-
-    .table-toast.on {
-      opacity: 1;
-      transform: translate(-50%, calc(-100% - 12px)) scale(1);
-    }
-
-    .table-toast .t-title { font-weight: 900; font-size: 13px; }
-    .table-toast .t-reason { margin-top: 6px; font-size: 12px; color: rgba(245, 238, 228, 0.78); }
-    .table-toast .t-reason b { color: rgba(255, 250, 244, 0.94); }
   
-    .table.small-vertical { width: 75px; height: 92px; border-radius: 18px; }
-    .table.small-vertical.wide-1 { width: 86px; }
+    .table.small-vertical { width: 58px; height: 92px; border-radius: 18px; }
     .table.wide { width: 112px; height: 58px; border-radius: 18px; }
     .table.large { width: 108px; height: 108px; border-radius: 26px; }
   
@@ -1169,6 +1081,20 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       flex-wrap: wrap;
       margin-top: var(--space-4);
     }
+
+    .guest-row {
+      display: flex;
+      gap: var(--space-3);
+      align-items: flex-end;
+      margin-top: var(--space-3);
+    }
+    .guest-label { flex: 0 0 40%; }
+    #resGuests { width: 100%; }
+    #checkBtn { flex: 1 1 auto; }
+    @media (max-width: 520px) {
+      .guest-row { flex-direction: column; align-items: stretch; }
+      .guest-label { flex-basis: auto; }
+    }
   
     .btn {
       border: 0;
@@ -1191,6 +1117,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       outline-offset: 2px;
     }
     .table.busy {
+      opacity: 0.5;
       filter: grayscale(0.2);
     }
   
@@ -1226,9 +1153,9 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
             <button class="table large" style="left: 0px; top: 150px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
             <button class="table large" style="left: 0px; top: 24px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
-            <button class="table small-vertical wide-1" style="left: 200px; top: 0px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 364px; top: 0px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 512px; top: 0px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 200px; top: 0px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 364px; top: 0px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 512px; top: 0px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
             <button class="table large" style="left: 700px; top: 0px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
   
             <button class="table wide" style="left: 286px; top: 142px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
@@ -1264,11 +1191,11 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
             <button class="table" style="left: 472px; top: 242px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
             <button class="table" style="left: 584px; top: 242px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
   
-            <button class="table small-vertical" style="left: 213px; top: 336px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 328px; top: 336px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 439px; top: 336px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 551px; top: 336px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 663px; top: 336px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 270px; top: 336px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 370px; top: 336px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 470px; top: 336px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 570px; top: 336px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 670px; top: 336px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
             <button class="table large" style="left: 758px; top: 258px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
   
             <div class="bar-row" aria-hidden="true">
@@ -1290,14 +1217,15 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
               <input type="datetime-local" id="resDate">
             </label>
             <div id="stepGuests" hidden>
-              <label>
-                Гостей
-                <input type="number" id="resGuests" min="1" max="30" value="2">
-              </label>
+              <div class="guest-row">
+                <label class="guest-label">
+                  Гостей
+                  <input type="number" id="resGuests" min="1" max="30" value="2">
+                </label>
+                <button class="btn btn-primary" id="checkBtn" type="button">Проверить</button>
+              </div>
             </div>
-            <div class="actions" id="stepCheck" hidden>
-              <button class="btn btn-primary" id="checkBtn" type="button">Проверить свободные столы</button>
-            </div>
+            <div class="actions" id="stepCheck" hidden></div>
             <div class="selected-output">
               <div style="display:flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap;">
                 <div>Стол: <strong id="selectedTable">—</strong></div>
@@ -1314,11 +1242,6 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       </section>
     </main>
   </div>
-
-  <div class="table-toast" id="tableToast" aria-live="polite" aria-atomic="true">
-    <div class="t-title" id="toastTitle"></div>
-    <div class="t-reason" id="toastReason"></div>
-  </div>
   
   <script>
     const root = document.documentElement;
@@ -1334,19 +1257,17 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     });
   
     const defaultResDateLocal = <?= json_encode($defaultResDateLocal, JSON_UNESCAPED_UNICODE) ?>;
-    const defaultSpotId = <?= (int)$spotIdForSettings ?>;
-    const defaultHallId = <?= (int)$hallIdForSettings ?>;
     const allowedTableNums = <?= json_encode($allowedSchemeNums, JSON_UNESCAPED_UNICODE) ?>;
     const tableCapsByNum = <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>;
     const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
 
     const tables = Array.from(document.querySelectorAll('.table'));
-    if (allowedSet !== null && allowedSet.size > 0) {
+    if (allowedSet !== null) {
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
         if (!allowedSet.has(n)) {
           t.classList.add('disabled');
-          t.title = 'Отключено в настройках';
+          t.disabled = true;
         }
       });
     }
@@ -1376,27 +1297,16 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       });
     };
 
-    const applyReservationsItemsToTables = (items, dateStr, dtValue) => {
+    const applyReservationsItemsToTables = (items, dateStr) => {
       const list = Array.isArray(items) ? items : [];
       const day = String(dateStr || '').slice(0, 10);
       if (!day) return;
 
-      const dt = String(dtValue || '').trim();
-      const selMin = (() => {
-        const m = dt.match(/^\d{4}-\d{2}-\d{2}[ T](\d{2}):(\d{2})/);
-        if (!m) return null;
-        const hh = Number(m[1]);
-        const mm = Number(m[2]);
-        if (!isFinite(hh) || !isFinite(mm)) return null;
-        return (hh * 60) + mm;
-      })();
-      const today = new Date();
-      const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-      const isToday = day === todayStr;
-
       const byTable = {};
       list.forEach((it) => {
         if (!it || typeof it !== 'object') return;
+        const status = Number(it.status ?? 0);
+        if (status === 7) return;
         const t = String(it.table_title ?? '').trim();
         const s = String(it.date_start ?? '').trim();
         const e = String(it.date_end ?? '').trim();
@@ -1421,22 +1331,13 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
         byTable[k] = merged;
       });
 
-      lastReservationsByTable = byTable;
-
       const pad2 = (x) => String(x).padStart(2, '0');
       const fmt = (m) => pad2(Math.floor(m / 60)) + ':' + pad2(m % 60);
 
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
         const ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
-        const overlapsSel = selMin != null ? ranges.some(([s, e]) => selMin >= s && selMin < e) : false;
-        let txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
-        if (isToday && selMin != null && !overlapsSel && last && !freeNums.has(n)) {
-          const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[n] != null ? Number(tableCapsByNum[n]) : null;
-          const guests = resGuests && String(resGuests.value || '').trim() ? Number(resGuests.value) : null;
-          const capacityOk = cap == null || !isFinite(cap) || guests == null || !isFinite(guests) ? true : guests <= cap;
-          if (capacityOk) txt = 'занят сейчас';
-        }
+        const txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
         let el = t.querySelector('.res-time');
         if (!txt) {
           if (el) el.remove();
@@ -1458,87 +1359,12 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     const statusLine = document.getElementById('statusLine');
     const stepGuests = document.getElementById('stepGuests');
     const stepCheck = document.getElementById('stepCheck');
-    const toastEl = document.getElementById('tableToast');
-    const toastTitleEl = document.getElementById('toastTitle');
-    const toastReasonEl = document.getElementById('toastReason');
 
     let last = null;
     let freeNums = new Set();
     let lastKey = '';
     let selectedTableNum = '';
     let isLoading = false;
-    let lastReservationsByTable = {};
-    let toastTimer = null;
-    let toastHideTimer = null;
-
-    const parseSel = (dtValue) => {
-      const dt = String(dtValue || '').trim();
-      const m = dt.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
-      if (!m) return null;
-      const hh = Number(m[2]);
-      const mm = Number(m[3]);
-      if (!isFinite(hh) || !isFinite(mm)) return null;
-      const day = m[1];
-      const selMin = (hh * 60) + mm;
-      const now = new Date();
-      const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-      return { day, selMin, isToday: day === todayStr };
-    };
-
-    const fmtMin = (m) => String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
-
-    const getUnavailable = (tableNum, current) => {
-      const el = tables.find((x) => String(x.dataset.table || '') === String(tableNum));
-      if (!el) return null;
-      if (el.classList.contains('disabled')) {
-        return { reason: 'отключено в настройках', detail: '' };
-      }
-      if (!current || !last) return null;
-      const ps = parseSel(current.dt);
-      const ranges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
-      const overlaps = ps && ranges.length ? ranges.some(([s, e]) => ps.selMin >= s && ps.selMin < e) : false;
-      if (overlaps) {
-        const txt = ranges.slice(0, 2).map(([s, e]) => fmtMin(s) + '-' + fmtMin(e)).join(' · ');
-        return { reason: 'есть бронь', detail: txt };
-      }
-      const isFree = freeNums.has(String(tableNum));
-      if (!isFree) {
-        const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[String(tableNum)] != null ? Number(tableCapsByNum[String(tableNum)]) : null;
-        const guests = current.guests != null ? Number(current.guests) : null;
-        if (cap != null && isFinite(cap) && guests != null && isFinite(guests) && guests > cap) {
-          return { reason: 'нет мест', detail: 'гостей ' + String(guests) + ', вместимость ' + String(cap) };
-        }
-        if (ps && ps.isToday) return { reason: 'гости сейчас сидят', detail: '' };
-        return { reason: 'недоступен на это время', detail: '' };
-      }
-      return null;
-    };
-
-    const positionToast = (target) => {
-      if (!toastEl || !target) return;
-      const r = target.getBoundingClientRect();
-      const x = Math.round(r.left + (r.width / 2));
-      const y = Math.round(r.top);
-      toastEl.style.left = String(x) + 'px';
-      toastEl.style.top = String(y) + 'px';
-    };
-
-    const hideToast = () => {
-      if (!toastEl) return;
-      toastEl.classList.remove('on');
-      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
-    };
-
-    const showToast = (target, reason) => {
-      if (!toastEl || !toastTitleEl || !toastReasonEl || !reason) return;
-      if (toastHideTimer) { clearTimeout(toastHideTimer); toastHideTimer = null; }
-      positionToast(target);
-      toastTitleEl.textContent = 'Этот столик не доступен';
-      toastReasonEl.innerHTML = 'Причина: <b>' + esc(reason.reason) + '</b>' + (reason.detail ? (' · ' + esc(reason.detail)) : '');
-      toastEl.classList.add('on');
-      if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(hideToast, 2200);
-    };
 
     const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const fmtJson = (x) => {
@@ -1603,7 +1429,6 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
 
     const applyAvailabilityStyles = () => {
       tables.forEach((t) => {
-        if (t.classList.contains('disabled') || t.disabled) return;
         const n = String(t.dataset.table || '');
         t.classList.remove('free', 'busy');
         if (!last) return;
@@ -1641,39 +1466,13 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     };
   
     tables.forEach(table => {
-      const showIfUnavailable = () => {
-        const id = String(table.dataset.table || '');
-        const current = getCurrentRequest();
-        const un = getUnavailable(id, current);
-        if (un) showToast(table, un);
-        return !!un;
-      };
-
-      table.addEventListener('mouseenter', () => {
-        if (toastHideTimer) { clearTimeout(toastHideTimer); toastHideTimer = null; }
-        showIfUnavailable();
-      });
-      table.addEventListener('mouseleave', () => {
-        if (toastHideTimer) clearTimeout(toastHideTimer);
-        toastHideTimer = setTimeout(hideToast, 180);
-      });
-
       table.addEventListener('click', async () => {
         const id = String(table.dataset.table || '');
-
-        const current = getCurrentRequest();
-        const un = getUnavailable(id, current);
-        if (un) {
-          tables.forEach((t) => t.classList.remove('selected'));
-          selectedTableNum = '';
-          showToast(table, un);
-          return;
-        }
-
         selectedTableNum = id;
         tables.forEach((t) => t.classList.remove('selected'));
         table.classList.add('selected');
 
+        const current = getCurrentRequest();
         if (!current) {
           setStatus(id);
           setOutput({ ok: false, error: 'Выбери дату и время' });
@@ -1731,7 +1530,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       url.searchParams.set('ajax', 'free_tables');
       url.searchParams.set('date_reservation', dt);
       url.searchParams.set('duration', '7200');
-      url.searchParams.set('spot_id', String(defaultSpotId || 1));
+      url.searchParams.set('spot_id', '1');
       url.searchParams.set('guests_count', String(guests));
 
       const loadReservations = async () => {
@@ -1739,7 +1538,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
         rUrl.searchParams.set('ajax', 'reservations');
         rUrl.searchParams.set('date_reservation', dt);
         rUrl.searchParams.set('duration', '7200');
-        rUrl.searchParams.set('spot_id', String(defaultSpotId || 1));
+        rUrl.searchParams.set('spot_id', '1');
         const rRes = await fetch(rUrl.toString(), { headers: { 'Accept': 'application/json' } });
         const rJ = await rRes.json().catch(() => null);
         if (!rRes.ok || !rJ || !rJ.ok) return null;
@@ -1772,7 +1571,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
           last.reservations_items = [];
         }
         clearReservationsOnTables();
-        applyReservationsItemsToTables(last.reservations_items, dateStr, dt);
+        applyReservationsItemsToTables(last.reservations_items, dateStr);
         if (!silent) setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
         renderSelectedTable();
       } finally {
