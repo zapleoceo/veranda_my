@@ -371,6 +371,35 @@ $defaultTo = $today;
         });
     }
 
+    const isYmd = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '').trim());
+    const saveDates = () => {
+        if (!dateFromEl || !dateToEl) return;
+        const df = String(dateFromEl.value || '').trim();
+        const dt = String(dateToEl.value || '').trim();
+        try {
+            if (isYmd(df)) localStorage.setItem('zapara_date_from', df);
+            if (isYmd(dt)) localStorage.setItem('zapara_date_to', dt);
+        } catch (_) {}
+    };
+    const restoreDates = () => {
+        if (!dateFromEl || !dateToEl) return;
+        try {
+            const df = localStorage.getItem('zapara_date_from') || '';
+            const dt = localStorage.getItem('zapara_date_to') || '';
+            if (isYmd(df)) dateFromEl.value = df;
+            if (isYmd(dt)) dateToEl.value = dt;
+        } catch (_) {}
+    };
+    restoreDates();
+    if (dateFromEl) {
+        dateFromEl.addEventListener('change', saveDates);
+        dateFromEl.addEventListener('input', saveDates);
+    }
+    if (dateToEl) {
+        dateToEl.addEventListener('change', saveDates);
+        dateToEl.addEventListener('input', saveDates);
+    }
+
     const dows = [
         { key: '1', name: 'Пн' },
         { key: '2', name: 'Вт' },
