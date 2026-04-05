@@ -1357,8 +1357,6 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       const byTable = {};
       list.forEach((it) => {
         if (!it || typeof it !== 'object') return;
-        const status = Number(it.status ?? 0);
-        if (status === 7) return;
         const t = String(it.table_title ?? '').trim();
         const s = String(it.date_start ?? '').trim();
         const e = String(it.date_end ?? '').trim();
