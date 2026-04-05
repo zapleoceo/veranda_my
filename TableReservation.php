@@ -307,7 +307,6 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   $spotId = (int)($_GET['spot_id'] ?? 1);
   $hallId = 2;
   $date = trim((string)($_GET['date'] ?? ''));
-  $tzParam = trim((string)($_GET['tz'] ?? ''));
   if ($spotId <= 0) $spotId = 1;
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     http_response_code(400);
@@ -329,23 +328,21 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   $allowedList = array_values(array_keys($allowedNums));
   usort($allowedList, fn($a, $b) => (int)$a <=> (int)$b);
 
-  $tzName = $tzParam !== '' && in_array($tzParam, timezone_identifiers_list(), true)
-    ? $tzParam
-    : date_default_timezone_get();
+  $tzName = date_default_timezone_get();
   $tzObj = new DateTimeZone($tzName);
 
   $api = new \App\Classes\PosterAPI($posterToken);
   $errors = [];
 
   try {
-    $step = 1800;
+    $slotStep = 900;
     $duration = 1800;
     $guests = 1;
 
     $startMin = 9 * 60;
     $endMin = 23 * 60;
     $slots = [];
-    for ($m = $startMin; $m < $endMin; $m += 30) {
+    for ($m = $startMin; $m < $endMin; $m += 15) {
       $hh = str_pad((string)floor($m / 60), 2, '0', STR_PAD_LEFT);
       $mm = str_pad((string)($m % 60), 2, '0', STR_PAD_LEFT);
       $slots[] = $date . ' ' . $hh . ':' . $mm . ':00';
@@ -410,9 +407,9 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
         $aTs = $aDt->getTimestamp();
         $bTs = $bDt->getTimestamp();
         $startStr = $aDt->format('H:i');
-        $endStr = (new DateTimeImmutable('@' . ($bTs + $step)))->setTimezone($tzObj)->format('H:i');
+        $endStr = (new DateTimeImmutable('@' . ($bTs + $slotStep)))->setTimezone($tzObj)->format('H:i');
         $txt[] = $startStr . '-' . $endStr;
-        $tsOut[] = [$aTs, $bTs + $step];
+        $tsOut[] = [$aTs, $bTs + $slotStep];
       }
       $rangesServer[$n] = $txt;
       $rangesTs[$n] = $tsOut;
@@ -708,6 +705,21 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       letter-spacing: 0.02em;
       text-transform: none;
       color: rgba(245,238,228,0.62);
+    }
+    .mini-loader {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid rgba(245,238,228,0.25);
+      border-top-color: rgba(245,238,228,0.75);
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 6px;
+      animation: miniSpin 0.8s linear infinite;
+    }
+    @keyframes miniSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
 
     .fountain {
@@ -1082,7 +1094,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
             <div class="bar-row" aria-hidden="true">
               <div class="station-wrap">
                 <div class="side-station">Музыканты</div>
-                <div class="station-sub" id="busyDateLabel">Данные на — дату</div>
+                <div class="station-sub"><span id="busyDateLabel">Данные на —</span><span class="mini-loader" id="busyDateLoader" hidden></span></div>
               </div>
               <div class="bar">BAR</div>
               <div class="side-station">Касса</div>
@@ -1211,17 +1223,18 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     const loadBusyForDate = (dateStr) => {
       if (!dateStr) return;
       const busyDateLabel = document.getElementById('busyDateLabel');
-      if (busyDateLabel) busyDateLabel.textContent = 'Данные на ' + dateStr + ' дату';
-      const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      if (busyDateLabel) busyDateLabel.textContent = 'Данные на ' + dateStr;
+      const busyDateLoader = document.getElementById('busyDateLoader');
+      if (busyDateLoader) busyDateLoader.hidden = false;
       const url = new URL(location.href);
       url.searchParams.set('ajax', 'busy_ranges');
       url.searchParams.set('spot_id', '1');
       url.searchParams.set('date', dateStr);
-      if (browserTz) url.searchParams.set('tz', browserTz);
       fetch(url.toString(), { headers: { 'Accept': 'application/json' } })
         .then((r) => r.json().catch(() => null))
         .then((j) => { if (j && j.ok) applyBusyRanges(j); })
-        .catch(() => null);
+        .catch(() => null)
+        .finally(() => { if (busyDateLoader) busyDateLoader.hidden = true; });
     };
     const resDate = document.getElementById('resDate');
     const resGuests = document.getElementById('resGuests');
