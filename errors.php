@@ -433,6 +433,7 @@ $todayStr = date('Y-m-d');
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Errors Dashboard</title>
     <link rel="stylesheet" href="assets/app.css">
+    <script src="assets/user_menu.js" defer></script>
     <style>
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f5f5f5; color:#111827; }
         .wrap { max-width: 1450px; margin: 0 auto; padding: 16px; }
@@ -517,6 +518,7 @@ $todayStr = date('Y-m-d');
                     <div class="desc" id="monthProgDesc"></div>
                 </div>
             </form>
+            <?php require __DIR__ . '/partials/user_menu.php'; ?>
         </div>
     </div>
 
