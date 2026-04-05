@@ -521,6 +521,44 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'cap_check') {
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+
+  $tableNum = trim((string)($_GET['table_num'] ?? ''));
+  $guests = (int)($_GET['guests'] ?? 0);
+  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректный номер стола'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if ($guests <= 0 || $guests > 99) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректное кол-во гостей'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $cap = isset($tableCapsByNum[$tableNum]) ? (int)$tableCapsByNum[$tableNum] : null;
+  if ($cap !== null && $cap > 0 && $guests > ($cap + 1)) {
+    echo json_encode([
+      'ok' => true,
+      'cap' => $cap,
+      'status' => 'warn',
+      'message' => 'Мы подставим вам стул, но вам может быть тесно за этим столиком :)',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  echo json_encode([
+    'ok' => true,
+    'cap' => $cap,
+    'status' => 'ok',
+    'message' => '',
+  ], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'submit_booking') {
   header('Content-Type: application/json; charset=utf-8');
   header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -584,8 +622,9 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
   $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
   if ($tgChatId === '') $tgChatId = '3397075474';
-  $tgThreadId = trim((string)($_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? ''));
+  $tgThreadId = trim((string)($_ENV['TABLE_RESERVATION_THREAD_ID'] ?? $_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? ''));
   $tgThreadNum = $tgThreadId !== '' ? (int)$tgThreadId : 0;
+  if ($tgThreadNum <= 0) $tgThreadNum = 1938;
   if ($tgToken === '' || $tgChatId === '') {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Telegram не настроен'], JSON_UNESCAPED_UNICODE);
@@ -1124,6 +1163,16 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       color: var(--color-text-muted);
       margin-top: var(--space-3);
     }
+
+    .dt-row {
+      display: flex;
+      gap: var(--space-3);
+      align-items: flex-end;
+      margin-top: var(--space-3);
+    }
+    .dt-row label { margin-top: 0; }
+    .dt-label { flex: 1 1 auto; }
+    .dt-dur { flex: 0 0 34%; }
     input[type="datetime-local"], input[type="number"] {
       width: 100%;
       border-radius: 14px;
@@ -1244,6 +1293,17 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       font-size: var(--text-sm);
       outline: none;
     }
+    #reqGuests { max-width: 160px; }
+    .modal-hint {
+      margin-top: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.35;
+      color: rgba(255, 250, 244, 0.90);
+    }
     .modal-note { margin-top: 10px; color: rgba(245, 238, 228, 0.70); font-size: 12px; line-height: 1.35; }
     @media (max-width: 560px) { .modal-grid { grid-template-columns: 1fr; } }
   
@@ -1362,10 +1422,16 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         <aside class="sidebar">
           <div class="card">
             <h2>Бронь</h2>
-            <label>
-              Дата и время
-              <input type="datetime-local" id="resDate">
-            </label>
+            <div class="dt-row">
+              <label class="dt-label">
+                Дата и время
+                <input type="datetime-local" id="resDate">
+              </label>
+              <label class="dt-dur">
+                Длительность (ч)
+                <input type="number" id="resDuration" min="0.5" max="12" step="0.5" value="2">
+              </label>
+            </div>
             <div id="stepGuests" hidden>
               <div class="guest-row">
                 <label class="guest-label">
@@ -1421,13 +1487,14 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
           </label>
           <label class="modal-label">
             Кол-во гостей
-            <input type="number" id="reqGuests" readonly>
+            <input type="number" id="reqGuests" min="1" max="99">
           </label>
           <label class="modal-label">
             Время старта брони
             <input type="text" id="reqStart" readonly>
           </label>
         </div>
+        <div class="modal-hint" id="reqHint" hidden></div>
         <div class="modal-note">Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.</div>
         <div class="modal-actions">
           <button class="btn btn-secondary" type="button" data-modal-close="reqModal">Закрыть</button>
@@ -1513,6 +1580,11 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       const today = new Date();
       const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
       const isToday = day === todayStr;
+      const durMin = (() => {
+        if (!resDuration) return 120;
+        const v = Number(resDuration.value || 2);
+        return isFinite(v) && v > 0 ? Math.max(30, Math.round(v * 60)) : 120;
+      })();
 
       const byTable = {};
       list.forEach((it) => {
@@ -1549,7 +1621,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
         const ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
-        const overlapsSel = selMin != null ? ranges.some(([s, e]) => selMin >= s && selMin < e) : false;
+        const selEnd = selMin != null ? (selMin + durMin) : null;
+        const overlapsSel = (selMin != null && selEnd != null)
+          ? ranges.some(([s, e]) => s < selEnd && e > selMin)
+          : false;
         let txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
         if (isToday && selMin != null && !overlapsSel && last && !freeNums.has(n)) {
           txt = 'занят сейчас';
@@ -1569,6 +1644,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     };
     const resDate = document.getElementById('resDate');
     const resGuests = document.getElementById('resGuests');
+    const resDuration = document.getElementById('resDuration');
     const checkBtn = document.getElementById('checkBtn');
     const resultText = document.getElementById('resultText');
     const selectedTableEl = document.getElementById('selectedTable');
@@ -1585,6 +1661,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const reqPhone = document.getElementById('reqPhone');
     const reqGuests = document.getElementById('reqGuests');
     const reqStart = document.getElementById('reqStart');
+    const reqHint = document.getElementById('reqHint');
     const toastEl = document.getElementById('tableToast');
     const toastTitleEl = document.getElementById('toastTitle');
     const toastReasonEl = document.getElementById('toastReason');
@@ -1597,6 +1674,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     let capConfirmResolve = null;
     let toastTimer = null;
     let toastHideTimer = null;
+    let reqGuestsHintTimer = null;
 
     const setModal = (el, on) => {
       if (!el) return;
@@ -1650,9 +1728,49 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       if (reqStart) reqStart.value = String(start);
       if (reqName) reqName.value = '';
       if (reqPhone) reqPhone.value = '';
+      if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; }
       setModal(reqModal, true);
       if (reqName) reqName.focus();
     };
+
+    const updateReqGuestsHint = async () => {
+      if (!reqHint) return;
+      const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
+      const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
+      if (!tableNum || !isFinite(guests) || guests <= 0) {
+        reqHint.hidden = true;
+        reqHint.textContent = '';
+        return;
+      }
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'cap_check');
+        url.searchParams.set('table_num', tableNum);
+        url.searchParams.set('guests', String(Math.floor(guests)));
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        if (j.status === 'warn' && j.message) {
+          reqHint.textContent = String(j.message);
+          reqHint.hidden = false;
+        } else {
+          reqHint.hidden = true;
+          reqHint.textContent = '';
+        }
+      } catch (_) {
+        reqHint.hidden = true;
+        reqHint.textContent = '';
+      }
+    };
+
+    if (reqGuests) {
+      reqGuests.addEventListener('input', () => {
+        if (pendingBooking) pendingBooking.guests = Number(reqGuests.value || 0) || pendingBooking.guests;
+        if (reqGuestsHintTimer) clearTimeout(reqGuestsHintTimer);
+        reqGuestsHintTimer = setTimeout(() => { updateReqGuestsHint().catch(() => null); }, 180);
+      });
+      reqGuests.addEventListener('change', () => { updateReqGuestsHint().catch(() => null); });
+    }
 
     if (reqForm) {
       reqForm.addEventListener('submit', async (e) => {
@@ -1744,7 +1862,9 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       const ps = parseSel(current.dtRaw);
       const ranges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
       if (ps && ranges.length) {
-        const overlaps = ranges.some(([s, e]) => ps.selMin >= s && ps.selMin < e);
+        const durMin = current && current.durationHours ? Math.max(30, Math.round(Number(current.durationHours) * 60)) : 120;
+        const selEnd = ps.selMin + durMin;
+        const overlaps = ranges.some(([s, e]) => s < selEnd && e > ps.selMin);
         if (overlaps) {
           const txt = ranges.slice(0, 2).map(([s, e]) => fmtMin(s) + '-' + fmtMin(e)).join(' · ');
           return { reason: 'там есть бронь', detail: txt };
@@ -1826,13 +1946,17 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const getCurrentRequest = () => {
       const dtRaw = resDate ? String(resDate.value || '').trim() : '';
       const guestsStr = resGuests ? String(resGuests.value || '').trim() : '';
+      const durStr = resDuration ? String(resDuration.value || '').trim() : '';
       if (!dtRaw) return null;
       if (!guestsStr) return null;
       const guestsRaw = Number(guestsStr);
       const guests = isFinite(guestsRaw) && guestsRaw > 0 ? Math.floor(guestsRaw) : null;
       if (guests == null) return null;
+      const durRaw = durStr ? Number(durStr) : 2;
+      const durH = isFinite(durRaw) && durRaw > 0 ? durRaw : 2;
+      const durationSec = Math.max(1800, Math.round(durH * 3600));
       const dt = dtRaw.replace('T', ' ') + ':00';
-      return { dt, guests, dtRaw };
+      return { dt, guests, dtRaw, durationSec, durationHours: durH };
     };
 
     const invalidateLast = () => {
@@ -1956,7 +2080,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       const url = new URL(location.href);
       url.searchParams.set('ajax', 'free_tables');
       url.searchParams.set('date_reservation', dt);
-      url.searchParams.set('duration', '7200');
+      url.searchParams.set('duration', String(current.durationSec || 7200));
       url.searchParams.set('spot_id', '1');
       url.searchParams.set('guests_count', String(guests));
 
@@ -1964,7 +2088,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         const rUrl = new URL(location.href);
         rUrl.searchParams.set('ajax', 'reservations');
         rUrl.searchParams.set('date_reservation', dt);
-        rUrl.searchParams.set('duration', '7200');
+        rUrl.searchParams.set('duration', String(current.durationSec || 7200));
         rUrl.searchParams.set('spot_id', '1');
         const rRes = await fetch(rUrl.toString(), { headers: { 'Accept': 'application/json' } });
         const rJ = await rRes.json().catch(() => null);
