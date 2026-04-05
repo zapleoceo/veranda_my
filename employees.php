@@ -421,6 +421,47 @@ if (($_GET['ajax'] ?? '') === 'pay_meta') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'tips_balance') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    try {
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $accs = $api->request('finance.getAccounts', [], 'GET');
+        if (!is_array($accs)) $accs = [];
+        $accountId = 8;
+        $name = '';
+        $balance = null;
+        foreach ($accs as $a) {
+            if (!is_array($a)) continue;
+            $id = (int)($a['account_id'] ?? $a['id'] ?? 0);
+            if ($id !== $accountId) continue;
+            $name = trim((string)($a['name'] ?? $a['title'] ?? ''));
+            $bRaw = $a['balance'] ?? null;
+            if (is_int($bRaw)) $balance = $bRaw;
+            elseif (is_float($bRaw)) $balance = (int)round($bRaw);
+            elseif (is_string($bRaw)) {
+                $t = trim($bRaw);
+                $t = str_replace(',', '.', $t);
+                if ($t !== '' && is_numeric($t)) $balance = (int)round((float)$t);
+            } elseif (is_numeric($bRaw)) {
+                $balance = (int)round((float)$bRaw);
+            }
+            break;
+        }
+        echo json_encode([
+            'ok' => true,
+            'account_id' => $accountId,
+            'name' => $name,
+            'balance_minor' => $balance !== null ? (int)$balance : null,
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'employee_lookup') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -626,6 +667,9 @@ $firstOfMonth = date('Y-m-01');
             </table>
         </div>
         <div class="muted" id="totals" style="margin-top: 10px; text-align:right; font-weight:900;">Итого: Чеков 0 · ЧасыРаботы 0 · Tips 0 · Salary 0</div>
+        <div class="muted" id="tipsBalanceTotals" style="margin-top: 6px; text-align:right; font-weight:900;">
+            Tips (на счету BIDV): <span id="tipsAccBalance">—</span> · Типсы в таблице: <span id="tipsTableSum">—</span> · Остаток: <span id="tipsBalanceDiff">—</span>
+        </div>
     </div>
 </div>
 
@@ -767,6 +811,39 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     let dataRows = [];
     let ltpById = {};
     let payMeta = null;
+    let tipsAccBalanceMinor = null;
+    let lastTipsMinorTotal = 0;
+    const tipsAccBalanceEl = document.getElementById('tipsAccBalance');
+    const tipsTableSumEl = document.getElementById('tipsTableSum');
+    const tipsBalanceDiffEl = document.getElementById('tipsBalanceDiff');
+
+    const renderTipsBalanceTotals = () => {
+        const tipsTableMinor = Number(lastTipsMinorTotal || 0) || 0;
+        if (tipsTableSumEl) tipsTableSumEl.textContent = fmtMoney(vndFromMinor(tipsTableMinor));
+        if (tipsAccBalanceEl) {
+            tipsAccBalanceEl.textContent = tipsAccBalanceMinor == null ? '—' : fmtMoney(vndFromMinor(tipsAccBalanceMinor));
+        }
+        if (tipsBalanceDiffEl) {
+            if (tipsAccBalanceMinor == null) tipsBalanceDiffEl.textContent = '—';
+            else tipsBalanceDiffEl.textContent = fmtMoney(vndFromMinor((Number(tipsAccBalanceMinor || 0) || 0) - tipsTableMinor));
+        }
+    };
+
+    const loadTipsBalance = async () => {
+        try {
+            const url = new URL(location.href);
+            url.searchParams.set('ajax', 'tips_balance');
+            const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+            const txt = await res.text();
+            let j = null;
+            try { j = JSON.parse(txt); } catch (_) {}
+            if (!j || !j.ok) return;
+            tipsAccBalanceMinor = (j.balance_minor == null) ? null : Number(j.balance_minor || 0);
+        } catch (_) {
+        } finally {
+            renderTipsBalanceTotals();
+        }
+    };
     const boundRateIds = new Set();
     function bindRateInputs() {
         Array.from(tbody.querySelectorAll('.rate-input')).forEach((inp) => {
@@ -899,6 +976,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 totalsEl.textContent = `Итого: Чеков ${fmtMoney(totChecks)} · ЧасыРаботы ${hoursTxt} · Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · Salary ${fmtMoney(totSalary)}`;
             }
         }
+        lastTipsMinorTotal = totTipsMinor;
+        renderTipsBalanceTotals();
     }
 
     const withTimeout = (ms = 30000) => {
@@ -1026,6 +1105,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 await loadPayMeta();
             } catch (_) {
             }
+            await loadTipsBalance();
 
             progBar.style.width = '100%';
             progLabel.textContent = '100%';
