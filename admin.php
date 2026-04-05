@@ -213,16 +213,28 @@ foreach ($settingKeys as $key => $default) {
 $resHallId = max(1, (int)($_GET['hall_id'] ?? 2));
 $resSpotId = max(1, (int)($_GET['spot_id'] ?? 1));
 $resMetaKey = 'reservations_allowed_scheme_nums_hall_' . $resHallId;
+$resCapsMetaKey = 'reservations_table_caps_hall_' . $resHallId;
 $resAllowedNums = [];
+$resCapsByNum = [];
 $resTables = [];
 
 if ($tab === 'reservations') {
     $metaRepo = new \App\Classes\MetaRepository($db);
+    $defaultCaps = [
+        '1' => 8, '2' => 8, '3' => 8,
+        '4' => 5, '5' => 5, '6' => 5,
+        '7' => 8,
+        '8' => 2, '9' => 2, '10' => 2, '11' => 2,
+        '12' => 3, '13' => 3, '14' => 3,
+        '15' => 5, '16' => 5, '17' => 5, '18' => 5, '19' => 5,
+        '20' => 15,
+    ];
 
     if (isset($_POST['save_reservation_tables'])) {
         $resHallIdPost = max(1, (int)($_POST['hall_id'] ?? $resHallId));
         $resSpotIdPost = max(1, (int)($_POST['spot_id'] ?? $resSpotId));
         $resMetaKeyPost = 'reservations_allowed_scheme_nums_hall_' . $resHallIdPost;
+        $resCapsMetaKeyPost = 'reservations_table_caps_hall_' . $resHallIdPost;
 
         $raw = $_POST['allowed_nums'] ?? [];
         $nums = [];
@@ -244,13 +256,36 @@ if ($tab === 'reservations') {
             [$resMetaKeyPost, json_encode($nums, JSON_UNESCAPED_UNICODE)]
         );
 
+        $capsRaw = $_POST['caps'] ?? [];
+        $caps = [];
+        if (is_array($capsRaw)) {
+            foreach ($capsRaw as $k => $v) {
+                $k = trim((string)$k);
+                if (!preg_match('/^\d+$/', $k)) continue;
+                $n = (int)$k;
+                if ($n < 1 || $n > 500) continue;
+                $c = (int)$v;
+                if ($c < 0) $c = 0;
+                if ($c > 999) $c = 999;
+                $caps[(string)$n] = $c;
+            }
+        }
+        if (!$caps) $caps = $defaultCaps;
+        ksort($caps, SORT_NATURAL);
+        $db->query(
+            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+            [$resCapsMetaKeyPost, json_encode($caps, JSON_UNESCAPED_UNICODE)]
+        );
+
         $message = 'Список доступных столов сохранён.';
         $resHallId = $resHallIdPost;
         $resSpotId = $resSpotIdPost;
         $resMetaKey = $resMetaKeyPost;
+        $resCapsMetaKey = $resCapsMetaKeyPost;
     }
 
-    $saved = $metaRepo->getMany([$resMetaKey]);
+    $saved = $metaRepo->getMany([$resMetaKey, $resCapsMetaKey]);
     $stored = array_key_exists($resMetaKey, $saved) ? trim((string)$saved[$resMetaKey]) : '';
     if ($stored !== '') {
         $decoded = json_decode($stored, true);
@@ -267,6 +302,23 @@ if ($tab === 'reservations') {
                 if ($n >= 1 && $n <= 500) $resAllowedNums[(string)$n] = true;
             }
         }
+    }
+
+    $capsStored = array_key_exists($resCapsMetaKey, $saved) ? trim((string)$saved[$resCapsMetaKey]) : '';
+    $capsDecoded = $capsStored !== '' ? json_decode($capsStored, true) : null;
+    if (is_array($capsDecoded)) {
+        foreach ($capsDecoded as $k => $v) {
+            $k = trim((string)$k);
+            if (!preg_match('/^\d+$/', $k)) continue;
+            $n = (int)$k;
+            if ($n < 1 || $n > 500) continue;
+            $c = (int)$v;
+            if ($c < 0) $c = 0;
+            if ($c > 999) $c = 999;
+            $resCapsByNum[(string)$n] = $c;
+        }
+    } else {
+        $resCapsByNum = $defaultCaps;
     }
 
     if ($posterToken === '') {
@@ -294,6 +346,7 @@ if ($tab === 'reservations') {
                     'table_title' => $tableTitle,
                     'scheme_num' => $scheme !== null ? (string)$scheme : '',
                     'is_allowed' => $scheme !== null && isset($resAllowedNums[(string)$scheme]) ? 1 : 0,
+                    'cap' => $scheme !== null ? (int)($resCapsByNum[(string)$scheme] ?? ($defaultCaps[(string)$scheme] ?? 0)) : 0,
                 ];
             }
         } catch (\Throwable $e) {
@@ -1509,11 +1562,12 @@ if ($tab === 'menu' || $tab === 'categories') {
                         <div class="small-muted">Нет данных по столам (или ошибка Poster API).</div>
                     <?php else: ?>
                         <div style="overflow:auto; border:1px solid #e5e7eb; border-radius: 12px; background:#fff;">
-                            <table style="width:100%; border-collapse: collapse; min-width: 760px;">
+                            <table style="width:100%; border-collapse: collapse; min-width: 860px;">
                                 <thead>
                                     <tr style="background:#f8fafc;">
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">Доступен</th>
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">Номер на схеме</th>
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">👤</th>
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">Table ID</th>
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">table_num</th>
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">table_title</th>
@@ -1531,6 +1585,13 @@ if ($tab === 'menu' || $tab === 'categories') {
                                             </td>
                                             <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; font-weight:700;">
                                                 <?= htmlspecialchars((string)($r['scheme_num'] ?? '—')) ?>
+                                            </td>
+                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                                                <?php if (($r['scheme_num'] ?? '') !== ''): ?>
+                                                    <input type="number" name="caps[<?= htmlspecialchars((string)$r['scheme_num']) ?>]" value="<?= (int)($r['cap'] ?? 0) ?>" min="0" max="999" style="width: 56px; padding: 6px 8px; border-radius: 10px; border: 1px solid #e5e7eb;">
+                                                <?php else: ?>
+                                                    <span class="small-muted">—</span>
+                                                <?php endif; ?>
                                             </td>
                                             <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
                                                 <?= htmlspecialchars((string)($r['table_id'] ?? '—')) ?>

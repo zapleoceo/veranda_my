@@ -32,6 +32,15 @@ if ($add > 0) $roundedNow = $roundedNow->modify('+' . $add . ' minutes');
 $defaultResDateLocal = $roundedNow->format('Y-m-d\TH:i');
 $hallIdForSettings = 2;
 $allowedSchemeNums = null;
+$tableCapsByNum = [
+  '1' => 8, '2' => 8, '3' => 8,
+  '4' => 5, '5' => 5, '6' => 5,
+  '7' => 8,
+  '8' => 2, '9' => 2, '10' => 2, '11' => 2,
+  '12' => 3, '13' => 3, '14' => 3,
+  '15' => 5, '16' => 5, '17' => 5, '18' => 5, '19' => 5,
+  '20' => 15,
+];
 try {
   $dbHost = trim((string)($_ENV['DB_HOST'] ?? ''));
   $dbName = trim((string)($_ENV['DB_NAME'] ?? ''));
@@ -45,6 +54,7 @@ try {
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $dbSuffix);
     $metaRepo = new \App\Classes\MetaRepository($db);
     $key = 'reservations_allowed_scheme_nums_hall_' . $hallIdForSettings;
+    $capsKey = 'reservations_table_caps_hall_' . $hallIdForSettings;
     $vals = $metaRepo->getMany([$key]);
     $stored = array_key_exists($key, $vals) ? trim((string)$vals[$key]) : '';
     if ($stored !== '') {
@@ -65,6 +75,24 @@ try {
       }
       $allowedSchemeNums = array_values(array_keys($tmp));
       usort($allowedSchemeNums, fn($a, $b) => (int)$a <=> (int)$b);
+    }
+
+    $capsVals = $metaRepo->getMany([$capsKey]);
+    $capsStored = array_key_exists($capsKey, $capsVals) ? trim((string)$capsVals[$capsKey]) : '';
+    if ($capsStored !== '') {
+      $decoded = json_decode($capsStored, true);
+      if (is_array($decoded)) {
+        foreach ($decoded as $k => $v) {
+          $k = trim((string)$k);
+          if (!preg_match('/^\d+$/', $k)) continue;
+          $n = (int)$k;
+          if ($n < 1 || $n > 500) continue;
+          $c = (int)$v;
+          if ($c < 0) $c = 0;
+          if ($c > 999) $c = 999;
+          $tableCapsByNum[(string)$n] = $c;
+        }
+      }
     }
   }
 } catch (\Throwable $e) {
@@ -695,14 +723,28 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       opacity: 0.65;
     }
   
-    .table .cap {
-      display: block;
-      font-size: 0.62rem;
-      letter-spacing: 0;
+    .table .num {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      font-size: 1.05rem;
       font-weight: 700;
-      opacity: 0.85;
-      margin-top: 2px;
+      letter-spacing: -0.02em;
+      font-family: var(--font-display);
+      pointer-events: none;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.22);
+    }
+    .table .cap {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
       font-family: var(--font-body);
+      color: rgba(255,250,244,0.92);
+      pointer-events: none;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.22);
       white-space: nowrap;
     }
 
@@ -904,26 +946,23 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     }
   
     .table .res-time {
-      position: relative;
-      width: 100%;
-      max-width: 100%;
-      margin: 2px 0 0;
-      padding: 0 2px;
-      font-size: 0.42rem;
-      font-weight: 600;
-      letter-spacing: -0.03em;
-      color: rgba(255,250,244,0.78);
+      position: absolute;
+      top: 34px;
+      left: 10px;
+      right: 10px;
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: rgba(255, 120, 120, 0.96);
       font-family: var(--font-body);
       pointer-events: none;
-      text-shadow: 0 1px 0 rgba(0,0,0,0.22);
+      text-shadow: 0 1px 0 rgba(0,0,0,0.34);
       line-height: 1.1;
       text-align: center;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      flex-shrink: 0;
     }
-    .table .cap { margin-top: 2px; }
 
     .table.disabled {
       opacity: 0.22;
@@ -1096,17 +1135,17 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
         <div class="map-shell">
           <div class="map is-mirrored" aria-label="Схема столов ресторана">
             <div class="grass-area" aria-hidden="true"></div>
-            <button class="table large" style="left: 0px; top: 276px;" data-table="1">1<span class="cap">до 8</span></button>
-            <button class="table large" style="left: 0px; top: 150px;" data-table="2">2<span class="cap">до 8</span></button>
-            <button class="table large" style="left: 0px; top: 24px;" data-table="3">3<span class="cap">до 8</span></button>
+            <button class="table large" style="left: 0px; top: 276px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
+            <button class="table large" style="left: 0px; top: 150px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
+            <button class="table large" style="left: 0px; top: 24px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
-            <button class="table small-vertical" style="left: 200px; top: 0px;" data-table="4">4<span class="cap">до 5</span></button>
-            <button class="table small-vertical" style="left: 364px; top: 0px;" data-table="5">5<span class="cap">до 5</span></button>
-            <button class="table small-vertical" style="left: 512px; top: 0px;" data-table="6">6<span class="cap">до 5</span></button>
-            <button class="table large" style="left: 700px; top: 0px;" data-table="7">7<span class="cap">до 8</span></button>
+            <button class="table small-vertical" style="left: 200px; top: 0px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 364px; top: 0px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 512px; top: 0px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
+            <button class="table large" style="left: 700px; top: 0px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
   
-            <button class="table wide" style="left: 286px; top: 142px;" data-table="8">8<span class="cap">2 чел</span></button>
-            <button class="table wide" style="left: 408px; top: 142px;" data-table="9">9<span class="cap">2 чел</span></button>
+            <button class="table wide" style="left: 286px; top: 142px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
+            <button class="table wide" style="left: 408px; top: 142px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
             <div class="fountain" style="left: 174px; top: 128px;" aria-hidden="true">
               <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
@@ -1131,19 +1170,19 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
               <div class="koi koi-1"></div>
               <div class="koi koi-2"></div>
             </div>
-            <button class="table wide" style="left: 606px; top: 142px;" data-table="10">10<span class="cap">2 чел</span></button>
-            <button class="table wide" style="left: 728px; top: 142px;" data-table="11">11<span class="cap">2 чел</span></button>
+            <button class="table wide" style="left: 606px; top: 142px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
+            <button class="table wide" style="left: 728px; top: 142px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
   
-            <button class="table" style="left: 344px; top: 242px;" data-table="12">12<span class="cap">до 3</span></button>
-            <button class="table" style="left: 472px; top: 242px;" data-table="13">13<span class="cap">до 3</span></button>
-            <button class="table" style="left: 584px; top: 242px;" data-table="14">14<span class="cap">до 3</span></button>
+            <button class="table" style="left: 344px; top: 242px;" data-table="12"><span class="num">12</span><span class="cap"></span></button>
+            <button class="table" style="left: 472px; top: 242px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
+            <button class="table" style="left: 584px; top: 242px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
   
-            <button class="table small-vertical" style="left: 270px; top: 336px;" data-table="15">15<span class="cap">до 5</span></button>
-            <button class="table small-vertical" style="left: 370px; top: 336px;" data-table="16">16<span class="cap">до 5</span></button>
-            <button class="table small-vertical" style="left: 470px; top: 336px;" data-table="17">17<span class="cap">до 5</span></button>
-            <button class="table small-vertical" style="left: 570px; top: 336px;" data-table="18">18<span class="cap">до 5</span></button>
-            <button class="table small-vertical" style="left: 670px; top: 336px;" data-table="19">19<span class="cap">до 5</span></button>
-            <button class="table large" style="left: 758px; top: 258px;" data-table="20">20<span class="cap">до 15</span></button>
+            <button class="table small-vertical" style="left: 270px; top: 336px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 370px; top: 336px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 470px; top: 336px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 570px; top: 336px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 670px; top: 336px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
+            <button class="table large" style="left: 758px; top: 258px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
   
             <div class="bar-row" aria-hidden="true">
               <div class="station-wrap">
@@ -1204,6 +1243,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   
     const defaultResDateLocal = <?= json_encode($defaultResDateLocal, JSON_UNESCAPED_UNICODE) ?>;
     const allowedTableNums = <?= json_encode($allowedSchemeNums, JSON_UNESCAPED_UNICODE) ?>;
+    const tableCapsByNum = <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>;
     const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
 
     const tables = Array.from(document.querySelectorAll('.table'));
@@ -1217,99 +1257,84 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       });
     }
 
-    const applyBusyRanges = (payload) => {
-      const displayTz = payload && typeof payload.display_timezone === 'string' && payload.display_timezone.trim()
-        ? payload.display_timezone.trim()
-        : null;
-      const tsMap = payload && typeof payload === 'object' && payload.ranges_ts_by_table_num && typeof payload.ranges_ts_by_table_num === 'object'
-        ? payload.ranges_ts_by_table_num
-        : null;
-      const strMap = payload && typeof payload === 'object' && payload.ranges_by_table_num_server && typeof payload.ranges_by_table_num_server === 'object'
-        ? payload.ranges_by_table_num_server
-        : null;
+    tables.forEach((t) => {
+      const n = String(t.dataset.table || '');
+      const capEl = t.querySelector('.cap');
+      const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[n] != null ? Number(tableCapsByNum[n]) : null;
+      if (capEl) capEl.textContent = (cap != null && isFinite(cap)) ? (String(Math.max(0, Math.floor(cap))) + ' 👤') : '';
+    });
 
-      const fmtTime = (tsSec) => {
-        const d = new Date(Number(tsSec) * 1000);
-        if (!Number.isFinite(d.getTime())) return '';
-        const opts = { hour: '2-digit', minute: '2-digit', hour12: false };
-        if (displayTz) opts.timeZone = displayTz;
-        return d.toLocaleTimeString('ru-RU', opts);
-      };
+    const setBusyLabel = (dateStr) => {
+      const busyDateLabel = document.getElementById('busyDateLabel');
+      if (busyDateLabel) busyDateLabel.textContent = 'Данные на ' + String(dateStr || '—');
+    };
+    const setBusyLoader = (isOn) => {
+      const busyDateLoader = document.getElementById('busyDateLoader');
+      if (!busyDateLoader) return;
+      busyDateLoader.hidden = !isOn;
+      busyDateLoader.style.display = isOn ? 'inline-block' : 'none';
+    };
+
+    const clearReservationsOnTables = () => {
+      tables.forEach((t) => {
+        const el = t.querySelector('.res-time');
+        if (el) el.remove();
+      });
+    };
+
+    const applyReservationsItemsToTables = (items, dateStr) => {
+      const list = Array.isArray(items) ? items : [];
+      const day = String(dateStr || '').slice(0, 10);
+      if (!day) return;
+
+      const byTable = {};
+      list.forEach((it) => {
+        if (!it || typeof it !== 'object') return;
+        const status = Number(it.status ?? 0);
+        if (status === 7) return;
+        const t = String(it.table_title ?? '').trim();
+        const s = String(it.date_start ?? '').trim();
+        const e = String(it.date_end ?? '').trim();
+        if (!t || !s || !e) return;
+        if (s.slice(0, 10) !== day) return;
+        const sm = Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
+        const em = Number(e.slice(11, 13)) * 60 + Number(e.slice(14, 16));
+        if (!isFinite(sm) || !isFinite(em)) return;
+        if (!byTable[t]) byTable[t] = [];
+        byTable[t].push([sm, em]);
+      });
+
+      Object.keys(byTable).forEach((k) => {
+        const arr = byTable[k].slice().sort((a, b) => a[0] - b[0]);
+        const merged = [];
+        arr.forEach(([s, e]) => {
+          if (!merged.length) { merged.push([s, e]); return; }
+          const last = merged[merged.length - 1];
+          if (s <= last[1]) last[1] = Math.max(last[1], e);
+          else merged.push([s, e]);
+        });
+        byTable[k] = merged;
+      });
+
+      const pad2 = (x) => String(x).padStart(2, '0');
+      const fmt = (m) => pad2(Math.floor(m / 60)) + ':' + pad2(m % 60);
 
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
-        let lines = [];
-        if (strMap && Array.isArray(strMap[n]) && strMap[n].length) {
-          lines = strMap[n].slice(0, 2).map(String).filter(Boolean);
-        } else {
-          const tsRanges = tsMap && Array.isArray(tsMap[n]) ? tsMap[n].slice(0, 2) : [];
-          if (tsRanges.length) {
-            lines = tsRanges.map((pair) => {
-              const a = Array.isArray(pair) ? pair[0] : null;
-              const b = Array.isArray(pair) ? pair[1] : null;
-              const s = fmtTime(a);
-              const e = fmtTime(b);
-              return (s && e) ? (s + '-' + e) : '';
-            }).filter(Boolean);
-          }
-        }
-
-        const txt = lines.length ? lines.join(' · ') : '';
+        const ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
+        const txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
         let el = t.querySelector('.res-time');
         if (!txt) {
           if (el) el.remove();
           return;
         }
-        const cap = t.querySelector('.cap');
         if (!el) {
           el = document.createElement('div');
           el.className = 'res-time';
         }
         el.textContent = txt;
-        if (cap) {
-          t.insertBefore(el, cap);
-        } else if (!t.contains(el)) {
-          t.appendChild(el);
-        }
+        if (!t.contains(el)) t.appendChild(el);
       });
-    };
-
-    let busyLoadSeq = 0;
-    let busyAbort = null;
-    const loadBusyForDate = async (dateStr) => {
-      if (!dateStr) return;
-      busyLoadSeq += 1;
-      const seq = busyLoadSeq;
-
-      const busyDateLabel = document.getElementById('busyDateLabel');
-      if (busyDateLabel) busyDateLabel.textContent = 'Данные на ' + dateStr;
-
-      const busyDateLoader = document.getElementById('busyDateLoader');
-      if (busyDateLoader) {
-        busyDateLoader.hidden = false;
-        busyDateLoader.style.display = 'inline-block';
-      }
-
-      try {
-        if (busyAbort) busyAbort.abort();
-        busyAbort = new AbortController();
-
-        const url = new URL(location.href);
-        url.searchParams.set('ajax', 'busy_ranges');
-        url.searchParams.set('spot_id', '1');
-        url.searchParams.set('date', dateStr);
-        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal: busyAbort.signal });
-        const j = await res.json().catch(() => null);
-        if (seq !== busyLoadSeq) return;
-        if (j && j.ok) applyBusyRanges(j);
-      } catch (_) {
-      } finally {
-        if (seq !== busyLoadSeq) return;
-        if (busyDateLoader) {
-          busyDateLoader.hidden = true;
-          busyDateLoader.style.display = 'none';
-        }
-      }
     };
     const resDate = document.getElementById('resDate');
     const resGuests = document.getElementById('resGuests');
@@ -1411,6 +1436,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       freeNums = new Set();
       lastKey = '';
       applyAvailabilityStyles();
+      clearReservationsOnTables();
       renderSelectedTable();
     };
 
@@ -1455,7 +1481,8 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     const initDate = () => {
       if (!resDate) return;
       resDate.value = defaultResDateLocal || '';
-      loadBusyForDate(String(resDate.value || '').slice(0, 10));
+      setBusyLabel(String(resDate.value || '').slice(0, 10));
+      clearReservationsOnTables();
     };
 
     const syncSteps = () => {
@@ -1476,10 +1503,13 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       const dt = current.dt;
       const guests = current.guests;
       const key = dt + '|' + String(guests);
+      const dateStr = String(dt).slice(0, 10);
 
       isLoading = true;
       if (statusLine) statusLine.textContent = 'Проверяю…';
       if (checkBtn) checkBtn.disabled = true;
+      setBusyLabel(dateStr);
+      setBusyLoader(true);
 
       const url = new URL(location.href);
       url.searchParams.set('ajax', 'free_tables');
@@ -1525,12 +1555,15 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
           last.reservations_request = null;
           last.reservations_items = [];
         }
+        clearReservationsOnTables();
+        applyReservationsItemsToTables(last.reservations_items, dateStr);
         if (!silent) setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
         renderSelectedTable();
       } finally {
         isLoading = false;
         if (checkBtn) checkBtn.disabled = false;
         setStatus(selectedTableNum);
+        setBusyLoader(false);
       }
     };
 
@@ -1543,12 +1576,15 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
     initDate();
     syncSteps();
     if (resDate) {
-      resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); loadBusyForDate(String(resDate.value || '').slice(0, 10)); });
-      resDate.addEventListener('change', () => { syncSteps(); invalidateLast(); loadBusyForDate(String(resDate.value || '').slice(0, 10)); });
+      resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); });
+      resDate.addEventListener('change', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); loadFree(true).catch(() => null); });
     }
     if (resGuests) {
       resGuests.addEventListener('input', invalidateLast);
       resGuests.addEventListener('change', invalidateLast);
+    }
+    if (resDate && String(resDate.value || '').trim()) {
+      loadFree(true).catch(() => null);
     }
     setOutput('Выбери дату. Потом укажи гостей и нажми "Проверить свободные столы". После этого кликай по столам.');
   </script>
