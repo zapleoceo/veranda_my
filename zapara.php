@@ -337,11 +337,13 @@ $defaultTo = $today;
     </div>
 
     <div class="grid" id="charts"><div class="card muted" style="display:flex; align-items:center; justify-content:center; min-height: 120px;">Выбери период и нажми «Загрузить»</div></div>
+    <div id="debug" style="margin-top: 12px;"></div>
 </div>
 
 <script>
 (() => {
     const chartsEl = document.getElementById('charts');
+    const debugEl = document.getElementById('debug');
     const dateFromEl = document.getElementById('dateFrom');
     const dateToEl = document.getElementById('dateTo');
     const loadBtn = document.getElementById('loadBtn');
@@ -562,6 +564,49 @@ $defaultTo = $today;
         else drawBars(canvas, hours, countsByHour, null, false);
     };
 
+    const renderDebug = (rows) => {
+        if (!debugEl) return;
+        const list = Array.isArray(rows) ? rows : [];
+        debugEl.innerHTML = '';
+        if (list.length === 0) return;
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.padding = '12px';
+
+        const title = document.createElement('div');
+        title.style.fontWeight = '900';
+        title.textContent = 'Среда: проверка всплеска';
+        card.appendChild(title);
+
+        const meta = document.createElement('div');
+        meta.className = 'muted';
+        meta.style.marginTop = '6px';
+        meta.textContent = 'Список сред в периоде: всего чеков (09–23) и пиковый час.';
+        card.appendChild(meta);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'table-wrap';
+        wrap.style.marginTop = '10px';
+
+        const tbl = document.createElement('table');
+        tbl.innerHTML = '<thead><tr><th>Дата</th><th>Чеков (09–23)</th><th>Пик</th></tr></thead><tbody></tbody>';
+        const tb = tbl.querySelector('tbody');
+        list.forEach((r) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td></td><td></td><td></td>';
+            const tds = tr.querySelectorAll('td');
+            tds[0].textContent = String(r.date || '');
+            tds[1].textContent = String(r.total || 0);
+            tds[2].textContent = String(r.peak || '—');
+            tb.appendChild(tr);
+        });
+
+        wrap.appendChild(tbl);
+        card.appendChild(wrap);
+        debugEl.appendChild(card);
+    };
+
     const hours = [];
     for (let hh = 9; hh <= 23; hh++) hours.push(hh);
 
@@ -667,6 +712,7 @@ $defaultTo = $today;
             let daysTotal = 0;
 
             const errors = [];
+            const dayRows = [];
             let done = 0;
             setProgress(0, dates.length, 'Подготовка…');
 
@@ -692,6 +738,15 @@ $defaultTo = $today;
                     const v = Number(byHour[hk] || 0) || 0;
                     counts[dow][hk] += v;
                 });
+
+                let bestH = null;
+                let bestV = -1;
+                hours.forEach((h) => {
+                    const v = Number(byHour[String(h)] || 0) || 0;
+                    if (v > bestV) { bestV = v; bestH = h; }
+                });
+                const peak = bestH == null ? '—' : (String(bestH).padStart(2, '0') + ':00 (' + String(bestV) + ')');
+                dayRows.push({ date, dow, total: Number(j.total || 0) || 0, peak });
             };
 
             const workers = Array.from({ length: concurrency }, async () => {
@@ -716,6 +771,8 @@ $defaultTo = $today;
             hideProgress();
             lastData = { counts_by_dow: counts, days_by_dow: daysByDow, days_total: daysTotal };
             render(lastData);
+            const weds = dayRows.filter((r) => String(r.dow) === '3').sort((a, b) => b.total - a.total);
+            renderDebug(weds);
             if (errors.length) {
                 const head = errors.slice(0, 3).map((x) => x.date + ': ' + x.error).join('\n');
                 alert('Ошибки загрузки: ' + String(errors.length) + '\n' + head);
