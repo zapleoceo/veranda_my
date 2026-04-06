@@ -1852,25 +1852,25 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
             <button class="table small-vertical" style="left: 82px; top: 192px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
             <button class="table large" style="left: -46px; top: 254px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
   
+            <div class="bar-row">
+              <div class="station-wrap">
+                <div class="side-station">Музыканты</div>
+                <div class="station-sub"><span id="busyDateLabel">Данные на —</span><span class="mini-loader" id="busyDateLoader" hidden></span></div>
+              </div>
+              <div class="bar">BAR</div>
+              <div class="station-wrap cash">
+                <div class="side-station">Касса</div>
+                <div class="cash-controls">
+                  <input type="datetime-local" id="resDate" aria-label="Дата и время">
+                  <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
+                  <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
+                </div>
+              </div>
+            </div>
               </div>
             </div>
           </div>
-
-          <div class="bar-row">
-            <div class="station-wrap">
-              <div class="side-station">Музыканты</div>
-              <div class="station-sub"><span id="busyDateLabel">Данные на —</span><span class="mini-loader" id="busyDateLoader" hidden></span></div>
-            </div>
-            <div class="bar">BAR</div>
-            <div class="station-wrap cash">
-              <div class="side-station">Касса</div>
-              <div class="cash-controls">
-                <input type="datetime-local" id="resDate" aria-label="Дата и время">
-                <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
-                <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
-              </div>
-            </div>
-          </div>
+        </div>
       </section>
     </main>
   </div>
