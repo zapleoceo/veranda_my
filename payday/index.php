@@ -1774,17 +1774,29 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
         } catch (\Throwable $e) {
             $excludeCatIds = [4 => true];
         }
-        $rows = $apiOut->request('finance.getTransactions', [
-            'dateFrom' => date('Ymd', strtotime($fromDate)),
-            'dateTo' => date('Ymd', strtotime($dTo)),
-            'account_type' => 1,
-            'timezone' => 'client',
-        ]);
-        if (!is_array($rows)) $rows = [];
+        $rows = [];
+        foreach ([1, 8] as $accType) {
+            try {
+                $r2 = $apiOut->request('finance.getTransactions', [
+                    'dateFrom' => date('Ymd', strtotime($fromDate)),
+                    'dateTo' => date('Ymd', strtotime($dTo)),
+                    'account_type' => $accType,
+                    'timezone' => 'client',
+                ]);
+                if (is_array($r2)) $rows = array_merge($rows, $r2);
+            } catch (\Throwable $e) {
+            }
+        }
 
         $out = [];
+        $seenTx = [];
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
+            $txId = (int)($r['transaction_id'] ?? 0);
+            if ($txId > 0) {
+                if (!empty($seenTx[$txId])) continue;
+                $seenTx[$txId] = true;
+            }
             $catId = (int)($r['category_id'] ?? 0);
             if ($catId > 0 && !empty($excludeCatIds[$catId])) continue;
             $dateStr = (string)($r['date'] ?? '');
