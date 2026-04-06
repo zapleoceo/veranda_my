@@ -872,7 +872,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       position: sticky;
       left: 0;
       right: 0;
-      top: 470px;
+      top: 0;
       display: flex;
       align-items: center;
       justify-content: center;
