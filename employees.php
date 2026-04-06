@@ -357,6 +357,64 @@ if (($_GET['ajax'] ?? '') === 'pay_salary') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'pay_extra') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    if (!veranda_can('admin')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $raw = file_get_contents('php://input');
+    $j = json_decode((string)$raw, true);
+    if (!is_array($j)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $waiterId = (int)($j['waiter_id'] ?? 0);
+    $amountVnd = (int)($j['amount_vnd'] ?? 0);
+    $kind = (string)($j['kind'] ?? '');
+    $accountFrom = (int)($j['account_from'] ?? 0);
+    $empName = trim((string)($j['employee_name'] ?? ''));
+    if ($empName !== '') {
+        $empName = preg_replace('/\s+/u', ' ', $empName);
+        $empName = preg_replace('/[^\p{L}\p{N}\s\.\-\'"()]+/u', '', (string)$empName);
+        $empName = trim((string)$empName);
+        if (mb_strlen($empName, 'UTF-8') > 60) $empName = mb_substr($empName, 0, 60, 'UTF-8');
+    }
+    if ($waiterId <= 0 || $amountVnd <= 0 || $accountFrom <= 0 || ($kind !== 'tips' && $kind !== 'salary')) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    try {
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $now = date('Y-m-d H:i:s');
+        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+        $prefix = $kind === 'salary' ? 'SLR' : 'TIPS';
+        $comment = $prefix . ($empName !== '' ? (' ' . $empName) : '') . ' ID=' . $waiterId . ($by !== '' ? (' by ' . $by) : '');
+        $res = $api->request('finance.createTransactions', [
+            'id' => (int)(time() * 1000 + random_int(0, 999)),
+            'type' => 0,
+            'category' => 4,
+            'user_id' => 10,
+            'amount_from' => $amountVnd,
+            'account_from' => $accountFrom,
+            'date' => $now,
+            'comment' => $comment,
+        ], 'POST');
+        echo json_encode(['ok' => true, 'created_id' => (int)$res, 'date' => $now, 'amount_vnd' => $amountVnd, 'waiter_id' => $waiterId, 'kind' => $kind], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'ltp_load') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -578,6 +636,70 @@ if (($_GET['ajax'] ?? '') === 'pay_meta_salary') {
             'category' => ['id' => 4, 'name' => $categoryName],
             'account_from' => ['id' => 1, 'name' => $accountName],
             'payer' => ['id' => 10, 'name' => $payerName],
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'pay_meta_extra') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    try {
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $accounts = [];
+        try {
+            $accs = $api->request('finance.getAccounts', [], 'GET');
+            if (is_array($accs)) {
+                foreach ($accs as $a) {
+                    if (!is_array($a)) continue;
+                    $id = (int)($a['account_id'] ?? $a['id'] ?? 0);
+                    if ($id <= 0) continue;
+                    $name = trim((string)($a['name'] ?? $a['title'] ?? ''));
+                    $accounts[] = ['id' => $id, 'name' => $name];
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $payerName = '';
+        try {
+            $emps = $api->request('access.getEmployees', [], 'GET');
+            if (is_array($emps)) {
+                foreach ($emps as $e) {
+                    if (!is_array($e)) continue;
+                    if ((int)($e['user_id'] ?? 0) === 10) {
+                        $payerName = trim((string)($e['name'] ?? ''));
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $categoryName = '';
+        try {
+            $cats = $api->request('finance.getCategories', [], 'GET');
+            if (is_array($cats)) {
+                foreach ($cats as $c) {
+                    if (!is_array($c)) continue;
+                    if ((int)($c['category_id'] ?? 0) === 4) {
+                        $categoryName = trim((string)($c['name'] ?? ''));
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'category' => ['id' => 4, 'name' => $categoryName],
+            'payer' => ['id' => 10, 'name' => $payerName],
+            'accounts' => $accounts,
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
@@ -813,6 +935,7 @@ $firstOfMonth = date('Y-m-01');
                     <div class="label" id="progLabel">0%</div>
                     <div class="desc" id="progDesc"></div>
                 </div>
+                <button type="button" class="secondary" id="payExtraBtn">PayExtra</button>
                 <button type="button" class="help-btn" id="helpBtn" title="Инструкция" style="margin-left:auto;">?</button>
             </div>
         </div>
@@ -843,7 +966,7 @@ $firstOfMonth = date('Y-m-01');
                     <th id="thHours" class="col-hours" data-sort="worked_hours" style="text-align:right; cursor:pointer;">ЧасыРаботы</th>
                     <th id="thTips" class="col-tips" data-sort="tips_minor" style="text-align:right; cursor:pointer;">Tips</th>
                     <th id="thTipsPaid" class="col-paid" data-sort="tips_paid_minor" style="text-align:right; cursor:pointer;">TipsPaid</th>
-                    <th id="thSlrPaid" class="col-slr" data-sort="slr_paid_vnd" style="text-align:right; cursor:pointer;">SlrPaid</th>
+                    <th id="thSlrPaid" class="col-slr" data-sort="slr_paid_minor" style="text-align:right; cursor:pointer;">SlrPaid</th>
                     <th id="thTtp" class="col-ttp" data-sort="tips_to_pay_minor" style="text-align:right; cursor:pointer;">TipsToPay</th>
                     <th id="thSalary" class="col-salary" data-sort="salary_minor" style="text-align:right; cursor:pointer;">Salary</th>
                 </tr>
@@ -868,6 +991,47 @@ $firstOfMonth = date('Y-m-01');
         </div>
         <div class="muted" id="tipsBalanceTotals" style="margin-top: 6px; text-align:right; font-weight:900;">
             Tips (на счету BIDV): <span id="tipsAccBalance">—</span> · TTP в таблице: <span id="tipsTableSum">—</span> · Остаток: <span id="tipsBalanceDiff">—</span>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="payExtraModal" style="display:none;">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="payExtraTitle">
+        <h3 id="payExtraTitle">PayExtra</h3>
+        <div class="body" style="display:grid; gap: 10px;">
+            <label style="display:grid; gap: 6px;">
+                Сотрудник
+                <select id="payExtraEmp"></select>
+            </label>
+            <label style="display:grid; gap: 6px;">
+                Тип
+                <select id="payExtraKind">
+                    <option value="tips">Tips</option>
+                    <option value="salary">Salary</option>
+                </select>
+            </label>
+            <label style="display:grid; gap: 6px;">
+                Сумма (VND)
+                <input type="number" id="payExtraAmount" min="1" step="1" inputmode="numeric">
+            </label>
+            <label style="display:grid; gap: 6px;">
+                Счет списания
+                <select id="payExtraAccount"></select>
+            </label>
+            <label style="display:grid; gap: 6px;">
+                Комментарий
+                <input type="text" id="payExtraComment" readonly>
+            </label>
+        </div>
+        <div class="sub" style="margin-top: 10px;">
+            <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
+                <input type="checkbox" id="payExtraChecked">
+                да проверил
+            </label>
+        </div>
+        <div class="actions">
+            <button type="button" class="btn2" id="payExtraCancel">Отмена</button>
+            <button type="button" class="btn2 primary" id="payExtraPay" disabled>Оплатить</button>
         </div>
     </div>
 </div>
@@ -952,6 +1116,16 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const helpBtn = document.getElementById('helpBtn');
     const helpModal = document.getElementById('helpModal');
     const helpClose = document.getElementById('helpClose');
+    const payExtraBtn = document.getElementById('payExtraBtn');
+    const payExtraModal = document.getElementById('payExtraModal');
+    const payExtraEmp = document.getElementById('payExtraEmp');
+    const payExtraKind = document.getElementById('payExtraKind');
+    const payExtraAmount = document.getElementById('payExtraAmount');
+    const payExtraAccount = document.getElementById('payExtraAccount');
+    const payExtraComment = document.getElementById('payExtraComment');
+    const payExtraChecked = document.getElementById('payExtraChecked');
+    const payExtraCancel = document.getElementById('payExtraCancel');
+    const payExtraPay = document.getElementById('payExtraPay');
     let runAbort = null;
     let currentJobId = '';
     let paidResolve = null;
@@ -1026,6 +1200,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     let slrPaidById = {};
     let payMeta = null;
     let payMetaSalary = null;
+    let payMetaExtra = null;
     let tipsAccBalanceMinor = null;
     let lastTipsMinorTotal = 0;
     let lastTtpMinorTotal = 0;
@@ -1143,7 +1318,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const sp = slrPaidById[String(r.user_id)] || null;
             const spTotal = sp ? Number(sp.total_amount || 0) : 0;
             const tipsToPayMinor = Math.max(0, tipsMinor - Math.abs(tpTotal || 0));
-            return { ...r, tips_paid_minor: Math.abs(tpTotal || 0), slr_paid_vnd: Math.abs(spTotal || 0), tips_to_pay_minor: tipsToPayMinor };
+            return { ...r, tips_paid_minor: Math.abs(tpTotal || 0), slr_paid_minor: Math.abs(spTotal || 0), tips_to_pay_minor: tipsToPayMinor };
         });
         const items = filtered.slice().sort((a, b) => {
             const av = a[sortBy];
@@ -1163,7 +1338,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         let totTipsPaidMinor = 0;
         let totTtpMinor = 0;
         let totSalary = 0;
-        let totSlrPaidVnd = 0;
+        let totSlrPaidMinor = 0;
         items.forEach((r) => {
             const tipsVnd = vndFromMinor(r.tips_minor || 0);
             const tp = tipsPaidById[String(r.user_id)] || null;
@@ -1172,7 +1347,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const tpDates = tp && Array.isArray(tp.dates) ? tp.dates : [];
             const sp = slrPaidById[String(r.user_id)] || null;
             const spTotal = sp ? Number(sp.total_amount || 0) : 0;
-            const spAmt = (spTotal && isFinite(spTotal)) ? fmtMoney(Math.abs(spTotal)) : '';
+            const spAmt = (spTotal && isFinite(spTotal)) ? fmtMoney(vndFromMinor(Math.abs(spTotal))) : '';
             const spDates = sp && Array.isArray(sp.dates) ? sp.dates : [];
             const tipsToPayMinor = Number(r.tips_to_pay_minor || 0) || 0;
             const tipsToPayVnd = vndFromMinor(tipsToPayMinor);
@@ -1183,7 +1358,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             totTipsPaidMinor += Math.abs(tpTotal || 0);
             totTtpMinor += tipsToPayMinor;
             totSalary += Number(r.salary_minor || 0);
-            totSlrPaidVnd += Math.abs(spTotal || 0);
+            totSlrPaidMinor += Math.abs(spTotal || 0);
             const paidDisabled = tipsToPayMinor <= 0 ? 'disabled' : '';
             tr.innerHTML = `
                 <td class="col-id">${esc(r.user_id)}</td>
@@ -1221,7 +1396,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         if (totTipsPaidEl) totTipsPaidEl.textContent = fmtMoney(vndFromMinor(totTipsPaidMinor));
         if (totTtpEl) totTtpEl.textContent = fmtMoney(vndFromMinor(totTtpMinor));
         if (totSalaryEl) totSalaryEl.textContent = fmtMoney(totSalary);
-        if (totSlrPaidEl) totSlrPaidEl.textContent = fmtMoney(totSlrPaidVnd);
+        if (totSlrPaidEl) totSlrPaidEl.textContent = fmtMoney(vndFromMinor(totSlrPaidMinor));
         lastTipsMinorTotal = totTipsMinor;
         lastTtpMinorTotal = totTtpMinor;
         renderTipsBalanceTotals();
@@ -1452,6 +1627,145 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         return payMetaSalary;
     };
 
+    const loadPayMetaExtra = async () => {
+        if (payMetaExtra) return payMetaExtra;
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'pay_meta_extra');
+        const { signal, cleanup } = withTimeout(15000);
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal });
+        const txt = await res.text();
+        cleanup();
+        let j = null;
+        try { j = JSON.parse(txt); } catch (_) {}
+        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        payMetaExtra = j;
+        return payMetaExtra;
+    };
+
+    const setModalVisible = (el, on) => {
+        if (!el) return;
+        el.style.display = on ? 'flex' : 'none';
+    };
+
+    const buildPayComment = (kind, empId, empName) => {
+        const creatorEmail = String((window.__USER_EMAIL__ || '')).trim();
+        const creatorLabel = creatorEmail ? creatorEmail : '—';
+        const prefix = kind === 'salary' ? 'SLR' : 'TIPS';
+        const namePart = empName ? (empName + ' ') : '';
+        return `${prefix} ${namePart}ID=${String(empId)} by ${creatorLabel}`;
+    };
+
+    const refreshPayExtraComment = () => {
+        if (!payExtraEmp || !payExtraKind || !payExtraComment) return;
+        const uid = Number(payExtraEmp.value || 0);
+        const row = dataRows.find((x) => Number(x.user_id) === uid);
+        const name = row ? String(row.name || '').trim() : '';
+        payExtraComment.value = uid ? buildPayComment(String(payExtraKind.value || 'tips'), uid, name) : '';
+    };
+
+    const fillPayExtraEmployees = () => {
+        if (!payExtraEmp) return;
+        payExtraEmp.innerHTML = '';
+        const rows = dataRows.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru'));
+        rows.forEach((r) => {
+            const uid = Number(r.user_id || 0);
+            if (!uid) return;
+            const opt = document.createElement('option');
+            opt.value = String(uid);
+            opt.textContent = `${String(r.name || '').trim()} (#${uid})`;
+            payExtraEmp.appendChild(opt);
+        });
+    };
+
+    const openPayExtra = async () => {
+        if (!payExtraModal) return;
+        if (!dataRows.length) { setError('Сначала нажми ЗАГРУЗИТЬ'); return; }
+        fillPayExtraEmployees();
+        try {
+            const meta = await loadPayMetaExtra();
+            if (payExtraAccount) {
+                payExtraAccount.innerHTML = '';
+                const accs = Array.isArray(meta.accounts) ? meta.accounts : [];
+                accs.forEach((a) => {
+                    const id = Number(a && a.id ? a.id : 0);
+                    if (!id) return;
+                    const opt = document.createElement('option');
+                    opt.value = String(id);
+                    opt.textContent = String(a.name || ('#' + String(id)));
+                    payExtraAccount.appendChild(opt);
+                });
+                if (payExtraKind && String(payExtraKind.value) === 'salary') payExtraAccount.value = '1';
+                else payExtraAccount.value = '8';
+            }
+        } catch (e) {
+            setError(e && e.message ? e.message : 'Ошибка');
+        }
+        if (payExtraAmount) payExtraAmount.value = '';
+        if (payExtraChecked) payExtraChecked.checked = false;
+        if (payExtraPay) payExtraPay.disabled = true;
+        refreshPayExtraComment();
+        setModalVisible(payExtraModal, true);
+    };
+
+    const closePayExtra = () => setModalVisible(payExtraModal, false);
+
+    if (payExtraBtn) payExtraBtn.addEventListener('click', () => { openPayExtra().catch((e) => setError(e && e.message ? e.message : 'Ошибка')); });
+    if (payExtraCancel) payExtraCancel.addEventListener('click', closePayExtra);
+    if (payExtraModal) payExtraModal.addEventListener('click', (e) => { if (e.target === payExtraModal) closePayExtra(); });
+    if (payExtraEmp) payExtraEmp.addEventListener('change', refreshPayExtraComment);
+    if (payExtraKind) payExtraKind.addEventListener('change', () => {
+        refreshPayExtraComment();
+        if (payExtraAccount) {
+            if (String(payExtraKind.value) === 'salary') payExtraAccount.value = '1';
+            else payExtraAccount.value = '8';
+        }
+    });
+    if (payExtraChecked && payExtraPay) payExtraChecked.addEventListener('change', () => { payExtraPay.disabled = !payExtraChecked.checked; });
+    if (payExtraPay) payExtraPay.addEventListener('click', async () => {
+        if (!payExtraEmp || !payExtraKind || !payExtraAmount || !payExtraAccount) return;
+        const uid = Number(payExtraEmp.value || 0);
+        const kind = String(payExtraKind.value || 'tips');
+        const amount = Math.round(Number(payExtraAmount.value || 0) || 0);
+        const accountFrom = Number(payExtraAccount.value || 0);
+        const row = dataRows.find((x) => Number(x.user_id) === uid);
+        const empName = row ? String(row.name || '').trim() : '';
+        if (!uid || !amount || !accountFrom) return;
+
+        payExtraPay.disabled = true;
+        try {
+            const url = new URL(location.href);
+            url.searchParams.set('ajax', 'pay_extra');
+            const res = await fetch(url.toString(), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ waiter_id: uid, kind, amount_vnd: amount, account_from: accountFrom, employee_name: empName }),
+            });
+            const txt = await res.text();
+            let j = null;
+            try { j = JSON.parse(txt); } catch (_) {}
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            const date = j.date ? String(j.date) : '';
+            if (kind === 'salary') {
+                const cur = slrPaidById[String(uid)] || { total_amount: 0, dates: [] };
+                const nextTotal = Number(cur.total_amount || 0) + (Math.abs(Number(j.amount_vnd || 0) || amount) * 100);
+                const nextDates = Array.isArray(cur.dates) ? cur.dates.slice() : [];
+                if (date) nextDates.unshift(date);
+                slrPaidById[String(uid)] = { total_amount: nextTotal, dates: nextDates };
+            } else {
+                const cur = tipsPaidById[String(uid)] || { total_amount: 0, dates: [] };
+                const nextTotal = Number(cur.total_amount || 0) + Math.abs(Number(j.amount_vnd || 0) || amount) * 100;
+                const nextDates = Array.isArray(cur.dates) ? cur.dates.slice() : [];
+                if (date) nextDates.unshift(date);
+                tipsPaidById[String(uid)] = { total_amount: nextTotal, dates: nextDates };
+            }
+            closePayExtra();
+            renderTable();
+        } catch (err) {
+            setError(err && err.message ? err.message : 'Ошибка');
+            payExtraPay.disabled = false;
+        }
+    });
+
     const empNameById = {};
     const loadEmployeeName = async (id) => {
         const uid = Number(id || 0);
@@ -1519,7 +1833,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 try { j = JSON.parse(txt); } catch (_) {}
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
                 const cur = slrPaidById[String(uid)] || { total_amount: 0, dates: [] };
-                const nextTotal = Number(cur.total_amount || 0) + Math.abs(Number(j.salary_vnd || 0) || salaryVnd);
+                const nextTotal = Number(cur.total_amount || 0) + (Math.abs(Number(j.salary_vnd || 0) || salaryVnd) * 100);
                 const nextDates = Array.isArray(cur.dates) ? cur.dates.slice() : [];
                 if (j.date) nextDates.unshift(String(j.date));
                 slrPaidById[String(uid)] = { total_amount: nextTotal, dates: nextDates };
