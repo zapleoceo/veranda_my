@@ -907,6 +907,7 @@ $firstOfMonth = date('Y-m-01');
         .modal .btn2:disabled { opacity: 0.6; cursor: default; }
         #payExtraModal .modal { max-width: 520px; position: relative; }
         .payextra-fields { display: grid; gap: 10px; }
+        .payextra-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
         .payextra-fields label { font-size: 12px; color: #6b7280; font-weight: 900; display: grid; gap: 6px; }
         .payextra-fields select,
         .payextra-fields input[type="number"],
@@ -917,6 +918,9 @@ $firstOfMonth = date('Y-m-01');
             font-size: 14px;
             background: #fff;
             width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            min-width: 0;
         }
         .payextra-fields input[readonly] { background: #f3f4f6; color: #374151; }
         .payextra-overlay {
@@ -1056,17 +1060,19 @@ $firstOfMonth = date('Y-m-01');
                 Сотрудник
                 <select id="payExtraEmp"></select>
             </label>
-            <label>
-                Тип
-                <select id="payExtraKind">
-                    <option value="tips">Tips</option>
-                    <option value="salary">Salary</option>
-                </select>
-            </label>
-            <label>
-                Сумма (VND)
-                <input type="number" id="payExtraAmount" min="1" step="1" inputmode="numeric">
-            </label>
+            <div class="payextra-row2">
+                <label>
+                    Тип
+                    <select id="payExtraKind">
+                        <option value="tips">Tips</option>
+                        <option value="salary">Salary</option>
+                    </select>
+                </label>
+                <label>
+                    Сумма (VND)
+                    <input type="number" id="payExtraAmount" min="1" step="1" inputmode="numeric">
+                </label>
+            </div>
             <label>
                 Счет списания
                 <select id="payExtraAccount"></select>
