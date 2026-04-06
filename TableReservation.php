@@ -1085,15 +1085,14 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     }
 
     .bar-row {
-      position: sticky;
+      position: absolute;
       left: 0;
-      right: 0;
       top: 0;
+      width: 820px;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 55px;
-      padding-left: 56px;
       user-select: none;
       pointer-events: none;
       z-index: 5;
