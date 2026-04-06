@@ -1756,8 +1756,6 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
     }
     try {
         $fromDate = $dFrom !== '' ? $dFrom : $dTo;
-        $fromTs = strtotime($fromDate . ' 00:00:00');
-        $toTs = strtotime($dTo . ' 00:00:00');
 
         $apiOut = new \App\Classes\PosterAPI((string)$token);
         $rows = [];
@@ -1784,10 +1782,6 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
                 $seenTx[$txId] = true;
             }
             $dateStr = (string)($r['date'] ?? '');
-            $ts = $dateStr !== '' ? strtotime($dateStr) : false;
-            if ($ts === false) continue;
-            if ($fromTs !== false && $ts < $fromTs) continue;
-            if ($toTs !== false && $ts >= $toTs) continue;
             $out[] = [
                 'transaction_id' => (int)($r['transaction_id'] ?? 0),
                 'user_id' => (int)($r['user_id'] ?? 0),
