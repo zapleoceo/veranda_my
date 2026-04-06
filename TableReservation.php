@@ -1205,12 +1205,21 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       color: rgba(255, 64, 64, 1);
       font-family: var(--font-body);
       pointer-events: none;
-      text-shadow: 0 1px 0 rgba(0,0,0,0.5), 0 0 10px rgba(255, 70, 70, 0.28);
+      text-shadow: 0 1px 0 rgba(0,0,0,0.22);
       line-height: 1.1;
       text-align: center;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      padding: 0;
+      border-radius: 8px;
+      background: transparent;
+      transition: background-color .14s ease, box-shadow .14s ease;
+    }
+    .table:hover .res-time, .table:focus-visible .res-time {
+      background: rgba(0, 0, 0, 0.28);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+      padding: 2px 6px;
     }
 
     .table.disabled {
@@ -1519,7 +1528,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   
             <button class="table wide" style="left: 422px; top: 420px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
             <button class="table wide" style="left: 300px; top: 420px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
-            <div class="fountain" style="left: 618px; top: 296px;" aria-hidden="true">
+            <div class="fountain" style="left: 532px; top: 316px;" aria-hidden="true">
               <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
                   <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
