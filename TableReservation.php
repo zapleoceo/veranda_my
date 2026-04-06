@@ -1668,6 +1668,20 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
 
     const tables = Array.from(document.querySelectorAll('.table'));
+    const shiftTablesUp = (px) => {
+      tables.forEach((t) => {
+        const n = String(t.dataset.table || '');
+        const num = Number(n);
+        if (!isFinite(num) || num < 1 || num > 20) return;
+        const topStr = String(t.style.top || '').trim();
+        const m = topStr.match(/^(-?\d+(?:\.\d+)?)px$/);
+        if (!m) return;
+        const cur = Number(m[1]);
+        if (!isFinite(cur)) return;
+        t.style.top = String(cur - px) + 'px';
+      });
+    };
+    shiftTablesUp(56);
     if (allowedSet !== null && allowedSet.size > 0) {
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
