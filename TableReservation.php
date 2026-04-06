@@ -650,6 +650,127 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'tg_state_create') {
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+  if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if (!isset($db) || !($db instanceof \App\Classes\Database)) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'DB не настроена'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
+  if (!is_array($payload)) $payload = [];
+
+  $tableNum = trim((string)($payload['table_num'] ?? ''));
+  $guests = (int)($payload['guests'] ?? 0);
+  $start = trim((string)($payload['start'] ?? ''));
+  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректный номер стола'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if ($guests <= 0 || $guests > 99) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректное кол-во гостей'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if ($start === '' || mb_strlen($start) > 40) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректное время'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $tgUserBot = trim((string)($_ENV['TABLE_RESERVATION_TG_BOT_USERNAME'] ?? $_ENV['TELEGRAM_BOT_USERNAME'] ?? ''));
+  if ($tgUserBot === '') {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Не задан TABLE_RESERVATION_TG_BOT_USERNAME'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $code = bin2hex(random_bytes(9));
+  $createdAt = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
+  $expiresAt = (new DateTimeImmutable('now'))->modify('+30 minutes')->format('Y-m-d H:i:s');
+
+  $t = $db->t('table_reservation_tg_states');
+  $pdo = $db->getPdo();
+  $pdo->exec("CREATE TABLE IF NOT EXISTS {$t} (
+    code VARCHAR(40) PRIMARY KEY,
+    payload_json TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    KEY idx_expires_at (expires_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+  $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE);
+  if ($payloadJson === false) $payloadJson = '{}';
+
+  $db->query("INSERT INTO {$t} (code, payload_json, created_at, expires_at) VALUES (?, ?, ?, ?)", [$code, $payloadJson, $createdAt, $expiresAt]);
+
+  $host = (string)($_SERVER['HTTP_HOST'] ?? '');
+  $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+  $returnUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/TableReservation.php?tg_state=' . rawurlencode($code);
+  $botUrl = 'https://t.me/' . rawurlencode($tgUserBot) . '?start=' . rawurlencode($code);
+
+  echo json_encode(['ok' => true, 'code' => $code, 'bot_url' => $botUrl, 'return_url' => $returnUrl], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'tg_state_get') {
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+  if (!isset($db) || !($db instanceof \App\Classes\Database)) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'DB не настроена'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $code = trim((string)($_GET['code'] ?? ''));
+  if ($code === '' || !preg_match('/^[a-f0-9]{8,40}$/', $code)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $t = $db->t('table_reservation_tg_states');
+  try {
+    $row = $db->query("SELECT payload_json, expires_at, used_at FROM {$t} WHERE code = ? LIMIT 1", [$code])->fetch();
+  } catch (\Throwable $e) {
+    $row = false;
+  }
+  if (!$row || !is_array($row)) {
+    http_response_code(404);
+    echo json_encode(['ok' => false, 'error' => 'Not found'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $usedAt = (string)($row['used_at'] ?? '');
+  if ($usedAt !== '') {
+    http_response_code(410);
+    echo json_encode(['ok' => false, 'error' => 'Expired'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $expiresAt = (string)($row['expires_at'] ?? '');
+  $expTs = $expiresAt !== '' ? strtotime($expiresAt) : false;
+  if ($expTs === false || $expTs < time()) {
+    $db->query("DELETE FROM {$t} WHERE code = ?", [$code]);
+    http_response_code(410);
+    echo json_encode(['ok' => false, 'error' => 'Expired'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $db->query("UPDATE {$t} SET used_at = ? WHERE code = ?", [(new DateTimeImmutable('now'))->format('Y-m-d H:i:s'), $code]);
+  $payloadJson = (string)($row['payload_json'] ?? '{}');
+  $payload = json_decode($payloadJson, true);
+  if (!is_array($payload)) $payload = [];
+  echo json_encode(['ok' => true, 'payload' => $payload], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
 ?><!doctype html>
 <html lang="ru" data-theme="dark">
 <head>
@@ -1443,6 +1564,39 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       outline: none;
     }
     #reqGuests { max-width: 160px; }
+    .msgr {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .msgr-title {
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      font-size: 11px;
+      color: rgba(245, 238, 228, 0.78);
+    }
+    .msgr-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .msgr-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255, 250, 244, 0.94);
+      padding: 0.55rem 0.8rem;
+      font-weight: 800;
+      font-size: 12px;
+      cursor: pointer;
+      transition: transform .14s ease, filter .14s ease, opacity .14s ease;
+    }
+    .msgr-btn:hover { transform: translateY(-1px); filter: saturate(1.05); }
+    .msgr-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+    .msgr-hint {
+      margin-top: 10px;
+      font-size: 12px;
+      line-height: 1.35;
+      color: rgba(245, 238, 228, 0.78);
+    }
     .modal-hint {
       margin-top: 10px;
       background: rgba(255, 255, 255, 0.04);
@@ -1654,6 +1808,15 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
             <input type="text" id="reqStart" readonly>
           </label>
         </div>
+        <div class="msgr">
+          <div class="msgr-title">ВАШ МЕССЕНДЖЕР</div>
+          <div class="msgr-row">
+            <button type="button" class="msgr-btn" id="msgrTgBtn">Telegram</button>
+            <button type="button" class="msgr-btn" disabled>WhatsApp</button>
+            <button type="button" class="msgr-btn" disabled>Zalo</button>
+          </div>
+          <div class="msgr-hint" id="msgrHint" hidden></div>
+        </div>
         <div class="modal-hint" id="reqHint" hidden></div>
         <div class="modal-note">Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.</div>
         <div class="modal-actions">
@@ -1846,6 +2009,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const reqGuests = document.getElementById('reqGuests');
     const reqStart = document.getElementById('reqStart');
     const reqHint = document.getElementById('reqHint');
+    const msgrTgBtn = document.getElementById('msgrTgBtn');
+    const msgrHint = document.getElementById('msgrHint');
     const toastEl = document.getElementById('tableToast');
     const toastTitleEl = document.getElementById('toastTitle');
     const toastReasonEl = document.getElementById('toastReason');
@@ -2105,17 +2270,69 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     }
 
     let pendingBooking = null;
-    const openRequestForm = ({ tableNum, guests, start }) => {
+    const openRequestForm = ({ tableNum, guests, start, name, phone, keepFields }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
       if (reqGuests) reqGuests.value = String(guests);
       if (reqStart) reqStart.value = String(start);
-      if (reqName) reqName.value = '';
-      if (reqPhone) reqPhone.value = '';
+      if (!keepFields) {
+        if (reqName) reqName.value = '';
+        if (reqPhone) reqPhone.value = '';
+      } else {
+        if (reqName) reqName.value = String(name || '');
+        if (reqPhone) reqPhone.value = String(phone || '');
+      }
       if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
       setModal(reqModal, true);
       if (reqName) reqName.focus();
     };
+
+    let msgrBusy = false;
+    const setMsgrHint = (msg) => {
+      if (!msgrHint) return;
+      const t = String(msg || '').trim();
+      if (!t) { msgrHint.hidden = true; msgrHint.textContent = ''; return; }
+      msgrHint.hidden = false;
+      msgrHint.textContent = t;
+    };
+
+    const startTelegramFlow = async () => {
+      if (!msgrTgBtn || msgrBusy) return;
+      if (!pendingBooking) { setMsgrHint('Сначала выбери столик.'); return; }
+      const tableNum = String(pendingBooking.tableNum || '');
+      const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
+      const start = reqStart ? String(reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
+      const name = reqName ? String(reqName.value || '').trim() : '';
+      const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
+      const resDt = resDate ? String(resDate.value || '').trim() : '';
+      const scrollY = Math.max(0, Math.floor(window.scrollY || 0));
+
+      msgrBusy = true;
+      msgrTgBtn.disabled = true;
+      setMsgrHint('Открываю Telegram…');
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'tg_state_create');
+        const res = await fetch(url.toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, res_date: resDt, scroll_y: scrollY }),
+        });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        const botUrl = String(j.bot_url || '').trim();
+        if (!botUrl) throw new Error('Нет ссылки на бота');
+        setMsgrHint('В Telegram нажми “Вернуться на сайт”.');
+        window.location.href = botUrl;
+      } catch (e) {
+        setMsgrHint(String(e && e.message ? e.message : e));
+      } finally {
+        msgrBusy = false;
+        msgrTgBtn.disabled = false;
+      }
+    };
+
+    if (msgrTgBtn) msgrTgBtn.addEventListener('click', () => { startTelegramFlow().catch(() => null); });
 
     const updateReqGuestsHint = async () => {
       if (!reqHint) return;
@@ -2513,6 +2730,46 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     }
 
     initDate();
+    const restoreFromTgState = async () => {
+      const params = new URLSearchParams(location.search);
+      const code = String(params.get('tg_state') || '').trim();
+      if (!code) return;
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'tg_state_get');
+        url.searchParams.set('code', code);
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok || !j.payload) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        const p = j.payload || {};
+        const resDt = String(p.res_date || '').trim();
+        if (resDate && resDt && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(resDt)) {
+          skipNextResDateAutoLoad = true;
+          resDate.value = resDt;
+          if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
+          setBusyLabel(String(resDate.value || '').slice(0, 10));
+          invalidateLast();
+        }
+        const tableNum = String(p.table_num || '').trim();
+        const guests = Number(p.guests || 0) || 0;
+        const start = String(p.start || '').trim();
+        const name = String(p.name || '');
+        const phone = String(p.phone || '');
+        if (tableNum && guests > 0 && start) {
+          selectedTableNum = tableNum;
+          openRequestForm({ tableNum, guests, start, name, phone, keepFields: true });
+          updateReqGuestsHint().catch(() => null);
+        }
+        const scrollY = Math.max(0, Math.floor(Number(p.scroll_y || 0) || 0));
+        if (scrollY > 0) setTimeout(() => { window.scrollTo(0, scrollY); }, 60);
+      } catch (_) {
+      } finally {
+        const next = new URL(location.href);
+        next.searchParams.delete('tg_state');
+        history.replaceState(null, '', next.toString());
+      }
+    };
+    restoreFromTgState().catch(() => null);
     syncSteps();
     if (resDate) {
       resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); });
