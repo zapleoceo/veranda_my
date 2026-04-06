@@ -638,6 +638,18 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $text .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
   $text .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
   $text .= 'Номер телефона: <b>' . htmlspecialchars($phoneNorm) . '</b>';
+  $tg = is_array($payload['tg'] ?? null) ? $payload['tg'] : [];
+  $tgUid = isset($tg['user_id']) ? (int)$tg['user_id'] : 0;
+  $tgUn = strtolower(trim((string)($tg['username'] ?? '')));
+  $tgUn = ltrim($tgUn, '@');
+  if ($tgUn !== '' || $tgUid > 0) {
+    $text .= "\n";
+    if ($tgUn !== '') {
+      $text .= 'Telegram: <a href="https://t.me/' . htmlspecialchars($tgUn) . '">@' . htmlspecialchars($tgUn) . '</a>';
+    } else {
+      $text .= 'Telegram: <a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">tg://user?id=' . htmlspecialchars((string)$tgUid) . '</a>';
+    }
+  }
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
   $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
@@ -725,8 +737,14 @@ if (($_GET['ajax'] ?? '') === 'tg_state_create') {
     created_at DATETIME NOT NULL,
     expires_at DATETIME NOT NULL,
     used_at DATETIME NULL,
+    tg_user_id BIGINT NULL,
+    tg_username VARCHAR(64) NULL,
+    tg_name VARCHAR(128) NULL,
     KEY idx_expires_at (expires_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+  try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_user_id BIGINT NULL"); } catch (\Throwable $e) {}
+  try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_username VARCHAR(64) NULL"); } catch (\Throwable $e) {}
+  try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_name VARCHAR(128) NULL"); } catch (\Throwable $e) {}
 
   $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE);
   if ($payloadJson === false) $payloadJson = '{}';
@@ -759,7 +777,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
   }
   $t = $db->t('table_reservation_tg_states');
   try {
-    $row = $db->query("SELECT payload_json, expires_at, used_at FROM {$t} WHERE code = ? LIMIT 1", [$code])->fetch();
+    $row = $db->query("SELECT payload_json, expires_at, used_at, tg_user_id, tg_username, tg_name FROM {$t} WHERE code = ? LIMIT 1", [$code])->fetch();
   } catch (\Throwable $e) {
     $row = false;
   }
@@ -786,7 +804,10 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
   $payloadJson = (string)($row['payload_json'] ?? '{}');
   $payload = json_decode($payloadJson, true);
   if (!is_array($payload)) $payload = [];
-  echo json_encode(['ok' => true, 'payload' => $payload], JSON_UNESCAPED_UNICODE);
+  $tgUserId = (int)($row['tg_user_id'] ?? 0);
+  $tgUsername = trim((string)($row['tg_username'] ?? ''));
+  $tgName = trim((string)($row['tg_name'] ?? ''));
+  echo json_encode(['ok' => true, 'payload' => $payload, 'tg' => ['user_id' => $tgUserId, 'username' => $tgUsername, 'name' => $tgName]], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
@@ -1662,6 +1683,13 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
   
     .btn-primary { background: var(--color-primary); color: #fffaf4; }
     .btn-secondary { background: transparent; color: var(--color-text); border: 1px solid var(--color-border); }
+    .btn-primary.is-disabled {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255, 250, 244, 0.55);
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
   
     .stats { display: none; }
     .stat { display: none; }
@@ -2291,6 +2319,13 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
 
     let pendingBooking = null;
     let messengerLinked = { telegram: false, whatsapp: false, zalo: false };
+    let linkedTg = null;
+    const syncSubmitState = () => {
+      if (!reqSubmit) return;
+      const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
+      if (linked) reqSubmit.classList.remove('is-disabled');
+      else reqSubmit.classList.add('is-disabled');
+    };
     const openRequestForm = ({ tableNum, guests, start, name, phone, keepFields }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
@@ -2299,14 +2334,15 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       if (!keepFields) {
         if (reqName) reqName.value = '';
         if (reqPhone) reqPhone.value = '';
+        messengerLinked = { telegram: false, whatsapp: false, zalo: false };
+        linkedTg = null;
       } else {
         if (reqName) reqName.value = String(name || '');
         if (reqPhone) reqPhone.value = String(phone || '');
       }
       if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
-      const canSubmit = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
-      if (reqSubmit) reqSubmit.disabled = !canSubmit;
-      if (!canSubmit) setMsgrHint('Для отправки привяжи любой мессенджер (Telegram).');
+      syncSubmitState();
+      if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) setMsgrHint('Для отправки привяжи Telegram.');
       setModal(reqModal, true);
       if (reqName) reqName.focus();
     };
@@ -2404,22 +2440,23 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     if (reqForm) {
       reqForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) {
-          setOutput({ ok: false, error: 'Для отправки привяжи любой мессенджер (Telegram).' });
-          setMsgrHint('Для отправки привяжи любой мессенджер (Telegram).');
-          return;
-        }
         const name = reqName ? String(reqName.value || '').trim() : '';
         const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
         const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
         const start = reqStart ? String(reqStart.value || '').trim() : '';
         const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
-        if (!tableNum) {
-          setOutput({ ok: false, error: 'Не выбран стол' });
-          return;
-        }
-        if (!name || !phone) {
-          setOutput({ ok: false, error: 'Заполни имя и телефон' });
+        const missing = [];
+        if (!tableNum) missing.push('выбери стол');
+        if (!start) missing.push('время старта');
+        if (!isFinite(guests) || guests <= 0) missing.push('кол-во гостей');
+        if (!name) missing.push('имя');
+        if (!phone) missing.push('телефон');
+        if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push('Telegram (привязать)');
+        if (missing.length) {
+          const msg = 'Не хватает: ' + missing.join(', ');
+          setOutput({ ok: false, error: msg });
+          setMsgrHint(msg);
+          syncSubmitState();
           return;
         }
 
@@ -2429,7 +2466,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone }),
+            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
@@ -2784,11 +2821,15 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         const start = String(p.start || '').trim();
         const name = String(p.name || '');
         const phone = String(p.phone || '');
+        const tg = j.tg && typeof j.tg === 'object' ? j.tg : null;
         if (tableNum && guests > 0 && start) {
           selectedTableNum = tableNum;
           messengerLinked.telegram = true;
+          linkedTg = tg ? { user_id: Number(tg.user_id || 0) || 0, username: String(tg.username || ''), name: String(tg.name || '') } : null;
           openRequestForm({ tableNum, guests, start, name, phone, keepFields: true });
-          setMsgrHint('Telegram привязан ✅');
+          if (linkedTg && linkedTg.username) setMsgrHint('Telegram привязан ✅ @' + String(linkedTg.username).replace(/^@+/, ''));
+          else setMsgrHint('Telegram привязан ✅');
+          syncSubmitState();
           updateReqGuestsHint().catch(() => null);
         }
         const scrollY = Math.max(0, Math.floor(Number(p.scroll_y || 0) || 0));

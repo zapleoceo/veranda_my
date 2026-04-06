@@ -61,6 +61,24 @@ if (!empty($update['message'])) {
         try {
             $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
             $t = $db->t('table_reservation_tg_states');
+            try {
+                $pdo = $db->getPdo();
+                $pdo->exec("CREATE TABLE IF NOT EXISTS {$t} (
+                    code VARCHAR(40) PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    expires_at DATETIME NOT NULL,
+                    used_at DATETIME NULL,
+                    tg_user_id BIGINT NULL,
+                    tg_username VARCHAR(64) NULL,
+                    tg_name VARCHAR(128) NULL,
+                    KEY idx_expires_at (expires_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+                try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_user_id BIGINT NULL"); } catch (\Throwable $e) {}
+                try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_username VARCHAR(64) NULL"); } catch (\Throwable $e) {}
+                try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_name VARCHAR(128) NULL"); } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+            }
             $row = $db->query(
                 "SELECT code
                  FROM {$t}
@@ -71,6 +89,22 @@ if (!empty($update['message'])) {
                 [$startCode]
             )->fetch();
             if (is_array($row) && !empty($row['code'])) {
+                $from = is_array($msg['from'] ?? null) ? $msg['from'] : [];
+                $tgUserId = isset($from['id']) ? (int)$from['id'] : 0;
+                $tgUsername = strtolower(trim((string)($from['username'] ?? '')));
+                $tgFirst = trim((string)($from['first_name'] ?? ''));
+                $tgLast = trim((string)($from['last_name'] ?? ''));
+                $tgName = trim($tgFirst . ' ' . $tgLast);
+                if ($tgUserId > 0 || $tgUsername !== '' || $tgName !== '') {
+                    $db->query(
+                        "UPDATE {$t}
+                         SET tg_user_id = NULLIF(?, 0),
+                             tg_username = NULLIF(?, ''),
+                             tg_name = NULLIF(?, '')
+                         WHERE code = ?",
+                        [$tgUserId, ltrim($tgUsername, '@'), $tgName, $startCode]
+                    );
+                }
                 $returnUrl = 'https://veranda.my/TableReservation.php?tg_state=' . rawurlencode($startCode);
                 $postJson('sendMessage', [
                     'chat_id' => $chatId,
