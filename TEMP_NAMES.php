@@ -83,11 +83,21 @@ if (($_GET['ajax'] ?? '') !== '') {
         name_en VARCHAR(255) NOT NULL,
         edit_ru VARCHAR(255) NOT NULL,
         edit_en VARCHAR(255) NOT NULL,
+        raw_json MEDIUMTEXT NULL,
+        menu_category_id INT NOT NULL DEFAULT 0,
+        workshop_id INT NOT NULL DEFAULT 0,
+        weight_flag TINYINT NOT NULL DEFAULT 0,
+        color VARCHAR(32) NOT NULL DEFAULT '',
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         KEY idx_name_ru (name_ru),
         KEY idx_name_en (name_en)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN raw_json MEDIUMTEXT NULL"); } catch (\Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN menu_category_id INT NOT NULL DEFAULT 0"); } catch (\Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN workshop_id INT NOT NULL DEFAULT 0"); } catch (\Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN weight_flag TINYINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN color VARCHAR(32) NOT NULL DEFAULT ''"); } catch (\Throwable $e) {}
 
     $ajax = (string)($_GET['ajax'] ?? '');
     if ($ajax === 'list') {
@@ -131,6 +141,87 @@ if (($_GET['ajax'] ?? '') !== '') {
         exit;
     }
 
+    if ($ajax === 'poster_update') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($posterToken === '') {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
+        if (!is_array($payload)) $payload = [];
+        $pid = (int)($payload['product_id'] ?? 0);
+        $lang = strtolower(trim((string)($payload['lang'] ?? '')));
+        if ($pid <= 0 || ($lang !== 'ru' && $lang !== 'en')) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $row = $db->query(
+            "SELECT product_id, name_ru, name_en, edit_ru, edit_en, menu_category_id, workshop_id, weight_flag, color
+             FROM {$t}
+             WHERE product_id = ?
+             LIMIT 1",
+            [$pid]
+        )->fetch();
+        if (!is_array($row)) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Not found'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $ruVal = trim((string)($row['edit_ru'] ?? $row['name_ru'] ?? ''));
+        $enVal = trim((string)($row['edit_en'] ?? $row['name_en'] ?? ''));
+        $newName = $lang === 'ru' ? $ruVal : $enVal;
+        if ($newName === '') {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Пустое название'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if (mb_strlen($newName, 'UTF-8') > 255) $newName = mb_substr($newName, 0, 255, 'UTF-8');
+
+        $menuCategoryId = (int)($row['menu_category_id'] ?? 0);
+        $workshopId = (int)($row['workshop_id'] ?? 0);
+        $weightFlag = (int)($row['weight_flag'] ?? 0);
+        $color = trim((string)($row['color'] ?? ''));
+        if ($color === '') $color = 'white';
+
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $okMethod = '';
+        try {
+            $api->request('menu.updateDish', [
+                'dish_id' => $pid,
+                'product_name' => $newName,
+                'menu_category_id' => $menuCategoryId,
+                'workshop' => $workshopId,
+                'weight_flag' => $weightFlag,
+                'product_color' => $color,
+            ], 'POST');
+            $okMethod = 'updateDish';
+        } catch (\Throwable $e) {
+            try {
+                $api->request('menu.updateProduct', [
+                    'id' => $pid,
+                    'product_name' => $newName,
+                    'menu_category_id' => $menuCategoryId,
+                    'workshop' => $workshopId,
+                    'weight_flag' => $weightFlag,
+                    'color' => $color,
+                ], 'POST');
+                $okMethod = 'updateProduct';
+            } catch (\Throwable $e2) {
+                http_response_code(500);
+                echo json_encode(['ok' => false, 'error' => $e2->getMessage()], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+        echo json_encode(['ok' => true, 'method' => $okMethod, 'product_id' => $pid, 'lang' => $lang], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     if ($ajax === 'sync') {
         if ($posterToken === '') {
             http_response_code(500);
@@ -143,12 +234,17 @@ if (($_GET['ajax'] ?? '') !== '') {
 
         $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
         $stmt = $pdo->prepare(
-            "INSERT INTO {$t} (product_id, name_raw, name_ru, name_en, edit_ru, edit_en, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            "INSERT INTO {$t} (product_id, name_raw, name_ru, name_en, edit_ru, edit_en, raw_json, menu_category_id, workshop_id, weight_flag, color, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                name_raw = VALUES(name_raw),
                name_ru = VALUES(name_ru),
                name_en = VALUES(name_en),
+               raw_json = VALUES(raw_json),
+               menu_category_id = VALUES(menu_category_id),
+               workshop_id = VALUES(workshop_id),
+               weight_flag = VALUES(weight_flag),
+               color = VALUES(color),
                updated_at = VALUES(updated_at)"
         );
 
@@ -178,7 +274,14 @@ if (($_GET['ajax'] ?? '') !== '') {
             if (mb_strlen($editRu, 'UTF-8') > 255) $editRu = mb_substr($editRu, 0, 255, 'UTF-8');
             if (mb_strlen($editEn, 'UTF-8') > 255) $editEn = mb_substr($editEn, 0, 255, 'UTF-8');
 
-            $stmt->execute([$pid, $rawName, $ru, $en, $editRu, $editEn, $now, $now]);
+            $rawJson = json_encode($p, JSON_UNESCAPED_UNICODE);
+            if (!is_string($rawJson)) $rawJson = null;
+            if (is_string($rawJson) && mb_strlen($rawJson, 'UTF-8') > 2000000) $rawJson = mb_substr($rawJson, 0, 2000000, 'UTF-8');
+            $menuCategoryId = (int)($p['menu_category_id'] ?? $p['category_id'] ?? $p['main_category_id'] ?? 0);
+            $workshopId = (int)($p['workshop'] ?? $p['workshop_id'] ?? 0);
+            $weightFlag = (int)($p['weight_flag'] ?? 0);
+            $color = trim((string)($p['color'] ?? $p['product_color'] ?? ''));
+            $stmt->execute([$pid, $rawName, $ru, $en, $editRu, $editEn, $rawJson, $menuCategoryId, $workshopId, $weightFlag, $color, $now, $now]);
             $count++;
         }
         echo json_encode(['ok' => true, 'count' => $count], JSON_UNESCAPED_UNICODE);
@@ -214,6 +317,23 @@ if (($_GET['ajax'] ?? '') !== '') {
         .edit { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); font-weight: 800; font-size: 13px; }
         .pid { font-variant-numeric: tabular-nums; font-size: 11px; }
         .row-saving { outline: 2px solid rgba(26,115,232,0.25); outline-offset: -2px; }
+        .cell { display:flex; align-items:flex-start; justify-content: space-between; gap: 10px; }
+        .cell .txt { min-width: 0; }
+        .upd {
+            flex: 0 0 auto;
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            border: 1px solid rgba(0,0,0,0.12);
+            background: #fff;
+            cursor: pointer;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            padding: 0;
+        }
+        .upd svg { width: 16px; height: 16px; }
+        .upd:disabled { opacity: 0.35; cursor: default; }
         @media (max-width: 800px) {
             th:nth-child(1), td:nth-child(1) { display:none; }
         }
@@ -270,13 +390,34 @@ if (($_GET['ajax'] ?? '') !== '') {
         const items = Array.isArray(j.items) ? j.items : [];
         if (tbody) tbody.innerHTML = '';
         items.forEach((r) => {
+            const pid = String(r.product_id || '');
             const tr = document.createElement('tr');
-            tr.dataset.pid = String(r.product_id || '');
+            tr.dataset.pid = pid;
             tr.innerHTML = `
-                <td class="pid muted">${esc(r.product_id || '')}</td>
-                <td>${esc(r.name_ru || '')}</td>
-                <td>${esc(r.name_en || '')}</td>
-                <td><input class="edit" data-pid="${esc(r.product_id || '')}" value="${esc(rowValue(r))}"></td>
+                <td class="pid muted">${esc(pid)}</td>
+                <td>
+                    <div class="cell">
+                        <div class="txt">${esc(r.name_ru || '')}</div>
+                        <button type="button" class="upd" data-pid="${esc(pid)}" data-lang="ru" ${String(r.edit_ru || r.name_ru || '').trim() ? '' : 'disabled'} title="Обновить RU в Poster" aria-label="Обновить RU">
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M20 12a8 8 0 1 1-2.2-5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M20 4v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+                <td>
+                    <div class="cell">
+                        <div class="txt">${esc(r.name_en || '')}</div>
+                        <button type="button" class="upd" data-pid="${esc(pid)}" data-lang="en" ${String(r.edit_en || r.name_en || '').trim() ? '' : 'disabled'} title="Обновить EN в Poster" aria-label="Обновить EN">
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M20 12a8 8 0 1 1-2.2-5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M20 4v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+                <td><input class="edit" data-pid="${esc(pid)}" value="${esc(rowValue(r))}"></td>
             `;
             tbody.appendChild(tr);
         });
@@ -300,6 +441,33 @@ if (($_GET['ajax'] ?? '') !== '') {
     };
 
     if (tbody) {
+        tbody.addEventListener('click', (e) => {
+            const t = e.target;
+            const btn = (t instanceof Element) ? t.closest('button.upd') : null;
+            if (!(btn instanceof HTMLButtonElement)) return;
+            if (btn.disabled) return;
+            const pid = String(btn.dataset.pid || '');
+            const lang = String(btn.dataset.lang || '');
+            const tr = btn.closest('tr');
+            btn.disabled = true;
+            if (tr) tr.classList.add('row-saving');
+            setStatus('Обновление в Poster…');
+            fetch(apiUrl('poster_update'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ product_id: Number(pid), lang }),
+            })
+                .then((r) => r.json().catch(() => null).then((j) => ({ r, j })))
+                .then(({ r, j }) => {
+                    if (!r.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                    setStatus('Обновлено в Poster: ' + String(j.method || 'ok') + ' · ' + String(lang).toUpperCase() + ' · ID ' + String(pid));
+                })
+                .catch((err) => setStatus(String(err && err.message ? err.message : err)))
+                .finally(() => {
+                    btn.disabled = false;
+                    if (tr) tr.classList.remove('row-saving');
+                });
+        });
         tbody.addEventListener('change', (e) => {
             const t = e.target;
             if (!(t instanceof HTMLInputElement)) return;
@@ -349,4 +517,3 @@ if (($_GET['ajax'] ?? '') !== '') {
 </script>
 </body>
 </html>
-
