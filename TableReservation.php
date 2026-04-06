@@ -661,6 +661,39 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение в Telegram'], JSON_UNESCAPED_UNICODE);
     exit;
   }
+
+  if ($tgUid <= 0) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Telegram не привязан'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $userText = '<b>Спасибо!</b> Мы с вами свяжемся в ближайшее время.' . "\n\n";
+  $userText .= '<b>Ваша бронь</b>' . "\n";
+  $userText .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
+  $userText .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
+  $userText .= 'Кол-во человек: <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
+  $userText .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
+  $userText .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
+  $userText .= 'Номер телефона: <b>' . htmlspecialchars($phoneNorm) . '</b>';
+
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+    'chat_id' => (string)$tgUid,
+    'text' => $userText,
+    'parse_mode' => 'HTML',
+  ]));
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+  $resp = curl_exec($ch);
+  curl_close($ch);
+  $data = $resp ? json_decode($resp, true) : null;
+  if (!is_array($data) || empty($data['ok'])) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение гостю в Telegram'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
   echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
   exit;
 }
@@ -2506,7 +2539,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
           setModal(reqModal, false);
-          setOutput('Заявка отправлена.\n\nДата: ' + String(start).slice(0, 10) + '\nВремя: ' + String(start).slice(11, 16) + '\nСтол: ' + tableNum + '\nГостей: ' + String(guests) + '\nИмя: ' + name + '\nТелефон: ' + phone + '\n\nБронь держится 30 минут.');
+          setOutput('Спасибо, мы с вами свяжемся в ближайшее время.\n\nДата: ' + String(start).slice(0, 10) + '\nВремя: ' + String(start).slice(11, 16) + '\nСтол: ' + tableNum + '\nГостей: ' + String(guests) + '\nИмя: ' + name + '\nТелефон: ' + phone);
         } catch (err) {
           setOutput({ ok: false, error: String(err && err.message ? err.message : err) });
         } finally {
