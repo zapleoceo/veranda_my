@@ -1750,7 +1750,12 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     }
   
     @media (max-width: 640px) {
-      .app, .layout, .map-shell { padding: var(--space-4); }
+      .app {
+        padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--space-3) calc(env(safe-area-inset-bottom) + var(--space-3));
+        min-height: auto;
+        display: block;
+      }
+      .layout, .map-shell { padding: var(--space-4); }
       .topbar { padding: var(--space-4); align-items: flex-start; flex-direction: column; }
       .map-shell { padding: 0 28px 28px 28px; }
     }
