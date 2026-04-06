@@ -1025,6 +1025,7 @@ $firstOfMonth = date('Y-m-01');
                     <th id="thTipsPaid" class="col-paid" data-sort="tips_paid_minor" style="text-align:right; cursor:pointer;">TipsPaid</th>
                     <th id="thSlrPaid" class="col-slr" data-sort="slr_paid_minor" style="text-align:right; cursor:pointer;">SlrPaid</th>
                     <th id="thTtp" class="col-ttp" data-sort="tips_to_pay_minor" style="text-align:right; cursor:pointer;">TipsToPay</th>
+                    <th id="thSalaryToPay" class="col-salarytopay" data-sort="salary_to_pay_vnd" style="text-align:right; cursor:pointer;">SalaryToPay</th>
                     <th id="thSalary" class="col-salary" data-sort="salary_minor" style="text-align:right; cursor:pointer;">Salary</th>
                 </tr>
                 </thead>
@@ -1041,6 +1042,7 @@ $firstOfMonth = date('Y-m-01');
                     <td class="col-paid" style="text-align:right;"><span id="totTipsPaid">0</span></td>
                     <td class="col-slr" style="text-align:right;"><span id="totSlrPaid">0</span></td>
                     <td class="col-ttp" style="text-align:right;"><span id="totTtp">0</span></td>
+                    <td class="col-salarytopay" style="text-align:right;"><span id="totSalaryToPay">0</span></td>
                     <td class="col-salary" style="text-align:right;"><span id="totSalary">0</span></td>
                 </tr>
                 </tfoot>
@@ -1170,6 +1172,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const totTipsPaidEl = document.getElementById('totTipsPaid');
     const totSlrPaidEl = document.getElementById('totSlrPaid');
     const totTtpEl = document.getElementById('totTtp');
+    const totSalaryToPayEl = document.getElementById('totSalaryToPay');
     const totSalaryEl = document.getElementById('totSalary');
     const paidModal = document.getElementById('paidModal');
     const paidText = document.getElementById('paidText');
@@ -1383,7 +1386,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const sp = slrPaidById[String(r.user_id)] || null;
             const spTotal = sp ? Number(sp.total_amount || 0) : 0;
             const tipsToPayMinor = Math.max(0, tipsMinor - Math.abs(tpTotal || 0));
-            return { ...r, tips_paid_minor: Math.abs(tpTotal || 0), slr_paid_minor: Math.abs(spTotal || 0), tips_to_pay_minor: tipsToPayMinor };
+            const salaryVnd = Math.round(Number(r.salary_minor || 0) || 0);
+            const slrPaidVnd = vndFromMinor(Math.abs(spTotal || 0));
+            const salaryToPayVnd = Math.max(0, salaryVnd - slrPaidVnd);
+            return { ...r, tips_paid_minor: Math.abs(tpTotal || 0), slr_paid_minor: Math.abs(spTotal || 0), tips_to_pay_minor: tipsToPayMinor, salary_to_pay_vnd: salaryToPayVnd };
         });
         const items = filtered.slice().sort((a, b) => {
             const av = a[sortBy];
@@ -1403,6 +1409,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         let totTipsPaidMinor = 0;
         let totTtpMinor = 0;
         let totSalary = 0;
+        let totSalaryToPayVnd = 0;
         let totSlrPaidMinor = 0;
         items.forEach((r) => {
             const tipsVnd = vndFromMinor(r.tips_minor || 0);
@@ -1416,6 +1423,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const spDates = sp && Array.isArray(sp.dates) ? sp.dates : [];
             const tipsToPayMinor = Number(r.tips_to_pay_minor || 0) || 0;
             const tipsToPayVnd = vndFromMinor(tipsToPayMinor);
+            const salaryVnd = Math.round(Number(r.salary_minor || 0) || 0);
+            const salaryToPayVnd = Math.round(Number(r.salary_to_pay_vnd || 0) || 0);
             const tr = document.createElement('tr');
             totChecks += Number(r.checks || 0);
             totHours += Number(r.worked_hours || 0);
@@ -1423,8 +1432,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             totTipsPaidMinor += Math.abs(tpTotal || 0);
             totTtpMinor += tipsToPayMinor;
             totSalary += Number(r.salary_minor || 0);
+            totSalaryToPayVnd += salaryToPayVnd;
             totSlrPaidMinor += Math.abs(spTotal || 0);
             const paidDisabled = tipsToPayMinor <= 0 ? 'disabled' : '';
+            const salaryPayDisabled = salaryToPayVnd <= 0 ? 'disabled' : '';
             tr.innerHTML = `
                 <td class="col-id">${esc(r.user_id)}</td>
                 <td class="col-name"><div>${esc(r.name)}</div></td>
@@ -1447,12 +1458,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         <button type="button" class="paid-btn" data-kind="tips" data-user-id="${esc(r.user_id)}" ${paidDisabled}>PAY</button>
                     </div>
                 </td>
-                <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">
+                <td class="col-salarytopay" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
-                        <span>${esc(fmtMoney(r.salary_minor))}</span>
-                        <button type="button" class="paid-btn" data-kind="salary" data-user-id="${esc(r.user_id)}" ${Number(r.salary_minor || 0) > 0 ? '' : 'disabled'}>PAY</button>
+                        <span>${esc(fmtMoney(salaryToPayVnd))}</span>
+                        <button type="button" class="paid-btn" data-kind="salary" data-user-id="${esc(r.user_id)}" ${salaryPayDisabled}>PAY</button>
                     </div>
                 </td>
+                <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(salaryVnd))}</td>
             `;
             tbody.appendChild(tr);
         });
@@ -1460,6 +1472,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         if (totTipsEl) totTipsEl.textContent = fmtMoney(vndFromMinor(totTipsMinor));
         if (totTipsPaidEl) totTipsPaidEl.textContent = fmtMoney(vndFromMinor(totTipsPaidMinor));
         if (totTtpEl) totTtpEl.textContent = fmtMoney(vndFromMinor(totTtpMinor));
+        if (totSalaryToPayEl) totSalaryToPayEl.textContent = fmtMoney(totSalaryToPayVnd);
         if (totSalaryEl) totSalaryEl.textContent = fmtMoney(totSalary);
         if (totSlrPaidEl) totSlrPaidEl.textContent = fmtMoney(vndFromMinor(totSlrPaidMinor));
         lastTipsMinorTotal = totTipsMinor;
@@ -1888,7 +1901,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
         if (kind === 'salary') {
             const salaryVnd = Math.round(Number(row.salary_minor || 0) || 0);
-            if (salaryVnd <= 0) return;
+            const sp = slrPaidById[String(uid)] || null;
+            const spTotal = sp ? Number(sp.total_amount || 0) : 0;
+            const slrPaidVnd = vndFromMinor(Math.abs(spTotal || 0));
+            const salaryToPayVnd = Math.max(0, salaryVnd - slrPaidVnd);
+            if (salaryToPayVnd <= 0) return;
             let empName = '';
             try { empName = await loadEmployeeName(uid); } catch (_) { empName = ''; }
             if (!empName) empName = String(row.name || '').trim();
@@ -1903,7 +1920,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const ok = await openPaidConfirm(
                 `Будет создана транзакция расхода на выплату зарплаты.<br>` +
                 `Сотрудник: <b>${esc(empName || ('#' + String(uid)))}</b><br>` +
-                `Сумма: <b>${esc(fmtMoney(salaryVnd))}</b><br>` +
+                `Сумма: <b>${esc(fmtMoney(salaryToPayVnd))}</b><br>` +
                 `Категория: <b>${esc(catName)}</b><br>` +
                 `Исполнитель: <b>${esc(payerName)}</b><br>` +
                 `Счет списания: <b>${esc(accName)}</b><br>` +
@@ -1917,14 +1934,14 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const res = await fetch(url.toString(), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify({ waiter_id: uid, salary_vnd: salaryVnd, employee_name: empName }),
+                    body: JSON.stringify({ waiter_id: uid, salary_vnd: salaryToPayVnd, employee_name: empName }),
                 });
                 const txt = await res.text();
                 let j = null;
                 try { j = JSON.parse(txt); } catch (_) {}
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
                 const cur = slrPaidById[String(uid)] || { total_amount: 0, dates: [] };
-                const nextTotal = Number(cur.total_amount || 0) + (Math.abs(Number(j.salary_vnd || 0) || salaryVnd) * 100);
+                const nextTotal = Number(cur.total_amount || 0) + (Math.abs(Number(j.salary_vnd || 0) || salaryToPayVnd) * 100);
                 const nextDates = Array.isArray(cur.dates) ? cur.dates.slice() : [];
                 if (j.date) nextDates.unshift(String(j.date));
                 slrPaidById[String(uid)] = { total_amount: nextTotal, dates: nextDates };
