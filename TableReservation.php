@@ -773,7 +773,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     .layout {
       padding: var(--space-6);
       display: grid;
-      grid-template-columns: 1fr 280px;
+      grid-template-columns: 1fr;
       gap: var(--space-6);
     }
   
@@ -931,6 +931,64 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       letter-spacing: 0.02em;
       text-transform: none;
       color: rgba(245,238,228,0.62);
+    }
+
+    .cash-controls {
+      width: 170px;
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .cash-controls input[type="datetime-local"],
+    .cash-controls input[type="number"] {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: rgba(245,238,228,0.92);
+      padding: 0.45rem 0.55rem;
+      font-size: 12px;
+      outline: none;
+    }
+    .cash-controls input[type="datetime-local"] { padding-left: 0.6rem; background-image: none; }
+    .cash-controls input[type="number"] { padding-left: 0.6rem; background-image: none; }
+    .cash-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .cash-row .dur { width: 62px; }
+    .cash-row .gst { width: 58px; }
+    .cash-controls .btn {
+      padding: 0.52rem 0.65rem;
+      font-size: 12px;
+      border-radius: 12px;
+      width: auto;
+      min-width: 0;
+    }
+    .cash-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: rgba(245,238,228,0.70);
+      text-transform: none;
+      letter-spacing: 0;
+      margin-top: 2px;
+    }
+    .cash-text {
+      width: 170px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.18);
+      color: rgba(245,238,228,0.86);
+      padding: 0.45rem 0.55rem;
+      font-size: 11px;
+      line-height: 1.3;
+      min-height: 72px;
+      resize: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
     .mini-loader {
       width: 10px;
@@ -1430,53 +1488,31 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
             <button class="table small-vertical" style="left: 663px; top: 336px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
             <button class="table large" style="left: 758px; top: 258px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
   
-            <div class="bar-row" aria-hidden="true">
+            <div class="bar-row">
               <div class="station-wrap">
                 <div class="side-station">Музыканты</div>
                 <div class="station-sub"><span id="busyDateLabel">Данные на —</span><span class="mini-loader" id="busyDateLoader" hidden></span></div>
               </div>
               <div class="bar">BAR</div>
-              <div class="side-station">Касса</div>
+              <div class="station-wrap">
+                <div class="side-station">Касса</div>
+                <div class="cash-controls">
+                  <input type="datetime-local" id="resDate" aria-label="Дата и время">
+                  <div class="cash-row">
+                    <input class="dur" type="number" id="resDuration" min="0.5" max="12" step="0.5" value="2" aria-label="Длительность (ч)">
+                    <input class="gst" type="number" id="resGuests" min="1" max="30" placeholder="1" value="1" aria-label="Гостей">
+                    <button class="btn btn-primary" id="checkBtn" type="button">Проверить</button>
+                  </div>
+                  <div class="cash-meta">
+                    <div>Стол: <strong id="selectedTable">—</strong></div>
+                    <div id="statusLine">—</div>
+                  </div>
+                  <textarea id="resultText" class="cash-text" readonly></textarea>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-  
-        <aside class="sidebar">
-          <div class="card">
-            <h2>Бронь</h2>
-            <div class="dt-row">
-              <label class="dt-label">
-                Дата и время
-                <input type="datetime-local" id="resDate">
-              </label>
-              <label class="dt-dur">
-                Длительность (ч)
-                <input type="number" id="resDuration" min="0.5" max="12" step="0.5" value="2">
-              </label>
-            </div>
-            <div id="stepGuests" hidden>
-              <div class="guest-row">
-                <label class="guest-label">
-                  Гостей
-                  <input type="number" id="resGuests" min="1" max="30" placeholder="1" value="1">
-                </label>
-                <button class="btn btn-primary" id="checkBtn" type="button">Проверить</button>
-              </div>
-            </div>
-            <div class="actions" id="stepCheck" hidden></div>
-            <div class="selected-output">
-              <div style="display:flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap;">
-                <div>Стол: <strong id="selectedTable">—</strong></div>
-                <div style="color:var(--color-text-muted); font-size: var(--text-sm);" id="statusLine">—</div>
-              </div>
-              <div style="margin-top: var(--space-3);">
-                <textarea id="resultText" readonly></textarea>
-              </div>
-            </div>
-          </div>
-  
-  
-        </aside>
       </section>
     </main>
   </div>
