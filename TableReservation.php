@@ -985,6 +985,11 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       line-height: 1;
     }
     .zoom .zv { font-variant-numeric: tabular-nums; font-weight: 900; min-width: 46px; text-align: right; }
+    .zoom input[type="range"] {
+      width: 90px;
+      height: 10px;
+      accent-color: var(--color-primary);
+    }
   
     .legend, .theme-toggle {
       border: 1px solid var(--color-border);
@@ -1811,6 +1816,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
             <button class="zbtn" type="button" id="mapZoomMinus" aria-label="Уменьшить масштаб">−</button>
             <span class="zv" id="mapZoomVal">100%</span>
             <button class="zbtn" type="button" id="mapZoomPlus" aria-label="Увеличить масштаб">+</button>
+            <input id="mapZoomRange" type="range" min="50" max="200" step="1" value="100" aria-label="Ползунок масштаба">
           </label>
           <button class="theme-toggle" type="button" data-theme-toggle aria-label="Переключить тему">☀️</button>
         </div>
@@ -1993,12 +1999,14 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     const mapZoomVal = document.getElementById('mapZoomVal');
     const mapZoomMinus = document.getElementById('mapZoomMinus');
     const mapZoomPlus = document.getElementById('mapZoomPlus');
+    const mapZoomRange = document.getElementById('mapZoomRange');
 
     const applyMapZoom = (pct, keepAnchor) => {
       if (!mapShell) return;
       const p = Math.max(50, Math.min(200, Number(pct || 100) || 100));
       const scale = p / 100;
       if (mapZoomVal) mapZoomVal.textContent = String(Math.round(p)) + '%';
+      if (mapZoomRange) mapZoomRange.value = String(Math.round(p));
 
       let ax = 0, ay = 0;
       if (keepAnchor) {
@@ -2025,6 +2033,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     };
     if (mapZoomMinus) mapZoomMinus.addEventListener('click', () => applyMapZoom(getCurrentZoomPct() - 5, true));
     if (mapZoomPlus) mapZoomPlus.addEventListener('click', () => applyMapZoom(getCurrentZoomPct() + 5, true));
+    if (mapZoomRange) mapZoomRange.addEventListener('input', () => applyMapZoom(mapZoomRange.value, true));
   
     toggle.addEventListener('click', () => {
       const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
