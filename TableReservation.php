@@ -1699,7 +1699,21 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         t.style.top = String(cur - px) + 'px';
       });
     };
+    const shiftTablesRight = (fromNum, toNum, px) => {
+      tables.forEach((t) => {
+        const n = String(t.dataset.table || '');
+        const num = Number(n);
+        if (!isFinite(num) || num < fromNum || num > toNum) return;
+        const leftStr = String(t.style.left || '').trim();
+        const m = leftStr.match(/^(-?\d+(?:\.\d+)?)px$/);
+        if (!m) return;
+        const cur = Number(m[1]);
+        if (!isFinite(cur)) return;
+        t.style.left = String(cur + px) + 'px';
+      });
+    };
     shiftTablesUp(56);
+    shiftTablesRight(15, 19, 28);
     if (allowedSet !== null && allowedSet.size > 0) {
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
@@ -1851,6 +1865,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     let dtpTimes = [];
     let dtpSelDate = null;
     let dtpSelTime = null;
+    let skipNextResDateAutoLoad = false;
 
     const pad2 = (n) => String(n).padStart(2, '0');
     const isoDate = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
@@ -1980,7 +1995,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         }, 80);
       });
     }
-    if (dtpOk) dtpOk.addEventListener('click', () => { applyDtpToInput(); setDtpModal(false); });
+    if (dtpOk) dtpOk.addEventListener('click', () => {
+      skipNextResDateAutoLoad = true;
+      applyDtpToInput();
+      setDtpModal(false);
+      loadFree(false).catch((e) => setOutput('Ошибка: ' + String(e && e.message ? e.message : e)));
+    });
     document.querySelectorAll('[data-dtp-close]').forEach((x) => x.addEventListener('click', () => setDtpModal(false)));
     if (resDateBtn) {
       resDateBtn.addEventListener('click', () => {
@@ -2444,7 +2464,13 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     syncSteps();
     if (resDate) {
       resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); });
-      resDate.addEventListener('change', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); loadFree(true).catch(() => null); });
+      resDate.addEventListener('change', () => {
+        syncSteps();
+        invalidateLast();
+        setBusyLabel(String(resDate.value || '').slice(0, 10));
+        if (skipNextResDateAutoLoad) { skipNextResDateAutoLoad = false; return; }
+        loadFree(true).catch(() => null);
+      });
     }
     if (resDate && String(resDate.value || '').trim()) {
       loadFree(true).catch(() => null);
