@@ -342,7 +342,7 @@ if (($_GET['ajax'] ?? '') === 'pay_salary') {
         $res = $api->request('finance.createTransactions', [
             'id' => (int)(time() * 1000 + random_int(0, 999)),
             'type' => 0,
-            'category' => 4,
+            'category' => 6,
             'user_id' => 10,
             'amount_from' => $salaryVnd,
             'account_from' => 1,
@@ -397,10 +397,11 @@ if (($_GET['ajax'] ?? '') === 'pay_extra') {
         $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
         $prefix = $kind === 'salary' ? 'SLR' : 'TIPS';
         $comment = $prefix . ($empName !== '' ? (' ' . $empName) : '') . ' ID=' . $waiterId . ($by !== '' ? (' by ' . $by) : '');
+        $categoryId = $kind === 'salary' ? 6 : 4;
         $res = $api->request('finance.createTransactions', [
             'id' => (int)(time() * 1000 + random_int(0, 999)),
             'type' => 0,
-            'category' => 4,
+            'category' => $categoryId,
             'user_id' => 10,
             'amount_from' => $amountVnd,
             'account_from' => $accountFrom,
@@ -465,7 +466,10 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
                 if ($uid !== 10 && $uid !== 4) continue;
             } else {
                 $cat = isset($t['category']) ? (int)$t['category'] : (isset($t['category_id']) ? (int)$t['category_id'] : 0);
-                if ($cat > 0 && $cat !== 4) continue;
+                if ($cat > 0) {
+                    if ($isTips && $cat !== 4) continue;
+                    if ($isSlr && $cat !== 6) continue;
+                }
                 $acc = isset($t['account_from']) ? (int)$t['account_from'] : (isset($t['account_id']) ? (int)$t['account_id'] : 0);
                 if ($acc > 0) {
                     if ($isTips && $acc !== 8) continue;
@@ -594,7 +598,7 @@ if (($_GET['ajax'] ?? '') === 'pay_meta_salary') {
             if (is_array($cats)) {
                 foreach ($cats as $c) {
                     if (!is_array($c)) continue;
-                    if ((int)($c['category_id'] ?? 0) === 4) {
+                    if ((int)($c['category_id'] ?? 0) === 6) {
                         $categoryName = trim((string)($c['name'] ?? ''));
                         break;
                     }
@@ -633,7 +637,7 @@ if (($_GET['ajax'] ?? '') === 'pay_meta_salary') {
 
         echo json_encode([
             'ok' => true,
-            'category' => ['id' => 4, 'name' => $categoryName],
+            'category' => ['id' => 6, 'name' => $categoryName],
             'account_from' => ['id' => 1, 'name' => $accountName],
             'payer' => ['id' => 10, 'name' => $payerName],
         ], JSON_UNESCAPED_UNICODE);
@@ -680,16 +684,16 @@ if (($_GET['ajax'] ?? '') === 'pay_meta_extra') {
         } catch (\Throwable $e) {
         }
 
-        $categoryName = '';
+        $catTipsName = '';
+        $catSalaryName = '';
         try {
             $cats = $api->request('finance.getCategories', [], 'GET');
             if (is_array($cats)) {
                 foreach ($cats as $c) {
                     if (!is_array($c)) continue;
-                    if ((int)($c['category_id'] ?? 0) === 4) {
-                        $categoryName = trim((string)($c['name'] ?? ''));
-                        break;
-                    }
+                    $cid = (int)($c['category_id'] ?? 0);
+                    if ($cid === 4) $catTipsName = trim((string)($c['name'] ?? ''));
+                    if ($cid === 6) $catSalaryName = trim((string)($c['name'] ?? ''));
                 }
             }
         } catch (\Throwable $e) {
@@ -697,7 +701,10 @@ if (($_GET['ajax'] ?? '') === 'pay_meta_extra') {
 
         echo json_encode([
             'ok' => true,
-            'category' => ['id' => 4, 'name' => $categoryName],
+            'categories' => [
+                'tips' => ['id' => 4, 'name' => $catTipsName],
+                'salary' => ['id' => 6, 'name' => $catSalaryName],
+            ],
             'payer' => ['id' => 10, 'name' => $payerName],
             'accounts' => $accounts,
         ], JSON_UNESCAPED_UNICODE);
