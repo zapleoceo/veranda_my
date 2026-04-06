@@ -939,6 +939,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       gap: 6px;
       margin-top: 8px;
     }
+    .cash-controls #resDate { display: none; }
     .cash-controls input[type="datetime-local"] {
       width: 100%;
       border-radius: 12px;
@@ -957,6 +958,110 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       width: auto;
       min-width: 0;
     }
+
+    .dt-btn {
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: rgba(245,238,228,0.92);
+      padding: 0.55rem 0.65rem;
+      font-size: 12px;
+      border-radius: 12px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .dt-btn:focus-visible {
+      outline: none;
+      border-color: rgba(213,156,90,0.55);
+      box-shadow: 0 0 0 4px rgba(213,156,90,0.12);
+    }
+
+    .dtp {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      z-index: 9999;
+    }
+    .dtp.on { display: flex; }
+    .dtp-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(2px); }
+    .dtp-card {
+      position: relative;
+      width: min(520px, 100%);
+      background: rgba(17, 24, 39, 0.96);
+      color: rgba(255, 250, 244, 0.94);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      box-shadow: 0 26px 70px rgba(0,0,0,0.45);
+      padding: 14px 14px 12px;
+      transform: translateY(8px) scale(0.98);
+      opacity: 0;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .dtp.on .dtp-card { transform: translateY(0) scale(1); opacity: 1; }
+    .dtp-title { font-weight: 900; font-size: 16px; font-family: var(--font-display); }
+    .dtp-wheels { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 10px; margin-top: 12px; }
+    .wheel {
+      position: relative;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+      overflow: hidden;
+      height: 210px;
+    }
+    .wheel::before, .wheel::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 40%;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .wheel::before { top: 0; background: linear-gradient(180deg, rgba(17,24,39,0.96), rgba(17,24,39,0)); }
+    .wheel::after { bottom: 0; background: linear-gradient(0deg, rgba(17,24,39,0.96), rgba(17,24,39,0)); }
+    .wheel-mid {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      top: 50%;
+      height: 40px;
+      transform: translateY(-50%);
+      border-top: 1px solid rgba(255,255,255,0.16);
+      border-bottom: 1px solid rgba(255,255,255,0.16);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      z-index: 1;
+      pointer-events: none;
+    }
+    .wheel-list {
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding: 85px 0;
+      scrollbar-width: none;
+    }
+    .wheel-list::-webkit-scrollbar { display: none; }
+    .wheel-item {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      scroll-snap-align: center;
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: rgba(245, 238, 228, 0.58);
+      font-size: 14px;
+      padding: 0 10px;
+      text-align: center;
+      user-select: none;
+    }
+    .wheel-item.active { color: rgba(255, 250, 244, 0.94); }
+    .dtp-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
     body { overflow-x: hidden; }
     .mini-loader {
       width: 10px;
@@ -1460,6 +1565,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
                 <div class="side-station">Касса</div>
                 <div class="cash-controls">
                   <input type="datetime-local" id="resDate" aria-label="Дата и время">
+                  <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
                   <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
                 </div>
               </div>
@@ -1468,6 +1574,27 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         </div>
       </section>
     </main>
+  </div>
+
+  <div class="dtp" id="dtpModal" aria-hidden="true">
+    <div class="dtp-backdrop" data-dtp-close></div>
+    <div class="dtp-card" role="dialog" aria-modal="true" aria-labelledby="dtpTitle">
+      <div class="dtp-title" id="dtpTitle">Выбор даты и времени</div>
+      <div class="dtp-wheels">
+        <div class="wheel">
+          <div class="wheel-mid"></div>
+          <div class="wheel-list" id="dtpDateList"></div>
+        </div>
+        <div class="wheel">
+          <div class="wheel-mid"></div>
+          <div class="wheel-list" id="dtpTimeList"></div>
+        </div>
+      </div>
+      <div class="dtp-actions">
+        <button class="btn btn-secondary" type="button" data-dtp-close>Отмена</button>
+        <button class="btn btn-primary" type="button" id="dtpOk">Ок</button>
+      </div>
+    </div>
   </div>
 
   <div class="modal" id="capModal" aria-hidden="true">
@@ -1650,6 +1777,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       });
     };
     const resDate = document.getElementById('resDate');
+    const resDateBtn = document.getElementById('resDateBtn');
     const checkBtn = document.getElementById('checkBtn');
     const resultText = document.getElementById('resultText');
     const selectedTableEl = document.getElementById('selectedTable');
@@ -1671,6 +1799,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const toastEl = document.getElementById('tableToast');
     const toastTitleEl = document.getElementById('toastTitle');
     const toastReasonEl = document.getElementById('toastReason');
+    const dtpModal = document.getElementById('dtpModal');
+    const dtpDateList = document.getElementById('dtpDateList');
+    const dtpTimeList = document.getElementById('dtpTimeList');
+    const dtpOk = document.getElementById('dtpOk');
 
     let last = null;
     let freeNums = new Set();
@@ -1681,6 +1813,147 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     let toastTimer = null;
     let toastHideTimer = null;
     let reqGuestsHintTimer = null;
+    let dtpDates = [];
+    let dtpTimes = [];
+    let dtpSelDate = null;
+    let dtpSelTime = null;
+
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const isoDate = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+
+    const fmtCashDate = (dtLocal) => {
+      const raw = String(dtLocal || '').trim();
+      const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (!m) return 'Выбрать дату';
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), 0);
+      const datePart = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: '2-digit', month: 'short' }).format(d);
+      return datePart + ' · ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    };
+
+    const setDtpModal = (on) => {
+      if (!dtpModal) return;
+      if (on) {
+        dtpModal.classList.add('on');
+        dtpModal.setAttribute('aria-hidden', 'false');
+      } else {
+        dtpModal.classList.remove('on');
+        dtpModal.setAttribute('aria-hidden', 'true');
+      }
+    };
+
+    const wheelIndex = (el, count) => {
+      if (!el) return 0;
+      const idx = Math.round(el.scrollTop / 40);
+      return Math.max(0, Math.min((count || 1) - 1, idx));
+    };
+
+    const updateWheelActive = (listEl, idx) => {
+      if (!listEl) return;
+      Array.from(listEl.children).forEach((c, i) => {
+        if (!(c instanceof HTMLElement)) return;
+        if (i === idx) c.classList.add('active');
+        else c.classList.remove('active');
+      });
+    };
+
+    const setWheelTo = (listEl, idx) => {
+      if (!listEl) return;
+      listEl.scrollTop = Math.max(0, idx) * 40;
+      updateWheelActive(listEl, idx);
+    };
+
+    const ensureDtpData = () => {
+      if (!dtpDateList || !dtpTimeList) return;
+      if (!dtpDates.length) {
+        const now = new Date();
+        const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const days = 28;
+        dtpDates = [];
+        for (let i = 0; i < days; i++) {
+          const d = new Date(base.getTime() + (i * 86400000));
+          dtpDates.push({ value: isoDate(d), date: d });
+        }
+        dtpDateList.innerHTML = '';
+        dtpDates.forEach(({ value, date }) => {
+          const label = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: '2-digit', month: 'short' }).format(date);
+          const it = document.createElement('div');
+          it.className = 'wheel-item';
+          it.dataset.value = value;
+          it.textContent = label;
+          dtpDateList.appendChild(it);
+        });
+      }
+      if (!dtpTimes.length) {
+        dtpTimes = [];
+        for (let h = 0; h < 24; h++) {
+          for (let m = 0; m < 60; m += 15) {
+            dtpTimes.push({ value: pad2(h) + ':' + pad2(m) });
+          }
+        }
+        dtpTimeList.innerHTML = '';
+        dtpTimes.forEach(({ value }) => {
+          const it = document.createElement('div');
+          it.className = 'wheel-item';
+          it.dataset.value = value;
+          it.textContent = value;
+          dtpTimeList.appendChild(it);
+        });
+      }
+    };
+
+    const syncDtpSelectionFromInput = () => {
+      ensureDtpData();
+      const raw = resDate ? String(resDate.value || '').trim() : '';
+      const m = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+      const dateVal = m ? m[1] : (dtpDates[0] ? dtpDates[0].value : '');
+      const timeVal = m ? m[2] : '18:00';
+      dtpSelDate = dateVal;
+      dtpSelTime = timeVal;
+      const dIdx = Math.max(0, dtpDates.findIndex((x) => x.value === dateVal));
+      const tIdx = Math.max(0, dtpTimes.findIndex((x) => x.value === timeVal));
+      setWheelTo(dtpDateList, dIdx);
+      setWheelTo(dtpTimeList, tIdx);
+    };
+
+    const applyDtpToInput = () => {
+      if (!resDate) return;
+      const dateVal = dtpSelDate || (dtpDates[0] ? dtpDates[0].value : '');
+      const timeVal = dtpSelTime || '18:00';
+      resDate.value = dateVal + 'T' + timeVal;
+      if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
+      resDate.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    if (dtpDateList) {
+      let t = null;
+      dtpDateList.addEventListener('scroll', () => {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => {
+          const idx = wheelIndex(dtpDateList, dtpDates.length);
+          updateWheelActive(dtpDateList, idx);
+          dtpSelDate = dtpDates[idx] ? dtpDates[idx].value : dtpSelDate;
+        }, 80);
+      });
+    }
+    if (dtpTimeList) {
+      let t = null;
+      dtpTimeList.addEventListener('scroll', () => {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => {
+          const idx = wheelIndex(dtpTimeList, dtpTimes.length);
+          updateWheelActive(dtpTimeList, idx);
+          dtpSelTime = dtpTimes[idx] ? dtpTimes[idx].value : dtpSelTime;
+        }, 80);
+      });
+    }
+    if (dtpOk) dtpOk.addEventListener('click', () => { applyDtpToInput(); setDtpModal(false); });
+    document.querySelectorAll('[data-dtp-close]').forEach((x) => x.addEventListener('click', () => setDtpModal(false)));
+    if (resDateBtn) {
+      resDateBtn.addEventListener('click', () => {
+        syncDtpSelectionFromInput();
+        setDtpModal(true);
+      });
+    }
 
     const setModal = (el, on) => {
       if (!el) return;
@@ -2039,6 +2312,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const initDate = () => {
       if (!resDate) return;
       resDate.value = defaultResDateLocal || '';
+      if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       setBusyLabel(String(resDate.value || '').slice(0, 10));
       clearReservationsOnTables();
     };
