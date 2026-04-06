@@ -943,10 +943,11 @@ $firstOfMonth = date('Y-m-01');
         .help-btn:hover { box-shadow: 0 0 0 2px rgba(26,115,232,0.35); }
         @keyframes helpPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
         .cols-dd { position: relative; display: inline-flex; }
-        .cols-dd > button { white-space: nowrap; }
+        .cols-dd > button { white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; }
+        .cols-icon { width: 14px; height: 14px; display: inline-block; }
         .cols-menu {
             position: absolute;
-            right: 0;
+            left: 0;
             top: calc(100% + 8px);
             width: 260px;
             max-height: 340px;
@@ -1023,7 +1024,12 @@ $firstOfMonth = date('Y-m-01');
                 Скрыть нулевые
             </label>
             <div class="cols-dd">
-                <button type="button" class="secondary" id="colsBtn">Колонки</button>
+                <button type="button" class="secondary" id="colsBtn">
+                    <svg class="cols-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M4 5h16M7 12h10M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    Колонки
+                </button>
                 <div class="cols-menu" id="colsMenu" hidden></div>
             </div>
         </div>
