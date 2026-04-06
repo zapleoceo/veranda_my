@@ -371,12 +371,30 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
         ], 'GET');
         if (!is_array($txs)) $txs = [];
 
-        $latest = [];
+        $strictPayerFilter = (string)($_ENV['LTP_STRICT_PAYER_USER_FILTER'] ?? '') === '1';
+        $tipsAgg = [];
+        $slrAgg = [];
+
+        $pushAgg = function (array &$dst, int $id, int $ts, string $dateStr, int $amount): void {
+            if (!isset($dst[$id])) $dst[$id] = ['total' => 0, 'items' => []];
+            $dst[$id]['total'] = (int)$dst[$id]['total'] + $amount;
+            $dst[$id]['items'][] = ['ts' => $ts, 'date' => $dateStr];
+        };
+
         foreach ($txs as $t) {
             if (!is_array($t)) continue;
             $type = (string)($t['type'] ?? '');
             if ($type !== '0' && $type !== 'expense' && $type !== 'out') continue;
-            $strictPayerFilter = (string)($_ENV['LTP_STRICT_PAYER_USER_FILTER'] ?? '') === '1';
+
+            $comment = trim((string)($t['comment'] ?? ''));
+            if ($comment === '') continue;
+            $isTips = stripos($comment, 'TIPS') === 0;
+            $isSlr = stripos($comment, 'SLR') === 0;
+            if (!$isTips && !$isSlr) continue;
+            if (!preg_match('/\bID\s*=\s*(\d+)\b/i', $comment, $m)) continue;
+            $empId = (int)$m[1];
+            if ($empId <= 0) continue;
+
             if ($strictPayerFilter) {
                 $uid = (int)($t['user_id'] ?? 0);
                 if ($uid !== 10 && $uid !== 4) continue;
@@ -384,13 +402,12 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
                 $cat = isset($t['category']) ? (int)$t['category'] : (isset($t['category_id']) ? (int)$t['category_id'] : 0);
                 if ($cat > 0 && $cat !== 4) continue;
                 $acc = isset($t['account_from']) ? (int)$t['account_from'] : (isset($t['account_id']) ? (int)$t['account_id'] : 0);
-                if ($acc > 0 && $acc !== 8) continue;
+                if ($acc > 0) {
+                    if ($isTips && $acc !== 8) continue;
+                    if ($isSlr && $acc !== 1) continue;
+                }
             }
-            $comment = trim((string)($t['comment'] ?? ''));
-            if ($comment === '' || stripos($comment, 'TIPS') !== 0) continue;
-            if (!preg_match('/\bID\s*=\s*(\d+)\b/i', $comment, $m)) continue;
-            $waiterId = (int)$m[1];
-            if ($waiterId <= 0) continue;
+
             $dt = $t['date'] ?? '';
             $ts = false;
             if (is_numeric($dt)) {
@@ -402,17 +419,29 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
                 if ($s !== '') $ts = strtotime($s);
             }
             if ($ts === false || (int)$ts <= 0) continue;
+
             $amount = (int)($t['amount'] ?? 0);
-            $cur = $latest[$waiterId] ?? null;
-            if (!$cur || (int)$cur['ts'] < $ts) {
-                $latest[$waiterId] = ['ts' => $ts, 'date' => date('Y-m-d H:i:s', $ts), 'amount' => $amount];
+            $dateStr = date('Y-m-d H:i:s', (int)$ts);
+            if ($isTips) $pushAgg($tipsAgg, $empId, (int)$ts, $dateStr, $amount);
+            else $pushAgg($slrAgg, $empId, (int)$ts, $dateStr, $amount);
+        }
+
+        $makeOut = function (array $agg): array {
+            $out = [];
+            foreach ($agg as $id => $v) {
+                $items = (array)($v['items'] ?? []);
+                usort($items, function ($a, $b) { return ((int)($b['ts'] ?? 0)) <=> ((int)($a['ts'] ?? 0)); });
+                $dates = [];
+                foreach ($items as $it) {
+                    $d = (string)($it['date'] ?? '');
+                    if ($d !== '') $dates[] = $d;
+                }
+                $out[(string)$id] = ['total_amount' => (int)($v['total'] ?? 0), 'dates' => $dates];
             }
-        }
-        $out = [];
-        foreach ($latest as $wid => $v) {
-            $out[(string)$wid] = ['date' => (string)$v['date'], 'amount' => (int)$v['amount']];
-        }
-        echo json_encode(['ok' => true, 'items' => $out], JSON_UNESCAPED_UNICODE);
+            return $out;
+        };
+
+        echo json_encode(['ok' => true, 'tips' => $makeOut($tipsAgg), 'slr' => $makeOut($slrAgg)], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -790,7 +819,8 @@ $firstOfMonth = date('Y-m-01');
                     <th id="thChecks" class="col-checks" data-sort="checks" style="text-align:right; cursor:pointer;">Чеков</th>
                     <th id="thHours" class="col-hours" data-sort="worked_hours" style="text-align:right; cursor:pointer;">ЧасыРаботы</th>
                     <th id="thTips" class="col-tips" data-sort="tips_minor" style="text-align:right; cursor:pointer;">Tips</th>
-                    <th id="thPaid" class="col-paid" data-sort="ltp_amount_minor" style="text-align:right; cursor:pointer;">PAID</th>
+                    <th id="thTipsPaid" class="col-paid" data-sort="tips_paid_minor" style="text-align:right; cursor:pointer;">TipsPaid</th>
+                    <th id="thSlrPaid" class="col-slr" data-sort="slr_paid_vnd" style="text-align:right; cursor:pointer;">SlrPaid</th>
                     <th id="thTtp" class="col-ttp" data-sort="tips_to_pay_minor" style="text-align:right; cursor:pointer;">TipsToPay</th>
                     <th id="thSalary" class="col-salary" data-sort="salary_minor" style="text-align:right; cursor:pointer;">Salary</th>
                 </tr>
@@ -951,7 +981,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const ths = Array.from(document.querySelectorAll('th[data-sort]'));
     ths.forEach((th) => th.addEventListener('click', () => setSort(th.getAttribute('data-sort') || '')));
     let dataRows = [];
-    let ltpById = {};
+    let tipsPaidById = {};
+    let slrPaidById = {};
     let payMeta = null;
     let payMetaSalary = null;
     let tipsAccBalanceMinor = null;
@@ -1066,11 +1097,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const dir = sortDir === 'desc' ? -1 : 1;
         const filtered = (hideZero ? dataRows.filter((r) => Number(r.worked_hours || 0) > 0) : dataRows.slice()).map((r) => {
             const tipsMinor = Number(r.tips_minor || 0) || 0;
-            const ltp = ltpById[String(r.user_id)] || null;
-            const ltpAmtMinor = ltp ? Number(ltp.amount || 0) : 0;
-            const ltpDate = ltp && ltp.date ? String(ltp.date) : '';
-            const tipsToPayMinor = Math.max(0, tipsMinor - Math.abs(ltpAmtMinor || 0));
-            return { ...r, ltp_amount_minor: ltpAmtMinor || 0, ltp_date: ltpDate, tips_to_pay_minor: tipsToPayMinor };
+            const tp = tipsPaidById[String(r.user_id)] || null;
+            const tpTotal = tp ? Number(tp.total_amount || 0) : 0;
+            const sp = slrPaidById[String(r.user_id)] || null;
+            const spTotal = sp ? Number(sp.total_amount || 0) : 0;
+            const tipsToPayMinor = Math.max(0, tipsMinor - Math.abs(tpTotal || 0));
+            return { ...r, tips_paid_minor: Math.abs(tpTotal || 0), slr_paid_vnd: Math.abs(spTotal || 0), tips_to_pay_minor: tipsToPayMinor };
         });
         const items = filtered.slice().sort((a, b) => {
             const av = a[sortBy];
@@ -1091,10 +1123,14 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         let totSalary = 0;
         items.forEach((r) => {
             const tipsVnd = vndFromMinor(r.tips_minor || 0);
-            const ltpAmtMinor = Number(r.ltp_amount_minor || 0) || 0;
-            const ltpDate = String(r.ltp_date || '');
-            const ltpAmt = (ltpAmtMinor && isFinite(ltpAmtMinor)) ? fmtMoney(vndFromMinor(Math.abs(ltpAmtMinor))) : '';
-            const paidTxt = (ltpDate && ltpAmt) ? `${ltpDate} · ${ltpAmt}` : '';
+            const tp = tipsPaidById[String(r.user_id)] || null;
+            const tpTotal = tp ? Number(tp.total_amount || 0) : 0;
+            const tpAmt = (tpTotal && isFinite(tpTotal)) ? fmtMoney(vndFromMinor(Math.abs(tpTotal))) : '';
+            const tpDates = tp && Array.isArray(tp.dates) ? tp.dates : [];
+            const sp = slrPaidById[String(r.user_id)] || null;
+            const spTotal = sp ? Number(sp.total_amount || 0) : 0;
+            const spAmt = (spTotal && isFinite(spTotal)) ? fmtMoney(Math.abs(spTotal)) : '';
+            const spDates = sp && Array.isArray(sp.dates) ? sp.dates : [];
             const tipsToPayMinor = Number(r.tips_to_pay_minor || 0) || 0;
             const tipsToPayVnd = vndFromMinor(tipsToPayMinor);
             const tr = document.createElement('tr');
@@ -1112,7 +1148,14 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 <td class="col-checks" style="text-align:right;">${esc(r.checks)}</td>
                 <td class="col-hours" style="text-align:right;">${esc(r.worked_hours)}</td>
                 <td class="col-tips" style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
-                <td class="col-paid" style="text-align:right;">${paidTxt ? `<div class="ltp" title="Сумма и дата последней выплаты типсов">${esc(paidTxt)}</div>` : '—'}</td>
+                <td class="col-paid" style="text-align:right;">
+                    ${tpAmt ? `<div style="font-weight:900;">${esc(tpAmt)}</div>` : '—'}
+                    ${tpDates.length ? tpDates.map((d) => `<div class="ltp">${esc(d)}</div>`).join('') : ''}
+                </td>
+                <td class="col-slr" style="text-align:right;">
+                    ${spAmt ? `<div style="font-weight:900;">${esc(spAmt)}</div>` : '—'}
+                    ${spDates.length ? spDates.map((d) => `<div class="ltp">${esc(d)}</div>`).join('') : ''}
+                </td>
                 <td class="col-ttp" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
                         <span>${esc(fmtMoney(tipsToPayVnd))}</span>
@@ -1254,13 +1297,16 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 cleanup();
                 let jLtp = null;
                 try { jLtp = JSON.parse(txtLtp); } catch (_) {}
-                if (jLtp && jLtp.ok && jLtp.items) {
-                    ltpById = jLtp.items || {};
+                if (jLtp && jLtp.ok) {
+                    tipsPaidById = jLtp.tips || {};
+                    slrPaidById = jLtp.slr || {};
                 } else {
-                    ltpById = {};
+                    tipsPaidById = {};
+                    slrPaidById = {};
                 }
             } catch (_) {
-                ltpById = {};
+                tipsPaidById = {};
+                slrPaidById = {};
             }
 
             try {
@@ -1429,6 +1475,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 let j = null;
                 try { j = JSON.parse(txt); } catch (_) {}
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                const cur = slrPaidById[String(uid)] || { total_amount: 0, dates: [] };
+                const nextTotal = Number(cur.total_amount || 0) + Math.abs(Number(j.salary_vnd || 0) || salaryVnd);
+                const nextDates = Array.isArray(cur.dates) ? cur.dates.slice() : [];
+                if (j.date) nextDates.unshift(String(j.date));
+                slrPaidById[String(uid)] = { total_amount: nextTotal, dates: nextDates };
                 renderTable();
             } catch (err) {
                 setError(err && err.message ? err.message : 'Ошибка');
@@ -1438,9 +1489,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         }
 
         const tipsMinor = Number(row.tips_minor || 0);
-        const ltp = ltpById[String(uid)] || null;
-        const ltpAmtMinor = ltp ? Number(ltp.amount || 0) : 0;
-        const tipsToPayMinor = Math.max(0, tipsMinor - Math.abs(ltpAmtMinor || 0));
+        const tp = tipsPaidById[String(uid)] || null;
+        const tpTotal = tp ? Number(tp.total_amount || 0) : 0;
+        const tipsToPayMinor = Math.max(0, tipsMinor - Math.abs(tpTotal || 0));
         if (tipsToPayMinor <= 0) return;
         const tipsToPayVnd = vndFromMinor(tipsToPayMinor);
         let empName = '';
@@ -1476,7 +1527,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             let j = null;
             try { j = JSON.parse(txt); } catch (_) {}
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-            ltpById[String(uid)] = { date: String(j.date || ''), amount: Number(j.amount || 0) };
+            const cur = tipsPaidById[String(uid)] || { total_amount: 0, dates: [] };
+            const nextTotal = Number(cur.total_amount || 0) + Math.abs(Number(j.amount || 0));
+            const nextDates = Array.isArray(cur.dates) ? cur.dates.slice() : [];
+            if (j.date) nextDates.unshift(String(j.date));
+            tipsPaidById[String(uid)] = { total_amount: nextTotal, dates: nextDates };
             renderTable();
         } catch (err) {
             setError(err && err.message ? err.message : 'Ошибка');
