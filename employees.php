@@ -895,9 +895,9 @@ $firstOfMonth = date('Y-m-01');
         .progress .desc { font-size: 12px; color:#6b7280; }
         #totals { white-space: nowrap; overflow-x: auto; }
         .ltp { margin-top: 2px; font-size: 11px; color: #6b7280; font-weight: 800; white-space: nowrap; }
-        .paid-item { margin-top: 6px; }
-        .paid-date { font-size: 11px; color: #6b7280; font-weight: 800; line-height: 1.1; }
-        .paid-line { display:flex; justify-content: flex-end; gap: 8px; align-items: baseline; font-size: 11px; color: #6b7280; font-weight: 800; line-height: 1.1; }
+        .paid-item { margin-top: 6px; text-align: left; }
+        .paid-date { font-size: 11px; color: #6b7280; font-weight: 800; line-height: 1.1; text-align: left; }
+        .paid-line { display:flex; justify-content: flex-start; gap: 8px; align-items: baseline; font-size: 11px; color: #6b7280; font-weight: 800; line-height: 1.1; text-align: left; }
         .paid-line .amt { font-weight: 900; color: #374151; }
         .paid-btn { border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: #1a73e8; border-radius: 8px; padding: 2px 7px; font-weight: 900; font-size: 11px; cursor: pointer; line-height: 1.2; }
         .paid-btn:disabled { opacity: 0.6; cursor: default; }
