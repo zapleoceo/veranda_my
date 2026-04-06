@@ -1208,7 +1208,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       text-shadow: 0 1px 0 rgba(0,0,0,0.22);
       line-height: 1.1;
       text-align: center;
-      white-space: nowrap;
+      white-space: pre-line;
       overflow: hidden;
       text-overflow: ellipsis;
       transition: color .14s ease;
@@ -1781,7 +1781,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
           : false;
         let txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
         if (isToday && selMin != null && !overlapsSel && last && !freeNums.has(n)) {
-          txt = 'занят сейчас';
+          txt = 'занят\nсейчас';
         }
         let el = t.querySelector('.res-time');
         if (!txt) {
