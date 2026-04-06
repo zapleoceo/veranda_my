@@ -1756,23 +1756,8 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
     }
     try {
         $fromDate = $dFrom !== '' ? $dFrom : $dTo;
-        $fromTs = strtotime($fromDate . ' 00:00:00');
-        $toTs = strtotime($dTo . ' 23:59:59');
 
         $apiOut = new \App\Classes\PosterAPI((string)$token);
-        $excludeCatIds = [];
-        try {
-            $catRows = $apiOut->request('finance.getCategories', []);
-            if (!is_array($catRows)) $catRows = [];
-            foreach ($catRows as $cr) {
-                if (!is_array($cr)) continue;
-                $cid = (int)($cr['category_id'] ?? 0);
-                $action = (int)($cr['action'] ?? $cr['category_action'] ?? 0);
-                if ($action === 14) $excludeCatIds[$cid] = true;
-            }
-        } catch (\Throwable $e) {
-            $excludeCatIds = [];
-        }
         $rows = [];
         foreach ([1, 8] as $accType) {
             try {
@@ -1796,13 +1781,7 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
                 if (!empty($seenTx[$txId])) continue;
                 $seenTx[$txId] = true;
             }
-            $catId = (int)($r['category_id'] ?? 0);
-            if ($catId > 0 && !empty($excludeCatIds[$catId])) continue;
             $dateStr = (string)($r['date'] ?? '');
-            $ts = $dateStr !== '' ? strtotime($dateStr) : false;
-            if ($ts === false) continue;
-            if ($fromTs !== false && $ts < $fromTs) continue;
-            if ($toTs !== false && $ts > $toTs) continue;
             $out[] = [
                 'transaction_id' => (int)($r['transaction_id'] ?? 0),
                 'user_id' => (int)($r['user_id'] ?? 0),
