@@ -302,6 +302,54 @@ if (($_GET['ajax'] ?? '') === 'tips_cancel') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'pay_salary') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    if (!veranda_can('admin')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $raw = file_get_contents('php://input');
+    $j = json_decode((string)$raw, true);
+    if (!is_array($j)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $waiterId = (int)($j['waiter_id'] ?? 0);
+    $salaryVnd = (int)($j['salary_vnd'] ?? 0);
+    if ($waiterId <= 0 || $salaryVnd <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    try {
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $now = date('Y-m-d H:i:s');
+        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+        $comment = 'SLR ID=' . $waiterId . ($by !== '' ? (' by ' . $by) : '');
+        $res = $api->request('finance.createTransactions', [
+            'id' => (int)(time() * 1000 + random_int(0, 999)),
+            'type' => 0,
+            'category' => 4,
+            'user_id' => 10,
+            'amount_from' => $salaryVnd,
+            'account_from' => 1,
+            'date' => $now,
+            'comment' => $comment,
+        ], 'POST');
+        echo json_encode(['ok' => true, 'created_id' => (int)$res, 'date' => $now, 'salary_vnd' => $salaryVnd, 'waiter_id' => $waiterId], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'ltp_load') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -428,6 +476,71 @@ if (($_GET['ajax'] ?? '') === 'pay_meta') {
             'ok' => true,
             'category' => ['id' => 4, 'name' => $categoryName],
             'account_from' => ['id' => 8, 'name' => $accountName],
+            'payer' => ['id' => 10, 'name' => $payerName],
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'pay_meta_salary') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    try {
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $categoryName = '';
+        $accountName = '';
+        $payerName = '';
+
+        try {
+            $cats = $api->request('finance.getCategories', [], 'GET');
+            if (is_array($cats)) {
+                foreach ($cats as $c) {
+                    if (!is_array($c)) continue;
+                    if ((int)($c['category_id'] ?? 0) === 4) {
+                        $categoryName = trim((string)($c['name'] ?? ''));
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        try {
+            $accs = $api->request('finance.getAccounts', [], 'GET');
+            if (is_array($accs)) {
+                foreach ($accs as $a) {
+                    if (!is_array($a)) continue;
+                    if ((int)($a['account_id'] ?? $a['id'] ?? 0) === 1) {
+                        $accountName = trim((string)($a['name'] ?? $a['title'] ?? ''));
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        try {
+            $emps = $api->request('access.getEmployees', [], 'GET');
+            if (is_array($emps)) {
+                foreach ($emps as $e) {
+                    if (!is_array($e)) continue;
+                    if ((int)($e['user_id'] ?? 0) === 10) {
+                        $payerName = trim((string)($e['name'] ?? ''));
+                        break;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'category' => ['id' => 4, 'name' => $categoryName],
+            'account_from' => ['id' => 1, 'name' => $accountName],
             'payer' => ['id' => 10, 'name' => $payerName],
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
@@ -840,6 +953,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     let dataRows = [];
     let ltpById = {};
     let payMeta = null;
+    let payMetaSalary = null;
     let tipsAccBalanceMinor = null;
     let lastTipsMinorTotal = 0;
     let lastTtpMinorTotal = 0;
@@ -1002,10 +1116,15 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 <td class="col-ttp" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
                         <span>${esc(fmtMoney(tipsToPayVnd))}</span>
-                        <button type="button" class="paid-btn" data-user-id="${esc(r.user_id)}" data-ttp-minor="${esc(String(tipsToPayMinor))}" ${paidDisabled}>PAID</button>
+                        <button type="button" class="paid-btn" data-kind="tips" data-user-id="${esc(r.user_id)}" ${paidDisabled}>PAY</button>
                     </div>
                 </td>
-                <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(r.salary_minor))}</td>
+                <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">
+                    <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
+                        <span>${esc(fmtMoney(r.salary_minor))}</span>
+                        <button type="button" class="paid-btn" data-kind="salary" data-user-id="${esc(r.user_id)}" ${Number(r.salary_minor || 0) > 0 ? '' : 'disabled'}>PAY</button>
+                    </div>
+                </td>
             `;
             tbody.appendChild(tr);
         });
@@ -1230,6 +1349,21 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         return payMeta;
     };
 
+    const loadPayMetaSalary = async () => {
+        if (payMetaSalary) return payMetaSalary;
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'pay_meta_salary');
+        const { signal, cleanup } = withTimeout(15000);
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal });
+        const txt = await res.text();
+        cleanup();
+        let j = null;
+        try { j = JSON.parse(txt); } catch (_) {}
+        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        payMetaSalary = j;
+        return payMetaSalary;
+    };
+
     const empNameById = {};
     const loadEmployeeName = async (id) => {
         const uid = Number(id || 0);
@@ -1253,10 +1387,56 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     tbody.addEventListener('click', async (e) => {
         const b = e.target && e.target.closest ? e.target.closest('.paid-btn') : null;
         if (!b) return;
+        const kind = String(b.getAttribute('data-kind') || 'tips');
         const uid = Number(b.getAttribute('data-user-id') || 0);
         if (!uid) return;
         const row = dataRows.find((x) => Number(x.user_id) === uid);
         if (!row) return;
+
+        if (kind === 'salary') {
+            const salaryVnd = Math.round(Number(row.salary_minor || 0) || 0);
+            if (salaryVnd <= 0) return;
+            let empName = '';
+            try { empName = await loadEmployeeName(uid); } catch (_) { empName = ''; }
+            if (!empName) empName = String(row.name || '').trim();
+            let meta = null;
+            try { meta = await loadPayMetaSalary(); } catch (_) { meta = null; }
+            const catName = meta && meta.category && meta.category.name ? String(meta.category.name) : '#4';
+            const accName = meta && meta.account_from && meta.account_from.name ? String(meta.account_from.name) : '#1';
+            const payerName = meta && meta.payer && meta.payer.name ? String(meta.payer.name) : '#10';
+            const creatorEmail = String((window.__USER_EMAIL__ || '')).trim();
+            const creatorLabel = creatorEmail ? creatorEmail : '—';
+            const ok = await openPaidConfirm(
+                `Будет создана транзакция расхода на выплату зарплаты.<br>` +
+                `Сотрудник: <b>${esc(empName || ('#' + String(uid)))}</b><br>` +
+                `Сумма: <b>${esc(fmtMoney(salaryVnd))}</b><br>` +
+                `Категория: <b>${esc(catName)}</b><br>` +
+                `Исполнитель: <b>${esc(payerName)}</b><br>` +
+                `Счет списания: <b>${esc(accName)}</b><br>` +
+                `Комментарий: <b>SLR ID=${esc(uid)}</b> by <b>${esc(creatorLabel)}</b>`
+            );
+            if (!ok) return;
+            b.disabled = true;
+            try {
+                const url = new URL(location.href);
+                url.searchParams.set('ajax', 'pay_salary');
+                const res = await fetch(url.toString(), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ waiter_id: uid, salary_vnd: salaryVnd }),
+                });
+                const txt = await res.text();
+                let j = null;
+                try { j = JSON.parse(txt); } catch (_) {}
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                renderTable();
+            } catch (err) {
+                setError(err && err.message ? err.message : 'Ошибка');
+                b.disabled = false;
+            }
+            return;
+        }
+
         const tipsMinor = Number(row.tips_minor || 0);
         const ltp = ltpById[String(uid)] || null;
         const ltpAmtMinor = ltp ? Number(ltp.amount || 0) : 0;
