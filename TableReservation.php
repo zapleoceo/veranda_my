@@ -1202,7 +1202,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       font-size: 0.6rem;
       font-weight: 800;
       letter-spacing: -0.02em;
-      color: rgba(255, 64, 64, 1);
+      color: rgba(245, 238, 228, 0.72);
       font-family: var(--font-body);
       pointer-events: none;
       text-shadow: 0 1px 0 rgba(0,0,0,0.22);
@@ -1211,15 +1211,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      padding: 0;
-      border-radius: 8px;
-      background: transparent;
-      transition: background-color .14s ease, box-shadow .14s ease;
+      transition: color .14s ease;
     }
     .table:hover .res-time, .table:focus-visible .res-time {
-      background: rgba(0, 0, 0, 0.28);
-      box-shadow: 0 6px 16px rgba(0,0,0,0.18);
-      padding: 2px 6px;
+      color: rgba(255, 64, 64, 1);
     }
 
     .table.disabled {
