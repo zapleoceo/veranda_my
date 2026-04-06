@@ -217,6 +217,7 @@ if (($_GET['ajax'] ?? '') !== '') {
         name_en VARCHAR(255) NOT NULL,
         edit_ru VARCHAR(255) NOT NULL,
         edit_en VARCHAR(255) NOT NULL,
+        edit_full VARCHAR(255) NOT NULL DEFAULT '',
         raw_json MEDIUMTEXT NULL,
         menu_category_id INT NOT NULL DEFAULT 0,
         workshop_id INT NOT NULL DEFAULT 0,
@@ -232,10 +233,11 @@ if (($_GET['ajax'] ?? '') !== '') {
     try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN workshop_id INT NOT NULL DEFAULT 0"); } catch (\Throwable $e) {}
     try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN weight_flag TINYINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) {}
     try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN color VARCHAR(32) NOT NULL DEFAULT ''"); } catch (\Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN edit_full VARCHAR(255) NOT NULL DEFAULT ''"); } catch (\Throwable $e) {}
 
     $ajax = (string)($_GET['ajax'] ?? '');
     if ($ajax === 'list') {
-        $rows = $db->query("SELECT product_id, name_raw, name_ru, name_en, edit_ru, edit_en, updated_at FROM {$t} ORDER BY name_ru, name_raw")->fetchAll();
+        $rows = $db->query("SELECT product_id, name_raw, name_ru, name_en, edit_full, updated_at FROM {$t} ORDER BY name_ru, name_raw")->fetchAll();
         echo json_encode(['ok' => true, 'items' => is_array($rows) ? $rows : []], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -255,22 +257,24 @@ if (($_GET['ajax'] ?? '') !== '') {
             echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
             exit;
         }
+        $full = $value;
+        if (mb_strlen($full, 'UTF-8') > 255) $full = mb_substr($full, 0, 255, 'UTF-8');
         $ru = '';
         $en = '';
-        if ($value !== '') {
-            $parts = preg_split('/\s*\/\s*/u', $value, 2);
+        if ($full !== '') {
+            $parts = preg_split('/\s*\/\s*/u', $full, 2);
             if (is_array($parts) && count($parts) === 2) {
                 $ru = trim((string)($parts[0] ?? ''));
                 $en = trim((string)($parts[1] ?? ''));
             } else {
-                $ru = $value;
+                $ru = $full;
                 $en = '';
             }
         }
         if (mb_strlen($ru, 'UTF-8') > 255) $ru = mb_substr($ru, 0, 255, 'UTF-8');
         if (mb_strlen($en, 'UTF-8') > 255) $en = mb_substr($en, 0, 255, 'UTF-8');
         $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
-        $db->query("UPDATE {$t} SET edit_ru = ?, edit_en = ?, updated_at = ? WHERE product_id = ? LIMIT 1", [$ru, $en, $now, $pid]);
+        $db->query("UPDATE {$t} SET edit_full = ?, edit_ru = ?, edit_en = ?, updated_at = ? WHERE product_id = ? LIMIT 1", [$full, $ru, $en, $now, $pid]);
         echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -289,14 +293,13 @@ if (($_GET['ajax'] ?? '') !== '') {
         $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
         if (!is_array($payload)) $payload = [];
         $pid = (int)($payload['product_id'] ?? 0);
-        $lang = strtolower(trim((string)($payload['lang'] ?? '')));
-        if ($pid <= 0 || ($lang !== 'ru' && $lang !== 'en')) {
+        if ($pid <= 0) {
             http_response_code(400);
             echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
             exit;
         }
         $row = $db->query(
-            "SELECT product_id, name_ru, name_en, edit_ru, edit_en, menu_category_id, workshop_id, weight_flag, color
+            "SELECT product_id, name_raw, name_ru, name_en, edit_full, menu_category_id, workshop_id, weight_flag, color
              FROM {$t}
              WHERE product_id = ?
              LIMIT 1",
@@ -307,9 +310,7 @@ if (($_GET['ajax'] ?? '') !== '') {
             echo json_encode(['ok' => false, 'error' => 'Not found'], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        $ruVal = trim((string)($row['edit_ru'] ?? $row['name_ru'] ?? ''));
-        $enVal = trim((string)($row['edit_en'] ?? $row['name_en'] ?? ''));
-        $newName = $lang === 'ru' ? $ruVal : $enVal;
+        $newName = trim((string)($row['edit_full'] ?? ''));
         if ($newName === '') {
             http_response_code(400);
             echo json_encode(['ok' => false, 'error' => 'Пустое название'], JSON_UNESCAPED_UNICODE);
@@ -352,7 +353,7 @@ if (($_GET['ajax'] ?? '') !== '') {
                 exit;
             }
         }
-        echo json_encode(['ok' => true, 'method' => $okMethod, 'product_id' => $pid, 'lang' => $lang], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => true, 'method' => $okMethod, 'product_id' => $pid], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
@@ -368,12 +369,13 @@ if (($_GET['ajax'] ?? '') !== '') {
 
         $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
         $stmt = $pdo->prepare(
-            "INSERT INTO {$t} (product_id, name_raw, name_ru, name_en, edit_ru, edit_en, raw_json, menu_category_id, workshop_id, weight_flag, color, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "INSERT INTO {$t} (product_id, name_raw, name_ru, name_en, edit_ru, edit_en, edit_full, raw_json, menu_category_id, workshop_id, weight_flag, color, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                name_raw = VALUES(name_raw),
                name_ru = VALUES(name_ru),
                name_en = VALUES(name_en),
+               edit_full = IF(TRIM(edit_full)='', VALUES(edit_full), edit_full),
                raw_json = VALUES(raw_json),
                menu_category_id = VALUES(menu_category_id),
                workshop_id = VALUES(workshop_id),
@@ -407,6 +409,9 @@ if (($_GET['ajax'] ?? '') !== '') {
             if (!$hasEdit) { $editRu = $ru; $editEn = $en; }
             if (mb_strlen($editRu, 'UTF-8') > 255) $editRu = mb_substr($editRu, 0, 255, 'UTF-8');
             if (mb_strlen($editEn, 'UTF-8') > 255) $editEn = mb_substr($editEn, 0, 255, 'UTF-8');
+            $editFull = trim($editRu) !== '' && trim($editEn) !== '' ? (trim($editRu) . ' / ' . trim($editEn)) : (trim($editRu) !== '' ? trim($editRu) : trim($editEn));
+            if ($editFull === '') $editFull = $rawName;
+            if (mb_strlen($editFull, 'UTF-8') > 255) $editFull = mb_substr($editFull, 0, 255, 'UTF-8');
 
             $rawJson = json_encode($p, JSON_UNESCAPED_UNICODE);
             if (!is_string($rawJson)) $rawJson = null;
@@ -415,7 +420,7 @@ if (($_GET['ajax'] ?? '') !== '') {
             $workshopId = (int)($p['workshop'] ?? $p['workshop_id'] ?? 0);
             $weightFlag = (int)($p['weight_flag'] ?? 0);
             $color = trim((string)($p['color'] ?? $p['product_color'] ?? ''));
-            $stmt->execute([$pid, $rawName, $ru, $en, $editRu, $editEn, $rawJson, $menuCategoryId, $workshopId, $weightFlag, $color, $now, $now]);
+            $stmt->execute([$pid, $rawName, $ru, $en, $editRu, $editEn, $editFull, $rawJson, $menuCategoryId, $workshopId, $weightFlag, $color, $now, $now]);
             $count++;
         }
         echo json_encode(['ok' => true, 'count' => $count], JSON_UNESCAPED_UNICODE);
@@ -426,7 +431,7 @@ if (($_GET['ajax'] ?? '') !== '') {
         $rows = $db->query("SELECT product_id, name_raw, name_ru, name_en, edit_ru, edit_en FROM {$t}")->fetchAll();
         if (!is_array($rows)) $rows = [];
         $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
-        $stmt = $pdo->prepare("UPDATE {$t} SET name_ru = ?, name_en = ?, edit_ru = IF(TRIM(edit_ru)='', ?, edit_ru), edit_en = IF(TRIM(edit_en)='', ?, edit_en), updated_at = ? WHERE product_id = ? LIMIT 1");
+        $stmt = $pdo->prepare("UPDATE {$t} SET name_ru = ?, name_en = ?, edit_ru = IF(TRIM(edit_ru)='', ?, edit_ru), edit_en = IF(TRIM(edit_en)='', ?, edit_en), edit_full = IF(TRIM(edit_full)='', ?, edit_full), updated_at = ? WHERE product_id = ? LIMIT 1");
         $upd = 0;
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
@@ -437,7 +442,10 @@ if (($_GET['ajax'] ?? '') !== '') {
             $ru = (string)($pair['ru'] ?? '');
             $en = (string)($pair['en'] ?? '');
             if ($ru === '' || $en === '') continue;
-            $stmt->execute([$ru, $en, $ru, $en, $now, $pid]);
+            $full = $ru !== '' && $en !== '' ? ($ru . ' / ' . $en) : ($ru !== '' ? $ru : $en);
+            if ($full === '') $full = $rawName;
+            if (mb_strlen($full, 'UTF-8') > 255) $full = mb_substr($full, 0, 255, 'UTF-8');
+            $stmt->execute([$ru, $en, $ru, $en, $full, $now, $pid]);
             $upd++;
         }
         echo json_encode(['ok' => true, 'updated' => $upd], JSON_UNESCAPED_UNICODE);
@@ -465,7 +473,7 @@ if (($_GET['ajax'] ?? '') !== '') {
         button.primary { background: #1a73e8; color: #fff; border-color:#1a73e8; }
         button:disabled { opacity: 0.5; cursor: default; }
         .status { font-size: 12px; color:#6b7280; font-weight: 800; }
-        table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #fff; border: 1px solid rgba(0,0,0,0.10); border-radius: 12px; overflow:hidden; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #fff; border: 1px solid rgba(0,0,0,0.10); border-radius: 12px; overflow:hidden; table-layout: fixed; }
         th, td { padding: 10px 12px; border-bottom: 1px solid rgba(0,0,0,0.06); vertical-align: top; }
         th { text-align:left; font-size: 12px; color:#6b7280; font-weight: 900; background: rgba(0,0,0,0.03); position: sticky; top: 0; }
         td { font-size: 13px; font-weight: 800; }
@@ -473,22 +481,9 @@ if (($_GET['ajax'] ?? '') !== '') {
         .edit { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); font-weight: 800; font-size: 13px; }
         .pid { font-variant-numeric: tabular-nums; font-size: 11px; }
         .row-saving { outline: 2px solid rgba(26,115,232,0.25); outline-offset: -2px; }
-        .cell { display:flex; align-items:flex-start; justify-content: space-between; gap: 10px; }
-        .cell .txt { min-width: 0; }
-        .upd {
-            flex: 0 0 auto;
-            width: 32px;
-            height: 32px;
-            border-radius: 10px;
-            border: 1px solid rgba(0,0,0,0.12);
-            background: #fff;
-            cursor: pointer;
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
-            padding: 0;
-        }
-        .upd svg { width: 16px; height: 16px; }
+        .clip { overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .upd { width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #fff; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; padding: 0; }
+        .upd svg { width: 18px; height: 18px; }
         .upd:disabled { opacity: 0.35; cursor: default; }
         @media (max-width: 800px) {
             th:nth-child(1), td:nth-child(1) { display:none; }
@@ -507,9 +502,11 @@ if (($_GET['ajax'] ?? '') !== '') {
         <thead>
         <tr>
             <th style="width:90px;">ID</th>
-            <th>RU</th>
-            <th>EN</th>
-            <th>RU / EN (edit)</th>
+            <th style="width: 24%;">Оригинальное</th>
+            <th style="width: 20%;">RU</th>
+            <th style="width: 20%;">EN</th>
+            <th style="width: 28%;">Новое название</th>
+            <th style="width: 52px;"></th>
         </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -533,11 +530,7 @@ if (($_GET['ajax'] ?? '') !== '') {
     const esc = (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
     const rowValue = (r) => {
-        const ru = String(r.edit_ru || '').trim();
-        const en = String(r.edit_en || '').trim();
-        if (!ru && !en) return '';
-        if (ru && en) return ru + ' / ' + en;
-        return ru || en;
+        return String(r.edit_full || '').trim();
     };
 
     const loadList = async () => {
@@ -551,31 +544,21 @@ if (($_GET['ajax'] ?? '') !== '') {
             const pid = String(r.product_id || '');
             const tr = document.createElement('tr');
             tr.dataset.pid = pid;
+            const canUpdate = String(rowValue(r)).trim() !== '';
             tr.innerHTML = `
                 <td class="pid muted">${esc(pid)}</td>
-                <td>
-                    <div class="cell">
-                        <div class="txt">${esc(r.name_ru || '')}</div>
-                        <button type="button" class="upd" data-pid="${esc(pid)}" data-lang="ru" ${String(r.edit_ru || r.name_ru || '').trim() ? '' : 'disabled'} title="Обновить RU в Poster" aria-label="Обновить RU">
-                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M20 12a8 8 0 1 1-2.2-5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                <path d="M20 4v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-                    </div>
-                </td>
-                <td>
-                    <div class="cell">
-                        <div class="txt">${esc(r.name_en || '')}</div>
-                        <button type="button" class="upd" data-pid="${esc(pid)}" data-lang="en" ${String(r.edit_en || r.name_en || '').trim() ? '' : 'disabled'} title="Обновить EN в Poster" aria-label="Обновить EN">
-                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M20 12a8 8 0 1 1-2.2-5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                <path d="M20 4v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-                    </div>
-                </td>
+                <td class="clip" title="${esc(r.name_raw || '')}">${esc(r.name_raw || '')}</td>
+                <td class="clip" title="${esc(r.name_ru || '')}">${esc(r.name_ru || '')}</td>
+                <td class="clip" title="${esc(r.name_en || '')}">${esc(r.name_en || '')}</td>
                 <td><input class="edit" data-pid="${esc(pid)}" value="${esc(rowValue(r))}"></td>
+                <td style="text-align:right;">
+                    <button type="button" class="upd" data-pid="${esc(pid)}" ${canUpdate ? '' : 'disabled'} title="Обновить в Poster" aria-label="Обновить">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M20 12a8 8 0 1 1-2.2-5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <path d="M20 4v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </td>
             `;
             tbody.appendChild(tr);
         });
@@ -605,7 +588,6 @@ if (($_GET['ajax'] ?? '') !== '') {
             if (!(btn instanceof HTMLButtonElement)) return;
             if (btn.disabled) return;
             const pid = String(btn.dataset.pid || '');
-            const lang = String(btn.dataset.lang || '');
             const tr = btn.closest('tr');
             btn.disabled = true;
             if (tr) tr.classList.add('row-saving');
@@ -613,12 +595,12 @@ if (($_GET['ajax'] ?? '') !== '') {
             fetch(apiUrl('poster_update'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ product_id: Number(pid), lang }),
+                body: JSON.stringify({ product_id: Number(pid) }),
             })
                 .then((r) => r.json().catch(() => null).then((j) => ({ r, j })))
                 .then(({ r, j }) => {
                     if (!r.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                    setStatus('Обновлено в Poster: ' + String(j.method || 'ok') + ' · ' + String(lang).toUpperCase() + ' · ID ' + String(pid));
+                    setStatus('Обновлено в Poster: ' + String(j.method || 'ok') + ' · ID ' + String(pid));
                 })
                 .catch((err) => setStatus(String(err && err.message ? err.message : err)))
                 .finally(() => {
