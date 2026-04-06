@@ -652,6 +652,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
     }
   }
+  $text .= "\n\n@Ollushka90 @ce_akh1  свяжитесь с гостем";
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
   $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
