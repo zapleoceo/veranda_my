@@ -889,6 +889,36 @@ $firstOfMonth = date('Y-m-01');
         .modal .btn2 { padding: 10px 14px; border-radius: 10px; border: 1px solid #d0d5dd; background: #fff; font-weight: 900; cursor: pointer; }
         .modal .btn2.primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
         .modal .btn2:disabled { opacity: 0.6; cursor: default; }
+        #payExtraModal .modal { max-width: 520px; position: relative; }
+        .payextra-fields { display: grid; gap: 10px; }
+        .payextra-fields label { font-size: 12px; color: #6b7280; font-weight: 900; display: grid; gap: 6px; }
+        .payextra-fields select,
+        .payextra-fields input[type="number"],
+        .payextra-fields input[type="text"] {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+            background: #fff;
+            width: 100%;
+        }
+        .payextra-fields input[readonly] { background: #f3f4f6; color: #374151; }
+        .payextra-overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 10px;
+            border-radius: 14px;
+            background: rgba(17, 24, 39, 0.55);
+            color: #fff;
+            font-weight: 900;
+            text-align: center;
+            padding: 16px;
+        }
+        #payExtraModal.loading .payextra-overlay { display: flex; }
         .help-btn { width: 24px; height: 24px; border-radius: 999px; border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: #1a73e8; font-weight: 900; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; line-height: 1; padding: 0; animation: helpPulse 1200ms ease-in-out infinite; }
         .help-btn:hover { box-shadow: 0 0 0 2px rgba(26,115,232,0.35); }
         @keyframes helpPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
@@ -1005,32 +1035,32 @@ $firstOfMonth = date('Y-m-01');
 <div class="modal-backdrop" id="payExtraModal" style="display:none;">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="payExtraTitle">
         <h3 id="payExtraTitle">PayExtra</h3>
-        <div class="body" style="display:grid; gap: 10px;">
-            <label style="display:grid; gap: 6px;">
+        <div class="body payextra-fields">
+            <label>
                 Сотрудник
                 <select id="payExtraEmp"></select>
             </label>
-            <label style="display:grid; gap: 6px;">
+            <label>
                 Тип
                 <select id="payExtraKind">
                     <option value="tips">Tips</option>
                     <option value="salary">Salary</option>
                 </select>
             </label>
-            <label style="display:grid; gap: 6px;">
+            <label>
                 Сумма (VND)
                 <input type="number" id="payExtraAmount" min="1" step="1" inputmode="numeric">
             </label>
-            <label style="display:grid; gap: 6px;">
+            <label>
                 Счет списания
                 <select id="payExtraAccount"></select>
             </label>
-            <label style="display:grid; gap: 6px;">
+            <label>
                 Комментарий
                 <input type="text" id="payExtraComment" readonly>
             </label>
         </div>
-        <div class="sub" style="margin-top: 10px;">
+        <div class="sub">
             <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
                 <input type="checkbox" id="payExtraChecked">
                 да проверил
@@ -1039,6 +1069,10 @@ $firstOfMonth = date('Y-m-01');
         <div class="actions">
             <button type="button" class="btn2" id="payExtraCancel">Отмена</button>
             <button type="button" class="btn2 primary" id="payExtraPay" disabled>Оплатить</button>
+        </div>
+        <div class="payextra-overlay" aria-hidden="true">
+            <span class="spinner" style="width: 20px; height: 20px;"></span>
+            <div>Загрузка…</div>
         </div>
     </div>
 </div>
@@ -1208,6 +1242,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     let payMeta = null;
     let payMetaSalary = null;
     let payMetaExtra = null;
+    let payExtraOpening = false;
+    let payExtraSubmitting = false;
     let tipsAccBalanceMinor = null;
     let lastTipsMinorTotal = 0;
     let lastTtpMinorTotal = 0;
@@ -1654,6 +1690,18 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         el.style.display = on ? 'flex' : 'none';
     };
 
+    const setPayExtraLoading = (on) => {
+        if (!payExtraModal) return;
+        if (on) payExtraModal.classList.add('loading');
+        else payExtraModal.classList.remove('loading');
+        const disabled = !!on;
+        if (payExtraEmp) payExtraEmp.disabled = disabled;
+        if (payExtraKind) payExtraKind.disabled = disabled;
+        if (payExtraAmount) payExtraAmount.disabled = disabled;
+        if (payExtraAccount) payExtraAccount.disabled = disabled;
+        if (payExtraChecked) payExtraChecked.disabled = disabled;
+    };
+
     const buildPayComment = (kind, empId, empName) => {
         const creatorEmail = String((window.__USER_EMAIL__ || '')).trim();
         const creatorLabel = creatorEmail ? creatorEmail : '—';
@@ -1686,7 +1734,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
     const openPayExtra = async () => {
         if (!payExtraModal) return;
+        if (payExtraOpening || payExtraSubmitting) return;
         if (!dataRows.length) { setError('Сначала нажми ЗАГРУЗИТЬ'); return; }
+        payExtraOpening = true;
+        if (payExtraBtn) payExtraBtn.disabled = true;
+        setModalVisible(payExtraModal, true);
+        setPayExtraLoading(true);
         fillPayExtraEmployees();
         try {
             const meta = await loadPayMetaExtra();
@@ -1711,7 +1764,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         if (payExtraChecked) payExtraChecked.checked = false;
         if (payExtraPay) payExtraPay.disabled = true;
         refreshPayExtraComment();
-        setModalVisible(payExtraModal, true);
+        setPayExtraLoading(false);
+        payExtraOpening = false;
+        if (payExtraBtn) payExtraBtn.disabled = false;
     };
 
     const closePayExtra = () => setModalVisible(payExtraModal, false);
@@ -1727,9 +1782,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             else payExtraAccount.value = '8';
         }
     });
-    if (payExtraChecked && payExtraPay) payExtraChecked.addEventListener('change', () => { payExtraPay.disabled = !payExtraChecked.checked; });
+    if (payExtraChecked && payExtraPay) payExtraChecked.addEventListener('change', () => { payExtraPay.disabled = !(payExtraChecked.checked && !payExtraSubmitting && !payExtraOpening); });
     if (payExtraPay) payExtraPay.addEventListener('click', async () => {
         if (!payExtraEmp || !payExtraKind || !payExtraAmount || !payExtraAccount) return;
+        if (payExtraSubmitting || payExtraOpening) return;
         const uid = Number(payExtraEmp.value || 0);
         const kind = String(payExtraKind.value || 'tips');
         const amount = Math.round(Number(payExtraAmount.value || 0) || 0);
@@ -1738,7 +1794,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const empName = row ? String(row.name || '').trim() : '';
         if (!uid || !amount || !accountFrom) return;
 
+        payExtraSubmitting = true;
         payExtraPay.disabled = true;
+        setPayExtraLoading(true);
         try {
             const url = new URL(location.href);
             url.searchParams.set('ajax', 'pay_extra');
@@ -1767,9 +1825,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             }
             closePayExtra();
             renderTable();
+            payExtraSubmitting = false;
+            setPayExtraLoading(false);
         } catch (err) {
             setError(err && err.message ? err.message : 'Ошибка');
-            payExtraPay.disabled = false;
+            payExtraSubmitting = false;
+            setPayExtraLoading(false);
+            if (payExtraChecked) payExtraPay.disabled = !payExtraChecked.checked;
         }
     });
 
