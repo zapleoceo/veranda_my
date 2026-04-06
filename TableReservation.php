@@ -966,30 +966,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       width: auto;
       min-width: 0;
     }
-    .cash-meta {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-      font-family: var(--font-body);
-      font-size: 11px;
-      color: rgba(245,238,228,0.70);
-      text-transform: none;
-      letter-spacing: 0;
-      margin-top: 2px;
-    }
-    .cash-text {
-      width: 170px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.14);
-      background: rgba(0,0,0,0.18);
-      color: rgba(245,238,228,0.86);
-      padding: 0.45rem 0.55rem;
-      font-size: 11px;
-      line-height: 1.3;
-      min-height: 72px;
-      resize: none;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    }
+    body { overflow-x: hidden; }
     .mini-loader {
       width: 10px;
       height: 10px;
@@ -1115,11 +1092,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       box-shadow: 0 18px 34px rgba(84, 49, 20, .3);
       filter: saturate(1.05);
       outline: none;
-    }
-  
-    .table.selected {
-      background: linear-gradient(180deg, #4f7b4b, #355b33);
-      box-shadow: 0 18px 34px rgba(43, 89, 50, .28);
     }
   
     .table .res-time {
@@ -1503,11 +1475,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
                     <input class="gst" type="number" id="resGuests" min="1" max="30" placeholder="1" value="1" aria-label="Гостей">
                     <button class="btn btn-primary" id="checkBtn" type="button">Проверить</button>
                   </div>
-                  <div class="cash-meta">
-                    <div>Стол: <strong id="selectedTable">—</strong></div>
-                    <div id="statusLine">—</div>
-                  </div>
-                  <textarea id="resultText" class="cash-text" readonly></textarea>
                 </div>
               </div>
             </div>
@@ -1532,7 +1499,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   <div class="modal" id="reqModal" aria-hidden="true">
     <div class="modal-backdrop" data-modal-close="reqModal"></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle">
-      <div class="modal-title" id="reqModalTitle">Заявка на бронь</div>
+      <div class="modal-title" id="reqModalTitle">Заявка на бронь на столик <span id="reqModalTable"></span></div>
       <form id="reqForm">
         <div class="modal-grid">
           <label class="modal-label">
@@ -1542,10 +1509,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
           <label class="modal-label">
             Ваш номер телефона
             <input type="tel" id="reqPhone" autocomplete="tel" required>
-          </label>
-          <label class="modal-label">
-            Номер стола
-            <input type="text" id="reqTable" readonly>
           </label>
           <label class="modal-label">
             Кол-во гостей
@@ -1721,7 +1684,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const reqForm = document.getElementById('reqForm');
     const reqName = document.getElementById('reqName');
     const reqPhone = document.getElementById('reqPhone');
-    const reqTable = document.getElementById('reqTable');
+    const reqModalTable = document.getElementById('reqModalTable');
     const reqGuests = document.getElementById('reqGuests');
     const reqStart = document.getElementById('reqStart');
     const reqHint = document.getElementById('reqHint');
@@ -1787,7 +1750,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     let pendingBooking = null;
     const openRequestForm = ({ tableNum, guests, start }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
-      if (reqTable) reqTable.value = String(tableNum || '');
+      if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
       if (reqGuests) reqGuests.value = String(guests);
       if (reqStart) reqStart.value = String(start);
       if (reqName) reqName.value = '';
@@ -2086,7 +2049,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         const un = getUnavailableReason(id, current);
         if (un) {
           selectedTableNum = '';
-          tables.forEach((t) => t.classList.remove('selected'));
           showToast(table, un.reason, un.detail);
           return;
         }
@@ -2096,7 +2058,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
           const ok = await confirmCapacity(Math.max(1, Math.floor(cap)), current.guests);
           if (!ok) {
             selectedTableNum = '';
-            tables.forEach((t) => t.classList.remove('selected'));
             setOutput('Исправь кол-во гостей и выбери столик снова.');
             if (resGuests) { resGuests.focus(); resGuests.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
             return;
@@ -2104,8 +2065,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         }
 
         selectedTableNum = id;
-        tables.forEach((t) => t.classList.remove('selected'));
-        table.classList.add('selected');
         openRequestForm({ tableNum: id, guests: current.guests, start: current.dtRaw });
       });
     });
