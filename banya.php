@@ -636,6 +636,7 @@ $firstOfMonth = date('Y-m-01');
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Отчет баня</title>
+    <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <script src="/assets/app.js" defer></script>
     <style>
         :root { --brand-text: #b65930; --brand-bg: #efdbce; }

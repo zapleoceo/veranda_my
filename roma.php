@@ -139,6 +139,7 @@ $firstOfMonth = date('Y-m-01');
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Roma</title>
+    <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <script src="/assets/app.js" defer></script>
     <style>
         body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f5f5f5; color:#111827; }
