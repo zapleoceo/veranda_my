@@ -63,6 +63,140 @@ $splitName = function (string $raw): array {
     return ['ru' => $ruS, 'en' => $enS];
 };
 
+$cleanName = function (string $raw): string {
+    $s = trim((string)$raw);
+    if ($s === '') return '';
+    $s = str_replace(["\u{00A0}", "\u{2007}", "\u{202F}"], ' ', $s);
+    $s = preg_replace('/\s+/u', ' ', $s);
+    $s = preg_replace('/^[\-\–\—\·\•\*\#\s]+/u', '', (string)$s);
+    $s = preg_replace('/\s*[\-\–\—\·\•\*\#\s]+$/u', '', (string)$s);
+    $s = preg_replace('/\s*\([^)]*\b(?:id|код|code|sku|арт|арт\.|№)\b[^)]*\)\s*/iu', ' ', (string)$s);
+    $s = preg_replace('/\s*\[[^\]]*\b(?:id|код|code|sku|арт|арт\.|№)\b[^\]]*\]\s*/iu', ' ', (string)$s);
+    $s = preg_replace('/\s*\((?:\d{1,4}|#\d{1,6})\)\s*/u', ' ', (string)$s);
+    $s = preg_replace('/\s*\[(?:\d{1,4}|#\d{1,6})\]\s*/u', ' ', (string)$s);
+    $s = preg_replace('/\s*\b(?:vnd|₫)\b\s*/iu', ' ', (string)$s);
+    $s = preg_replace('/\s+/u', ' ', (string)$s);
+    $s = trim((string)$s);
+    return (string)$s;
+};
+
+$translitRuToEn = function (string $s): string {
+    $map = [
+        'А'=>'A','Б'=>'B','В'=>'V','Г'=>'G','Д'=>'D','Е'=>'E','Ё'=>'E','Ж'=>'Zh','З'=>'Z','И'=>'I','Й'=>'Y','К'=>'K','Л'=>'L','М'=>'M','Н'=>'N','О'=>'O','П'=>'P','Р'=>'R','С'=>'S','Т'=>'T','У'=>'U','Ф'=>'F','Х'=>'Kh','Ц'=>'Ts','Ч'=>'Ch','Ш'=>'Sh','Щ'=>'Shch','Ъ'=>'','Ы'=>'Y','Ь'=>'','Э'=>'E','Ю'=>'Yu','Я'=>'Ya',
+        'а'=>'a','б'=>'b','в'=>'v','г'=>'g','д'=>'d','е'=>'e','ё'=>'e','ж'=>'zh','з'=>'z','и'=>'i','й'=>'y','к'=>'k','л'=>'l','м'=>'m','н'=>'n','о'=>'o','п'=>'p','р'=>'r','с'=>'s','т'=>'t','у'=>'u','ф'=>'f','х'=>'kh','ц'=>'ts','ч'=>'ch','ш'=>'sh','щ'=>'shch','ъ'=>'','ы'=>'y','ь'=>'','э'=>'e','ю'=>'yu','я'=>'ya',
+    ];
+    return strtr($s, $map);
+};
+
+$translitEnToRu = function (string $s): string {
+    $repl = [
+        'shch' => 'щ', 'yo' => 'ё', 'zh' => 'ж', 'kh' => 'х', 'ts' => 'ц', 'ch' => 'ч', 'sh' => 'ш', 'yu' => 'ю', 'ya' => 'я',
+    ];
+    $out = '';
+    $i = 0;
+    $lower = (string)$s;
+    while ($i < strlen($lower)) {
+        $chunk = substr($lower, $i);
+        $matched = false;
+        foreach ($repl as $k => $v) {
+            if (stripos($chunk, $k) === 0) {
+                $out .= $v;
+                $i += strlen($k);
+                $matched = true;
+                break;
+            }
+        }
+        if ($matched) continue;
+        $ch = $lower[$i];
+        $map = [
+            'a'=>'а','b'=>'б','c'=>'к','d'=>'д','e'=>'е','f'=>'ф','g'=>'г','h'=>'х','i'=>'и','j'=>'й','k'=>'к','l'=>'л','m'=>'м','n'=>'н','o'=>'о','p'=>'п','q'=>'к','r'=>'р','s'=>'с','t'=>'т','u'=>'у','v'=>'в','w'=>'в','x'=>'кс','y'=>'и','z'=>'з',
+        ];
+        $low = strtolower($ch);
+        if (isset($map[$low])) {
+            $out .= ctype_upper($ch) ? mb_strtoupper($map[$low], 'UTF-8') : $map[$low];
+        } else {
+            $out .= $ch;
+        }
+        $i += 1;
+    }
+    return $out;
+};
+
+$enFromRu = function (string $ru) use ($translitRuToEn): string {
+    $dict = [
+        'салат' => 'Salad',
+        'суп' => 'Soup',
+        'борщ' => 'Borsch',
+        'паста' => 'Pasta',
+        'пицца' => 'Pizza',
+        'бургер' => 'Burger',
+        'стейк' => 'Steak',
+        'чай' => 'Tea',
+        'кофе' => 'Coffee',
+        'капучино' => 'Cappuccino',
+        'латте' => 'Latte',
+        'эспрессо' => 'Espresso',
+        'лимонад' => 'Lemonade',
+        'сок' => 'Juice',
+        'вода' => 'Water',
+        'десерт' => 'Dessert',
+        'мороженое' => 'Ice cream',
+        'сыр' => 'Cheese',
+        'курица' => 'Chicken',
+        'говядина' => 'Beef',
+        'свинина' => 'Pork',
+        'рыба' => 'Fish',
+        'креветки' => 'Shrimp',
+        'рис' => 'Rice',
+        'лапша' => 'Noodles',
+        'соус' => 'Sauce',
+        'острый' => 'Spicy',
+        'острая' => 'Spicy',
+        'острое' => 'Spicy',
+        'большой' => 'Large',
+        'маленький' => 'Small',
+    ];
+    $ru = trim(preg_replace('/\s+/u', ' ', $ru));
+    if ($ru === '') return '';
+    $tokens = preg_split('/\s+/u', $ru) ?: [];
+    $out = [];
+    foreach ($tokens as $tok) {
+        $t = trim($tok);
+        if ($t === '') continue;
+        $tClean = mb_strtolower(preg_replace('/[^\p{L}\p{N}\-]+/u', '', $t), 'UTF-8');
+        if ($tClean !== '' && isset($dict[$tClean])) { $out[] = $dict[$tClean]; continue; }
+        $out[] = $translitRuToEn($t);
+    }
+    return trim(preg_replace('/\s+/u', ' ', implode(' ', $out)));
+};
+
+$processPair = function (string $raw) use ($cleanName, $splitName, $translitRuToEn, $translitEnToRu, $enFromRu): array {
+    $clean = $cleanName($raw);
+    if ($clean === '') return ['ru' => '', 'en' => ''];
+    $pair = $splitName($clean);
+    $ru = trim((string)($pair['ru'] ?? ''));
+    $en = trim((string)($pair['en'] ?? ''));
+
+    $ru = $cleanName($ru);
+    $en = $cleanName($en);
+
+    $ru = preg_replace('/\s+\d{1,3}\s*$/u', '', (string)$ru);
+    $en = preg_replace('/\s+\d{1,3}\s*$/u', '', (string)$en);
+    $ru = trim(preg_replace('/\s+/u', ' ', (string)$ru));
+    $en = trim(preg_replace('/\s+/u', ' ', (string)$en));
+
+    if ($ru === '' && $en !== '') $ru = $translitEnToRu($en);
+    if ($en === '' && $ru !== '') $en = $enFromRu($ru);
+
+    if ($ru === '' && $en === '') { $ru = $clean; $en = $translitRuToEn($clean); }
+    if ($ru === '') $ru = $clean;
+    if ($en === '') $en = $translitRuToEn($ru);
+
+    if (mb_strlen($ru, 'UTF-8') > 255) $ru = mb_substr($ru, 0, 255, 'UTF-8');
+    if (mb_strlen($en, 'UTF-8') > 255) $en = mb_substr($en, 0, 255, 'UTF-8');
+    return ['ru' => $ru, 'en' => $en];
+};
+
 if (($_GET['ajax'] ?? '') !== '') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -288,6 +422,28 @@ if (($_GET['ajax'] ?? '') !== '') {
         exit;
     }
 
+    if ($ajax === 'process_all') {
+        $rows = $db->query("SELECT product_id, name_raw, name_ru, name_en, edit_ru, edit_en FROM {$t}")->fetchAll();
+        if (!is_array($rows)) $rows = [];
+        $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
+        $stmt = $pdo->prepare("UPDATE {$t} SET name_ru = ?, name_en = ?, edit_ru = IF(TRIM(edit_ru)='', ?, edit_ru), edit_en = IF(TRIM(edit_en)='', ?, edit_en), updated_at = ? WHERE product_id = ? LIMIT 1");
+        $upd = 0;
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $pid = (int)($r['product_id'] ?? 0);
+            if ($pid <= 0) continue;
+            $rawName = (string)($r['name_raw'] ?? '');
+            $pair = $processPair($rawName);
+            $ru = (string)($pair['ru'] ?? '');
+            $en = (string)($pair['en'] ?? '');
+            if ($ru === '' || $en === '') continue;
+            $stmt->execute([$ru, $en, $ru, $en, $now, $pid]);
+            $upd++;
+        }
+        echo json_encode(['ok' => true, 'updated' => $upd], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
     exit;
@@ -344,6 +500,7 @@ if (($_GET['ajax'] ?? '') !== '') {
     <div class="top">
         <h1>TEMP_NAMES</h1>
         <button class="primary" id="syncBtn">Синхронизировать из Poster</button>
+        <button id="processBtn">Обработать названия</button>
         <span class="status" id="status"></span>
     </div>
     <table>
@@ -363,6 +520,7 @@ if (($_GET['ajax'] ?? '') !== '') {
 (() => {
     const tbody = document.getElementById('tbody');
     const syncBtn = document.getElementById('syncBtn');
+    const processBtn = document.getElementById('processBtn');
     const statusEl = document.getElementById('status');
     const setStatus = (t) => { if (statusEl) statusEl.textContent = String(t || ''); };
 
@@ -493,6 +651,25 @@ if (($_GET['ajax'] ?? '') !== '') {
                 setStatus(String(err && err.message ? err.message : err));
             } finally {
                 syncBtn.disabled = false;
+            }
+        });
+    }
+
+    if (processBtn) {
+        processBtn.addEventListener('click', async () => {
+            if (processBtn.disabled) return;
+            processBtn.disabled = true;
+            setStatus('Обработка…');
+            try {
+                const res = await fetch(apiUrl('process_all'), { headers: { 'Accept': 'application/json' } });
+                const j = await res.json().catch(() => null);
+                if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                setStatus('Обработано: ' + String(j.updated || 0));
+                await loadList();
+            } catch (err) {
+                setStatus(String(err && err.message ? err.message : err));
+            } finally {
+                processBtn.disabled = false;
             }
         });
     }
