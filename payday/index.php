@@ -1773,12 +1773,19 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
         } catch (\Throwable $e) {
             $excludeCatIds = [];
         }
-        $rows = $apiOut->request('finance.getTransactions', [
-            'dateFrom' => date('Ymd', strtotime($fromDate)),
-            'dateTo' => date('Ymd', strtotime($dTo)),
-            'timezone' => 'client',
-        ]);
-        if (!is_array($rows)) $rows = [];
+        $rows = [];
+        foreach ([1, 8] as $accType) {
+            try {
+                $r2 = $apiOut->request('finance.getTransactions', [
+                    'dateFrom' => date('Ymd', strtotime($fromDate)),
+                    'dateTo' => date('Ymd', strtotime($dTo)),
+                    'account_type' => $accType,
+                    'timezone' => 'client',
+                ]);
+                if (is_array($r2)) $rows = array_merge($rows, $r2);
+            } catch (\Throwable $e) {
+            }
+        }
 
         $out = [];
         $seenTx = [];
