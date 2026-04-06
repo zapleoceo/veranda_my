@@ -879,14 +879,17 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     }
 
     .bar-row {
-      position: absolute;
-      left: 50%;
-      bottom: 28px;
-      transform: translateX(-50%) scale(var(--mx), var(--my));
+      position: sticky;
+      left: 0;
+      right: 0;
+      bottom: 18px;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 56px;
       user-select: none;
+      pointer-events: none;
+      z-index: 5;
     }
 
     .bar {
@@ -923,6 +926,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       flex-direction: column;
       align-items: center;
       gap: 6px;
+      pointer-events: auto;
     }
     .station-sub {
       font-family: var(--font-body);
@@ -933,11 +937,21 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       color: rgba(245,238,228,0.62);
     }
 
+    .station-wrap.cash {
+      flex-direction: row;
+      gap: 10px;
+      align-items: center;
+    }
     .cash-controls {
       width: 170px;
       display: grid;
       gap: 6px;
-      margin-top: 8px;
+      margin-top: 0;
+      padding: 8px;
+      border-radius: 16px;
+      border: 1px solid rgba(123, 75, 42, 0.62);
+      background: rgba(0,0,0,0.12);
+      box-shadow: 0 12px 22px rgba(0,0,0,0.22);
     }
     .cash-controls #resDate { display: none; }
     .cash-controls input[type="datetime-local"] {
@@ -1210,7 +1224,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     }
 
     .table.disabled {
-      background: linear-gradient(180deg, rgba(150, 150, 150, 0.75), rgba(95, 95, 95, 0.78));
+      background: linear-gradient(180deg, rgba(120, 120, 120, 0.78), rgba(55, 55, 55, 0.86));
+      filter: grayscale(1) brightness(0.75);
       cursor: not-allowed;
     }
 
@@ -1475,7 +1490,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       outline-offset: 2px;
     }
     .table.busy {
-      filter: grayscale(0.2);
+      filter: grayscale(0.85) brightness(0.82);
     }
   
     @media (max-width: 980px) {
@@ -1561,7 +1576,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
                 <div class="station-sub"><span id="busyDateLabel">Данные на —</span><span class="mini-loader" id="busyDateLoader" hidden></span></div>
               </div>
               <div class="bar">BAR</div>
-              <div class="station-wrap">
+              <div class="station-wrap cash">
                 <div class="side-station">Касса</div>
                 <div class="cash-controls">
                   <input type="datetime-local" id="resDate" aria-label="Дата и время">
