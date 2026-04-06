@@ -1296,13 +1296,35 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     #reqGuests { max-width: 160px; }
     .modal-hint {
       margin-top: 10px;
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.04);
       border: 1px solid rgba(255, 255, 255, 0.10);
       border-radius: 14px;
       padding: 10px 12px;
       font-size: 12px;
       line-height: 1.35;
       color: rgba(255, 250, 244, 0.90);
+    }
+
+    .modal-hint.warn {
+      border-color: rgba(255, 88, 88, 0.55);
+      box-shadow: 0 0 0 3px rgba(255, 88, 88, 0.10);
+    }
+
+    .modal-hint .hint-text {
+      display: inline-block;
+      background-image: linear-gradient(90deg, rgba(255, 190, 140, 0.95), rgba(255, 88, 88, 0.95), rgba(255, 225, 170, 0.95));
+      background-size: 220% 100%;
+      background-position: 0% 50%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: shimmerHint 2.4s ease-in-out infinite;
+    }
+
+    @keyframes shimmerHint {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
     }
     .modal-note { margin-top: 10px; color: rgba(245, 238, 228, 0.70); font-size: 12px; line-height: 1.35; }
     @media (max-width: 560px) { .modal-grid { grid-template-columns: 1fr; } }
@@ -1486,6 +1508,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
             <input type="tel" id="reqPhone" autocomplete="tel" required>
           </label>
           <label class="modal-label">
+            Номер стола
+            <input type="text" id="reqTable" readonly>
+          </label>
+          <label class="modal-label">
             Кол-во гостей
             <input type="number" id="reqGuests" min="1" max="99">
           </label>
@@ -1659,6 +1685,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const reqForm = document.getElementById('reqForm');
     const reqName = document.getElementById('reqName');
     const reqPhone = document.getElementById('reqPhone');
+    const reqTable = document.getElementById('reqTable');
     const reqGuests = document.getElementById('reqGuests');
     const reqStart = document.getElementById('reqStart');
     const reqHint = document.getElementById('reqHint');
@@ -1724,11 +1751,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     let pendingBooking = null;
     const openRequestForm = ({ tableNum, guests, start }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
+      if (reqTable) reqTable.value = String(tableNum || '');
       if (reqGuests) reqGuests.value = String(guests);
       if (reqStart) reqStart.value = String(start);
       if (reqName) reqName.value = '';
       if (reqPhone) reqPhone.value = '';
-      if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; }
+      if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
       setModal(reqModal, true);
       if (reqName) reqName.focus();
     };
@@ -1740,6 +1768,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       if (!tableNum || !isFinite(guests) || guests <= 0) {
         reqHint.hidden = true;
         reqHint.textContent = '';
+        reqHint.classList.remove('warn');
         return;
       }
       try {
@@ -1751,15 +1780,18 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
         if (j.status === 'warn' && j.message) {
-          reqHint.textContent = String(j.message);
+          reqHint.innerHTML = '<span class="hint-text">' + esc(String(j.message)) + '</span>';
+          reqHint.classList.add('warn');
           reqHint.hidden = false;
         } else {
           reqHint.hidden = true;
           reqHint.textContent = '';
+          reqHint.classList.remove('warn');
         }
       } catch (_) {
         reqHint.hidden = true;
         reqHint.textContent = '';
+        reqHint.classList.remove('warn');
       }
     };
 
