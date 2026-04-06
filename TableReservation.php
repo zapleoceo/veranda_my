@@ -719,7 +719,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     }
   
     .panel {
-      width: min(1320px, 100%);
+      width: min(1000px, 100%);
       background: linear-gradient(180deg, rgba(255,255,255,.35), transparent), var(--color-surface);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-lg);
