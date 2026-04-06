@@ -321,6 +321,13 @@ if (($_GET['ajax'] ?? '') === 'pay_salary') {
     }
     $waiterId = (int)($j['waiter_id'] ?? 0);
     $salaryVnd = (int)($j['salary_vnd'] ?? 0);
+    $empName = trim((string)($j['employee_name'] ?? ''));
+    if ($empName !== '') {
+        $empName = preg_replace('/\s+/u', ' ', $empName);
+        $empName = preg_replace('/[^\p{L}\p{N}\s\.\-\'"()]+/u', '', (string)$empName);
+        $empName = trim((string)$empName);
+        if (mb_strlen($empName, 'UTF-8') > 60) $empName = mb_substr($empName, 0, 60, 'UTF-8');
+    }
     if ($waiterId <= 0 || $salaryVnd <= 0) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
@@ -331,7 +338,7 @@ if (($_GET['ajax'] ?? '') === 'pay_salary') {
         $api = new \App\Classes\PosterAPI($posterToken);
         $now = date('Y-m-d H:i:s');
         $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
-        $comment = 'SLR ID=' . $waiterId . ($by !== '' ? (' by ' . $by) : '');
+        $comment = 'SLR' . ($empName !== '' ? (' ' . $empName) : '') . ' ID=' . $waiterId . ($by !== '' ? (' by ' . $by) : '');
         $res = $api->request('finance.createTransactions', [
             'id' => (int)(time() * 1000 + random_int(0, 999)),
             'type' => 0,
@@ -669,6 +676,13 @@ if (($_GET['ajax'] ?? '') === 'pay_tips') {
     }
     $waiterId = (int)($j['waiter_id'] ?? 0);
     $tipsMinor = (int)($j['tips_minor'] ?? 0);
+    $empName = trim((string)($j['employee_name'] ?? ''));
+    if ($empName !== '') {
+        $empName = preg_replace('/\s+/u', ' ', $empName);
+        $empName = preg_replace('/[^\p{L}\p{N}\s\.\-\'"()]+/u', '', (string)$empName);
+        $empName = trim((string)$empName);
+        if (mb_strlen($empName, 'UTF-8') > 60) $empName = mb_substr($empName, 0, 60, 'UTF-8');
+    }
     if ($waiterId <= 0 || $tipsMinor <= 0) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
@@ -686,7 +700,7 @@ if (($_GET['ajax'] ?? '') === 'pay_tips') {
         $api = new \App\Classes\PosterAPI($posterToken);
         $now = date('Y-m-d H:i:s');
         $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
-        $comment = 'TIPS ID=' . $waiterId . ($by !== '' ? (' by ' . $by) : '');
+        $comment = 'TIPS' . ($empName !== '' ? (' ' . $empName) : '') . ' ID=' . $waiterId . ($by !== '' ? (' by ' . $by) : '');
         $res = $api->request('finance.createTransactions', [
             'id' => (int)(time() * 1000 + random_int(0, 999)),
             'type' => 0,
@@ -1452,6 +1466,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const payerName = meta && meta.payer && meta.payer.name ? String(meta.payer.name) : '#10';
             const creatorEmail = String((window.__USER_EMAIL__ || '')).trim();
             const creatorLabel = creatorEmail ? creatorEmail : '—';
+            const commentText = `SLR ${empName ? empName + ' ' : ''}ID=${String(uid)} by ${creatorLabel}`;
             const ok = await openPaidConfirm(
                 `Будет создана транзакция расхода на выплату зарплаты.<br>` +
                 `Сотрудник: <b>${esc(empName || ('#' + String(uid)))}</b><br>` +
@@ -1459,7 +1474,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 `Категория: <b>${esc(catName)}</b><br>` +
                 `Исполнитель: <b>${esc(payerName)}</b><br>` +
                 `Счет списания: <b>${esc(accName)}</b><br>` +
-                `Комментарий: <b>SLR ID=${esc(uid)}</b> by <b>${esc(creatorLabel)}</b>`
+                `Комментарий: <b>${esc(commentText)}</b>`
             );
             if (!ok) return;
             b.disabled = true;
@@ -1469,7 +1484,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const res = await fetch(url.toString(), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify({ waiter_id: uid, salary_vnd: salaryVnd }),
+                    body: JSON.stringify({ waiter_id: uid, salary_vnd: salaryVnd, employee_name: empName }),
                 });
                 const txt = await res.text();
                 let j = null;
@@ -1504,6 +1519,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const payerName = meta && meta.payer && meta.payer.name ? String(meta.payer.name) : '#10';
         const creatorEmail = String((window.__USER_EMAIL__ || '')).trim();
         const creatorLabel = creatorEmail ? creatorEmail : '—';
+        const commentText = `TIPS ${empName ? empName + ' ' : ''}ID=${String(uid)} by ${creatorLabel}`;
         const ok = await openPaidConfirm(
             `Будет создана транзакция расхода на выплату типсов.<br>` +
             `Сотрудник: <b>${esc(empName || ('#' + String(uid)))}</b><br>` +
@@ -1511,7 +1527,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             `Категория: <b>${esc(catName)}</b><br>` +
             `Исполнитель: <b>${esc(payerName)}</b><br>` +
             `Счет списания: <b>${esc(accName)}</b><br>` +
-            `Комментарий: <b>TIPS ID=${esc(uid)}</b> by <b>${esc(creatorLabel)}</b>`
+            `Комментарий: <b>${esc(commentText)}</b>`
         );
         if (!ok) return;
         b.disabled = true;
@@ -1521,7 +1537,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const res = await fetch(url.toString(), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ waiter_id: uid, tips_minor: tipsToPayMinor }),
+                body: JSON.stringify({ waiter_id: uid, tips_minor: tipsToPayMinor, employee_name: empName }),
             });
             const txt = await res.text();
             let j = null;
