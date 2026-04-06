@@ -644,10 +644,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $tgUn = ltrim($tgUn, '@');
   if ($tgUn !== '' || $tgUid > 0) {
     $text .= "\n";
+    $text .= 'Telegram: ';
     if ($tgUn !== '') {
-      $text .= 'Telegram: <a href="https://t.me/' . htmlspecialchars($tgUn) . '">@' . htmlspecialchars($tgUn) . '</a>';
-    } else {
-      $text .= 'Telegram: <a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">tg://user?id=' . htmlspecialchars((string)$tgUid) . '</a>';
+      $text .= '<a href="https://t.me/' . htmlspecialchars($tgUn) . '">@' . htmlspecialchars($tgUn) . '</a>';
+      if ($tgUid > 0) $text .= ' · <a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a>';
+    } elseif ($tgUid > 0) {
+      $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
     }
   }
 
@@ -1623,12 +1625,18 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       border: 1px solid rgba(255,255,255,0.14);
       background: rgba(255,255,255,0.06);
       color: rgba(255, 250, 244, 0.94);
-      padding: 0.55rem 0.8rem;
+      width: 44px;
+      height: 44px;
+      padding: 0;
       font-weight: 800;
       font-size: 12px;
       cursor: pointer;
       transition: transform .14s ease, filter .14s ease, opacity .14s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
+    .msgr-btn svg { width: 22px; height: 22px; }
     .msgr-btn:hover { transform: translateY(-1px); filter: saturate(1.05); }
     .msgr-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
     .msgr-hint {
@@ -1840,11 +1848,11 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         <div class="modal-grid">
           <label class="modal-label">
             Ваше имя
-            <input type="text" id="reqName" autocomplete="name" required>
+            <input type="text" id="reqName" autocomplete="name">
           </label>
           <label class="modal-label">
             Ваш номер телефона
-            <input type="tel" id="reqPhone" autocomplete="tel" required>
+            <input type="tel" id="reqPhone" autocomplete="tel">
           </label>
           <label class="modal-label">
             Кол-во гостей
@@ -1858,9 +1866,24 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         <div class="msgr">
           <div class="msgr-title">ВАШ МЕССЕНДЖЕР</div>
           <div class="msgr-row">
-            <button type="button" class="msgr-btn" id="msgrTgBtn">Telegram</button>
-            <button type="button" class="msgr-btn" disabled>WhatsApp</button>
-            <button type="button" class="msgr-btn" disabled>Zalo</button>
+            <button type="button" class="msgr-btn" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
+                <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
+              </svg>
+            </button>
+            <button type="button" class="msgr-btn" aria-label="WhatsApp (скоро)" title="WhatsApp (скоро)" disabled>
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 3.2a8.8 8.8 0 0 0-7.5 13.5l-.9 3.3 3.4-.9A8.8 8.8 0 1 0 12 3.2Z" fill="currentColor" opacity=".9"/>
+                <path d="M10.2 8.7c.2-.4.4-.4.7-.4h.5c.2 0 .4 0 .6.4l.7 1.6c.1.3.1.5-.1.7l-.5.5c-.2.2-.2.4-.1.6.4.8 1 1.5 1.7 2 .2.2.4.2.6.1l.6-.3c.2-.1.5-.1.7 0l1.4.7c.4.2.4.4.4.6 0 .2 0 .5-.1.7-.2.5-1 1-1.6 1.1-.5.1-1.1.1-2.6-.6-1.8-.8-3.2-2.6-3.7-3.4-.5-.9-.9-2-.1-3.3Z" fill="#0b0f14"/>
+              </svg>
+            </button>
+            <button type="button" class="msgr-btn" aria-label="Zalo (скоро)" title="Zalo (скоро)" disabled>
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="6" fill="currentColor" opacity=".9"/>
+                <path d="M7.6 16.6v-1.2l5.3-6.3H7.7V7.4h8.7v1.2l-5.3 6.3h5.4v1.7H7.6Z" fill="#0b0f14"/>
+              </svg>
+            </button>
           </div>
           <div class="msgr-hint" id="msgrHint" hidden></div>
         </div>
@@ -2320,11 +2343,15 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     let pendingBooking = null;
     let messengerLinked = { telegram: false, whatsapp: false, zalo: false };
     let linkedTg = null;
+    let submitBusy = false;
+    let submitPrevText = '';
     const syncSubmitState = () => {
       if (!reqSubmit) return;
       const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
       if (linked) reqSubmit.classList.remove('is-disabled');
       else reqSubmit.classList.add('is-disabled');
+      reqSubmit.setAttribute('aria-disabled', linked ? 'false' : 'true');
+      reqSubmit.disabled = !!submitBusy;
     };
     const openRequestForm = ({ tableNum, guests, start, name, phone, keepFields }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
@@ -2440,6 +2467,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     if (reqForm) {
       reqForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (submitBusy) return;
         const name = reqName ? String(reqName.value || '').trim() : '';
         const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
         const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
@@ -2460,6 +2488,12 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
           return;
         }
 
+        submitBusy = true;
+        if (reqSubmit) {
+          submitPrevText = String(reqSubmit.textContent || '');
+          reqSubmit.textContent = 'Отправляю…';
+          reqSubmit.disabled = true;
+        }
         try {
           const url = new URL(location.href);
           url.searchParams.set('ajax', 'submit_booking');
@@ -2474,6 +2508,13 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
           setOutput('Заявка отправлена.\n\nДата: ' + String(start).slice(0, 10) + '\nВремя: ' + String(start).slice(11, 16) + '\nСтол: ' + tableNum + '\nГостей: ' + String(guests) + '\nИмя: ' + name + '\nТелефон: ' + phone + '\n\nБронь держится 30 минут.');
         } catch (err) {
           setOutput({ ok: false, error: String(err && err.message ? err.message : err) });
+        } finally {
+          submitBusy = false;
+          if (reqSubmit) {
+            if (submitPrevText) reqSubmit.textContent = submitPrevText;
+            reqSubmit.disabled = false;
+          }
+          syncSubmitState();
         }
       });
     }
