@@ -677,15 +677,17 @@ $firstOfMonth = date('Y-m-01');
                     <th id="thChecks" class="col-checks" data-sort="checks" style="text-align:right; cursor:pointer;">Чеков</th>
                     <th id="thHours" class="col-hours" data-sort="worked_hours" style="text-align:right; cursor:pointer;">ЧасыРаботы</th>
                     <th id="thTips" class="col-tips" data-sort="tips_minor" style="text-align:right; cursor:pointer;">Tips</th>
+                    <th id="thPaid" class="col-paid" data-sort="ltp_amount_minor" style="text-align:right; cursor:pointer;">PAID</th>
+                    <th id="thTtp" class="col-ttp" data-sort="tips_to_pay_minor" style="text-align:right; cursor:pointer;">TipsToPay</th>
                     <th id="thSalary" class="col-salary" data-sort="salary_minor" style="text-align:right; cursor:pointer;">Salary</th>
                 </tr>
                 </thead>
                 <tbody id="tbody"></tbody>
             </table>
         </div>
-        <div class="muted" id="totals" style="margin-top: 10px; text-align:right; font-weight:900;">Итого: Чеков 0 · ЧасыРаботы 0 · Tips 0 · Salary 0</div>
+        <div class="muted" id="totals" style="margin-top: 10px; text-align:right; font-weight:900;">Итого: Чеков 0 · ЧасыРаботы 0 · Tips 0 · TTP 0 · Salary 0</div>
         <div class="muted" id="tipsBalanceTotals" style="margin-top: 6px; text-align:right; font-weight:900;">
-            Tips (на счету BIDV): <span id="tipsAccBalance">—</span> · Типсы в таблице: <span id="tipsTableSum">—</span> · Остаток: <span id="tipsBalanceDiff">—</span>
+            Tips (на счету BIDV): <span id="tipsAccBalance">—</span> · TTP в таблице: <span id="tipsTableSum">—</span> · Остаток: <span id="tipsBalanceDiff">—</span>
         </div>
     </div>
 </div>
@@ -781,6 +783,16 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
+    const addDays = (isoDate, days) => {
+        const m = String(isoDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) return '';
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0, 0);
+        d.setDate(d.getDate() + Number(days || 0));
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    };
     const fmtSpaces = (digits) => {
         const d = String(digits || '').replace(/\D+/g, '');
         if (!d) return '';
@@ -830,12 +842,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     let payMeta = null;
     let tipsAccBalanceMinor = null;
     let lastTipsMinorTotal = 0;
+    let lastTtpMinorTotal = 0;
     const tipsAccBalanceEl = document.getElementById('tipsAccBalance');
     const tipsTableSumEl = document.getElementById('tipsTableSum');
     const tipsBalanceDiffEl = document.getElementById('tipsBalanceDiff');
 
     const renderTipsBalanceTotals = () => {
-        const tipsTableMinor = Number(lastTipsMinorTotal || 0) || 0;
+        const tipsTableMinor = Number(lastTtpMinorTotal || 0) || 0;
         if (tipsTableSumEl) tipsTableSumEl.textContent = fmtMoney(vndFromMinor(tipsTableMinor));
         if (tipsAccBalanceEl) {
             tipsAccBalanceEl.textContent = tipsAccBalanceMinor == null ? '—' : fmtMoney(vndFromMinor(tipsAccBalanceMinor));
@@ -937,7 +950,14 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     function renderTable() {
         const coll = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
         const dir = sortDir === 'desc' ? -1 : 1;
-        const filtered = hideZero ? dataRows.filter((r) => Number(r.worked_hours || 0) > 0) : dataRows.slice();
+        const filtered = (hideZero ? dataRows.filter((r) => Number(r.worked_hours || 0) > 0) : dataRows.slice()).map((r) => {
+            const tipsMinor = Number(r.tips_minor || 0) || 0;
+            const ltp = ltpById[String(r.user_id)] || null;
+            const ltpAmtMinor = ltp ? Number(ltp.amount || 0) : 0;
+            const ltpDate = ltp && ltp.date ? String(ltp.date) : '';
+            const tipsToPayMinor = Math.max(0, tipsMinor - Math.abs(ltpAmtMinor || 0));
+            return { ...r, ltp_amount_minor: ltpAmtMinor || 0, ltp_date: ltpDate, tips_to_pay_minor: tipsToPayMinor };
+        });
         const items = filtered.slice().sort((a, b) => {
             const av = a[sortBy];
             const bv = b[sortBy];
@@ -953,31 +973,36 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         let totChecks = 0;
         let totHours = 0;
         let totTipsMinor = 0;
+        let totTtpMinor = 0;
         let totSalary = 0;
         items.forEach((r) => {
             const tipsVnd = vndFromMinor(r.tips_minor || 0);
-            const ltp = ltpById[String(r.user_id)] || null;
-            const ltpAmtMinor = ltp ? Number(ltp.amount || 0) : 0;
-            const ltpDate = ltp && ltp.date ? String(ltp.date) : '';
+            const ltpAmtMinor = Number(r.ltp_amount_minor || 0) || 0;
+            const ltpDate = String(r.ltp_date || '');
             const ltpAmt = (ltpAmtMinor && isFinite(ltpAmtMinor)) ? fmtMoney(vndFromMinor(Math.abs(ltpAmtMinor))) : '';
-            const ltpHtml = (ltpDate && ltpAmt) ? `<div class="ltp" title="Сумма и дата последней выплаты типсов">LTP ${esc(ltpDate)} · ${esc(ltpAmt)}</div>` : '';
+            const paidTxt = (ltpDate && ltpAmt) ? `${ltpDate} · ${ltpAmt}` : '';
+            const tipsToPayMinor = Number(r.tips_to_pay_minor || 0) || 0;
+            const tipsToPayVnd = vndFromMinor(tipsToPayMinor);
             const tr = document.createElement('tr');
             totChecks += Number(r.checks || 0);
             totHours += Number(r.worked_hours || 0);
             totTipsMinor += Number(r.tips_minor || 0);
+            totTtpMinor += tipsToPayMinor;
             totSalary += Number(r.salary_minor || 0);
-            const paidDisabled = Number(r.tips_minor || 0) <= 0 ? 'disabled' : '';
+            const paidDisabled = tipsToPayMinor <= 0 ? 'disabled' : '';
             tr.innerHTML = `
                 <td class="col-id">${esc(r.user_id)}</td>
-                <td class="col-name"><div>${esc(r.name)}</div>${ltpHtml}</td>
+                <td class="col-name"><div>${esc(r.name)}</div></td>
                 <td class="col-rate" style="text-align:right;"><input class="rate-input" inputmode="numeric" data-user-id="${esc(r.user_id)}" data-hours="${esc(r.worked_hours)}" data-rate="${esc(r.rate)}" value="${esc(fmtSpaces(String(r.rate || '')))}"></td>
                 <td class="col-role">${esc(r.role_name)}</td>
                 <td class="col-checks" style="text-align:right;">${esc(r.checks)}</td>
                 <td class="col-hours" style="text-align:right;">${esc(r.worked_hours)}</td>
-                <td class="col-tips" style="text-align:right;">
+                <td class="col-tips" style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
+                <td class="col-paid" style="text-align:right;">${paidTxt ? `<div class="ltp" title="Сумма и дата последней выплаты типсов">${esc(paidTxt)}</div>` : '—'}</td>
+                <td class="col-ttp" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
-                        <span>${esc(fmtMoney(tipsVnd))}</span>
-                        <button type="button" class="paid-btn" data-user-id="${esc(r.user_id)}" ${paidDisabled}>PAID</button>
+                        <span>${esc(fmtMoney(tipsToPayVnd))}</span>
+                        <button type="button" class="paid-btn" data-user-id="${esc(r.user_id)}" data-ttp-minor="${esc(String(tipsToPayMinor))}" ${paidDisabled}>PAID</button>
                     </div>
                 </td>
                 <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(r.salary_minor))}</td>
@@ -987,13 +1012,14 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         bindRateInputs();
         if (totalsEl) {
             if (viewMode === 'lite') {
-                totalsEl.textContent = `Итого: Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · Salary ${fmtMoney(totSalary)}`;
+                totalsEl.textContent = `Итого: Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · TTP ${fmtMoney(vndFromMinor(totTtpMinor))} · Salary ${fmtMoney(totSalary)}`;
             } else {
                 const hoursTxt = (Math.round(totHours * 100) / 100).toFixed(2).replace(/\.00$/, '');
-                totalsEl.textContent = `Итого: Чеков ${fmtMoney(totChecks)} · ЧасыРаботы ${hoursTxt} · Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · Salary ${fmtMoney(totSalary)}`;
+                totalsEl.textContent = `Итого: Чеков ${fmtMoney(totChecks)} · ЧасыРаботы ${hoursTxt} · Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · TTP ${fmtMoney(vndFromMinor(totTtpMinor))} · Salary ${fmtMoney(totSalary)}`;
             }
         }
         lastTipsMinorTotal = totTipsMinor;
+        lastTtpMinorTotal = totTtpMinor;
         renderTipsBalanceTotals();
     }
 
@@ -1102,7 +1128,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const urlLtp = new URL(location.href);
                 urlLtp.searchParams.set('ajax', 'ltp_load');
                 urlLtp.searchParams.set('date_from', dateFrom.value);
-                urlLtp.searchParams.set('date_to', dateTo.value);
+                urlLtp.searchParams.set('date_to', addDays(dateTo.value, 1));
                 const { signal, cleanup } = withTimeout(20000);
                 const resLtp = await fetch(urlLtp.toString(), { headers: { 'Accept': 'application/json' }, signal });
                 const txtLtp = await resLtp.text();
@@ -1232,8 +1258,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const row = dataRows.find((x) => Number(x.user_id) === uid);
         if (!row) return;
         const tipsMinor = Number(row.tips_minor || 0);
-        if (tipsMinor <= 0) return;
-        const tipsVnd = vndFromMinor(tipsMinor);
+        const ltp = ltpById[String(uid)] || null;
+        const ltpAmtMinor = ltp ? Number(ltp.amount || 0) : 0;
+        const tipsToPayMinor = Math.max(0, tipsMinor - Math.abs(ltpAmtMinor || 0));
+        if (tipsToPayMinor <= 0) return;
+        const tipsToPayVnd = vndFromMinor(tipsToPayMinor);
         let empName = '';
         try { empName = await loadEmployeeName(uid); } catch (_) { empName = ''; }
         if (!empName) empName = String(row.name || '').trim();
@@ -1247,7 +1276,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const ok = await openPaidConfirm(
             `Будет создана транзакция расхода на выплату типсов.<br>` +
             `Сотрудник: <b>${esc(empName || ('#' + String(uid)))}</b><br>` +
-            `Сумма: <b>${esc(fmtMoney(tipsVnd))}</b><br>` +
+            `Сумма: <b>${esc(fmtMoney(tipsToPayVnd))}</b><br>` +
             `Категория: <b>${esc(catName)}</b><br>` +
             `Исполнитель: <b>${esc(payerName)}</b><br>` +
             `Счет списания: <b>${esc(accName)}</b><br>` +
@@ -1261,14 +1290,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const res = await fetch(url.toString(), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ waiter_id: uid, tips_minor: tipsMinor }),
+                body: JSON.stringify({ waiter_id: uid, tips_minor: tipsToPayMinor }),
             });
             const txt = await res.text();
             let j = null;
             try { j = JSON.parse(txt); } catch (_) {}
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
             ltpById[String(uid)] = { date: String(j.date || ''), amount: Number(j.amount || 0) };
-            row.tips_minor = 0;
             renderTable();
         } catch (err) {
             setError(err && err.message ? err.message : 'Ошибка');
