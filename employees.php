@@ -786,40 +786,6 @@ if (($_GET['ajax'] ?? '') === 'employee_lookup') {
     exit;
 }
 
-if (($_GET['ajax'] ?? '') === 'employees_all') {
-    header('Content-Type: application/json; charset=utf-8');
-    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-    header('Pragma: no-cache');
-    try {
-        $api = new \App\Classes\PosterAPI($posterToken);
-        $emps = $api->request('access.getEmployees', [], 'GET');
-        if (!is_array($emps)) $emps = [];
-        $out = [];
-        foreach ($emps as $e) {
-            if (!is_array($e)) continue;
-            $uid = (int)($e['user_id'] ?? 0);
-            if ($uid <= 0) continue;
-            $out[] = [
-                'user_id' => $uid,
-                'name' => trim((string)($e['name'] ?? '')),
-                'role_name' => trim((string)($e['role_name'] ?? '')),
-            ];
-        }
-        usort($out, function ($a, $b) {
-            $an = (string)($a['name'] ?? '');
-            $bn = (string)($b['name'] ?? '');
-            $c = strcasecmp($an, $bn);
-            if ($c !== 0) return $c;
-            return ((int)($a['user_id'] ?? 0)) <=> ((int)($b['user_id'] ?? 0));
-        });
-        echo json_encode(['ok' => true, 'items' => $out], JSON_UNESCAPED_UNICODE);
-    } catch (\Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-    }
-    exit;
-}
-
 if (($_GET['ajax'] ?? '') === 'pay_tips') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -1278,7 +1244,6 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     let payMetaExtra = null;
     let payExtraOpening = false;
     let payExtraSubmitting = false;
-    let employeesAll = null;
     let tipsAccBalanceMinor = null;
     let lastTipsMinorTotal = 0;
     let lastTtpMinorTotal = 0;
@@ -1720,28 +1685,6 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         return payMetaExtra;
     };
 
-    const loadEmployeesAll = async () => {
-        if (employeesAll) return employeesAll;
-        const url = new URL(location.href);
-        url.searchParams.set('ajax', 'employees_all');
-        const { signal, cleanup } = withTimeout(20000);
-        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal });
-        const txt = await res.text();
-        cleanup();
-        let j = null;
-        try { j = JSON.parse(txt); } catch (_) {}
-        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-        const items = Array.isArray(j.items) ? j.items : [];
-        const byId = {};
-        items.forEach((x) => {
-            const uid = Number(x && x.user_id ? x.user_id : 0);
-            if (!uid) return;
-            byId[String(uid)] = { user_id: uid, name: String(x.name || '').trim(), role_name: String(x.role_name || '').trim() };
-        });
-        employeesAll = { items, byId };
-        return employeesAll;
-    };
-
     const setModalVisible = (el, on) => {
         if (!el) return;
         el.style.display = on ? 'flex' : 'none';
@@ -1767,49 +1710,38 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         return `${prefix} ${namePart}ID=${String(empId)} by ${creatorLabel}`;
     };
 
-    const getEmployeeNameLocal = (uid) => {
-        const id = Number(uid || 0);
-        if (!id) return '';
-        if (employeesAll && employeesAll.byId && employeesAll.byId[String(id)]) return String(employeesAll.byId[String(id)].name || '').trim();
-        const row = dataRows.find((x) => Number(x.user_id) === id);
-        return row ? String(row.name || '').trim() : '';
-    };
-
     const refreshPayExtraComment = () => {
         if (!payExtraEmp || !payExtraKind || !payExtraComment) return;
         const uid = Number(payExtraEmp.value || 0);
-        const name = getEmployeeNameLocal(uid);
+        const row = dataRows.find((x) => Number(x.user_id) === uid);
+        const name = row ? String(row.name || '').trim() : '';
         payExtraComment.value = uid ? buildPayComment(String(payExtraKind.value || 'tips'), uid, name) : '';
     };
 
-    const fillPayExtraEmployees = (items) => {
+    const fillPayExtraEmployees = () => {
         if (!payExtraEmp) return;
-        const prev = String(payExtraEmp.value || '');
         payExtraEmp.innerHTML = '';
-        const arr = Array.isArray(items) ? items : [];
-        arr.forEach((r) => {
-            const uid = Number(r && r.user_id ? r.user_id : 0);
+        const rows = dataRows.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru'));
+        rows.forEach((r) => {
+            const uid = Number(r.user_id || 0);
             if (!uid) return;
-            const name = String(r.name || '').trim();
-            const role = String(r.role_name || '').trim();
             const opt = document.createElement('option');
             opt.value = String(uid);
-            opt.textContent = `${name !== '' ? name : ('#' + String(uid))}${role !== '' ? (' · ' + role) : ''} (#${uid})`;
+            opt.textContent = `${String(r.name || '').trim()} (#${uid})`;
             payExtraEmp.appendChild(opt);
         });
-        if (prev && Array.from(payExtraEmp.options).some((o) => o.value === prev)) payExtraEmp.value = prev;
     };
 
     const openPayExtra = async () => {
         if (!payExtraModal) return;
         if (payExtraOpening || payExtraSubmitting) return;
+        if (!dataRows.length) { setError('Сначала нажми ЗАГРУЗИТЬ'); return; }
         payExtraOpening = true;
         if (payExtraBtn) payExtraBtn.disabled = true;
         setModalVisible(payExtraModal, true);
         setPayExtraLoading(true);
+        fillPayExtraEmployees();
         try {
-            const emps = await loadEmployeesAll();
-            fillPayExtraEmployees(emps.items);
             const meta = await loadPayMetaExtra();
             if (payExtraAccount) {
                 payExtraAccount.innerHTML = '';
@@ -1858,7 +1790,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const kind = String(payExtraKind.value || 'tips');
         const amount = Math.round(Number(payExtraAmount.value || 0) || 0);
         const accountFrom = Number(payExtraAccount.value || 0);
-        const empName = getEmployeeNameLocal(uid);
+        const row = dataRows.find((x) => Number(x.user_id) === uid);
+        const empName = row ? String(row.name || '').trim() : '';
         if (!uid || !amount || !accountFrom) return;
 
         payExtraSubmitting = true;
