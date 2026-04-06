@@ -899,6 +899,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
 
     .bar {
       width: 260px;
+      min-width: 260px;
+      flex: 0 0 260px;
       height: 72px;
       border-radius: 36px;
       background: linear-gradient(180deg, var(--color-primary), var(--color-primary-strong));
