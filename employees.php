@@ -460,7 +460,7 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
         $pushAgg = function (array &$dst, int $id, int $ts, string $dateStr, int $amount): void {
             if (!isset($dst[$id])) $dst[$id] = ['total' => 0, 'items' => []];
             $dst[$id]['total'] = (int)$dst[$id]['total'] + $amount;
-            $dst[$id]['items'][] = ['ts' => $ts, 'date' => $dateStr];
+            $dst[$id]['items'][] = ['ts' => $ts, 'date' => $dateStr, 'amount' => $amount];
         };
 
         foreach ($txs as $t) {
@@ -516,12 +516,13 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
             foreach ($agg as $id => $v) {
                 $items = (array)($v['items'] ?? []);
                 usort($items, function ($a, $b) { return ((int)($b['ts'] ?? 0)) <=> ((int)($a['ts'] ?? 0)); });
-                $dates = [];
+                $payload = [];
                 foreach ($items as $it) {
                     $d = (string)($it['date'] ?? '');
-                    if ($d !== '') $dates[] = $d;
+                    if ($d === '') continue;
+                    $payload[] = ['date' => $d, 'amount' => (int)($it['amount'] ?? 0)];
                 }
-                $out[(string)$id] = ['total_amount' => (int)($v['total'] ?? 0), 'dates' => $dates];
+                $out[(string)$id] = ['total_amount' => (int)($v['total'] ?? 0), 'items' => $payload];
             }
             return $out;
         };
@@ -894,6 +895,10 @@ $firstOfMonth = date('Y-m-01');
         .progress .desc { font-size: 12px; color:#6b7280; }
         #totals { white-space: nowrap; overflow-x: auto; }
         .ltp { margin-top: 2px; font-size: 11px; color: #6b7280; font-weight: 800; white-space: nowrap; }
+        .paid-item { margin-top: 6px; }
+        .paid-date { font-size: 11px; color: #6b7280; font-weight: 800; line-height: 1.1; }
+        .paid-line { display:flex; justify-content: flex-end; gap: 8px; align-items: baseline; font-size: 11px; color: #6b7280; font-weight: 800; line-height: 1.1; }
+        .paid-line .amt { font-weight: 900; color: #374151; }
         .paid-btn { border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: #1a73e8; border-radius: 8px; padding: 2px 7px; font-weight: 900; font-size: 11px; cursor: pointer; line-height: 1.2; }
         .paid-btn:disabled { opacity: 0.6; cursor: default; }
         .modal-backdrop { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.55); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
@@ -1519,11 +1524,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const tp = tipsPaidById[String(r.user_id)] || null;
             const tpTotal = tp ? Number(tp.total_amount || 0) : 0;
             const tpAmt = (tpTotal && isFinite(tpTotal)) ? fmtMoney(vndFromMinor(Math.abs(tpTotal))) : '';
-            const tpDates = tp && Array.isArray(tp.dates) ? tp.dates : [];
+            const tpItems = tp && Array.isArray(tp.items) ? tp.items : [];
             const sp = slrPaidById[String(r.user_id)] || null;
             const spTotal = sp ? Number(sp.total_amount || 0) : 0;
             const spAmt = (spTotal && isFinite(spTotal)) ? fmtMoney(vndFromMinor(Math.abs(spTotal))) : '';
-            const spDates = sp && Array.isArray(sp.dates) ? sp.dates : [];
+            const spItems = sp && Array.isArray(sp.items) ? sp.items : [];
             const tipsToPayMinor = Number(r.tips_to_pay_minor || 0) || 0;
             const tipsToPayVnd = vndFromMinor(tipsToPayMinor);
             const salaryVnd = Math.round(Number(r.salary_minor || 0) || 0);
@@ -1549,11 +1554,25 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 <td class="col-tips" style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
                 <td class="col-paid" style="text-align:right;">
                     ${tpAmt ? `<div style="font-weight:900;">${esc(tpAmt)}</div>` : '—'}
-                    ${tpDates.length ? tpDates.map((d) => `<div class="ltp">${esc(d)}</div>`).join('') : ''}
+                    ${tpItems.length ? tpItems.map((it) => {
+                        const raw = String(it && it.date ? it.date : '');
+                        const parts = raw.split(' ');
+                        const d = parts[0] || raw;
+                        const tm = parts[1] || '';
+                        const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
+                        return `<div class="paid-item"><div class="paid-date">${esc(d)}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
+                    }).join('') : ''}
                 </td>
                 <td class="col-slr" style="text-align:right;">
                     ${spAmt ? `<div style="font-weight:900;">${esc(spAmt)}</div>` : '—'}
-                    ${spDates.length ? spDates.map((d) => `<div class="ltp">${esc(d)}</div>`).join('') : ''}
+                    ${spItems.length ? spItems.map((it) => {
+                        const raw = String(it && it.date ? it.date : '');
+                        const parts = raw.split(' ');
+                        const d = parts[0] || raw;
+                        const tm = parts[1] || '';
+                        const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
+                        return `<div class="paid-item"><div class="paid-date">${esc(d)}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
+                    }).join('') : ''}
                 </td>
                 <td class="col-ttp" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
@@ -1949,17 +1968,17 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
             const date = j.date ? String(j.date) : '';
             if (kind === 'salary') {
-                const cur = slrPaidById[String(uid)] || { total_amount: 0, dates: [] };
+                const cur = slrPaidById[String(uid)] || { total_amount: 0, items: [] };
                 const nextTotal = Number(cur.total_amount || 0) + (Math.abs(Number(j.amount_vnd || 0) || amount) * 100);
-                const nextDates = Array.isArray(cur.dates) ? cur.dates.slice() : [];
-                if (date) nextDates.unshift(date);
-                slrPaidById[String(uid)] = { total_amount: nextTotal, dates: nextDates };
+                const nextItems = Array.isArray(cur.items) ? cur.items.slice() : [];
+                if (date) nextItems.unshift({ date, amount: -Math.abs((Number(j.amount_vnd || 0) || amount) * 100) });
+                slrPaidById[String(uid)] = { total_amount: nextTotal, items: nextItems };
             } else {
-                const cur = tipsPaidById[String(uid)] || { total_amount: 0, dates: [] };
+                const cur = tipsPaidById[String(uid)] || { total_amount: 0, items: [] };
                 const nextTotal = Number(cur.total_amount || 0) + Math.abs(Number(j.amount_vnd || 0) || amount) * 100;
-                const nextDates = Array.isArray(cur.dates) ? cur.dates.slice() : [];
-                if (date) nextDates.unshift(date);
-                tipsPaidById[String(uid)] = { total_amount: nextTotal, dates: nextDates };
+                const nextItems = Array.isArray(cur.items) ? cur.items.slice() : [];
+                if (date) nextItems.unshift({ date, amount: -Math.abs((Number(j.amount_vnd || 0) || amount) * 100) });
+                tipsPaidById[String(uid)] = { total_amount: nextTotal, items: nextItems };
             }
             closePayExtra();
             renderTable();
@@ -2043,11 +2062,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 let j = null;
                 try { j = JSON.parse(txt); } catch (_) {}
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                const cur = slrPaidById[String(uid)] || { total_amount: 0, dates: [] };
+                const cur = slrPaidById[String(uid)] || { total_amount: 0, items: [] };
                 const nextTotal = Number(cur.total_amount || 0) + (Math.abs(Number(j.salary_vnd || 0) || salaryToPayVnd) * 100);
-                const nextDates = Array.isArray(cur.dates) ? cur.dates.slice() : [];
-                if (j.date) nextDates.unshift(String(j.date));
-                slrPaidById[String(uid)] = { total_amount: nextTotal, dates: nextDates };
+                const nextItems = Array.isArray(cur.items) ? cur.items.slice() : [];
+                if (j.date) nextItems.unshift({ date: String(j.date), amount: -Math.abs((Number(j.salary_vnd || 0) || salaryToPayVnd) * 100) });
+                slrPaidById[String(uid)] = { total_amount: nextTotal, items: nextItems };
                 renderTable();
             } catch (err) {
                 setError(err && err.message ? err.message : 'Ошибка');
@@ -2096,11 +2115,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             let j = null;
             try { j = JSON.parse(txt); } catch (_) {}
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-            const cur = tipsPaidById[String(uid)] || { total_amount: 0, dates: [] };
+            const cur = tipsPaidById[String(uid)] || { total_amount: 0, items: [] };
             const nextTotal = Number(cur.total_amount || 0) + Math.abs(Number(j.amount || 0));
-            const nextDates = Array.isArray(cur.dates) ? cur.dates.slice() : [];
-            if (j.date) nextDates.unshift(String(j.date));
-            tipsPaidById[String(uid)] = { total_amount: nextTotal, dates: nextDates };
+            const nextItems = Array.isArray(cur.items) ? cur.items.slice() : [];
+            if (j.date) nextItems.unshift({ date: String(j.date), amount: Number(j.amount || 0) });
+            tipsPaidById[String(uid)] = { total_amount: nextTotal, items: nextItems };
             renderTable();
         } catch (err) {
             setError(err && err.message ? err.message : 'Ошибка');
