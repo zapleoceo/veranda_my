@@ -1519,7 +1519,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   
             <button class="table wide" style="left: 422px; top: 420px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
             <button class="table wide" style="left: 300px; top: 420px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
-            <div class="fountain" style="left: 562px; top: 408px;" aria-hidden="true">
+            <div class="fountain" style="left: 618px; top: 296px;" aria-hidden="true">
               <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
                   <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
