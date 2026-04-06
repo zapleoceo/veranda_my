@@ -784,7 +784,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         var(--color-surface-2);
       background-size: 28px 28px;
       border-radius: calc(var(--radius-lg) - 8px);
-      padding: 56px;
+      padding: 0 56px 56px 56px;
       border: 1px solid var(--color-border);
       overflow: auto;
     }
@@ -1490,7 +1490,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     @media (max-width: 640px) {
       .app, .layout, .map-shell { padding: var(--space-4); }
       .topbar { padding: var(--space-4); align-items: flex-start; flex-direction: column; }
-      .map-shell { padding: 28px; }
+      .map-shell { padding: 0 28px 28px 28px; }
     }
   </style>
 </head>
