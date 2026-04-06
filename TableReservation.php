@@ -1511,7 +1511,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
           <div class="map" aria-label="Схема столов ресторана">
             <div class="grass-area" aria-hidden="true"></div>
             <button class="table large" style="left: 712px; top: 236px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
-            <button class="table large" style="left: 712px; top: 362px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 488px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
             <button class="table small-vertical wide-1" style="left: 534px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
