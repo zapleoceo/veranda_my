@@ -784,20 +784,16 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         var(--color-surface-2);
       background-size: 28px 28px;
       border-radius: calc(var(--radius-lg) - 8px);
-      padding: var(--space-6);
+      padding: 56px;
       border: 1px solid var(--color-border);
       overflow: auto;
     }
   
     .map {
-      --sx: -56px;
-      --sy: -56px;
       position: relative;
       width: 820px;
       height: 620px;
       border-radius: var(--radius-md);
-      transform: translate(var(--sx), var(--sy));
-      transform-origin: top left;
     }
 
     .grass-area {
@@ -1494,6 +1490,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     @media (max-width: 640px) {
       .app, .layout, .map-shell { padding: var(--space-4); }
       .topbar { padding: var(--space-4); align-items: flex-start; flex-direction: column; }
+      .map-shell { padding: 28px; }
     }
   </style>
 </head>
