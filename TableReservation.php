@@ -939,8 +939,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       gap: 6px;
       margin-top: 8px;
     }
-    .cash-controls input[type="datetime-local"],
-    .cash-controls input[type="number"] {
+    .cash-controls input[type="datetime-local"] {
       width: 100%;
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.14);
@@ -951,14 +950,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       outline: none;
     }
     .cash-controls input[type="datetime-local"] { padding-left: 0.6rem; background-image: none; }
-    .cash-controls input[type="number"] { padding-left: 0.6rem; background-image: none; }
-    .cash-row {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-    .cash-row .dur { width: 62px; }
-    .cash-row .gst { width: 58px; }
     .cash-controls .btn {
       padding: 0.52rem 0.65rem;
       font-size: 12px;
@@ -1284,7 +1275,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       margin-top: var(--space-3);
     }
     .guest-label { flex: 0 0 40%; }
-    #resGuests { width: 100%; }
     #checkBtn { flex: 1 1 auto; }
     @media (max-width: 520px) {
       .guest-row { flex-direction: column; align-items: stretch; }
@@ -1470,11 +1460,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
                 <div class="side-station">Касса</div>
                 <div class="cash-controls">
                   <input type="datetime-local" id="resDate" aria-label="Дата и время">
-                  <div class="cash-row">
-                    <input class="dur" type="number" id="resDuration" min="0.5" max="12" step="0.5" value="2" aria-label="Длительность (ч)">
-                    <input class="gst" type="number" id="resGuests" min="1" max="30" placeholder="1" value="1" aria-label="Гостей">
-                    <button class="btn btn-primary" id="checkBtn" type="button">Проверить</button>
-                  </div>
+                  <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
                 </div>
               </div>
             </div>
@@ -1605,11 +1591,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       const today = new Date();
       const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
       const isToday = day === todayStr;
-      const durMin = (() => {
-        if (!resDuration) return 120;
-        const v = Number(resDuration.value || 2);
-        return isFinite(v) && v > 0 ? Math.max(30, Math.round(v * 60)) : 120;
-      })();
+      const durMin = 120;
 
       const byTable = {};
       list.forEach((it) => {
@@ -1668,8 +1650,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       });
     };
     const resDate = document.getElementById('resDate');
-    const resGuests = document.getElementById('resGuests');
-    const resDuration = document.getElementById('resDuration');
     const checkBtn = document.getElementById('checkBtn');
     const resultText = document.getElementById('resultText');
     const selectedTableEl = document.getElementById('selectedTable');
@@ -1893,8 +1873,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       const ps = parseSel(current.dtRaw);
       const ranges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
       if (ps && ranges.length) {
-        const durMin = current && current.durationHours ? Math.max(30, Math.round(Number(current.durationHours) * 60)) : 120;
-        const selEnd = ps.selMin + durMin;
+        const selEnd = ps.selMin + 120;
         const overlaps = ranges.some(([s, e]) => s < selEnd && e > ps.selMin);
         if (overlaps) {
           const txt = ranges.slice(0, 2).map(([s, e]) => fmtMin(s) + '-' + fmtMin(e)).join(' · ');
@@ -1976,18 +1955,9 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
 
     const getCurrentRequest = () => {
       const dtRaw = resDate ? String(resDate.value || '').trim() : '';
-      const guestsStr = resGuests ? String(resGuests.value || '').trim() : '';
-      const durStr = resDuration ? String(resDuration.value || '').trim() : '';
       if (!dtRaw) return null;
-      if (!guestsStr) return null;
-      const guestsRaw = Number(guestsStr);
-      const guests = isFinite(guestsRaw) && guestsRaw > 0 ? Math.floor(guestsRaw) : null;
-      if (guests == null) return null;
-      const durRaw = durStr ? Number(durStr) : 2;
-      const durH = isFinite(durRaw) && durRaw > 0 ? durRaw : 2;
-      const durationSec = Math.max(1800, Math.round(durH * 3600));
       const dt = dtRaw.replace('T', ' ') + ':00';
-      return { dt, guests, dtRaw, durationSec, durationHours: durH };
+      return { dt, guests: 1, dtRaw, durationSec: 7200, durationHours: 2 };
     };
 
     const invalidateLast = () => {
@@ -2030,9 +2000,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
             setOutput({ ok: false, error: 'Выбери дату и время' });
             return;
           }
-          setStatus('');
-          setOutput({ ok: false, error: 'Укажи кол-во гостей' });
-          if (resGuests) { resGuests.focus(); resGuests.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+          setOutput({ ok: false, error: 'Выбери дату и время' });
           return;
         }
 
@@ -2059,7 +2027,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
           if (!ok) {
             selectedTableNum = '';
             setOutput('Исправь кол-во гостей и выбери столик снова.');
-            if (resGuests) { resGuests.focus(); resGuests.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
             return;
           }
         }
@@ -2072,7 +2039,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const initDate = () => {
       if (!resDate) return;
       resDate.value = defaultResDateLocal || '';
-      if (resGuests) resGuests.value = '1';
       setBusyLabel(String(resDate.value || '').slice(0, 10));
       clearReservationsOnTables();
     };
@@ -2089,7 +2055,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       const current = getCurrentRequest();
       if (!current) {
         if (!resDate || !String(resDate.value || '').trim()) setOutput({ ok: false, error: 'Выбери дату и время' });
-        else setOutput({ ok: false, error: 'Укажи кол-во гостей' });
+        else setOutput({ ok: false, error: 'Выбери дату и время' });
         return;
       }
 
@@ -2172,14 +2138,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); });
       resDate.addEventListener('change', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); loadFree(true).catch(() => null); });
     }
-    if (resGuests) {
-      resGuests.addEventListener('input', invalidateLast);
-      resGuests.addEventListener('change', invalidateLast);
-    }
     if (resDate && String(resDate.value || '').trim()) {
-      if (resGuests && String(resGuests.value || '').trim()) loadFree(true).catch(() => null);
+      loadFree(true).catch(() => null);
     }
-    setOutput('Выбери дату. Потом укажи гостей и нажми "Проверить". После этого кликай по столам.');
+    setOutput('Выбери дату и нажми "Проверить столики". Потом кликай по столам.');
   </script>
 </body>
 </html>
