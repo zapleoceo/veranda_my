@@ -775,6 +775,21 @@ $firstOfMonth = date('Y-m-01');
         #empTable.lite .col-role,
         #empTable.lite .col-checks,
         #empTable.lite .col-hours { display: none; }
+        .bottom-totals {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.98);
+            border-top: 1px solid rgba(0,0,0,0.08);
+            box-shadow: 0 -18px 40px rgba(0,0,0,0.08);
+            padding: 10px 14px;
+            z-index: 2500;
+        }
+        .bottom-totals .inner { max-width: 1320px; margin: 0 auto; }
+        .bottom-totals .row { display:flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+        .bottom-totals .row + .row { margin-top: 4px; }
+        .container { padding-bottom: 92px; }
     </style>
 </head>
 <body>
@@ -842,8 +857,13 @@ $firstOfMonth = date('Y-m-01');
                 <tbody id="tbody"></tbody>
             </table>
         </div>
-        <div class="muted" id="totals" style="margin-top: 10px; text-align:right; font-weight:900;">Итого: Чеков 0 · ЧасыРаботы 0 · Tips 0 · TTP 0 · Salary 0</div>
-        <div class="muted" id="tipsBalanceTotals" style="margin-top: 6px; text-align:right; font-weight:900;">
+    </div>
+</div>
+
+<div class="bottom-totals">
+    <div class="inner">
+        <div class="muted row" id="totals" style="text-align:right; font-weight:900;">Итого: Tips 0 · TipsPaid 0 · TTP 0 · Salary 0 · SlrPaid 0</div>
+        <div class="muted row" id="tipsBalanceTotals" style="text-align:right; font-weight:900;">
             Tips (на счету BIDV): <span id="tipsAccBalance">—</span> · TTP в таблице: <span id="tipsTableSum">—</span> · Остаток: <span id="tipsBalanceDiff">—</span>
         </div>
     </div>
@@ -1133,8 +1153,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         let totChecks = 0;
         let totHours = 0;
         let totTipsMinor = 0;
+        let totTipsPaidMinor = 0;
         let totTtpMinor = 0;
         let totSalary = 0;
+        let totSlrPaidVnd = 0;
         items.forEach((r) => {
             const tipsVnd = vndFromMinor(r.tips_minor || 0);
             const tp = tipsPaidById[String(r.user_id)] || null;
@@ -1151,8 +1173,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             totChecks += Number(r.checks || 0);
             totHours += Number(r.worked_hours || 0);
             totTipsMinor += Number(r.tips_minor || 0);
+            totTipsPaidMinor += Math.abs(tpTotal || 0);
             totTtpMinor += tipsToPayMinor;
             totSalary += Number(r.salary_minor || 0);
+            totSlrPaidVnd += Math.abs(spTotal || 0);
             const paidDisabled = tipsToPayMinor <= 0 ? 'disabled' : '';
             tr.innerHTML = `
                 <td class="col-id">${esc(r.user_id)}</td>
@@ -1187,12 +1211,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         });
         bindRateInputs();
         if (totalsEl) {
-            if (viewMode === 'lite') {
-                totalsEl.textContent = `Итого: Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · TTP ${fmtMoney(vndFromMinor(totTtpMinor))} · Salary ${fmtMoney(totSalary)}`;
-            } else {
-                const hoursTxt = (Math.round(totHours * 100) / 100).toFixed(2).replace(/\.00$/, '');
-                totalsEl.textContent = `Итого: Чеков ${fmtMoney(totChecks)} · ЧасыРаботы ${hoursTxt} · Tips ${fmtMoney(vndFromMinor(totTipsMinor))} · TTP ${fmtMoney(vndFromMinor(totTtpMinor))} · Salary ${fmtMoney(totSalary)}`;
-            }
+            totalsEl.textContent =
+                `Итого: Tips ${fmtMoney(vndFromMinor(totTipsMinor))}` +
+                ` · TipsPaid ${fmtMoney(vndFromMinor(totTipsPaidMinor))}` +
+                ` · TTP ${fmtMoney(vndFromMinor(totTtpMinor))}` +
+                ` · Salary ${fmtMoney(totSalary)}` +
+                ` · SlrPaid ${fmtMoney(totSlrPaidVnd)}`;
         }
         lastTipsMinorTotal = totTipsMinor;
         lastTtpMinorTotal = totTtpMinor;
