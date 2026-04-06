@@ -882,6 +882,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       pointer-events: none;
       z-index: 5;
     }
+    .bar-row * { pointer-events: auto; }
 
     .bar {
       width: 260px;
@@ -1934,7 +1935,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       }
       if (!dtpTimes.length) {
         dtpTimes = [];
-        for (let h = 0; h < 24; h++) {
+        for (let h = 10; h <= 21; h++) {
           for (let m = 0; m < 60; m += 30) {
             dtpTimes.push({ value: pad2(h) + ':' + pad2(m) });
           }
@@ -1957,9 +1958,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       const dateVal = m ? m[1] : (dtpDates[0] ? dtpDates[0].value : '');
       const timeVal = m ? m[2] : '18:00';
       dtpSelDate = dateVal;
-      dtpSelTime = timeVal;
       const dIdx = Math.max(0, dtpDates.findIndex((x) => x.value === dateVal));
-      const tIdx = Math.max(0, dtpTimes.findIndex((x) => x.value === timeVal));
+      const tFoundIdx = dtpTimes.findIndex((x) => x.value === timeVal);
+      const tIdx = Math.max(0, tFoundIdx);
+      dtpSelTime = tFoundIdx >= 0 ? timeVal : (dtpTimes[0] ? dtpTimes[0].value : '10:00');
       setWheelTo(dtpDateList, dIdx);
       setWheelTo(dtpTimeList, tIdx);
     };
@@ -1967,7 +1969,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const applyDtpToInput = () => {
       if (!resDate) return;
       const dateVal = dtpSelDate || (dtpDates[0] ? dtpDates[0].value : '');
-      const timeVal = dtpSelTime || '18:00';
+      const timeVal = dtpSelTime || (dtpTimes[0] ? dtpTimes[0].value : '10:00');
       resDate.value = dateVal + 'T' + timeVal;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       resDate.dispatchEvent(new Event('change', { bubbles: true }));
