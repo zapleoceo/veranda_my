@@ -1759,7 +1759,7 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
 
         $apiOut = new \App\Classes\PosterAPI((string)$token);
         $rows = [];
-        foreach ([1, 8] as $accType) {
+        foreach ([8] as $accType) {
             try {
                 $r2 = $apiOut->request('finance.getTransactions', [
                     'dateFrom' => date('Ymd', strtotime($fromDate)),
