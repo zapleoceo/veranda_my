@@ -775,21 +775,15 @@ $firstOfMonth = date('Y-m-01');
         #empTable.lite .col-role,
         #empTable.lite .col-checks,
         #empTable.lite .col-hours { display: none; }
-        .bottom-totals {
-            position: fixed;
-            left: 0;
-            right: 0;
+        #empTable tfoot td {
+            position: sticky;
             bottom: 0;
             background: rgba(255,255,255,0.98);
-            border-top: 1px solid rgba(0,0,0,0.08);
-            box-shadow: 0 -18px 40px rgba(0,0,0,0.08);
-            padding: 10px 14px;
-            z-index: 2500;
+            border-top: 2px solid rgba(0,0,0,0.10);
+            box-shadow: 0 -10px 24px rgba(0,0,0,0.08);
+            font-weight: 900;
         }
-        .bottom-totals .inner { max-width: 1320px; margin: 0 auto; }
-        .bottom-totals .row { display:flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
-        .bottom-totals .row + .row { margin-top: 4px; }
-        .container { padding-bottom: 92px; }
+        #empTable tfoot td .muted { font-weight: 800; }
     </style>
 </head>
 <body>
@@ -855,15 +849,24 @@ $firstOfMonth = date('Y-m-01');
                 </tr>
                 </thead>
                 <tbody id="tbody"></tbody>
+                <tfoot>
+                <tr id="totalsRow">
+                    <td class="col-id"></td>
+                    <td class="col-name">ИТОГО</td>
+                    <td class="col-rate"></td>
+                    <td class="col-role"></td>
+                    <td class="col-checks" style="text-align:right;"></td>
+                    <td class="col-hours" style="text-align:right;"></td>
+                    <td class="col-tips" style="text-align:right;"><span id="totTips">0</span></td>
+                    <td class="col-paid" style="text-align:right;"><span id="totTipsPaid">0</span></td>
+                    <td class="col-slr" style="text-align:right;"><span id="totSlrPaid">0</span></td>
+                    <td class="col-ttp" style="text-align:right;"><span id="totTtp">0</span></td>
+                    <td class="col-salary" style="text-align:right;"><span id="totSalary">0</span></td>
+                </tr>
+                </tfoot>
             </table>
         </div>
-    </div>
-</div>
-
-<div class="bottom-totals">
-    <div class="inner">
-        <div class="muted row" id="totals" style="text-align:right; font-weight:900;">Итого: Tips 0 · TipsPaid 0 · TTP 0 · Salary 0 · SlrPaid 0</div>
-        <div class="muted row" id="tipsBalanceTotals" style="text-align:right; font-weight:900;">
+        <div class="muted" id="tipsBalanceTotals" style="margin-top: 6px; text-align:right; font-weight:900;">
             Tips (на счету BIDV): <span id="tipsAccBalance">—</span> · TTP в таблице: <span id="tipsTableSum">—</span> · Остаток: <span id="tipsBalanceDiff">—</span>
         </div>
     </div>
@@ -935,8 +938,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const cancelBtn = document.getElementById('cancelBtn');
     const hideZeroCb = document.getElementById('hideZero');
     const modeLiteCb = document.getElementById('modeLite');
-    const totalsEl = document.getElementById('totals');
     const empTable = document.getElementById('empTable');
+    const totTipsEl = document.getElementById('totTips');
+    const totTipsPaidEl = document.getElementById('totTipsPaid');
+    const totSlrPaidEl = document.getElementById('totSlrPaid');
+    const totTtpEl = document.getElementById('totTtp');
+    const totSalaryEl = document.getElementById('totSalary');
     const paidModal = document.getElementById('paidModal');
     const paidText = document.getElementById('paidText');
     const paidChecked = document.getElementById('paidChecked');
@@ -1210,14 +1217,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             tbody.appendChild(tr);
         });
         bindRateInputs();
-        if (totalsEl) {
-            totalsEl.textContent =
-                `Итого: Tips ${fmtMoney(vndFromMinor(totTipsMinor))}` +
-                ` · TipsPaid ${fmtMoney(vndFromMinor(totTipsPaidMinor))}` +
-                ` · TTP ${fmtMoney(vndFromMinor(totTtpMinor))}` +
-                ` · Salary ${fmtMoney(totSalary)}` +
-                ` · SlrPaid ${fmtMoney(totSlrPaidVnd)}`;
-        }
+        if (totTipsEl) totTipsEl.textContent = fmtMoney(vndFromMinor(totTipsMinor));
+        if (totTipsPaidEl) totTipsPaidEl.textContent = fmtMoney(vndFromMinor(totTipsPaidMinor));
+        if (totTtpEl) totTtpEl.textContent = fmtMoney(vndFromMinor(totTtpMinor));
+        if (totSalaryEl) totSalaryEl.textContent = fmtMoney(totSalary);
+        if (totSlrPaidEl) totSlrPaidEl.textContent = fmtMoney(totSlrPaidVnd);
         lastTipsMinorTotal = totTipsMinor;
         lastTtpMinorTotal = totTtpMinor;
         renderTipsBalanceTotals();
