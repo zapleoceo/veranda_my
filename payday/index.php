@@ -1770,9 +1770,8 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
                 $action = (int)($cr['action'] ?? $cr['category_action'] ?? 0);
                 if ($action === 14) $excludeCatIds[$cid] = true;
             }
-            $excludeCatIds[4] = true;
         } catch (\Throwable $e) {
-            $excludeCatIds = [4 => true];
+            $excludeCatIds = [];
         }
         $rows = [];
         foreach ([1, 8] as $accType) {
