@@ -957,6 +957,21 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       flex-wrap: wrap;
     }
   
+    .zoom {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface-2);
+      border-radius: var(--radius-full);
+      padding: var(--space-2) var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--color-text);
+      white-space: nowrap;
+    }
+    .zoom input[type="range"] { width: 140px; }
+    .zoom .zv { font-variant-numeric: tabular-nums; font-weight: 900; min-width: 46px; text-align: right; }
+  
     .legend, .theme-toggle {
       border: 1px solid var(--color-border);
       background: var(--color-surface-2);
@@ -985,8 +1000,11 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       padding: 0 56px 56px 56px;
       border: 1px solid var(--color-border);
       overflow: auto;
+      --map-scale: 1;
     }
   
+    .map-zoom-box { width: 820px; height: 620px; }
+    .map-zoom-inner { width: 820px; height: 620px; transform: scale(var(--map-scale)); transform-origin: top left; }
     .map {
       position: relative;
       width: 820px;
@@ -1758,6 +1776,8 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       .layout, .map-shell { padding: var(--space-4); }
       .topbar { padding: var(--space-4); align-items: flex-start; flex-direction: column; }
       .map-shell { padding: 0 28px 28px 28px; }
+      .zoom { width: 100%; justify-content: space-between; }
+      .zoom input[type="range"] { width: 160px; }
     }
   </style>
 </head>
@@ -1769,13 +1789,20 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
           <h1>Схема бронирования</h1>
         </div>
         <div class="controls">
+          <label class="zoom" aria-label="Масштаб схемы">
+            <span>Масштаб</span>
+            <input id="mapZoom" type="range" min="50" max="200" step="1" value="100">
+            <span class="zv" id="mapZoomVal">100%</span>
+          </label>
           <button class="theme-toggle" type="button" data-theme-toggle aria-label="Переключить тему">☀️</button>
         </div>
       </div>
   
       <section class="layout">
         <div class="map-shell">
-          <div class="map" aria-label="Схема столов ресторана">
+          <div class="map-zoom-box" id="mapZoomBox">
+            <div class="map-zoom-inner" id="mapZoomInner">
+              <div class="map" aria-label="Схема столов ресторана">
             <button class="table large" style="left: 712px; top: 236px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 362px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 488px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
@@ -1838,6 +1865,8 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
                   <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
                   <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
                 </div>
+              </div>
+            </div>
               </div>
             </div>
           </div>
@@ -1947,6 +1976,38 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
     toggle.textContent = prefersDark ? '☀️' : '🌙';
+
+    const mapShell = document.querySelector('.map-shell');
+    const mapZoom = document.getElementById('mapZoom');
+    const mapZoomVal = document.getElementById('mapZoomVal');
+    const mapZoomInner = document.getElementById('mapZoomInner');
+
+    const applyMapZoom = (pct, keepAnchor) => {
+      if (!mapShell) return;
+      const p = Math.max(50, Math.min(200, Number(pct || 100) || 100));
+      const scale = p / 100;
+      if (mapZoom) mapZoom.value = String(Math.round(p));
+      if (mapZoomVal) mapZoomVal.textContent = String(Math.round(p)) + '%';
+
+      let ax = 0, ay = 0;
+      if (keepAnchor) {
+        const old = Number(getComputedStyle(mapShell).getPropertyValue('--map-scale')) || 1;
+        const rect = mapShell.getBoundingClientRect();
+        ax = (mapShell.scrollLeft + rect.width / 2) / old;
+        ay = (mapShell.scrollTop + rect.height / 2) / old;
+      }
+
+      mapShell.style.setProperty('--map-scale', String(scale));
+
+      if (keepAnchor) {
+        const rect = mapShell.getBoundingClientRect();
+        mapShell.scrollLeft = Math.max(0, ax * scale - rect.width / 2);
+        mapShell.scrollTop = Math.max(0, ay * scale - rect.height / 2);
+      }
+    };
+
+    applyMapZoom(100, false);
+    if (mapZoom) mapZoom.addEventListener('input', () => applyMapZoom(mapZoom.value, true));
   
     toggle.addEventListener('click', () => {
       const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
