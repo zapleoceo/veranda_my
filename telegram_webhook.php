@@ -53,6 +53,45 @@ if (!empty($update['message'])) {
     $chatType = (string)($chat['type'] ?? '');
     $text = trim((string)($msg['text'] ?? ''));
     $cmd = strtolower(preg_replace('/\s+.*/', '', $text));
+    $startCode = '';
+    if (preg_match('/^\/start(?:@\w+)?\s+([a-f0-9]{8,40})$/i', $text, $m)) {
+        $startCode = strtolower((string)($m[1] ?? ''));
+    }
+    if ($cmd === '/start' && $startCode !== '' && $chatId !== '' && $chatType === 'private') {
+        try {
+            $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+            $t = $db->t('table_reservation_tg_states');
+            $row = $db->query(
+                "SELECT code
+                 FROM {$t}
+                 WHERE code = ?
+                   AND used_at IS NULL
+                   AND expires_at > NOW()
+                 LIMIT 1",
+                [$startCode]
+            )->fetch();
+            if (is_array($row) && !empty($row['code'])) {
+                $returnUrl = 'https://veranda.my/TableReservation.php?tg_state=' . rawurlencode($startCode);
+                $postJson('sendMessage', [
+                    'chat_id' => $chatId,
+                    'text' => "Готово.\nНажми кнопку ниже, чтобы вернуться к заявке:",
+                    'reply_markup' => [
+                        'inline_keyboard' => [
+                            [
+                                [
+                                    'text' => 'Вернуться на сайт',
+                                    'url' => $returnUrl,
+                                ],
+                            ],
+                        ],
+                    ],
+                ]);
+                echo 'ok';
+                exit;
+            }
+        } catch (\Throwable $e) {
+        }
+    }
     if ($cmd === '/start' || $cmd === '/menu') {
         if ($chatId !== '') {
             if ($chatType !== 'private') {
