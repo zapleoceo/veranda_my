@@ -996,11 +996,11 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     .dtp-card {
       position: relative;
       width: min(520px, 100%);
-      background: rgba(17, 24, 39, 0.96);
+      background: linear-gradient(180deg, rgba(37, 24, 16, 0.98), rgba(17, 12, 8, 0.96));
       color: rgba(255, 250, 244, 0.94);
-      border: 1px solid rgba(255,255,255,0.12);
+      border: 1px solid rgba(213,156,90,0.28);
       border-radius: 18px;
-      box-shadow: 0 26px 70px rgba(0,0,0,0.45);
+      box-shadow: 0 26px 70px rgba(0,0,0,0.45), 0 0 0 1px rgba(123, 75, 42, 0.20);
       padding: 14px 14px 12px;
       transform: translateY(8px) scale(0.98);
       opacity: 0;
@@ -1012,8 +1012,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     .wheel {
       position: relative;
       border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(213,156,90,0.18);
+      background: rgba(255,255,255,0.03);
       overflow: hidden;
       height: 210px;
     }
@@ -1026,8 +1026,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       pointer-events: none;
       z-index: 2;
     }
-    .wheel::before { top: 0; background: linear-gradient(180deg, rgba(17,24,39,0.96), rgba(17,24,39,0)); }
-    .wheel::after { bottom: 0; background: linear-gradient(0deg, rgba(17,24,39,0.96), rgba(17,24,39,0)); }
+    .wheel::before { top: 0; background: linear-gradient(180deg, rgba(17,12,8,0.96), rgba(17,12,8,0)); }
+    .wheel::after { bottom: 0; background: linear-gradient(0deg, rgba(17,12,8,0.96), rgba(17,12,8,0)); }
     .wheel-mid {
       position: absolute;
       left: 12px;
@@ -1035,10 +1035,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       top: 50%;
       height: 40px;
       transform: translateY(-50%);
-      border-top: 1px solid rgba(255,255,255,0.16);
-      border-bottom: 1px solid rgba(255,255,255,0.16);
+      border-top: 1px solid rgba(213,156,90,0.22);
+      border-bottom: 1px solid rgba(213,156,90,0.22);
       border-radius: 12px;
-      background: rgba(255,255,255,0.04);
+      background: rgba(213,156,90,0.06);
       z-index: 1;
       pointer-events: none;
     }
@@ -1068,6 +1068,19 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       user-select: none;
     }
     .wheel-item.active { color: rgba(255, 250, 244, 0.94); }
+    .dtp-actions .btn {
+      transition: transform .14s ease, filter .14s ease, box-shadow .14s ease;
+    }
+    .dtp-actions .btn:hover {
+      transform: translateY(-1px);
+      filter: saturate(1.05);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.28);
+    }
+    .dtp-actions .btn:active { transform: translateY(0); box-shadow: none; }
+    .dtp-actions .btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 4px rgba(213,156,90,0.18);
+    }
     .dtp-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
     body { overflow-x: hidden; }
     .mini-loader {
@@ -1514,6 +1527,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         <div class="map-shell">
           <div class="map" aria-label="Схема столов ресторана">
             <button class="table large" style="left: 712px; top: 236px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
+            <button class="table large" style="left: 712px; top: 362px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 488px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
             <button class="table small-vertical wide-1" style="left: 534px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
