@@ -687,10 +687,29 @@ if (($_GET['ajax'] ?? '') === 'tg_state_create') {
     exit;
   }
 
-  $tgUserBot = trim((string)($_ENV['TABLE_RESERVATION_TG_BOT_USERNAME'] ?? $_ENV['TELEGRAM_BOT_USERNAME'] ?? ''));
+  $tgUserBot = trim((string)($_ENV['TABLE_RESERVATION_TG_BOT_USERNAME'] ?? $_ENV['TELEGRAM_BOT_USERNAME'] ?? $_ENV['TG_BOT_USERNAME'] ?? ''));
+  if ($tgUserBot === '') {
+    $token = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+    if ($token !== '') {
+      try {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$token}/getMe");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        $data = $resp ? json_decode($resp, true) : null;
+        if (is_array($data) && !empty($data['ok']) && is_array($data['result'] ?? null)) {
+          $u = trim((string)($data['result']['username'] ?? ''));
+          if ($u !== '') $tgUserBot = $u;
+        }
+      } catch (\Throwable $e) {
+      }
+    }
+  }
   if ($tgUserBot === '') {
     http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'Не задан TABLE_RESERVATION_TG_BOT_USERNAME'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => false, 'error' => 'Не задан username бота Telegram'], JSON_UNESCAPED_UNICODE);
     exit;
   }
 
@@ -1821,7 +1840,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         <div class="modal-note">Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.</div>
         <div class="modal-actions">
           <button class="btn btn-secondary" type="button" data-modal-close="reqModal">Закрыть</button>
-          <button class="btn btn-primary" type="submit">Отправить</button>
+          <button class="btn btn-primary" type="submit" id="reqSubmit">Отправить</button>
         </div>
       </form>
     </div>
@@ -2009,6 +2028,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     const reqGuests = document.getElementById('reqGuests');
     const reqStart = document.getElementById('reqStart');
     const reqHint = document.getElementById('reqHint');
+    const reqSubmit = document.getElementById('reqSubmit');
     const msgrTgBtn = document.getElementById('msgrTgBtn');
     const msgrHint = document.getElementById('msgrHint');
     const toastEl = document.getElementById('tableToast');
@@ -2270,6 +2290,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     }
 
     let pendingBooking = null;
+    let messengerLinked = { telegram: false, whatsapp: false, zalo: false };
     const openRequestForm = ({ tableNum, guests, start, name, phone, keepFields }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
@@ -2283,6 +2304,9 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         if (reqPhone) reqPhone.value = String(phone || '');
       }
       if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
+      const canSubmit = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
+      if (reqSubmit) reqSubmit.disabled = !canSubmit;
+      if (!canSubmit) setMsgrHint('Для отправки привяжи любой мессенджер (Telegram).');
       setModal(reqModal, true);
       if (reqName) reqName.focus();
     };
@@ -2380,6 +2404,11 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     if (reqForm) {
       reqForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) {
+          setOutput({ ok: false, error: 'Для отправки привяжи любой мессенджер (Telegram).' });
+          setMsgrHint('Для отправки привяжи любой мессенджер (Telegram).');
+          return;
+        }
         const name = reqName ? String(reqName.value || '').trim() : '';
         const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
         const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
@@ -2757,7 +2786,9 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         const phone = String(p.phone || '');
         if (tableNum && guests > 0 && start) {
           selectedTableNum = tableNum;
+          messengerLinked.telegram = true;
           openRequestForm({ tableNum, guests, start, name, phone, keepFields: true });
+          setMsgrHint('Telegram привязан ✅');
           updateReqGuestsHint().catch(() => null);
         }
         const scrollY = Math.max(0, Math.floor(Number(p.scroll_y || 0) || 0));
