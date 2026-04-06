@@ -1870,6 +1870,36 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
 
     const pad2 = (n) => String(n).padStart(2, '0');
     const isoDate = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    const timeToMin = (hhmm) => {
+      const m = String(hhmm || '').match(/^(\d{2}):(\d{2})$/);
+      if (!m) return 0;
+      return (Number(m[1]) * 60) + Number(m[2]);
+    };
+
+    const getMinSelectableSlot = () => {
+      const now = new Date();
+      const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0);
+      const m = base.getMinutes();
+      const add = (30 - (m % 30)) % 30;
+      base.setMinutes(m + add, 0, 0);
+
+      const minToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0, 0);
+      const maxToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 21, 0, 0, 0);
+
+      let slot = base;
+      if (slot < minToday) slot = minToday;
+      if (slot > maxToday) slot = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10, 0, 0, 0);
+
+      return { dateVal: isoDate(slot), timeVal: pad2(slot.getHours()) + ':' + pad2(slot.getMinutes()) };
+    };
+
+    const clampToMinSlot = (dateVal, timeVal) => {
+      const minSlot = getMinSelectableSlot();
+      if (!dateVal) return minSlot;
+      if (dateVal < minSlot.dateVal) return minSlot;
+      if (dateVal === minSlot.dateVal && timeToMin(timeVal) < timeToMin(minSlot.timeVal)) return minSlot;
+      return { dateVal, timeVal };
+    };
 
     const fmtCashDate = (dtLocal) => {
       const raw = String(dtLocal || '').trim();
@@ -1937,6 +1967,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
         dtpTimes = [];
         for (let h = 10; h <= 21; h++) {
           for (let m = 0; m < 60; m += 30) {
+            if (h === 21 && m > 0) continue;
             dtpTimes.push({ value: pad2(h) + ':' + pad2(m) });
           }
         }
@@ -1955,24 +1986,38 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       ensureDtpData();
       const raw = resDate ? String(resDate.value || '').trim() : '';
       const m = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
-      const dateVal = m ? m[1] : (dtpDates[0] ? dtpDates[0].value : '');
-      const timeVal = m ? m[2] : '18:00';
-      dtpSelDate = dateVal;
-      const dIdx = Math.max(0, dtpDates.findIndex((x) => x.value === dateVal));
-      const tFoundIdx = dtpTimes.findIndex((x) => x.value === timeVal);
+      const fallback = getMinSelectableSlot();
+      const picked = clampToMinSlot(m ? m[1] : fallback.dateVal, m ? m[2] : fallback.timeVal);
+      dtpSelDate = picked.dateVal;
+      const dIdx = Math.max(0, dtpDates.findIndex((x) => x.value === picked.dateVal));
+      const tFoundIdx = dtpTimes.findIndex((x) => x.value === picked.timeVal);
       const tIdx = Math.max(0, tFoundIdx);
-      dtpSelTime = tFoundIdx >= 0 ? timeVal : (dtpTimes[0] ? dtpTimes[0].value : '10:00');
+      dtpSelTime = tFoundIdx >= 0 ? picked.timeVal : (dtpTimes[0] ? dtpTimes[0].value : '10:00');
       setWheelTo(dtpDateList, dIdx);
       setWheelTo(dtpTimeList, tIdx);
     };
 
     const applyDtpToInput = () => {
       if (!resDate) return;
-      const dateVal = dtpSelDate || (dtpDates[0] ? dtpDates[0].value : '');
-      const timeVal = dtpSelTime || (dtpTimes[0] ? dtpTimes[0].value : '10:00');
-      resDate.value = dateVal + 'T' + timeVal;
+      const fallback = getMinSelectableSlot();
+      const picked = clampToMinSlot(dtpSelDate || fallback.dateVal, dtpSelTime || fallback.timeVal);
+      resDate.value = picked.dateVal + 'T' + picked.timeVal;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       resDate.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const clampDtpTimeForSelectedDate = () => {
+      ensureDtpData();
+      const minSlot = getMinSelectableSlot();
+      if (!dtpSelDate) return;
+      if (dtpSelDate === minSlot.dateVal) {
+        const cur = dtpSelTime || (dtpTimes[0] ? dtpTimes[0].value : minSlot.timeVal);
+        if (timeToMin(cur) < timeToMin(minSlot.timeVal)) {
+          dtpSelTime = minSlot.timeVal;
+          const idx = Math.max(0, dtpTimes.findIndex((x) => x.value === dtpSelTime));
+          setWheelTo(dtpTimeList, idx);
+        }
+      }
     };
 
     if (dtpDateList) {
@@ -1983,6 +2028,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
           const idx = wheelIndex(dtpDateList, dtpDates.length);
           updateWheelActive(dtpDateList, idx);
           dtpSelDate = dtpDates[idx] ? dtpDates[idx].value : dtpSelDate;
+          clampDtpTimeForSelectedDate();
         }, 80);
       });
     }
@@ -1994,6 +2040,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
           const idx = wheelIndex(dtpTimeList, dtpTimes.length);
           updateWheelActive(dtpTimeList, idx);
           dtpSelTime = dtpTimes[idx] ? dtpTimes[idx].value : dtpSelTime;
+          clampDtpTimeForSelectedDate();
         }, 80);
       });
     }
@@ -2368,6 +2415,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     const initDate = () => {
       if (!resDate) return;
       resDate.value = defaultResDateLocal || '';
+      const minSlot = getMinSelectableSlot();
+      resDate.min = minSlot.dateVal + 'T' + minSlot.timeVal;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       setBusyLabel(String(resDate.value || '').slice(0, 10));
       clearReservationsOnTables();
