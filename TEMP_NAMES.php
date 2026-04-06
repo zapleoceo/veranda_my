@@ -220,6 +220,7 @@ if (($_GET['ajax'] ?? '') !== '') {
         edit_full VARCHAR(255) NOT NULL DEFAULT '',
         raw_json MEDIUMTEXT NULL,
         menu_category_id INT NOT NULL DEFAULT 0,
+        category_name VARCHAR(255) NOT NULL DEFAULT '',
         workshop_id INT NOT NULL DEFAULT 0,
         weight_flag TINYINT NOT NULL DEFAULT 0,
         color VARCHAR(32) NOT NULL DEFAULT '',
@@ -234,10 +235,11 @@ if (($_GET['ajax'] ?? '') !== '') {
     try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN weight_flag TINYINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) {}
     try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN color VARCHAR(32) NOT NULL DEFAULT ''"); } catch (\Throwable $e) {}
     try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN edit_full VARCHAR(255) NOT NULL DEFAULT ''"); } catch (\Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN category_name VARCHAR(255) NOT NULL DEFAULT ''"); } catch (\Throwable $e) {}
 
     $ajax = (string)($_GET['ajax'] ?? '');
     if ($ajax === 'list') {
-        $rows = $db->query("SELECT product_id, name_raw, name_ru, name_en, edit_full, updated_at FROM {$t} ORDER BY name_ru, name_raw")->fetchAll();
+        $rows = $db->query("SELECT product_id, name_raw, name_ru, name_en, edit_full, menu_category_id, category_name, updated_at FROM {$t} ORDER BY name_ru, name_raw")->fetchAll();
         echo json_encode(['ok' => true, 'items' => is_array($rows) ? $rows : []], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -353,6 +355,49 @@ if (($_GET['ajax'] ?? '') !== '') {
                 exit;
             }
         }
+
+        $updatedNameRaw = (string)($row['name_raw'] ?? '');
+        $updatedRu = (string)($row['name_ru'] ?? '');
+        $updatedEn = (string)($row['name_en'] ?? '');
+        $updatedCatName = trim((string)($row['category_name'] ?? ''));
+        try {
+            $prod = $api->request('menu.getProduct', ['product_id' => $pid], 'GET');
+            if (is_array($prod)) {
+                $pname = trim((string)($prod['product_name'] ?? ''));
+                if ($pname !== '') {
+                    if (mb_strlen($pname, 'UTF-8') > 255) $pname = mb_substr($pname, 0, 255, 'UTF-8');
+                    $pair = $processPair($pname);
+                    $updatedNameRaw = $pname;
+                    $updatedRu = (string)($pair['ru'] ?? '');
+                    $updatedEn = (string)($pair['en'] ?? '');
+                }
+                $menuCategoryId = (int)($prod['menu_category_id'] ?? $prod['category_id'] ?? $menuCategoryId);
+                $updatedCatName = trim((string)($prod['category_name'] ?? $updatedCatName));
+                $workshopId = (int)($prod['workshop'] ?? $prod['workshop_id'] ?? $workshopId);
+                $weightFlag = (int)($prod['weight_flag'] ?? $weightFlag);
+                $color = trim((string)($prod['color'] ?? $prod['product_color'] ?? $color));
+                if ($color === '') $color = 'white';
+            }
+        } catch (\Throwable $e) {
+        }
+        if (mb_strlen($updatedCatName, 'UTF-8') > 255) $updatedCatName = mb_substr($updatedCatName, 0, 255, 'UTF-8');
+
+        $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
+        $db->query(
+            "UPDATE {$t}
+             SET name_raw = ?,
+                 name_ru = ?,
+                 name_en = ?,
+                 menu_category_id = ?,
+                 category_name = ?,
+                 workshop_id = ?,
+                 weight_flag = ?,
+                 color = ?,
+                 updated_at = ?
+             WHERE product_id = ?
+             LIMIT 1",
+            [$updatedNameRaw, $updatedRu, $updatedEn, $menuCategoryId, $updatedCatName, $workshopId, $weightFlag, $color, $now, $pid]
+        );
         echo json_encode(['ok' => true, 'method' => $okMethod, 'product_id' => $pid], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -369,8 +414,8 @@ if (($_GET['ajax'] ?? '') !== '') {
 
         $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
         $stmt = $pdo->prepare(
-            "INSERT INTO {$t} (product_id, name_raw, name_ru, name_en, edit_ru, edit_en, edit_full, raw_json, menu_category_id, workshop_id, weight_flag, color, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            "INSERT INTO {$t} (product_id, name_raw, name_ru, name_en, edit_ru, edit_en, edit_full, raw_json, menu_category_id, category_name, workshop_id, weight_flag, color, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                name_raw = VALUES(name_raw),
                name_ru = VALUES(name_ru),
@@ -378,6 +423,7 @@ if (($_GET['ajax'] ?? '') !== '') {
                edit_full = IF(TRIM(edit_full)='', VALUES(edit_full), edit_full),
                raw_json = VALUES(raw_json),
                menu_category_id = VALUES(menu_category_id),
+               category_name = VALUES(category_name),
                workshop_id = VALUES(workshop_id),
                weight_flag = VALUES(weight_flag),
                color = VALUES(color),
@@ -417,10 +463,12 @@ if (($_GET['ajax'] ?? '') !== '') {
             if (!is_string($rawJson)) $rawJson = null;
             if (is_string($rawJson) && mb_strlen($rawJson, 'UTF-8') > 2000000) $rawJson = mb_substr($rawJson, 0, 2000000, 'UTF-8');
             $menuCategoryId = (int)($p['menu_category_id'] ?? $p['category_id'] ?? $p['main_category_id'] ?? 0);
+            $catName = trim((string)($p['category_name'] ?? $p['menu_category_name'] ?? ''));
+            if (mb_strlen($catName, 'UTF-8') > 255) $catName = mb_substr($catName, 0, 255, 'UTF-8');
             $workshopId = (int)($p['workshop'] ?? $p['workshop_id'] ?? 0);
             $weightFlag = (int)($p['weight_flag'] ?? 0);
             $color = trim((string)($p['color'] ?? $p['product_color'] ?? ''));
-            $stmt->execute([$pid, $rawName, $ru, $en, $editRu, $editEn, $editFull, $rawJson, $menuCategoryId, $workshopId, $weightFlag, $color, $now, $now]);
+            $stmt->execute([$pid, $rawName, $ru, $en, $editRu, $editEn, $editFull, $rawJson, $menuCategoryId, $catName, $workshopId, $weightFlag, $color, $now, $now]);
             $count++;
         }
         echo json_encode(['ok' => true, 'count' => $count], JSON_UNESCAPED_UNICODE);
@@ -496,6 +544,12 @@ if (($_GET['ajax'] ?? '') !== '') {
         <h1>TEMP_NAMES</h1>
         <button class="primary" id="syncBtn">Синхронизировать из Poster</button>
         <button id="processBtn">Обработать названия</button>
+        <label class="status" style="display:flex; align-items:center; gap: 8px;">
+            Категория
+            <select id="catFilter" style="padding: 9px 10px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); font-weight: 800; background:#fff;">
+                <option value="">Все</option>
+            </select>
+        </label>
         <span class="status" id="status"></span>
     </div>
     <table>
@@ -518,6 +572,7 @@ if (($_GET['ajax'] ?? '') !== '') {
     const tbody = document.getElementById('tbody');
     const syncBtn = document.getElementById('syncBtn');
     const processBtn = document.getElementById('processBtn');
+    const catFilter = document.getElementById('catFilter');
     const statusEl = document.getElementById('status');
     const setStatus = (t) => { if (statusEl) statusEl.textContent = String(t || ''); };
 
@@ -533,12 +588,22 @@ if (($_GET['ajax'] ?? '') !== '') {
         return String(r.edit_full || '').trim();
     };
 
-    const loadList = async () => {
-        setStatus('Загрузка…');
-        const res = await fetch(apiUrl('list'), { headers: { 'Accept': 'application/json' } });
-        const j = await res.json().catch(() => null);
-        if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-        const items = Array.isArray(j.items) ? j.items : [];
+    let allItems = [];
+    const buildCategories = (items) => {
+        const map = new Map();
+        items.forEach((r) => {
+            const id = String(r.menu_category_id ?? '');
+            if (!id || id === '0') return;
+            const name = String(r.category_name || '').trim() || ('#' + id);
+            map.set(id, name);
+        });
+        const arr = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+        arr.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+        return arr;
+    };
+    const renderList = () => {
+        const catId = catFilter ? String(catFilter.value || '') : '';
+        const items = catId ? allItems.filter((r) => String(r.menu_category_id ?? '') === catId) : allItems.slice();
         if (tbody) tbody.innerHTML = '';
         items.forEach((r) => {
             const pid = String(r.product_id || '');
@@ -562,7 +627,28 @@ if (($_GET['ajax'] ?? '') !== '') {
             `;
             tbody.appendChild(tr);
         });
-        setStatus('Готово: ' + String(items.length));
+        setStatus('Готово: ' + String(items.length) + (catId ? (' (фильтр)') : ''));
+    };
+
+    const loadList = async () => {
+        setStatus('Загрузка…');
+        const res = await fetch(apiUrl('list'), { headers: { 'Accept': 'application/json' } });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        allItems = Array.isArray(j.items) ? j.items : [];
+        if (catFilter) {
+            const prev = String(catFilter.value || '');
+            const cats = buildCategories(allItems);
+            catFilter.innerHTML = '<option value="">Все</option>';
+            cats.forEach((c) => {
+                const opt = document.createElement('option');
+                opt.value = String(c.id);
+                opt.textContent = String(c.name);
+                catFilter.appendChild(opt);
+            });
+            if (prev && Array.from(catFilter.options).some((o) => o.value === prev)) catFilter.value = prev;
+        }
+        renderList();
     };
 
     const saveValue = async (pid, value, tr) => {
@@ -601,6 +687,7 @@ if (($_GET['ajax'] ?? '') !== '') {
                 .then(({ r, j }) => {
                     if (!r.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
                     setStatus('Обновлено в Poster: ' + String(j.method || 'ok') + ' · ID ' + String(pid));
+                    return loadList();
                 })
                 .catch((err) => setStatus(String(err && err.message ? err.message : err)))
                 .finally(() => {
@@ -617,6 +704,7 @@ if (($_GET['ajax'] ?? '') !== '') {
             saveValue(pid, t.value, tr).catch((err) => setStatus(String(err && err.message ? err.message : err)));
         });
     }
+    if (catFilter) catFilter.addEventListener('change', renderList);
 
     if (syncBtn) {
         syncBtn.addEventListener('click', async () => {
