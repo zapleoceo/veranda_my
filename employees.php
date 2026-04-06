@@ -1488,7 +1488,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     function renderTable() {
         const coll = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
         const dir = sortDir === 'desc' ? -1 : 1;
-        const filtered = (hideZero ? dataRows.filter((r) => Number(r.worked_hours || 0) > 0) : dataRows.slice()).map((r) => {
+        const augmented = dataRows.slice().map((r) => {
             const tipsMinor = Number(r.tips_minor || 0) || 0;
             const tp = tipsPaidById[String(r.user_id)] || null;
             const tpTotal = tp ? Number(tp.total_amount || 0) : 0;
@@ -1500,6 +1500,19 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const salaryToPayVnd = Math.max(0, salaryVnd - slrPaidVnd);
             return { ...r, tips_paid_minor: Math.abs(tpTotal || 0), slr_paid_minor: Math.abs(spTotal || 0), tips_to_pay_minor: tipsToPayMinor, salary_to_pay_vnd: salaryToPayVnd };
         });
+        const filtered = hideZero
+            ? augmented.filter((r) => {
+                const checks = Number(r.checks || 0) || 0;
+                const hours = Number(r.worked_hours || 0) || 0;
+                const tips = Number(r.tips_minor || 0) || 0;
+                const tipsPaid = Number(r.tips_paid_minor || 0) || 0;
+                const slrPaid = Number(r.slr_paid_minor || 0) || 0;
+                const tipsToPay = Number(r.tips_to_pay_minor || 0) || 0;
+                const salary = Number(r.salary_minor || 0) || 0;
+                const salaryToPay = Number(r.salary_to_pay_vnd || 0) || 0;
+                return !(checks === 0 && hours === 0 && tips === 0 && tipsPaid === 0 && slrPaid === 0 && tipsToPay === 0 && salary === 0 && salaryToPay === 0);
+            })
+            : augmented;
         const items = filtered.slice().sort((a, b) => {
             const av = a[sortBy];
             const bv = b[sortBy];

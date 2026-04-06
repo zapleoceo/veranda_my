@@ -656,6 +656,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Restaurant Table Map</title>
+  <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
