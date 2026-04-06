@@ -1003,16 +1003,13 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       --map-scale: 1;
     }
   
+    .map-shell-wrap { position: relative; }
     .map-overlay {
-      position: sticky;
+      position: absolute;
       top: 12px;
-      z-index: 20;
-      pointer-events: none;
-      display: flex;
-      justify-content: flex-end;
-      margin: 12px 12px 0 12px;
+      right: 12px;
+      z-index: 30;
     }
-    .map-overlay .cash-controls { pointer-events: auto; }
 
     .map-zoom-box { width: 820px; height: 620px; }
     .map-zoom-inner { width: 820px; height: 620px; transform: scale(var(--map-scale)); transform-origin: top left; }
@@ -1809,15 +1806,9 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       </div>
   
       <section class="layout">
-        <div class="map-shell">
-          <div class="map-overlay">
-            <div class="cash-controls">
-              <input type="datetime-local" id="resDate" aria-label="Дата и время">
-              <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
-              <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
-            </div>
-          </div>
-          <div class="map-zoom-box" id="mapZoomBox">
+        <div class="map-shell-wrap">
+          <div class="map-shell">
+            <div class="map-zoom-box" id="mapZoomBox">
             <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="Схема столов ресторана">
             <button class="table large" style="left: 712px; top: 236px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
@@ -1880,6 +1871,14 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
               </div>
             </div>
               </div>
+            </div>
+          </div>
+          </div>
+          <div class="map-overlay">
+            <div class="cash-controls">
+              <input type="datetime-local" id="resDate" aria-label="Дата и время">
+              <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
+              <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
             </div>
           </div>
         </div>
