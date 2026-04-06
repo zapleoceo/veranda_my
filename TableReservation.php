@@ -1103,6 +1103,18 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       white-space: nowrap;
     }
 
+    .grass-corner-1-7 {
+      position: absolute;
+      right: -40px;
+      bottom: -40px;
+      width: 520px;
+      height: 520px;
+      background: url("/links/grass_corner_1_7.png") no-repeat right bottom / contain;
+      pointer-events: none;
+      z-index: 1;
+      filter: drop-shadow(0 18px 22px rgba(0,0,0,0.22));
+    }
+
     .bar-row {
       position: absolute;
       left: 0;
@@ -1420,6 +1432,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       background: linear-gradient(180deg, #b58a63, #8b5e3b);
       color: #fffaf4;
       box-shadow: 0 14px 24px rgba(84, 49, 20, .22);
+      z-index: 2;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -1827,6 +1840,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
             <div class="map-zoom-box" id="mapZoomBox">
             <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="Схема столов ресторана">
+            <div class="grass-corner-1-7" aria-hidden="true"></div>
             <button class="table large" style="left: 712px; top: 236px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 362px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 488px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
