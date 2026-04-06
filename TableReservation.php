@@ -1003,6 +1003,17 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       --map-scale: 1;
     }
   
+    .map-overlay {
+      position: sticky;
+      top: 12px;
+      z-index: 20;
+      pointer-events: none;
+      display: flex;
+      justify-content: flex-end;
+      margin: 12px 12px 0 12px;
+    }
+    .map-overlay .cash-controls { pointer-events: auto; }
+
     .map-zoom-box { width: 820px; height: 620px; }
     .map-zoom-inner { width: 820px; height: 620px; transform: scale(var(--map-scale)); transform-origin: top left; }
     .map {
@@ -1799,6 +1810,13 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
   
       <section class="layout">
         <div class="map-shell">
+          <div class="map-overlay">
+            <div class="cash-controls">
+              <input type="datetime-local" id="resDate" aria-label="Дата и время">
+              <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
+              <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
+            </div>
+          </div>
           <div class="map-zoom-box" id="mapZoomBox">
             <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="Схема столов ресторана">
@@ -1859,11 +1877,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
               <div class="bar">BAR</div>
               <div class="station-wrap cash">
                 <div class="side-station">Касса</div>
-                <div class="cash-controls">
-                  <input type="datetime-local" id="resDate" aria-label="Дата и время">
-                  <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
-                  <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
-                </div>
               </div>
             </div>
               </div>
