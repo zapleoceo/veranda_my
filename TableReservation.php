@@ -882,7 +882,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       position: sticky;
       left: 0;
       right: 0;
-      bottom: 18px;
+      top: 18px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -890,6 +890,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       user-select: none;
       pointer-events: none;
       z-index: 5;
+    }
+    .map.is-mirrored .bar-row {
+      transform: scale(-1, -1);
+      transform-origin: center;
     }
 
     .bar {
@@ -1212,10 +1216,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       font-size: 0.6rem;
       font-weight: 800;
       letter-spacing: -0.02em;
-      color: rgba(255, 120, 120, 0.96);
+      color: rgba(255, 64, 64, 1);
       font-family: var(--font-body);
       pointer-events: none;
-      text-shadow: 0 1px 0 rgba(0,0,0,0.34);
+      text-shadow: 0 1px 0 rgba(0,0,0,0.5), 0 0 10px rgba(255, 70, 70, 0.28);
       line-height: 1.1;
       text-align: center;
       white-space: nowrap;
