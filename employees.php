@@ -942,18 +942,38 @@ $firstOfMonth = date('Y-m-01');
         .help-btn { width: 24px; height: 24px; border-radius: 999px; border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: #1a73e8; font-weight: 900; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; line-height: 1; padding: 0; animation: helpPulse 1200ms ease-in-out infinite; }
         .help-btn:hover { box-shadow: 0 0 0 2px rgba(26,115,232,0.35); }
         @keyframes helpPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-        .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color:#374151; }
-        .toggle-wrap .toggle-text { user-select:none; }
-        .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#d1d5db; transition: 180ms; border-radius: 999px; }
-        .slider:before { position:absolute; content:""; height: 22px; width: 22px; left: 3px; bottom: 3px; background: #fff; transition: 180ms; border-radius: 999px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
-        .switch input:checked + .slider { background:#1a73e8; }
-        .switch input:checked + .slider:before { transform: translateX(24px); }
-        #empTable.lite .col-id,
-        #empTable.lite .col-role,
-        #empTable.lite .col-checks,
-        #empTable.lite .col-hours { display: none; }
+        .cols-dd { position: relative; display: inline-flex; }
+        .cols-dd > button { white-space: nowrap; }
+        .cols-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 8px);
+            width: 260px;
+            max-height: 340px;
+            overflow: auto;
+            background: rgba(255,255,255,0.98);
+            border: 1px solid rgba(0,0,0,0.10);
+            border-radius: 12px;
+            box-shadow: 0 18px 45px rgba(0,0,0,0.18);
+            padding: 10px;
+            z-index: 2200;
+        }
+        .cols-item { display:flex; align-items:center; gap: 10px; padding: 6px 8px; border-radius: 10px; cursor: pointer; user-select: none; }
+        .cols-item:hover { background: rgba(26,115,232,0.06); }
+        .cols-item input { width: 16px; height: 16px; }
+        .cols-item span { font-weight: 900; font-size: 12px; color: #374151; }
+        #empTable.hide-col-id .col-id { display: none; }
+        #empTable.hide-col-name .col-name { display: none; }
+        #empTable.hide-col-rate .col-rate { display: none; }
+        #empTable.hide-col-role .col-role { display: none; }
+        #empTable.hide-col-checks .col-checks { display: none; }
+        #empTable.hide-col-hours .col-hours { display: none; }
+        #empTable.hide-col-tips .col-tips { display: none; }
+        #empTable.hide-col-tipsPaid .col-paid { display: none; }
+        #empTable.hide-col-slrPaid .col-slr { display: none; }
+        #empTable.hide-col-tipsToPay .col-ttp { display: none; }
+        #empTable.hide-col-salary .col-salary { display: none; }
+        #empTable.hide-col-salaryToPay .col-salarytopay { display: none; }
         #empTable tfoot td {
             position: sticky;
             bottom: 0;
@@ -1002,13 +1022,9 @@ $firstOfMonth = date('Y-m-01');
                 <input type="checkbox" id="hideZero">
                 Скрыть нулевые
             </label>
-            <div class="toggle-wrap" title="Lite/Full">
-                <span class="toggle-text">Lite</span>
-                <label class="switch">
-                    <input type="checkbox" id="modeLite">
-                    <span class="slider"></span>
-                </label>
-                <span class="toggle-text">Full</span>
+            <div class="cols-dd">
+                <button type="button" class="secondary" id="colsBtn">Колонки</button>
+                <div class="cols-menu" id="colsMenu" hidden></div>
             </div>
         </div>
         <div class="table-wrap" style="margin-top: 12px;">
@@ -1025,8 +1041,8 @@ $firstOfMonth = date('Y-m-01');
                     <th id="thTipsPaid" class="col-paid" data-sort="tips_paid_minor" style="text-align:right; cursor:pointer;">TipsPaid</th>
                     <th id="thSlrPaid" class="col-slr" data-sort="slr_paid_minor" style="text-align:right; cursor:pointer;">SlrPaid</th>
                     <th id="thTtp" class="col-ttp" data-sort="tips_to_pay_minor" style="text-align:right; cursor:pointer;">TipsToPay</th>
-                    <th id="thSalaryToPay" class="col-salarytopay" data-sort="salary_to_pay_vnd" style="text-align:right; cursor:pointer;">SalaryToPay</th>
                     <th id="thSalary" class="col-salary" data-sort="salary_minor" style="text-align:right; cursor:pointer;">Salary</th>
+                    <th id="thSalaryToPay" class="col-salarytopay" data-sort="salary_to_pay_vnd" style="text-align:right; cursor:pointer;">SalaryToPay</th>
                 </tr>
                 </thead>
                 <tbody id="tbody"></tbody>
@@ -1042,8 +1058,8 @@ $firstOfMonth = date('Y-m-01');
                     <td class="col-paid" style="text-align:right;"><span id="totTipsPaid">0</span></td>
                     <td class="col-slr" style="text-align:right;"><span id="totSlrPaid">0</span></td>
                     <td class="col-ttp" style="text-align:right;"><span id="totTtp">0</span></td>
-                    <td class="col-salarytopay" style="text-align:right;"><span id="totSalaryToPay">0</span></td>
                     <td class="col-salary" style="text-align:right;"><span id="totSalary">0</span></td>
+                    <td class="col-salarytopay" style="text-align:right;"><span id="totSalaryToPay">0</span></td>
                 </tr>
                 </tfoot>
             </table>
@@ -1166,7 +1182,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const progDesc = document.getElementById('progDesc');
     const cancelBtn = document.getElementById('cancelBtn');
     const hideZeroCb = document.getElementById('hideZero');
-    const modeLiteCb = document.getElementById('modeLite');
+    const colsBtn = document.getElementById('colsBtn');
+    const colsMenu = document.getElementById('colsMenu');
     const empTable = document.getElementById('empTable');
     const totTipsEl = document.getElementById('totTips');
     const totTipsPaidEl = document.getElementById('totTipsPaid');
@@ -1234,9 +1251,80 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     if (prefs.date_to) dateTo.value = prefs.date_to;
     let hideZero = !!prefs.hide_zero;
     if (hideZeroCb) hideZeroCb.checked = hideZero;
-    let viewMode = (prefs.view_mode === 'full') ? 'full' : 'lite';
-    if (modeLiteCb) modeLiteCb.checked = viewMode === 'full';
-    if (empTable) empTable.classList.toggle('lite', viewMode === 'lite');
+    const COLS_KEY = 'employees_cols_v1';
+    const defaultCols = {
+        id: true,
+        name: true,
+        rate: true,
+        role: true,
+        checks: true,
+        hours: true,
+        tips: true,
+        tipsPaid: true,
+        slrPaid: true,
+        tipsToPay: true,
+        salary: true,
+        salaryToPay: true,
+    };
+    const loadCols = () => {
+        try {
+            const raw = localStorage.getItem(COLS_KEY) || '';
+            const j = raw ? JSON.parse(raw) : null;
+            if (!j || typeof j !== 'object') return { ...defaultCols };
+            return { ...defaultCols, ...j };
+        } catch (_) {
+            return { ...defaultCols };
+        }
+    };
+    const saveCols = (cols) => { try { localStorage.setItem(COLS_KEY, JSON.stringify(cols || {})); } catch (_) {} };
+    const colState = loadCols();
+    const colDefs = [
+        { key: 'id', label: 'ID' },
+        { key: 'name', label: 'name' },
+        { key: 'rate', label: 'Rate' },
+        { key: 'role', label: 'role_name' },
+        { key: 'checks', label: 'Чеков' },
+        { key: 'hours', label: 'ЧасыРаботы' },
+        { key: 'tips', label: 'Tips' },
+        { key: 'tipsPaid', label: 'TipsPaid' },
+        { key: 'slrPaid', label: 'SlrPaid' },
+        { key: 'tipsToPay', label: 'TipsToPay' },
+        { key: 'salary', label: 'Salary' },
+        { key: 'salaryToPay', label: 'SalaryToPay' },
+    ];
+    const applyCols = () => {
+        if (!empTable) return;
+        colDefs.forEach(({ key }) => {
+            empTable.classList.toggle('hide-col-' + key, !colState[key]);
+        });
+    };
+    const renderColsMenu = () => {
+        if (!colsMenu) return;
+        colsMenu.innerHTML = '';
+        colDefs.forEach(({ key, label }) => {
+            const lab = document.createElement('label');
+            lab.className = 'cols-item';
+            const inp = document.createElement('input');
+            inp.type = 'checkbox';
+            inp.checked = !!colState[key];
+            inp.addEventListener('change', () => {
+                colState[key] = !!inp.checked;
+                saveCols(colState);
+                applyCols();
+            });
+            const text = document.createElement('span');
+            text.textContent = label;
+            lab.appendChild(inp);
+            lab.appendChild(text);
+            colsMenu.appendChild(lab);
+        });
+    };
+    const setColsMenuOpen = (on) => {
+        if (!colsMenu) return;
+        colsMenu.hidden = !on;
+    };
+    applyCols();
+    renderColsMenu();
     dateFrom.addEventListener('change', () => { const p = loadPrefs(); p.date_from = dateFrom.value; savePrefs(p); });
     dateTo.addEventListener('change', () => { const p = loadPrefs(); p.date_to = dateTo.value; savePrefs(p); });
     if (hideZeroCb) hideZeroCb.addEventListener('change', () => {
@@ -1244,12 +1332,21 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const p = loadPrefs(); p.hide_zero = hideZero; savePrefs(p);
         renderTable();
     });
-    if (modeLiteCb) modeLiteCb.addEventListener('change', () => {
-        viewMode = modeLiteCb.checked ? 'full' : 'lite';
-        const p = loadPrefs(); p.view_mode = viewMode; savePrefs(p);
-        if (empTable) empTable.classList.toggle('lite', viewMode === 'lite');
-        renderTable();
-    });
+    if (colsBtn && colsMenu) {
+        colsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            setColsMenuOpen(colsMenu.hidden);
+        });
+        document.addEventListener('click', (e) => {
+            if (colsMenu.hidden) return;
+            const t = e.target;
+            if (t === colsBtn || (colsMenu.contains && colsMenu.contains(t))) return;
+            setColsMenuOpen(false);
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') setColsMenuOpen(false);
+        });
+    }
     let sortBy = prefs.sort_by || 'checks';
     let sortDir = prefs.sort_dir || 'desc';
     const setSort = (by) => {
@@ -1458,13 +1555,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         <button type="button" class="paid-btn" data-kind="tips" data-user-id="${esc(r.user_id)}" ${paidDisabled}>PAY</button>
                     </div>
                 </td>
+                <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(salaryVnd))}</td>
                 <td class="col-salarytopay" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
                         <span>${esc(fmtMoney(salaryToPayVnd))}</span>
                         <button type="button" class="paid-btn" data-kind="salary" data-user-id="${esc(r.user_id)}" ${salaryPayDisabled}>PAY</button>
                     </div>
                 </td>
-                <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(salaryVnd))}</td>
             `;
             tbody.appendChild(tr);
         });
