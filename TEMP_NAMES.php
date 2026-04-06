@@ -409,6 +409,20 @@ if (($_GET['ajax'] ?? '') !== '') {
             exit;
         }
         $api = new \App\Classes\PosterAPI($posterToken);
+        $catMap = [];
+        try {
+            $cats = $api->request('menu.getCategories', [], 'GET');
+            if (is_array($cats)) {
+                foreach ($cats as $c) {
+                    if (!is_array($c)) continue;
+                    $cid = (int)($c['category_id'] ?? 0);
+                    if ($cid <= 0) continue;
+                    $cname = trim((string)($c['category_name'] ?? ''));
+                    if ($cname !== '') $catMap[$cid] = $cname;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
         $products = $api->request('menu.getProducts', [], 'GET');
         if (!is_array($products)) $products = [];
 
@@ -463,7 +477,12 @@ if (($_GET['ajax'] ?? '') !== '') {
             if (!is_string($rawJson)) $rawJson = null;
             if (is_string($rawJson) && mb_strlen($rawJson, 'UTF-8') > 2000000) $rawJson = mb_substr($rawJson, 0, 2000000, 'UTF-8');
             $menuCategoryId = (int)($p['menu_category_id'] ?? $p['category_id'] ?? $p['main_category_id'] ?? 0);
-            $catName = trim((string)($p['category_name'] ?? $p['menu_category_name'] ?? ''));
+            $catName = '';
+            if ($menuCategoryId > 0 && isset($catMap[$menuCategoryId])) {
+                $catName = (string)$catMap[$menuCategoryId];
+            } else {
+                $catName = trim((string)($p['category_name'] ?? $p['menu_category_name'] ?? ''));
+            }
             if (mb_strlen($catName, 'UTF-8') > 255) $catName = mb_substr($catName, 0, 255, 'UTF-8');
             $workshopId = (int)($p['workshop'] ?? $p['workshop_id'] ?? 0);
             $weightFlag = (int)($p['weight_flag'] ?? 0);
@@ -476,10 +495,27 @@ if (($_GET['ajax'] ?? '') !== '') {
     }
 
     if ($ajax === 'process_all') {
-        $rows = $db->query("SELECT product_id, name_raw, name_ru, name_en, edit_ru, edit_en FROM {$t}")->fetchAll();
+        $catMap = [];
+        if ($posterToken !== '') {
+            try {
+                $api = new \App\Classes\PosterAPI($posterToken);
+                $cats = $api->request('menu.getCategories', [], 'GET');
+                if (is_array($cats)) {
+                    foreach ($cats as $c) {
+                        if (!is_array($c)) continue;
+                        $cid = (int)($c['category_id'] ?? 0);
+                        if ($cid <= 0) continue;
+                        $cname = trim((string)($c['category_name'] ?? ''));
+                        if ($cname !== '') $catMap[$cid] = $cname;
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+        $rows = $db->query("SELECT product_id, name_raw, menu_category_id, name_ru, name_en, edit_ru, edit_en FROM {$t}")->fetchAll();
         if (!is_array($rows)) $rows = [];
         $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
-        $stmt = $pdo->prepare("UPDATE {$t} SET name_ru = ?, name_en = ?, edit_ru = IF(TRIM(edit_ru)='', ?, edit_ru), edit_en = IF(TRIM(edit_en)='', ?, edit_en), edit_full = IF(TRIM(edit_full)='', ?, edit_full), updated_at = ? WHERE product_id = ? LIMIT 1");
+        $stmt = $pdo->prepare("UPDATE {$t} SET name_ru = ?, name_en = ?, edit_ru = IF(TRIM(edit_ru)='', ?, edit_ru), edit_en = IF(TRIM(edit_en)='', ?, edit_en), edit_full = IF(TRIM(edit_full)='', ?, edit_full), category_name = IF(?, ?, category_name), updated_at = ? WHERE product_id = ? LIMIT 1");
         $upd = 0;
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
@@ -493,7 +529,11 @@ if (($_GET['ajax'] ?? '') !== '') {
             $full = $ru !== '' && $en !== '' ? ($ru . ' / ' . $en) : ($ru !== '' ? $ru : $en);
             if ($full === '') $full = $rawName;
             if (mb_strlen($full, 'UTF-8') > 255) $full = mb_substr($full, 0, 255, 'UTF-8');
-            $stmt->execute([$ru, $en, $ru, $en, $full, $now, $pid]);
+            $catId = (int)($r['menu_category_id'] ?? 0);
+            $newCatName = ($catId > 0 && isset($catMap[$catId])) ? (string)$catMap[$catId] : '';
+            $hasCat = $newCatName !== '';
+            if (mb_strlen($newCatName, 'UTF-8') > 255) $newCatName = mb_substr($newCatName, 0, 255, 'UTF-8');
+            $stmt->execute([$ru, $en, $ru, $en, $full, $hasCat, $newCatName, $now, $pid]);
             $upd++;
         }
         echo json_encode(['ok' => true, 'updated' => $upd], JSON_UNESCAPED_UNICODE);
