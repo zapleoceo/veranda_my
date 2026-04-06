@@ -101,11 +101,11 @@ if (($_GET['ajax'] ?? '') === 'load') {
         if (!is_array($rows)) $rows = [];
 
         $out = [];
-        $uids = [];
+        $byUid = [];
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
             $uid = (int)($r['user_id'] ?? 0);
-            if ($uid > 0) $uids[$uid] = true;
+            if ($uid <= 0) continue;
             $name = (string)($r['name'] ?? '');
             $clients = (int)($r['clients'] ?? 0);
             $worked = $r['worked_time'] ?? null;
@@ -113,13 +113,29 @@ if (($_GET['ajax'] ?? '') === 'load') {
             if ($worked === null) $worked = $r['middle_time'] ?? null;
             $workedMin = is_numeric($worked) ? (int)round((float)$worked) : 0;
             $workedHours = $workedMin > 0 ? round($workedMin / 60, 2) : 0;
-            $role = $uid > 0 ? (string)($roleByUser[$uid] ?? '') : '';
-            $out[] = [
+            $byUid[$uid] = [
                 'user_id' => $uid,
                 'name' => $name,
-                'role_name' => $role,
                 'checks' => $clients,
                 'worked_hours' => $workedHours,
+            ];
+        }
+
+        $uids = [];
+        foreach ($emps as $e) {
+            if (!is_array($e)) continue;
+            $uid = (int)($e['user_id'] ?? 0);
+            if ($uid <= 0) continue;
+            $uids[$uid] = true;
+            $empName = trim((string)($e['name'] ?? ''));
+            $role = trim((string)($e['role_name'] ?? ''));
+            $w = $byUid[$uid] ?? null;
+            $out[] = [
+                'user_id' => $uid,
+                'name' => ($empName !== '' ? $empName : (string)($w['name'] ?? '')),
+                'role_name' => $role,
+                'checks' => (int)($w['checks'] ?? 0),
+                'worked_hours' => (float)($w['worked_hours'] ?? 0),
                 'tips_card' => 0,
             ];
         }
