@@ -328,16 +328,26 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
             if (!is_array($t)) continue;
             $type = (string)($t['type'] ?? '');
             if ($type !== '0' && $type !== 'expense' && $type !== 'out') continue;
-            $uid = (int)($t['user_id'] ?? 0);
-            if ($uid !== 10 && $uid !== 4) continue;
+            $cat = isset($t['category']) ? (int)$t['category'] : (isset($t['category_id']) ? (int)$t['category_id'] : 0);
+            if ($cat > 0 && $cat !== 4) continue;
+            $acc = isset($t['account_from']) ? (int)$t['account_from'] : (isset($t['account_id']) ? (int)$t['account_id'] : 0);
+            if ($acc > 0 && $acc !== 8) continue;
             $comment = trim((string)($t['comment'] ?? ''));
             if ($comment === '' || stripos($comment, 'TIPS') !== 0) continue;
             if (!preg_match('/\bID\s*=\s*(\d+)\b/i', $comment, $m)) continue;
             $waiterId = (int)$m[1];
             if ($waiterId <= 0) continue;
-            $dt = (string)($t['date'] ?? '');
-            $ts = $dt !== '' ? strtotime($dt) : false;
-            if ($ts === false || $ts <= 0) continue;
+            $dt = $t['date'] ?? '';
+            $ts = false;
+            if (is_numeric($dt)) {
+                $v = (int)$dt;
+                if ($v > 10000000000) $v = (int)round($v / 1000);
+                if ($v > 0) $ts = $v;
+            } else {
+                $s = trim((string)$dt);
+                if ($s !== '') $ts = strtotime($s);
+            }
+            if ($ts === false || (int)$ts <= 0) continue;
             $amount = (int)($t['amount'] ?? 0);
             $cur = $latest[$waiterId] ?? null;
             if (!$cur || (int)$cur['ts'] < $ts) {
