@@ -790,26 +790,20 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     }
   
     .map {
-      --mx: 1;
-      --my: 1;
       --sx: -56px;
       --sy: -56px;
       position: relative;
-      min-width: 820px;
-      min-height: 620px;
+      width: 820px;
+      height: 620px;
       border-radius: var(--radius-md);
-      transform: translate(var(--sx), var(--sy)) scale(var(--mx), var(--my));
-      transform-origin: center;
-    }
-    .map.is-mirrored {
-      --mx: -1;
-      --my: -1;
+      transform: translate(var(--sx), var(--sy));
+      transform-origin: top left;
     }
 
     .grass-area {
       position: absolute;
-      left: -42px;
-      top: -40px;
+      left: -82px;
+      top: 230px;
       width: 944px;
       height: 430px;
       clip-path: polygon(0 0, 100% 0, 100% 184px, 224px 184px, 224px 100%, 0 100%);
@@ -891,10 +885,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       user-select: none;
       pointer-events: none;
       z-index: 5;
-    }
-    .map.is-mirrored .bar-row {
-      transform: scale(-1, -1);
-      transform-origin: center;
     }
 
     .bar {
@@ -1113,8 +1103,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       box-shadow: 0 16px 30px rgba(0,0,0,0.22), inset 0 2px 8px rgba(255,255,255,0.10);
       pointer-events: none;
       z-index: 1;
-      transform: scale(var(--mx), var(--my));
-      transform-origin: center;
     }
     .fountain svg {
       position: absolute;
@@ -1199,13 +1187,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       cursor: pointer;
       transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
       user-select: none;
-      transform: scale(var(--mx), var(--my));
       transform-origin: center;
       padding: 6px 4px 8px;
     }
   
     .table:hover, .table:focus-visible {
-      transform: translateY(-3px) scale(1.02) scale(var(--mx), var(--my));
+      transform: translateY(-3px) scale(1.02);
       box-shadow: 0 18px 34px rgba(84, 49, 20, .3);
       filter: saturate(1.05);
       outline: none;
@@ -1240,7 +1227,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
 
     .table.disabled:hover, .table.disabled:focus-visible,
     .table.busy:hover, .table.busy:focus-visible {
-      transform: scale(var(--mx), var(--my));
+      transform: none;
       box-shadow: 0 14px 24px rgba(84, 49, 20, .22);
       filter: none;
     }
@@ -1502,13 +1489,11 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   
     @media (max-width: 980px) {
       .layout { grid-template-columns: 1fr; }
-      .map { min-width: 720px; }
     }
   
     @media (max-width: 640px) {
       .app, .layout, .map-shell { padding: var(--space-4); }
       .topbar { padding: var(--space-4); align-items: flex-start; flex-direction: column; }
-      .map { min-width: 640px; min-height: 600px; }
     }
   </style>
 </head>
@@ -1526,20 +1511,20 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   
       <section class="layout">
         <div class="map-shell">
-          <div class="map is-mirrored" aria-label="Схема столов ресторана">
+          <div class="map" aria-label="Схема столов ресторана">
             <div class="grass-area" aria-hidden="true"></div>
-            <button class="table large" style="left: 0px; top: 276px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
-            <button class="table large" style="left: 0px; top: 150px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
-            <button class="table large" style="left: 0px; top: 24px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
+            <button class="table large" style="left: 712px; top: 236px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
+            <button class="table large" style="left: 712px; top: 362px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
+            <button class="table large" style="left: 712px; top: 488px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
-            <button class="table small-vertical wide-1" style="left: 200px; top: 0px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 364px; top: 0px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 512px; top: 0px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
-            <button class="table large" style="left: 700px; top: 0px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 534px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 370px; top: 528px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 222px; top: 528px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
+            <button class="table large" style="left: 12px; top: 512px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
   
-            <button class="table wide" style="left: 286px; top: 142px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
-            <button class="table wide" style="left: 408px; top: 142px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
-            <div class="fountain" style="left: 174px; top: 128px;" aria-hidden="true">
+            <button class="table wide" style="left: 422px; top: 420px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
+            <button class="table wide" style="left: 300px; top: 420px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
+            <div class="fountain" style="left: 562px; top: 408px;" aria-hidden="true">
               <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
                   <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
@@ -1563,19 +1548,19 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
               <div class="koi koi-1"></div>
               <div class="koi koi-2"></div>
             </div>
-            <button class="table wide" style="left: 606px; top: 142px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
-            <button class="table wide" style="left: 728px; top: 142px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
+            <button class="table wide" style="left: 102px; top: 420px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
+            <button class="table wide" style="left: -20px; top: 420px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
   
-            <button class="table" style="left: 344px; top: 242px;" data-table="12"><span class="num">12</span><span class="cap"></span></button>
-            <button class="table" style="left: 472px; top: 242px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
-            <button class="table" style="left: 584px; top: 242px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
+            <button class="table" style="left: 402px; top: 304px;" data-table="12"><span class="num">12</span><span class="cap"></span></button>
+            <button class="table" style="left: 274px; top: 304px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
+            <button class="table" style="left: 162px; top: 304px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
   
-            <button class="table small-vertical" style="left: 213px; top: 336px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 328px; top: 336px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 439px; top: 336px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 551px; top: 336px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 663px; top: 336px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
-            <button class="table large" style="left: 758px; top: 258px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 532px; top: 192px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 417px; top: 192px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 306px; top: 192px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 194px; top: 192px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 82px; top: 192px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
+            <button class="table large" style="left: -46px; top: 254px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
   
             <div class="bar-row">
               <div class="station-wrap">
