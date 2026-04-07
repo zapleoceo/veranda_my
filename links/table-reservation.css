@@ -1052,6 +1052,21 @@
       .req-right { width: 100%; flex: 0 0 auto; }
       .req-right .pre-body { max-height: 340px; }
     }
+    @media (max-width: 640px) {
+      .modal { padding: 10px; align-items: stretch; justify-content: stretch; }
+      .modal-card {
+        width: 100%;
+        max-height: calc(100dvh - 20px);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .modal-title { font-size: 15px; }
+      .modal-actions { position: sticky; bottom: 0; background: rgba(0,0,0,0.18); padding-top: 10px; margin-top: 10px; }
+      .req-layout { flex: 1 1 auto; overflow: auto; padding-right: 2px; }
+      .req-right { opacity: 1; transform: none; }
+      .req-right .pre-body { max-height: min(46dvh, 360px); }
+    }
     #reqGuests { max-width: 80px; }
     #reqGuests::-webkit-outer-spin-button,
     #reqGuests::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
