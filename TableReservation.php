@@ -1006,7 +1006,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       content: '';
       position: absolute;
       inset: 0;
-      background: url("/links/gray-tiles-texture.jpg?v=20260407_1920") center / contain no-repeat;
+      background: url("/links/gray-tiles-texture.jpg?v=20260407_1928") 0 0 / 260px auto repeat;
       opacity: 0.92;
       pointer-events: none;
       z-index: 0;
