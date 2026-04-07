@@ -972,6 +972,8 @@ $firstOfMonth = date('Y-m-01');
         .ltp { margin-top: 2px; font-size: 11px; color: #6b7280; font-weight: 800; white-space: nowrap; }
         .paid-item { margin-top: 6px; text-align: left; }
         .paid-date { font-size: 11px; color: #6b7280; font-weight: 800; line-height: 1.1; text-align: left; }
+        .paid-tag { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 6px; border-radius: 999px; border: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.03); color: #374151; font-weight: 900; font-size: 10px; line-height: 1.2; }
+        .paid-tag img { width: 12px; height: 12px; border-radius: 3px; display: block; }
         .paid-line { display:flex; justify-content: flex-start; gap: 8px; align-items: baseline; font-size: 11px; color: #6b7280; font-weight: 800; line-height: 1.1; text-align: left; }
         .paid-line .amt { font-weight: 900; color: #374151; }
         .paid-btn { border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: #1a73e8; border-radius: 8px; padding: 2px 7px; font-weight: 900; font-size: 11px; cursor: pointer; line-height: 1.2; }
@@ -1348,8 +1350,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
     const slrIconByAccount = (acc) => {
         const a = Number(acc || 0) || 0;
-        if (a === 1) return '<img src="https://st2.depositphotos.com/38197074/44590/v/450/depositphotos_445903832-stock-illustration-initial-letter-vector-logo-icon.jpg" width="14" height="14" style="vertical-align:-2px; border-radius: 3px;" alt="QR">';
-        if (a === 2) return '💵';
+        if (a === 1) return '<span class="paid-tag"><img src="https://st2.depositphotos.com/38197074/44590/v/450/depositphotos_445903832-stock-illustration-initial-letter-vector-logo-icon.jpg" alt="QR">QR</span>';
+        if (a === 2) return '<span class="paid-tag">КЕШ</span>';
         return '';
     };
     const addDays = (isoDate, days) => {
@@ -1737,7 +1739,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         const acc = Number(it && it.account_id ? it.account_id : 0) || 0;
                         const ic = slrIconByAccount(acc);
                         const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
-                        return `<div class="paid-item"><div class="paid-date">${esc(d)}</div><div class="paid-line"><span>${ic ? (ic + '&nbsp;') : ''}${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
+                        return `<div class="paid-item"><div class="paid-date">${esc(d)}${ic ? (' ' + ic) : ''}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
                     }).join('') : ''}
                 </td>
                 <td class="col-ttp" style="text-align:right;">
