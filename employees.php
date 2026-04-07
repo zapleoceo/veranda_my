@@ -1351,7 +1351,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const a = Number(acc || 0) || 0;
         if (a === 1) return '<span class="paid-tag">QR</span>';
         if (a === 2) return '<span class="paid-tag">КЕШ</span>';
-        if (a === 8) return '<span class="paid-tag">BIDV</span>';
+        if (a === 8) return '<span class="paid-tag">QR</span>';
         if (a > 0) return '<span class="paid-tag">#' + String(a) + '</span>';
         return '';
     };
