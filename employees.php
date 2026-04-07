@@ -1009,7 +1009,7 @@ $firstOfMonth = date('Y-m-01');
             border-radius: 12px 12px 0 0;
             box-shadow: 0 12px 30px rgba(0,0,0,0.10);
         }
-        .sticky-head-wrap table { width: max-content; border-collapse: collapse; }
+        .sticky-head-wrap table { border-collapse: collapse; table-layout: fixed; }
         .sticky-head-wrap th {
             position: relative;
             background: #f8f9fa;
@@ -1019,6 +1019,7 @@ $firstOfMonth = date('Y-m-01');
             font-weight: 700;
             border-bottom: 1px solid #eee;
         }
+        .sticky-head-wrap th, .sticky-head-wrap td { padding: 12px 10px; vertical-align: top; box-sizing: border-box; }
         .rate-input { width: 58px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
         .progress { display:none; align-items:center; gap: 10px; margin-left: 10px; }
         .progress .bar { width: 160px; height: 10px; border-radius: 999px; background: #eee; overflow: hidden; }
@@ -1101,18 +1102,18 @@ $firstOfMonth = date('Y-m-01');
         .cols-item:hover { background: rgba(26,115,232,0.06); }
         .cols-item input { width: 16px; height: 16px; }
         .cols-item span { font-weight: 900; font-size: 12px; color: #374151; }
-        #empTable.hide-col-id .col-id { display: none; }
-        #empTable.hide-col-name .col-name { display: none; }
-        #empTable.hide-col-rate .col-rate { display: none; }
-        #empTable.hide-col-role .col-role { display: none; }
-        #empTable.hide-col-checks .col-checks { display: none; }
-        #empTable.hide-col-hours .col-hours { display: none; }
-        #empTable.hide-col-tips .col-tips { display: none; }
-        #empTable.hide-col-tipsPaid .col-paid { display: none; }
-        #empTable.hide-col-slrPaid .col-slr { display: none; }
-        #empTable.hide-col-tipsToPay .col-ttp { display: none; }
-        #empTable.hide-col-salary .col-salary { display: none; }
-        #empTable.hide-col-salaryToPay .col-salarytopay { display: none; }
+        #empTable.hide-col-id .col-id, #empStickyHead.hide-col-id .col-id { display: none; }
+        #empTable.hide-col-name .col-name, #empStickyHead.hide-col-name .col-name { display: none; }
+        #empTable.hide-col-rate .col-rate, #empStickyHead.hide-col-rate .col-rate { display: none; }
+        #empTable.hide-col-role .col-role, #empStickyHead.hide-col-role .col-role { display: none; }
+        #empTable.hide-col-checks .col-checks, #empStickyHead.hide-col-checks .col-checks { display: none; }
+        #empTable.hide-col-hours .col-hours, #empStickyHead.hide-col-hours .col-hours { display: none; }
+        #empTable.hide-col-tips .col-tips, #empStickyHead.hide-col-tips .col-tips { display: none; }
+        #empTable.hide-col-tipsPaid .col-paid, #empStickyHead.hide-col-tipsPaid .col-paid { display: none; }
+        #empTable.hide-col-slrPaid .col-slr, #empStickyHead.hide-col-slrPaid .col-slr { display: none; }
+        #empTable.hide-col-tipsToPay .col-ttp, #empStickyHead.hide-col-tipsToPay .col-ttp { display: none; }
+        #empTable.hide-col-salary .col-salary, #empStickyHead.hide-col-salary .col-salary { display: none; }
+        #empTable.hide-col-salaryToPay .col-salarytopay, #empStickyHead.hide-col-salaryToPay .col-salarytopay { display: none; }
         .hours-btn {
             border: 0;
             background: transparent;
@@ -1514,6 +1515,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 colState[key] = !!inp.checked;
                 saveCols(colState);
                 applyCols();
+                syncStickyHeader(true);
             });
             const text = document.createElement('span');
             text.textContent = label;
@@ -1714,7 +1716,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         });
     }
 
-    const ensureStickyHeader = () => {
+    function ensureStickyHeader() {
         if (!empTable || !empTable.tHead || !tableWrap) return;
         if (stickyWrap && stickyTable) return;
         stickyWrap = document.createElement('div');
@@ -1736,9 +1738,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             th.addEventListener('click', () => setSort(th.getAttribute('data-sort') || ''));
         });
         stickyTable.appendChild(thead);
-    };
+    }
 
-    const syncStickyHeader = (forceMeasure) => {
+    function syncStickyHeader(forceMeasure) {
         if (!empTable || !empTable.tHead || !tableWrap) return;
         ensureStickyHeader();
         if (!stickyWrap || !stickyTable) return;
@@ -1758,6 +1760,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         stickyWrap.style.width = Math.round(wrapRect.width) + 'px';
         stickyWrap.style.top = '0px';
         stickyTable.className = empTable.className;
+        stickyTable.style.width = String(empTable.scrollWidth || empTable.getBoundingClientRect().width) + 'px';
 
         const scrollLeft = tableWrap.scrollLeft || 0;
         stickyTable.style.transform = `translateX(${-scrollLeft}px)`;
@@ -1769,13 +1772,14 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const n = Math.min(srcThs.length, dstThs.length);
             for (let i = 0; i < n; i++) {
                 const w = srcThs[i].getBoundingClientRect().width;
-                dstThs[i].style.width = Math.round(w) + 'px';
-                dstThs[i].style.minWidth = Math.round(w) + 'px';
-                dstThs[i].style.maxWidth = Math.round(w) + 'px';
+                const px = (isFinite(w) ? w : 0).toFixed(2) + 'px';
+                dstThs[i].style.width = px;
+                dstThs[i].style.minWidth = px;
+                dstThs[i].style.maxWidth = px;
             }
         }
         lastStickyVisible = true;
-    };
+    }
     function renderTable() {
         const coll = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
         const dir = sortDir === 'desc' ? -1 : 1;
