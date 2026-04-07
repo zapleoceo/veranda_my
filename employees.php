@@ -1347,10 +1347,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
-    const slrIconByAccount = (acc) => {
+    const accountTagById = (acc) => {
         const a = Number(acc || 0) || 0;
         if (a === 1) return '<span class="paid-tag">QR</span>';
         if (a === 2) return '<span class="paid-tag">КЕШ</span>';
+        if (a === 8) return '<span class="paid-tag">BIDV</span>';
+        if (a > 0) return '<span class="paid-tag">#' + String(a) + '</span>';
         return '';
     };
     const addDays = (isoDate, days) => {
@@ -1724,8 +1726,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         const parts = raw.split(' ');
                         const d = parts[0] || raw;
                         const tm = parts[1] || '';
+                        const acc = Number(it && it.account_id ? it.account_id : 0) || 0;
+                        const ic = accountTagById(acc);
                         const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
-                        return `<div class="paid-item"><div class="paid-date">${esc(d)}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
+                        return `<div class="paid-item"><div class="paid-date">${esc(d)}${ic ? (' ' + ic) : ''}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
                     }).join('') : ''}
                 </td>
                 <td class="col-slr" style="text-align:right;">
@@ -1736,7 +1740,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         const d = parts[0] || raw;
                         const tm = parts[1] || '';
                         const acc = Number(it && it.account_id ? it.account_id : 0) || 0;
-                        const ic = slrIconByAccount(acc);
+                        const ic = accountTagById(acc);
                         const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
                         return `<div class="paid-item"><div class="paid-date">${esc(d)}${ic ? (' ' + ic) : ''}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
                     }).join('') : ''}
