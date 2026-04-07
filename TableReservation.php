@@ -1102,7 +1102,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       height: 900px;
       transform: scale(1.1);
       transform-origin: right bottom;
-      background: url("/links/grass_corner_1_7.png?v=20260407_1728") no-repeat right bottom / 850px auto;
+      background: url("/links/grass_corner_1_7.png?v=20260407_2015") no-repeat right bottom / 850px auto;
       pointer-events: none;
       z-index: 1;
       filter: drop-shadow(0 18px 22px rgba(0,0,0,0.22));
@@ -1491,6 +1491,9 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     .table.small-vertical.wide-1 { width: 86px; }
     .table.wide { width: 112px; height: 58px; border-radius: 18px; }
     .table.large { width: 108px; height: 108px; border-radius: 26px; }
+    .table.large[data-table="1"],
+    .table.large[data-table="2"],
+    .table.large[data-table="3"] { height: 90px; }
 
     .table-toast {
       position: fixed;
@@ -1847,6 +1850,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       <div class="topbar">
         <div class="title-wrap">
           <h1>Схема бронирования</h1>
+          <p><span id="busyDateLabel">Данные на —</span><span class="mini-loader" id="busyDateLoader" hidden></span></p>
         </div>
         <div class="cash-controls">
           <input type="datetime-local" id="resDate" aria-label="Дата и время">
@@ -1869,9 +1873,9 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
             <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="Схема столов ресторана">
             <div class="grass-corner-1-7" aria-hidden="true"></div>
-            <button class="table large" style="left: 712px; top: 256px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
-            <button class="table large" style="left: 712px; top: 382px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
-            <button class="table large" style="left: 712px; top: 508px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
+            <button class="table large" style="left: 712px; top: 276px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
+            <button class="table large" style="left: 712px; top: 402px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
+            <button class="table large" style="left: 712px; top: 528px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
             <button class="table small-vertical wide-1" style="left: 534px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
             <button class="table small-vertical wide-1" style="left: 370px; top: 528px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
@@ -1921,7 +1925,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
             <div class="bar-row">
               <div class="station-wrap">
                 <div class="side-station">Музыканты</div>
-                <div class="station-sub"><span id="busyDateLabel">Данные на —</span><span class="mini-loader" id="busyDateLoader" hidden></span></div>
               </div>
               <div class="bar">BAR</div>
               <div class="station-wrap cash">
