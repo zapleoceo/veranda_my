@@ -1009,18 +1009,19 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       width: 820px;
       height: 620px;
       border-radius: var(--radius-md);
+      overflow: hidden;
     }
 
     .tile-underlay {
       position: absolute;
-      left: 15px;
+      left: 0;
       top: 0;
-      width: 850px;
+      width: 820px;
       height: 620px;
       background: url("/links/gray-tiles-texture.jpg?v=20260407_1821") repeat;
       pointer-events: none;
       z-index: 0;
-      border-radius: var(--radius-md);
+      border-radius: inherit;
       opacity: 0.92;
     }
 
