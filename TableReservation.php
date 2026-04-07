@@ -1106,10 +1106,12 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     .grass-corner-1-7 {
       position: absolute;
       left: 0;
-      top: 0;
-      width: 820px;
+      top: 400px;
+      width: 850px;
       height: 620px;
-      background: url("/links/grass_corner_1_7.png?v=20260407_1645") no-repeat right 0 bottom -46px / 820px auto;
+      transform: scale(1.1);
+      transform-origin: right bottom;
+      background: url("/links/grass_corner_1_7.png?v=20260407_1645") no-repeat right bottom / 850px auto;
       pointer-events: none;
       z-index: 1;
       filter: drop-shadow(0 18px 22px rgba(0,0,0,0.22));
