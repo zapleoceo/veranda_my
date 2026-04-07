@@ -1162,9 +1162,9 @@ $firstOfMonth = date('Y-m-01');
                     <th id="thHours" class="col-hours" data-sort="worked_hours" style="text-align:right; cursor:pointer;">ЧасыРаботы</th>
                     <th id="thTips" class="col-tips" data-sort="tips_minor" style="text-align:right; cursor:pointer;">Tips</th>
                     <th id="thTipsPaid" class="col-paid" data-sort="tips_paid_minor" style="text-align:right; cursor:pointer;">TipsPaid</th>
-                    <th id="thSlrPaid" class="col-slr" data-sort="slr_paid_minor" style="text-align:right; cursor:pointer;">SlrPaid</th>
                     <th id="thTtp" class="col-ttp" data-sort="tips_to_pay_minor" style="text-align:right; cursor:pointer;">TipsToPay</th>
                     <th id="thSalary" class="col-salary" data-sort="salary_minor" style="text-align:right; cursor:pointer;">Salary</th>
+                    <th id="thSlrPaid" class="col-slr" data-sort="slr_paid_minor" style="text-align:right; cursor:pointer;">SlrPaid</th>
                     <th id="thSalaryToPay" class="col-salarytopay" data-sort="salary_to_pay_vnd" style="text-align:right; cursor:pointer;">SalaryToPay</th>
                 </tr>
                 </thead>
@@ -1179,9 +1179,9 @@ $firstOfMonth = date('Y-m-01');
                     <td class="col-hours" style="text-align:right;"></td>
                     <td class="col-tips" style="text-align:right;"><span id="totTips">0</span></td>
                     <td class="col-paid" style="text-align:right;"><span id="totTipsPaid">0</span></td>
-                    <td class="col-slr" style="text-align:right;"><span id="totSlrPaid">0</span></td>
                     <td class="col-ttp" style="text-align:right;"><span id="totTtp">0</span></td>
                     <td class="col-salary" style="text-align:right;"><span id="totSalary">0</span></td>
+                    <td class="col-slr" style="text-align:right;"><span id="totSlrPaid">0</span></td>
                     <td class="col-salarytopay" style="text-align:right;"><span id="totSalaryToPay">0</span></td>
                 </tr>
                 </tfoot>
@@ -1732,6 +1732,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         return `<div class="paid-item"><div class="paid-date">${esc(d)}${ic ? (' ' + ic) : ''}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
                     }).join('') : ''}
                 </td>
+                <td class="col-ttp" style="text-align:right;">
+                    <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
+                        <span>${esc(fmtMoney(tipsToPayVnd))}</span>
+                        <button type="button" class="paid-btn" data-kind="tips" data-user-id="${esc(r.user_id)}" ${paidDisabled}>PAY</button>
+                    </div>
+                </td>
+                <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(salaryVnd))}</td>
                 <td class="col-slr" style="text-align:right;">
                     ${spAmt ? `<div style="font-weight:900;">${esc(spAmt)}</div>` : '—'}
                     ${spItems.length ? spItems.map((it) => {
@@ -1745,13 +1752,6 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         return `<div class="paid-item"><div class="paid-date">${esc(d)}${ic ? (' ' + ic) : ''}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
                     }).join('') : ''}
                 </td>
-                <td class="col-ttp" style="text-align:right;">
-                    <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
-                        <span>${esc(fmtMoney(tipsToPayVnd))}</span>
-                        <button type="button" class="paid-btn" data-kind="tips" data-user-id="${esc(r.user_id)}" ${paidDisabled}>PAY</button>
-                    </div>
-                </td>
-                <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(salaryVnd))}</td>
                 <td class="col-salarytopay" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
                         <span>${esc(fmtMoney(salaryToPayVnd))}</span>
