@@ -64,25 +64,12 @@
     const mapZoomPlus = document.getElementById('mapZoomPlus');
     const mapZoomRange = document.getElementById('mapZoomRange');
     const mapZoomBox = document.getElementById('mapZoomBox');
-    const baseMapW = (() => {
-      const raw = mapZoomBox ? Number(mapZoomBox.getAttribute('data-base-w') || 0) : 0;
-      if (raw > 0) return raw;
-      const w = mapZoomBox ? (mapZoomBox.offsetWidth || 820) : 820;
-      if (mapZoomBox) mapZoomBox.setAttribute('data-base-w', String(w));
-      return w;
-    })();
-    const baseMapH = (() => {
-      const raw = mapZoomBox ? Number(mapZoomBox.getAttribute('data-base-h') || 0) : 0;
-      if (raw > 0) return raw;
-      const h = mapZoomBox ? (mapZoomBox.offsetHeight || 620) : 620;
-      if (mapZoomBox) mapZoomBox.setAttribute('data-base-h', String(h));
-      return h;
-    })();
 
     const applyMapZoom = (pct, keepAnchor) => {
       if (!mapShell) return;
-      let p = Math.max(50, Math.min(100, Number(pct || 100) || 100));
-      if (p >= 93 && p <= 107) p = 100;
+      const raw = Math.round(Number(pct || 100) || 100);
+      let p = Math.max(50, Math.min(100, raw));
+      if (raw === 93) p = 100;
       const scale = p / 100;
       if (mapZoomVal) mapZoomVal.textContent = String(Math.round(p)) + '%';
       if (mapZoomRange) mapZoomRange.value = String(Math.round(p));
@@ -97,11 +84,6 @@
 
       mapShell.style.setProperty('--map-scale', String(scale));
       mapShell.style.setProperty('--inv-map-scale', String(1 / scale));
-
-      if (mapZoomBox) {
-        mapZoomBox.style.width = String(Math.round(baseMapW * scale)) + 'px';
-        mapZoomBox.style.height = String(Math.round(baseMapH * scale)) + 'px';
-      }
 
       if (keepAnchor) {
         const rect = mapShell.getBoundingClientRect();
@@ -668,6 +650,9 @@
         empty.className = 'preorder-empty';
         empty.textContent = '—';
         reqPreorderBox.appendChild(empty);
+        const desired = 92;
+        reqPreorderBox.style.height = String(desired) + 'px';
+        if (reqComment) reqComment.style.height = String(desired) + 'px';
         return;
       }
       let total = 0;
@@ -700,7 +685,8 @@
       totalEl.textContent = fmtPrice(total);
       reqPreorderBox.appendChild(totalEl);
 
-      const desired = Math.min(220, Math.max(92, reqPreorderBox.scrollHeight));
+      const commentH = reqComment ? reqComment.scrollHeight : 0;
+      const desired = Math.min(240, Math.max(92, reqPreorderBox.scrollHeight, commentH));
       reqPreorderBox.style.height = String(desired) + 'px';
       if (reqComment) reqComment.style.height = String(desired) + 'px';
     };
