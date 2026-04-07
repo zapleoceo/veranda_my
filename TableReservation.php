@@ -1009,7 +1009,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       width: 820px;
       height: 620px;
       border-radius: var(--radius-md);
-      overflow: hidden;
     }
 
     .tile-underlay {
