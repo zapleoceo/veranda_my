@@ -1233,7 +1233,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       z-index: 9999;
     }
     .dtp.on { display: flex; }
-    .dtp-backdrop { position: absolute; inset: 0; background: rgba(66, 35, 12, 0.78); backdrop-filter: blur(2px); }
+    .dtp-backdrop { position: absolute; inset: 0; background: rgba(26, 12, 6, 0.92); backdrop-filter: blur(2px); }
     .dtp-card {
       position: relative;
       width: min(520px, 100%);
@@ -1644,7 +1644,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       margin-top: var(--space-3);
     }
     .guest-label { flex: 0 0 40%; }
-    #checkBtn { flex: 1 1 auto; }
     @media (max-width: 520px) {
       .guest-row { flex-direction: column; align-items: stretch; }
       .guest-label { flex-basis: auto; }
@@ -1652,7 +1651,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
 
     .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 14px; z-index: 9998; }
     .modal.on { display: flex; }
-    .modal-backdrop { position: absolute; inset: 0; background: rgba(66, 35, 12, 0.78); backdrop-filter: blur(2px); }
+    .modal-backdrop { position: absolute; inset: 0; background: rgba(26, 12, 6, 0.92); backdrop-filter: blur(2px); }
     .modal-card {
       position: relative;
       width: min(520px, 100%);
@@ -1852,7 +1851,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         <div class="cash-controls">
           <input type="datetime-local" id="resDate" aria-label="Дата и время">
           <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
-          <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
         </div>
         <div class="controls">
           <label class="zoom" aria-label="Масштаб схемы">
@@ -2253,7 +2251,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     const msgrHint = document.getElementById('msgrHint');
     const toastEl = document.getElementById('tableToast');
     const toastTitleEl = document.getElementById('toastTitle');
-    const toastReasonEl = document.getElementById('toastReason');
     const dtpModal = document.getElementById('dtpModal');
     const dtpDateList = document.getElementById('dtpDateList');
     const dtpTimeList = document.getElementById('dtpTimeList');
@@ -2974,7 +2971,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
 
       isLoading = true;
       if (statusLine) statusLine.textContent = 'Проверяю…';
-      if (checkBtn) checkBtn.disabled = true;
       setBusyLabel(dateStr);
       setBusyLoader(true);
 
@@ -3028,17 +3024,10 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         renderSelectedTable();
       } finally {
         isLoading = false;
-        if (checkBtn) checkBtn.disabled = false;
         setStatus(selectedTableNum);
         setBusyLoader(false);
       }
     };
-
-    if (checkBtn) {
-      checkBtn.addEventListener('click', () => {
-        loadFree(false).catch((e) => setOutput('Ошибка: ' + String(e && e.message ? e.message : e)));
-      });
-    }
 
     initDate();
     const restoreFromTgState = async () => {
@@ -3091,18 +3080,8 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     syncSteps();
     if (resDate) {
       resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); });
-      resDate.addEventListener('change', () => {
-        syncSteps();
-        invalidateLast();
-        setBusyLabel(String(resDate.value || '').slice(0, 10));
-        if (skipNextResDateAutoLoad) { skipNextResDateAutoLoad = false; return; }
-        loadFree(true).catch(() => null);
-      });
     }
-    if (resDate && String(resDate.value || '').trim()) {
-      loadFree(true).catch(() => null);
-    }
-    setOutput('Выбери дату и нажми "Проверить столики". Потом кликай по столам.');
+    setOutput('Выбери дату и нажми “Ок”. Потом кликай по столам.');
   </script>
 </body>
 </html>
