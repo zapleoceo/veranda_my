@@ -1127,9 +1127,44 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     }
     .zoom .zv { font-variant-numeric: tabular-nums; font-weight: 900; min-width: 46px; text-align: right; }
     .zoom input[type="range"] {
-      width: 90px;
+      width: 120px;
       height: 10px;
-      accent-color: var(--color-primary);
+      -webkit-appearance: none;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .zoom input[type="range"]::-webkit-slider-runnable-track {
+      height: 10px;
+      background: linear-gradient(90deg, rgba(184,135,70,0.18) 0%, rgba(184,135,70,0.85) 42%, rgba(184,135,70,0.18) 84%);
+      background-size: 220px 100%;
+      border: none;
+      border-radius: 999px;
+    }
+    .zoom input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: var(--color-primary);
+      border: 2px solid var(--color-primary-strong);
+      border-radius: 50%;
+      margin-top: -4px;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.28);
+    }
+    .zoom input[type="range"]::-moz-range-track {
+      height: 10px;
+      background: linear-gradient(90deg, rgba(184,135,70,0.18) 0%, rgba(184,135,70,0.85) 42%, rgba(184,135,70,0.18) 84%);
+      border: none;
+      border-radius: 999px;
+    }
+    .zoom input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: var(--color-primary);
+      border: 2px solid var(--color-primary-strong);
+      border-radius: 50%;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.28);
     }
   
     .cash-controls input[type="datetime-local"] { color-scheme: dark; }
@@ -2052,12 +2087,11 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       <div class="topbar">
         <div class="title-wrap">
           <h1>Схема бронирования</h1>
-          <p><span id="busyDateLabel">Данные на —</span><span class="mini-loader" id="busyDateLoader" hidden></span></p>
+          <p><span id="busyDateLabel">Данные на</span> <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
         </div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="cash-controls">
           <input type="datetime-local" id="resDate" aria-label="Дата и время">
-          <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
         </div>
         <div class="controls">
           <label class="zoom" aria-label="Масштаб схемы">
@@ -2346,7 +2380,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
 
     const setBusyLabel = (dateStr) => {
       const busyDateLabel = document.getElementById('busyDateLabel');
-      if (busyDateLabel) busyDateLabel.textContent = 'Данные на ' + String(dateStr || '—');
+      if (busyDateLabel) busyDateLabel.textContent = 'Данные на';
     };
     const setBusyLoader = (isOn) => {
       const busyDateLoader = document.getElementById('busyDateLoader');
@@ -2385,6 +2419,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       const today = new Date();
       const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
       const isToday = day === todayStr;
+      const nowMin = isToday ? (today.getHours() * 60 + today.getMinutes()) : null;
       const durMin = 120;
 
       const byTable = {};
@@ -2421,7 +2456,10 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
 
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
-        const ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
+        let ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
+        if (isToday && nowMin != null) {
+          ranges = ranges.filter(([s, e]) => e > nowMin);
+        }
         const selEnd = selMin != null ? (selMin + durMin) : null;
         const overlapsSel = (selMin != null && selEnd != null)
           ? ranges.some(([s, e]) => s < selEnd && e > selMin)
