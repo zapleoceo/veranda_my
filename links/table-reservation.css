@@ -1193,6 +1193,6 @@
       }
       .layout, .map-shell { padding: var(--space-4); }
       .topbar { padding: var(--space-4); grid-template-columns: 1fr; justify-items: stretch; }
-      .map-shell { padding: 0 28px 28px 28px; }
+      .map-shell { padding: 0 14px 14px 14px; }
       .zoom { width: 100%; justify-content: space-between; }
     }

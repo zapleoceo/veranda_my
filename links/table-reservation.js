@@ -61,11 +61,17 @@
   })();
   const root = document.documentElement;
     const mapShell = document.querySelector('.map-shell');
+    const tileLayer = mapShell ? mapShell.querySelector(':scope > .tile-layer') : null;
     const mapZoomVal = document.getElementById('mapZoomVal');
     const mapZoomMinus = document.getElementById('mapZoomMinus');
     const mapZoomPlus = document.getElementById('mapZoomPlus');
     const mapZoomRange = document.getElementById('mapZoomRange');
     const mapZoomBox = document.getElementById('mapZoomBox');
+    const syncTileLayerSize = () => {
+      if (!mapShell || !tileLayer) return;
+      tileLayer.style.width = String(Math.max(mapShell.scrollWidth, mapShell.clientWidth)) + 'px';
+      tileLayer.style.height = String(Math.max(mapShell.scrollHeight, mapShell.clientHeight)) + 'px';
+    };
 
     const applyMapZoom = (pct, keepAnchor) => {
       if (!mapShell) return;
@@ -86,6 +92,7 @@
 
       mapShell.style.setProperty('--map-scale', String(scale));
       mapShell.style.setProperty('--inv-map-scale', String(1 / scale));
+      syncTileLayerSize();
 
       if (keepAnchor) {
         const rect = mapShell.getBoundingClientRect();
@@ -94,7 +101,18 @@
       }
     };
 
-    applyMapZoom(100, false);
+    const getInitialZoomPct = () => {
+      if (!mapShell) return 100;
+      if (!window.matchMedia || !window.matchMedia('(max-width: 520px)').matches) return 100;
+      const pad = 24;
+      const baseW = mapZoomBox ? (mapZoomBox.offsetWidth || 820) : 820;
+      const fit = Math.floor(((mapShell.clientWidth || baseW) - pad) / baseW * 100);
+      return Math.max(50, Math.min(100, fit));
+    };
+    applyMapZoom(getInitialZoomPct(), false);
+    if (typeof window.addEventListener === 'function') {
+      window.addEventListener('resize', () => { syncTileLayerSize(); });
+    }
     const getCurrentZoomPct = () => {
       if (!mapShell) return 100;
       const cur = Number(getComputedStyle(mapShell).getPropertyValue('--map-scale')) || 1;
