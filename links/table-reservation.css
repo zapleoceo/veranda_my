@@ -224,6 +224,14 @@
     }
     .map-shell > * { position: relative; z-index: 1; }
     .map-shell > .tile-layer { position: absolute; z-index: 0; }
+    .map-shell {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(184,135,70,0.75) rgba(0,0,0,0.25);
+    }
+    .map-shell::-webkit-scrollbar { width: 12px; height: 12px; }
+    .map-shell::-webkit-scrollbar-track { background: rgba(0,0,0,0.22); border-radius: 999px; }
+    .map-shell::-webkit-scrollbar-thumb { background: rgba(184,135,70,0.60); border-radius: 999px; border: 3px solid rgba(0,0,0,0.22); }
+    .map-shell::-webkit-scrollbar-thumb:hover { background: rgba(184,135,70,0.82); }
   
     .map-zoom-box { width: 820px; height: 620px; }
     .map-zoom-inner { width: 820px; height: 620px; transform: scale(var(--map-scale)); transform-origin: top left; }
@@ -1000,6 +1008,14 @@
     .req-right.open { opacity: 1; transform: translateX(0); }
     .req-right .pre-title { padding: 10px 12px; font-weight: 900; font-size: 12px; letter-spacing: 0.06em; color: rgba(255,255,255,0.75); border-bottom: 1px solid rgba(255,255,255,0.08); }
     .req-right .pre-body { max-height: 520px; overflow: auto; }
+    .req-right .pre-body {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(184,135,70,0.75) rgba(0,0,0,0.25);
+    }
+    .req-right .pre-body::-webkit-scrollbar { width: 10px; height: 10px; }
+    .req-right .pre-body::-webkit-scrollbar-track { background: rgba(0,0,0,0.22); }
+    .req-right .pre-body::-webkit-scrollbar-thumb { background: rgba(184,135,70,0.65); border-radius: 999px; border: 2px solid rgba(0,0,0,0.22); }
+    .req-right .pre-body::-webkit-scrollbar-thumb:hover { background: rgba(184,135,70,0.85); }
     .pre-group { border-top: 1px solid rgba(255,255,255,0.08); }
     .pre-group summary {
       list-style: none;
