@@ -1864,6 +1864,36 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     .req-right.open { opacity: 1; transform: translateX(0); }
     .req-right .pre-title { padding: 10px 12px; font-weight: 900; font-size: 12px; letter-spacing: 0.06em; color: rgba(255,255,255,0.75); border-bottom: 1px solid rgba(255,255,255,0.08); }
     .req-right .pre-body { max-height: 520px; overflow: auto; }
+    .pre-group { border-top: 1px solid rgba(255,255,255,0.08); }
+    .pre-group summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 10px 12px;
+      font-weight: 900;
+      color: rgba(255,255,255,0.90);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      user-select: none;
+    }
+    .pre-group summary::-webkit-details-marker { display: none; }
+    .pre-group summary .cnt { color: rgba(255,255,255,0.52); font-weight: 800; font-size: 11px; }
+    .pre-cat { padding: 8px 12px 6px; font-weight: 800; font-size: 12px; color: rgba(255,255,255,0.70); }
+    .pre-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      cursor: pointer;
+      transition: background .14s ease, transform .14s ease;
+    }
+    .pre-item:hover { background: rgba(255,255,255,0.04); transform: translateY(-1px); }
+    .pre-item .t { font-weight: 800; font-size: 13px; color: rgba(255,255,255,0.92); }
+    .pre-item .d { margin-top: 4px; font-size: 11px; color: rgba(255,255,255,0.58); line-height: 1.25; }
+    .pre-item .p { font-weight: 900; font-size: 12px; color: rgba(184,135,70,0.95); white-space: nowrap; }
     .modal-hint.preorder { border-color: rgba(184,135,70,0.55); box-shadow: 0 0 0 3px rgba(184,135,70,0.12); }
     @media (max-width: 900px) {
       .req-layout { flex-direction: column; }
@@ -2705,6 +2735,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     let linkedTg = null;
     let submitBusy = false;
     let submitPrevText = '';
+    let preorderMenu = null;
+    let preorderMenuLoading = false;
     const setPreorderOpen = (on) => {
       if (!preorderPanel) return;
       if (on) {
@@ -2725,8 +2757,159 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       if (reqModalCard) reqModalCard.classList.toggle('wide', on);
       setPreorderOpen(on);
       if (!on) return;
-      if (preorderBody) preorderBody.textContent = 'Загрузка меню…';
+      loadPreorderMenu().catch(() => null);
     };
+
+    const parsePreorderFromComment = (text) => {
+      const out = {};
+      const lines = String(text || '').split('\n');
+      const idx = lines.findIndex((l) => String(l || '').trim().toLowerCase() === 'предзаказ:');
+      if (idx < 0) return out;
+      for (let i = idx + 1; i < lines.length; i++) {
+        const raw = String(lines[i] || '').trim();
+        if (!raw) continue;
+        const l = raw.replace(/^[\-\*\u2022]\s*/, '').trim();
+        if (!l) continue;
+        const m = l.match(/^(.*?)(?:\s*x\s*(\d+))?$/i);
+        const title = (m && m[1]) ? String(m[1]).trim() : l;
+        const qty = (m && m[2]) ? (Number(m[2]) || 1) : 1;
+        if (!title) continue;
+        out[title] = (Number(out[title] || 0) || 0) + Math.max(1, qty);
+      }
+      return out;
+    };
+    const stripPreorderSection = (text) => {
+      const lines = String(text || '').split('\n');
+      const idx = lines.findIndex((l) => String(l || '').trim().toLowerCase() === 'предзаказ:');
+      if (idx < 0) return String(text || '');
+      return lines.slice(0, idx).join('\n').replace(/\s+$/g, '');
+    };
+    const buildPreorderSection = (counts) => {
+      const keys = Object.keys(counts || {}).filter((k) => (Number(counts[k] || 0) || 0) > 0).sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
+      if (!keys.length) return '';
+      const lines = ['Предзаказ:'];
+      keys.forEach((k) => {
+        const n = Number(counts[k] || 0) || 0;
+        lines.push('- ' + k + (n > 1 ? (' x' + String(n)) : ''));
+      });
+      return lines.join('\n');
+    };
+    const addPreorderItemToComment = (title) => {
+      if (!reqComment) return;
+      const t = String(title || '').trim();
+      if (!t) return;
+      const counts = parsePreorderFromComment(reqComment.value);
+      counts[t] = (Number(counts[t] || 0) || 0) + 1;
+      const base = stripPreorderSection(reqComment.value);
+      const section = buildPreorderSection(counts);
+      const next = (base ? (base.replace(/\s+$/g, '') + '\n\n') : '') + section;
+      reqComment.value = next.replace(/\s+$/g, '');
+      reqComment.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    const fmtPrice = (n) => {
+      const v = Number(n);
+      if (!isFinite(v)) return '';
+      return new Intl.NumberFormat('ru-RU').format(Math.round(v)) + ' ₫';
+    };
+    const renderPreorderMenu = () => {
+      if (!preorderBody) return;
+      const groups = preorderMenu && typeof preorderMenu === 'object' && Array.isArray(preorderMenu.groups) ? preorderMenu.groups : [];
+      if (!groups.length) {
+        preorderBody.textContent = 'Меню недоступно.';
+        return;
+      }
+      preorderBody.innerHTML = '';
+      groups.forEach((g) => {
+        const details = document.createElement('details');
+        details.className = 'pre-group';
+        details.open = true;
+        const sum = document.createElement('summary');
+        const t = document.createElement('span');
+        t.textContent = String(g.title || '');
+        const cnt = document.createElement('span');
+        cnt.className = 'cnt';
+        const itemsCount = (Array.isArray(g.categories) ? g.categories : []).reduce((acc, c) => acc + (Array.isArray(c.items) ? c.items.length : 0), 0);
+        cnt.textContent = String(itemsCount);
+        sum.appendChild(t);
+        sum.appendChild(cnt);
+        details.appendChild(sum);
+        const cats = Array.isArray(g.categories) ? g.categories : [];
+        cats.forEach((c) => {
+          const cat = document.createElement('div');
+          cat.className = 'pre-cat';
+          cat.textContent = String(c.title || '');
+          details.appendChild(cat);
+          const items = Array.isArray(c.items) ? c.items : [];
+          items.forEach((it) => {
+            const row = document.createElement('div');
+            row.className = 'pre-item';
+            row.setAttribute('data-pre-item', '1');
+            row.setAttribute('data-title', String(it.title || ''));
+            const left = document.createElement('div');
+            const tt = document.createElement('div');
+            tt.className = 't';
+            tt.textContent = String(it.title || '');
+            left.appendChild(tt);
+            const desc = String(it.description || '').trim();
+            if (desc) {
+              const dd = document.createElement('div');
+              dd.className = 'd';
+              dd.textContent = desc;
+              left.appendChild(dd);
+            }
+            const price = document.createElement('div');
+            price.className = 'p';
+            price.textContent = it.price != null ? fmtPrice(it.price) : '';
+            row.appendChild(left);
+            row.appendChild(price);
+            details.appendChild(row);
+          });
+        });
+        preorderBody.appendChild(details);
+      });
+    };
+    const loadPreorderMenu = async () => {
+      if (preorderMenuLoading || preorderMenu) return;
+      if (!preorderBody) return;
+      preorderMenuLoading = true;
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'menu_preorder');
+        url.searchParams.set('lang', 'ru');
+        const timeoutMs = 12000;
+        let res;
+        if (typeof AbortController === 'function') {
+          const ctrl = new AbortController();
+          const tm = setTimeout(() => ctrl.abort(), timeoutMs);
+          try {
+            res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal: ctrl.signal });
+          } finally {
+            clearTimeout(tm);
+          }
+        } else {
+          res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        }
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok) throw new Error('bad');
+        preorderMenu = j;
+        renderPreorderMenu();
+      } catch (_) {
+        if (preorderBody) preorderBody.textContent = 'Не удалось загрузить меню.';
+      } finally {
+        preorderMenuLoading = false;
+      }
+    };
+
+    if (preorderBody) {
+      preorderBody.addEventListener('click', (e) => {
+        const target = e.target && e.target.closest ? e.target.closest('[data-pre-item]') : null;
+        if (!target) return;
+        const title = String(target.getAttribute('data-title') || '').trim();
+        if (!title) return;
+        addPreorderItemToComment(title);
+      });
+    }
     const parseIsoLocal = (raw) => {
       const s = String(raw || '').trim();
       const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
