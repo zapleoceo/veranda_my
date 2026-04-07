@@ -1710,7 +1710,11 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       background: rgba(0,0,0,0.12);
       overflow: hidden;
       box-shadow: 0 18px 45px rgba(0,0,0,0.22);
+      opacity: 0;
+      transform: translateX(10px);
+      transition: opacity .18s ease, transform .18s ease;
     }
+    .req-right.open { opacity: 1; transform: translateX(0); }
     .req-right .pre-title { padding: 10px 12px; font-weight: 900; font-size: 12px; letter-spacing: 0.06em; color: rgba(255,255,255,0.75); border-bottom: 1px solid rgba(255,255,255,0.08); }
     .req-right iframe { display: block; width: 100%; border: 0; }
     .modal-hint.preorder { border-color: rgba(184,135,70,0.55); box-shadow: 0 0 0 3px rgba(184,135,70,0.12); }
@@ -2648,7 +2652,17 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     const updatePreorderUi = () => {
       const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
       const on = guests > 5;
-      if (preorderPanel) preorderPanel.hidden = !on;
+      if (preorderPanel) {
+        if (on) {
+          if (preorderPanel.hidden) preorderPanel.hidden = false;
+          preorderPanel.classList.add('open');
+        } else {
+          preorderPanel.classList.remove('open');
+          setTimeout(() => {
+            if (!preorderPanel.classList.contains('open')) preorderPanel.hidden = true;
+          }, 190);
+        }
+      }
       if (preorderReqHint) preorderReqHint.hidden = !on;
       if (reqModalCard) reqModalCard.classList.toggle('wide', on);
       if (on) ensureMenuLoaded();
@@ -3040,10 +3054,21 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         }
 
         const key = current.dt + '|' + String(current.guests);
-        if (!last || lastKey !== key) {
+        if ((!last || lastKey !== key) && isLoading) {
           setStatus(id);
-          setOutput('Сначала выбери дату и нажми “Ок”, чтобы проверить доступность столиков.');
+          setOutput('Проверяю доступность…');
           return;
+        }
+        if (!last || lastKey !== key) {
+          try {
+            await loadFree(true);
+          } catch (_) {
+          }
+          if (!last || lastKey !== key) {
+            setStatus(id);
+            setOutput('Выбери дату и нажми “Ок”, чтобы проверить доступность столиков.');
+            return;
+          }
         }
 
         const un = getUnavailableReason(id, current);
@@ -3111,6 +3136,24 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       setBusyLabel(dateStr);
       setBusyLoader(true);
 
+      const fetchJson = async (u) => {
+        const timeoutMs = 12000;
+        if (typeof AbortController === 'function') {
+          const ctrl = new AbortController();
+          const tm = setTimeout(() => ctrl.abort(), timeoutMs);
+          try {
+            const r = await fetch(u, { headers: { 'Accept': 'application/json' }, signal: ctrl.signal });
+            const j = await r.json().catch(() => null);
+            return { res: r, json: j };
+          } finally {
+            clearTimeout(tm);
+          }
+        }
+        const r = await fetch(u, { headers: { 'Accept': 'application/json' } });
+        const j = await r.json().catch(() => null);
+        return { res: r, json: j };
+      };
+
       const url = new URL(location.href);
       url.searchParams.set('ajax', 'free_tables');
       url.searchParams.set('date_reservation', dt);
@@ -3124,15 +3167,17 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         rUrl.searchParams.set('date_reservation', dt);
         rUrl.searchParams.set('duration', String(current.durationSec || 7200));
         rUrl.searchParams.set('spot_id', '1');
-        const rRes = await fetch(rUrl.toString(), { headers: { 'Accept': 'application/json' } });
-        const rJ = await rRes.json().catch(() => null);
+        const rX = await fetchJson(rUrl.toString());
+        const rRes = rX.res;
+        const rJ = rX.json;
         if (!rRes.ok || !rJ || !rJ.ok) return null;
         return rJ;
       };
 
       try {
-        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
-        const j = await res.json().catch(() => null);
+        const x = await fetchJson(url.toString());
+        const res = x.res;
+        const j = x.json;
         if (!res.ok || !j || !j.ok) {
           last = null;
           freeNums = new Set();
@@ -3159,6 +3204,12 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         applyReservationsItemsToTables(last.reservations_items, dateStr, dt);
         if (!silent) setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
         renderSelectedTable();
+      } catch (e) {
+        last = null;
+        freeNums = new Set();
+        lastKey = '';
+        applyAvailabilityStyles();
+        if (!silent) setOutput('Ошибка запроса. Попробуй нажать “Ок” ещё раз.');
       } finally {
         isLoading = false;
         setStatus(selectedTableNum);
