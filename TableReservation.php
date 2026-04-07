@@ -2071,6 +2071,40 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       min-height: 92px;
       font-family: var(--font-body);
     }
+    .preorder-box {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255, 250, 244, 0.94);
+      padding: 10px 10px;
+      font-size: 12px;
+      min-height: 92px;
+      max-height: 164px;
+      overflow: auto;
+    }
+    .preorder-line {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 8px;
+      border-radius: 10px;
+    }
+    .preorder-line + .preorder-line { margin-top: 6px; }
+    .preorder-title { font-weight: 800; color: rgba(255,255,255,0.92); font-size: 12px; line-height: 1.2; }
+    .preorder-qty { font-weight: 900; color: rgba(184,135,70,0.95); font-variant-numeric: tabular-nums; }
+    .preorder-minus {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.22);
+      color: rgba(255,255,255,0.85);
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .preorder-empty { color: rgba(255,255,255,0.55); font-size: 12px; padding: 2px 2px; }
     .modal-card.wide { width: min(980px, 100%); }
     .req-layout { display: flex; gap: 12px; align-items: flex-start; }
     .req-left { flex: 1 1 440px; min-width: 0; }
@@ -2428,9 +2462,13 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 <?= htmlspecialchars(tr('your_phone')) ?>
                 <input type="tel" id="reqPhone" autocomplete="tel">
               </label>
-              <label class="modal-label full">
+              <label class="modal-label">
                 <?= htmlspecialchars(tr('comment')) ?>
-                <textarea id="reqComment" rows="3" placeholder="Пожелания, особые условия…"></textarea>
+                <textarea id="reqComment" rows="3" placeholder="..."></textarea>
+              </label>
+              <label class="modal-label">
+                <?= htmlspecialchars(tr('preorder_title')) ?>
+                <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
               </label>
               <label class="modal-label">
                 <?= htmlspecialchars(tr('guests_count')) ?>
@@ -2710,6 +2748,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     const reqName = document.getElementById('reqName');
     const reqPhone = document.getElementById('reqPhone');
     const reqComment = document.getElementById('reqComment');
+    const reqPreorderBox = document.getElementById('reqPreorderBox');
     const reqModalTable = document.getElementById('reqModalTable');
     const reqGuests = document.getElementById('reqGuests');
     const reqGuestsMinus = document.getElementById('reqGuestsMinus');
@@ -2968,6 +3007,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           phone: String(reqPhone.value || ''),
           comment: String(reqComment.value || ''),
           guests: String(reqGuests.value || ''),
+          preorder: (typeof preorderCounts === 'object' && preorderCounts) ? preorderCounts : {},
         };
         localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
       } catch (_) {
@@ -3039,51 +3079,76 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       loadPreorderMenu().catch(() => null);
     };
 
-    const parsePreorderFromComment = (text) => {
+    let preorderCounts = {};
+    const normalizePreorder = (obj) => {
       const out = {};
-      const lines = String(text || '').split('\n');
-      const idx = lines.findIndex((l) => String(l || '').trim().toLowerCase() === 'предзаказ:');
-      if (idx < 0) return out;
-      for (let i = idx + 1; i < lines.length; i++) {
-        const raw = String(lines[i] || '').trim();
-        if (!raw) continue;
-        const l = raw.replace(/^[\-\*\u2022]\s*/, '').trim();
-        if (!l) continue;
-        const m = l.match(/^(.*?)(?:\s*x\s*(\d+))?$/i);
-        const title = (m && m[1]) ? String(m[1]).trim() : l;
-        const qty = (m && m[2]) ? (Number(m[2]) || 1) : 1;
-        if (!title) continue;
-        out[title] = (Number(out[title] || 0) || 0) + Math.max(1, qty);
-      }
+      if (!obj || typeof obj !== 'object') return out;
+      Object.keys(obj).forEach((k) => {
+        const title = String(k || '').trim();
+        if (!title) return;
+        const n = Number(obj[k] || 0) || 0;
+        if (n <= 0) return;
+        out[title] = Math.min(99, Math.floor(n));
+      });
       return out;
     };
-    const stripPreorderSection = (text) => {
-      const lines = String(text || '').split('\n');
-      const idx = lines.findIndex((l) => String(l || '').trim().toLowerCase() === 'предзаказ:');
-      if (idx < 0) return String(text || '');
-      return lines.slice(0, idx).join('\n').replace(/\s+$/g, '');
-    };
-    const buildPreorderSection = (counts) => {
-      const keys = Object.keys(counts || {}).filter((k) => (Number(counts[k] || 0) || 0) > 0).sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
-      if (!keys.length) return '';
-      const lines = ['Предзаказ:'];
-      keys.forEach((k) => {
-        const n = Number(counts[k] || 0) || 0;
-        lines.push('- ' + k + (n > 1 ? (' x' + String(n)) : ''));
+    const renderPreorderBox = () => {
+      if (!reqPreorderBox) return;
+      const counts = normalizePreorder(preorderCounts);
+      const keys = Object.keys(counts).sort((a, b) => a.localeCompare(b, UI_LOCALE, { sensitivity: 'base' }));
+      reqPreorderBox.innerHTML = '';
+      if (!keys.length) {
+        const empty = document.createElement('div');
+        empty.className = 'preorder-empty';
+        empty.textContent = '—';
+        reqPreorderBox.appendChild(empty);
+        return;
+      }
+      keys.forEach((title) => {
+        const row = document.createElement('div');
+        row.className = 'preorder-line';
+        row.setAttribute('data-preorder-title', title);
+        const left = document.createElement('div');
+        const tEl = document.createElement('div');
+        tEl.className = 'preorder-title';
+        tEl.textContent = title;
+        left.appendChild(tEl);
+        const qty = document.createElement('div');
+        qty.className = 'preorder-qty';
+        qty.textContent = 'x' + String(counts[title]);
+        const minus = document.createElement('button');
+        minus.type = 'button';
+        minus.className = 'preorder-minus';
+        minus.setAttribute('data-preorder-minus', title);
+        minus.textContent = '−';
+        row.appendChild(left);
+        row.appendChild(qty);
+        row.appendChild(minus);
+        reqPreorderBox.appendChild(row);
       });
-      return lines.join('\n');
     };
-    const addPreorderItemToComment = (title) => {
-      if (!reqComment) return;
-      const t = String(title || '').trim();
-      if (!t) return;
-      const counts = parsePreorderFromComment(reqComment.value);
-      counts[t] = (Number(counts[t] || 0) || 0) + 1;
-      const base = stripPreorderSection(reqComment.value);
-      const section = buildPreorderSection(counts);
-      const next = (base ? (base.replace(/\s+$/g, '') + '\n\n') : '') + section;
-      reqComment.value = next.replace(/\s+$/g, '');
-      reqComment.dispatchEvent(new Event('input', { bubbles: true }));
+    const incPreorder = (title) => {
+      const t0 = String(title || '').trim();
+      if (!t0) return;
+      preorderCounts = normalizePreorder(preorderCounts);
+      preorderCounts[t0] = Math.min(99, (Number(preorderCounts[t0] || 0) || 0) + 1);
+      renderPreorderBox();
+      saveDraft();
+    };
+    const decPreorder = (title) => {
+      const t0 = String(title || '').trim();
+      if (!t0) return;
+      preorderCounts = normalizePreorder(preorderCounts);
+      const next = (Number(preorderCounts[t0] || 0) || 0) - 1;
+      if (next <= 0) delete preorderCounts[t0];
+      else preorderCounts[t0] = next;
+      renderPreorderBox();
+      saveDraft();
+    };
+    const getPreorderText = () => {
+      const counts = normalizePreorder(preorderCounts);
+      const keys = Object.keys(counts).sort((a, b) => a.localeCompare(b, UI_LOCALE, { sensitivity: 'base' }));
+      return keys.map((k) => '- ' + k + (counts[k] > 1 ? (' x' + String(counts[k])) : '')).join('\n');
     };
 
     const fmtPrice = (n) => {
@@ -3102,7 +3167,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       groups.forEach((g) => {
         const details = document.createElement('details');
         details.className = 'pre-group';
-        details.open = true;
+        details.open = false;
         const sum = document.createElement('summary');
         const t = document.createElement('span');
         t.textContent = String(g.title || '');
@@ -3115,11 +3180,19 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         details.appendChild(sum);
         const cats = Array.isArray(g.categories) ? g.categories : [];
         cats.forEach((c) => {
-          const cat = document.createElement('div');
-          cat.className = 'pre-cat';
-          cat.textContent = String(c.title || '');
-          details.appendChild(cat);
+          const catDetails = document.createElement('details');
+          catDetails.className = 'pre-group';
+          catDetails.open = false;
+          const catSum = document.createElement('summary');
+          const catTitle = document.createElement('span');
+          catTitle.textContent = String(c.title || '');
+          const catCnt = document.createElement('span');
+          catCnt.className = 'cnt';
           const items = Array.isArray(c.items) ? c.items : [];
+          catCnt.textContent = String(items.length);
+          catSum.appendChild(catTitle);
+          catSum.appendChild(catCnt);
+          catDetails.appendChild(catSum);
           items.forEach((it) => {
             const row = document.createElement('div');
             row.className = 'pre-item';
@@ -3142,8 +3215,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             price.textContent = it.price != null ? fmtPrice(it.price) : '';
             row.appendChild(left);
             row.appendChild(price);
-            details.appendChild(row);
+            catDetails.appendChild(row);
           });
+          details.appendChild(catDetails);
         });
         preorderBody.appendChild(details);
       });
@@ -3186,7 +3260,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         if (!target) return;
         const title = String(target.getAttribute('data-title') || '').trim();
         if (!title) return;
-        addPreorderItemToComment(title);
+        incPreorder(title);
       });
     }
     const parseIsoLocal = (raw) => {
@@ -3225,6 +3299,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         if (reqPhone) reqPhone.value = d && typeof d.phone === 'string' ? d.phone : '';
         if (reqComment) reqComment.value = d && typeof d.comment === 'string' ? d.comment : '';
         if (reqGuests) reqGuests.value = d && typeof d.guests === 'string' && String(d.guests || '').trim() ? String(d.guests) : String(guests);
+        preorderCounts = d && typeof d.preorder === 'object' ? normalizePreorder(d.preorder) : {};
       } else {
         if (reqName) reqName.value = String(name || '');
         if (reqPhone) reqPhone.value = String(phone || '');
@@ -3234,6 +3309,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
       syncSubmitState();
       updatePreorderUi();
+      renderPreorderBox();
       if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) setMsgrHint(t('link_tg_hint'));
       setModal(reqModal, true);
       if (reqName) reqName.focus();
@@ -3349,6 +3425,15 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     if (reqName) reqName.addEventListener('input', () => { saveDraft(); });
     if (reqPhone) reqPhone.addEventListener('input', () => { saveDraft(); });
     if (reqComment) reqComment.addEventListener('input', () => { saveDraft(); });
+    if (reqPreorderBox) {
+      reqPreorderBox.addEventListener('click', (e) => {
+        const btn = e.target && e.target.closest ? e.target.closest('[data-preorder-minus]') : null;
+        if (!btn) return;
+        const title = String(btn.getAttribute('data-preorder-minus') || '').trim();
+        if (!title) return;
+        decPreorder(title);
+      });
+    }
 
     if (reqForm) {
       reqForm.addEventListener('submit', async (e) => {
@@ -3359,6 +3444,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
         const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || '').trim() : '';
         const comment = reqComment ? String(reqComment.value || '').trim() : '';
+        const preorder = getPreorderText();
         const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
         const missing = [];
         if (!tableNum) missing.push('выбери стол');
@@ -3366,6 +3452,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         if (!isFinite(guests) || guests <= 0) missing.push('кол-во гостей');
         if (!name) missing.push('имя');
         if (!phone) missing.push('телефон');
+        if (guests > 5 && !String(preorder || '').trim()) missing.push('предзаказ');
         if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push('Telegram (привязать)');
         if (missing.length) {
           const msg = 'Не хватает: ' + missing.join(', ');
@@ -3387,7 +3474,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, tg: linkedTg }),
+            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
