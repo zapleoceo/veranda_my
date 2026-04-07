@@ -615,7 +615,10 @@
       const on = guests > 5;
       if (preorderReqHint) preorderReqHint.hidden = !on;
       if (reqModalCard) reqModalCard.classList.toggle('wide', on);
-      if (reqPreorderLabel) reqPreorderLabel.hidden = !on;
+      if (reqPreorderLabel) {
+        reqPreorderLabel.hidden = !on;
+        reqPreorderLabel.style.display = on ? '' : 'none';
+      }
       if (reqCommentLabel) {
         if (on) reqCommentLabel.classList.remove('full');
         else reqCommentLabel.classList.add('full');
