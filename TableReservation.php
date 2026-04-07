@@ -927,6 +927,23 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       border-bottom: 1px solid var(--color-border);
       background: rgba(255,255,255,0.03);
       backdrop-filter: blur(14px);
+      position: relative;
+    }
+    .busy-progress {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 3px;
+      background: linear-gradient(90deg, rgba(184,135,70,0) 0%, rgba(184,135,70,0.85) 40%, rgba(184,135,70,0) 80%);
+      background-size: 220px 100%;
+      background-repeat: repeat-x;
+      animation: busySweep 0.9s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes busySweep {
+      from { background-position: 0 0; }
+      to { background-position: 220px 0; }
     }
   
     .title-wrap h1 {
@@ -1852,6 +1869,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
           <h1>Схема бронирования</h1>
           <p><span id="busyDateLabel">Данные на —</span><span class="mini-loader" id="busyDateLoader" hidden></span></p>
         </div>
+        <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="cash-controls">
           <input type="datetime-local" id="resDate" aria-label="Дата и время">
           <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
@@ -2141,6 +2159,11 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       if (!busyDateLoader) return;
       busyDateLoader.hidden = !isOn;
       busyDateLoader.style.display = isOn ? 'inline-block' : 'none';
+      const busyProgress = document.getElementById('busyProgress');
+      if (busyProgress) {
+        busyProgress.hidden = !isOn;
+        busyProgress.style.display = isOn ? 'block' : 'none';
+      }
     };
 
     const clearReservationsOnTables = () => {
