@@ -450,7 +450,7 @@
     .dt-btn.attn {
       border: 1px solid transparent;
       background:
-        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)) padding-box,
+        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.06)) padding-box,
         linear-gradient(90deg, rgba(184,135,70,0.15), rgba(184,135,70,0.95), rgba(184,135,70,0.15)) border-box;
       background-size: auto, 220px 100%;
       animation: dtBorder 1.15s linear infinite;
