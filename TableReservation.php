@@ -574,6 +574,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $tableNum = trim((string)($payload['table_num'] ?? ''));
   $name = trim((string)($payload['name'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
+  $comment = trim((string)($payload['comment'] ?? ''));
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
 
@@ -599,6 +600,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     echo json_encode(['ok' => false, 'error' => 'Некорректный номер телефона'], JSON_UNESCAPED_UNICODE);
     exit;
   }
+  $comment = str_replace(["\r\n", "\r"], "\n", $comment);
+  if (mb_strlen($comment) > 600) $comment = mb_substr($comment, 0, 600);
 
   $displayTz = new DateTimeZone($displayTzName);
   $startDt = null;
@@ -638,6 +641,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $text .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
   $text .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
   $text .= 'Номер телефона: <b>' . htmlspecialchars($phoneNorm) . '</b>';
+  if ($comment !== '') {
+    $text .= "\n";
+    $text .= '<b>Комментарий:</b>' . "\n" . '<pre>' . htmlspecialchars($comment) . '</pre>';
+  }
   $tg = is_array($payload['tg'] ?? null) ? $payload['tg'] : [];
   $tgUid = isset($tg['user_id']) ? (int)$tg['user_id'] : 0;
   $tgUn = strtolower(trim((string)($tg['username'] ?? '')));
@@ -1681,6 +1688,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
     .modal-label { display: grid; gap: 6px; font-size: 12px; color: rgba(245, 238, 228, 0.78); margin-top: 0; }
+    .modal-label.full { grid-column: 1 / -1; }
     .modal input[type="text"], .modal input[type="tel"], .modal input[type="number"] {
       width: 100%;
       border-radius: 14px;
@@ -1691,7 +1699,43 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       font-size: var(--text-sm);
       outline: none;
     }
-    #reqGuests { max-width: 160px; }
+    .modal textarea {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255, 250, 244, 0.94);
+      padding: 0.75rem 0.85rem;
+      font-size: var(--text-sm);
+      outline: none;
+      resize: vertical;
+      min-height: 92px;
+      font-family: var(--font-body);
+    }
+    #reqGuests { max-width: 80px; }
+    #reqGuests::-webkit-outer-spin-button,
+    #reqGuests::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    #reqGuests { -moz-appearance: textfield; }
+    .num-step {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .num-step .num-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: rgba(245,238,228,0.92);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      font-weight: 900;
+      line-height: 1;
+    }
     .msgr {
       margin-top: 12px;
       padding: 10px 12px;
@@ -1957,9 +2001,17 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
             Ваш номер телефона
             <input type="tel" id="reqPhone" autocomplete="tel">
           </label>
+          <label class="modal-label full">
+            Комментарий
+            <textarea id="reqComment" rows="3" placeholder="Пожелания, особые условия…"></textarea>
+          </label>
           <label class="modal-label">
             Кол-во гостей
-            <input type="number" id="reqGuests" min="1" max="99">
+            <div class="num-step">
+              <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
+              <input type="number" id="reqGuests" min="1" max="99">
+              <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
+            </div>
           </label>
           <label class="modal-label">
             Время старта брони
@@ -2218,8 +2270,11 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     const reqForm = document.getElementById('reqForm');
     const reqName = document.getElementById('reqName');
     const reqPhone = document.getElementById('reqPhone');
+    const reqComment = document.getElementById('reqComment');
     const reqModalTable = document.getElementById('reqModalTable');
     const reqGuests = document.getElementById('reqGuests');
+    const reqGuestsMinus = document.getElementById('reqGuestsMinus');
+    const reqGuestsPlus = document.getElementById('reqGuestsPlus');
     const reqStart = document.getElementById('reqStart');
     const reqHint = document.getElementById('reqHint');
     const reqSubmit = document.getElementById('reqSubmit');
@@ -2496,7 +2551,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       reqSubmit.setAttribute('aria-disabled', linked ? 'false' : 'true');
       reqSubmit.disabled = !!submitBusy;
     };
-    const openRequestForm = ({ tableNum, guests, start, name, phone, keepFields }) => {
+    const openRequestForm = ({ tableNum, guests, start, name, phone, comment, keepFields }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
       if (reqGuests) reqGuests.value = String(guests);
@@ -2504,11 +2559,13 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       if (!keepFields) {
         if (reqName) reqName.value = '';
         if (reqPhone) reqPhone.value = '';
+        if (reqComment) reqComment.value = '';
         messengerLinked = { telegram: false, whatsapp: false, zalo: false };
         linkedTg = null;
       } else {
         if (reqName) reqName.value = String(name || '');
         if (reqPhone) reqPhone.value = String(phone || '');
+        if (reqComment) reqComment.value = String(comment || '');
       }
       if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
       syncSubmitState();
@@ -2534,6 +2591,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       const start = reqStart ? String(reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
       const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
+      const comment = reqComment ? String(reqComment.value || '').trim() : '';
       const resDt = resDate ? String(resDate.value || '').trim() : '';
       const scrollY = Math.max(0, Math.floor(window.scrollY || 0));
 
@@ -2546,7 +2604,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, res_date: resDt, scroll_y: scrollY }),
+          body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, res_date: resDt, scroll_y: scrollY }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
@@ -2598,6 +2656,20 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       }
     };
 
+    const bumpGuests = (delta) => {
+      if (!reqGuests) return;
+      const cur = Number(reqGuests.value || 0) || 0;
+      let next = cur + Number(delta || 0);
+      if (!isFinite(next) || next <= 0) next = 1;
+      if (next > 99) next = 99;
+      reqGuests.value = String(Math.floor(next));
+      reqGuests.dispatchEvent(new Event('input', { bubbles: true }));
+      reqGuests.dispatchEvent(new Event('change', { bubbles: true }));
+      reqGuests.focus();
+    };
+    if (reqGuestsMinus) reqGuestsMinus.addEventListener('click', () => bumpGuests(-1));
+    if (reqGuestsPlus) reqGuestsPlus.addEventListener('click', () => bumpGuests(1));
+
     if (reqGuests) {
       reqGuests.addEventListener('input', () => {
         if (pendingBooking) pendingBooking.guests = Number(reqGuests.value || 0) || pendingBooking.guests;
@@ -2615,6 +2687,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
         const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
         const start = reqStart ? String(reqStart.value || '').trim() : '';
+        const comment = reqComment ? String(reqComment.value || '').trim() : '';
         const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
         const missing = [];
         if (!tableNum) missing.push('выбери стол');
@@ -2643,7 +2716,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, tg: linkedTg }),
+            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
@@ -3005,12 +3078,13 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         const start = String(p.start || '').trim();
         const name = String(p.name || '');
         const phone = String(p.phone || '');
+        const comment = String(p.comment || '');
         const tg = j.tg && typeof j.tg === 'object' ? j.tg : null;
         if (tableNum && guests > 0 && start) {
           selectedTableNum = tableNum;
           messengerLinked.telegram = true;
           linkedTg = tg ? { user_id: Number(tg.user_id || 0) || 0, username: String(tg.username || ''), name: String(tg.name || '') } : null;
-          openRequestForm({ tableNum, guests, start, name, phone, keepFields: true });
+          openRequestForm({ tableNum, guests, start, name, phone, comment, keepFields: true });
           if (linkedTg && linkedTg.username) setMsgrHint('Telegram привязан ✅ @' + String(linkedTg.username).replace(/^@+/, ''));
           else setMsgrHint('Telegram привязан ✅');
           syncSubmitState();
