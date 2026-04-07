@@ -63,6 +63,22 @@
     const mapZoomMinus = document.getElementById('mapZoomMinus');
     const mapZoomPlus = document.getElementById('mapZoomPlus');
     const mapZoomRange = document.getElementById('mapZoomRange');
+    const mapZoomBox = document.getElementById('mapZoomBox');
+    const tileLayer = mapZoomBox ? mapZoomBox.querySelector('.tile-layer') : null;
+    const baseMapW = (() => {
+      const raw = mapZoomBox ? Number(mapZoomBox.getAttribute('data-base-w') || 0) : 0;
+      if (raw > 0) return raw;
+      const w = mapZoomBox ? (mapZoomBox.offsetWidth || 820) : 820;
+      if (mapZoomBox) mapZoomBox.setAttribute('data-base-w', String(w));
+      return w;
+    })();
+    const baseMapH = (() => {
+      const raw = mapZoomBox ? Number(mapZoomBox.getAttribute('data-base-h') || 0) : 0;
+      if (raw > 0) return raw;
+      const h = mapZoomBox ? (mapZoomBox.offsetHeight || 620) : 620;
+      if (mapZoomBox) mapZoomBox.setAttribute('data-base-h', String(h));
+      return h;
+    })();
 
     const applyMapZoom = (pct, keepAnchor) => {
       if (!mapShell) return;
@@ -81,6 +97,15 @@
 
       mapShell.style.setProperty('--map-scale', String(scale));
       mapShell.style.setProperty('--inv-map-scale', String(1 / scale));
+
+      if (mapZoomBox) {
+        mapZoomBox.style.width = String(Math.round(baseMapW * scale)) + 'px';
+        mapZoomBox.style.height = String(Math.round(baseMapH * scale)) + 'px';
+      }
+      if (tileLayer) {
+        tileLayer.style.width = String(Math.round(baseMapW * scale)) + 'px';
+        tileLayer.style.height = String(Math.round(baseMapH * scale)) + 'px';
+      }
 
       if (keepAnchor) {
         const rect = mapShell.getBoundingClientRect();
@@ -1264,14 +1289,7 @@
       if (!resDate) return;
       const minSlot = getMinSelectableSlot();
       resDate.min = minSlot.dateVal + 'T' + minSlot.timeVal;
-      const raw = String(defaultResDateLocal || '').trim();
-      let next = raw;
-      if (next && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(next)) {
-        if (next < resDate.min) next = resDate.min;
-      } else {
-        next = resDate.min;
-      }
-      resDate.value = next;
+      resDate.value = resDate.min;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       setBusyLabel(String(resDate.value || '').slice(0, 10));
       clearReservationsOnTables();
