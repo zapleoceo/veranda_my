@@ -1168,6 +1168,10 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       letter-spacing: 0.02em;
       text-transform: none;
       color: rgba(245,238,228,0.62);
+      background: #201a15;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 999px;
+      padding: 6px 10px;
     }
 
     .station-wrap.cash {
@@ -2967,7 +2971,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         return;
       }
       if (!last) {
-        if (statusLine) statusLine.textContent = 'Нажми "Проверить свободные столы"';
+        if (statusLine) statusLine.textContent = 'Нажми “Ок”, чтобы проверить столики';
         return;
       }
       const isFree = freeNums.has(String(tableNum));
@@ -3004,7 +3008,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       setStatus(selectedTableNum);
       if (!selectedTableNum) return;
       if (!last) {
-        setOutput('Нажми "Проверить свободные столы"');
+        setOutput('Нажми “Ок”, чтобы проверить столики.');
         return;
       }
       setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
@@ -3066,9 +3070,16 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
 
     const initDate = () => {
       if (!resDate) return;
-      resDate.value = defaultResDateLocal || '';
       const minSlot = getMinSelectableSlot();
       resDate.min = minSlot.dateVal + 'T' + minSlot.timeVal;
+      const raw = String(defaultResDateLocal || '').trim();
+      let next = raw;
+      if (next && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(next)) {
+        if (next < resDate.min) next = resDate.min;
+      } else {
+        next = resDate.min;
+      }
+      resDate.value = next;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       setBusyLabel(String(resDate.value || '').slice(0, 10));
       clearReservationsOnTables();
@@ -3156,6 +3167,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     };
 
     initDate();
+    loadFree(true).catch(() => null);
     const restoreFromTgState = async () => {
       const params = new URLSearchParams(location.search);
       const code = String(params.get('tg_state') || '').trim();
@@ -3175,6 +3187,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
           if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
           setBusyLabel(String(resDate.value || '').slice(0, 10));
           invalidateLast();
+          setTimeout(() => { loadFree(true).catch(() => null); }, 0);
         }
         const tableNum = String(p.table_num || '').trim();
         const guests = Number(p.guests || 0) || 0;
