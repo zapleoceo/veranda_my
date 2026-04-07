@@ -999,7 +999,26 @@ $firstOfMonth = date('Y-m-01');
         @keyframes spin { to { transform: rotate(360deg); } }
         .error { margin-top: 10px; color:#b91c1c; font-weight: 800; }
         .table-wrap { overflow-x: auto; overflow-y: visible; }
-        #empTable thead th { position: sticky; top: 0; background: #f8f9fa; z-index: 10; }
+        #empTable thead th { background: #f8f9fa; }
+        .sticky-head-wrap {
+            position: fixed;
+            top: 0;
+            z-index: 3000;
+            overflow: hidden;
+            display: none;
+            border-radius: 12px 12px 0 0;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.10);
+        }
+        .sticky-head-wrap table { width: max-content; border-collapse: collapse; }
+        .sticky-head-wrap th {
+            position: relative;
+            background: #f8f9fa;
+            color: #65676b;
+            font-size: 13px;
+            text-transform: uppercase;
+            font-weight: 700;
+            border-bottom: 1px solid #eee;
+        }
         .rate-input { width: 58px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
         .progress { display:none; align-items:center; gap: 10px; margin-left: 10px; }
         .progress .bar { width: 160px; height: 10px; border-radius: 999px; background: #eee; overflow: hidden; }
@@ -1346,6 +1365,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const colsBtn = document.getElementById('colsBtn');
     const colsMenu = document.getElementById('colsMenu');
     const empTable = document.getElementById('empTable');
+    const tableWrap = empTable ? empTable.closest('.table-wrap') : null;
     const totTipsEl = document.getElementById('totTips');
     const totTipsPaidEl = document.getElementById('totTipsPaid');
     const totSlrPaidEl = document.getElementById('totSlrPaid');
@@ -1373,6 +1393,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     let runAbort = null;
     let currentJobId = '';
     let paidResolve = null;
+    let stickyWrap = null;
+    let stickyTable = null;
+    let lastStickyVisible = false;
 
     const setLoading = (on) => {
         btn.disabled = on;
@@ -1538,6 +1561,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const ths = Array.from(document.querySelectorAll('th[data-sort]'));
     ths.forEach((th) => th.addEventListener('click', () => setSort(th.getAttribute('data-sort') || '')));
+    window.addEventListener('scroll', () => syncStickyHeader(false), { passive: true });
+    window.addEventListener('resize', () => syncStickyHeader(true), { passive: true });
+    if (tableWrap) tableWrap.addEventListener('scroll', () => syncStickyHeader(false), { passive: true });
     let dataRows = [];
     let tipsPaidById = {};
     let slrPaidById = {};
@@ -1687,6 +1713,69 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             });
         });
     }
+
+    const ensureStickyHeader = () => {
+        if (!empTable || !empTable.tHead || !tableWrap) return;
+        if (stickyWrap && stickyTable) return;
+        stickyWrap = document.createElement('div');
+        stickyWrap.className = 'sticky-head-wrap';
+        stickyWrap.setAttribute('aria-hidden', 'true');
+        stickyWrap.addEventListener('wheel', (e) => {
+            if (tableWrap) tableWrap.scrollLeft += e.deltaY;
+        }, { passive: true });
+        document.body.appendChild(stickyWrap);
+
+        stickyTable = document.createElement('table');
+        stickyTable.id = 'empStickyHead';
+        stickyTable.setAttribute('aria-hidden', 'true');
+        stickyWrap.appendChild(stickyTable);
+
+        const thead = empTable.tHead.cloneNode(true);
+        Array.from(thead.querySelectorAll('[id]')).forEach((el) => el.removeAttribute('id'));
+        Array.from(thead.querySelectorAll('th')).forEach((th) => {
+            th.addEventListener('click', () => setSort(th.getAttribute('data-sort') || ''));
+        });
+        stickyTable.appendChild(thead);
+    };
+
+    const syncStickyHeader = (forceMeasure) => {
+        if (!empTable || !empTable.tHead || !tableWrap) return;
+        ensureStickyHeader();
+        if (!stickyWrap || !stickyTable) return;
+
+        const wrapRect = tableWrap.getBoundingClientRect();
+        const headRect = empTable.tHead.getBoundingClientRect();
+        const tableRect = empTable.getBoundingClientRect();
+        const shouldShow = headRect.top < 0 && tableRect.bottom > 0 && wrapRect.bottom > 0 && wrapRect.width > 0;
+        if (!shouldShow) {
+            if (stickyWrap.style.display !== 'none') stickyWrap.style.display = 'none';
+            lastStickyVisible = false;
+            return;
+        }
+
+        stickyWrap.style.display = 'block';
+        stickyWrap.style.left = Math.round(wrapRect.left) + 'px';
+        stickyWrap.style.width = Math.round(wrapRect.width) + 'px';
+        stickyWrap.style.top = '0px';
+        stickyTable.className = empTable.className;
+
+        const scrollLeft = tableWrap.scrollLeft || 0;
+        stickyTable.style.transform = `translateX(${-scrollLeft}px)`;
+
+        const needMeasure = forceMeasure || !lastStickyVisible;
+        if (needMeasure) {
+            const srcThs = Array.from(empTable.tHead.querySelectorAll('th'));
+            const dstThs = Array.from(stickyTable.tHead.querySelectorAll('th'));
+            const n = Math.min(srcThs.length, dstThs.length);
+            for (let i = 0; i < n; i++) {
+                const w = srcThs[i].getBoundingClientRect().width;
+                dstThs[i].style.width = Math.round(w) + 'px';
+                dstThs[i].style.minWidth = Math.round(w) + 'px';
+                dstThs[i].style.maxWidth = Math.round(w) + 'px';
+            }
+        }
+        lastStickyVisible = true;
+    };
     function renderTable() {
         const coll = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
         const dir = sortDir === 'desc' ? -1 : 1;
@@ -1820,6 +1909,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         lastTipsMinorTotal = totTipsMinor;
         lastTtpMinorTotal = totTtpMinor;
         renderTipsBalanceTotals();
+        syncStickyHeader(true);
     }
 
     tbody.addEventListener('click', async (e) => {
