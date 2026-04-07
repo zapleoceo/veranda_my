@@ -855,7 +855,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
 }
 
 ?><!doctype html>
-<html lang="ru" data-theme="dark">
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -872,18 +872,18 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
       --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
       --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem; --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem; --space-12: 3rem;
-      --color-bg: #f5f2ea;
-      --color-surface: #fcfbf7;
-      --color-surface-2: #f0ece3;
-      --color-border: rgba(43, 36, 28, 0.12);
-      --color-text: #2b241c;
-      --color-text-muted: #746a60;
-      --color-primary: #7b4b2a;
-      --color-primary-strong: #5f3417;
-      --color-accent: #c89a63;
+      --color-bg: #000;
+      --color-surface: rgba(255,255,255,0.06);
+      --color-surface-2: rgba(255,255,255,0.03);
+      --color-border: rgba(255,255,255,0.10);
+      --color-text: rgba(255,255,255,0.92);
+      --color-text-muted: rgba(255,255,255,0.62);
+      --color-primary: #B88746;
+      --color-primary-strong: rgba(184,135,70,0.95);
+      --color-accent: rgba(184,135,70,0.22);
       --color-success: #4f7b4b;
-      --shadow-sm: 0 8px 20px rgba(43, 36, 28, 0.08);
-      --shadow-lg: 0 20px 60px rgba(43, 36, 28, 0.14);
+      --shadow-sm: 0 12px 30px rgba(0,0,0,0.35);
+      --shadow-lg: 0 20px 60px rgba(0,0,0,0.34);
       --radius-md: 16px;
       --radius-lg: 24px;
       --radius-full: 999px;
@@ -891,27 +891,13 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       --font-display: 'Clash Display', 'Satoshi', sans-serif;
     }
   
-    [data-theme="dark"] {
-      --color-bg: #181513;
-      --color-surface: #23201c;
-      --color-surface-2: #2b2722;
-      --color-border: rgba(255, 245, 232, 0.1);
-      --color-text: #f5eee4;
-      --color-text-muted: #b7ab9d;
-      --color-primary: #d59c5a;
-      --color-primary-strong: #f0bd7d;
-      --color-accent: #7b4b2a;
-      --shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.22);
-      --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.34);
-    }
-  
     * { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; }
     body {
       font-family: var(--font-body);
       background:
-        radial-gradient(circle at top left, rgba(200,154,99,.12), transparent 28%),
-        radial-gradient(circle at right bottom, rgba(123,75,42,.08), transparent 24%),
+        radial-gradient(900px 420px at 20% -10%, rgba(184,135,70,0.20), transparent 60%),
+        radial-gradient(900px 420px at 85% 0%, rgba(184,135,70,0.10), transparent 55%),
         var(--color-bg);
       color: var(--color-text);
     }
@@ -925,7 +911,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
   
     .panel {
       width: min(1000px, 100%);
-      background: linear-gradient(180deg, rgba(255,255,255,.35), transparent), var(--color-surface);
+      background: linear-gradient(180deg, var(--color-surface), rgba(255,255,255,0.03));
       border: 1px solid var(--color-border);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow-lg);
@@ -937,16 +923,16 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       justify-content: space-between;
       gap: var(--space-4);
       align-items: center;
-      padding: var(--space-5) var(--space-6);
+      padding: var(--space-4) var(--space-5);
       border-bottom: 1px solid var(--color-border);
-      background: rgba(255,255,255,0.24);
+      background: rgba(255,255,255,0.03);
       backdrop-filter: blur(14px);
     }
   
     .title-wrap h1 {
       margin: 0;
       font-family: var(--font-display);
-      font-size: var(--text-xl);
+      font-size: var(--text-lg);
       line-height: 1;
       letter-spacing: -0.03em;
     }
@@ -998,16 +984,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       accent-color: var(--color-primary);
     }
   
-    .legend, .theme-toggle {
-      border: 1px solid var(--color-border);
-      background: var(--color-surface-2);
-      border-radius: var(--radius-full);
-      padding: var(--space-2) var(--space-4);
-      font-size: var(--text-sm);
-      color: var(--color-text);
-    }
-  
-    .theme-toggle { cursor: pointer; }
+    .cash-controls input[type="datetime-local"] { color-scheme: dark; }
   
     .layout {
       padding: var(--space-6);
@@ -1017,11 +994,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     }
   
     .map-shell {
-      background:
-        linear-gradient(var(--color-border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--color-border) 1px, transparent 1px),
-        var(--color-surface-2);
-      background-size: 28px 28px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
       border-radius: calc(var(--radius-lg) - 8px);
       padding: 0 56px 56px 56px;
       border: 1px solid var(--color-border);
@@ -1036,6 +1009,19 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       width: 820px;
       height: 620px;
       border-radius: var(--radius-md);
+    }
+
+    .tile-underlay {
+      position: absolute;
+      left: 15px;
+      top: 0;
+      width: 850px;
+      height: 620px;
+      background: url("/links/gray-tiles-texture.jpg?v=20260407_1821") repeat;
+      pointer-events: none;
+      z-index: 0;
+      border-radius: var(--radius-md);
+      opacity: 0.92;
     }
 
     .grass-area {
@@ -1199,8 +1185,8 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       margin-top: 0;
       padding: 8px;
       border-radius: 16px;
-      border: 1px solid rgba(123, 75, 42, 0.62);
-      background: rgba(0,0,0,0.12);
+      border: 1px solid var(--color-border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
       box-shadow: 0 12px 22px rgba(0,0,0,0.22);
     }
     .cash-controls #resDate { display: none; }
@@ -1672,9 +1658,9 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     .modal-card {
       position: relative;
       width: min(520px, 100%);
-      background: rgba(17, 24, 39, 0.96);
-      color: rgba(255, 250, 244, 0.94);
-      border: 1px solid rgba(255,255,255,0.12);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
       border-radius: 18px;
       box-shadow: 0 26px 70px rgba(0,0,0,0.45);
       padding: 14px 14px 12px;
@@ -1684,10 +1670,10 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     }
     .modal.on .modal-card { transform: translateY(0) scale(1); opacity: 1; }
     .modal-title { font-weight: 900; font-size: 16px; font-family: var(--font-display); }
-    .modal-text { margin-top: 10px; color: rgba(245, 238, 228, 0.78); font-size: var(--text-sm); line-height: 1.35; }
+    .modal-text { margin-top: 10px; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.35; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-    .modal-label { display: grid; gap: 6px; font-size: 12px; color: rgba(245, 238, 228, 0.78); margin-top: 0; }
+    .modal-label { display: grid; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-top: 0; }
     .modal-label.full { grid-column: 1 / -1; }
     .modal input[type="text"], .modal input[type="tel"], .modal input[type="number"] {
       width: 100%;
@@ -1807,7 +1793,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       50% { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
     }
-    .modal-note { margin-top: 10px; color: rgba(245, 238, 228, 0.70); font-size: 12px; line-height: 1.35; }
+    .modal-note { margin-top: 10px; color: var(--color-text-muted); font-size: 12px; line-height: 1.35; }
     @media (max-width: 560px) { .modal-grid { grid-template-columns: 1fr; } }
   
     .btn {
@@ -1878,7 +1864,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
             <button class="zbtn" type="button" id="mapZoomPlus" aria-label="Увеличить масштаб">+</button>
             <input id="mapZoomRange" type="range" min="50" max="200" step="1" value="100" aria-label="Ползунок масштаба">
           </label>
-          <button class="theme-toggle" type="button" data-theme-toggle aria-label="Переключить тему">☀️</button>
         </div>
       </div>
   
@@ -1887,6 +1872,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
             <div class="map-zoom-box" id="mapZoomBox">
             <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="Схема столов ресторана">
+            <div class="tile-underlay" aria-hidden="true"></div>
             <div class="grass-corner-1-7" aria-hidden="true"></div>
             <button class="table large" style="left: 712px; top: 256px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 382px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
@@ -2059,11 +2045,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
   
   <script>
     const root = document.documentElement;
-    const toggle = document.querySelector('[data-theme-toggle]');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-    toggle.textContent = prefersDark ? '☀️' : '🌙';
-
     const mapShell = document.querySelector('.map-shell');
     const mapZoomVal = document.getElementById('mapZoomVal');
     const mapZoomMinus = document.getElementById('mapZoomMinus');
@@ -2103,13 +2084,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     if (mapZoomMinus) mapZoomMinus.addEventListener('click', () => applyMapZoom(getCurrentZoomPct() - 5, true));
     if (mapZoomPlus) mapZoomPlus.addEventListener('click', () => applyMapZoom(getCurrentZoomPct() + 5, true));
     if (mapZoomRange) mapZoomRange.addEventListener('input', () => applyMapZoom(mapZoomRange.value, true));
-  
-    toggle.addEventListener('click', () => {
-      const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-      root.setAttribute('data-theme', next);
-      toggle.textContent = next === 'dark' ? '☀️' : '🌙';
-    });
-  
     const defaultResDateLocal = <?= json_encode($defaultResDateLocal, JSON_UNESCAPED_UNICODE) ?>;
     const allowedTableNums = <?= json_encode($allowedSchemeNums, JSON_UNESCAPED_UNICODE) ?>;
     const tableCapsByNum = <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>;
@@ -2543,6 +2517,19 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     let linkedTg = null;
     let submitBusy = false;
     let submitPrevText = '';
+    const parseIsoLocal = (raw) => {
+      const s = String(raw || '').trim();
+      const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+      if (!m) return null;
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), 0);
+    };
+    const fmtStartHuman = (raw) => {
+      const d = parseIsoLocal(raw);
+      if (!d) return '';
+      const datePart = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+      const timePart = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      return datePart + ' ' + timePart;
+    };
     const syncSubmitState = () => {
       if (!reqSubmit) return;
       const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
@@ -2555,7 +2542,11 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
       if (reqGuests) reqGuests.value = String(guests);
-      if (reqStart) reqStart.value = String(start);
+      if (reqStart) {
+        const iso = String(start || '').trim();
+        reqStart.dataset.iso = iso;
+        reqStart.value = fmtStartHuman(iso) || iso;
+      }
       if (!keepFields) {
         if (reqName) reqName.value = '';
         if (reqPhone) reqPhone.value = '';
@@ -2588,7 +2579,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       if (!pendingBooking) { setMsgrHint('Сначала выбери столик.'); return; }
       const tableNum = String(pendingBooking.tableNum || '');
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
-      const start = reqStart ? String(reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
+      const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
       const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
       const comment = reqComment ? String(reqComment.value || '').trim() : '';
@@ -2686,7 +2677,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         const name = reqName ? String(reqName.value || '').trim() : '';
         const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
         const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
-        const start = reqStart ? String(reqStart.value || '').trim() : '';
+        const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || '').trim() : '';
         const comment = reqComment ? String(reqComment.value || '').trim() : '';
         const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
         const missing = [];
@@ -2721,7 +2712,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
           setModal(reqModal, false);
-          setOutput('Спасибо, мы с вами свяжемся в ближайшее время.\n\nДата: ' + String(start).slice(0, 10) + '\nВремя: ' + String(start).slice(11, 16) + '\nСтол: ' + tableNum + '\nГостей: ' + String(guests) + '\nИмя: ' + name + '\nТелефон: ' + phone);
+          setOutput('Спасибо, мы с вами свяжемся в ближайшее время.\n\nСтарт: ' + (fmtStartHuman(start) || start) + '\nСтол: ' + tableNum + '\nГостей: ' + String(guests) + '\nИмя: ' + name + '\nТелефон: ' + phone);
         } catch (err) {
           setOutput({ ok: false, error: String(err && err.message ? err.message : err) });
         } finally {
