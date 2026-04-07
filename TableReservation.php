@@ -81,6 +81,34 @@ $I18N = [
     'dtp_title' => 'Выбор даты и времени',
     'status_free' => 'Свободен',
     'status_busy' => 'Занят',
+    'tg_thanks_title' => 'Спасибо!',
+    'tg_thanks_body' => 'Мы с вами свяжемся в ближайшее время.',
+    'tg_booking_title' => 'Ваша бронь',
+    'tg_date' => 'Дата',
+    'tg_time' => 'Время',
+    'tg_guests' => 'Кол-во человек',
+    'tg_table' => 'Номер стола',
+    'tg_name' => 'Имя',
+    'tg_phone' => 'Номер телефона',
+    'tg_comment' => 'Комментарий',
+    'tg_preorder' => 'Предзаказ',
+    'err_prefix' => 'Ошибка: ',
+    'err_generic' => 'Ошибка',
+    'err_no_bot_link' => 'Нет ссылки на бота',
+    'hint_pick_table_first' => 'Сначала выбери столик.',
+    'hint_opening_tg' => 'Открываю Telegram…',
+    'hint_tg_back' => 'В Telegram нажми “Вернуться на сайт”.',
+    'missing_prefix' => 'Не хватает: ',
+    'missing_table' => 'выбери стол',
+    'missing_start' => 'время старта',
+    'missing_guests' => 'кол-во гостей',
+    'missing_name' => 'имя',
+    'missing_phone' => 'телефон',
+    'missing_preorder' => 'предзаказ',
+    'missing_telegram' => 'Telegram (привязать)',
+    'sending' => 'Отправляю…',
+    'submit_success' => 'Спасибо, мы с вами свяжемся в ближайшее время.\n\nСтарт: {start}\nСтол: {table}\nГостей: {guests}\nИмя: {name}\nТелефон: {phone}',
+    'cap_warn' => 'Мы подставим вам стул, но вам может быть тесно за этим столиком :)',
   ],
   'en' => [
     'page_title' => 'Booking Map',
@@ -122,6 +150,34 @@ $I18N = [
     'dtp_title' => 'Pick date & time',
     'status_free' => 'Free',
     'status_busy' => 'Busy',
+    'tg_thanks_title' => 'Thank you!',
+    'tg_thanks_body' => 'We will contact you shortly.',
+    'tg_booking_title' => 'Your reservation',
+    'tg_date' => 'Date',
+    'tg_time' => 'Time',
+    'tg_guests' => 'Guests',
+    'tg_table' => 'Table',
+    'tg_name' => 'Name',
+    'tg_phone' => 'Phone',
+    'tg_comment' => 'Comment',
+    'tg_preorder' => 'Pre-order',
+    'err_prefix' => 'Error: ',
+    'err_generic' => 'Error',
+    'err_no_bot_link' => 'Bot link is missing',
+    'hint_pick_table_first' => 'Pick a table first.',
+    'hint_opening_tg' => 'Opening Telegram…',
+    'hint_tg_back' => 'In Telegram press “Back to site”.',
+    'missing_prefix' => 'Missing: ',
+    'missing_table' => 'pick table',
+    'missing_start' => 'start time',
+    'missing_guests' => 'guests',
+    'missing_name' => 'name',
+    'missing_phone' => 'phone',
+    'missing_preorder' => 'pre-order',
+    'missing_telegram' => 'Telegram (link)',
+    'sending' => 'Sending…',
+    'submit_success' => 'Thank you, we will contact you shortly.\n\nStart: {start}\nTable: {table}\nGuests: {guests}\nName: {name}\nPhone: {phone}',
+    'cap_warn' => 'We can add an extra chair, but it may be tight at this table :)',
   ],
   'vi' => [
     'page_title' => 'Sơ đồ đặt bàn',
@@ -163,6 +219,34 @@ $I18N = [
     'dtp_title' => 'Chọn ngày & giờ',
     'status_free' => 'Trống',
     'status_busy' => 'Bận',
+    'tg_thanks_title' => 'Cảm ơn!',
+    'tg_thanks_body' => 'Chúng tôi sẽ liên hệ với bạn sớm.',
+    'tg_booking_title' => 'Đặt bàn của bạn',
+    'tg_date' => 'Ngày',
+    'tg_time' => 'Giờ',
+    'tg_guests' => 'Số khách',
+    'tg_table' => 'Bàn',
+    'tg_name' => 'Tên',
+    'tg_phone' => 'Số điện thoại',
+    'tg_comment' => 'Ghi chú',
+    'tg_preorder' => 'Đặt trước',
+    'err_prefix' => 'Lỗi: ',
+    'err_generic' => 'Lỗi',
+    'err_no_bot_link' => 'Không có link bot',
+    'hint_pick_table_first' => 'Hãy chọn bàn trước.',
+    'hint_opening_tg' => 'Đang mở Telegram…',
+    'hint_tg_back' => 'Trong Telegram nhấn “Quay lại trang”.',
+    'missing_prefix' => 'Thiếu: ',
+    'missing_table' => 'chọn bàn',
+    'missing_start' => 'giờ bắt đầu',
+    'missing_guests' => 'số khách',
+    'missing_name' => 'tên',
+    'missing_phone' => 'số điện thoại',
+    'missing_preorder' => 'đặt trước',
+    'missing_telegram' => 'Telegram (liên kết)',
+    'sending' => 'Đang gửi…',
+    'submit_success' => 'Cảm ơn, chúng tôi sẽ liên hệ sớm.\n\nBắt đầu: {start}\nBàn: {table}\nSố khách: {guests}\nTên: {name}\nSĐT: {phone}',
+    'cap_warn' => 'Chúng tôi có thể thêm ghế, nhưng bàn này có thể hơi chật :)',
   ],
 ];
 if (!isset($I18N[$lang])) $lang = 'ru';
@@ -705,7 +789,7 @@ if (($_GET['ajax'] ?? '') === 'cap_check') {
       'ok' => true,
       'cap' => $cap,
       'status' => 'warn',
-      'message' => 'Мы подставим вам стул, но вам может быть тесно за этим столиком :)',
+      'message' => tr('cap_warn'),
     ], JSON_UNESCAPED_UNICODE);
     exit;
   }
@@ -731,11 +815,18 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
   if (!is_array($payload)) $payload = [];
 
+  $langIn = strtolower(trim((string)($payload['lang'] ?? '')));
+  $userLang = in_array($langIn, ['ru', 'en', 'vi'], true) ? $langIn : $lang;
+  $trFor = function (string $key) use ($I18N, $userLang): string {
+    return isset($I18N[$userLang][$key]) ? (string)$I18N[$userLang][$key] : $key;
+  };
+
   $tableNum = trim((string)($payload['table_num'] ?? ''));
   $name = trim((string)($payload['name'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
   $comment = trim((string)($payload['comment'] ?? ''));
   $preorder = trim((string)($payload['preorder'] ?? ''));
+  $preorderRu = trim((string)($payload['preorder_ru'] ?? ''));
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
 
@@ -765,9 +856,11 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   if (mb_strlen($comment) > 600) $comment = mb_substr($comment, 0, 600);
   $preorder = str_replace(["\r\n", "\r"], "\n", $preorder);
   if (mb_strlen($preorder) > 1200) $preorder = mb_substr($preorder, 0, 1200);
+  $preorderRu = str_replace(["\r\n", "\r"], "\n", $preorderRu);
+  if (mb_strlen($preorderRu) > 1200) $preorderRu = mb_substr($preorderRu, 0, 1200);
   if ($guests > 5 && trim($preorder) === '') {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Предзаказ обязателен для компаний больше 5 гостей'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => false, 'error' => $trFor('preorder_required')], JSON_UNESCAPED_UNICODE);
     exit;
   }
 
@@ -813,9 +906,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     $text .= "\n";
     $text .= '<b>Комментарий:</b>' . "\n" . htmlspecialchars($comment);
   }
-  if ($preorder !== '') {
+  $preForGroup = $preorderRu !== '' ? $preorderRu : $preorder;
+  if ($preForGroup !== '') {
     $text .= "\n";
-    $text .= '<b>Предзаказ:</b>' . "\n" . htmlspecialchars($preorder);
+    $text .= '<b>Предзаказ:</b>' . "\n" . htmlspecialchars($preForGroup);
   }
   $tg = is_array($payload['tg'] ?? null) ? $payload['tg'] : [];
   $tgUid = isset($tg['user_id']) ? (int)$tg['user_id'] : 0;
@@ -846,21 +940,21 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     echo json_encode(['ok' => false, 'error' => 'Telegram не привязан'], JSON_UNESCAPED_UNICODE);
     exit;
   }
-  $userText = '<b>Спасибо!</b> Мы с вами свяжемся в ближайшее время.' . "\n\n";
-  $userText .= '<b>Ваша бронь</b>' . "\n";
-  $userText .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
-  $userText .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
-  $userText .= 'Кол-во человек: <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
-  $userText .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
-  $userText .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
-  $userText .= 'Номер телефона: <b>' . htmlspecialchars($phoneNorm) . '</b>';
+  $userText = '<b>' . htmlspecialchars($trFor('tg_thanks_title')) . '</b> ' . htmlspecialchars($trFor('tg_thanks_body')) . "\n\n";
+  $userText .= '<b>' . htmlspecialchars($trFor('tg_booking_title')) . '</b>' . "\n";
+  $userText .= htmlspecialchars($trFor('tg_date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
+  $userText .= htmlspecialchars($trFor('tg_time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
+  $userText .= htmlspecialchars($trFor('tg_guests')) . ': <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
+  $userText .= htmlspecialchars($trFor('tg_table')) . ': <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
+  $userText .= htmlspecialchars($trFor('tg_name')) . ': <b>' . htmlspecialchars($name) . '</b>' . "\n";
+  $userText .= htmlspecialchars($trFor('tg_phone')) . ': <b>' . htmlspecialchars($phoneNorm) . '</b>';
   if ($comment !== '') {
     $userText .= "\n";
-    $userText .= '<b>Комментарий:</b>' . "\n" . htmlspecialchars($comment);
+    $userText .= '<b>' . htmlspecialchars($trFor('tg_comment')) . ':</b>' . "\n" . htmlspecialchars($comment);
   }
   if ($preorder !== '') {
     $userText .= "\n";
-    $userText .= '<b>Предзаказ:</b>' . "\n" . htmlspecialchars($preorder);
+    $userText .= '<b>' . htmlspecialchars($trFor('tg_preorder')) . ':</b>' . "\n" . htmlspecialchars($preorder);
   }
 
   $ch = curl_init();
@@ -1078,9 +1172,11 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           COALESCE(NULLIF(wtr.name,''), NULLIF(w.name_raw,''), '') AS main_label,
           c.id AS category_id,
           COALESCE(NULLIF(ctr.name,''), NULLIF(c.name_raw,''), '') AS sub_label,
+          mi.id AS menu_item_id,
           p.poster_id,
           p.price_raw,
           COALESCE(NULLIF(itr.title,''), NULLIF(itr_ru.title,''), NULLIF(p.name_raw,''), '') AS title,
+          COALESCE(NULLIF(itr_ru.title,''), NULLIF(p.name_raw,''), '') AS ru_title,
           COALESCE(NULLIF(itr.description,''), NULLIF(itr_ru.description,''), '') AS description,
           COALESCE(NULLIF(mi.image_url,''), '') AS image_url,
           COALESCE(mi.sort_order, 0) AS sort_order,
@@ -1138,7 +1234,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     $price = is_numeric($priceRaw) ? (int)$priceRaw : null;
 
     $groups[$groupsKey]['categories'][$catKey]['items'][] = [
+      'id' => (int)($it['menu_item_id'] ?? 0),
       'title' => $title,
+      'ru_title' => trim((string)($it['ru_title'] ?? '')),
       'price' => $price,
       'description' => trim((string)($it['description'] ?? '')),
       'image_url' => trim((string)($it['image_url'] ?? '')),
@@ -1175,7 +1273,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260407_2635">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260407_2700">
 
 </head>
 <body>
@@ -1194,7 +1292,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             <button class="zbtn" type="button" id="mapZoomMinus" aria-label="−">−</button>
             <span class="zv" id="mapZoomVal">100%</span>
             <button class="zbtn" type="button" id="mapZoomPlus" aria-label="+">+</button>
-            <input id="mapZoomRange" type="range" min="50" max="100" step="1" value="100" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
+            <input id="mapZoomRange" type="range" min="10" max="100" step="1" value="100" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
           </label>
         </div>
         <?php
@@ -1389,7 +1487,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             </div>
           </div>
           <div class="req-right" id="preorderPanel" hidden>
-            <div class="pre-title"><?= htmlspecialchars(tr('preorder_title')) ?></div>
+            <div class="pre-title" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></div>
             <div class="pre-body" id="preorderBody"></div>
           </div>
         </div>
@@ -1413,6 +1511,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260407_2635"></script>
+  <script src="/links/table-reservation.js?v=20260407_2700"></script>
 </body>
 </html>

@@ -38,6 +38,11 @@
     window.UI_LANG = UI_LANG;
     window.UI_LOCALE = UI_LOCALE;
     window.STR = STR;
+    try {
+      if (typeof preorderMenu !== 'undefined') preorderMenu = null;
+      if (typeof preorderMenuLoading !== 'undefined') preorderMenuLoading = false;
+      if (typeof preorderBody !== 'undefined' && preorderBody) preorderBody.innerHTML = '';
+    } catch (_) {}
     applyI18n();
     if (typeof setStatus === 'function') setStatus(selectedTableNum);
     if (typeof renderSelectedTable === 'function') renderSelectedTable();
@@ -76,7 +81,7 @@
     const applyMapZoom = (pct, keepAnchor) => {
       if (!mapShell) return;
       const raw = Math.round(Number(pct || 100) || 100);
-      let p = Math.max(50, Math.min(100, raw));
+      let p = Math.max(10, Math.min(100, raw));
       if (raw === 93) p = 100;
       const scale = p / 100;
       if (mapZoomVal) mapZoomVal.textContent = String(Math.round(p)) + '%';
@@ -103,11 +108,11 @@
 
     const getInitialZoomPct = () => {
       if (!mapShell) return 100;
-      if (!window.matchMedia || !window.matchMedia('(max-width: 520px)').matches) return 100;
-      const pad = 24;
+      if (!window.matchMedia || !window.matchMedia('(max-width: 640px)').matches) return 100;
+      const pad = 32;
       const baseW = mapZoomBox ? (mapZoomBox.offsetWidth || 820) : 820;
       const fit = Math.floor(((mapShell.clientWidth || baseW) - pad) / baseW * 100);
-      return Math.max(50, Math.min(100, fit));
+      return Math.max(10, Math.min(100, fit));
     };
     applyMapZoom(getInitialZoomPct(), false);
     if (typeof window.addEventListener === 'function') {
@@ -505,7 +510,7 @@
       skipNextResDateAutoLoad = true;
       applyDtpToInput();
       setDtpModal(false);
-      loadFree(false).catch((e) => setOutput('Ошибка: ' + String(e && e.message ? e.message : e)));
+      loadFree(false).catch((e) => setOutput(t('err_prefix') + String(e && e.message ? e.message : e)));
     });
     document.querySelectorAll('[data-dtp-close]').forEach((x) => x.addEventListener('click', () => setDtpModal(false)));
     if (resDateBtn) {
@@ -635,6 +640,14 @@
     };
 
     let preorderCounts = {};
+    const getPreorderUiTitle = (key) => {
+      const k = String(key || '').trim();
+      if (!k) return '';
+      const map = window.preorderUiTitleByKey && typeof window.preorderUiTitleByKey === 'object' ? window.preorderUiTitleByKey : {};
+      const v = map[k];
+      const vv = v != null ? String(v).trim() : '';
+      return vv || k;
+    };
     const normalizePreorder = (obj) => {
       const out = {};
       if (!obj || typeof obj !== 'object') return out;
@@ -676,24 +689,24 @@
         return;
       }
       let total = 0;
-      keys.forEach((title) => {
+      keys.forEach((key) => {
         const row = document.createElement('div');
         row.className = 'preorder-line';
-        row.setAttribute('data-preorder-title', title);
+        row.setAttribute('data-preorder-title', key);
         const left = document.createElement('div');
         const tEl = document.createElement('div');
         tEl.className = 'preorder-title';
-        tEl.textContent = title;
+        tEl.textContent = getPreorderUiTitle(key);
         left.appendChild(tEl);
         const qty = document.createElement('div');
         qty.className = 'preorder-qty';
-        qty.textContent = 'x' + String(counts[title]);
-        const price = (window.preorderPriceByTitle && window.preorderPriceByTitle[title]) ? Number(window.preorderPriceByTitle[title]) : 0;
-        total += price * counts[title];
+        qty.textContent = 'x' + String(counts[key]);
+        const price = (window.preorderPriceByKey && window.preorderPriceByKey[key]) ? Number(window.preorderPriceByKey[key]) : 0;
+        total += price * counts[key];
         const minus = document.createElement('button');
         minus.type = 'button';
         minus.className = 'preorder-minus';
-        minus.setAttribute('data-preorder-minus', title);
+        minus.setAttribute('data-preorder-minus', key);
         minus.textContent = '−';
         row.appendChild(left);
         row.appendChild(qty);
@@ -710,9 +723,11 @@
       reqPreorderBox.style.height = String(desired) + 'px';
       if (reqComment) reqComment.style.height = String(desired) + 'px';
     };
-    const incPreorder = (title) => {
-      const t0 = String(title || '').trim();
+    const incPreorder = (key, uiTitle) => {
+      const t0 = String(key || '').trim();
       if (!t0) return;
+      const uiT = String(uiTitle || '').trim();
+      if (uiT) window.preorderUiTitleByKey = Object.assign(window.preorderUiTitleByKey || {}, { [t0]: uiT });
       preorderCounts = normalizePreorder(preorderCounts);
       preorderCounts[t0] = Math.min(99, (Number(preorderCounts[t0] || 0) || 0) + 1);
       renderPreorderBox();
@@ -728,10 +743,14 @@
       renderPreorderBox();
       saveDraft();
     };
-    const getPreorderText = () => {
+    const getPreorderText = (mode) => {
       const counts = normalizePreorder(preorderCounts);
       const keys = Object.keys(counts).sort((a, b) => a.localeCompare(b, UI_LOCALE, { sensitivity: 'base' }));
-      return keys.map((k) => '- ' + k + (counts[k] > 1 ? (' x' + String(counts[k])) : '')).join('\n');
+      const m = String(mode || 'ui');
+      return keys.map((k) => {
+        const title = (m === 'ru') ? k : getPreorderUiTitle(k);
+        return '- ' + title + (counts[k] > 1 ? (' x' + String(counts[k])) : '');
+      }).join('\n');
     };
 
     const fmtPrice = (n) => {
@@ -777,15 +796,21 @@
           catSum.appendChild(catCnt);
           catDetails.appendChild(catSum);
           items.forEach((it) => {
-            if (it && typeof it.title === 'string') window.preorderPriceByTitle = Object.assign(window.preorderPriceByTitle || {}, { [String(it.title)]: (it.price != null ? Number(it.price) : 0) || 0 });
+            const uiTitle = String(it && it.title != null ? it.title : '').trim();
+            const ruTitle = String(it && it.ru_title != null ? it.ru_title : '').trim() || uiTitle;
+            if (ruTitle) {
+              window.preorderPriceByKey = Object.assign(window.preorderPriceByKey || {}, { [ruTitle]: (it && it.price != null ? Number(it.price) : 0) || 0 });
+              if (uiTitle) window.preorderUiTitleByKey = Object.assign(window.preorderUiTitleByKey || {}, { [ruTitle]: uiTitle });
+            }
             const row = document.createElement('div');
             row.className = 'pre-item';
             row.setAttribute('data-pre-item', '1');
-            row.setAttribute('data-title', String(it.title || ''));
+            row.setAttribute('data-title', uiTitle);
+            row.setAttribute('data-ru-title', ruTitle);
             const left = document.createElement('div');
             const tt = document.createElement('div');
             tt.className = 't';
-            tt.textContent = String(it.title || '');
+            tt.textContent = uiTitle;
             left.appendChild(tt);
             const desc = String(it.description || '').trim();
             if (desc) {
@@ -842,9 +867,10 @@
       preorderBody.addEventListener('click', (e) => {
         const target = e.target && e.target.closest ? e.target.closest('[data-pre-item]') : null;
         if (!target) return;
-        const title = String(target.getAttribute('data-title') || '').trim();
-        if (!title) return;
-        incPreorder(title);
+        const ruTitle = String(target.getAttribute('data-ru-title') || '').trim();
+        const uiTitle = String(target.getAttribute('data-title') || '').trim();
+        if (!ruTitle) return;
+        incPreorder(ruTitle, uiTitle);
       });
     }
     const parseIsoLocal = (raw) => {
@@ -911,33 +937,34 @@
 
     const startTelegramFlow = async () => {
       if (!msgrTgBtn || msgrBusy) return;
-      if (!pendingBooking) { setMsgrHint('Сначала выбери столик.'); return; }
+      if (!pendingBooking) { setMsgrHint(t('hint_pick_table_first')); return; }
       const tableNum = String(pendingBooking.tableNum || '');
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
       const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
       const comment = reqComment ? String(reqComment.value || '').trim() : '';
-      const preorder = getPreorderText();
+      const preorder = guests > 5 ? getPreorderText('ui') : '';
+      const preorderRu = guests > 5 ? getPreorderText('ru') : '';
       const resDt = resDate ? String(resDate.value || '').trim() : '';
       const scrollY = Math.max(0, Math.floor(window.scrollY || 0));
 
       msgrBusy = true;
       msgrTgBtn.disabled = true;
-      setMsgrHint('Открываю Telegram…');
+      setMsgrHint(t('hint_opening_tg'));
       try {
         const url = new URL(location.href);
         url.searchParams.set('ajax', 'tg_state_create');
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, res_date: resDt, scroll_y: scrollY }),
+            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, lang: UI_LANG, res_date: resDt, scroll_y: scrollY }),
         });
         const j = await res.json().catch(() => null);
-        if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
         const botUrl = String(j.bot_url || '').trim();
-        if (!botUrl) throw new Error('Нет ссылки на бота');
-        setMsgrHint('В Telegram нажми “Вернуться на сайт”.');
+        if (!botUrl) throw new Error(t('err_no_bot_link'));
+        setMsgrHint(t('hint_tg_back'));
         window.location.href = botUrl;
       } catch (e) {
         setMsgrHint(String(e && e.message ? e.message : e));
@@ -966,7 +993,7 @@
         url.searchParams.set('guests', String(Math.floor(guests)));
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
         const j = await res.json().catch(() => null);
-        if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
         if (j.status === 'warn' && j.message) {
           reqHint.innerHTML = '<span class="hint-text">' + esc(String(j.message)) + '</span>';
           reqHint.classList.add('warn');
@@ -1032,18 +1059,19 @@
         const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
         const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || '').trim() : '';
         const comment = reqComment ? String(reqComment.value || '').trim() : '';
-        const preorder = guests > 5 ? getPreorderText() : '';
+        const preorder = guests > 5 ? getPreorderText('ui') : '';
+        const preorderRu = guests > 5 ? getPreorderText('ru') : '';
         const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
         const missing = [];
-        if (!tableNum) missing.push('выбери стол');
-        if (!start) missing.push('время старта');
-        if (!isFinite(guests) || guests <= 0) missing.push('кол-во гостей');
-        if (!name) missing.push('имя');
-        if (!phone) missing.push('телефон');
-        if (guests > 5 && !String(preorder || '').trim()) missing.push('предзаказ');
-        if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push('Telegram (привязать)');
+        if (!tableNum) missing.push(t('missing_table'));
+        if (!start) missing.push(t('missing_start'));
+        if (!isFinite(guests) || guests <= 0) missing.push(t('missing_guests'));
+        if (!name) missing.push(t('missing_name'));
+        if (!phone) missing.push(t('missing_phone'));
+        if (guests > 5 && !String(preorder || '').trim()) missing.push(t('missing_preorder'));
+        if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push(t('missing_telegram'));
         if (missing.length) {
-          const msg = 'Не хватает: ' + missing.join(', ');
+          const msg = t('missing_prefix') + missing.join(', ');
           setOutput({ ok: false, error: msg });
           setMsgrHint(msg);
           syncSubmitState();
@@ -1053,7 +1081,7 @@
         submitBusy = true;
         if (reqSubmit) {
           submitPrevText = String(reqSubmit.textContent || '');
-          reqSubmit.textContent = 'Отправляю…';
+          reqSubmit.textContent = t('sending');
           reqSubmit.disabled = true;
         }
         try {
@@ -1062,12 +1090,12 @@
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, tg: linkedTg }),
+            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, lang: UI_LANG, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
-          if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+          if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
           setModal(reqModal, false);
-          setOutput('Спасибо, мы с вами свяжемся в ближайшее время.\n\nСтарт: ' + (fmtStartHuman(start) || start) + '\nСтол: ' + tableNum + '\nГостей: ' + String(guests) + '\nИмя: ' + name + '\nТелефон: ' + phone);
+          setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableNum, guests: String(guests), name, phone }));
         } catch (err) {
           setOutput({ ok: false, error: String(err && err.message ? err.message : err) });
         } finally {
@@ -1383,7 +1411,7 @@
           freeNums = new Set();
           lastKey = '';
           applyAvailabilityStyles();
-          setOutput(j && typeof j === 'object' ? fmtJson(j) : 'Ошибка запроса');
+          setOutput(j && typeof j === 'object' ? fmtJson(j) : t('try_ok_again'));
           renderSelectedTable();
           return;
         }
@@ -1430,7 +1458,7 @@
         url.searchParams.set('code', code);
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
         const j = await res.json().catch(() => null);
-        if (!res.ok || !j || !j.ok || !j.payload) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        if (!res.ok || !j || !j.ok || !j.payload) throw new Error((j && j.error) ? j.error : t('err_generic'));
         const p = j.payload || {};
         const resDt = String(p.res_date || '').trim();
         if (resDate && resDt && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(resDt)) {
@@ -1448,12 +1476,13 @@
         const phone = String(p.phone || '');
         const comment = String(p.comment || '');
         const preorder = String(p.preorder || '');
+        const preorderRu = String(p.preorder_ru || '');
         const tg = j.tg && typeof j.tg === 'object' ? j.tg : null;
         if (tableNum && guests > 0 && start) {
           selectedTableNum = tableNum;
           messengerLinked.telegram = true;
           linkedTg = tg ? { user_id: Number(tg.user_id || 0) || 0, username: String(tg.username || ''), name: String(tg.name || '') } : null;
-          openRequestForm({ tableNum, guests, start, name, phone, comment, preorder, keepFields: true });
+          openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
           if (linkedTg && linkedTg.username) setMsgrHint('Telegram привязан ✅ @' + String(linkedTg.username).replace(/^@+/, ''));
           else setMsgrHint('Telegram привязан ✅');
           syncSubmitState();
