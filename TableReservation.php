@@ -2945,11 +2945,41 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       }
     };
 
+    const DRAFT_KEY = 'tr_booking_draft_v1';
+    const loadDraft = () => {
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return null;
+        const d = JSON.parse(raw);
+        if (!d || typeof d !== 'object') return null;
+        const ts = Number(d.ts || 0) || 0;
+        if (ts && (Date.now() - ts) > (7 * 86400 * 1000)) return null;
+        return d;
+      } catch (_) {
+        return null;
+      }
+    };
+    const saveDraft = () => {
+      try {
+        if (!reqName || !reqPhone || !reqComment || !reqGuests) return;
+        const d = {
+          ts: Date.now(),
+          name: String(reqName.value || ''),
+          phone: String(reqPhone.value || ''),
+          comment: String(reqComment.value || ''),
+          guests: String(reqGuests.value || ''),
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+      } catch (_) {
+      }
+    };
+
     document.querySelectorAll('[data-modal-close]').forEach((x) => {
       x.addEventListener('click', () => {
         const id = String(x.getAttribute('data-modal-close') || '');
         if (!id) return;
         const el = document.getElementById(id);
+        if (id === 'reqModal') saveDraft();
         setModal(el, false);
         if (id === 'capModal' && typeof capConfirmResolve === 'function') {
           capConfirmResolve(false);
@@ -3190,16 +3220,17 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         reqStart.value = fmtStartHuman(iso) || iso;
       }
       if (!keepFields) {
-        if (reqName) reqName.value = '';
-        if (reqPhone) reqPhone.value = '';
-        if (reqComment) reqComment.value = '';
-        messengerLinked = { telegram: false, whatsapp: false, zalo: false };
-        linkedTg = null;
+        const d = loadDraft();
+        if (reqName) reqName.value = d && typeof d.name === 'string' ? d.name : '';
+        if (reqPhone) reqPhone.value = d && typeof d.phone === 'string' ? d.phone : '';
+        if (reqComment) reqComment.value = d && typeof d.comment === 'string' ? d.comment : '';
+        if (reqGuests) reqGuests.value = d && typeof d.guests === 'string' && String(d.guests || '').trim() ? String(d.guests) : String(guests);
       } else {
         if (reqName) reqName.value = String(name || '');
         if (reqPhone) reqPhone.value = String(phone || '');
         if (reqComment) reqComment.value = String(comment || '');
       }
+      if (pendingBooking && reqGuests) pendingBooking.guests = Number(reqGuests.value || pendingBooking.guests || 0) || pendingBooking.guests;
       if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
       syncSubmitState();
       updatePreorderUi();
@@ -3308,11 +3339,16 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       reqGuests.addEventListener('input', () => {
         if (pendingBooking) pendingBooking.guests = Number(reqGuests.value || 0) || pendingBooking.guests;
         updatePreorderUi();
+        saveDraft();
         if (reqGuestsHintTimer) clearTimeout(reqGuestsHintTimer);
         reqGuestsHintTimer = setTimeout(() => { updateReqGuestsHint().catch(() => null); }, 180);
       });
       reqGuests.addEventListener('change', () => { updateReqGuestsHint().catch(() => null); });
     }
+
+    if (reqName) reqName.addEventListener('input', () => { saveDraft(); });
+    if (reqPhone) reqPhone.addEventListener('input', () => { saveDraft(); });
+    if (reqComment) reqComment.addEventListener('input', () => { saveDraft(); });
 
     if (reqForm) {
       reqForm.addEventListener('submit', async (e) => {
