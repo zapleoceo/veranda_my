@@ -81,7 +81,7 @@
 
     const applyMapZoom = (pct, keepAnchor) => {
       if (!mapShell) return;
-      let p = Math.max(50, Math.min(200, Number(pct || 100) || 100));
+      let p = Math.max(50, Math.min(100, Number(pct || 100) || 100));
       if (p >= 93 && p <= 107) p = 100;
       const scale = p / 100;
       if (mapZoomVal) mapZoomVal.textContent = String(Math.round(p)) + '%';
@@ -117,7 +117,7 @@
       return Math.round(cur * 100);
     };
     if (mapZoomMinus) mapZoomMinus.addEventListener('click', () => applyMapZoom(getCurrentZoomPct() - 5, true));
-    if (mapZoomPlus) mapZoomPlus.addEventListener('click', () => applyMapZoom(getCurrentZoomPct() + 5, true));
+    if (mapZoomPlus) mapZoomPlus.addEventListener('click', () => applyMapZoom(Math.min(100, getCurrentZoomPct() + 5), true));
     if (mapZoomRange) mapZoomRange.addEventListener('input', () => applyMapZoom(mapZoomRange.value, true));
     const defaultResDateLocal = String(cfg.defaultResDateLocal || "");
     const allowedTableNums = cfg.allowedTableNums ?? null;

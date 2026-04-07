@@ -1166,7 +1166,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260407_2455">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260407_2505">
 
 </head>
 <body>
@@ -1185,7 +1185,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             <button class="zbtn" type="button" id="mapZoomMinus" aria-label="−">−</button>
             <span class="zv" id="mapZoomVal">100%</span>
             <button class="zbtn" type="button" id="mapZoomPlus" aria-label="+">+</button>
-            <input id="mapZoomRange" type="range" min="50" max="200" step="1" value="100" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
+            <input id="mapZoomRange" type="range" min="50" max="100" step="1" value="100" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
           </label>
         </div>
         <?php
@@ -1404,6 +1404,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260407_2455"></script>
+  <script src="/links/table-reservation.js?v=20260407_2505"></script>
 </body>
 </html>
