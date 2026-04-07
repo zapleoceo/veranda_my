@@ -998,8 +998,8 @@ $firstOfMonth = date('Y-m-01');
         .spinner { width: 16px; height: 16px; border: 2px solid rgba(26,115,232,0.22); border-top-color: rgba(26,115,232,0.9); border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .error { margin-top: 10px; color:#b91c1c; font-weight: 800; }
-        .table-wrap { overflow:auto; }
-        #empTable thead th { position: sticky; top: 0; background: rgba(255,255,255,0.98); z-index: 10; }
+        .table-wrap { overflow-x: auto; overflow-y: visible; }
+        #empTable thead th { position: sticky; top: 0; background: #f8f9fa; z-index: 10; }
         .rate-input { width: 58px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
         .progress { display:none; align-items:center; gap: 10px; margin-left: 10px; }
         .progress .bar { width: 160px; height: 10px; border-radius: 999px; background: #eee; overflow: hidden; }
