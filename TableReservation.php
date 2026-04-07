@@ -1192,8 +1192,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     }
   
     .topbar {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       gap: var(--space-4);
       align-items: center;
       padding: var(--space-4) var(--space-5);
@@ -1241,6 +1241,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       border: 1px solid rgba(255,255,255,0.10);
       background: rgba(255,255,255,0.03);
       flex: 0 0 auto;
+      justify-self: end;
     }
     .lang a {
       text-decoration: none;
@@ -1268,6 +1269,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       gap: var(--space-3);
       align-items: center;
       flex-wrap: wrap;
+      justify-self: center;
     }
   
     .zoom {
@@ -1339,7 +1341,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       box-shadow: 0 6px 14px rgba(0,0,0,0.28);
     }
   
-    .cash-controls input[type="datetime-local"] { color-scheme: dark; }
+    #resDate { display: none; }
+    #resDate { color-scheme: dark; }
   
     .layout {
       padding: var(--space-6);
@@ -1355,16 +1358,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       border: 1px solid var(--color-border);
       overflow: auto;
       --map-scale: 1;
+      --inv-map-scale: 1;
       position: relative;
-    }
-    .map-shell::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: url("/links/gray-tiles-texture.jpg?v=20260407_1928") 0 0 / 260px auto repeat;
-      opacity: 0.92;
-      pointer-events: none;
-      z-index: 0;
     }
     .map-shell > * { position: relative; z-index: 1; }
   
@@ -1375,6 +1370,17 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       width: 820px;
       height: 620px;
       border-radius: var(--radius-md);
+    }
+    .tile-layer {
+      position: absolute;
+      inset: 0;
+      background: url("/links/gray-tiles-texture.jpg?v=20260407_1928") 0 0 / 260px auto repeat;
+      pointer-events: none;
+      z-index: 0;
+      transform: scale(var(--inv-map-scale));
+      transform-origin: top left;
+      border-radius: inherit;
+      opacity: 0.92;
     }
 
     .grass-area {
@@ -1571,6 +1577,18 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       border-radius: 12px;
       text-align: left;
       cursor: pointer;
+    }
+    .dt-btn.attn {
+      border: 1px solid transparent;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)) padding-box,
+        linear-gradient(90deg, rgba(184,135,70,0.15), rgba(184,135,70,0.95), rgba(184,135,70,0.15)) border-box;
+      background-size: auto, 220px 100%;
+      animation: dtBorder 1.15s linear infinite;
+    }
+    @keyframes dtBorder {
+      from { background-position: 0 0, 0 0; }
+      to { background-position: 0 0, 220px 0; }
     }
     .dt-btn:focus-visible {
       outline: none;
@@ -2247,7 +2265,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         display: block;
       }
       .layout, .map-shell { padding: var(--space-4); }
-      .topbar { padding: var(--space-4); align-items: flex-start; flex-direction: column; }
+      .topbar { padding: var(--space-4); grid-template-columns: 1fr; justify-items: stretch; }
       .map-shell { padding: 0 28px 28px 28px; }
       .zoom { width: 100%; justify-content: space-between; }
     }
@@ -2259,12 +2277,10 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       <div class="topbar">
         <div class="title-wrap">
           <h1><?= htmlspecialchars(tr('page_title')) ?></h1>
-          <p><span id="busyDateLabel"><?= htmlspecialchars(tr('data_on')) ?></span> <button type="button" class="dt-btn" id="resDateBtn"><?= htmlspecialchars(tr('pick_date')) ?></button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
-        </div>
-        <div class="busy-progress" id="busyProgress" hidden></div>
-        <div class="cash-controls">
+          <p><span id="busyDateLabel"><?= htmlspecialchars(tr('data_on')) ?></span> <button type="button" class="dt-btn attn" id="resDateBtn"><?= htmlspecialchars(tr('pick_date')) ?></button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
           <input type="datetime-local" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
         </div>
+        <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
           <label class="zoom" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
             <span><?= htmlspecialchars(tr('zoom')) ?></span>
@@ -2296,6 +2312,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             <div class="map-zoom-box" id="mapZoomBox">
             <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="Схема столов ресторана">
+            <div class="tile-layer" aria-hidden="true"></div>
             <div class="grass-corner-1-7" aria-hidden="true"></div>
             <button class="table large" style="left: 712px; top: 276px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 402px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
@@ -2504,6 +2521,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       }
 
       mapShell.style.setProperty('--map-scale', String(scale));
+      mapShell.style.setProperty('--inv-map-scale', String(1 / scale));
 
       if (keepAnchor) {
         const rect = mapShell.getBoundingClientRect();
