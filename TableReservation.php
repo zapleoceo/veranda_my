@@ -45,6 +45,8 @@ $I18N = [
     'page_title' => 'Схема бронирования',
     'data_on' => 'Данные на',
     'pick_date' => 'Выбрать дату',
+    'comment_placeholder' => 'Пожелания, особые условия…',
+    'booking_note' => 'Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.',
     'zoom' => 'Масштаб',
     'musicians' => 'Музыканты',
     'cashier' => 'Касса',
@@ -75,11 +77,14 @@ $I18N = [
     'select_date_time' => 'Выбери дату и время',
     'try_ok_again' => 'Ошибка запроса. Попробуй нажать “Ок” ещё раз.',
     'confirm_capacity' => 'Вы хотите забронировать столик для {max} для {guests} гостей?',
+    'busy_now' => 'занят\nсейчас',
   ],
   'en' => [
     'page_title' => 'Booking Map',
     'data_on' => 'Data for',
     'pick_date' => 'Pick date',
+    'comment_placeholder' => 'Wishes, special conditions…',
+    'booking_note' => 'Hold time is 30 minutes from start. If guest is late more than 30 minutes — reservation is cancelled.',
     'zoom' => 'Zoom',
     'musicians' => 'Musicians',
     'cashier' => 'Cashier',
@@ -110,11 +115,14 @@ $I18N = [
     'select_date_time' => 'Select date and time',
     'try_ok_again' => 'Request failed. Please press “OK” again.',
     'confirm_capacity' => 'Do you want to book a table for {max} when you have {guests} guests?',
+    'busy_now' => 'busy\nnow',
   ],
   'vi' => [
     'page_title' => 'Sơ đồ đặt bàn',
     'data_on' => 'Dữ liệu ngày',
     'pick_date' => 'Chọn ngày',
+    'comment_placeholder' => 'Yêu cầu, ghi chú…',
+    'booking_note' => 'Giữ bàn 30 phút từ lúc bắt đầu. Nếu khách đến muộn quá 30 phút — đặt bàn sẽ bị hủy.',
     'zoom' => 'Thu phóng',
     'musicians' => 'Nhạc',
     'cashier' => 'Thu ngân',
@@ -145,6 +153,7 @@ $I18N = [
     'select_date_time' => 'Chọn ngày và giờ',
     'try_ok_again' => 'Lỗi yêu cầu. Hãy nhấn “OK” lại.',
     'confirm_capacity' => 'Bạn muốn đặt bàn {max} chỗ cho {guests} khách phải không?',
+    'busy_now' => 'bận\nhiện tại',
   ],
 ];
 if (!isset($I18N[$lang])) $lang = 'ru';
@@ -1397,10 +1406,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       background: url("/links/gray-tiles-texture.jpg?v=20260407_1928") 0 0 / 260px auto repeat;
       pointer-events: none;
       z-index: 0;
-      transform: scale(var(--inv-map-scale));
-      transform-origin: top left;
-      border-radius: inherit;
       opacity: 0.92;
+      border-radius: 18px;
     }
 
     .grass-area {
@@ -1605,6 +1612,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         linear-gradient(90deg, rgba(184,135,70,0.15), rgba(184,135,70,0.95), rgba(184,135,70,0.15)) border-box;
       background-size: auto, 220px 100%;
       animation: dtBorder 1.15s linear infinite;
+      -webkit-background-clip: padding-box, border-box;
+      background-clip: padding-box, border-box;
     }
     @keyframes dtBorder {
       from { background-position: 0 0, 0 0; }
@@ -2125,6 +2134,14 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       flex: 0 0 auto;
     }
     .preorder-empty { color: rgba(255,255,255,0.55); font-size: 12px; padding: 2px 2px; }
+    .preorder-total {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-top: 1px dashed rgba(255,255,255,0.16);
+      text-align: right;
+      font-weight: 900;
+      color: rgba(184,135,70,0.95);
+    }
     .modal-card.wide { width: min(980px, 100%); }
     .req-layout { display: flex; gap: 12px; align-items: flex-start; }
     .req-left { flex: 1 1 440px; min-width: 0; }
@@ -2364,9 +2381,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       <section class="layout">
         <div class="map-shell">
             <div class="map-zoom-box" id="mapZoomBox">
-            <div class="map-zoom-inner" id="mapZoomInner">
+              <div class="tile-layer" aria-hidden="true"></div>
+              <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="Схема столов ресторана">
-            <div class="tile-layer" aria-hidden="true"></div>
             <div class="grass-corner-1-7" aria-hidden="true"></div>
             <button class="table large" style="left: 712px; top: 276px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 402px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
@@ -2484,7 +2501,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               </label>
               <label class="modal-label">
                 <?= htmlspecialchars(tr('comment')) ?>
-                <textarea id="reqComment" rows="3" placeholder="..."></textarea>
+                <textarea id="reqComment" rows="3" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
               </label>
               <label class="modal-label">
                 <?= htmlspecialchars(tr('preorder_title')) ?>
@@ -2529,7 +2546,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             </div>
             <div class="modal-hint" id="reqHint" hidden></div>
             <div class="modal-hint preorder" id="preorderReqHint" hidden><?= htmlspecialchars(tr('preorder_required')) ?></div>
-            <div class="modal-note">Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.</div>
+            <div class="modal-note"><?= htmlspecialchars(tr('booking_note')) ?></div>
             <div class="modal-actions">
               <button class="btn btn-secondary" type="button" data-modal-close="reqModal"><?= htmlspecialchars(tr('close')) ?></button>
               <button class="btn btn-primary" type="submit" id="reqSubmit"><?= htmlspecialchars(tr('send')) ?></button>
@@ -2553,8 +2570,52 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     const UI_LANG = <?= json_encode($lang, JSON_UNESCAPED_UNICODE) ?>;
     const UI_LOCALE = <?= json_encode($lang === 'ru' ? 'ru-RU' : ($lang === 'vi' ? 'vi-VN' : 'en-US'), JSON_UNESCAPED_UNICODE) ?>;
     const STR = <?= json_encode($I18N[$lang], JSON_UNESCAPED_UNICODE) ?>;
+    const I18N_ALL = <?= json_encode($I18N, JSON_UNESCAPED_UNICODE) ?>;
     const t = (key) => (STR && Object.prototype.hasOwnProperty.call(STR, key)) ? STR[key] : String(key);
     const fmtVars = (str, vars) => String(str || '').replace(/\{(\w+)\}/g, (_, k) => (vars && vars[k] != null) ? String(vars[k]) : '');
+    const setLangCookie = (l) => {
+      try { document.cookie = 'links_lang=' + encodeURIComponent(l) + '; path=/; samesite=lax; max-age=' + (365*24*3600); } catch (_) {}
+    };
+    const switchLang = (l) => {
+      const supported = ['ru','en','vi'];
+      if (!supported.includes(l)) return;
+      setLangCookie(l);
+      window.UI_LANG = l;
+      window.UI_LOCALE = (l === 'ru') ? 'ru-RU' : (l === 'vi' ? 'vi-VN' : 'en-US');
+      window.STR = I18N_ALL[l] || {};
+      const busyDateLabel = document.getElementById('busyDateLabel');
+      if (busyDateLabel) busyDateLabel.textContent = t('data_on');
+      const resDateBtn = document.getElementById('resDateBtn');
+      if (resDateBtn) resDateBtn.textContent = t('pick_date');
+      const titleEl = document.querySelector('.title-wrap h1');
+      if (titleEl) titleEl.textContent = t('page_title');
+      const zoomLabel = document.querySelector('.zoom span');
+      if (zoomLabel) zoomLabel.textContent = t('zoom');
+      const reqModalTitle = document.getElementById('reqModalTitle');
+      if (reqModalTitle) reqModalTitle.innerHTML = t('booking_request') + ' <span id="reqModalTable"></span>';
+      const msgrTitle = document.querySelector('.msgr-title');
+      if (msgrTitle) msgrTitle.textContent = t('messenger');
+      const preorderTitle = document.querySelector('.req-right .pre-title');
+      if (preorderTitle) preorderTitle.textContent = t('preorder_title');
+      const preReqHint = document.getElementById('preorderReqHint');
+      if (preReqHint) preReqHint.textContent = t('preorder_required');
+      const commentLbl = document.querySelector('label[for="reqComment"]') || null;
+      const reqComment = document.getElementById('reqComment');
+      if (reqComment) reqComment.setAttribute('placeholder', t('comment_placeholder'));
+    };
+    (() => {
+      const langEl = document.querySelector('.lang');
+      if (!langEl) return;
+      langEl.addEventListener('click', (e) => {
+        const a = e.target && e.target.closest ? e.target.closest('a') : null;
+        if (!a) return;
+        e.preventDefault();
+        const txt = String(a.textContent || '').trim().toLowerCase();
+        const map = { ru: 'ru', en: 'en', vi: 'vi' };
+        const l = map[txt] || (txt.includes('ru') ? 'ru' : (txt.includes('en') ? 'en' : (txt.includes('vi') ? 'vi' : null)));
+        if (l) switchLang(l);
+      });
+    })();
 
     const root = document.documentElement;
     const mapShell = document.querySelector('.map-shell');
@@ -2735,7 +2796,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           : false;
         let txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
         if (isToday && selMin != null && !overlapsSel && last && !freeNums.has(n)) {
-          txt = 'занят\nсейчас';
+          txt = t('busy_now');
         }
         let el = t.querySelector('.res-time');
         if (!txt) {
@@ -3005,6 +3066,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     };
 
     const DRAFT_KEY = 'tr_booking_draft_v1';
+    try { localStorage.removeItem(DRAFT_KEY); } catch (_) {}
     const loadDraft = () => {
       try {
         const raw = localStorage.getItem(DRAFT_KEY);
@@ -3137,6 +3199,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         reqPreorderBox.appendChild(empty);
         return;
       }
+      let total = 0;
       keys.forEach((title) => {
         const row = document.createElement('div');
         row.className = 'preorder-line';
@@ -3149,6 +3212,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         const qty = document.createElement('div');
         qty.className = 'preorder-qty';
         qty.textContent = 'x' + String(counts[title]);
+        const price = (window.preorderPriceByTitle && window.preorderPriceByTitle[title]) ? Number(window.preorderPriceByTitle[title]) : 0;
+        total += price * counts[title];
         const minus = document.createElement('button');
         minus.type = 'button';
         minus.className = 'preorder-minus';
@@ -3159,6 +3224,10 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         row.appendChild(minus);
         reqPreorderBox.appendChild(row);
       });
+      const totalEl = document.createElement('div');
+      totalEl.className = 'preorder-total';
+      totalEl.textContent = fmtPrice(total);
+      reqPreorderBox.appendChild(totalEl);
     };
     const incPreorder = (title) => {
       const t0 = String(title || '').trim();
@@ -3227,6 +3296,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           catSum.appendChild(catCnt);
           catDetails.appendChild(catSum);
           items.forEach((it) => {
+            if (it && typeof it.title === 'string') window.preorderPriceByTitle = Object.assign(window.preorderPriceByTitle || {}, { [String(it.title)]: (it.price != null ? Number(it.price) : 0) || 0 });
             const row = document.createElement('div');
             row.className = 'pre-item';
             row.setAttribute('data-pre-item', '1');
@@ -3464,6 +3534,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       reqPreorderBox.addEventListener('click', (e) => {
         const btn = e.target && e.target.closest ? e.target.closest('[data-preorder-minus]') : null;
         if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
         const title = String(btn.getAttribute('data-preorder-minus') || '').trim();
         if (!title) return;
         decPreorder(title);
