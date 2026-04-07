@@ -10,6 +10,24 @@
   const t = (key) => (STR && Object.prototype.hasOwnProperty.call(STR, key)) ? STR[key] : String(key);
   const fmtVars = (str, vars) => String(str || '').replace(/\{(\w+)\}/g, (_, k) => (vars && vars[k] != null) ? String(vars[k]) : '');
   const setLangCookie = (l) => { try { document.cookie = 'links_lang=' + encodeURIComponent(l) + '; path=/; samesite=lax; max-age=' + (365*24*3600); } catch (_) {} };
+  const applyI18n = () => {
+    document.documentElement.lang = UI_LANG;
+    document.title = t('page_title');
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      const key = String(el.getAttribute('data-i18n') || '').trim();
+      if (!key) return;
+      el.textContent = t(key);
+    });
+    const reqComment = document.getElementById('reqComment');
+    if (reqComment) reqComment.setAttribute('placeholder', t('comment_placeholder'));
+    const resDateBtn = document.getElementById('resDateBtn');
+    const resDate = document.getElementById('resDate');
+    if (resDateBtn) {
+      if (resDate && String(resDate.value || '').trim() && typeof fmtCashDate === 'function') resDateBtn.textContent = fmtCashDate(resDate.value);
+      else resDateBtn.textContent = t('pick_date');
+    }
+  };
   const switchLang = (l) => {
     const supported = ['ru','en','vi'];
     if (!supported.includes(l)) return;
@@ -20,27 +38,11 @@
     window.UI_LANG = UI_LANG;
     window.UI_LOCALE = UI_LOCALE;
     window.STR = STR;
-    const busyDateLabel = document.getElementById('busyDateLabel');
-    if (busyDateLabel) busyDateLabel.textContent = t('data_on');
-    const resDateBtn = document.getElementById('resDateBtn');
-    if (resDateBtn) resDateBtn.textContent = t('pick_date');
-    const titleEl = document.querySelector('.title-wrap h1');
-    if (titleEl) titleEl.textContent = t('page_title');
-    const zoomLabel = document.querySelector('.zoom span');
-    if (zoomLabel) zoomLabel.textContent = t('zoom');
-    const msgrTitle = document.querySelector('.msgr-title');
-    if (msgrTitle) msgrTitle.textContent = t('messenger');
-    const preorderTitle = document.querySelector('.req-right .pre-title');
-    if (preorderTitle) preorderTitle.textContent = t('preorder_title');
-    const preReqHint = document.getElementById('preorderReqHint');
-    if (preReqHint) preReqHint.textContent = t('preorder_required');
-    const reqComment = document.getElementById('reqComment');
-    if (reqComment) reqComment.setAttribute('placeholder', t('comment_placeholder'));
-    if (typeof window.fmtCashDate === 'function') {
-      if (typeof window.resDate !== 'undefined' && window.resDate && window.resDateBtn) window.resDateBtn.textContent = window.fmtCashDate(window.resDate.value);
-    }
-    renderPreorderBox?.();
-    applyReservationsItemsToTables?.(last?.reservations_items || [], String((getCurrentRequest?.() || {}).dt || '').slice(0, 10), (getCurrentRequest?.() || {}).dt || '');
+    applyI18n();
+    if (typeof setStatus === 'function') setStatus(selectedTableNum);
+    if (typeof renderSelectedTable === 'function') renderSelectedTable();
+    if (typeof updatePreorderUi === 'function') updatePreorderUi();
+    if (typeof renderPreorderBox === 'function') renderPreorderBox();
   };
   (() => {
     const langEl = document.querySelector('.lang');
@@ -1183,7 +1185,7 @@
         return;
       }
       const isFree = freeNums.has(String(tableNum));
-      if (statusLine) statusLine.textContent = isFree ? 'Свободен' : 'Занят';
+      if (statusLine) statusLine.textContent = isFree ? t('status_free') : t('status_busy');
     };
 
     const applyAvailabilityStyles = () => {
