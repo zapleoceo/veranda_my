@@ -1144,7 +1144,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       height: 58px;
       border-radius: 18px;
       border: 1px solid rgba(255,255,255,.16);
-      background: #201a15;
+      background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.10)), rgba(255,255,255,0.04);
       box-shadow: 0 12px 20px rgba(0,0,0,0.22);
       color: rgba(245,238,228,0.92);
       display: grid;
@@ -1181,11 +1181,11 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       display: grid;
       gap: 6px;
       margin-top: 0;
-      padding: 0;
-      border-radius: 0;
-      border: 0;
-      background: transparent;
-      box-shadow: none;
+      padding: 8px;
+      border-radius: 16px;
+      border: 1px solid var(--color-border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      box-shadow: 0 12px 22px rgba(0,0,0,0.22);
     }
     .cash-controls #resDate { display: none; }
     .cash-controls input[type="datetime-local"] {
@@ -3036,10 +3036,13 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         }
 
         const key = current.dt + '|' + String(current.guests);
-        if (!last || lastKey !== key) {
-          setStatus(id);
-          setOutput('Сначала выбери дату и нажми “Ок”, чтобы проверить доступность столиков.');
-          return;
+        if ((!last || lastKey !== key) && !isLoading) {
+          try {
+            await loadFree(true);
+          } catch (e) {
+            setOutput({ ok: false, error: String(e && e.message ? e.message : e) });
+            return;
+          }
         }
 
         const un = getUnavailableReason(id, current);
