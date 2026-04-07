@@ -11,6 +11,148 @@ if (file_exists(__DIR__ . '/.env')) {
   }
 }
 
+$supportedLangs = ['ru', 'en', 'vi'];
+$lang = null;
+if (isset($_GET['lang'])) {
+  $candidate = strtolower(trim((string)$_GET['lang']));
+  if (in_array($candidate, $supportedLangs, true)) {
+    $lang = $candidate;
+    setcookie('links_lang', $lang, [
+      'expires' => time() + 31536000,
+      'path' => '/',
+      'samesite' => 'Lax'
+    ]);
+  }
+}
+if ($lang === null) {
+  $cookieLang = strtolower(trim((string)($_COOKIE['links_lang'] ?? '')));
+  if (in_array($cookieLang, $supportedLangs, true)) $lang = $cookieLang;
+}
+if ($lang === null) {
+  $accept = (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '');
+  $parts = preg_split('/\s*,\s*/', $accept);
+  foreach ($parts as $part) {
+    if ($part === '') continue;
+    $code = strtolower(trim(explode(';', $part, 2)[0]));
+    $base = explode('-', $code, 2)[0];
+    if (in_array($base, $supportedLangs, true)) { $lang = $base; break; }
+  }
+}
+if ($lang === null) $lang = 'ru';
+
+$I18N = [
+  'ru' => [
+    'page_title' => 'Схема бронирования',
+    'data_on' => 'Данные на',
+    'pick_date' => 'Выбрать дату',
+    'zoom' => 'Масштаб',
+    'musicians' => 'Музыканты',
+    'cashier' => 'Касса',
+    'bar' => 'BAR',
+    'ok' => 'Ок',
+    'cancel' => 'Отмена',
+    'close' => 'Закрыть',
+    'send' => 'Отправить',
+    'confirm' => 'Подтвердите',
+    'yes' => 'Да',
+    'no' => 'Нет',
+    'booking_request' => 'Заявка на бронь на столик',
+    'your_name' => 'Ваше имя',
+    'your_phone' => 'Ваш номер телефона',
+    'comment' => 'Комментарий',
+    'guests_count' => 'Кол-во гостей',
+    'start_time' => 'Время старта брони',
+    'messenger' => 'ВАШ МЕССЕНДЖЕР',
+    'link_tg_hint' => 'Для отправки привяжи Telegram.',
+    'preorder_title' => 'МЕНЮ · ПРЕДЗАКАЗ',
+    'preorder_required' => 'Предзаказ обязателен для компаний больше 5 гостей.',
+    'menu_loading' => 'Загрузка меню…',
+    'menu_unavailable' => 'Меню недоступно.',
+    'menu_load_failed' => 'Не удалось загрузить меню.',
+    'checking' => 'Проверяю…',
+    'press_ok' => 'Нажми “Ок”, чтобы проверить столики.',
+    'press_ok_then_tables' => 'Выбери дату и нажми “Ок”. Потом кликай по столам.',
+    'select_date_time' => 'Выбери дату и время',
+    'try_ok_again' => 'Ошибка запроса. Попробуй нажать “Ок” ещё раз.',
+    'confirm_capacity' => 'Вы хотите забронировать столик для {max} для {guests} гостей?',
+  ],
+  'en' => [
+    'page_title' => 'Booking Map',
+    'data_on' => 'Data for',
+    'pick_date' => 'Pick date',
+    'zoom' => 'Zoom',
+    'musicians' => 'Musicians',
+    'cashier' => 'Cashier',
+    'bar' => 'BAR',
+    'ok' => 'OK',
+    'cancel' => 'Cancel',
+    'close' => 'Close',
+    'send' => 'Send',
+    'confirm' => 'Confirm',
+    'yes' => 'Yes',
+    'no' => 'No',
+    'booking_request' => 'Booking request for table',
+    'your_name' => 'Your name',
+    'your_phone' => 'Your phone',
+    'comment' => 'Comment',
+    'guests_count' => 'Guests',
+    'start_time' => 'Start time',
+    'messenger' => 'YOUR MESSENGER',
+    'link_tg_hint' => 'Link Telegram to submit.',
+    'preorder_title' => 'MENU · PRE-ORDER',
+    'preorder_required' => 'Pre-order is required for parties over 5 guests.',
+    'menu_loading' => 'Loading menu…',
+    'menu_unavailable' => 'Menu unavailable.',
+    'menu_load_failed' => 'Failed to load menu.',
+    'checking' => 'Checking…',
+    'press_ok' => 'Press “OK” to check availability.',
+    'press_ok_then_tables' => 'Pick a date and press “OK”. Then tap tables.',
+    'select_date_time' => 'Select date and time',
+    'try_ok_again' => 'Request failed. Please press “OK” again.',
+    'confirm_capacity' => 'Do you want to book a table for {max} when you have {guests} guests?',
+  ],
+  'vi' => [
+    'page_title' => 'Sơ đồ đặt bàn',
+    'data_on' => 'Dữ liệu ngày',
+    'pick_date' => 'Chọn ngày',
+    'zoom' => 'Thu phóng',
+    'musicians' => 'Nhạc',
+    'cashier' => 'Thu ngân',
+    'bar' => 'BAR',
+    'ok' => 'OK',
+    'cancel' => 'Hủy',
+    'close' => 'Đóng',
+    'send' => 'Gửi',
+    'confirm' => 'Xác nhận',
+    'yes' => 'Có',
+    'no' => 'Không',
+    'booking_request' => 'Yêu cầu đặt bàn',
+    'your_name' => 'Tên của bạn',
+    'your_phone' => 'Số điện thoại',
+    'comment' => 'Ghi chú',
+    'guests_count' => 'Số khách',
+    'start_time' => 'Giờ bắt đầu',
+    'messenger' => 'MESSENGER CỦA BẠN',
+    'link_tg_hint' => 'Liên kết Telegram để gửi.',
+    'preorder_title' => 'MENU · ĐẶT TRƯỚC',
+    'preorder_required' => 'Bắt buộc đặt trước cho nhóm trên 5 khách.',
+    'menu_loading' => 'Đang tải menu…',
+    'menu_unavailable' => 'Không có menu.',
+    'menu_load_failed' => 'Không tải được menu.',
+    'checking' => 'Đang kiểm tra…',
+    'press_ok' => 'Nhấn “OK” để kiểm tra bàn trống.',
+    'press_ok_then_tables' => 'Chọn ngày và nhấn “OK”. Sau đó chạm vào bàn.',
+    'select_date_time' => 'Chọn ngày và giờ',
+    'try_ok_again' => 'Lỗi yêu cầu. Hãy nhấn “OK” lại.',
+    'confirm_capacity' => 'Bạn muốn đặt bàn {max} chỗ cho {guests} khách phải không?',
+  ],
+];
+if (!isset($I18N[$lang])) $lang = 'ru';
+function tr(string $key): string {
+  global $I18N, $lang;
+  return isset($I18N[$lang][$key]) ? (string)$I18N[$lang][$key] : $key;
+}
+
 $displayTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
 if ($displayTzName === '' || !in_array($displayTzName, timezone_identifiers_list(), true)) {
   $displayTzName = 'Asia/Ho_Chi_Minh';
@@ -986,11 +1128,11 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
 }
 
 ?><!doctype html>
-<html lang="ru">
+<html lang="<?= htmlspecialchars($lang) ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Restaurant Table Map</title>
+  <title><?= htmlspecialchars(tr('page_title')) ?></title>
   <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
@@ -1089,6 +1231,36 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       margin: var(--space-2) 0 0;
       color: var(--color-text-muted);
       font-size: var(--text-sm);
+    }
+    .lang {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.03);
+      flex: 0 0 auto;
+    }
+    .lang a {
+      text-decoration: none;
+      color: rgba(255,255,255,0.65);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      line-height: 1;
+    }
+    .lang a.active {
+      color: rgba(0,0,0,0.95);
+      background: rgba(184,135,70,0.95);
+      border-color: rgba(184,135,70,0.55);
+    }
+    .lang a:not(.active):hover {
+      color: rgba(255,255,255,0.85);
+      border-color: rgba(184,135,70,0.35);
     }
   
     .controls {
@@ -2086,21 +2258,36 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     <main class="panel">
       <div class="topbar">
         <div class="title-wrap">
-          <h1>Схема бронирования</h1>
-          <p><span id="busyDateLabel">Данные на</span> <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
+          <h1><?= htmlspecialchars(tr('page_title')) ?></h1>
+          <p><span id="busyDateLabel"><?= htmlspecialchars(tr('data_on')) ?></span> <button type="button" class="dt-btn" id="resDateBtn"><?= htmlspecialchars(tr('pick_date')) ?></button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
         </div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="cash-controls">
-          <input type="datetime-local" id="resDate" aria-label="Дата и время">
+          <input type="datetime-local" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
         </div>
         <div class="controls">
-          <label class="zoom" aria-label="Масштаб схемы">
-            <span>Масштаб</span>
-            <button class="zbtn" type="button" id="mapZoomMinus" aria-label="Уменьшить масштаб">−</button>
+          <label class="zoom" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
+            <span><?= htmlspecialchars(tr('zoom')) ?></span>
+            <button class="zbtn" type="button" id="mapZoomMinus" aria-label="−">−</button>
             <span class="zv" id="mapZoomVal">100%</span>
-            <button class="zbtn" type="button" id="mapZoomPlus" aria-label="Увеличить масштаб">+</button>
-            <input id="mapZoomRange" type="range" min="50" max="200" step="1" value="100" aria-label="Ползунок масштаба">
+            <button class="zbtn" type="button" id="mapZoomPlus" aria-label="+">+</button>
+            <input id="mapZoomRange" type="range" min="50" max="200" step="1" value="100" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
           </label>
+        </div>
+        <?php
+          $self = strtok((string)($_SERVER['REQUEST_URI'] ?? '/TableReservation.php'), '?');
+          $params = $_GET;
+          unset($params['ajax'], $params['lang']);
+          $baseQs = http_build_query($params);
+          $mk = function (string $l) use ($self, $baseQs) {
+            $qs = $baseQs !== '' ? ($baseQs . '&lang=' . rawurlencode($l)) : ('lang=' . rawurlencode($l));
+            return $self . '?' . $qs;
+          };
+        ?>
+        <div class="lang" aria-label="Language">
+          <a href="<?= htmlspecialchars($mk('ru')) ?>" class="<?= $lang === 'ru' ? 'active' : '' ?>">RU</a>
+          <a href="<?= htmlspecialchars($mk('en')) ?>" class="<?= $lang === 'en' ? 'active' : '' ?>">EN</a>
+          <a href="<?= htmlspecialchars($mk('vi')) ?>" class="<?= $lang === 'vi' ? 'active' : '' ?>">VI</a>
         </div>
       </div>
   
@@ -2161,11 +2348,11 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   
             <div class="bar-row">
               <div class="station-wrap">
-                <div class="side-station">Музыканты</div>
+                <div class="side-station"><?= htmlspecialchars(tr('musicians')) ?></div>
               </div>
-              <div class="bar">BAR</div>
+              <div class="bar"><?= htmlspecialchars(tr('bar')) ?></div>
               <div class="station-wrap cash">
-                <div class="side-station">Касса</div>
+                <div class="side-station"><?= htmlspecialchars(tr('cashier')) ?></div>
               </div>
             </div>
               </div>
@@ -2190,8 +2377,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         </div>
       </div>
       <div class="dtp-actions">
-        <button class="btn btn-secondary" type="button" data-dtp-close>Отмена</button>
-        <button class="btn btn-primary" type="button" id="dtpOk">Ок</button>
+        <button class="btn btn-secondary" type="button" data-dtp-close><?= htmlspecialchars(tr('cancel')) ?></button>
+        <button class="btn btn-primary" type="button" id="dtpOk"><?= htmlspecialchars(tr('ok')) ?></button>
       </div>
     </div>
   </div>
@@ -2199,11 +2386,11 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <div class="modal" id="capModal" aria-hidden="true">
     <div class="modal-backdrop" data-modal-close="capModal"></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="capModalTitle">
-      <div class="modal-title" id="capModalTitle">Подтвердите</div>
+      <div class="modal-title" id="capModalTitle"><?= htmlspecialchars(tr('confirm')) ?></div>
       <div class="modal-text" id="capModalText"></div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" type="button" id="capModalNo">Нет</button>
-        <button class="btn btn-primary" type="button" id="capModalYes">Да</button>
+        <button class="btn btn-secondary" type="button" id="capModalNo"><?= htmlspecialchars(tr('no')) ?></button>
+        <button class="btn btn-primary" type="button" id="capModalYes"><?= htmlspecialchars(tr('yes')) ?></button>
       </div>
     </div>
   </div>
@@ -2211,25 +2398,25 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <div class="modal" id="reqModal" aria-hidden="true">
     <div class="modal-backdrop" data-modal-close="reqModal"></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle" id="reqModalCard">
-      <div class="modal-title" id="reqModalTitle">Заявка на бронь на столик <span id="reqModalTable"></span></div>
+      <div class="modal-title" id="reqModalTitle"><?= htmlspecialchars(tr('booking_request')) ?> <span id="reqModalTable"></span></div>
       <form id="reqForm">
         <div class="req-layout">
           <div class="req-left" id="reqLeft">
             <div class="modal-grid">
               <label class="modal-label">
-                Ваше имя
+                <?= htmlspecialchars(tr('your_name')) ?>
                 <input type="text" id="reqName" autocomplete="name">
               </label>
               <label class="modal-label">
-                Ваш номер телефона
+                <?= htmlspecialchars(tr('your_phone')) ?>
                 <input type="tel" id="reqPhone" autocomplete="tel">
               </label>
               <label class="modal-label full">
-                Комментарий
+                <?= htmlspecialchars(tr('comment')) ?>
                 <textarea id="reqComment" rows="3" placeholder="Пожелания, особые условия…"></textarea>
               </label>
               <label class="modal-label">
-                Кол-во гостей
+                <?= htmlspecialchars(tr('guests_count')) ?>
                 <div class="num-step">
                   <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
                   <input type="number" id="reqGuests" min="1" max="99">
@@ -2237,12 +2424,12 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 </div>
               </label>
               <label class="modal-label">
-                Время старта брони
+                <?= htmlspecialchars(tr('start_time')) ?>
                 <input type="text" id="reqStart" readonly>
               </label>
             </div>
             <div class="msgr">
-              <div class="msgr-title">ВАШ МЕССЕНДЖЕР</div>
+              <div class="msgr-title"><?= htmlspecialchars(tr('messenger')) ?></div>
               <div class="msgr-row">
                 <button type="button" class="msgr-btn" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -2266,15 +2453,15 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               <div class="msgr-hint" id="msgrHint" hidden></div>
             </div>
             <div class="modal-hint" id="reqHint" hidden></div>
-            <div class="modal-hint preorder" id="preorderReqHint" hidden>Предзаказ обязателен для компаний больше 5 гостей.</div>
+            <div class="modal-hint preorder" id="preorderReqHint" hidden><?= htmlspecialchars(tr('preorder_required')) ?></div>
             <div class="modal-note">Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.</div>
             <div class="modal-actions">
-              <button class="btn btn-secondary" type="button" data-modal-close="reqModal">Закрыть</button>
-              <button class="btn btn-primary" type="submit" id="reqSubmit">Отправить</button>
+              <button class="btn btn-secondary" type="button" data-modal-close="reqModal"><?= htmlspecialchars(tr('close')) ?></button>
+              <button class="btn btn-primary" type="submit" id="reqSubmit"><?= htmlspecialchars(tr('send')) ?></button>
             </div>
           </div>
           <div class="req-right" id="preorderPanel" hidden>
-            <div class="pre-title">МЕНЮ · ПРЕДЗАКАЗ</div>
+            <div class="pre-title"><?= htmlspecialchars(tr('preorder_title')) ?></div>
             <div class="pre-body" id="preorderBody"></div>
           </div>
         </div>
@@ -2288,6 +2475,12 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   </div>
   
   <script>
+    const UI_LANG = <?= json_encode($lang, JSON_UNESCAPED_UNICODE) ?>;
+    const UI_LOCALE = <?= json_encode($lang === 'ru' ? 'ru-RU' : ($lang === 'vi' ? 'vi-VN' : 'en-US'), JSON_UNESCAPED_UNICODE) ?>;
+    const STR = <?= json_encode($I18N[$lang], JSON_UNESCAPED_UNICODE) ?>;
+    const t = (key) => (STR && Object.prototype.hasOwnProperty.call(STR, key)) ? STR[key] : String(key);
+    const fmtVars = (str, vars) => String(str || '').replace(/\{(\w+)\}/g, (_, k) => (vars && vars[k] != null) ? String(vars[k]) : '');
+
     const root = document.documentElement;
     const mapShell = document.querySelector('.map-shell');
     const mapZoomVal = document.getElementById('mapZoomVal');
@@ -2569,9 +2762,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     const fmtCashDate = (dtLocal) => {
       const raw = String(dtLocal || '').trim();
       const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-      if (!m) return 'Выбрать дату';
+      if (!m) return t('pick_date');
       const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), 0);
-      const datePart = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: '2-digit', month: 'short' }).format(d);
+      const datePart = new Intl.DateTimeFormat(UI_LOCALE, { weekday: 'short', day: '2-digit', month: 'short' }).format(d);
       return datePart + ' · ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
     };
 
@@ -2620,7 +2813,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         }
         dtpDateList.innerHTML = '';
         dtpDates.forEach(({ value, date }) => {
-          const label = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: '2-digit', month: 'short' }).format(date);
+          const label = new Intl.DateTimeFormat(UI_LOCALE, { weekday: 'short', day: '2-digit', month: 'short' }).format(date);
           const it = document.createElement('div');
           it.className = 'wheel-item';
           it.dataset.value = value;
@@ -2749,7 +2942,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
 
     const confirmCapacity = (maxCap, guests) => new Promise((resolve) => {
       capConfirmResolve = resolve;
-      if (capModalText) capModalText.textContent = `Вы хотите забронировать столик для ${maxCap} для ${guests} гостей?`;
+      if (capModalText) capModalText.textContent = fmtVars(t('confirm_capacity'), { max: maxCap, guests });
       setModal(capModal, true);
     });
 
@@ -2780,7 +2973,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       if (on) {
         if (preorderPanel.hidden) preorderPanel.hidden = false;
         preorderPanel.classList.add('open');
-        if (preorderBody && preorderBody.childElementCount === 0) preorderBody.textContent = 'Загрузка меню…';
+        if (preorderBody && preorderBody.childElementCount === 0) preorderBody.textContent = t('menu_loading');
       } else {
         preorderPanel.classList.remove('open');
         setTimeout(() => {
@@ -2848,13 +3041,13 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     const fmtPrice = (n) => {
       const v = Number(n);
       if (!isFinite(v)) return '';
-      return new Intl.NumberFormat('ru-RU').format(Math.round(v)) + ' ₫';
+      return new Intl.NumberFormat(UI_LOCALE).format(Math.round(v)) + ' ₫';
     };
     const renderPreorderMenu = () => {
       if (!preorderBody) return;
       const groups = preorderMenu && typeof preorderMenu === 'object' && Array.isArray(preorderMenu.groups) ? preorderMenu.groups : [];
       if (!groups.length) {
-        preorderBody.textContent = 'Меню недоступно.';
+        preorderBody.textContent = t('menu_unavailable');
         return;
       }
       preorderBody.innerHTML = '';
@@ -2914,7 +3107,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       try {
         const url = new URL(location.href);
         url.searchParams.set('ajax', 'menu_preorder');
-        url.searchParams.set('lang', 'ru');
+        url.searchParams.set('lang', UI_LANG);
         const timeoutMs = 12000;
         let res;
         if (typeof AbortController === 'function') {
@@ -2933,7 +3126,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         preorderMenu = j;
         renderPreorderMenu();
       } catch (_) {
-        if (preorderBody) preorderBody.textContent = 'Не удалось загрузить меню.';
+        if (preorderBody) preorderBody.textContent = t('menu_load_failed');
       } finally {
         preorderMenuLoading = false;
       }
@@ -2957,7 +3150,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     const fmtStartHuman = (raw) => {
       const d = parseIsoLocal(raw);
       if (!d) return '';
-      const datePart = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+      const datePart = new Intl.DateTimeFormat(UI_LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
       const timePart = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
       return datePart + ' ' + timePart;
     };
@@ -2992,7 +3185,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
       syncSubmitState();
       updatePreorderUi();
-      if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) setMsgrHint('Для отправки привяжи Telegram.');
+      if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) setMsgrHint(t('link_tg_hint'));
       setModal(reqModal, true);
       if (reqName) reqName.focus();
     };
@@ -3273,11 +3466,11 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         return;
       }
       if (isLoading) {
-        if (statusLine) statusLine.textContent = 'Проверяю…';
+        if (statusLine) statusLine.textContent = t('checking');
         return;
       }
       if (!last) {
-        if (statusLine) statusLine.textContent = 'Нажми “Ок”, чтобы проверить столики';
+        if (statusLine) statusLine.textContent = t('press_ok');
         return;
       }
       const isFree = freeNums.has(String(tableNum));
@@ -3314,7 +3507,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       setStatus(selectedTableNum);
       if (!selectedTableNum) return;
       if (!last) {
-        setOutput('Нажми “Ок”, чтобы проверить столики.');
+        setOutput(t('press_ok'));
         return;
       }
       setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
@@ -3338,10 +3531,10 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         if (!current) {
           if (!resDate || !String(resDate.value || '').trim()) {
             setStatus(id);
-            setOutput({ ok: false, error: 'Выбери дату и время' });
+            setOutput({ ok: false, error: t('select_date_time') });
             return;
           }
-          setOutput({ ok: false, error: 'Выбери дату и время' });
+          setOutput({ ok: false, error: t('select_date_time') });
           return;
         }
 
@@ -3405,8 +3598,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       if (isLoading) return;
       const current = getCurrentRequest();
       if (!current) {
-        if (!resDate || !String(resDate.value || '').trim()) setOutput({ ok: false, error: 'Выбери дату и время' });
-        else setOutput({ ok: false, error: 'Выбери дату и время' });
+        if (!resDate || !String(resDate.value || '').trim()) setOutput({ ok: false, error: t('select_date_time') });
+        else setOutput({ ok: false, error: t('select_date_time') });
         return;
       }
 
@@ -3416,7 +3609,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       const dateStr = String(dt).slice(0, 10);
 
       isLoading = true;
-      if (statusLine) statusLine.textContent = 'Проверяю…';
+      if (statusLine) statusLine.textContent = t('checking');
       setBusyLabel(dateStr);
       setBusyLoader(true);
 
@@ -3493,7 +3686,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         freeNums = new Set();
         lastKey = '';
         applyAvailabilityStyles();
-        if (!silent) setOutput('Ошибка запроса. Попробуй нажать “Ок” ещё раз.');
+        if (!silent) setOutput(t('try_ok_again'));
       } finally {
         isLoading = false;
         setStatus(selectedTableNum);
@@ -3555,7 +3748,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     if (resDate) {
       resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); });
     }
-    setOutput('Выбери дату и нажми “Ок”. Потом кликай по столам.');
+    setOutput(t('press_ok_then_tables'));
   </script>
 </body>
 </html>
