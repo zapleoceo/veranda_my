@@ -1273,7 +1273,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260407_2730">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260407_2800">
 
 </head>
 <body>
@@ -1437,7 +1437,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
                 <textarea id="reqComment" rows="3" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
               </label>
-              <label class="modal-label" id="reqPreorderLabel" hidden>
+              <label class="modal-label full" id="reqPreorderLabel" hidden>
                 <span data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
                 <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
               </label>
@@ -1478,18 +1478,18 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               </div>
               <div class="msgr-hint" id="msgrHint" hidden></div>
             </div>
-            <div class="modal-hint" id="reqHint" hidden></div>
-            <div class="modal-hint preorder" id="preorderReqHint" hidden data-i18n="preorder_required"><?= htmlspecialchars(tr('preorder_required')) ?></div>
-            <div class="modal-note" data-i18n="booking_note"><?= htmlspecialchars(tr('booking_note')) ?></div>
-            <div class="modal-actions">
-              <button class="btn btn-secondary" type="button" data-modal-close="reqModal" data-i18n="close"><?= htmlspecialchars(tr('close')) ?></button>
-              <button class="btn btn-primary" type="submit" id="reqSubmit" data-i18n="send"><?= htmlspecialchars(tr('send')) ?></button>
-            </div>
           </div>
           <div class="req-right" id="preorderPanel" hidden>
             <div class="pre-title" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></div>
             <div class="pre-body" id="preorderBody"></div>
           </div>
+        </div>
+        <div class="modal-hint" id="reqHint" hidden></div>
+        <div class="modal-hint preorder" id="preorderReqHint" hidden data-i18n="preorder_required"><?= htmlspecialchars(tr('preorder_required')) ?></div>
+        <div class="modal-note" data-i18n="booking_note"><?= htmlspecialchars(tr('booking_note')) ?></div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" type="button" data-modal-close="reqModal" data-i18n="close"><?= htmlspecialchars(tr('close')) ?></button>
+          <button class="btn btn-primary" type="submit" id="reqSubmit" data-i18n="send"><?= htmlspecialchars(tr('send')) ?></button>
         </div>
       </form>
     </div>
@@ -1511,6 +1511,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260407_2730"></script>
+  <script src="/links/table-reservation.js?v=20260407_2800"></script>
 </body>
 </html>

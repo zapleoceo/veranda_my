@@ -1062,8 +1062,9 @@
         flex-direction: column;
       }
       .modal-title { font-size: 15px; }
-      .modal-actions { position: sticky; bottom: 0; background: rgba(0,0,0,0.18); padding-top: 10px; margin-top: 10px; }
-      .req-layout { flex: 1 1 auto; overflow: auto; padding-right: 2px; }
+      #reqForm { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+      .req-layout { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding-right: 2px; min-height: 0; }
+      .modal-actions { position: sticky; bottom: 0; background: rgba(0,0,0,0.18); padding-top: 10px; margin-top: 10px; z-index: 2; }
       .req-right { opacity: 1; transform: none; }
       .req-right .pre-body { max-height: min(46dvh, 360px); }
     }
