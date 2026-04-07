@@ -1111,7 +1111,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       height: 900px;
       transform: scale(1.1);
       transform-origin: right bottom;
-      background: url("/links/grass_corner_1_7.png?v=20260407_1722") no-repeat right bottom / 850px auto;
+      background: url("/links/grass_corner_1_7.png?v=20260407_1726") no-repeat right bottom / 850px auto;
       pointer-events: none;
       z-index: 1;
       filter: drop-shadow(0 18px 22px rgba(0,0,0,0.22));
