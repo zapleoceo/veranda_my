@@ -1106,7 +1106,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     .grass-corner-1-7 {
       position: absolute;
       left: 15px;
-      top: 220px;
+      top: -230px;
       width: 850px;
       height: 900px;
       transform: scale(1.1);
