@@ -717,6 +717,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $name = trim((string)($payload['name'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
   $comment = trim((string)($payload['comment'] ?? ''));
+  $preorder = trim((string)($payload['preorder'] ?? ''));
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
 
@@ -744,6 +745,13 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   }
   $comment = str_replace(["\r\n", "\r"], "\n", $comment);
   if (mb_strlen($comment) > 600) $comment = mb_substr($comment, 0, 600);
+  $preorder = str_replace(["\r\n", "\r"], "\n", $preorder);
+  if (mb_strlen($preorder) > 1200) $preorder = mb_substr($preorder, 0, 1200);
+  if ($guests > 5 && trim($preorder) === '') {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Предзаказ обязателен для компаний больше 5 гостей'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
 
   $displayTz = new DateTimeZone($displayTzName);
   $startDt = null;
@@ -785,7 +793,11 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $text .= 'Номер телефона: <b>' . htmlspecialchars($phoneNorm) . '</b>';
   if ($comment !== '') {
     $text .= "\n";
-    $text .= '<b>Комментарий:</b>' . "\n" . '<pre>' . htmlspecialchars($comment) . '</pre>';
+    $text .= '<b>Комментарий:</b>' . "\n" . htmlspecialchars($comment);
+  }
+  if ($preorder !== '') {
+    $text .= "\n";
+    $text .= '<b>Предзаказ:</b>' . "\n" . htmlspecialchars($preorder);
   }
   $tg = is_array($payload['tg'] ?? null) ? $payload['tg'] : [];
   $tgUid = isset($tg['user_id']) ? (int)$tg['user_id'] : 0;
@@ -824,6 +836,14 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $userText .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
   $userText .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
   $userText .= 'Номер телефона: <b>' . htmlspecialchars($phoneNorm) . '</b>';
+  if ($comment !== '') {
+    $userText .= "\n";
+    $userText .= '<b>Комментарий:</b>' . "\n" . htmlspecialchars($comment);
+  }
+  if ($preorder !== '') {
+    $userText .= "\n";
+    $userText .= '<b>Предзаказ:</b>' . "\n" . htmlspecialchars($preorder);
+  }
 
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
@@ -3092,6 +3112,19 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       });
       return out;
     };
+    const parsePreorderTextToCounts = (text) => {
+      const out = {};
+      String(text || '').split('\n').forEach((raw) => {
+        const line = String(raw || '').trim();
+        if (!line) return;
+        const m = line.match(/^\-\s*(.+?)(?:\s*x\s*(\d+))?\s*$/i);
+        const title = (m && m[1]) ? String(m[1]).trim() : line.replace(/^[\-\*\u2022]\s*/, '').trim();
+        if (!title) return;
+        const qty = (m && m[2]) ? (Number(m[2]) || 1) : 1;
+        out[title] = (Number(out[title] || 0) || 0) + Math.max(1, qty);
+      });
+      return normalizePreorder(out);
+    };
     const renderPreorderBox = () => {
       if (!reqPreorderBox) return;
       const counts = normalizePreorder(preorderCounts);
@@ -3284,7 +3317,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       reqSubmit.setAttribute('aria-disabled', linked ? 'false' : 'true');
       reqSubmit.disabled = !!submitBusy;
     };
-    const openRequestForm = ({ tableNum, guests, start, name, phone, comment, keepFields }) => {
+    const openRequestForm = ({ tableNum, guests, start, name, phone, comment, preorder, keepFields }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
       if (reqGuests) reqGuests.value = String(guests);
@@ -3304,6 +3337,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         if (reqName) reqName.value = String(name || '');
         if (reqPhone) reqPhone.value = String(phone || '');
         if (reqComment) reqComment.value = String(comment || '');
+        preorderCounts = parsePreorderTextToCounts(preorder);
       }
       if (pendingBooking && reqGuests) pendingBooking.guests = Number(reqGuests.value || pendingBooking.guests || 0) || pendingBooking.guests;
       if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
@@ -3333,6 +3367,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       const name = reqName ? String(reqName.value || '').trim() : '';
       const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
       const comment = reqComment ? String(reqComment.value || '').trim() : '';
+      const preorder = getPreorderText();
       const resDt = resDate ? String(resDate.value || '').trim() : '';
       const scrollY = Math.max(0, Math.floor(window.scrollY || 0));
 
@@ -3345,7 +3380,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, res_date: resDt, scroll_y: scrollY }),
+          body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, res_date: resDt, scroll_y: scrollY }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
@@ -3864,12 +3899,13 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         const name = String(p.name || '');
         const phone = String(p.phone || '');
         const comment = String(p.comment || '');
+        const preorder = String(p.preorder || '');
         const tg = j.tg && typeof j.tg === 'object' ? j.tg : null;
         if (tableNum && guests > 0 && start) {
           selectedTableNum = tableNum;
           messengerLinked.telegram = true;
           linkedTg = tg ? { user_id: Number(tg.user_id || 0) || 0, username: String(tg.username || ''), name: String(tg.name || '') } : null;
-          openRequestForm({ tableNum, guests, start, name, phone, comment, keepFields: true });
+          openRequestForm({ tableNum, guests, start, name, phone, comment, preorder, keepFields: true });
           if (linkedTg && linkedTg.username) setMsgrHint('Telegram привязан ✅ @' + String(linkedTg.username).replace(/^@+/, ''));
           else setMsgrHint('Telegram привязан ✅');
           syncSubmitState();
