@@ -2966,9 +2966,16 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
 
     const initDate = () => {
       if (!resDate) return;
-      resDate.value = defaultResDateLocal || '';
       const minSlot = getMinSelectableSlot();
       resDate.min = minSlot.dateVal + 'T' + minSlot.timeVal;
+      const raw = String(defaultResDateLocal || '').trim();
+      let next = raw;
+      if (next && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(next)) {
+        if (next < resDate.min) next = resDate.min;
+      } else {
+        next = resDate.min;
+      }
+      resDate.value = next;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       setBusyLabel(String(resDate.value || '').slice(0, 10));
       clearReservationsOnTables();
@@ -3007,21 +3014,41 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       url.searchParams.set('spot_id', '1');
       url.searchParams.set('guests_count', String(guests));
 
+      const fetchJson = async (u) => {
+        const timeoutMs = 12000;
+        if (typeof AbortController === 'function') {
+          const ctrl = new AbortController();
+          const tm = setTimeout(() => ctrl.abort(), timeoutMs);
+          try {
+            const r = await fetch(u, { headers: { 'Accept': 'application/json' }, signal: ctrl.signal });
+            const j = await r.json().catch(() => null);
+            return { res: r, json: j };
+          } finally {
+            clearTimeout(tm);
+          }
+        }
+        const r = await fetch(u, { headers: { 'Accept': 'application/json' } });
+        const j = await r.json().catch(() => null);
+        return { res: r, json: j };
+      };
+
       const loadReservations = async () => {
         const rUrl = new URL(location.href);
         rUrl.searchParams.set('ajax', 'reservations');
         rUrl.searchParams.set('date_reservation', dt);
         rUrl.searchParams.set('duration', String(current.durationSec || 7200));
         rUrl.searchParams.set('spot_id', '1');
-        const rRes = await fetch(rUrl.toString(), { headers: { 'Accept': 'application/json' } });
-        const rJ = await rRes.json().catch(() => null);
+        const rX = await fetchJson(rUrl.toString());
+        const rRes = rX.res;
+        const rJ = rX.json;
         if (!rRes.ok || !rJ || !rJ.ok) return null;
         return rJ;
       };
 
       try {
-        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
-        const j = await res.json().catch(() => null);
+        const x = await fetchJson(url.toString());
+        const res = x.res;
+        const j = x.json;
         if (!res.ok || !j || !j.ok) {
           last = null;
           freeNums = new Set();
@@ -3048,6 +3075,12 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         applyReservationsItemsToTables(last.reservations_items, dateStr, dt);
         if (!silent) setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
         renderSelectedTable();
+      } catch (_) {
+        last = null;
+        freeNums = new Set();
+        lastKey = '';
+        applyAvailabilityStyles();
+        if (!silent) setOutput('Ошибка запроса. Попробуй нажать “Ок” ещё раз.');
       } finally {
         isLoading = false;
         setStatus(selectedTableNum);
@@ -3056,6 +3089,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     };
 
     initDate();
+    setTimeout(() => { loadFree(true).catch(() => null); }, 0);
     const restoreFromTgState = async () => {
       const params = new URLSearchParams(location.search);
       const code = String(params.get('tg_state') || '').trim();
@@ -3075,6 +3109,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
           if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
           setBusyLabel(String(resDate.value || '').slice(0, 10));
           invalidateLast();
+          setTimeout(() => { loadFree(true).catch(() => null); }, 0);
         }
         const tableNum = String(p.table_num || '').trim();
         const guests = Number(p.guests || 0) || 0;
