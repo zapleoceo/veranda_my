@@ -1,4 +1,4 @@
-﻿(() => {
+﻿﻿(() => {
   const cfg = window.__TR_CONFIG__ || {};
   let UI_LANG = cfg.lang || 'ru';
   let UI_LOCALE = cfg.locale || (UI_LANG === 'vi' ? 'vi-VN' : (UI_LANG === 'en' ? 'en-US' : 'ru-RU'));
@@ -64,7 +64,6 @@
     const mapZoomPlus = document.getElementById('mapZoomPlus');
     const mapZoomRange = document.getElementById('mapZoomRange');
     const mapZoomBox = document.getElementById('mapZoomBox');
-    const tileLayer = mapZoomBox ? mapZoomBox.querySelector('.tile-layer') : null;
     const baseMapW = (() => {
       const raw = mapZoomBox ? Number(mapZoomBox.getAttribute('data-base-w') || 0) : 0;
       if (raw > 0) return raw;
@@ -101,10 +100,6 @@
       if (mapZoomBox) {
         mapZoomBox.style.width = String(Math.round(baseMapW * scale)) + 'px';
         mapZoomBox.style.height = String(Math.round(baseMapH * scale)) + 'px';
-      }
-      if (tileLayer) {
-        tileLayer.style.width = String(Math.round(baseMapW * scale)) + 'px';
-        tileLayer.style.height = String(Math.round(baseMapH * scale)) + 'px';
       }
 
       if (keepAnchor) {
@@ -404,9 +399,7 @@
       if (!dtpDateList || !dtpTimeList) return;
       if (!dtpDates.length) {
         const now = new Date();
-        const minSlot = getMinSelectableSlot();
-        const m0 = String(minSlot.dateVal || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        const base = m0 ? new Date(Number(m0[1]), Number(m0[2]) - 1, Number(m0[3]), 0, 0, 0) : new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         const days = 28;
         dtpDates = [];
         for (let i = 0; i < days; i++) {
