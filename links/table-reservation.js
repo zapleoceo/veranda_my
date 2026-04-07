@@ -616,7 +616,10 @@
       if (preorderReqHint) preorderReqHint.hidden = !on;
       if (reqModalCard) reqModalCard.classList.toggle('wide', on);
       if (reqPreorderLabel) reqPreorderLabel.hidden = !on;
-      if (reqCommentLabel) reqCommentLabel.classList.toggle('full', !on);
+      if (reqCommentLabel) {
+        if (on) reqCommentLabel.classList.remove('full');
+        else reqCommentLabel.classList.add('full');
+      }
       setPreorderOpen(on);
       if (!on) {
         if (reqComment) reqComment.style.height = '';
