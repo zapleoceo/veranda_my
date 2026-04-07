@@ -219,16 +219,16 @@
       const byTable = {};
       list.forEach((it) => {
         if (!it || typeof it !== 'object') return;
-        const t = String(it.table_title ?? '').trim();
+        const tableTitle = String(it.table_title ?? '').trim();
         const s = String(it.date_start ?? '').trim();
         const e = String(it.date_end ?? '').trim();
-        if (!t || !s || !e) return;
+        if (!tableTitle || !s || !e) return;
         if (s.slice(0, 10) !== day) return;
         const sm = Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
         const em = Number(e.slice(11, 13)) * 60 + Number(e.slice(14, 16));
         if (!isFinite(sm) || !isFinite(em)) return;
-        if (!byTable[t]) byTable[t] = [];
-        byTable[t].push([sm, em]);
+        if (!byTable[tableTitle]) byTable[tableTitle] = [];
+        byTable[tableTitle].push([sm, em]);
       });
 
       Object.keys(byTable).forEach((k) => {
@@ -248,8 +248,8 @@
 
       lastReservationsByTable = byTable;
 
-      tables.forEach((t) => {
-        const n = String(t.dataset.table || '');
+      tables.forEach((tableEl) => {
+        const n = String(tableEl.dataset.table || '');
         let ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
         if (isToday && nowMin != null) {
           ranges = ranges.filter(([s, e]) => e > nowMin);
@@ -258,13 +258,13 @@
         const overlapsSel = (selMin != null && selEnd != null)
           ? ranges.some(([s, e]) => s < selEnd && e > selMin)
           : false;
-        if (overlapsSel) t.dataset.resBusy = '1';
-        else delete t.dataset.resBusy;
+        if (overlapsSel) tableEl.dataset.resBusy = '1';
+        else delete tableEl.dataset.resBusy;
         let txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
-        if (isToday && selMin != null && !overlapsSel && last && !freeNums.has(n)) {
+        if (isToday && selMin != null && !overlapsSel && !ranges.length && last && !freeNums.has(n)) {
           txt = t('busy_now');
         }
-        let el = t.querySelector('.res-time');
+        let el = tableEl.querySelector('.res-time');
         if (!txt) {
           if (el) el.remove();
           return;
@@ -274,7 +274,7 @@
           el.className = 'res-time';
         }
         el.textContent = txt;
-        if (!t.contains(el)) t.appendChild(el);
+        if (!tableEl.contains(el)) tableEl.appendChild(el);
       });
     };
     const resDate = document.getElementById('resDate');
