@@ -814,31 +814,68 @@ if (($_GET['ajax'] ?? '') === 'tips_balance') {
         $api = new \App\Classes\PosterAPI($posterToken);
         $accs = $api->request('finance.getAccounts', [], 'GET');
         if (!is_array($accs)) $accs = [];
-        $accountId = 8;
+        $accountId = 0;
         $name = '';
-        $balance = null;
+        $balanceMinor = null;
+
         foreach ($accs as $a) {
             if (!is_array($a)) continue;
             $id = (int)($a['account_id'] ?? $a['id'] ?? 0);
-            if ($id !== $accountId) continue;
-            $name = trim((string)($a['name'] ?? $a['title'] ?? ''));
-            $bRaw = $a['balance'] ?? null;
-            if (is_int($bRaw)) $balance = $bRaw;
-            elseif (is_float($bRaw)) $balance = (int)round($bRaw);
-            elseif (is_string($bRaw)) {
-                $t = trim($bRaw);
-                $t = str_replace(',', '.', $t);
-                if ($t !== '' && is_numeric($t)) $balance = (int)round((float)$t);
-            } elseif (is_numeric($bRaw)) {
-                $balance = (int)round((float)$bRaw);
+            if ($id <= 0) continue;
+            $n = trim((string)($a['name'] ?? $a['title'] ?? ''));
+            if ($n === '') continue;
+            if (stripos($n, 'BIDV') !== false) { $accountId = $id; $name = $n; break; }
+        }
+        if ($accountId <= 0) {
+            foreach ($accs as $a) {
+                if (!is_array($a)) continue;
+                $id = (int)($a['account_id'] ?? $a['id'] ?? 0);
+                if ($id !== 8) continue;
+                $accountId = 8;
+                $name = trim((string)($a['name'] ?? $a['title'] ?? ''));
+                break;
             }
-            break;
+        }
+
+        if ($accountId > 0) {
+            foreach ($accs as $a) {
+                if (!is_array($a)) continue;
+                $id = (int)($a['account_id'] ?? $a['id'] ?? 0);
+                if ($id !== $accountId) continue;
+                $name = $name !== '' ? $name : trim((string)($a['name'] ?? $a['title'] ?? ''));
+                $bRaw = $a['balance'] ?? null;
+
+                $hasDecimal = false;
+                if (is_string($bRaw)) {
+                    $t = trim((string)$bRaw);
+                    $hasDecimal = (strpos($t, '.') !== false) || (strpos($t, ',') !== false);
+                } elseif (is_float($bRaw)) {
+                    $hasDecimal = true;
+                }
+
+                $val = null;
+                if (is_int($bRaw)) $val = (float)$bRaw;
+                elseif (is_float($bRaw)) $val = (float)$bRaw;
+                elseif (is_string($bRaw)) {
+                    $t = trim((string)$bRaw);
+                    $t = str_replace(',', '.', $t);
+                    if ($t !== '' && is_numeric($t)) $val = (float)$t;
+                } elseif (is_numeric($bRaw)) {
+                    $val = (float)$bRaw;
+                }
+
+                if ($val !== null) {
+                    if ($hasDecimal) $balanceMinor = (int)round($val * 100);
+                    else $balanceMinor = (int)(abs($val) >= 10000000 ? round($val) : round($val * 100));
+                }
+                break;
+            }
         }
         echo json_encode([
             'ok' => true,
             'account_id' => $accountId,
             'name' => $name,
-            'balance_minor' => $balance !== null ? (int)$balance : null,
+            'balance_minor' => $balanceMinor !== null ? (int)$balanceMinor : null,
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
@@ -1372,6 +1409,17 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         return norm.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     };
     const fmtMoney = (n) => fmtSpaces(String(Math.round(Number(n || 0))));
+    const fmtMinor2 = (minor) => {
+        const m = Number(minor);
+        if (!isFinite(m)) return '';
+        const neg = m < 0;
+        const abs = Math.abs(m);
+        const s = (abs / 100).toFixed(2);
+        const parts = s.split('.');
+        const intPart = fmtSpaces(parts[0] || '0');
+        const frac = parts[1] || '00';
+        return (neg ? '-' : '') + intPart + '.' + frac;
+    };
     const calcSalary = (rate, hours) => Math.round(Number(rate || 0) * Number(hours || 0));
     const vndFromMinor = (minor) => Math.round(Number(minor || 0) / 100);
     const LS_KEY = 'employees_prefs_v1';
@@ -1542,11 +1590,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const tipsTableMinor = Number(lastTtpMinorTotal || 0) || 0;
         if (tipsTableSumEl) tipsTableSumEl.textContent = fmtMoney(vndFromMinor(tipsTableMinor));
         if (tipsAccBalanceEl) {
-            tipsAccBalanceEl.textContent = tipsAccBalanceMinor == null ? '—' : fmtMoney(vndFromMinor(tipsAccBalanceMinor));
+            tipsAccBalanceEl.textContent = tipsAccBalanceMinor == null ? '—' : fmtMinor2(tipsAccBalanceMinor);
         }
         if (tipsBalanceDiffEl) {
             if (tipsAccBalanceMinor == null) tipsBalanceDiffEl.textContent = '—';
-            else tipsBalanceDiffEl.textContent = fmtMoney(vndFromMinor((Number(tipsAccBalanceMinor || 0) || 0) - tipsTableMinor));
+            else tipsBalanceDiffEl.textContent = fmtMinor2((Number(tipsAccBalanceMinor || 0) || 0) - tipsTableMinor);
         }
     };
 
@@ -2193,17 +2241,18 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const cur = slrPaidById[String(uid)] || { total_amount: 0, items: [] };
                 const nextTotal = Number(cur.total_amount || 0) + (Math.abs(Number(j.amount_vnd || 0) || amount) * 100);
                 const nextItems = Array.isArray(cur.items) ? cur.items.slice() : [];
-                if (date) nextItems.unshift({ date, amount: -Math.abs((Number(j.amount_vnd || 0) || amount) * 100) });
+                if (date) nextItems.unshift({ date, amount: -Math.abs((Number(j.amount_vnd || 0) || amount) * 100), account_id: accountFrom });
                 slrPaidById[String(uid)] = { total_amount: nextTotal, items: nextItems };
             } else {
                 const cur = tipsPaidById[String(uid)] || { total_amount: 0, items: [] };
                 const nextTotal = Number(cur.total_amount || 0) + Math.abs(Number(j.amount_vnd || 0) || amount) * 100;
                 const nextItems = Array.isArray(cur.items) ? cur.items.slice() : [];
-                if (date) nextItems.unshift({ date, amount: -Math.abs((Number(j.amount_vnd || 0) || amount) * 100) });
+                if (date) nextItems.unshift({ date, amount: -Math.abs((Number(j.amount_vnd || 0) || amount) * 100), account_id: accountFrom });
                 tipsPaidById[String(uid)] = { total_amount: nextTotal, items: nextItems };
             }
             closePayExtra();
             renderTable();
+            loadTipsBalance().catch(() => {});
             payExtraSubmitting = false;
             setPayExtraLoading(false);
         } catch (err) {
@@ -2287,9 +2336,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const cur = slrPaidById[String(uid)] || { total_amount: 0, items: [] };
                 const nextTotal = Number(cur.total_amount || 0) + (Math.abs(Number(j.salary_vnd || 0) || salaryToPayVnd) * 100);
                 const nextItems = Array.isArray(cur.items) ? cur.items.slice() : [];
-                if (j.date) nextItems.unshift({ date: String(j.date), amount: -Math.abs((Number(j.salary_vnd || 0) || salaryToPayVnd) * 100) });
+                if (j.date) nextItems.unshift({ date: String(j.date), amount: -Math.abs((Number(j.salary_vnd || 0) || salaryToPayVnd) * 100), account_id: 1 });
                 slrPaidById[String(uid)] = { total_amount: nextTotal, items: nextItems };
                 renderTable();
+                loadTipsBalance().catch(() => {});
             } catch (err) {
                 setError(err && err.message ? err.message : 'Ошибка');
                 b.disabled = false;
@@ -2340,9 +2390,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const cur = tipsPaidById[String(uid)] || { total_amount: 0, items: [] };
             const nextTotal = Number(cur.total_amount || 0) + Math.abs(Number(j.amount || 0));
             const nextItems = Array.isArray(cur.items) ? cur.items.slice() : [];
-            if (j.date) nextItems.unshift({ date: String(j.date), amount: Number(j.amount || 0) });
+            if (j.date) nextItems.unshift({ date: String(j.date), amount: Number(j.amount || 0), account_id: 8 });
             tipsPaidById[String(uid)] = { total_amount: nextTotal, items: nextItems };
             renderTable();
+            loadTipsBalance().catch(() => {});
         } catch (err) {
             setError(err && err.message ? err.message : 'Ошибка');
             b.disabled = false;
