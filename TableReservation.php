@@ -2251,7 +2251,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     };
     const resDate = document.getElementById('resDate');
     const resDateBtn = document.getElementById('resDateBtn');
-    const checkBtn = document.getElementById('checkBtn');
     const resultText = document.getElementById('resultText');
     const selectedTableEl = document.getElementById('selectedTable');
     const statusLine = document.getElementById('statusLine');
@@ -2864,7 +2863,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         return;
       }
       if (!last) {
-        if (statusLine) statusLine.textContent = 'Нажми "Проверить свободные столы"';
+        if (statusLine) statusLine.textContent = 'Нажми “Ок”, чтобы проверить столики';
         return;
       }
       const isFree = freeNums.has(String(tableNum));
@@ -2901,7 +2900,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       setStatus(selectedTableNum);
       if (!selectedTableNum) return;
       if (!last) {
-        setOutput('Нажми "Проверить свободные столы"');
+        setOutput('Нажми “Ок”, чтобы проверить столики.');
         return;
       }
       setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
