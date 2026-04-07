@@ -144,7 +144,6 @@ foreach ($groups as $station => $cats) {
 
 $pageTitle = $lang === 'ru' ? 'Online меню' : ($lang === 'vi' ? 'Thực đơn online' : ($lang === 'ko' ? '온라인 메뉴' : 'Online menu'));
 $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg';
-$embed = isset($_GET['embed']) && (string)$_GET['embed'] === '1';
 ?>
 <!doctype html>
 <html lang="<?= htmlspecialchars($lang) ?>">
@@ -294,24 +293,13 @@ $embed = isset($_GET['embed']) && (string)$_GET['embed'] === '1';
         }
         .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .muted { color: var(--muted); font-size: 12px; }
-        <?php if ($embed): ?>
-        html, body { height: auto; }
-        body { background: transparent; }
-        .parallax-bg { display: none; }
-        .wrap { max-width: none; padding: 12px; }
-        .header { display: none; }
-        .section { margin-top: 0; }
-        .section-title { margin-top: 10px; }
-        details { background: rgba(10,10,15,0.35); }
-        .item { cursor: pointer; }
-        <?php endif; ?>
         @media (max-width: 520px) {
             .subtitle { display: none; }
         }
     </style>
 </head>
 <body>
-    <?php if (!$embed): ?><div class="parallax-bg" aria-hidden="true"></div><?php endif; ?>
+    <div class="parallax-bg" aria-hidden="true"></div>
     <div class="wrap">
         <div class="header">
             <div class="header-top">
@@ -389,26 +377,24 @@ $embed = isset($_GET['embed']) && (string)$_GET['embed'] === '1';
             </div>
         <?php endif; ?>
     </div>
-    <?php if (!$embed): ?>
-        <script>
-            (() => {
-                const bg = document.querySelector('.parallax-bg');
-                if (!bg) return;
-                const speed = 0.3;
-                let ticking = false;
-                const update = () => {
-                    const y = window.pageYOffset * speed;
-                    bg.style.backgroundPosition = 'center ' + (-y) + 'px';
-                    ticking = false;
-                };
-                window.addEventListener('scroll', () => {
-                    if (ticking) return;
-                    window.requestAnimationFrame(update);
-                    ticking = true;
-                });
-                update();
-            })();
-        </script>
-    <?php endif; ?>
+    <script>
+        (() => {
+            const bg = document.querySelector('.parallax-bg');
+            if (!bg) return;
+            const speed = 0.3;
+            let ticking = false;
+            const update = () => {
+                const y = window.pageYOffset * speed;
+                bg.style.backgroundPosition = 'center ' + (-y) + 'px';
+                ticking = false;
+            };
+            window.addEventListener('scroll', () => {
+                if (ticking) return;
+                window.requestAnimationFrame(update);
+                ticking = true;
+            });
+            update();
+        })();
+    </script>
 </body>
 </html>
