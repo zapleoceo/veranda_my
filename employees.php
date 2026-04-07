@@ -519,10 +519,10 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
         $tipsAgg = [];
         $slrAgg = [];
 
-        $pushAgg = function (array &$dst, int $id, int $ts, string $dateStr, int $amount): void {
+        $pushAgg = function (array &$dst, int $id, int $ts, string $dateStr, int $amount, int $accountId): void {
             if (!isset($dst[$id])) $dst[$id] = ['total' => 0, 'items' => []];
             $dst[$id]['total'] = (int)$dst[$id]['total'] + $amount;
-            $dst[$id]['items'][] = ['ts' => $ts, 'date' => $dateStr, 'amount' => $amount];
+            $dst[$id]['items'][] = ['ts' => $ts, 'date' => $dateStr, 'amount' => $amount, 'account_id' => $accountId];
         };
 
         foreach ($txs as $t) {
@@ -551,7 +551,7 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
                 $acc = isset($t['account_from']) ? (int)$t['account_from'] : (isset($t['account_id']) ? (int)$t['account_id'] : 0);
                 if ($acc > 0) {
                     if ($isTips && $acc !== 8) continue;
-                    if ($isSlr && $acc !== 1) continue;
+                    if ($isSlr && $acc !== 1 && $acc !== 2) continue;
                 }
             }
 
@@ -568,9 +568,10 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
             if ($ts === false || (int)$ts <= 0) continue;
 
             $amount = (int)($t['amount'] ?? 0);
+            $acc = isset($t['account_from']) ? (int)$t['account_from'] : (isset($t['account_id']) ? (int)$t['account_id'] : 0);
             $dateStr = date('Y-m-d H:i:s', (int)$ts);
-            if ($isTips) $pushAgg($tipsAgg, $empId, (int)$ts, $dateStr, $amount);
-            else $pushAgg($slrAgg, $empId, (int)$ts, $dateStr, $amount);
+            if ($isTips) $pushAgg($tipsAgg, $empId, (int)$ts, $dateStr, $amount, $acc);
+            else $pushAgg($slrAgg, $empId, (int)$ts, $dateStr, $amount, $acc);
         }
 
         $makeOut = function (array $agg): array {
@@ -582,7 +583,7 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
                 foreach ($items as $it) {
                     $d = (string)($it['date'] ?? '');
                     if ($d === '') continue;
-                    $payload[] = ['date' => $d, 'amount' => (int)($it['amount'] ?? 0)];
+                    $payload[] = ['date' => $d, 'amount' => (int)($it['amount'] ?? 0), 'account_id' => (int)($it['account_id'] ?? 0)];
                 }
                 $out[(string)$id] = ['total_amount' => (int)($v['total'] ?? 0), 'items' => $payload];
             }
@@ -1333,6 +1334,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
+    const slrIconByAccount = (acc) => {
+        const a = Number(acc || 0) || 0;
+        if (a === 2) return '<img src="https://openmoji.org/data/color/svg/E1D8.svg" width="14" height="14" style="vertical-align:-2px;" alt="QR">';
+        if (a === 1) return '💵';
+        return '';
+    };
     const addDays = (isoDate, days) => {
         const m = String(isoDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
         if (!m) return '';
@@ -1714,8 +1721,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         const parts = raw.split(' ');
                         const d = parts[0] || raw;
                         const tm = parts[1] || '';
+                        const acc = Number(it && it.account_id ? it.account_id : 0) || 0;
+                        const ic = slrIconByAccount(acc);
                         const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
-                        return `<div class="paid-item"><div class="paid-date">${esc(d)}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
+                        return `<div class="paid-item"><div class="paid-date">${esc(d)}</div><div class="paid-line"><span>${ic ? (ic + '&nbsp;') : ''}${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
                     }).join('') : ''}
                 </td>
                 <td class="col-ttp" style="text-align:right;">
