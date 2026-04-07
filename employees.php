@@ -498,10 +498,21 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
 
-    $dateFrom = $parseDate((string)($_GET['date_from'] ?? ''));
-    $today = date('Y-m-d');
-    $dateTo = $today;
-    if ($dateFrom === null || $dateFrom > $dateTo) {
+    $dateFrom0 = $parseDate((string)($_GET['date_from'] ?? ''));
+    $dateTo0 = $parseDate((string)($_GET['date_to'] ?? ''));
+    if ($dateFrom0 === null || $dateTo0 === null || $dateFrom0 > $dateTo0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Некорректный период'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $shift3 = function (string $d): ?string {
+        $ts = strtotime($d . ' +3 days');
+        if ($ts === false) return null;
+        return date('Y-m-d', $ts);
+    };
+    $dateFrom = $shift3($dateFrom0);
+    $dateTo = $shift3($dateTo0);
+    if ($dateFrom === null || $dateTo === null || $dateFrom > $dateTo) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Некорректный период'], JSON_UNESCAPED_UNICODE);
         exit;
@@ -1122,6 +1133,7 @@ $firstOfMonth = date('Y-m-01');
             </div>
         </div>
         <div class="error" id="err" style="display:none;"></div>
+        <div class="muted" id="ltpRangeNote" style="margin-top: 6px; font-size: 12px; font-weight: 800;"></div>
         <div style="display:flex; gap: 14px; align-items:center; flex-wrap: wrap; margin-top: 10px;">
             <label class="muted" style="display:flex; align-items:center; gap: 8px; margin: 0;">
                 <input type="checkbox" id="hideZero">
@@ -1488,6 +1500,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const tipsAccBalanceEl = document.getElementById('tipsAccBalance');
     const tipsTableSumEl = document.getElementById('tipsTableSum');
     const tipsBalanceDiffEl = document.getElementById('tipsBalanceDiff');
+    const ltpRangeNote = document.getElementById('ltpRangeNote');
     const hoursDayCache = new Map();
     let hoursPopEl = null;
     const closeHoursPop = () => {
@@ -1908,9 +1921,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const urlLtp = new URL(location.href);
                 urlLtp.searchParams.set('ajax', 'ltp_load');
                 urlLtp.searchParams.set('date_from', dateFrom.value);
-                const dNow = new Date();
-                const today = String(dNow.getFullYear()) + '-' + String(dNow.getMonth() + 1).padStart(2, '0') + '-' + String(dNow.getDate()).padStart(2, '0');
-                urlLtp.searchParams.set('date_to', today);
+                urlLtp.searchParams.set('date_to', dateTo.value);
                 const { signal, cleanup } = withTimeout(20000);
                 const resLtp = await fetch(urlLtp.toString(), { headers: { 'Accept': 'application/json' }, signal });
                 const txtLtp = await resLtp.text();
@@ -1920,13 +1931,16 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 if (jLtp && jLtp.ok) {
                     tipsPaidById = jLtp.tips || {};
                     slrPaidById = jLtp.slr || {};
+                    if (ltpRangeNote) ltpRangeNote.textContent = 'В учет TipsPaid SlrPaid взяты даты ' + String(jLtp.date_from || '') + ' — ' + String(jLtp.date_to || '');
                 } else {
                     tipsPaidById = {};
                     slrPaidById = {};
+                    if (ltpRangeNote) ltpRangeNote.textContent = '';
                 }
             } catch (_) {
                 tipsPaidById = {};
                 slrPaidById = {};
+                if (ltpRangeNote) ltpRangeNote.textContent = '';
             }
 
             try {
