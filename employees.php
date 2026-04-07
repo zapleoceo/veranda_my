@@ -1348,7 +1348,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
     const slrIconByAccount = (acc) => {
         const a = Number(acc || 0) || 0;
-        if (a === 1) return '<img src="https://openmoji.org/data/color/svg/E1D8.svg" width="14" height="14" style="vertical-align:-2px;" alt="QR">';
+        if (a === 1) return '<img src="https://st2.depositphotos.com/38197074/44590/v/450/depositphotos_445903832-stock-illustration-initial-letter-vector-logo-icon.jpg" width="14" height="14" style="vertical-align:-2px; border-radius: 3px;" alt="QR">';
         if (a === 2) return '💵';
         return '';
     };
