@@ -945,7 +945,13 @@
       min-height: 92px;
       max-height: 164px;
       overflow: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(184,135,70,0.75) rgba(0,0,0,0.25);
     }
+    .preorder-box::-webkit-scrollbar { width: 10px; height: 10px; }
+    .preorder-box::-webkit-scrollbar-track { background: rgba(0,0,0,0.22); border-radius: 999px; }
+    .preorder-box::-webkit-scrollbar-thumb { background: rgba(184,135,70,0.65); border-radius: 999px; border: 2px solid rgba(0,0,0,0.22); }
+    .preorder-box::-webkit-scrollbar-thumb:hover { background: rgba(184,135,70,0.85); }
     .preorder-line {
       display: flex;
       align-items: flex-start;

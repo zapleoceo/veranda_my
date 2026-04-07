@@ -81,7 +81,8 @@
 
     const applyMapZoom = (pct, keepAnchor) => {
       if (!mapShell) return;
-      const p = Math.max(50, Math.min(200, Number(pct || 100) || 100));
+      let p = Math.max(50, Math.min(200, Number(pct || 100) || 100));
+      if (p >= 93 && p <= 107) p = 100;
       const scale = p / 100;
       if (mapZoomVal) mapZoomVal.textContent = String(Math.round(p)) + '%';
       if (mapZoomRange) mapZoomRange.value = String(Math.round(p));
@@ -294,6 +295,8 @@
     const reqName = document.getElementById('reqName');
     const reqPhone = document.getElementById('reqPhone');
     const reqComment = document.getElementById('reqComment');
+    const reqCommentLabel = document.getElementById('reqCommentLabel');
+    const reqPreorderLabel = document.getElementById('reqPreorderLabel');
     const reqPreorderBox = document.getElementById('reqPreorderBox');
     const reqModalTable = document.getElementById('reqModalTable');
     const reqGuests = document.getElementById('reqGuests');
@@ -612,8 +615,14 @@
       const on = guests > 5;
       if (preorderReqHint) preorderReqHint.hidden = !on;
       if (reqModalCard) reqModalCard.classList.toggle('wide', on);
+      if (reqPreorderLabel) reqPreorderLabel.hidden = !on;
+      if (reqCommentLabel) reqCommentLabel.classList.toggle('full', !on);
       setPreorderOpen(on);
-      if (!on) return;
+      if (!on) {
+        if (reqComment) reqComment.style.height = '';
+        if (reqPreorderBox) reqPreorderBox.style.height = '';
+        return;
+      }
       loadPreorderMenu().catch(() => null);
     };
 
@@ -684,6 +693,10 @@
       totalEl.className = 'preorder-total';
       totalEl.textContent = fmtPrice(total);
       reqPreorderBox.appendChild(totalEl);
+
+      const desired = Math.min(220, Math.max(92, reqPreorderBox.scrollHeight));
+      reqPreorderBox.style.height = String(desired) + 'px';
+      if (reqComment) reqComment.style.height = String(desired) + 'px';
     };
     const incPreorder = (title) => {
       const t0 = String(title || '').trim();
@@ -1007,7 +1020,7 @@
         const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
         const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || '').trim() : '';
         const comment = reqComment ? String(reqComment.value || '').trim() : '';
-        const preorder = getPreorderText();
+        const preorder = guests > 5 ? getPreorderText() : '';
         const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
         const missing = [];
         if (!tableNum) missing.push('выбери стол');
