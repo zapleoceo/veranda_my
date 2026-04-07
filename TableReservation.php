@@ -1013,11 +1013,8 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
 
     .tile-underlay {
       position: absolute;
-      left: 0;
-      top: 0;
-      width: 820px;
-      height: 620px;
-      background: url("/links/gray-tiles-texture.jpg?v=20260407_1821") repeat;
+      inset: 0;
+      background: url("/links/gray-tiles-texture.jpg?v=20260407_1900") repeat;
       pointer-events: none;
       z-index: 0;
       border-radius: inherit;
@@ -1235,7 +1232,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       z-index: 9999;
     }
     .dtp.on { display: flex; }
-    .dtp-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(2px); }
+    .dtp-backdrop { position: absolute; inset: 0; background: rgba(66, 35, 12, 0.78); backdrop-filter: blur(2px); }
     .dtp-card {
       position: relative;
       width: min(520px, 100%);
@@ -1654,7 +1651,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
 
     .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 14px; z-index: 9998; }
     .modal.on { display: flex; }
-    .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(2px); }
+    .modal-backdrop { position: absolute; inset: 0; background: rgba(66, 35, 12, 0.78); backdrop-filter: blur(2px); }
     .modal-card {
       position: relative;
       width: min(520px, 100%);
