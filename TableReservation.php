@@ -1009,14 +1009,15 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       width: 820px;
       height: 620px;
       border-radius: var(--radius-md);
+      overflow: hidden;
     }
 
     .tile-underlay {
       position: absolute;
-      left: 15px;
+      left: -56px;
       top: 0;
-      width: 850px;
-      height: 620px;
+      width: 948px;
+      height: 677px;
       background: url("/links/gray-tiles-texture.jpg?v=20260407_1821") repeat;
       pointer-events: none;
       z-index: 0;
@@ -1099,12 +1100,12 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     .grass-corner-1-7 {
       position: absolute;
       left: 15px;
-      top: -230px;
-      width: 850px;
+      top: -212px;
+      width: 867px;
       height: 900px;
       transform: scale(1.1);
       transform-origin: right bottom;
-      background: url("/links/grass_corner_1_7.png?v=20260407_1728") no-repeat right bottom / 850px auto;
+      background: url("/links/grass_corner_1_7.png?v=20260407_1836") no-repeat right bottom / 867px auto;
       pointer-events: none;
       z-index: 1;
       filter: drop-shadow(0 18px 22px rgba(0,0,0,0.22));
@@ -1646,7 +1647,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       margin-top: var(--space-3);
     }
     .guest-label { flex: 0 0 40%; }
-    #checkBtn { flex: 1 1 auto; }
     @media (max-width: 520px) {
       .guest-row { flex-direction: column; align-items: stretch; }
       .guest-label { flex-basis: auto; }
@@ -1854,7 +1854,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         <div class="cash-controls">
           <input type="datetime-local" id="resDate" aria-label="Дата и время">
           <button type="button" class="dt-btn" id="resDateBtn">Выбрать дату</button>
-          <button class="btn btn-primary" id="checkBtn" type="button">Проверить столики</button>
         </div>
         <div class="controls">
           <label class="zoom" aria-label="Масштаб схемы">
@@ -2977,7 +2976,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
 
       isLoading = true;
       if (statusLine) statusLine.textContent = 'Проверяю…';
-      if (checkBtn) checkBtn.disabled = true;
       setBusyLabel(dateStr);
       setBusyLoader(true);
 
@@ -3031,17 +3029,10 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
         renderSelectedTable();
       } finally {
         isLoading = false;
-        if (checkBtn) checkBtn.disabled = false;
         setStatus(selectedTableNum);
         setBusyLoader(false);
       }
     };
-
-    if (checkBtn) {
-      checkBtn.addEventListener('click', () => {
-        loadFree(false).catch((e) => setOutput('Ошибка: ' + String(e && e.message ? e.message : e)));
-      });
-    }
 
     initDate();
     const restoreFromTgState = async () => {
@@ -3094,18 +3085,8 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
     syncSteps();
     if (resDate) {
       resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); });
-      resDate.addEventListener('change', () => {
-        syncSteps();
-        invalidateLast();
-        setBusyLabel(String(resDate.value || '').slice(0, 10));
-        if (skipNextResDateAutoLoad) { skipNextResDateAutoLoad = false; return; }
-        loadFree(true).catch(() => null);
-      });
     }
-    if (resDate && String(resDate.value || '').trim()) {
-      loadFree(true).catch(() => null);
-    }
-    setOutput('Выбери дату и нажми "Проверить столики". Потом кликай по столам.');
+    setOutput('Выбери дату и нажми “Ок”. Потом кликай по столам.');
   </script>
 </body>
 </html>
