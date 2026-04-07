@@ -222,6 +222,7 @@
       position: relative;
     }
     .map-shell > * { position: relative; z-index: 1; }
+    .map-shell > .tile-layer { position: absolute; z-index: 0; }
   
     .map-zoom-box { width: 820px; height: 620px; }
     .map-zoom-inner { width: 820px; height: 620px; transform: scale(var(--map-scale)); transform-origin: top left; }
@@ -238,7 +239,7 @@
       pointer-events: none;
       z-index: 0;
       opacity: 0.92;
-      border-radius: 18px;
+      border-radius: inherit;
       background-position: 0 0;
     }
 

@@ -1166,7 +1166,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260407_2345">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260407_2400">
 
 </head>
 <body>
@@ -1207,8 +1207,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   
       <section class="layout">
         <div class="map-shell">
+          <div class="tile-layer" aria-hidden="true"></div>
             <div class="map-zoom-box" id="mapZoomBox">
-              <div class="tile-layer" aria-hidden="true"></div>
               <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="Схема столов ресторана">
             <div class="grass-corner-1-7" aria-hidden="true"></div>
@@ -1404,6 +1404,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260407_2345"></script>
+  <script src="/links/table-reservation.js?v=20260407_2400"></script>
 </body>
 </html>

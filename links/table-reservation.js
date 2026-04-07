@@ -200,7 +200,10 @@
     const applyReservationsItemsToTables = (items, dateStr, dtValue) => {
       const list = Array.isArray(items) ? items : [];
       const day = String(dateStr || '').slice(0, 10);
-      if (!day) return;
+      if (!day) {
+        tables.forEach((t) => { delete t.dataset.resBusy; });
+        return;
+      }
 
       const dt = String(dtValue || '').trim();
       const selMin = (() => {
@@ -259,6 +262,8 @@
         const overlapsSel = (selMin != null && selEnd != null)
           ? ranges.some(([s, e]) => s < selEnd && e > selMin)
           : false;
+        if (overlapsSel) t.dataset.resBusy = '1';
+        else delete t.dataset.resBusy;
         let txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
         if (isToday && selMin != null && !overlapsSel && last && !freeNums.has(n)) {
           txt = t('busy_now');
@@ -343,15 +348,7 @@
       const m = base.getMinutes();
       const add = (30 - (m % 30)) % 30;
       base.setMinutes(m + add, 0, 0);
-
-      const minToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0, 0, 0);
-      const maxToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 21, 0, 0, 0);
-
-      let slot = base;
-      if (slot < minToday) slot = minToday;
-      if (slot > maxToday) slot = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10, 0, 0, 0);
-
-      return { dateVal: isoDate(slot), timeVal: pad2(slot.getHours()) + ':' + pad2(slot.getMinutes()) };
+      return { dateVal: isoDate(base), timeVal: pad2(base.getHours()) + ':' + pad2(base.getMinutes()) };
     };
 
     const clampToMinSlot = (dateVal, timeVal) => {
@@ -428,9 +425,8 @@
       }
       if (!dtpTimes.length) {
         dtpTimes = [];
-        for (let h = 10; h <= 21; h++) {
+        for (let h = 0; h <= 23; h++) {
           for (let m = 0; m < 60; m += 30) {
-            if (h === 21 && m > 0) continue;
             dtpTimes.push({ value: pad2(h) + ':' + pad2(m) });
           }
         }
@@ -1197,6 +1193,7 @@
         const n = String(t.dataset.table || '');
         t.classList.remove('free', 'busy');
         if (!last) return;
+        if (t.dataset.resBusy === '1') { t.classList.add('busy'); return; }
         if (freeNums.has(n)) t.classList.add('free');
         else t.classList.add('busy');
       });
@@ -1387,6 +1384,7 @@
         }
         clearReservationsOnTables();
         applyReservationsItemsToTables(last.reservations_items, dateStr, dt);
+        applyAvailabilityStyles();
         if (!silent) setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
         renderSelectedTable();
       } catch (_) {
