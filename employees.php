@@ -499,8 +499,9 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
     header('Pragma: no-cache');
 
     $dateFrom = $parseDate((string)($_GET['date_from'] ?? ''));
-    $dateTo = $parseDate((string)($_GET['date_to'] ?? ''));
-    if ($dateFrom === null || $dateTo === null || $dateFrom > $dateTo) {
+    $today = date('Y-m-d');
+    $dateTo = $today;
+    if ($dateFrom === null || $dateFrom > $dateTo) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Некорректный период'], JSON_UNESCAPED_UNICODE);
         exit;
@@ -588,7 +589,7 @@ if (($_GET['ajax'] ?? '') === 'ltp_load') {
             return $out;
         };
 
-        echo json_encode(['ok' => true, 'tips' => $makeOut($tipsAgg), 'slr' => $makeOut($slrAgg)], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => true, 'tips' => $makeOut($tipsAgg), 'slr' => $makeOut($slrAgg), 'date_from' => $dateFrom, 'date_to' => $dateTo], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -1898,7 +1899,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const urlLtp = new URL(location.href);
                 urlLtp.searchParams.set('ajax', 'ltp_load');
                 urlLtp.searchParams.set('date_from', dateFrom.value);
-                urlLtp.searchParams.set('date_to', addDays(dateTo.value, 1));
+                const dNow = new Date();
+                const today = String(dNow.getFullYear()) + '-' + String(dNow.getMonth() + 1).padStart(2, '0') + '-' + String(dNow.getDate()).padStart(2, '0');
+                urlLtp.searchParams.set('date_to', today);
                 const { signal, cleanup } = withTimeout(20000);
                 const resLtp = await fetch(urlLtp.toString(), { headers: { 'Accept': 'application/json' }, signal });
                 const txtLtp = await resLtp.text();
