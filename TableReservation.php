@@ -1000,7 +1000,18 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       border: 1px solid var(--color-border);
       overflow: auto;
       --map-scale: 1;
+      position: relative;
     }
+    .map-shell::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url("/links/gray-tiles-texture.jpg?v=20260407_1920") center / contain no-repeat;
+      opacity: 0.92;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .map-shell > * { position: relative; z-index: 1; }
   
     .map-zoom-box { width: 820px; height: 620px; }
     .map-zoom-inner { width: 820px; height: 620px; transform: scale(var(--map-scale)); transform-origin: top left; }
@@ -1009,16 +1020,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       width: 820px;
       height: 620px;
       border-radius: var(--radius-md);
-    }
-
-    .tile-underlay {
-      position: absolute;
-      inset: 0;
-      background: url("/links/gray-tiles-texture.jpg?v=20260407_1900") repeat;
-      pointer-events: none;
-      z-index: 0;
-      border-radius: inherit;
-      opacity: 0.92;
     }
 
     .grass-area {
@@ -1869,7 +1870,6 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
             <div class="map-zoom-box" id="mapZoomBox">
             <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="Схема столов ресторана">
-            <div class="tile-underlay" aria-hidden="true"></div>
             <div class="grass-corner-1-7" aria-hidden="true"></div>
             <button class="table large" style="left: 712px; top: 256px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 382px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
