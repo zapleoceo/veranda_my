@@ -56,7 +56,8 @@
       Array.from(langEl.querySelectorAll('a')).forEach((x) => x.classList.remove('active'));
       a.classList.add('active');
     });
-  })();\nconst root = document.documentElement;
+  })();
+  const root = document.documentElement;
     const mapShell = document.querySelector('.map-shell');
     const mapZoomVal = document.getElementById('mapZoomVal');
     const mapZoomMinus = document.getElementById('mapZoomMinus');
@@ -149,7 +150,7 @@
 
     const setBusyLabel = (dateStr) => {
       const busyDateLabel = document.getElementById('busyDateLabel');
-      if (busyDateLabel) busyDateLabel.textContent = 'Данные на';
+      if (busyDateLabel) busyDateLabel.textContent = t('data_on');
     };
     const setBusyLoader = (isOn) => {
       const busyDateLoader = document.getElementById('busyDateLoader');
@@ -381,7 +382,9 @@
       if (!dtpDateList || !dtpTimeList) return;
       if (!dtpDates.length) {
         const now = new Date();
-        const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const minSlot = getMinSelectableSlot();
+        const m0 = String(minSlot.dateVal || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        const base = m0 ? new Date(Number(m0[1]), Number(m0[2]) - 1, Number(m0[3]), 0, 0, 0) : new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         const days = 28;
         dtpDates = [];
         for (let i = 0; i < days; i++) {
@@ -1436,4 +1439,5 @@
     if (resDate) {
       resDate.addEventListener('input', () => { syncSteps(); invalidateLast(); setBusyLabel(String(resDate.value || '').slice(0, 10)); });
     }
-    setOutput(t('press_ok_then_tables'));\n})();\n
+    setOutput(t('press_ok_then_tables'));
+})();
