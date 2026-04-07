@@ -1184,6 +1184,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
       gap: 10px;
       align-items: center;
     }
+    .station-wrap.cash .side-station { width: 102px; }
     .cash-controls {
       width: 170px;
       display: grid;
