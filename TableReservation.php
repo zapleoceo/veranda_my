@@ -1846,6 +1846,30 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       min-height: 92px;
       font-family: var(--font-body);
     }
+    .modal-card.wide { width: min(980px, 100%); }
+    .req-layout { display: flex; gap: 12px; align-items: flex-start; }
+    .req-left { flex: 1 1 440px; min-width: 0; }
+    .req-right {
+      width: 380px;
+      flex: 0 0 380px;
+      border-radius: 16px;
+      border: 1px solid var(--color-border);
+      background: rgba(0,0,0,0.12);
+      overflow: hidden;
+      box-shadow: 0 18px 45px rgba(0,0,0,0.22);
+      opacity: 0;
+      transform: translateX(10px);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .req-right.open { opacity: 1; transform: translateX(0); }
+    .req-right .pre-title { padding: 10px 12px; font-weight: 900; font-size: 12px; letter-spacing: 0.06em; color: rgba(255,255,255,0.75); border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .req-right .pre-body { max-height: 520px; overflow: auto; }
+    .modal-hint.preorder { border-color: rgba(184,135,70,0.55); box-shadow: 0 0 0 3px rgba(184,135,70,0.12); }
+    @media (max-width: 900px) {
+      .req-layout { flex-direction: column; }
+      .req-right { width: 100%; flex: 0 0 auto; }
+      .req-right .pre-body { max-height: 340px; }
+    }
     #reqGuests { max-width: 80px; }
     #reqGuests::-webkit-outer-spin-button,
     #reqGuests::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -2122,64 +2146,73 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
 
   <div class="modal" id="reqModal" aria-hidden="true">
     <div class="modal-backdrop" data-modal-close="reqModal"></div>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle" id="reqModalCard">
       <div class="modal-title" id="reqModalTitle">Заявка на бронь на столик <span id="reqModalTable"></span></div>
       <form id="reqForm">
-        <div class="modal-grid">
-          <label class="modal-label">
-            Ваше имя
-            <input type="text" id="reqName" autocomplete="name">
-          </label>
-          <label class="modal-label">
-            Ваш номер телефона
-            <input type="tel" id="reqPhone" autocomplete="tel">
-          </label>
-          <label class="modal-label full">
-            Комментарий
-            <textarea id="reqComment" rows="3" placeholder="Пожелания, особые условия…"></textarea>
-          </label>
-          <label class="modal-label">
-            Кол-во гостей
-            <div class="num-step">
-              <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
-              <input type="number" id="reqGuests" min="1" max="99">
-              <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
+        <div class="req-layout">
+          <div class="req-left" id="reqLeft">
+            <div class="modal-grid">
+              <label class="modal-label">
+                Ваше имя
+                <input type="text" id="reqName" autocomplete="name">
+              </label>
+              <label class="modal-label">
+                Ваш номер телефона
+                <input type="tel" id="reqPhone" autocomplete="tel">
+              </label>
+              <label class="modal-label full">
+                Комментарий
+                <textarea id="reqComment" rows="3" placeholder="Пожелания, особые условия…"></textarea>
+              </label>
+              <label class="modal-label">
+                Кол-во гостей
+                <div class="num-step">
+                  <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
+                  <input type="number" id="reqGuests" min="1" max="99">
+                  <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
+                </div>
+              </label>
+              <label class="modal-label">
+                Время старта брони
+                <input type="text" id="reqStart" readonly>
+              </label>
             </div>
-          </label>
-          <label class="modal-label">
-            Время старта брони
-            <input type="text" id="reqStart" readonly>
-          </label>
-        </div>
-        <div class="msgr">
-          <div class="msgr-title">ВАШ МЕССЕНДЖЕР</div>
-          <div class="msgr-row">
-            <button type="button" class="msgr-btn" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
-                <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
-              </svg>
-            </button>
-            <button type="button" class="msgr-btn" aria-label="WhatsApp (скоро)" title="WhatsApp (скоро)" disabled>
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M12 3.2a8.8 8.8 0 0 0-7.5 13.5l-.9 3.3 3.4-.9A8.8 8.8 0 1 0 12 3.2Z" fill="currentColor" opacity=".9"/>
-                <path d="M10.2 8.7c.2-.4.4-.4.7-.4h.5c.2 0 .4 0 .6.4l.7 1.6c.1.3.1.5-.1.7l-.5.5c-.2.2-.2.4-.1.6.4.8 1 1.5 1.7 2 .2.2.4.2.6.1l.6-.3c.2-.1.5-.1.7 0l1.4.7c.4.2.4.4.4.6 0 .2 0 .5-.1.7-.2.5-1 1-1.6 1.1-.5.1-1.1.1-2.6-.6-1.8-.8-3.2-2.6-3.7-3.4-.5-.9-.9-2-.1-3.3Z" fill="#0b0f14"/>
-              </svg>
-            </button>
-            <button type="button" class="msgr-btn" aria-label="Zalo (скоро)" title="Zalo (скоро)" disabled>
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="6" fill="currentColor" opacity=".9"/>
-                <path d="M7.6 16.6v-1.2l5.3-6.3H7.7V7.4h8.7v1.2l-5.3 6.3h5.4v1.7H7.6Z" fill="#0b0f14"/>
-              </svg>
-            </button>
+            <div class="msgr">
+              <div class="msgr-title">ВАШ МЕССЕНДЖЕР</div>
+              <div class="msgr-row">
+                <button type="button" class="msgr-btn" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
+                    <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
+                  </svg>
+                </button>
+                <button type="button" class="msgr-btn" aria-label="WhatsApp (скоро)" title="WhatsApp (скоро)" disabled>
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 3.2a8.8 8.8 0 0 0-7.5 13.5l-.9 3.3 3.4-.9A8.8 8.8 0 1 0 12 3.2Z" fill="currentColor" opacity=".9"/>
+                    <path d="M10.2 8.7c.2-.4.4-.4.7-.4h.5c.2 0 .4 0 .6.4l.7 1.6c.1.3.1.5-.1.7l-.5.5c-.2.2-.2.4-.1.6.4.8 1 1.5 1.7 2 .2.2.4.2.6.1l.6-.3c.2-.1.5-.1.7 0l1.4.7c.4.2.4.4.4.6 0 .2 0 .5-.1.7-.2.5-1 1-1.6 1.1-.5.1-1.1.1-2.6-.6-1.8-.8-3.2-2.6-3.7-3.4-.5-.9-.9-2-.1-3.3Z" fill="#0b0f14"/>
+                  </svg>
+                </button>
+                <button type="button" class="msgr-btn" aria-label="Zalo (скоро)" title="Zalo (скоро)" disabled>
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="6" fill="currentColor" opacity=".9"/>
+                    <path d="M7.6 16.6v-1.2l5.3-6.3H7.7V7.4h8.7v1.2l-5.3 6.3h5.4v1.7H7.6Z" fill="#0b0f14"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="msgr-hint" id="msgrHint" hidden></div>
+            </div>
+            <div class="modal-hint" id="reqHint" hidden></div>
+            <div class="modal-hint preorder" id="preorderReqHint" hidden>Предзаказ обязателен для компаний больше 5 гостей.</div>
+            <div class="modal-note">Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.</div>
+            <div class="modal-actions">
+              <button class="btn btn-secondary" type="button" data-modal-close="reqModal">Закрыть</button>
+              <button class="btn btn-primary" type="submit" id="reqSubmit">Отправить</button>
+            </div>
           </div>
-          <div class="msgr-hint" id="msgrHint" hidden></div>
-        </div>
-        <div class="modal-hint" id="reqHint" hidden></div>
-        <div class="modal-note">Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.</div>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" type="button" data-modal-close="reqModal">Закрыть</button>
-          <button class="btn btn-primary" type="submit" id="reqSubmit">Отправить</button>
+          <div class="req-right" id="preorderPanel" hidden>
+            <div class="pre-title">МЕНЮ · ПРЕДЗАКАЗ</div>
+            <div class="pre-body" id="preorderBody"></div>
+          </div>
         </div>
       </form>
     </div>
@@ -2392,7 +2425,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     const capModalYes = document.getElementById('capModalYes');
     const capModalNo = document.getElementById('capModalNo');
     const reqModal = document.getElementById('reqModal');
+    const reqModalCard = document.getElementById('reqModalCard');
     const reqForm = document.getElementById('reqForm');
+    const reqLeft = document.getElementById('reqLeft');
     const reqName = document.getElementById('reqName');
     const reqPhone = document.getElementById('reqPhone');
     const reqComment = document.getElementById('reqComment');
@@ -2402,6 +2437,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     const reqGuestsPlus = document.getElementById('reqGuestsPlus');
     const reqStart = document.getElementById('reqStart');
     const reqHint = document.getElementById('reqHint');
+    const preorderReqHint = document.getElementById('preorderReqHint');
+    const preorderPanel = document.getElementById('preorderPanel');
+    const preorderBody = document.getElementById('preorderBody');
     const reqSubmit = document.getElementById('reqSubmit');
     const msgrTgBtn = document.getElementById('msgrTgBtn');
     const msgrHint = document.getElementById('msgrHint');
@@ -2667,6 +2705,28 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     let linkedTg = null;
     let submitBusy = false;
     let submitPrevText = '';
+    const setPreorderOpen = (on) => {
+      if (!preorderPanel) return;
+      if (on) {
+        if (preorderPanel.hidden) preorderPanel.hidden = false;
+        preorderPanel.classList.add('open');
+        if (preorderBody && preorderBody.childElementCount === 0) preorderBody.textContent = 'Загрузка меню…';
+      } else {
+        preorderPanel.classList.remove('open');
+        setTimeout(() => {
+          if (!preorderPanel.classList.contains('open')) preorderPanel.hidden = true;
+        }, 190);
+      }
+    };
+    const updatePreorderUi = () => {
+      const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
+      const on = guests > 5;
+      if (preorderReqHint) preorderReqHint.hidden = !on;
+      if (reqModalCard) reqModalCard.classList.toggle('wide', on);
+      setPreorderOpen(on);
+      if (!on) return;
+      if (preorderBody) preorderBody.textContent = 'Загрузка меню…';
+    };
     const parseIsoLocal = (raw) => {
       const s = String(raw || '').trim();
       const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
@@ -2710,6 +2770,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       }
       if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
       syncSubmitState();
+      updatePreorderUi();
       if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) setMsgrHint('Для отправки привяжи Telegram.');
       setModal(reqModal, true);
       if (reqName) reqName.focus();
@@ -2814,6 +2875,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     if (reqGuests) {
       reqGuests.addEventListener('input', () => {
         if (pendingBooking) pendingBooking.guests = Number(reqGuests.value || 0) || pendingBooking.guests;
+        updatePreorderUi();
         if (reqGuestsHintTimer) clearTimeout(reqGuestsHintTimer);
         reqGuestsHintTimer = setTimeout(() => { updateReqGuestsHint().catch(() => null); }, 180);
       });
