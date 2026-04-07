@@ -179,6 +179,67 @@ $mkDays = function (string $from, string $to): array {
     return $out;
 };
 
+if (($_GET['ajax'] ?? '') === 'hours_by_day') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+
+    $dateFrom = $parseDate((string)($_GET['date_from'] ?? ''));
+    $dateTo = $parseDate((string)($_GET['date_to'] ?? ''));
+    $userId = (int)($_GET['user_id'] ?? 0);
+    if ($dateFrom === null || $dateTo === null || $dateFrom > $dateTo || $userId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $cacheKey = 'hours_by_day_' . $userId . '_' . $dateFrom . '_' . $dateTo;
+    $cached = $_SESSION[$cacheKey] ?? null;
+    if (is_array($cached) && isset($cached['created_at']) && is_numeric($cached['created_at']) && (time() - (int)$cached['created_at']) < 3600) {
+        echo json_encode(['ok' => true, 'user_id' => $userId, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'days' => $cached['days'] ?? [], 'total_hours' => $cached['total_hours'] ?? 0], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $days = $mkDays($dateFrom, $dateTo);
+    if (!$days) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Нет дней'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    try {
+        $api = new \App\Classes\PosterAPI($posterToken);
+        $out = [];
+        $total = 0.0;
+        foreach ($days as $d) {
+            $ymd = str_replace('-', '', $d);
+            $rows = $api->request('dash.getWaitersSales', ['dateFrom' => $ymd, 'dateTo' => $ymd], 'GET');
+            if (!is_array($rows)) $rows = [];
+            $workedMin = 0;
+            foreach ($rows as $r) {
+                if (!is_array($r)) continue;
+                $uid = (int)($r['user_id'] ?? 0);
+                if ($uid !== $userId) continue;
+                $worked = $r['worked_time'] ?? null;
+                if ($worked === null) $worked = $r['workedTime'] ?? null;
+                if ($worked === null) $worked = $r['middle_time'] ?? null;
+                $workedMin = is_numeric($worked) ? (int)round((float)$worked) : 0;
+                break;
+            }
+            $h = $workedMin > 0 ? round($workedMin / 60, 2) : 0;
+            $out[] = ['date' => $d, 'hours' => $h];
+            $total += (float)$h;
+        }
+        $total = round($total, 2);
+        $_SESSION[$cacheKey] = ['created_at' => time(), 'days' => $out, 'total_hours' => $total];
+        echo json_encode(['ok' => true, 'user_id' => $userId, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'days' => $out, 'total_hours' => $total], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'tips_prepare') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -981,6 +1042,41 @@ $firstOfMonth = date('Y-m-01');
         #empTable.hide-col-tipsToPay .col-ttp { display: none; }
         #empTable.hide-col-salary .col-salary { display: none; }
         #empTable.hide-col-salaryToPay .col-salarytopay { display: none; }
+        .hours-btn {
+            border: 0;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            font: inherit;
+            font-weight: 900;
+            color: #111827;
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-color: rgba(26,115,232,0.35);
+            text-underline-offset: 3px;
+        }
+        .hours-btn:hover { color: #1a73e8; text-decoration-color: rgba(26,115,232,0.75); }
+        .hours-pop {
+            position: fixed;
+            z-index: 2600;
+            width: 260px;
+            max-width: calc(100vw - 24px);
+            max-height: 55vh;
+            overflow: auto;
+            background: rgba(255,255,255,0.98);
+            border: 1px solid rgba(0,0,0,0.10);
+            border-radius: 12px;
+            box-shadow: 0 18px 45px rgba(0,0,0,0.18);
+            padding: 10px;
+            color: #111827;
+        }
+        .hours-pop .h-title { font-weight: 900; font-size: 12px; }
+        .hours-pop .h-sub { margin-top: 4px; color:#6b7280; font-weight: 800; font-size: 11px; }
+        .hours-pop .h-list { margin-top: 10px; display: grid; gap: 6px; }
+        .hours-pop .h-row { display:flex; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 800; }
+        .hours-pop .h-row .d { color:#374151; }
+        .hours-pop .h-row .v { font-variant-numeric: tabular-nums; }
+        .hours-pop .h-total { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.08); display:flex; justify-content: space-between; font-weight: 900; font-size: 12px; }
         #empTable tfoot td {
             position: sticky;
             bottom: 0;
@@ -1384,6 +1480,39 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const tipsAccBalanceEl = document.getElementById('tipsAccBalance');
     const tipsTableSumEl = document.getElementById('tipsTableSum');
     const tipsBalanceDiffEl = document.getElementById('tipsBalanceDiff');
+    const hoursDayCache = new Map();
+    let hoursPopEl = null;
+    const closeHoursPop = () => {
+        if (hoursPopEl) { hoursPopEl.remove(); hoursPopEl = null; }
+    };
+    document.addEventListener('click', (e) => {
+        if (!hoursPopEl) return;
+        const t = e.target;
+        if (hoursPopEl.contains && hoursPopEl.contains(t)) return;
+        if (t && t.closest && t.closest('.hours-btn')) return;
+        closeHoursPop();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeHoursPop();
+    });
+    const showHoursPop = (anchor, html) => {
+        closeHoursPop();
+        const pop = document.createElement('div');
+        pop.className = 'hours-pop';
+        pop.innerHTML = html;
+        document.body.appendChild(pop);
+        hoursPopEl = pop;
+
+        const r = anchor.getBoundingClientRect();
+        const pr = pop.getBoundingClientRect();
+        const margin = 10;
+        let left = r.left;
+        let top = r.bottom + 8;
+        if (left + pr.width > window.innerWidth - margin) left = Math.max(margin, window.innerWidth - margin - pr.width);
+        if (top + pr.height > window.innerHeight - margin) top = Math.max(margin, r.top - 8 - pr.height);
+        pop.style.left = Math.round(left) + 'px';
+        pop.style.top = Math.round(top) + 'px';
+    };
 
     const renderTipsBalanceTotals = () => {
         const tipsTableMinor = Number(lastTtpMinorTotal || 0) || 0;
@@ -1564,7 +1693,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 <td class="col-rate" style="text-align:right;"><input class="rate-input" inputmode="numeric" data-user-id="${esc(r.user_id)}" data-hours="${esc(r.worked_hours)}" data-rate="${esc(r.rate)}" value="${esc(fmtSpaces(String(r.rate || '')))}"></td>
                 <td class="col-role">${esc(r.role_name)}</td>
                 <td class="col-checks" style="text-align:right;">${esc(r.checks)}</td>
-                <td class="col-hours" style="text-align:right;">${esc(r.worked_hours)}</td>
+                <td class="col-hours" style="text-align:right;"><button type="button" class="hours-btn" data-user-id="${esc(r.user_id)}">${esc(r.worked_hours)}</button></td>
                 <td class="col-tips" style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
                 <td class="col-paid" style="text-align:right;">
                     ${tpAmt ? `<div style="font-weight:900;">${esc(tpAmt)}</div>` : '—'}
@@ -1615,6 +1744,54 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         lastTtpMinorTotal = totTtpMinor;
         renderTipsBalanceTotals();
     }
+
+    tbody.addEventListener('click', async (e) => {
+        const t = e.target;
+        const btn = (t && t.closest) ? t.closest('.hours-btn') : null;
+        if (!btn) return;
+        const uid = Number(btn.getAttribute('data-user-id') || 0);
+        if (!uid) return;
+        const row = dataRows.find((x) => Number(x.user_id) === uid);
+        const name = row ? String(row.name || '') : '';
+        const df = dateFrom ? String(dateFrom.value || '').trim() : '';
+        const dt = dateTo ? String(dateTo.value || '').trim() : '';
+        if (!df || !dt) return;
+
+        const key = uid + '|' + df + '|' + dt;
+        showHoursPop(btn, `<div class="h-title">${esc(name || ('ID ' + String(uid)))}</div><div class="h-sub">Загрузка…</div>`);
+        try {
+            let cached = hoursDayCache.get(key) || null;
+            if (!cached) {
+                const url = new URL(location.href);
+                url.searchParams.set('ajax', 'hours_by_day');
+                url.searchParams.set('user_id', String(uid));
+                url.searchParams.set('date_from', df);
+                url.searchParams.set('date_to', dt);
+                const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                const txt = await res.text();
+                let j = null;
+                try { j = JSON.parse(txt); } catch (_) {}
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                cached = j;
+                hoursDayCache.set(key, cached);
+            }
+            const days = Array.isArray(cached.days) ? cached.days : [];
+            const list = days.map((it) => {
+                const d = String(it && it.date ? it.date : '');
+                const v = Number(it && it.hours ? it.hours : 0) || 0;
+                return `<div class="h-row"><div class="d">${esc(d)}</div><div class="v">${esc(String(v))}</div></div>`;
+            }).join('');
+            const tot = Number(cached.total_hours || 0) || 0;
+            showHoursPop(btn, `
+                <div class="h-title">${esc(name || ('ID ' + String(uid)))}</div>
+                <div class="h-sub">Часы по дням · ${esc(df)} — ${esc(dt)}</div>
+                <div class="h-list">${list || '<div class="h-sub">Нет данных</div>'}</div>
+                <div class="h-total"><span>Итого</span><span>${esc(String(tot))}</span></div>
+            `);
+        } catch (err) {
+            showHoursPop(btn, `<div class="h-title">${esc(name || ('ID ' + String(uid)))}</div><div class="h-sub">${esc(String(err && err.message ? err.message : err))}</div>`);
+        }
+    });
 
     const withTimeout = (ms = 30000) => {
         const ctrl = new AbortController();
