@@ -481,8 +481,8 @@
       pointer-events: none;
     }
     @keyframes dtBorder {
-      from { background-position: 0 0, 0 0; }
-      to { background-position: 0 0, 220px 0; }
+      from { background-position: 0 0; }
+      to { background-position: 220px 0; }
     }
     .dt-btn:focus-visible {
       outline: none;
