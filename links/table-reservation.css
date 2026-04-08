@@ -622,6 +622,18 @@
       filter: drop-shadow(0 8px 16px rgba(0,0,0,0.22));
       pointer-events: none;
     }
+    .water-fall {
+      stroke-dasharray: 8 10;
+      animation: waterDrop 0.9s linear infinite;
+    }
+    .water-fall-center {
+      stroke-dasharray: 10 12;
+      animation: waterDrop 0.7s linear infinite;
+    }
+    @keyframes waterDrop {
+      from { stroke-dashoffset: 18; }
+      to { stroke-dashoffset: 0; }
+    }
     .koi {
       position: absolute;
       left: 50%;
