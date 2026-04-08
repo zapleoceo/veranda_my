@@ -1088,7 +1088,8 @@
       .modal-actions { position: sticky; bottom: 0; background: rgba(0,0,0,0.18); padding-top: 10px; margin-top: 10px; z-index: 2; }
       .req-right { display: none !important; }
       
-      .btn-preorder-mobile { display: inline-flex !important; align-items: center; justify-content: center; padding: 0; width: 44px; height: 44px; margin-left: auto; border-radius: 12px; }
+       .btn-preorder-mobile { display: inline-flex !important; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; height: 44px; margin-left: auto; border-radius: 12px; white-space: nowrap; font-size: 12px; }
+       .btn-preorder-mobile svg { width: 18px; height: 18px; flex: 0 0 auto; }
       .btn-preorder-mobile[hidden] { display: none !important; }
     }
     
@@ -1138,9 +1139,10 @@
     #reqGuests::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     #reqGuests { -moz-appearance: textfield; }
     .num-step {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 8px;
+      width: 100%;
     }
     .num-step .num-btn {
       width: 34px;

@@ -68,6 +68,7 @@ $I18N = [
     'link_tg_hint' => 'Для отправки привяжи Telegram.',
     'preorder_title' => 'МЕНЮ · ПРЕДЗАКАЗ',
     'preorder_required' => 'Предзаказ обязателен для компаний больше 5 гостей.',
+    'menu_btn' => 'Меню',
     'menu_loading' => 'Загрузка меню…',
     'menu_unavailable' => 'Меню недоступно.',
     'menu_load_failed' => 'Не удалось загрузить меню.',
@@ -137,6 +138,7 @@ $I18N = [
     'link_tg_hint' => 'Link Telegram to submit.',
     'preorder_title' => 'MENU · PRE-ORDER',
     'preorder_required' => 'Pre-order is required for parties over 5 guests.',
+    'menu_btn' => 'Menu',
     'menu_loading' => 'Loading menu…',
     'menu_unavailable' => 'Menu unavailable.',
     'menu_load_failed' => 'Failed to load menu.',
@@ -206,6 +208,7 @@ $I18N = [
     'link_tg_hint' => 'Liên kết Telegram để gửi.',
     'preorder_title' => 'MENU · ĐẶT TRƯỚC',
     'preorder_required' => 'Bắt buộc đặt trước cho nhóm trên 5 khách.',
+    'menu_btn' => 'Menu',
     'menu_loading' => 'Đang tải menu…',
     'menu_unavailable' => 'Không có menu.',
     'menu_load_failed' => 'Không tải được menu.',
@@ -1273,7 +1276,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0002">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0003">
 
 </head>
 <body>
@@ -1456,8 +1459,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
                   <input type="number" id="reqGuests" min="1" max="99">
                   <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
-                  <button type="button" class="btn btn-secondary btn-preorder-mobile" id="btnOpenMobilePreorder" hidden aria-label="Меню">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:18px;height:18px;"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                  <button type="button" class="btn btn-secondary btn-preorder-mobile" id="btnOpenMobilePreorder" hidden aria-label="Menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    <span data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></span>
                   </button>
                 </div>
               </label>
@@ -1517,6 +1521,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260408_0002"></script>
+  <script src="/links/table-reservation.js?v=20260408_0003"></script>
 </body>
 </html>
