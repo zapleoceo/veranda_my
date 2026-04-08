@@ -453,6 +453,7 @@
     }
 
     .dt-btn {
+      position: relative;
       border: 1px solid rgba(255,255,255,0.14);
       background: rgba(255,255,255,0.06);
       color: rgba(245,238,228,0.92);
@@ -463,14 +464,21 @@
       cursor: pointer;
     }
     .dt-btn.attn {
-      border: 1px solid transparent;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.06)) padding-box,
-        linear-gradient(90deg, rgba(184,135,70,0.15), rgba(184,135,70,0.95), rgba(184,135,70,0.15)) border-box;
-      background-size: auto, 220px 100%;
+      border-color: transparent;
+    }
+    .dt-btn.attn::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 13px;
+      padding: 1px;
+      background: linear-gradient(90deg, rgba(184,135,70,0.15), rgba(184,135,70,0.95), rgba(184,135,70,0.15));
+      background-size: 220px 100%;
       animation: dtBorder 1.15s linear infinite;
-      -webkit-background-clip: padding-box, border-box;
-      background-clip: padding-box, border-box;
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
     }
     @keyframes dtBorder {
       from { background-position: 0 0, 0 0; }
