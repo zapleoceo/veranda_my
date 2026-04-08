@@ -664,6 +664,7 @@
     const mobilePreorderModal = document.getElementById('mobilePreorderModal');
     const mobilePreorderBox = document.getElementById('mobilePreorderBox');
     const mobilePreorderMenuBody = document.getElementById('mobilePreorderMenuBody');
+    const mobilePreorderTotal = document.getElementById('mobilePreorderTotal');
 
     const updatePreorderUi = () => {
       const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
@@ -730,6 +731,12 @@
       const keys = Object.keys(counts).sort((a, b) => a.localeCompare(b, UI_LOCALE, { sensitivity: 'base' }));
       reqPreorderBox.innerHTML = '';
       if (mobilePreorderBox) mobilePreorderBox.innerHTML = '';
+
+      const totalPrice = keys.reduce((acc, key) => {
+        const price = (window.preorderPriceByKey && window.preorderPriceByKey[key]) ? Number(window.preorderPriceByKey[key]) : 0;
+        return acc + (price * (Number(counts[key] || 0) || 0));
+      }, 0);
+      if (mobilePreorderTotal) mobilePreorderTotal.textContent = keys.length ? fmtPrice(totalPrice) : '';
       
       const renderToTarget = (targetBox, isMobile) => {
         if (!targetBox) return;
@@ -745,7 +752,6 @@
           }
           return;
         }
-        let total = 0;
         keys.forEach((key) => {
           const row = document.createElement('div');
           row.className = 'preorder-line';
@@ -758,8 +764,6 @@
           const qty = document.createElement('div');
           qty.className = 'preorder-qty';
           qty.textContent = 'x' + String(counts[key]);
-          const price = (window.preorderPriceByKey && window.preorderPriceByKey[key]) ? Number(window.preorderPriceByKey[key]) : 0;
-          total += price * counts[key];
           const minus = document.createElement('button');
           minus.type = 'button';
           minus.className = 'preorder-minus';
@@ -770,10 +774,12 @@
           row.appendChild(minus);
           targetBox.appendChild(row);
         });
-        const totalEl = document.createElement('div');
-        totalEl.className = 'preorder-total';
-        totalEl.textContent = fmtPrice(total);
-        targetBox.appendChild(totalEl);
+        if (!isMobile) {
+          const totalEl = document.createElement('div');
+          totalEl.className = 'preorder-total';
+          totalEl.textContent = fmtPrice(totalPrice);
+          targetBox.appendChild(totalEl);
+        }
         
         if (!isMobile) {
           const commentH = reqComment ? reqComment.scrollHeight : 0;

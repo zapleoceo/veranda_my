@@ -990,7 +990,7 @@
     }
     .preorder-line + .preorder-line { margin-top: 6px; }
     .preorder-title { font-weight: 800; color: rgba(255,255,255,0.92); font-size: 12px; line-height: 1.2; }
-    .preorder-qty { font-weight: 900; color: rgba(184,135,70,0.95); font-variant-numeric: tabular-nums; }
+    .preorder-qty { font-weight: 900; color: rgba(184,135,70,0.95); font-variant-numeric: tabular-nums; flex: 0 0 44px; text-align: right; }
     .preorder-minus {
       width: 28px;
       height: 28px;
@@ -1085,13 +1085,15 @@
       .modal-title { font-size: 15px; }
       #reqForm { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
       .req-layout { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding-right: 2px; min-height: 0; }
-      .modal-actions { position: sticky; bottom: 0; background: rgba(0,0,0,0.18); padding-top: 10px; margin-top: 10px; z-index: 2; }
+      .modal-actions { position: sticky; bottom: 0; background: transparent; padding-top: 10px; margin-top: 10px; z-index: 2; }
       .req-right { display: none !important; }
       
        .btn-preorder-mobile { display: inline-flex !important; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; height: 44px; margin-left: auto; border-radius: 12px; white-space: nowrap; font-size: 12px; }
        .btn-preorder-mobile svg { width: 18px; height: 18px; flex: 0 0 auto; }
       .btn-preorder-mobile[hidden] { display: none !important; }
     }
+
+    #reqModal .modal-actions { justify-content: center; }
     
     .preorder-modal-card {
       padding: 0;
@@ -1106,6 +1108,8 @@
       border-bottom: 1px solid rgba(255,255,255,0.08);
       background: rgba(0,0,0,0.15);
     }
+    .modal-title-left { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+    .modal-total { font-weight: 900; font-size: 12px; color: rgba(184,135,70,0.95); font-variant-numeric: tabular-nums; }
     .btn-close-modal {
       background: transparent;
       border: none;
