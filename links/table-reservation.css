@@ -38,9 +38,10 @@
   
     .app {
       min-height: 100vh;
-      padding: var(--space-6);
-      display: grid;
-      place-items: center;
+      padding: 60px var(--space-6) var(--space-6);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
     }
   
     .panel {

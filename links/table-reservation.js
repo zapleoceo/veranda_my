@@ -572,8 +572,8 @@
         const el = document.getElementById(id);
         if (id === 'reqModal' || id === 'mobilePreorderModal') {
             if (id === 'reqModal') saveDraft();
+            setModal(el, false);
             if (history.state && history.state.modal === id) history.back();
-            else setModal(el, false);
         } else {
             setModal(el, false);
         }
@@ -592,8 +592,8 @@
           if (m && m.classList.contains('on')) {
             if (m.id === 'reqModal' || m.id === 'mobilePreorderModal') {
                 if (m.id === 'reqModal') saveDraft();
+                setModal(m, false);
                 if (history.state && history.state.modal === m.id) history.back();
-                else setModal(m, false);
             } else {
                 setModal(m, false);
             }
@@ -1195,6 +1195,7 @@
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
           setModal(reqModal, false);
+          if (history.state && history.state.modal === 'reqModal') history.back();
           setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableNum, guests: String(guests), name, phone }));
         } catch (err) {
           setOutput({ ok: false, error: String(err && err.message ? err.message : err) });
