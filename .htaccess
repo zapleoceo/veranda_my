@@ -6,3 +6,7 @@ RewriteRule ^links/?$ links/index.php [L,QSA]
 RewriteRule ^sepay/?$ sepay/index.php [L,QSA]
 RewriteRule ^payday/?$ payday/index.php [L,QSA]
 RewriteRule ^TableReservation/?$ TableReservation.php [L,QSA]
+
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^(.*)$ $1.php [L,QSA]

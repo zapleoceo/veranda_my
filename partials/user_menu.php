@@ -27,6 +27,12 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
     .user-dropdown details[open] .ud-summary { background: #f4f7f6; }
     .user-dropdown .ud-summary::after { content: "›"; float: right; color: #9aa0a6; font-weight: 900; }
     .user-dropdown details[open] .ud-summary::after { content: "⌄"; }
+    @media (max-width: 768px) {
+        .top-nav { flex-wrap: wrap !important; }
+        .top-nav .nav-left { order: 1; flex: 0 0 auto; }
+        .top-nav .user-menu { order: 2; margin-left: auto; }
+        .top-nav .nav-mid { order: 3; flex: 1 1 100%; margin-top: 10px; }
+    }
 </style>
 <div class="user-menu">
     <div class="user-chip" data-name="<?= htmlspecialchars($userLabel, ENT_QUOTES) ?>">
