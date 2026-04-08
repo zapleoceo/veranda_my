@@ -1108,6 +1108,9 @@
       display: flex;
       flex-direction: column;
     }
+    .preorder-modal-card .modal-title-bar {
+      padding: 14px 14px 10px;
+    }
     .modal-title-bar {
       display: flex;
       align-items: center;
@@ -1210,11 +1213,17 @@
     .msgr-btn svg { width: 22px; height: 22px; }
     .msgr-btn:hover { transform: translateY(-1px); filter: saturate(1.05); }
     .msgr-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+    .label-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
     .msgr-hint {
-      margin-top: 10px;
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1.35;
       color: rgba(245, 238, 228, 0.78);
+      text-align: right;
     }
     .modal-hint {
       margin-top: 10px;
