@@ -743,14 +743,11 @@
       
       const renderToTarget = (targetBox, isMobile) => {
         if (!targetBox) return;
-        const commentH = (!isMobile && reqComment) ? reqComment.getBoundingClientRect().height : 0;
-        const fixedH = (!isMobile && commentH > 0) ? Math.round(commentH) : 92;
         if (!keys.length) {
           const empty = document.createElement('div');
           empty.className = 'preorder-empty';
           empty.textContent = '—';
           targetBox.appendChild(empty);
-          if (!isMobile) targetBox.style.height = String(fixedH) + 'px';
           return;
         }
         keys.forEach((key) => {
@@ -781,8 +778,6 @@
           totalEl.textContent = fmtPrice(totalPrice);
           targetBox.appendChild(totalEl);
         }
-        
-        if (!isMobile) targetBox.style.height = String(fixedH) + 'px';
       };
 
       renderToTarget(reqPreorderBox, false);

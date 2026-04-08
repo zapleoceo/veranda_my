@@ -1276,7 +1276,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0006">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0007">
 
 </head>
 <body>
@@ -1425,7 +1425,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle" id="reqModalCard">
       <div class="modal-title-bar">
         <div class="modal-title" id="reqModalTitle"><span data-i18n="booking_request"><?= htmlspecialchars(tr('booking_request')) ?></span> <span id="reqModalTable"></span></div>
-        <button class="btn-close-modal" type="button" data-modal-close="reqModal" aria-label="<?= htmlspecialchars(tr('close')) ?>">×</button>
       </div>
       <form id="reqForm">
         <div class="req-layout">
@@ -1452,7 +1451,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
                   <div class="msgr-hint inline" id="msgrHint" hidden></div>
                 </div>
-                <textarea id="reqComment" rows="3" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
+                <textarea id="reqComment" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
               </label>
               <label class="modal-label full" id="reqPreorderLabel" hidden>
                 <span data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
@@ -1497,14 +1496,13 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   </div>
 
   <div class="modal" id="mobilePreorderModal" aria-hidden="true">
-    <div class="modal-backdrop modal-backdrop-strong"></div>
+    <div class="modal-backdrop modal-backdrop-strong" data-modal-close="mobilePreorderModal"></div>
     <div class="modal-card preorder-modal-card" role="dialog" aria-modal="true" aria-labelledby="mobilePreorderTitle">
       <div class="modal-title-bar">
         <div class="modal-title-left">
           <div class="modal-title" id="mobilePreorderTitle" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></div>
           <div class="modal-total" id="mobilePreorderTotal"></div>
         </div>
-        <button class="btn-close-modal" type="button" data-modal-close="mobilePreorderModal" aria-label="Закрыть">×</button>
       </div>
       <div class="mobile-preorder-layout">
         <div class="preorder-top">
@@ -1528,6 +1526,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260408_0006"></script>
+  <script src="/links/table-reservation.js?v=20260408_0007"></script>
 </body>
 </html>
