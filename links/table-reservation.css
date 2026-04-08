@@ -933,6 +933,7 @@
     .modal-text { margin-top: 10px; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.35; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    #reqModal .modal-grid { grid-template-columns: 1fr; }
     .modal-label { display: grid; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-top: 0; }
     .modal-label.full { grid-column: 1 / -1; }
     .phone-row { display: flex; align-items: center; gap: 10px; }

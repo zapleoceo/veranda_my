@@ -675,10 +675,7 @@
         reqPreorderLabel.hidden = !on;
         reqPreorderLabel.style.display = on ? '' : 'none';
       }
-      if (reqCommentLabel) {
-        if (on) reqCommentLabel.classList.remove('full');
-        else reqCommentLabel.classList.add('full');
-      }
+      if (reqCommentLabel) reqCommentLabel.classList.add('full');
       if (btnOpenMobilePreorder) {
         btnOpenMobilePreorder.hidden = !on;
       }
