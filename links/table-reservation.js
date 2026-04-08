@@ -525,8 +525,8 @@
       if (on) {
         el.classList.add('on');
         el.setAttribute('aria-hidden', 'false');
-        if (el.id === 'reqModal') {
-          history.pushState({ modal: 'reqModal' }, '');
+        if (el.id === 'reqModal' || el.id === 'mobilePreorderModal') {
+          history.pushState({ modal: el.id }, '');
         }
       } else {
         el.classList.remove('on');
@@ -570,9 +570,9 @@
         const id = String(x.getAttribute('data-modal-close') || '');
         if (!id) return;
         const el = document.getElementById(id);
-        if (id === 'reqModal') {
-            saveDraft();
-            if (history.state && history.state.modal === 'reqModal') history.back();
+        if (id === 'reqModal' || id === 'mobilePreorderModal') {
+            if (id === 'reqModal') saveDraft();
+            if (history.state && history.state.modal === id) history.back();
             else setModal(el, false);
         } else {
             setModal(el, false);
@@ -587,12 +587,12 @@
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        const modals = [reqModal, capModal, dtpModal];
-        modals.forEach(m => {
+        const modals = [mobilePreorderModal, reqModal, capModal, dtpModal];
+        for (const m of modals) {
           if (m && m.classList.contains('on')) {
-            if (m.id === 'reqModal') {
-                saveDraft();
-                if (history.state && history.state.modal === 'reqModal') history.back();
+            if (m.id === 'reqModal' || m.id === 'mobilePreorderModal') {
+                if (m.id === 'reqModal') saveDraft();
+                if (history.state && history.state.modal === m.id) history.back();
                 else setModal(m, false);
             } else {
                 setModal(m, false);
@@ -601,12 +601,17 @@
               capConfirmResolve(false);
               capConfirmResolve = null;
             }
+            break;
           }
-        });
+        }
       }
     });
 
     window.addEventListener('popstate', (e) => {
+      if (mobilePreorderModal && mobilePreorderModal.classList.contains('on') && (!e.state || e.state.modal !== 'mobilePreorderModal')) {
+        setModal(mobilePreorderModal, false);
+        return;
+      }
       if (reqModal && reqModal.classList.contains('on') && (!e.state || e.state.modal !== 'reqModal')) {
         saveDraft();
         reqModal.classList.remove('on');
@@ -655,6 +660,11 @@
         }, 190);
       }
     };
+    const btnOpenMobilePreorder = document.getElementById('btnOpenMobilePreorder');
+    const mobilePreorderModal = document.getElementById('mobilePreorderModal');
+    const mobilePreorderBox = document.getElementById('mobilePreorderBox');
+    const mobilePreorderMenuBody = document.getElementById('mobilePreorderMenuBody');
+
     const updatePreorderUi = () => {
       const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
       const on = guests > 5;
@@ -667,6 +677,9 @@
       if (reqCommentLabel) {
         if (on) reqCommentLabel.classList.remove('full');
         else reqCommentLabel.classList.add('full');
+      }
+      if (btnOpenMobilePreorder) {
+        btnOpenMobilePreorder.hidden = !on;
       }
       setPreorderOpen(on);
       if (!on) {
@@ -716,50 +729,62 @@
       const counts = normalizePreorder(preorderCounts);
       const keys = Object.keys(counts).sort((a, b) => a.localeCompare(b, UI_LOCALE, { sensitivity: 'base' }));
       reqPreorderBox.innerHTML = '';
-      if (!keys.length) {
-        const empty = document.createElement('div');
-        empty.className = 'preorder-empty';
-        empty.textContent = '—';
-        reqPreorderBox.appendChild(empty);
-        const desired = 92;
-        reqPreorderBox.style.height = String(desired) + 'px';
-        if (reqComment) reqComment.style.height = String(desired) + 'px';
-        return;
-      }
-      let total = 0;
-      keys.forEach((key) => {
-        const row = document.createElement('div');
-        row.className = 'preorder-line';
-        row.setAttribute('data-preorder-title', key);
-        const left = document.createElement('div');
-        const tEl = document.createElement('div');
-        tEl.className = 'preorder-title';
-        tEl.textContent = getPreorderUiTitle(key);
-        left.appendChild(tEl);
-        const qty = document.createElement('div');
-        qty.className = 'preorder-qty';
-        qty.textContent = 'x' + String(counts[key]);
-        const price = (window.preorderPriceByKey && window.preorderPriceByKey[key]) ? Number(window.preorderPriceByKey[key]) : 0;
-        total += price * counts[key];
-        const minus = document.createElement('button');
-        minus.type = 'button';
-        minus.className = 'preorder-minus';
-        minus.setAttribute('data-preorder-minus', key);
-        minus.textContent = '−';
-        row.appendChild(left);
-        row.appendChild(qty);
-        row.appendChild(minus);
-        reqPreorderBox.appendChild(row);
-      });
-      const totalEl = document.createElement('div');
-      totalEl.className = 'preorder-total';
-      totalEl.textContent = fmtPrice(total);
-      reqPreorderBox.appendChild(totalEl);
+      if (mobilePreorderBox) mobilePreorderBox.innerHTML = '';
+      
+      const renderToTarget = (targetBox, isMobile) => {
+        if (!targetBox) return;
+        if (!keys.length) {
+          const empty = document.createElement('div');
+          empty.className = 'preorder-empty';
+          empty.textContent = '—';
+          targetBox.appendChild(empty);
+          if (!isMobile) {
+            const desired = 92;
+            targetBox.style.height = String(desired) + 'px';
+            if (reqComment) reqComment.style.height = String(desired) + 'px';
+          }
+          return;
+        }
+        let total = 0;
+        keys.forEach((key) => {
+          const row = document.createElement('div');
+          row.className = 'preorder-line';
+          row.setAttribute('data-preorder-title', key);
+          const left = document.createElement('div');
+          const tEl = document.createElement('div');
+          tEl.className = 'preorder-title';
+          tEl.textContent = getPreorderUiTitle(key);
+          left.appendChild(tEl);
+          const qty = document.createElement('div');
+          qty.className = 'preorder-qty';
+          qty.textContent = 'x' + String(counts[key]);
+          const price = (window.preorderPriceByKey && window.preorderPriceByKey[key]) ? Number(window.preorderPriceByKey[key]) : 0;
+          total += price * counts[key];
+          const minus = document.createElement('button');
+          minus.type = 'button';
+          minus.className = 'preorder-minus';
+          minus.setAttribute('data-preorder-minus', key);
+          minus.textContent = '−';
+          row.appendChild(left);
+          row.appendChild(qty);
+          row.appendChild(minus);
+          targetBox.appendChild(row);
+        });
+        const totalEl = document.createElement('div');
+        totalEl.className = 'preorder-total';
+        totalEl.textContent = fmtPrice(total);
+        targetBox.appendChild(totalEl);
+        
+        if (!isMobile) {
+          const commentH = reqComment ? reqComment.scrollHeight : 0;
+          const desired = Math.min(240, Math.max(92, targetBox.scrollHeight, commentH));
+          targetBox.style.height = String(desired) + 'px';
+          if (reqComment) reqComment.style.height = String(desired) + 'px';
+        }
+      };
 
-      const commentH = reqComment ? reqComment.scrollHeight : 0;
-      const desired = Math.min(240, Math.max(92, reqPreorderBox.scrollHeight, commentH));
-      reqPreorderBox.style.height = String(desired) + 'px';
-      if (reqComment) reqComment.style.height = String(desired) + 'px';
+      renderToTarget(reqPreorderBox, false);
+      renderToTarget(mobilePreorderBox, true);
     };
     const incPreorder = (key, uiTitle) => {
       const t0 = String(key || '').trim();
@@ -797,77 +822,91 @@
       return new Intl.NumberFormat(UI_LOCALE).format(Math.round(v)) + ' ₫';
     };
     const renderPreorderMenu = () => {
-      if (!preorderBody) return;
+      if (!preorderBody && !mobilePreorderMenuBody) return;
       const groups = preorderMenu && typeof preorderMenu === 'object' && Array.isArray(preorderMenu.groups) ? preorderMenu.groups : [];
       if (!groups.length) {
-        preorderBody.textContent = t('menu_unavailable');
+        if (preorderBody) preorderBody.textContent = t('menu_unavailable');
+        if (mobilePreorderMenuBody) mobilePreorderMenuBody.textContent = t('menu_unavailable');
         return;
       }
-      preorderBody.innerHTML = '';
-      groups.forEach((g) => {
-        const details = document.createElement('details');
-        details.className = 'pre-group';
-        details.open = false;
-        const sum = document.createElement('summary');
-        const t = document.createElement('span');
-        t.textContent = String(g.title || '');
-        const cnt = document.createElement('span');
-        cnt.className = 'cnt';
-        const itemsCount = (Array.isArray(g.categories) ? g.categories : []).reduce((acc, c) => acc + (Array.isArray(c.items) ? c.items.length : 0), 0);
-        cnt.textContent = String(itemsCount);
-        sum.appendChild(t);
-        sum.appendChild(cnt);
-        details.appendChild(sum);
-        const cats = Array.isArray(g.categories) ? g.categories : [];
-        cats.forEach((c) => {
-          const catDetails = document.createElement('details');
-          catDetails.className = 'pre-group';
-          catDetails.open = false;
-          const catSum = document.createElement('summary');
-          const catTitle = document.createElement('span');
-          catTitle.textContent = String(c.title || '');
-          const catCnt = document.createElement('span');
-          catCnt.className = 'cnt';
-          const items = Array.isArray(c.items) ? c.items : [];
-          catCnt.textContent = String(items.length);
-          catSum.appendChild(catTitle);
-          catSum.appendChild(catCnt);
-          catDetails.appendChild(catSum);
-          items.forEach((it) => {
-            const uiTitle = String(it && it.title != null ? it.title : '').trim();
-            const ruTitle = String(it && it.ru_title != null ? it.ru_title : '').trim() || uiTitle;
-            if (ruTitle) {
-              window.preorderPriceByKey = Object.assign(window.preorderPriceByKey || {}, { [ruTitle]: (it && it.price != null ? Number(it.price) : 0) || 0 });
-              if (uiTitle) window.preorderUiTitleByKey = Object.assign(window.preorderUiTitleByKey || {}, { [ruTitle]: uiTitle });
-            }
-            const row = document.createElement('div');
-            row.className = 'pre-item';
-            row.setAttribute('data-pre-item', '1');
-            row.setAttribute('data-title', uiTitle);
-            row.setAttribute('data-ru-title', ruTitle);
-            const left = document.createElement('div');
-            const tt = document.createElement('div');
-            tt.className = 't';
-            tt.textContent = uiTitle;
-            left.appendChild(tt);
-            const desc = String(it.description || '').trim();
-            if (desc) {
-              const dd = document.createElement('div');
-              dd.className = 'd';
-              dd.textContent = desc;
-              left.appendChild(dd);
-            }
-            const price = document.createElement('div');
-            price.className = 'p';
-            price.textContent = it.price != null ? fmtPrice(it.price) : '';
-            row.appendChild(left);
-            row.appendChild(price);
-            catDetails.appendChild(row);
+      
+      const createMenuDOM = () => {
+        const container = document.createElement('div');
+        groups.forEach((g) => {
+          const details = document.createElement('details');
+          details.className = 'pre-group';
+          details.open = false;
+          const sum = document.createElement('summary');
+          const tEl = document.createElement('span');
+          tEl.textContent = String(g.title || '');
+          const cnt = document.createElement('span');
+          cnt.className = 'cnt';
+          const itemsCount = (Array.isArray(g.categories) ? g.categories : []).reduce((acc, c) => acc + (Array.isArray(c.items) ? c.items.length : 0), 0);
+          cnt.textContent = String(itemsCount);
+          sum.appendChild(tEl);
+          sum.appendChild(cnt);
+          details.appendChild(sum);
+          const cats = Array.isArray(g.categories) ? g.categories : [];
+          cats.forEach((c) => {
+            const catDetails = document.createElement('details');
+            catDetails.className = 'pre-group';
+            catDetails.open = false;
+            const catSum = document.createElement('summary');
+            const catTitle = document.createElement('span');
+            catTitle.textContent = String(c.title || '');
+            const catCnt = document.createElement('span');
+            catCnt.className = 'cnt';
+            const items = Array.isArray(c.items) ? c.items : [];
+            catCnt.textContent = String(items.length);
+            catSum.appendChild(catTitle);
+            catSum.appendChild(catCnt);
+            catDetails.appendChild(catSum);
+            items.forEach((it) => {
+              const uiTitle = String(it && it.title != null ? it.title : '').trim();
+              const ruTitle = String(it && it.ru_title != null ? it.ru_title : '').trim() || uiTitle;
+              if (ruTitle) {
+                window.preorderPriceByKey = Object.assign(window.preorderPriceByKey || {}, { [ruTitle]: (it && it.price != null ? Number(it.price) : 0) || 0 });
+                if (uiTitle) window.preorderUiTitleByKey = Object.assign(window.preorderUiTitleByKey || {}, { [ruTitle]: uiTitle });
+              }
+              const row = document.createElement('div');
+              row.className = 'pre-item';
+              row.setAttribute('data-pre-item', '1');
+              row.setAttribute('data-title', uiTitle);
+              row.setAttribute('data-ru-title', ruTitle);
+              const left = document.createElement('div');
+              const tt = document.createElement('div');
+              tt.className = 't';
+              tt.textContent = uiTitle;
+              left.appendChild(tt);
+              const desc = String(it.description || '').trim();
+              if (desc) {
+                const dd = document.createElement('div');
+                dd.className = 'd';
+                dd.textContent = desc;
+                left.appendChild(dd);
+              }
+              const price = document.createElement('div');
+              price.className = 'p';
+              price.textContent = it.price != null ? fmtPrice(it.price) : '';
+              row.appendChild(left);
+              row.appendChild(price);
+              catDetails.appendChild(row);
+            });
+            details.appendChild(catDetails);
           });
-          details.appendChild(catDetails);
+          container.appendChild(details);
         });
-        preorderBody.appendChild(details);
-      });
+        return container;
+      };
+
+      if (preorderBody) {
+        preorderBody.innerHTML = '';
+        preorderBody.appendChild(createMenuDOM());
+      }
+      if (mobilePreorderMenuBody) {
+        mobilePreorderMenuBody.innerHTML = '';
+        mobilePreorderMenuBody.appendChild(createMenuDOM());
+      }
     };
     const loadPreorderMenu = async () => {
       if (preorderMenuLoading || preorderMenu) return;
@@ -909,6 +948,34 @@
         const uiTitle = String(target.getAttribute('data-title') || '').trim();
         if (!ruTitle) return;
         incPreorder(ruTitle, uiTitle);
+      });
+    }
+    if (mobilePreorderMenuBody) {
+      mobilePreorderMenuBody.addEventListener('click', (e) => {
+        const target = e.target && e.target.closest ? e.target.closest('[data-pre-item]') : null;
+        if (!target) return;
+        const ruTitle = String(target.getAttribute('data-ru-title') || '').trim();
+        const uiTitle = String(target.getAttribute('data-title') || '').trim();
+        if (!ruTitle) return;
+        incPreorder(ruTitle, uiTitle);
+      });
+    }
+
+    if (btnOpenMobilePreorder) {
+      btnOpenMobilePreorder.addEventListener('click', () => {
+        setModal(mobilePreorderModal, true);
+      });
+    }
+
+    if (mobilePreorderBox) {
+      mobilePreorderBox.addEventListener('click', (e) => {
+        const btn = e.target && e.target.closest ? e.target.closest('[data-preorder-minus]') : null;
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const title = String(btn.getAttribute('data-preorder-minus') || '').trim();
+        if (!title) return;
+        decPreorder(title);
       });
     }
     const parseIsoLocal = (raw) => {

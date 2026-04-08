@@ -1447,6 +1447,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
                   <input type="number" id="reqGuests" min="1" max="99">
                   <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
+                  <button type="button" class="btn btn-secondary btn-preorder-mobile" id="btnOpenMobilePreorder" hidden aria-label="Меню">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:18px;height:18px;"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                  </button>
                 </div>
               </label>
               <label class="modal-label">
@@ -1498,6 +1501,23 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <div class="table-toast" id="tableToast" aria-live="polite" aria-atomic="true">
     <div class="t-title" id="toastTitle"></div>
     <div class="t-reason" id="toastReason"></div>
+  </div>
+
+  <div class="modal" id="mobilePreorderModal" aria-hidden="true">
+    <div class="modal-card preorder-modal-card" role="dialog" aria-modal="true" aria-labelledby="mobilePreorderTitle">
+      <div class="modal-title-bar">
+        <div class="modal-title" id="mobilePreorderTitle" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></div>
+        <button class="btn-close-modal" type="button" data-modal-close="mobilePreorderModal" aria-label="Закрыть">×</button>
+      </div>
+      <div class="mobile-preorder-layout">
+        <div class="preorder-top">
+          <div id="mobilePreorderBox" class="preorder-box"></div>
+        </div>
+        <div class="preorder-bottom">
+          <div id="mobilePreorderMenuBody" class="pre-body"></div>
+        </div>
+      </div>
+    </div>
   </div>
   
     <script>
