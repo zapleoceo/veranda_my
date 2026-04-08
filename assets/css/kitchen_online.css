@@ -1,0 +1,51 @@
+.container { width: 100%; max-width: 1800px; margin: 0 auto; padding: 12px; box-sizing: border-box; }
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
+        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; min-width: 0; }
+        .nav-left a { color: var(--accent); text-decoration: none; font-weight: 500; }
+        .nav-left a:hover { text-decoration: underline; }
+        .nav-title { font-weight: 800; color: var(--text); }
+        .nav-mid { display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 0.95em; flex: 1 1 360px; min-width: 260px; }
+        .ko-refresh { display: inline-flex; align-items: center; gap: 10px; }
+        .ko-refresh-ring { width: 34px; height: 34px; position: relative; display: inline-flex; align-items: center; justify-content: center; }
+        .ko-refresh-ring svg { position: absolute; inset: 0; width: 34px; height: 34px; transform: rotate(-90deg); }
+        .ko-refresh-text { position: relative; z-index: 1; width: 34px; height: 34px; border-radius: 50%; background: var(--card); border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; color: var(--text); font-size: 12px; box-sizing: border-box; }
+        .ko-refresh-track { stroke: var(--border); stroke-width: 4; fill: none; }
+        .ko-refresh-progress { stroke: var(--accent); stroke-width: 4; fill: none; stroke-linecap: round; transition: stroke-dashoffset 0.1s linear; }
+        .user-menu { position: relative; }
+        .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text); font-weight: 600; cursor: default; }
+        .user-icon { width: 22px; height: 22px; border-radius: 50%; background: var(--accent2); display: inline-flex; align-items: center; justify-content: center; color: var(--accent); font-weight: 800; font-size: 12px; overflow: hidden; }
+        .user-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.5); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
+        .user-menu.open .user-dropdown { display: block; }
+        .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; font-weight: 600; }
+        .user-dropdown a:hover { background: #f5f6fa; }
+        h1 { text-align: center; color: var(--text); margin-bottom: 10px; }
+        .ko-titlebar { display: inline-flex; align-items: center; gap: 10px; }
+        .ko-sound { border: 0; background: transparent; cursor: pointer; font-size: 18px; line-height: 1; padding: 4px 6px; color: var(--muted); }
+        .ko-sound:hover { color: var(--accent); }
+        .nav-mid select { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); }
+        .wait-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(245, 124, 0, 0.3); border-top-color: #f57c00; border-radius: 50%; margin-right: 6px; animation: waitSpin 0.9s linear infinite; vertical-align: -1px; }
+        @keyframes waitSpin { to { transform: rotate(360deg); } }
+        .cards { display: flex; flex-wrap: nowrap; gap: 10px; align-items: flex-start; overflow-x: auto; overflow-y: hidden; padding-bottom: 8px; }
+        .ko-card { flex: 0 0 auto; }
+        .ko-card { width: 240px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.06); overflow: hidden; }
+        .ko-card-header { padding: 8px 10px; border-bottom: 1px solid var(--border); background: transparent; }
+        .ko-card-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .ko-title { font-weight: 800; color: var(--text); }
+        .ko-table { font-weight: 800; color: var(--text); white-space: nowrap; }
+        .ko-meta { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #607d8b; }
+        .ko-items { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+        .ko-item { border: 1px solid #eef2f6; border-radius: 10px; padding: 6px; background: var(--card); box-sizing: border-box; }
+        .ko-item-overdue { border: 2px solid #d32f2f; }
+        .ko-item-name { font-weight: 700; color: #263238; }
+        .ko-item-row { margin-top: 4px; display: flex; justify-content: space-between; gap: 2px; font-size: 13px; color: var(--muted); }
+        .ko-item-wait { font-weight: 700; color: #d32f2f; white-space: nowrap; }
+        .ko-ack { border: 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
+        .ko-ack:hover { color: #5f6368; }
+        .ko-ack:disabled { opacity: 0.4; cursor: default; }
+        .tg-indicator { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; }
+        .tg-indicator svg { width:16px; height:16px; }
+        .tg-indicator svg path { fill: #b0b7c3; }
+        .tg-indicator.sent svg path { fill: #26a5e4; }
+        .empty { text-align: center; color: var(--muted); margin-top: 18px; }
+        .ko-footer { margin-top: 18px; text-align: center; color: #607d8b; font-size: 13px; line-height: 1.5; }

@@ -42,17 +42,9 @@ $loginUrl = $auth->getGoogleLoginUrl();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>Вход - Kitchen Analytics</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; min-height: 100svh; margin: 0; padding: 16px; box-sizing: border-box; }
-        .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 100%; }
-        h1 { color: #1a73e8; margin-bottom: 20px; font-size: 24px; }
-        p { color: #65676b; margin-bottom: 30px; }
-        .google-btn { display: inline-flex; align-items: center; background: white; border: 1px solid #dadce0; color: #3c4043; padding: 10px 24px; border-radius: 4px; font-weight: 500; text-decoration: none; transition: background 0.2s; }
-        .google-btn:hover { background: #f8f9fa; border-color: #d2d4d7; }
-        .google-btn img { width: 18px; height: 18px; margin-right: 12px; }
-        .error { color: #d32f2f; background: #fdecea; padding: 10px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; }
-    </style>
-    <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+        <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+  <link rel="stylesheet" href="/assets/css/common.css">
+  <link rel="stylesheet" href="/assets/css/login.css">
 </head>
 <body>
     <div class="login-card">
@@ -75,27 +67,6 @@ $loginUrl = $auth->getGoogleLoginUrl();
             Войти через Google
         </a>
     </div>
-    <script>
-        (() => {
-            const fire = () => window.dispatchEvent(new Event('resize'));
-            const kick = () => {
-                requestAnimationFrame(() => {
-                    fire();
-                    requestAnimationFrame(fire);
-                });
-                setTimeout(fire, 200);
-                setTimeout(fire, 800);
-            };
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', kick, { once: true });
-            } else {
-                kick();
-            }
-            window.addEventListener('load', () => {
-                fire();
-                setTimeout(fire, 300);
-            });
-        })();
-    </script>
+    <script src="/assets/js/login.js"></script>
 </body>
 </html>

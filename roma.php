@@ -141,30 +141,9 @@ $firstOfMonth = date('Y-m-01');
     <title>Roma</title>
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <script src="/assets/app.js" defer></script>
-    <style>
-        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f5f5f5; color:#111827; }
-        .wrap { max-width: 1120px; margin: 0 auto; padding: 16px; }
-        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
-        h1 { margin: 0; font-size: 20px; }
-        .row { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; }
-        label { font-size: 12px; color:#6b7280; display:flex; flex-direction: column; gap: 6px; }
-        input[type="date"] { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; }
-        button { padding: 10px 14px; border-radius: 10px; border: 1px solid #111827; background:#111827; color:#fff; font-weight: 800; cursor:pointer; }
-        button:disabled { opacity: 0.6; cursor: default; }
-        .muted { color:#6b7280; font-size: 12px; }
-        .loader { display:none; align-items:center; gap: 10px; margin-left: 10px; }
-        .spinner { width: 16px; height: 16px; border: 2px solid rgba(17,24,39,0.20); border-top-color: rgba(17,24,39,0.85); border-radius: 50%; animation: spin 0.8s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        table { width:100%; border-collapse: collapse; margin-top: 12px; }
-        th, td { padding: 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
-        th { text-align:left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color:#6b7280; background:#f9fafb; }
-        td.num { text-align:right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-        tr.total td { font-weight: 900; background: rgba(26,115,232,0.06); }
-        .romaTotal { margin-top: 12px; display:flex; justify-content: flex-end; }
-        .romaBox { border: 1px solid rgba(46,125,50,0.35); background: rgba(46,125,50,0.08); padding: 10px 12px; border-radius: 12px; font-weight: 900; }
-        .error { margin-top: 10px; color:#b91c1c; font-weight: 700; }
-    </style>
-  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+      <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+  <link rel="stylesheet" href="/assets/css/common.css">
+  <link rel="stylesheet" href="/assets/css/roma.css">
 </head>
 <body>
 <div class="wrap">
@@ -208,72 +187,6 @@ $firstOfMonth = date('Y-m-01');
     </div>
 </div>
 
-<script>
-    const elFrom = document.getElementById('dateFrom');
-    const elTo = document.getElementById('dateTo');
-    const btn = document.getElementById('loadBtn');
-    const loader = document.getElementById('loader');
-    const err = document.getElementById('err');
-    const tbody = document.getElementById('tbody');
-    const tfoot = document.getElementById('tfoot');
-    const romaSum = document.getElementById('romaSum');
-
-    const setLoading = (on) => {
-        btn.disabled = on;
-        loader.style.display = on ? 'inline-flex' : 'none';
-    };
-
-    const setError = (msg) => {
-        if (!msg) { err.style.display = 'none'; err.textContent = ''; return; }
-        err.style.display = 'block';
-        err.textContent = msg;
-    };
-
-    const load = async () => {
-        setError('');
-        setLoading(true);
-        tbody.innerHTML = '';
-        tfoot.innerHTML = '';
-        romaSum.textContent = '0';
-        try {
-            const url = new URL(location.href);
-            url.searchParams.set('ajax', 'load');
-            url.searchParams.set('date_from', elFrom.value);
-            url.searchParams.set('date_to', elTo.value);
-            const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
-            const txt = await res.text();
-            let j = null;
-            try { j = JSON.parse(txt); } catch (_) {}
-            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка загрузки');
-
-            (j.items || []).forEach((it) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${String(it.product_name || '')}</td>
-                    <td class="num">${String(it.count || '0')}</td>
-                    <td class="num">${String(it.sum || '0')}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            const trTot = document.createElement('tr');
-            trTot.className = 'total';
-            trTot.innerHTML = `
-                <td>Итого</td>
-                <td class="num">${String(j.totals?.count || '0')}</td>
-                <td class="num">${String(j.totals?.sum || '0')}</td>
-            `;
-            tfoot.appendChild(trTot);
-            romaSum.textContent = String(j.roma?.sum || '0');
-        } catch (e) {
-            setError(e && e.message ? e.message : 'Ошибка');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    btn.addEventListener('click', () => load());
-    load();
-</script>
+<script src="/assets/js/roma.js"></script>
 </body>
 </html>

@@ -1442,80 +1442,9 @@ if ($tab === 'menu' || $tab === 'categories') {
     <title>УПРАВЛЕНИЕ - Kitchen Analytics</title>
     <link rel="stylesheet" href="assets/app.css">
     <script src="/assets/app.js" defer></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 0; color: #1c1e21; }
-        .container { width: 100%; max-width: 1800px; margin: 0 auto; padding: 12px; box-sizing: border-box; }
-        h1 { text-align: center; color: #1a73e8; margin-bottom: 30px; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 25px; border: 1px solid #ddd; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #65676b; font-size: 14px; text-transform: uppercase; }
-        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
-        button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500; }
-        button:hover { background: #1557b0; }
-        .success { background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #c8e6c9; }
-        .error { background: #fdecea; color: #d32f2f; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #f5c2c7; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f8f9fa; color: #65676b; font-size: 13px; text-transform: uppercase; font-weight: 600; }
-        .delete-btn { color: #d32f2f; text-decoration: none; font-size: 14px; }
-        .delete-btn:hover { text-decoration: underline; }
-        .perm-gear { border: 0; background: transparent; cursor: pointer; font-size: 16px; color: #546e7a; padding: 4px 8px; }
-        .perm-gear:hover { color: #1a73e8; }
-        .perm-modal { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; }
-        .perm-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
-        .perm-modal-card { position: relative; width: 420px; max-width: calc(100vw - 24px); background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 12px 28px rgba(0,0,0,0.25); }
-        .perm-modal-title { font-weight: 800; color: #2c3e50; margin-bottom: 10px; }
-        .perm-list { display: grid; gap: 8px; margin: 10px 0 14px; }
-        .perm-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 10px; }
-        .perm-actions { display: flex; justify-content: flex-end; gap: 10px; }
-        .perm-cancel { background: #eceff1; color: #37474f; }
-        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
-        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; min-width: 0; }
-        .nav-left a { color: #1a73e8; text-decoration: none; font-weight: 500; }
-        .nav-left a:hover { text-decoration: underline; }
-        .nav-title { font-weight: 800; color: #2c3e50; }
-        .user-menu { position: relative; }
-        .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
-        .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; overflow: hidden; }
-        .user-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.12); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
-        .user-menu.open .user-dropdown { display: block; }
-        .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: #37474f; text-decoration: none; font-weight: 600; }
-        .user-dropdown a:hover { background: #f5f6fa; }
-        .tab-links { text-align: center; margin: -10px 0 24px; }
-        .tab-links a { display: inline-block; padding: 8px 14px; border-radius: 999px; margin: 0 6px; text-decoration: none; font-weight: 600; color: #1a73e8; background: rgba(26,115,232,0.08); }
-        .tab-links a.active { color: white; background: #1a73e8; }
-        .tab-links a:hover { background: rgba(26,115,232,0.14); }
-        .description-card { background: #fff; border-left: 4px solid #1a73e8; padding: 20px; border-radius: 4px; font-size: 14px; line-height: 1.6; color: #444; }
-        .description-card h4 { margin-top: 0; color: #1a73e8; }
-        .description-card ul { padding-left: 20px; }
-        .settings-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-        textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-        .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-        .pill.ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-        .pill.bad { background: #fdecea; color: #d32f2f; border: 1px solid #f5c2c7; }
-        .pill.warn { background: #fff8e1; color: #8d6e00; border: 1px solid #ffe0b2; }
-        .menu-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-        .menu-actions .left { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-        .menu-actions .right { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-        .menu-filters { display: grid; grid-template-columns: 1fr 1fr 2fr 1fr; gap: 12px; margin-top: 14px; }
-        .menu-filters .form-group { margin-bottom: 0; }
-        .menu-table td { vertical-align: top; }
-        .table-wrap { width: 100%; overflow-x: auto; }
-        .menu-table { width: 100%; max-width: 100%; }
-        .menu-table th, .menu-table td { padding: 10px; }
-        .menu-table input, .menu-table select, .menu-table textarea { max-width: 100%; }
-        .sticky-hscroll-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 20px; z-index: 1000; pointer-events: none; }
-        .sticky-hscroll { max-width: 1300px; margin: 0 auto; border: 1px solid #ddd; border-radius: 10px; background: rgba(255,255,255,0.92); box-shadow: 0 10px 26px rgba(0,0,0,0.16); pointer-events: auto; }
-        .sticky-hscroll-viewport { overflow-x: auto; overflow-y: hidden; height: 14px; }
-        .sticky-hscroll-content { height: 1px; }
-        .sort-link { color: inherit; text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
-        .sort-link:hover { text-decoration: underline; }
-        .sort-arrow { color: #1a73e8; font-size: 12px; }
-        .muted { color: #777; font-size: 12px; }
-        .info-icon { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid #cbd5e1; color:#1a73e8; font-weight:800; font-size:12px; cursor:help; background:#fff; }
-    </style>
-  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+      <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+  <link rel="stylesheet" href="/assets/css/common.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
 </head>
 <body>
     <div class="container">
@@ -1615,16 +1544,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 </form>
             </div>
 
-            <script>
-                (() => {
-                    const root = document.currentScript && document.currentScript.parentElement ? document.currentScript.parentElement : document;
-                    const allBtn = document.querySelector('[data-select-all]');
-                    const noneBtn = document.querySelector('[data-select-none]');
-                    const boxes = () => Array.from(document.querySelectorAll('input[type="checkbox"][name="allowed_nums[]"]'));
-                    if (allBtn) allBtn.addEventListener('click', () => boxes().forEach((cb) => { cb.checked = true; }));
-                    if (noneBtn) noneBtn.addEventListener('click', () => boxes().forEach((cb) => { cb.checked = false; }));
-                })();
-            </script>
+            <script src="/assets/js/admin.js"></script>
         <?php elseif ($tab === 'sync'): ?>
             <?php
                 $syncDefs = [
@@ -1767,19 +1687,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                         }
                     }
                 ?>
-                <script>
-                    (() => {
-                        const sel = document.getElementById('script_name');
-                        const out = document.getElementById('script_desc');
-                        const upd = () => {
-                            if (!sel || !out) return;
-                            const opt = sel.options[sel.selectedIndex];
-                            out.textContent = opt && opt.dataset && opt.dataset.desc ? opt.dataset.desc : '';
-                        };
-                        if (sel) sel.addEventListener('change', upd);
-                        upd();
-                    })();
-                </script>
+                <script src="/assets/js/admin_2.js"></script>
             </div>
 
         <?php elseif ($tab === 'telegram'): ?>
@@ -2587,194 +2495,7 @@ if ($tab === 'menu' || $tab === 'categories') {
         </div>
         <?php endif; ?>
     </div>
-    <script>
-        (() => {
-            const fire = () => window.dispatchEvent(new Event('resize'));
-            const kick = () => {
-                requestAnimationFrame(() => {
-                    fire();
-                    requestAnimationFrame(fire);
-                });
-                setTimeout(fire, 200);
-                setTimeout(fire, 800);
-            };
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', kick, { once: true });
-            } else {
-                kick();
-            }
-            window.addEventListener('load', () => {
-                fire();
-                setTimeout(fire, 300);
-            });
-        })();
-
-        (() => {
-            const bar = document.createElement('div');
-            bar.className = 'sticky-hscroll-bar';
-            bar.style.display = 'none';
-            bar.innerHTML = '<div class="sticky-hscroll"><div class="sticky-hscroll-viewport"><div class="sticky-hscroll-content"></div></div></div>';
-            document.body.appendChild(bar);
-
-            const viewport = bar.querySelector('.sticky-hscroll-viewport');
-            const content = bar.querySelector('.sticky-hscroll-content');
-
-            let target = null;
-            let syncingFromViewport = false;
-            let syncingFromTarget = false;
-            let ro = null;
-            let raf = 0;
-
-            const pickTarget = () => {
-                const wraps = Array.from(document.querySelectorAll('.table-wrap'));
-                let best = null;
-                let bestW = 0;
-                for (const w of wraps) {
-                    const sw = w.scrollWidth || 0;
-                    if (sw > bestW) {
-                        bestW = sw;
-                        best = w;
-                    }
-                }
-                return best;
-            };
-
-            const update = () => {
-                if (!target) {
-                    bar.style.display = 'none';
-                    document.body.style.paddingBottom = '';
-                    return;
-                }
-                const needs = (target.scrollWidth - target.clientWidth) > 2;
-                bar.style.display = needs ? '' : 'none';
-                document.body.style.paddingBottom = needs ? '46px' : '';
-                if (!needs) return;
-                content.style.width = target.scrollWidth + 'px';
-                viewport.scrollLeft = target.scrollLeft;
-            };
-
-            const scheduleUpdate = () => {
-                if (raf) cancelAnimationFrame(raf);
-                raf = requestAnimationFrame(update);
-            };
-
-            const attach = () => {
-                const next = pickTarget();
-                if (next === target) {
-                    scheduleUpdate();
-                    return;
-                }
-                if (target) {
-                    target.removeEventListener('scroll', onTargetScroll);
-                }
-                if (ro) {
-                    ro.disconnect();
-                    ro = null;
-                }
-                target = next;
-                if (!target) {
-                    update();
-                    return;
-                }
-                target.addEventListener('scroll', onTargetScroll, { passive: true });
-                if (window.ResizeObserver) {
-                    ro = new ResizeObserver(() => scheduleUpdate());
-                    ro.observe(target);
-                    const table = target.querySelector('table');
-                    if (table) ro.observe(table);
-                }
-                scheduleUpdate();
-            };
-
-            const onTargetScroll = () => {
-                if (syncingFromViewport) return;
-                syncingFromTarget = true;
-                viewport.scrollLeft = target ? target.scrollLeft : 0;
-                syncingFromTarget = false;
-            };
-
-            viewport.addEventListener('scroll', () => {
-                if (!target) return;
-                if (syncingFromTarget) return;
-                syncingFromViewport = true;
-                target.scrollLeft = viewport.scrollLeft;
-                syncingFromViewport = false;
-            }, { passive: true });
-
-            window.addEventListener('resize', scheduleUpdate);
-
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', attach);
-            } else {
-                attach();
-            }
-            setTimeout(attach, 0);
-        })();
-
-        (() => {
-            const els = Array.from(document.querySelectorAll('.js-local-dt'));
-            if (els.length === 0) return;
-            els.forEach((el) => {
-                const iso = (el.getAttribute('data-iso') || '').trim();
-                if (!iso) return;
-                const d = new Date(iso);
-                if (Number.isNaN(d.getTime())) return;
-                el.textContent = d.toLocaleString();
-            });
-        })();
-
-        (() => {
-            const modal = document.getElementById('permModal');
-            const form = document.getElementById('permForm');
-            const emailEl = document.getElementById('permEmail');
-            const tgEl = document.getElementById('permTgUsername');
-            const cancel = document.getElementById('permCancel');
-            if (!modal || !form || !emailEl || !tgEl || !cancel) return;
-
-            const defaultPerms = {
-                dashboard: false,
-                rawdata: false,
-                kitchen_online: false,
-                employees: false,
-                payday: false,
-                admin: false,
-                roma: false,
-                banya: false,
-                exclude_toggle: false,
-            };
-
-            const close = () => { modal.style.display = 'none'; };
-            const open = (email, perms, tg) => {
-                emailEl.value = email;
-                tgEl.value = (tg || '').trim();
-                const p = Object.assign({}, defaultPerms, perms || {});
-                if (p.telegram_ack && !p.exclude_toggle) p.exclude_toggle = true;
-                p.telegram_ack = !!p.exclude_toggle;
-                Array.from(form.querySelectorAll('input[type="checkbox"][id^="perm_"]')).forEach((cb) => {
-                    const k = String(cb.id).slice('perm_'.length);
-                    cb.checked = !!p[k];
-                });
-                modal.style.display = 'flex';
-            };
-
-            document.addEventListener('click', (e) => {
-                const btn = e.target.closest('.perm-gear');
-                if (!btn) return;
-                const email = btn.getAttribute('data-email') || '';
-                const tg = btn.getAttribute('data-tg') || '';
-                let perms = null;
-                try { perms = JSON.parse(btn.getAttribute('data-perms') || 'null'); } catch (_) { perms = null; }
-                open(email, perms, tg);
-            });
-            modal.addEventListener('click', (e) => {
-                if (e.target.classList.contains('perm-modal-backdrop')) close();
-            });
-            cancel.addEventListener('click', close);
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') close();
-            });
-        })();
-    </script>
+    <script src="/assets/js/admin_3.js"></script>
     <script src="/assets/user_menu.js" defer></script>
 </body>
 </html>

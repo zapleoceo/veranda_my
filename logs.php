@@ -95,46 +95,9 @@ $fileInfo = function (string $filePath): array {
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>Kitchen Analytics</title>
     <link rel="stylesheet" href="assets/app.css">
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 0; color: #1c1e21; }
-        .container { width: 100%; max-width: 1800px; margin: 0 auto; padding: 12px; box-sizing: border-box; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 25px; border: 1px solid #ddd; }
-        .muted { color: #777; font-size: 12px; }
-        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
-        .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; min-width: 0; }
-        .nav-title { font-weight: 800; color: #2c3e50; }
-        .nav-right { display: flex; justify-content: flex-end; }
-        .user-menu { position: relative; }
-        .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 999px; background: #fff; color: #37474f; font-weight: 600; cursor: default; }
-        .user-icon { width: 22px; height: 22px; border-radius: 50%; background: #e3f2fd; display: inline-flex; align-items: center; justify-content: center; color: #1a73e8; font-weight: 800; font-size: 12px; overflow: hidden; }
-        .user-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.12); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
-        .user-menu.open .user-dropdown { display: block; }
-        .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: #37474f; text-decoration: none; font-weight: 600; }
-        .user-dropdown a:hover { background: #f4f7f6; }
-
-        .tab-links { text-align: center; margin: -10px 0 24px; }
-        .tab-links a { display: inline-block; padding: 8px 14px; border-radius: 999px; margin: 0 6px; text-decoration: none; font-weight: 600; color: #1a73e8; background: rgba(26,115,232,0.08); }
-        .tab-links a.active { color: white; background: #1a73e8; }
-        .tab-links a:hover { background: rgba(26,115,232,0.14); }
-
-        pre { white-space: pre-wrap; word-break: break-word; background: #0b1020; color: #e5e7eb; padding: 12px; border-radius: 12px; overflow: auto; max-height: 70vh; }
-        .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom: 12px; }
-        .filters label { display:block; font-size:12px; font-weight:800; text-transform:uppercase; color:#6b7280; margin-bottom:6px; }
-        .in { padding:8px 10px; border:1px solid #d1d5db; border-radius:10px; background:#fff; }
-        .btn { padding:9px 16px; border-radius:10px; border:0; background:#1a73e8; color:#fff; font-weight:800; cursor:pointer; }
-        .btn-danger { padding:9px 16px; border-radius:10px; border:0; background:#d32f2f; color:#fff; font-weight:800; cursor:pointer; }
-        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-        th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid #eee; vertical-align: top; }
-        th { background: #f8f9fa; color: #65676b; font-size: 13px; text-transform: uppercase; font-weight: 600; }
-        .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-        .pill.ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-        .pill.bad { background: #fdecea; color: #d32f2f; border: 1px solid #f5c2c7; }
-        .info-icon { position: relative; display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid #cbd5e1; color:#1a73e8; font-weight:800; font-size:12px; cursor:help; background:#fff; }
-        .info-icon::after { content: attr(data-tip); position:absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); min-width: 280px; max-width: 520px; width: max-content; padding: 10px 12px; border-radius: 12px; background: rgba(17, 24, 39, 0.96); color: #fff; font-size: 12px; line-height: 1.35; font-weight: 600; text-transform: none; box-shadow: 0 16px 32px rgba(0,0,0,0.22); opacity: 0; pointer-events: none; transition: opacity 0.12s ease-out; z-index: 2000; }
-        .info-icon:hover::after { opacity: 1; }
-    </style>
-  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+      <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+  <link rel="stylesheet" href="/assets/css/common.css">
+  <link rel="stylesheet" href="/assets/css/logs.css">
 </head>
 <body>
 <div class="container">
