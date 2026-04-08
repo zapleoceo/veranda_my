@@ -525,6 +525,9 @@
       if (on) {
         el.classList.add('on');
         el.setAttribute('aria-hidden', 'false');
+        if (el.id === 'reqModal') {
+          history.pushState({ modal: 'reqModal' }, '');
+        }
       } else {
         el.classList.remove('on');
         el.setAttribute('aria-hidden', 'true');
@@ -567,13 +570,48 @@
         const id = String(x.getAttribute('data-modal-close') || '');
         if (!id) return;
         const el = document.getElementById(id);
-        if (id === 'reqModal') saveDraft();
-        setModal(el, false);
+        if (id === 'reqModal') {
+            saveDraft();
+            if (history.state && history.state.modal === 'reqModal') history.back();
+            else setModal(el, false);
+        } else {
+            setModal(el, false);
+        }
+        
         if (id === 'capModal' && typeof capConfirmResolve === 'function') {
           capConfirmResolve(false);
           capConfirmResolve = null;
         }
       });
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modals = [reqModal, capModal, dtpModal];
+        modals.forEach(m => {
+          if (m && m.classList.contains('on')) {
+            if (m.id === 'reqModal') {
+                saveDraft();
+                if (history.state && history.state.modal === 'reqModal') history.back();
+                else setModal(m, false);
+            } else {
+                setModal(m, false);
+            }
+            if (m.id === 'capModal' && typeof capConfirmResolve === 'function') {
+              capConfirmResolve(false);
+              capConfirmResolve = null;
+            }
+          }
+        });
+      }
+    });
+
+    window.addEventListener('popstate', (e) => {
+      if (reqModal && reqModal.classList.contains('on') && (!e.state || e.state.modal !== 'reqModal')) {
+        saveDraft();
+        reqModal.classList.remove('on');
+        reqModal.setAttribute('aria-hidden', 'true');
+      }
     });
 
     const confirmCapacity = (maxCap, guests) => new Promise((resolve) => {

@@ -1008,6 +1008,7 @@
       transition: opacity .18s ease, transform .18s ease;
     }
     .req-right.open { opacity: 1; transform: translateX(0); }
+    .req-right[hidden] { display: none !important; }
     .req-right .pre-title { padding: 10px 12px; font-weight: 900; font-size: 12px; letter-spacing: 0.06em; color: rgba(255,255,255,0.75); border-bottom: 1px solid rgba(255,255,255,0.08); }
     .req-right .pre-body { max-height: 520px; overflow: auto; }
     .req-right .pre-body {
