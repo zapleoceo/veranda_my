@@ -671,7 +671,7 @@
       const on = guests > 5;
       const isMobile = !!(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
       if (preorderReqHint) preorderReqHint.hidden = !on;
-      if (reqModalCard) reqModalCard.classList.remove('wide');
+      if (reqModalCard) reqModalCard.classList.toggle('wide', on && !isMobile);
       if (reqPreorderLabel) {
         reqPreorderLabel.hidden = !on;
         reqPreorderLabel.style.display = on ? '' : 'none';
@@ -685,7 +685,7 @@
       if (btnOpenMobilePreorder) {
         btnOpenMobilePreorder.hidden = !on || !isMobile;
       }
-      setPreorderOpen(on);
+      setPreorderOpen(!isMobile && on);
       if (!on) {
         if (reqComment) reqComment.style.height = '';
         if (reqPreorderBox) reqPreorderBox.style.height = '';
