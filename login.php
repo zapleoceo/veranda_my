@@ -52,6 +52,7 @@ $loginUrl = $auth->getGoogleLoginUrl();
         .google-btn img { width: 18px; height: 18px; margin-right: 12px; }
         .error { color: #d32f2f; background: #fdecea; padding: 10px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; }
     </style>
+    <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
     <div class="login-card">

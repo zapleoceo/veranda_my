@@ -523,6 +523,7 @@ try {
         .last-sync { text-align: center; color: #546e7a; font-size: 0.95em; margin: -18px 0 20px; display: flex; justify-content: center; align-items: center; gap: 14px; flex-wrap: wrap; }
         .resync-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9em; color: #546e7a; }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
     <div class="container">

@@ -272,6 +272,7 @@ $icons = [
             .wrap { padding: 20px 14px 34px; }
         }
     </style>
+    <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
     <div class="auth-float">

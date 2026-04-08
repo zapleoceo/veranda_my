@@ -1515,6 +1515,7 @@ if ($tab === 'menu' || $tab === 'categories') {
         .muted { color: #777; font-size: 12px; }
         .info-icon { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border:1px solid #cbd5e1; color:#1a73e8; font-weight:800; font-size:12px; cursor:help; background:#fff; }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
     <div class="container">

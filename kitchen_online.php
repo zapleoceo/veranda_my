@@ -658,6 +658,7 @@ $dashboardQuery = http_build_query([
         .empty { text-align: center; color: #65676b; margin-top: 18px; }
         .ko-footer { margin-top: 18px; text-align: center; color: #607d8b; font-size: 13px; line-height: 1.5; }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
     <div class="container">

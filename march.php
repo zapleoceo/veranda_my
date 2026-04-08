@@ -268,6 +268,7 @@ $daysInMonth = (int)date('t', strtotime($monthStart));
         .dot.miss { background: rgba(211,47,47,0.55); border: 1px solid rgba(211,47,47,0.75); }
         @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
 <div class="wrap">

@@ -249,6 +249,7 @@ try {
         .chart-type-btn[aria-pressed="true"] { background: rgba(26,115,232,0.12); color: #1a73e8; }
         .chart-type-btn:focus { outline: 2px solid rgba(26,115,232,0.35); outline-offset: 2px; }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
     <div class="container">

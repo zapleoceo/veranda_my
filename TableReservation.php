@@ -1281,6 +1281,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0022">
 
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
   <div class="app">

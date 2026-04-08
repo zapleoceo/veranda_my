@@ -164,6 +164,7 @@ $firstOfMonth = date('Y-m-01');
         .romaBox { border: 1px solid rgba(46,125,50,0.35); background: rgba(46,125,50,0.08); padding: 10px 12px; border-radius: 12px; font-weight: 900; }
         .error { margin-top: 10px; color:#b91c1c; font-weight: 700; }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
 <div class="wrap">

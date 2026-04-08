@@ -1159,6 +1159,7 @@ $firstOfMonth = date('Y-m-01');
         }
         #empTable tfoot td .muted { font-weight: 800; }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
 <div class="container">

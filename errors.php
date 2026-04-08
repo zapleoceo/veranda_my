@@ -501,6 +501,7 @@ $todayStr = date('Y-m-d');
         .hist-body { margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; white-space: pre-wrap; word-break: break-word; color:#111827; }
         @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
 <div class="wrap">

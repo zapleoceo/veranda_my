@@ -134,6 +134,7 @@ $fileInfo = function (string $filePath): array {
         .info-icon::after { content: attr(data-tip); position:absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); min-width: 280px; max-width: 520px; width: max-content; padding: 10px 12px; border-radius: 12px; background: rgba(17, 24, 39, 0.96); color: #fff; font-size: 12px; line-height: 1.35; font-weight: 600; text-transform: none; box-shadow: 0 16px 32px rgba(0,0,0,0.22); opacity: 0; pointer-events: none; transition: opacity 0.12s ease-out; z-index: 2000; }
         .info-icon:hover::after { opacity: 1; }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
 <div class="container">

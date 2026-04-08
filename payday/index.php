@@ -2856,6 +2856,7 @@ $fmtVnd = function (int $v): string {
         body.mode-lite #outPosterTable .col-out-date-date { display: none; }
         body.mode-lite #outSepayTable .col-out-date-part { display: none; }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
 <div class="container">

@@ -297,6 +297,7 @@ $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg'
             .subtitle { display: none; }
         }
     </style>
+    <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
     <div class="parallax-bg" aria-hidden="true"></div>

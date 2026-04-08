@@ -717,6 +717,7 @@ $firstOfMonth = date('Y-m-01');
         .user-dropdown .ud-summary::after { content: "›"; float: right; color: rgba(182,89,48,0.65); font-weight: 900; }
         .user-dropdown details[open] .ud-summary::after { content: "⌄"; }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
 <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 16px;">

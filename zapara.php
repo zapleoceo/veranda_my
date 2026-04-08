@@ -335,6 +335,7 @@ $defaultTo = $today;
         .progText { font-weight: 700; font-size: 12px; color: rgba(245,238,228,0.62); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
     </style>
+  <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
 <div class="wrap">
