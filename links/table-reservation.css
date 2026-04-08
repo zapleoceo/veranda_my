@@ -1219,13 +1219,18 @@
       display: flex;
       align-items: baseline;
       justify-content: space-between;
-      gap: 10px;
+      gap: 4px;
+      flex-wrap: nowrap;
+      white-space: nowrap;
     }
     .msgr-hint {
-      font-size: 11px;
+      font-size: 10px;
+      letter-spacing: -0.02em;
       line-height: 1.35;
       color: rgba(245, 238, 228, 0.78);
       text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .modal-hint {
       margin-top: 10px;
