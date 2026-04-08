@@ -66,7 +66,7 @@ $I18N = [
     'start_time' => 'Время старта брони',
     'messenger' => 'ВАШ МЕССЕНДЖЕР',
     'link_tg_hint' => 'Мессенджер обязателен',
-    'preorder_title' => 'МЕНЮ · ПРЕДЗАКАЗ',
+    'preorder_title' => 'Предзаказ. Нажмите кнопку меню ниже',
     'preorder_required' => 'Предзаказ обязателен для компаний больше 5 гостей.',
     'menu_btn' => 'Меню',
     'menu_loading' => 'Загрузка меню…',
@@ -136,7 +136,7 @@ $I18N = [
     'start_time' => 'Start time',
     'messenger' => 'YOUR MESSENGER',
     'link_tg_hint' => 'Messenger is required',
-    'preorder_title' => 'MENU · PRE-ORDER',
+    'preorder_title' => 'Pre-order. Click the menu button below',
     'preorder_required' => 'Pre-order is required for parties over 5 guests.',
     'menu_btn' => 'Menu',
     'menu_loading' => 'Loading menu…',
@@ -206,7 +206,7 @@ $I18N = [
     'start_time' => 'Giờ bắt đầu',
     'messenger' => 'MESSENGER CỦA BẠN',
     'link_tg_hint' => 'Cần messenger',
-    'preorder_title' => 'MENU · ĐẶT TRƯỚC',
+    'preorder_title' => 'Đặt trước. Nhấp vào nút menu bên dưới',
     'preorder_required' => 'Bắt buộc đặt trước cho nhóm trên 5 khách.',
     'menu_btn' => 'Menu',
     'menu_loading' => 'Đang tải menu…',
@@ -1276,7 +1276,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0015">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0016">
 
 </head>
 <body>
@@ -1530,6 +1530,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260408_0015"></script>
+  <script src="/links/table-reservation.js?v=20260408_0016"></script>
 </body>
 </html>

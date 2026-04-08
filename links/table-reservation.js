@@ -687,8 +687,6 @@
       }
       setPreorderOpen(!isMobile && on);
       if (!on) {
-        if (reqComment) reqComment.style.height = '';
-        if (reqPreorderBox) reqPreorderBox.style.height = '';
         return;
       }
       loadPreorderMenu().catch(() => null);
