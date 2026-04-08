@@ -221,6 +221,8 @@
       --map-scale: 1;
       --inv-map-scale: 1;
       position: relative;
+      aspect-ratio: 820 / 620;
+      max-height: 80vh;
     }
     .map-shell > * { position: relative; z-index: 1; }
     .map-shell > .tile-layer { position: absolute; z-index: 0; }
