@@ -66,7 +66,8 @@ $I18N = [
     'start_time' => 'Время старта брони',
     'messenger' => 'ВАШ МЕССЕНДЖЕР',
     'link_tg_hint' => 'Мессенджер обязателен',
-    'preorder_title' => 'Предзаказ. Нажмите кнопку меню ниже',
+    'preorder_title' => 'Предзаказ',
+    'preorder_title_mobile' => 'Предзаказ. Нажмите кнопку меню ниже',
     'preorder_required' => 'Предзаказ обязателен для компаний больше 5 гостей.',
     'menu_btn' => 'Меню',
     'menu_loading' => 'Загрузка меню…',
@@ -136,7 +137,8 @@ $I18N = [
     'start_time' => 'Start time',
     'messenger' => 'YOUR MESSENGER',
     'link_tg_hint' => 'Messenger is required',
-    'preorder_title' => 'Pre-order. Click the menu button below',
+    'preorder_title' => 'Pre-order',
+    'preorder_title_mobile' => 'Pre-order. Click the menu button below',
     'preorder_required' => 'Pre-order is required for parties over 5 guests.',
     'menu_btn' => 'Menu',
     'menu_loading' => 'Loading menu…',
@@ -206,7 +208,8 @@ $I18N = [
     'start_time' => 'Giờ bắt đầu',
     'messenger' => 'MESSENGER CỦA BẠN',
     'link_tg_hint' => 'Cần messenger',
-    'preorder_title' => 'Đặt trước. Nhấp vào nút menu bên dưới',
+    'preorder_title' => 'Đặt trước',
+    'preorder_title_mobile' => 'Đặt trước. Nhấp vào nút menu bên dưới',
     'preorder_required' => 'Bắt buộc đặt trước cho nhóm trên 5 khách.',
     'menu_btn' => 'Menu',
     'menu_loading' => 'Đang tải menu…',
@@ -1276,7 +1279,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0018">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0019">
 
 </head>
 <body>
@@ -1455,7 +1458,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 <textarea id="reqComment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
               </label>
               <label class="modal-label full" id="reqPreorderLabel" hidden>
-                <span data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
+                <span class="desktop-text" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
+                <span class="mobile-text" data-i18n="preorder_title_mobile"><?= htmlspecialchars(tr('preorder_title_mobile')) ?></span>
                 <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
               </label>
               <div class="guests-time-row full">
@@ -1530,6 +1534,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260408_0018"></script>
+  <script src="/links/table-reservation.js?v=20260408_0019"></script>
 </body>
 </html>
