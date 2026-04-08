@@ -669,13 +669,19 @@
     const updatePreorderUi = () => {
       const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
       const on = guests > 5;
+      const isMobile = !!(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
       if (preorderReqHint) preorderReqHint.hidden = !on;
-      if (reqModalCard) reqModalCard.classList.toggle('wide', on);
+      if (reqModalCard) reqModalCard.classList.remove('wide');
       if (reqPreorderLabel) {
         reqPreorderLabel.hidden = !on;
         reqPreorderLabel.style.display = on ? '' : 'none';
+        if (on && !isMobile) reqPreorderLabel.classList.remove('full');
+        else reqPreorderLabel.classList.add('full');
       }
-      if (reqCommentLabel) reqCommentLabel.classList.add('full');
+      if (reqCommentLabel) {
+        if (on && !isMobile) reqCommentLabel.classList.remove('full');
+        else reqCommentLabel.classList.add('full');
+      }
       if (btnOpenMobilePreorder) {
         btnOpenMobilePreorder.hidden = !on;
       }
@@ -737,16 +743,14 @@
       
       const renderToTarget = (targetBox, isMobile) => {
         if (!targetBox) return;
+        const commentH = (!isMobile && reqComment) ? reqComment.getBoundingClientRect().height : 0;
+        const fixedH = (!isMobile && commentH > 0) ? Math.round(commentH) : 92;
         if (!keys.length) {
           const empty = document.createElement('div');
           empty.className = 'preorder-empty';
           empty.textContent = '—';
           targetBox.appendChild(empty);
-          if (!isMobile) {
-            const desired = 92;
-            targetBox.style.height = String(desired) + 'px';
-            if (reqComment) reqComment.style.height = String(desired) + 'px';
-          }
+          if (!isMobile) targetBox.style.height = String(fixedH) + 'px';
           return;
         }
         keys.forEach((key) => {
@@ -778,12 +782,7 @@
           targetBox.appendChild(totalEl);
         }
         
-        if (!isMobile) {
-          const commentH = reqComment ? reqComment.scrollHeight : 0;
-          const desired = Math.min(240, Math.max(92, targetBox.scrollHeight, commentH));
-          targetBox.style.height = String(desired) + 'px';
-          if (reqComment) reqComment.style.height = String(desired) + 'px';
-        }
+        if (!isMobile) targetBox.style.height = String(fixedH) + 'px';
       };
 
       renderToTarget(reqPreorderBox, false);

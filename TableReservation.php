@@ -1276,7 +1276,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0005">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0006">
 
 </head>
 <body>
@@ -1446,10 +1446,12 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                     </svg>
                   </button>
                 </div>
-                <div class="msgr-hint" id="msgrHint" hidden></div>
               </label>
               <label class="modal-label full" id="reqCommentLabel">
-                <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
+                <div class="label-top">
+                  <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
+                  <div class="msgr-hint inline" id="msgrHint" hidden></div>
+                </div>
                 <textarea id="reqComment" rows="3" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
               </label>
               <label class="modal-label full" id="reqPreorderLabel" hidden>
@@ -1526,6 +1528,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260408_0005"></script>
+  <script src="/links/table-reservation.js?v=20260408_0006"></script>
 </body>
 </html>
