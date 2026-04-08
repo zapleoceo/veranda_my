@@ -1276,7 +1276,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0011">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0012">
 
 </head>
 <body>
@@ -1425,6 +1425,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle" id="reqModalCard">
       <div class="modal-title-bar">
         <div class="modal-title" id="reqModalTitle"><span data-i18n="booking_request"><?= htmlspecialchars(tr('booking_request')) ?></span> <span id="reqModalTable"></span></div>
+        <button class="btn-close-modal" type="button" data-modal-close="reqModal" aria-label="Close">×</button>
       </div>
       <form id="reqForm">
         <div class="req-layout">
@@ -1455,22 +1456,24 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 <span data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
                 <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
               </label>
-              <label class="modal-label">
-                <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
-                <div class="num-step">
-                  <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
-                  <input type="number" id="reqGuests" min="1" max="99">
-                  <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
-                  <button type="button" class="btn btn-secondary btn-preorder-mobile" id="btnOpenMobilePreorder" hidden aria-label="Menu">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                    <span data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></span>
-                  </button>
-                </div>
-              </label>
-              <label class="modal-label">
-                <span data-i18n="start_time"><?= htmlspecialchars(tr('start_time')) ?></span>
-                <input type="text" id="reqStart" readonly>
-              </label>
+              <div class="guests-time-row full">
+                <label class="modal-label">
+                  <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
+                  <div class="num-step">
+                    <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
+                    <input type="number" id="reqGuests" min="1" max="99">
+                    <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
+                    <button type="button" class="btn btn-secondary btn-preorder-mobile" id="btnOpenMobilePreorder" hidden aria-label="Menu">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                      <span data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></span>
+                    </button>
+                  </div>
+                </label>
+                <label class="modal-label">
+                  <span data-i18n="start_time"><?= htmlspecialchars(tr('start_time')) ?></span>
+                  <input type="text" id="reqStart" readonly>
+                </label>
+              </div>
             </div>
           </div>
           <div class="req-right" id="preorderPanel" hidden>
@@ -1501,6 +1504,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           <div class="modal-title" id="mobilePreorderTitle" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></div>
           <div class="modal-total" id="mobilePreorderTotal"></div>
         </div>
+        <button class="btn-close-modal" type="button" data-modal-close="mobilePreorderModal" aria-label="Close">×</button>
       </div>
       <div class="mobile-preorder-layout">
         <div class="preorder-top">
@@ -1524,6 +1528,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260408_0011"></script>
+  <script src="/links/table-reservation.js?v=20260408_0012"></script>
 </body>
 </html>
