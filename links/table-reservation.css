@@ -1138,12 +1138,13 @@
       padding: 10px 14px;
       background: rgba(0,0,0,0.25);
       border-bottom: 1px solid rgba(255,255,255,0.08);
-      max-height: 48vh;
-      overflow: auto;
+      flex: 0 0 auto;
     }
     #mobilePreorderBox {
-      max-height: none;
-      overflow: visible;
+      min-height: calc(5 * 1.35em + 20px);
+      max-height: calc(5 * 1.35em + 20px);
+      height: calc(5 * 1.35em + 20px);
+      overflow: auto;
     }
     .preorder-bottom {
       flex: 1 1 auto;
