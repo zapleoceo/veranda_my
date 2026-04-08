@@ -1273,7 +1273,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0001">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0002">
 
 </head>
 <body>
@@ -1431,7 +1431,16 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               </label>
               <label class="modal-label">
                 <span data-i18n="your_phone"><?= htmlspecialchars(tr('your_phone')) ?></span>
-                <input type="tel" id="reqPhone" autocomplete="tel">
+                <div class="phone-row">
+                  <input type="tel" id="reqPhone" autocomplete="tel">
+                  <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
+                      <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="msgr-hint" id="msgrHint" hidden></div>
               </label>
               <label class="modal-label full" id="reqCommentLabel">
                 <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
@@ -1457,30 +1466,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 <input type="text" id="reqStart" readonly>
               </label>
             </div>
-            <div class="msgr">
-              <div class="msgr-title" data-i18n="messenger"><?= htmlspecialchars(tr('messenger')) ?></div>
-              <div class="msgr-row">
-                <button type="button" class="msgr-btn" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
-                    <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
-                  </svg>
-                </button>
-                <button type="button" class="msgr-btn" aria-label="WhatsApp (скоро)" title="WhatsApp (скоро)" disabled>
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M12 3.2a8.8 8.8 0 0 0-7.5 13.5l-.9 3.3 3.4-.9A8.8 8.8 0 1 0 12 3.2Z" fill="currentColor" opacity=".9"/>
-                    <path d="M10.2 8.7c.2-.4.4-.4.7-.4h.5c.2 0 .4 0 .6.4l.7 1.6c.1.3.1.5-.1.7l-.5.5c-.2.2-.2.4-.1.6.4.8 1 1.5 1.7 2 .2.2.4.2.6.1l.6-.3c.2-.1.5-.1.7 0l1.4.7c.4.2.4.4.4.6 0 .2 0 .5-.1.7-.2.5-1 1-1.6 1.1-.5.1-1.1.1-2.6-.6-1.8-.8-3.2-2.6-3.7-3.4-.5-.9-.9-2-.1-3.3Z" fill="#0b0f14"/>
-                  </svg>
-                </button>
-                <button type="button" class="msgr-btn" aria-label="Zalo (скоро)" title="Zalo (скоро)" disabled>
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="6" fill="currentColor" opacity=".9"/>
-                    <path d="M7.6 16.6v-1.2l5.3-6.3H7.7V7.4h8.7v1.2l-5.3 6.3h5.4v1.7H7.6Z" fill="#0b0f14"/>
-                  </svg>
-                </button>
-              </div>
-              <div class="msgr-hint" id="msgrHint" hidden></div>
-            </div>
           </div>
           <div class="req-right" id="preorderPanel" hidden>
             <div class="pre-title" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></div>
@@ -1504,6 +1489,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   </div>
 
   <div class="modal" id="mobilePreorderModal" aria-hidden="true">
+    <div class="modal-backdrop modal-backdrop-strong"></div>
     <div class="modal-card preorder-modal-card" role="dialog" aria-modal="true" aria-labelledby="mobilePreorderTitle">
       <div class="modal-title-bar">
         <div class="modal-title" id="mobilePreorderTitle" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></div>
@@ -1531,6 +1517,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260408_0001"></script>
+  <script src="/links/table-reservation.js?v=20260408_0002"></script>
 </body>
 </html>
