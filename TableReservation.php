@@ -65,7 +65,7 @@ $I18N = [
     'guests_count' => 'Кол-во гостей',
     'start_time' => 'Время старта брони',
     'messenger' => 'ВАШ МЕССЕНДЖЕР',
-    'link_tg_hint' => 'Для отправки привяжи Telegram.',
+    'link_tg_hint' => 'Мессенджер обязателен',
     'preorder_title' => 'МЕНЮ · ПРЕДЗАКАЗ',
     'preorder_required' => 'Предзаказ обязателен для компаний больше 5 гостей.',
     'menu_btn' => 'Меню',
@@ -135,7 +135,7 @@ $I18N = [
     'guests_count' => 'Guests',
     'start_time' => 'Start time',
     'messenger' => 'YOUR MESSENGER',
-    'link_tg_hint' => 'Link Telegram to submit.',
+    'link_tg_hint' => 'Messenger is required',
     'preorder_title' => 'MENU · PRE-ORDER',
     'preorder_required' => 'Pre-order is required for parties over 5 guests.',
     'menu_btn' => 'Menu',
@@ -205,7 +205,7 @@ $I18N = [
     'guests_count' => 'Số khách',
     'start_time' => 'Giờ bắt đầu',
     'messenger' => 'MESSENGER CỦA BẠN',
-    'link_tg_hint' => 'Liên kết Telegram để gửi.',
+    'link_tg_hint' => 'Cần messenger',
     'preorder_title' => 'MENU · ĐẶT TRƯỚC',
     'preorder_required' => 'Bắt buộc đặt trước cho nhóm trên 5 khách.',
     'menu_btn' => 'Menu',
@@ -1276,7 +1276,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0010">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0011">
 
 </head>
 <body>
@@ -1436,6 +1436,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               </label>
               <label class="modal-label">
                 <span data-i18n="your_phone"><?= htmlspecialchars(tr('your_phone')) ?></span>
+                <div class="msgr-hint" id="msgrHint" hidden></div>
                 <div class="phone-row">
                   <input type="tel" id="reqPhone" autocomplete="tel">
                   <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
@@ -1447,11 +1448,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 </div>
               </label>
               <label class="modal-label full" id="reqCommentLabel">
-                <div class="label-top">
-                  <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
-                  <div class="msgr-hint inline" id="msgrHint" hidden></div>
-                </div>
-                <textarea id="reqComment" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
+                <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
+                <textarea id="reqComment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
               </label>
               <label class="modal-label full" id="reqPreorderLabel" hidden>
                 <span data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
@@ -1526,6 +1524,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260408_0010"></script>
+  <script src="/links/table-reservation.js?v=20260408_0011"></script>
 </body>
 </html>
