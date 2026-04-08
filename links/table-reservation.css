@@ -1125,6 +1125,7 @@
       padding: 0;
       cursor: pointer;
     }
+    .btn-preorder-mobile { display: none; }
     .mobile-preorder-layout {
       display: flex;
       flex-direction: column;

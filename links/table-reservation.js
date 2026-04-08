@@ -683,7 +683,7 @@
         else reqCommentLabel.classList.add('full');
       }
       if (btnOpenMobilePreorder) {
-        btnOpenMobilePreorder.hidden = !on;
+        btnOpenMobilePreorder.hidden = !on || !isMobile;
       }
       setPreorderOpen(on);
       if (!on) {
