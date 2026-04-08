@@ -265,6 +265,9 @@ $icons = [
             font-size: 12px;
             text-align: center;
         }
+        @media (max-width: 640px) {
+            .auth-float { transform: scale(0.333); transform-origin: top right; }
+        }
         @media (max-width: 420px) {
             .wrap { padding: 20px 14px 34px; }
         }
