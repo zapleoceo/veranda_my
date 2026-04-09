@@ -4,8 +4,8 @@
             inset: 0;
             background-size: cover;
             background-position: center 0;
-            filter: brightness(0.22) blur(1px);
-            transform: translate3d(0,0,0);
+            filter: brightness(0.22) blur(3px);
+            transform: translate3d(0,0,0) scale(1.05);
             will-change: background-position;
             z-index: -1;
         }
@@ -76,12 +76,10 @@
         }
         details {
             border: 1px solid var(--border);
-            background: rgba(10,10,15,0.72);
+            background: rgba(10,10,15,0.85);
             border-radius: 16px;
             overflow: hidden;
             margin-top: 10px;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
         }
         summary {
             cursor: pointer;
