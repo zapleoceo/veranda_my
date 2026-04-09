@@ -1,9 +1,6 @@
-html, 
-        
         .parallax-bg {
             position: fixed;
             inset: 0;
-            background-image: url("<?= htmlspecialchars($bgImageUrl) ?>");
             background-size: cover;
             background-position: center 0;
             filter: brightness(0.22) blur(1px);

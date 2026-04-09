@@ -157,7 +157,7 @@ $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg'
   <link rel="stylesheet" href="/assets/css/menu-beta.css">
 </head>
 <body>
-    <div class="parallax-bg" aria-hidden="true"></div>
+    <div class="parallax-bg" style="background-image: url('<?= htmlspecialchars($bgImageUrl) ?>');" aria-hidden="true"></div>
     <div class="wrap">
         <div class="header">
             <div class="header-top">
