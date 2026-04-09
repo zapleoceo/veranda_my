@@ -311,7 +311,6 @@
     const reqGuestsPlus = document.getElementById('reqGuestsPlus');
     const reqStart = document.getElementById('reqStart');
     const reqHint = document.getElementById('reqHint');
-    const preorderReqHint = document.getElementById('preorderReqHint');
     const preorderPanel = document.getElementById('preorderPanel');
     const preorderBody = document.getElementById('preorderBody');
     const reqSubmit = document.getElementById('reqSubmit');
@@ -480,7 +479,7 @@
         el.classList.add('on');
         el.setAttribute('aria-hidden', 'false');
         if (el.id === 'reqModal' || el.id === 'mobilePreorderModal') {
-          history.pushState({ modal: el.id }, '');
+          history.pushState({ modal: el.id }, '', '#modal-' + el.id);
         }
       } else {
         el.classList.remove('on');
@@ -624,7 +623,6 @@
       const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
       const on = guests > 5;
       const isMobile = !!(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
-      if (preorderReqHint) preorderReqHint.hidden = !on;
       if (reqModalCard) reqModalCard.classList.toggle('wide', on && !isMobile);
       if (reqPreorderLabel) {
         reqPreorderLabel.hidden = !on;
@@ -699,7 +697,7 @@
         if (!keys.length) {
           const empty = document.createElement('div');
           empty.className = 'preorder-empty';
-          empty.textContent = '—';
+          empty.textContent = targetBox.id === 'reqPreorderBox' ? t('preorder_required') : '—';
           targetBox.appendChild(empty);
           return;
         }

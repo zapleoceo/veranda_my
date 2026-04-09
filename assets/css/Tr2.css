@@ -1041,7 +1041,7 @@
       cursor: pointer;
       flex: 0 0 auto;
     }
-    .preorder-empty { color: rgba(255,255,255,0.55); font-size: 12px; padding: 2px 2px; }
+    .preorder-empty { color: rgba(255,255,255,0.55); font-size: var(--text-sm); font-family: var(--font-body); padding: 0; }
     .preorder-total {
       margin-top: 8px;
       padding: 8px 10px;
