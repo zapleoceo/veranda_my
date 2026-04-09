@@ -1446,8 +1446,18 @@
     const getCurrentRequest = () => {
       const dtRaw = resDate ? String(resDate.value || '').trim() : '';
       if (!dtRaw) return null;
-      const dt = dtRaw.replace('T', ' ') + ':00';
-      return { dt, guests: 1, dtRaw, durationSec: 7200, durationHours: 2 };
+      // Since dtRaw is now just YYYY-MM-DD, we need to append current time if it's today,
+      // or 00:00:00 if it's a future date just to make it a valid datetime for backend checks
+      const now = new Date();
+      const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      
+      let timeStr = '12:00:00'; // Default time for future dates
+      if (dtRaw === todayStr) {
+        timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':00';
+      }
+      
+      const dt = dtRaw + ' ' + timeStr;
+      return { dt, guests: 1, dtRaw: dtRaw + 'T' + timeStr.slice(0, 5), durationSec: 7200, durationHours: 2 };
     };
 
     const invalidateLast = () => {
@@ -1529,8 +1539,8 @@
     const initDate = () => {
       if (!resDate) return;
       const minSlot = getMinSelectableSlot();
-      resDate.min = minSlot.dateVal + 'T' + minSlot.timeVal;
-      resDate.value = resDate.min;
+      resDate.min = minSlot.dateVal;
+      resDate.value = minSlot.dateVal;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       setBusyLabel(String(resDate.value || '').slice(0, 10));
       clearReservationsOnTables();
@@ -1590,6 +1600,7 @@
       const loadReservations = async () => {
         const rUrl = new URL(location.href);
         rUrl.searchParams.set('ajax', 'reservations');
+        // dt is already date+time
         rUrl.searchParams.set('date_reservation', dt);
         rUrl.searchParams.set('duration', String(current.durationSec || 7200));
         rUrl.searchParams.set('spot_id', '1');
