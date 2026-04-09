@@ -388,6 +388,14 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $displayTz = new DateTimeZone($displayTzName);
   $apiTz = new DateTimeZone($apiTzName);
   $dtDisplay = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $dateReservation, $displayTz);
+  if ($dtDisplay !== false) {
+    $nowDisplay = new DateTimeImmutable('now', $displayTz);
+    if ($dtDisplay->format('Y-m-d') === $nowDisplay->format('Y-m-d')) {
+      // For today, always use server's current time + 5 mins to avoid Poster API Error 155 (time in past)
+      // regardless of what the client sent, because client's clock might be wrong or in a different timezone.
+      $dtDisplay = $nowDisplay->modify('+5 minutes');
+    }
+  }
   if ($dtDisplay === false) {
     try { $dtDisplay = new DateTimeImmutable($dateReservation, $displayTz); } catch (\Throwable $e) { $dtDisplay = false; }
   }
@@ -1302,7 +1310,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0009">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0010">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1576,6 +1584,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260409_0009"></script>
+  <script src="/assets/js/Tr2.js?v=20260409_0010"></script>
 </body>
 </html>
