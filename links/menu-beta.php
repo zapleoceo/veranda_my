@@ -153,8 +153,8 @@ $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg'
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title><?= htmlspecialchars($pageTitle) ?> | Veranda</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260409_001">
-  <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260409_001">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260409_002">
+  <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260409_002">
 </head>
 <body>
     <div class="parallax-bg" style="background-image: url('<?= htmlspecialchars($bgImageUrl) ?>');" aria-hidden="true"></div>
@@ -235,6 +235,6 @@ $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg'
             </div>
         <?php endif; ?>
     </div>
-    <script src="/assets/js/menu-beta.js?v=20260409_001"></script>
+    <script src="/assets/js/menu-beta.js?v=20260409_002"></script>
 </body>
 </html>

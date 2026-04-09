@@ -1,13 +1,15 @@
         body { background: transparent !important; }
         .parallax-bg {
             position: fixed;
-            inset: 0;
+            /* Make the background taller and wider so it doesn't run out of pixels when scrolled or blurred */
+            top: -10%; left: -10%; right: -10%; bottom: -10%;
             background-size: cover;
-            background-position: center 0;
-            filter: brightness(0.22) blur(3px);
-            transform: translate3d(0,0,0) scale(1.05);
-            will-change: background-position;
+            background-position: center center;
+            filter: brightness(0.22) blur(5px);
+            will-change: transform;
             z-index: -1;
+            /* Optional: ensure it behaves as a separate hardware layer */
+            transform: translate3d(0,0,0);
         }
         .wrap { max-width: 920px; margin: 0 auto; padding: 26px 18px 40px; position: relative; z-index: 1; }
         .header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
