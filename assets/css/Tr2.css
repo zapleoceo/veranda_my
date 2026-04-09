@@ -950,8 +950,8 @@
       transition: opacity .18s ease, transform .18s ease;
     }
     .modal.on .modal-card { transform: translateY(0) scale(1); opacity: 1; }
-    .modal-title { font-weight: 900; font-size: 16px; font-family: var(--font-display); line-height: 1.4; }
-    .framed-box { display: inline-block; padding: 2px 8px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-card); margin: 0 4px; }
+    .modal-title { font-weight: 900; font-size: 16px; font-family: var(--font-display); line-height: 1.4; display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
+    .framed-box { display: inline-block; padding: 2px 8px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-card); margin: 0; }
     .modal-text { margin-top: 10px; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.35; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }

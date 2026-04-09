@@ -406,7 +406,7 @@
     };
 
     const ensureDtpData = () => {
-      if (!dtpDateList || !dtpTimeList) return;
+      if (!dtpDateList) return;
       if (!dtpDates.length) {
         const now = new Date();
         const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
@@ -424,22 +424,6 @@
           it.dataset.value = value;
           it.textContent = label;
           dtpDateList.appendChild(it);
-        });
-      }
-      if (!dtpTimes.length) {
-        dtpTimes = [];
-        for (let h = 0; h <= 23; h++) {
-          for (let m = 0; m < 60; m += 30) {
-            dtpTimes.push({ value: pad2(h) + ':' + pad2(m) });
-          }
-        }
-        dtpTimeList.innerHTML = '';
-        dtpTimes.forEach(({ value }) => {
-          const it = document.createElement('div');
-          it.className = 'wheel-item';
-          it.dataset.value = value;
-          it.textContent = value;
-          dtpTimeList.appendChild(it);
         });
       }
     };
@@ -464,19 +448,7 @@
       resDate.dispatchEvent(new Event('change', { bubbles: true }));
     };
 
-    const clampDtpTimeForSelectedDate = () => {
-      ensureDtpData();
-      const minSlot = getMinSelectableSlot();
-      if (!dtpSelDate) return;
-      if (dtpSelDate === minSlot.dateVal) {
-        const cur = dtpSelTime || (dtpTimes[0] ? dtpTimes[0].value : minSlot.timeVal);
-        if (timeToMin(cur) < timeToMin(minSlot.timeVal)) {
-          dtpSelTime = minSlot.timeVal;
-          const idx = Math.max(0, dtpTimes.findIndex((x) => x.value === dtpSelTime));
-          setWheelTo(dtpTimeList, idx);
-        }
-      }
-    };
+
 
     if (dtpDateList) {
       let t = null;
@@ -486,19 +458,6 @@
           const idx = wheelIndex(dtpDateList, dtpDates.length);
           updateWheelActive(dtpDateList, idx);
           dtpSelDate = dtpDates[idx] ? dtpDates[idx].value : dtpSelDate;
-          clampDtpTimeForSelectedDate();
-        }, 80);
-      });
-    }
-    if (dtpTimeList) {
-      let t = null;
-      dtpTimeList.addEventListener('scroll', () => {
-        if (t) clearTimeout(t);
-        t = setTimeout(() => {
-          const idx = wheelIndex(dtpTimeList, dtpTimes.length);
-          updateWheelActive(dtpTimeList, idx);
-          dtpSelTime = dtpTimes[idx] ? dtpTimes[idx].value : dtpSelTime;
-          clampDtpTimeForSelectedDate();
         }, 80);
       });
     }
