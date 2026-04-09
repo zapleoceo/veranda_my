@@ -59,11 +59,14 @@ $I18N = [
     'yes' => 'Да',
     'no' => 'Нет',
     'booking_request' => 'Заявка на бронь на столик',
+    'on_date' => 'на',
     'your_name' => 'Ваше имя',
     'your_phone' => 'Ваш номер телефона',
     'comment' => 'Комментарий',
     'guests_count' => 'Кол-во гостей',
-    'start_time' => 'Время старта брони',
+    'start_time' => 'Время старта',
+    'duration' => 'Продолжительность',
+    'table_busy_warning' => 'К сожалению, этот столик занят в выбранное время. Пожалуйста, выберите другое время или столик.',
     'messenger' => 'ВАШ МЕССЕНДЖЕР',
     'link_tg_hint' => 'Мессенджер обязателен',
     'preorder_title' => 'Предзаказ',
@@ -130,11 +133,14 @@ $I18N = [
     'yes' => 'Yes',
     'no' => 'No',
     'booking_request' => 'Booking request for table',
+    'on_date' => 'on',
     'your_name' => 'Your name',
     'your_phone' => 'Your phone',
     'comment' => 'Comment',
     'guests_count' => 'Guests',
     'start_time' => 'Start time',
+    'duration' => 'Duration',
+    'table_busy_warning' => 'Unfortunately, this table is busy at the selected time. Please choose another time or table.',
     'messenger' => 'YOUR MESSENGER',
     'link_tg_hint' => 'Messenger is required',
     'preorder_title' => 'Pre-order',
@@ -201,11 +207,14 @@ $I18N = [
     'yes' => 'Có',
     'no' => 'Không',
     'booking_request' => 'Yêu cầu đặt bàn',
+    'on_date' => 'vào ngày',
     'your_name' => 'Tên của bạn',
     'your_phone' => 'Số điện thoại',
     'comment' => 'Ghi chú',
     'guests_count' => 'Số khách',
-    'start_time' => 'Giờ bắt đầu',
+    'start_time' => 'Thời gian bắt đầu',
+    'duration' => 'Thời lượng',
+    'table_busy_warning' => 'Rất tiếc, bàn này đã được đặt trong thời gian bạn chọn. Vui lòng chọn thời gian hoặc bàn khác.',
     'messenger' => 'MESSENGER CỦA BẠN',
     'link_tg_hint' => 'Cần messenger',
     'preorder_title' => 'Đặt trước',
@@ -253,6 +262,13 @@ $I18N = [
     'sending' => 'Đang gửi…',
     'submit_success' => 'Cảm ơn, chúng tôi sẽ liên hệ sớm.\n\nBắt đầu: {start}\nBàn: {table}\nSố khách: {guests}\nTên: {name}\nSĐT: {phone}',
     'cap_warn' => 'Chúng tôi có thể thêm ghế, nhưng bàn này có thể hơi chật :)',
+  ],
+  'ko' => [
+    'booking_request' => '테이블 예약 요청',
+    'on_date' => '날짜',
+    'start_time' => '시작 시간',
+    'duration' => '소요 시간',
+    'table_busy_warning' => '죄송합니다. 선택한 시간에는 이 테이블이 예약되어 있습니다. 다른 시간이나 테이블을 선택해주세요.',
   ],
 ];
 if (!isset($I18N[$lang])) $lang = 'ru';
@@ -835,6 +851,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $preorderRu = trim((string)($payload['preorder_ru'] ?? ''));
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
+  $duration_m = (int)($payload['duration_m'] ?? 120);
 
   if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) {
     http_response_code(400);
@@ -904,6 +921,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $text = '<b>Новая бронь с сайта</b>' . "\n";
   $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
   $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
+  if ($duration_m > 0) {
+    $hours = floor($duration_m / 60);
+    $mins = $duration_m % 60;
+    $durStr = $hours . ' ч' . ($mins > 0 ? ' ' . $mins . ' м' : '');
+    $text .= 'Продолжительность: <b>' . htmlspecialchars($durStr) . '</b>' . "\n";
+  }
   $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
   $text .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
   $text .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
@@ -1279,7 +1302,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260408_0022">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0001">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1428,7 +1451,12 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     <div class="modal-backdrop" data-modal-close="reqModal"></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle" id="reqModalCard">
       <div class="modal-title-bar">
-        <div class="modal-title" id="reqModalTitle"><span data-i18n="booking_request"><?= htmlspecialchars(tr('booking_request')) ?></span> <span id="reqModalTable"></span></div>
+        <div class="modal-title" id="reqModalTitle">
+          <span data-i18n="booking_request"><?= htmlspecialchars(tr('booking_request')) ?></span>
+          <span class="framed-box" id="reqModalTable"></span>
+          <span data-i18n="on_date"><?= htmlspecialchars(tr('on_date')) ?></span>
+          <span class="framed-box" id="reqModalDate"></span>
+        </div>
         <button class="btn-close-modal" type="button" data-modal-close="reqModal" aria-label="Close">×</button>
       </div>
       <form id="reqForm">
@@ -1454,6 +1482,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   </button>
                 </div>
               </label>
+              <div id="tableBusyWarning" style="display:none; color: #ff4d4d; font-size: 13px; margin-top: 10px; line-height: 1.4; padding: 10px; background: rgba(255,0,0,0.1); border-radius: 8px;">
+                <span data-i18n="table_busy_warning"><?= htmlspecialchars(tr('table_busy_warning')) ?></span>
+              </div>
               <label class="modal-label full" id="reqCommentLabel">
                 <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
                 <textarea id="reqComment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
@@ -1478,7 +1509,21 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 </label>
                 <label class="modal-label">
                   <span data-i18n="start_time"><?= htmlspecialchars(tr('start_time')) ?></span>
-                  <input type="text" id="reqStart" readonly>
+                  <input type="time" id="reqStart" required>
+                </label>
+                <label class="modal-label">
+                  <span data-i18n="duration"><?= htmlspecialchars(tr('duration')) ?></span>
+                  <select id="reqDuration">
+                    <option value="60">1 ч</option>
+                    <option value="90">1.5 ч</option>
+                    <option value="120" selected>2 ч</option>
+                    <option value="150">2.5 ч</option>
+                    <option value="180">3 ч</option>
+                    <option value="210">3.5 ч</option>
+                    <option value="240">4 ч</option>
+                    <option value="270">4.5 ч</option>
+                    <option value="300">5 ч</option>
+                  </select>
                 </label>
               </div>
             </div>
@@ -1535,6 +1580,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260408_0022"></script>
+  <script src="/assets/js/Tr2.js?v=20260409_0001"></script>
 </body>
 </html>
