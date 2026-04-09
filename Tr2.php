@@ -70,7 +70,7 @@ $I18N = [
     'messenger' => 'ВАШ МЕССЕНДЖЕР',
     'link_tg_hint' => 'Мессенджер обязателен',
     'preorder_title' => 'Предзаказ',
-    'preorder_title_mobile' => 'Предзаказ. Нажмите кнопку меню ниже',
+    'preorder_title_mobile' => 'Предзаказ. Нажмите кнопку',
     'preorder_required' => 'Предзаказ обязателен для компаний больше 5 гостей.',
     'menu_btn' => 'Меню',
     'menu_loading' => 'Загрузка меню…',
@@ -144,7 +144,7 @@ $I18N = [
     'messenger' => 'YOUR MESSENGER',
     'link_tg_hint' => 'Messenger is required',
     'preorder_title' => 'Pre-order',
-    'preorder_title_mobile' => 'Pre-order. Click the menu button below',
+    'preorder_title_mobile' => 'Pre-order. Click the button',
     'preorder_required' => 'Pre-order is required for parties over 5 guests.',
     'menu_btn' => 'Menu',
     'menu_loading' => 'Loading menu…',
@@ -218,7 +218,7 @@ $I18N = [
     'messenger' => 'MESSENGER CỦA BẠN',
     'link_tg_hint' => 'Cần messenger',
     'preorder_title' => 'Đặt trước',
-    'preorder_title_mobile' => 'Đặt trước. Nhấp vào nút menu bên dưới',
+    'preorder_title_mobile' => 'Đặt trước. Nhấp vào nút',
     'preorder_required' => 'Bắt buộc đặt trước cho nhóm trên 5 khách.',
     'menu_btn' => 'Menu',
     'menu_loading' => 'Đang tải menu…',
@@ -1310,7 +1310,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0013">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0014">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1497,13 +1497,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               </div>
               <label class="modal-label">
                 <span data-i18n="your_name"><?= htmlspecialchars(tr('your_name')) ?></span>
-                <div class="name-row">
-                  <input type="text" id="reqName" autocomplete="name">
-                  <button type="button" class="btn btn-secondary btn-preorder-mobile" id="btnOpenMobilePreorder" hidden aria-label="Menu">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                    <span data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></span>
-                  </button>
-                </div>
+                <input type="text" id="reqName" autocomplete="name">
               </label>
               <label class="modal-label">
                 <div class="label-row">
@@ -1529,7 +1523,10 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               </label>
               <label class="modal-label full" id="reqPreorderLabel" hidden>
                 <span class="desktop-text" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
-                <span class="mobile-text" data-i18n="preorder_title_mobile"><?= htmlspecialchars(tr('preorder_title_mobile')) ?></span>
+                <div class="mobile-text mobile-preorder-title-wrap">
+                  <span data-i18n="preorder_title_mobile"><?= htmlspecialchars(tr('preorder_title_mobile')) ?></span>
+                  <button type="button" class="btn-preorder-mobile-inline" id="btnOpenMobilePreorder" aria-label="Menu" data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></button>
+                </div>
                 <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
               </label>
             </div>
@@ -1586,6 +1583,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260409_0013"></script>
+  <script src="/assets/js/Tr2.js?v=20260409_0014"></script>
 </body>
 </html>

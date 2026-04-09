@@ -1134,9 +1134,7 @@
       .modal-actions { position: sticky; bottom: 0; background: transparent; padding-top: 10px; margin-top: 10px; z-index: 2; }
       .req-right { display: none !important; }
       
-       .btn-preorder-mobile { display: inline-flex !important; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; height: 44px; margin-left: auto; border-radius: 12px; white-space: nowrap; font-size: 12px; }
-       .btn-preorder-mobile svg { width: 18px; height: 18px; flex: 0 0 auto; }
-      .btn-preorder-mobile[hidden] { display: none !important; }
+
     }
 
     #reqModal .modal-actions { justify-content: center; }
@@ -1173,7 +1171,29 @@
       color: rgba(255,255,255,1);
       transform: scale(1.1);
     }
-    .btn-preorder-mobile { display: none; }
+    .mobile-preorder-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-preorder-mobile-inline {
+      display: inline-flex !important;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 10px;
+      height: auto;
+      border-radius: 14px;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--color-text);
+      background: transparent;
+      border: 1px solid var(--color-border);
+      cursor: pointer;
+    }
+    .btn-preorder-mobile-inline[hidden] {
+      display: none !important;
+    }
     .mobile-preorder-layout {
       display: flex;
       flex-direction: column;

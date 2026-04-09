@@ -637,7 +637,8 @@
         else reqCommentLabel.classList.add('full');
       }
       if (btnOpenMobilePreorder) {
-        btnOpenMobilePreorder.hidden = !on || !isMobile;
+        if (on && isMobile) btnOpenMobilePreorder.removeAttribute('hidden');
+        else btnOpenMobilePreorder.setAttribute('hidden', 'hidden');
       }
       setPreorderOpen(!isMobile && on);
       if (!on) {
