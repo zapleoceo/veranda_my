@@ -447,23 +447,19 @@
     const syncDtpSelectionFromInput = () => {
       ensureDtpData();
       const raw = resDate ? String(resDate.value || '').trim() : '';
-      const m = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+      const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
       const fallback = getMinSelectableSlot();
-      const picked = clampToMinSlot(m ? m[1] : fallback.dateVal, m ? m[2] : fallback.timeVal);
-      dtpSelDate = picked.dateVal;
-      const dIdx = Math.max(0, dtpDates.findIndex((x) => x.value === picked.dateVal));
-      const tFoundIdx = dtpTimes.findIndex((x) => x.value === picked.timeVal);
-      const tIdx = Math.max(0, tFoundIdx);
-      dtpSelTime = tFoundIdx >= 0 ? picked.timeVal : (dtpTimes[0] ? dtpTimes[0].value : '10:00');
+      const pickedDate = m ? m[1] : fallback.dateVal;
+      dtpSelDate = pickedDate;
+      const dIdx = Math.max(0, dtpDates.findIndex((x) => x.value === pickedDate));
       setWheelTo(dtpDateList, dIdx);
-      setWheelTo(dtpTimeList, tIdx);
     };
 
     const applyDtpToInput = () => {
       if (!resDate) return;
       const fallback = getMinSelectableSlot();
-      const picked = clampToMinSlot(dtpSelDate || fallback.dateVal, dtpSelTime || fallback.timeVal);
-      resDate.value = picked.dateVal + 'T' + picked.timeVal;
+      const pickedDate = dtpSelDate || fallback.dateVal;
+      resDate.value = pickedDate;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       resDate.dispatchEvent(new Event('change', { bubbles: true }));
     };

@@ -269,6 +269,7 @@ $I18N = [
     'start_time' => '시작 시간',
     'duration' => '소요 시간',
     'table_busy_warning' => '죄송합니다. 선택한 시간에는 이 테이블이 예약되어 있습니다. 다른 시간이나 테이블을 선택해주세요.',
+    'busy_now' => "지금\n사용중",
   ],
 ];
 if (!isset($I18N[$lang])) $lang = 'ru';
@@ -1313,7 +1314,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         <div class="title-wrap">
           <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
           <p><span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span> <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
-          <input type="datetime-local" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
+          <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
         </div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
