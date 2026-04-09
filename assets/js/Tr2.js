@@ -348,10 +348,18 @@
 
     const getMinSelectableSlot = () => {
       const now = new Date();
-      const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0);
+      let base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0);
       const m = base.getMinutes();
       const add = (30 - (m % 30)) % 30;
       base.setMinutes(m + add, 0, 0);
+      
+      if (base.getHours() < 8) {
+        base.setHours(8, 0, 0, 0);
+      } else if (base.getHours() === 23 && base.getMinutes() > 0 || base.getHours() > 23) {
+        base.setDate(base.getDate() + 1);
+        base.setHours(8, 0, 0, 0);
+      }
+      
       return { dateVal: isoDate(base), timeVal: pad2(base.getHours()) + ':' + pad2(base.getMinutes()) };
     };
 
@@ -406,13 +414,14 @@
     const ensureDtpData = () => {
       if (!dtpDateList) return;
       if (!dtpDates.length) {
-        const now = new Date();
-        const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const minSlotDateStr = getMinSelectableSlot().dateVal;
+        const [y, m, d] = minSlotDateStr.split('-');
+        const base = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10), 0, 0, 0);
         const days = 28;
         dtpDates = [];
         for (let i = 0; i < days; i++) {
-          const d = new Date(base.getTime() + (i * 86400000));
-          dtpDates.push({ value: isoDate(d), date: d });
+          const dt = new Date(base.getTime() + (i * 86400000));
+          dtpDates.push({ value: isoDate(dt), date: dt });
         }
         dtpDateList.innerHTML = '';
         dtpDates.forEach(({ value, date }) => {
@@ -1058,10 +1067,16 @@
         if (reqStart.options.length === 0) {
           const opt = document.createElement('option');
           opt.value = '';
-          opt.textContent = '—';
+          opt.textContent = t('no_time_available') || 'Нет времени';
           reqStart.appendChild(opt);
+          reqStart.disabled = true;
+          modalTableBusy = true;
+          syncSubmitState();
         } else if (!hasSelected) {
           reqStart.options[0].selected = true;
+          reqStart.disabled = false;
+        } else {
+          reqStart.disabled = false;
         }
       }
       if (!keepFields) {

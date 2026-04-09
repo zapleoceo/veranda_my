@@ -1128,7 +1128,7 @@
       .guests-time-row .modal-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
       .desktop-text { display: none; }
       .mobile-text { display: inline; }
-      .modal { padding: 10px; align-items: stretch; justify-content: stretch; }
+      .modal { padding: 10px; align-items: center; justify-content: center; }
       .modal-card {
         width: 100%;
         max-height: calc(100dvh - 20px);
@@ -1310,6 +1310,11 @@
       font-size: 12px;
       line-height: 1.35;
       color: rgba(255, 250, 244, 0.90);
+    }
+    .modal-hint:empty, .modal-note:empty, .tight-warning:empty {
+      display: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
 
     .modal-hint.warn {
