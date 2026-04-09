@@ -1000,9 +1000,20 @@
       reqSubmit.disabled = !!submitBusy || modalTableBusy;
     };
     const openRequestForm = ({ tableNum, guests, start, name, phone, comment, preorder, keepFields }) => {
+      if (reqHint) {
+        reqHint.hidden = true;
+        reqHint.textContent = '';
+        reqHint.classList.remove('warn');
+      }
+      const tightWarning = document.getElementById('tightWarning');
+      if (tightWarning) tightWarning.hidden = true;
+
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
-      if (reqGuests) reqGuests.value = String(guests);
+      if (reqGuests) {
+        reqGuests.value = String(guests);
+        updateReqGuestsHint().catch(() => null);
+      }
       const reqModalDate = document.getElementById('reqModalDate');
       if (reqStart) {
         const iso = String(start || '').trim();
@@ -1127,7 +1138,7 @@
 
     if (msgrTgBtn) msgrTgBtn.addEventListener('click', () => { startTelegramFlow().catch(() => null); });
 
-    const updateReqGuestsHint = async () => {
+    async function updateReqGuestsHint() {
       if (!reqHint) return;
       const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
       const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
@@ -1170,7 +1181,7 @@
         reqHint.textContent = '';
         reqHint.classList.remove('warn');
       }
-    };
+    }
 
     const bumpGuests = (delta) => {
       if (!reqGuests) return;

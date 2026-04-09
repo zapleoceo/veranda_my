@@ -976,7 +976,14 @@
       transition: border-color .2s ease;
       appearance: none;
     }
-    .modal select { cursor: pointer; }
+    .modal select {
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='rgba(255,255,255,0.65)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 16px;
+      padding-right: 36px;
+    }
     .modal input:focus, .modal select:focus { border-color: rgba(184,135,70,0.6); outline: none; }
     .modal input[type="text"], .modal input[type="tel"], .modal input[type="time"], .modal select { height: 44px; }
     .modal textarea {
@@ -1116,7 +1123,8 @@
     }
     @media (max-width: 640px) {
       .guests-time-row { grid-template-columns: auto 1fr 1fr; gap: 6px; }
-      .guests-time-row .modal-label input, .guests-time-row .modal-label select { padding: 12px 6px; font-size: 14px; }
+      .guests-time-row .modal-label input { padding: 12px 6px; font-size: 14px; }
+      .guests-time-row .modal-label select { padding: 12px 24px 12px 6px; font-size: 14px; background-position: right 6px center; background-size: 14px; }
       .guests-time-row .modal-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
       .desktop-text { display: none; }
       .mobile-text { display: inline; }
