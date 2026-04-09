@@ -1373,7 +1373,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             <button class="table small-vertical" style="left: 306px; top: 192px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
             <button class="table small-vertical" style="left: 194px; top: 192px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
             <button class="table small-vertical" style="left: 82px; top: 192px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
-            <button class="table large" style="left: -36px; top: 254px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
+            <button class="table large" style="left: -31px; top: 254px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
   
             <div class="bar-row">
               <div class="station-wrap">
