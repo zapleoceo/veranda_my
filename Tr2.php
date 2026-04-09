@@ -1302,7 +1302,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0001">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0004">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1313,7 +1313,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         <div class="title-wrap">
           <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
           <p><span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span> <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
-          <input type="datetime-local" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
+          <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
         </div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
@@ -1419,13 +1419,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     <div class="dtp-card" role="dialog" aria-modal="true" aria-labelledby="dtpTitle">
       <div class="dtp-title" id="dtpTitle" data-i18n="dtp_title"><?= htmlspecialchars(tr('dtp_title')) ?></div>
       <div class="dtp-wheels">
-        <div class="wheel">
+        <div class="wheel" style="width: 100%;">
           <div class="wheel-mid"></div>
           <div class="wheel-list" id="dtpDateList"></div>
-        </div>
-        <div class="wheel">
-          <div class="wheel-mid"></div>
-          <div class="wheel-list" id="dtpTimeList"></div>
         </div>
       </div>
       <div class="dtp-actions">

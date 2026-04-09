@@ -447,23 +447,19 @@
     const syncDtpSelectionFromInput = () => {
       ensureDtpData();
       const raw = resDate ? String(resDate.value || '').trim() : '';
-      const m = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+      const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
       const fallback = getMinSelectableSlot();
-      const picked = clampToMinSlot(m ? m[1] : fallback.dateVal, m ? m[2] : fallback.timeVal);
-      dtpSelDate = picked.dateVal;
-      const dIdx = Math.max(0, dtpDates.findIndex((x) => x.value === picked.dateVal));
-      const tFoundIdx = dtpTimes.findIndex((x) => x.value === picked.timeVal);
-      const tIdx = Math.max(0, tFoundIdx);
-      dtpSelTime = tFoundIdx >= 0 ? picked.timeVal : (dtpTimes[0] ? dtpTimes[0].value : '10:00');
+      const pickedDate = m ? m[1] : fallback.dateVal;
+      dtpSelDate = pickedDate;
+      const dIdx = Math.max(0, dtpDates.findIndex((x) => x.value === pickedDate));
       setWheelTo(dtpDateList, dIdx);
-      setWheelTo(dtpTimeList, tIdx);
     };
 
     const applyDtpToInput = () => {
       if (!resDate) return;
       const fallback = getMinSelectableSlot();
-      const picked = clampToMinSlot(dtpSelDate || fallback.dateVal, dtpSelTime || fallback.timeVal);
-      resDate.value = picked.dateVal + 'T' + picked.timeVal;
+      const pickedDate = dtpSelDate || fallback.dateVal;
+      resDate.value = pickedDate;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       resDate.dispatchEvent(new Event('change', { bubbles: true }));
     };
@@ -1450,8 +1446,17 @@
     const getCurrentRequest = () => {
       const dtRaw = resDate ? String(resDate.value || '').trim() : '';
       if (!dtRaw) return null;
-      const dt = dtRaw.replace('T', ' ') + ':00';
-      return { dt, guests: 1, dtRaw, durationSec: 7200, durationHours: 2 };
+      // dtRaw is YYYY-MM-DD
+      const now = new Date();
+      const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      
+      let timeStr = '12:00:00';
+      if (dtRaw === todayStr) {
+        timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':00';
+      }
+      
+      const dt = dtRaw + ' ' + timeStr;
+      return { dt, guests: 1, dtRaw: dtRaw + 'T' + timeStr.slice(0, 5), durationSec: 7200, durationHours: 2 };
     };
 
     const invalidateLast = () => {
@@ -1533,8 +1538,8 @@
     const initDate = () => {
       if (!resDate) return;
       const minSlot = getMinSelectableSlot();
-      resDate.min = minSlot.dateVal + 'T' + minSlot.timeVal;
-      resDate.value = resDate.min;
+      resDate.min = minSlot.dateVal;
+      resDate.value = minSlot.dateVal;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       setBusyLabel(String(resDate.value || '').slice(0, 10));
       clearReservationsOnTables();
