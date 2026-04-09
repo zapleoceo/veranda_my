@@ -957,7 +957,7 @@
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
     .modal-label { display: grid; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-top: 0; }
     .modal-label.full { grid-column: 1 / -1; }
-    .guests-time-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 10px; }
+    .guests-time-row { display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr; gap: 10px; }
     .guests-time-row.full { grid-column: 1 / -1; }
     .phone-row { display: flex; align-items: center; gap: 10px; }
     .phone-row input { flex: 1 1 auto; min-width: 0; }
