@@ -1310,7 +1310,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0010">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0011">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1467,37 +1467,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         <div class="req-layout">
           <div class="req-left" id="reqLeft">
             <div class="modal-grid">
-              <label class="modal-label">
-                <span data-i18n="your_name"><?= htmlspecialchars(tr('your_name')) ?></span>
-                <input type="text" id="reqName" autocomplete="name">
-              </label>
-              <label class="modal-label">
-                <div class="label-row">
-                  <span data-i18n="your_phone"><?= htmlspecialchars(tr('your_phone')) ?></span>
-                  <div class="msgr-hint" id="msgrHint" hidden></div>
-                </div>
-                <div class="phone-row">
-                  <input type="tel" id="reqPhone" autocomplete="tel">
-                  <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
-                      <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
-                    </svg>
-                  </button>
-                </div>
-              </label>
-              <div id="tableBusyWarning" style="display:none; color: #ff4d4d; font-size: 13px; margin-top: 10px; line-height: 1.4; padding: 10px; background: rgba(255,0,0,0.1); border-radius: 8px;">
-                <span data-i18n="table_busy_warning"><?= htmlspecialchars(tr('table_busy_warning')) ?></span>
-              </div>
-              <label class="modal-label full" id="reqCommentLabel">
-                <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
-                <textarea id="reqComment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
-              </label>
-              <label class="modal-label full" id="reqPreorderLabel" hidden>
-                <span class="desktop-text" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
-                <span class="mobile-text" data-i18n="preorder_title_mobile"><?= htmlspecialchars(tr('preorder_title_mobile')) ?></span>
-                <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
-              </label>
               <div class="guests-time-row full">
                 <label class="modal-label">
                   <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
@@ -1530,6 +1499,37 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   </select>
                 </label>
               </div>
+              <label class="modal-label">
+                <span data-i18n="your_name"><?= htmlspecialchars(tr('your_name')) ?></span>
+                <input type="text" id="reqName" autocomplete="name">
+              </label>
+              <label class="modal-label">
+                <div class="label-row">
+                  <span data-i18n="your_phone"><?= htmlspecialchars(tr('your_phone')) ?></span>
+                  <div class="msgr-hint" id="msgrHint" hidden></div>
+                </div>
+                <div class="phone-row">
+                  <input type="tel" id="reqPhone" autocomplete="tel">
+                  <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
+                      <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+              </label>
+              <div id="tableBusyWarning" style="display:none; color: #ff4d4d; font-size: 13px; margin-top: 10px; line-height: 1.4; padding: 10px; background: rgba(255,0,0,0.1); border-radius: 8px;">
+                <span data-i18n="table_busy_warning"><?= htmlspecialchars(tr('table_busy_warning')) ?></span>
+              </div>
+              <label class="modal-label full" id="reqCommentLabel">
+                <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
+                <textarea id="reqComment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
+              </label>
+              <label class="modal-label full" id="reqPreorderLabel" hidden>
+                <span class="desktop-text" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
+                <span class="mobile-text" data-i18n="preorder_title_mobile"><?= htmlspecialchars(tr('preorder_title_mobile')) ?></span>
+                <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
+              </label>
             </div>
           </div>
           <div class="req-right" id="preorderPanel" hidden>
@@ -1584,6 +1584,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260409_0010"></script>
+  <script src="/assets/js/Tr2.js?v=20260409_0011"></script>
 </body>
 </html>
