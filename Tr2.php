@@ -47,6 +47,7 @@ $I18N = [
     'pick_date' => 'Выбрать дату',
     'comment_placeholder' => 'Пожелания, особые условия…',
     'booking_note' => 'Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.',
+    'tight_warning' => 'Мы подставим вам стул, но вам может быть тесно за этим столиком :)',
     'zoom' => 'Масштаб',
     'musicians' => 'Музыканты',
     'cashier' => 'Касса',
@@ -120,7 +121,8 @@ $I18N = [
     'data_on' => 'Data for',
     'pick_date' => 'Pick date',
     'comment_placeholder' => 'Wishes, special conditions…',
-    'booking_note' => 'Hold time is 30 minutes from start. If guest is late more than 30 minutes — reservation is cancelled.',
+    'booking_note' => 'Your reservation is held for 30 min from the start time. If guests do not arrive within 30 min, the booking is cancelled.',
+    'tight_warning' => 'We will add an extra chair, but it might be tight at this table :)',
     'zoom' => 'Zoom',
     'musicians' => 'Musicians',
     'cashier' => 'Cashier',
@@ -194,7 +196,8 @@ $I18N = [
     'data_on' => 'Dữ liệu ngày',
     'pick_date' => 'Chọn ngày',
     'comment_placeholder' => 'Yêu cầu, ghi chú…',
-    'booking_note' => 'Giữ bàn 30 phút từ lúc bắt đầu. Nếu khách đến muộn quá 30 phút — đặt bàn sẽ bị hủy.',
+    'booking_note' => 'Bàn của bạn được giữ trong 30 phút kể từ thời gian bắt đầu. Nếu khách không đến trong vòng 30 phút, đặt bàn sẽ bị hủy.',
+    'tight_warning' => 'Chúng tôi sẽ thêm ghế, nhưng có thể sẽ hơi chật tại bàn này :)',
     'zoom' => 'Thu phóng',
     'musicians' => 'Nhạc',
     'cashier' => 'Thu ngân',
@@ -1310,7 +1313,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0015">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0016">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1537,6 +1540,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           </div>
         </div>
         <div class="modal-hint" id="reqHint" hidden></div>
+        <div class="modal-note tight-warning" id="tightWarning" hidden data-i18n="tight_warning"><?= htmlspecialchars(tr('tight_warning')) ?></div>
         <div class="modal-note" data-i18n="booking_note"><?= htmlspecialchars(tr('booking_note')) ?></div>
         <div class="modal-actions">
           <button class="btn btn-primary" type="submit" id="reqSubmit" data-i18n="send"><?= htmlspecialchars(tr('send')) ?></button>
@@ -1582,6 +1586,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260409_0015"></script>
+  <script src="/assets/js/Tr2.js?v=20260409_0016"></script>
 </body>
 </html>

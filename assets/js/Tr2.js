@@ -962,9 +962,17 @@
       let busy = false;
       const overlaps = ranges.some(([s, e]) => s < selEnd + 30 && e > selMin - 30);
       if (overlaps) busy = true;
-      if (isToday && freeNums && !freeNums.has(tableNum)) {
-        if (selMin < nowMin + 120) {
-          busy = true;
+      if (isToday) {
+        if (selMin < nowMin) {
+          reqStart.value = String(Math.floor(nowMin / 60)).padStart(2, '0') + ':' + String(nowMin % 60).padStart(2, '0');
+          showToast(reqStart, 'Ошибка времени', 'Нельзя выбрать время в прошлом');
+          selMin = nowMin;
+          selEnd = selMin + durMin;
+        }
+        if (freeNums && !freeNums.has(tableNum)) {
+          if (selMin < nowMin + 120) {
+            busy = true;
+          }
         }
       }
 
@@ -1079,6 +1087,17 @@
       if (!reqHint) return;
       const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
       const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
+
+      const tightWarning = document.getElementById('tightWarning');
+      const cap = tableCapsByNum && tableCapsByNum[tableNum] != null ? Number(tableCapsByNum[tableNum]) : null;
+      
+      if (tightWarning) {
+        if (cap != null && isFinite(cap) && guests > cap) {
+          tightWarning.hidden = false;
+        } else {
+          tightWarning.hidden = true;
+        }
+      }
       if (!tableNum || !isFinite(guests) || guests <= 0) {
         reqHint.hidden = true;
         reqHint.textContent = '';
