@@ -959,8 +959,8 @@
     .modal-label.full { grid-column: 1 / -1; }
     .guests-time-row { display: grid; grid-template-columns: auto 1fr 1fr; gap: 10px; }
     .guests-time-row.full { grid-column: 1 / -1; }
-    .phone-row { display: flex; align-items: center; gap: 10px; }
-    .phone-row input { flex: 1 1 auto; min-width: 0; }
+    .phone-row, .name-row { display: flex; align-items: center; gap: 10px; }
+    .phone-row input, .name-row input { flex: 1 1 auto; min-width: 0; }
     .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; }
     .msgr-btn-inline svg { width: 22px; height: 22px; }
     .modal input[type="text"], .modal input[type="tel"], .modal input[type="number"], .modal input[type="time"], .modal select {

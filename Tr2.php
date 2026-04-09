@@ -1310,7 +1310,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0011">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0012">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1474,10 +1474,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                     <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
                     <input type="number" id="reqGuests" min="1" max="99">
                     <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
-                    <button type="button" class="btn btn-secondary btn-preorder-mobile" id="btnOpenMobilePreorder" hidden aria-label="Menu">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                      <span data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></span>
-                    </button>
                   </div>
                 </label>
                 <label class="modal-label">
@@ -1501,7 +1497,13 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               </div>
               <label class="modal-label">
                 <span data-i18n="your_name"><?= htmlspecialchars(tr('your_name')) ?></span>
-                <input type="text" id="reqName" autocomplete="name">
+                <div class="name-row">
+                  <input type="text" id="reqName" autocomplete="name">
+                  <button type="button" class="btn btn-secondary btn-preorder-mobile" id="btnOpenMobilePreorder" hidden aria-label="Menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    <span data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></span>
+                  </button>
+                </div>
               </label>
               <label class="modal-label">
                 <div class="label-row">
@@ -1584,6 +1586,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260409_0011"></script>
+  <script src="/assets/js/Tr2.js?v=20260409_0012"></script>
 </body>
 </html>
