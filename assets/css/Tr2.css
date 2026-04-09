@@ -1167,6 +1167,11 @@
       line-height: 1;
       padding: 0;
       cursor: pointer;
+      transition: color 0.15s ease, transform 0.15s ease;
+    }
+    .btn-close-modal:hover {
+      color: rgba(255,255,255,1);
+      transform: scale(1.1);
     }
     .btn-preorder-mobile { display: none; }
     .mobile-preorder-layout {
@@ -1305,7 +1310,7 @@
   
     .btn {
       border: 0;
-      border-radius: var(--radius-full);
+      border-radius: 14px;
       padding: 0.9rem 1rem;
       font-size: var(--text-sm);
       font-weight: 700;
