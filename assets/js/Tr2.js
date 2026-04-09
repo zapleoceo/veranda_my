@@ -942,12 +942,20 @@
     let modalTableBusy = false;
 
     const checkModalAvailability = () => {
-      if (!pendingBooking || !pendingBooking.tableNum || !reqStart || !reqStart.value || !reqDuration) return;
+      if (!pendingBooking || !pendingBooking.tableNum || !reqStart || !reqStart.value || !reqDuration) {
+        modalTableBusy = true;
+        syncSubmitState();
+        return;
+      }
       const isoDateStr = String(pendingBooking.start || '').slice(0, 10);
       if (!isoDateStr) return;
 
       const timeParts = reqStart.value.split(':');
-      if (timeParts.length < 2) return;
+      if (timeParts.length < 2) {
+        modalTableBusy = true;
+        syncSubmitState();
+        return;
+      }
       const selMin = parseInt(timeParts[0], 10) * 60 + parseInt(timeParts[1], 10);
       const durMin = parseInt(reqDuration.value, 10);
       const selEnd = selMin + durMin;
@@ -964,10 +972,11 @@
       if (overlaps) busy = true;
       if (isToday) {
         if (selMin < nowMin) {
-          reqStart.value = String(Math.floor(nowMin / 60)).padStart(2, '0') + ':' + String(nowMin % 60).padStart(2, '0');
-          showToast(reqStart, 'Ошибка времени', 'Нельзя выбрать время в прошлом');
+          // Time passed while form was open
+          showToast(reqStart, 'Ошибка времени', 'Время уже прошло');
           selMin = nowMin;
           selEnd = selMin + durMin;
+          busy = true; // explicitly mark as busy
         }
         if (freeNums && !freeNums.has(tableNum)) {
           if (selMin < nowMin + 120) {
@@ -999,14 +1008,49 @@
         const iso = String(start || '').trim();
         reqStart.dataset.iso = iso;
         const d = new Date(iso);
+        let selectedTime = '';
         if (!isNaN(d.getTime())) {
           if (reqModalDate) reqModalDate.textContent = d.toLocaleDateString(UI_LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric'});
           const hh = String(d.getHours()).padStart(2, '0');
           const mm = String(d.getMinutes()).padStart(2, '0');
-          reqStart.value = `${hh}:${mm}`;
+          selectedTime = `${hh}:${mm}`;
         } else {
-          reqStart.value = '';
           if (reqModalDate) reqModalDate.textContent = '';
+        }
+        
+        reqStart.innerHTML = '';
+        const now = new Date();
+        const datePart = iso.slice(0, 10);
+        const isToday = datePart === now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+
+        let hasSelected = false;
+        for (let h = 8; h <= 23; h++) {
+          for (let m = 0; m < 60; m += 30) {
+            if (h === 23 && m === 30) continue;
+            
+            const slotMin = h * 60 + m;
+            if (isToday && slotMin < nowMin) continue;
+            
+            const val = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = val;
+            if (val === selectedTime) {
+              opt.selected = true;
+              hasSelected = true;
+            }
+            reqStart.appendChild(opt);
+          }
+        }
+        
+        if (reqStart.options.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = '—';
+          reqStart.appendChild(opt);
+        } else if (!hasSelected) {
+          reqStart.options[0].selected = true;
         }
       }
       if (!keepFields) {

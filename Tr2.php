@@ -1313,7 +1313,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0016">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260409_0017">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1481,7 +1481,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 </label>
                 <label class="modal-label">
                   <span data-i18n="start_time"><?= htmlspecialchars(tr('start_time')) ?></span>
-                  <input type="time" id="reqStart" required>
+                  <select id="reqStart" required></select>
                 </label>
                 <label class="modal-label">
                   <span data-i18n="duration"><?= htmlspecialchars(tr('duration')) ?></span>
@@ -1586,6 +1586,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260409_0016"></script>
+  <script src="/assets/js/Tr2.js?v=20260409_0017"></script>
 </body>
 </html>
