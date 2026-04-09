@@ -958,11 +958,16 @@
 
       const now = new Date();
       const isToday = isoDateStr === now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      const nowMin = now.getHours() * 60 + now.getMinutes();
 
       let busy = false;
       const overlaps = ranges.some(([s, e]) => s < selEnd + 30 && e > selMin - 30);
       if (overlaps) busy = true;
-      if (isToday && freeNums && !freeNums.has(tableNum)) busy = true;
+      if (isToday && freeNums && !freeNums.has(tableNum)) {
+        if (selMin < nowMin + 120) {
+          busy = true;
+        }
+      }
 
       modalTableBusy = busy;
       const tableBusyWarning = document.getElementById('tableBusyWarning');
@@ -1471,10 +1476,9 @@
           }
         }
 
-        const un = getUnavailableReason(id, current);
-        if (un) {
+        if (table.classList.contains('disabled')) {
           selectedTableNum = '';
-          showToast(table, un.reason, un.detail);
+          showToast(table, 'отключено в настройках', '');
           return;
         }
 
