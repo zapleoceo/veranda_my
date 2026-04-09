@@ -353,11 +353,11 @@
       const add = (30 - (m % 30)) % 30;
       base.setMinutes(m + add, 0, 0);
       
-      if (base.getHours() < 8) {
-        base.setHours(8, 0, 0, 0);
-      } else if (base.getHours() === 23 && base.getMinutes() > 0 || base.getHours() > 23) {
+      if (base.getHours() < 10) {
+        base.setHours(10, 0, 0, 0);
+      } else if (base.getHours() > 21 || (base.getHours() === 21 && base.getMinutes() > 0)) {
         base.setDate(base.getDate() + 1);
-        base.setHours(8, 0, 0, 0);
+        base.setHours(10, 0, 0, 0);
       }
       
       return { dateVal: isoDate(base), timeVal: pad2(base.getHours()) + ':' + pad2(base.getMinutes()) };
@@ -1043,9 +1043,9 @@
         const nowMin = now.getHours() * 60 + now.getMinutes();
 
         let hasSelected = false;
-        for (let h = 8; h <= 23; h++) {
+        for (let h = 10; h <= 21; h++) {
           for (let m = 0; m < 60; m += 30) {
-            if (h === 23 && m === 30) continue;
+            if (h === 21 && m > 0) continue;
             
             const slotMin = h * 60 + m;
             if (isToday && slotMin < nowMin) continue;

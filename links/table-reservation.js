@@ -353,6 +353,12 @@
       const m = base.getMinutes();
       const add = (30 - (m % 30)) % 30;
       base.setMinutes(m + add, 0, 0);
+      if (base.getHours() < 10) {
+        base.setHours(10, 0, 0, 0);
+      } else if (base.getHours() > 21 || (base.getHours() === 21 && base.getMinutes() > 0)) {
+        base.setDate(base.getDate() + 1);
+        base.setHours(10, 0, 0, 0);
+      }
       return { dateVal: isoDate(base), timeVal: pad2(base.getHours()) + ':' + pad2(base.getMinutes()) };
     };
 
@@ -428,8 +434,9 @@
       }
       if (!dtpTimes.length) {
         dtpTimes = [];
-        for (let h = 0; h <= 23; h++) {
+        for (let h = 10; h <= 21; h++) {
           for (let m = 0; m < 60; m += 30) {
+            if (h === 21 && m > 0) continue;
             dtpTimes.push({ value: pad2(h) + ':' + pad2(m) });
           }
         }
