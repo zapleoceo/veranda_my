@@ -366,11 +366,10 @@
 
     const fmtCashDate = (dtLocal) => {
       const raw = String(dtLocal || '').trim();
-      const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (!m) return t('pick_date');
-      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), 0);
-      const datePart = new Intl.DateTimeFormat(UI_LOCALE, { weekday: 'short', day: '2-digit', month: 'short' }).format(d);
-      return datePart + ' · ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0);
+      return new Intl.DateTimeFormat(UI_LOCALE, { weekday: 'short', day: '2-digit', month: 'short' }).format(d);
     };
 
     const setDtpModal = (on) => {
