@@ -378,7 +378,6 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $duration = (int)($_GET['duration'] ?? 0);
   $guests = (int)($_GET['guests_count'] ?? 0);
   $spotId = (int)($_GET['spot_id'] ?? 1);
-  $hallId = 2;
   $allowed = $allowedSchemeNums;
 
   $dateReservation = trim($dateReservation);
@@ -411,7 +410,6 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
     foreach ($free as $row) {
       if (!is_array($row)) continue;
-      if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
       $num = trim((string)($row['table_num'] ?? ''));
       if ($num === '') continue;
       if (is_array($allowedSet) && !isset($allowedSet[$num])) continue;
@@ -427,7 +425,6 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
         'duration' => $duration,
         'spot_id' => $spotId,
         'guests_count' => $guests,
-        'hall_id' => $hallId,
       ],
       'free_table_nums' => array_values(array_keys($nums)),
       'free_tables' => $filtered,
@@ -454,7 +451,6 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   $dateReservation = trim((string)($_GET['date_reservation'] ?? ''));
   $duration = (int)($_GET['duration'] ?? 0);
   $spotId = (int)($_GET['spot_id'] ?? 1);
-  $hallId = 2;
   $allowed = $allowedSchemeNums;
 
   $displayTz = new DateTimeZone($displayTzName);
@@ -481,9 +477,8 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       'timezone' => 'client',
     ], 'GET');
 
-    $tablesResp = $api->request('spots.getTableHallTables', [
+    $tablesResp = $api->request('spots.getTables', [
       'spot_id' => $spotId,
-      'hall_id' => $hallId,
       'without_deleted' => 1,
     ], 'GET');
 
@@ -615,7 +610,6 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         'date_from_api' => $dayStartDisplay->format('Y-m-d H:i:s'),
         'date_to_api' => $dayEndDisplay->format('Y-m-d H:i:s'),
         'spot_id' => $spotId,
-        'hall_id' => $hallId,
         'display_timezone' => $displayTzName,
         'api_timezone' => $apiTzName,
         'count_raw' => is_array($resp) ? count($resp) : 0,
