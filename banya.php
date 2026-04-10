@@ -640,7 +640,7 @@ $firstOfMonth = date('Y-m-01');
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/banya.css?v=20260410_0005">
+  <link rel="stylesheet" href="/assets/css/banya.css?v=20260410_0006">
 </head>
 <body>
 <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 16px;">
@@ -658,14 +658,16 @@ $firstOfMonth = date('Y-m-01');
             <div>
                 <h1 style="display:none;">Отчет баня</h1>
             </div>
-            <label>
-                Дата начала
-                <input type="date" id="dateFrom" value="<?= htmlspecialchars($firstOfMonth) ?>">
-            </label>
-            <label>
-                Дата конца
-                <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>">
-            </label>
+            <div class="date-inputs" style="display:flex; gap:10px; flex-wrap:wrap;">
+                <label>
+                    Начало
+                    <input type="date" id="dateFrom" value="<?= htmlspecialchars($firstOfMonth) ?>">
+                </label>
+                <label>
+                    Конец
+                    <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>">
+                </label>
+            </div>
             <div class="controls">
                 <button id="loadBtn" type="button">ЗАГРУЗИТЬ</button>
                 <div class="progress" id="prog" style="display:none; align-items:center; gap: 10px; margin-left: 10px;">

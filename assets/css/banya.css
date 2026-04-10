@@ -26,12 +26,12 @@
         .sort-arrow { margin-left: 6px; color: var(--accent); font-weight: 900; }
         .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color: var(--text); }
         .toggle-wrap .toggle-text { user-select:none; }
-        .switch { position: relative; display:inline-block; width: 44px; height: 24px; flex: 0 0 auto; }
+        .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background: var(--card2); transition: 180ms; border-radius: 999px; }
-        .slider:before { position:absolute; content:""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: var(--text); transition: 180ms; border-radius: 999px; box-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+        .slider:before { position:absolute; content:""; height: 22px; width: 22px; left: 3px; bottom: 3px; background: var(--text); transition: 180ms; border-radius: 999px; box-shadow: 0 1px 2px rgba(0,0,0,0.5); }
         .switch input:checked + .slider { background: var(--accent); }
-        .switch input:checked + .slider:before { transform: translateX(20px); }
+        .switch input:checked + .slider:before { transform: translateX(24px); }
         .table-filter { position: relative; display: inline-flex; align-items: center; gap: 8px; }
         .table-filter-btn { width: 18px; height: 18px; border-radius: 8px; padding: 0; background: transparent; border: 1px solid var(--border); color: var(--accent); font-weight: 900; line-height: 1; cursor: pointer; }
         .table-filter-btn:hover { border-color: var(--accent); }
@@ -80,7 +80,8 @@
         @media (max-width: 768px) {
             .row { flex-direction: column; align-items: stretch; gap: 12px; }
             .row > div:first-child { display: none; }
-            .row label { width: 100%; }
+            .date-inputs { display: flex; gap: 10px; width: 100%; }
+            .date-inputs label { flex: 1; margin: 0; }
             .row input[type="date"] { width: 100%; }
             .controls { flex-direction: column; align-items: stretch; width: 100%; gap: 12px; }
             .controls button { width: 100%; padding: 12px; font-size: 16px; }
