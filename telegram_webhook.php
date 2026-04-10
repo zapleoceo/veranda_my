@@ -312,23 +312,33 @@ $action = (string)($m[1] ?? '');
         }
 
         $nameParts = explode(' ', trim((string)$row['name']), 2);
-        $reservationData = [
-            'spot_id' => 1,
-            'type' => 2,
-            'table_id' => $tableId,
-            'guests_count' => (int)$row['guests'],
-            'date_reservation' => date('Y-m-d H:i:s', strtotime($row['start_time'])),
-            'duration' => 7200,
-            'phone' => preg_replace('/\D+/', '', (string)$row['phone']),
-            'first_name' => $nameParts[0] ?? 'Guest',
-            'last_name' => $nameParts[1] ?? '',
-            'comment' => trim(($row['comment'] ?? '') . ' (TG ' . $ackBy . ')')
-        ];
+        $firstName = trim($nameParts[0] ?? 'Guest');
+        $lastName = trim($nameParts[1] ?? '');
 
+        // Use spot_id from environment if set, fallback to 1
+        $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
+        if ($spotId === '0') $spotId = '1';
+
+        $phone = preg_replace('/\D+/', '', (string)$row['phone']);
         // If phone starts with 380, Poster might expect + prefix or specific format
-        if (strpos($reservationData['phone'], '380') === 0) {
-            $reservationData['phone'] = '+' . $reservationData['phone'];
+        if (strpos($phone, '380') === 0) {
+            $phone = '+' . $phone;
         }
+
+        // Prepare reservation data for Poster API as per documentation:
+        // https://dev.joinposter.com/docs/v3/web/incomingOrders/createReservation
+        // Removed 'type' as it's not listed as an input parameter in the documentation example.
+        $reservationData = [
+            'spot_id'          => $spotId,
+            'phone'            => $phone,
+            'table_id'         => (string)$tableId,
+            'guests_count'     => (string)$row['guests'],
+            'date_reservation' => date('Y-m-d H:i:s', strtotime($row['start_time'])),
+            'duration'         => '7200', // 2 hours default in seconds
+            'first_name'       => $firstName,
+            'last_name'        => $lastName,
+            'comment'          => trim(($row['comment'] ?? '') . ' (TG ' . $ackBy . ')')
+        ];
 
         $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
         
