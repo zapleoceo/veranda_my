@@ -767,10 +767,22 @@
       const counts = normalizePreorder(preorderCounts);
       const keys = Object.keys(counts).sort((a, b) => a.localeCompare(b, UI_LOCALE, { sensitivity: 'base' }));
       const m = String(mode || 'ui');
-      return keys.map((k) => {
+      let text = keys.map((k) => {
         const title = (m === 'ru') ? k : getPreorderUiTitle(k);
         return '- ' + title + (counts[k] > 1 ? (' x' + String(counts[k])) : '');
       }).join('\n');
+      
+      const totalPrice = Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
+      if (totalPrice > 0 && text) {
+        const amountStr = new Intl.NumberFormat(UI_LOCALE).format(Math.round(totalPrice));
+        if (m === 'ru') {
+          text += '\n\n' + (I18N && I18N.ru && I18N.ru.preorder_amount ? I18N.ru.preorder_amount : 'Сумма предзаказа: {amount} ₫').replace('{amount}', amountStr);
+        } else {
+          text += '\n\n' + t('preorder_amount').replace('{amount}', amountStr);
+        }
+      }
+      
+      return text;
     };
 
     const fmtPrice = (n) => {
