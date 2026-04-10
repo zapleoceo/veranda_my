@@ -93,7 +93,13 @@
   const bindResend = () => {
     qa('.btn-resend').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Отправить сообщение в группу и гостю повторно?')) return;
+        const target = String(btn.dataset.target || 'both');
+        const msg = target === 'guest'
+          ? 'Отправить сообщение гостю повторно?'
+          : (target === 'manager'
+            ? 'Отправить сообщение менеджеру (в группу) повторно?'
+            : 'Отправить сообщение в группу и гостю повторно?');
+        if (!confirm(msg)) return;
         const id = String(btn.dataset.id || '');
         if (!id) return;
         const statusEl = q(`#resend-status-${id}`);
@@ -103,12 +109,19 @@
           statusEl.style.color = 'var(--muted)';
         }
         try {
-          const { res, j } = await postForm('reservations.php?ajax=resend', { id });
+          const { res, j } = await postForm('reservations.php?ajax=resend', { id, target });
           if (res.ok && j && j.ok) {
             const parts = [];
-            parts.push(j.group_ok ? 'Группа: ОК' : 'Группа: Ошибка');
-            if (j.has_tg) parts.push(j.guest_ok ? 'Гость: ОК' : 'Гость: Ошибка');
-            else parts.push('Гость: нет TG');
+            if (target === 'manager') {
+              parts.push(j.group_ok ? 'Менеджер: ОК' : 'Менеджер: Ошибка');
+            } else if (target === 'guest') {
+              if (j.has_tg) parts.push(j.guest_ok ? 'Гость: ОК' : 'Гость: Ошибка');
+              else parts.push('Гость: нет TG');
+            } else {
+              parts.push(j.group_ok ? 'Менеджер: ОК' : 'Менеджер: Ошибка');
+              if (j.has_tg) parts.push(j.guest_ok ? 'Гость: ОК' : 'Гость: Ошибка');
+              else parts.push('Гость: нет TG');
+            }
             if (statusEl) {
               statusEl.textContent = parts.join(' | ');
               statusEl.style.color = '#81c784';

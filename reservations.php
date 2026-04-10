@@ -56,6 +56,8 @@ if ($ajax === 'resend') {
     $tgThreadId = trim((string)($_ENV['TABLE_RESERVATION_THREAD_ID'] ?? ''));
     $tgThreadNum = $tgThreadId !== '' ? (int)$tgThreadId : 1938;
     if ($tgThreadNum <= 0) $tgThreadNum = 1938;
+    $target = strtolower(trim((string)($_POST['target'] ?? 'both')));
+    if (!in_array($target, ['both', 'guest', 'manager'], true)) $target = 'both';
 
     if ($tgToken === '' || $tgChatId === '') {
         http_response_code(500);
@@ -66,39 +68,42 @@ if ($ajax === 'resend') {
     $startDt = new DateTimeImmutable($row['start_time']);
     
     // Group Message
-    $text = '<b>[Повтор] Новая бронь с сайта</b>' . "\n";
-    $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
-    $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
-    $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
-    $text .= 'Номер стола: <b>' . htmlspecialchars($row['table_num']) . '</b>' . "\n";
-    $text .= 'Имя: <b>' . htmlspecialchars($row['name']) . '</b>' . "\n";
-    $text .= 'Номер телефона: <b>' . htmlspecialchars($row['phone']) . '</b>';
-    if ($row['comment'] !== '') {
-        $text .= "\n<b>Комментарий:</b>\n" . htmlspecialchars($row['comment']);
-    }
-    $preForGroup = $row['preorder_ru'] !== '' ? $row['preorder_ru'] : $row['preorder_text'];
-    if ($preForGroup !== '') {
-        $text .= "\n<b>Предзаказ:</b>\n" . htmlspecialchars($preForGroup);
-    }
     $tgUid = (int)$row['tg_user_id'];
     $tgUn = (string)$row['tg_username'];
-    if ($tgUn !== '' || $tgUid > 0) {
-        $text .= "\nTelegram: ";
-        if ($tgUn !== '') {
-            $text .= '<a href="https://t.me/' . htmlspecialchars($tgUn) . '">@' . htmlspecialchars($tgUn) . '</a>';
-            if ($tgUid > 0) $text .= ' · <a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a>';
-        } elseif ($tgUid > 0) {
-            $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
-        }
-    }
-    $text .= "\n\n@Ollushka90 @ce_akh1 свяжитесь с гостем";
 
     $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-    $okGroup = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
+    $okGroup = true;
+    if ($target === 'both' || $target === 'manager') {
+        $text = '<b>[Повтор] Новая бронь с сайта</b>' . "\n";
+        $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
+        $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
+        $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
+        $text .= 'Номер стола: <b>' . htmlspecialchars($row['table_num']) . '</b>' . "\n";
+        $text .= 'Имя: <b>' . htmlspecialchars($row['name']) . '</b>' . "\n";
+        $text .= 'Номер телефона: <b>' . htmlspecialchars($row['phone']) . '</b>';
+        if ($row['comment'] !== '') {
+            $text .= "\n<b>Комментарий:</b>\n" . htmlspecialchars($row['comment']);
+        }
+        $preForGroup = $row['preorder_ru'] !== '' ? $row['preorder_ru'] : $row['preorder_text'];
+        if ($preForGroup !== '') {
+            $text .= "\n<b>Предзаказ:</b>\n" . htmlspecialchars($preForGroup);
+        }
+        if ($tgUn !== '' || $tgUid > 0) {
+            $text .= "\nTelegram: ";
+            if ($tgUn !== '') {
+                $text .= '<a href="https://t.me/' . htmlspecialchars($tgUn) . '">@' . htmlspecialchars($tgUn) . '</a>';
+                if ($tgUid > 0) $text .= ' · <a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a>';
+            } elseif ($tgUid > 0) {
+                $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
+            }
+        }
+        $text .= "\n\n@Ollushka90 @ce_akh1 свяжитесь с гостем";
+        $okGroup = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
+    }
 
     // Guest Message (localized to reservation language)
     $okGuest = true;
-    if ($tgUid > 0) {
+    if (($target === 'both' || $target === 'guest') && $tgUid > 0) {
         $langRow = strtolower(trim((string)($row['lang'] ?? 'ru')));
         if (!in_array($langRow, ['ru', 'en', 'vi'], true)) $langRow = 'ru';
         $T = [
@@ -234,13 +239,17 @@ if ($ajax === 'resend') {
             $okGuest = false;
         }
     } else {
-        $okGuest = false; // No TG linked
+        if ($target === 'both' || $target === 'guest') $okGuest = false;
+        else $okGuest = null;
     }
+
+    $respGroup = ($target === 'guest') ? null : $okGroup;
+    $respGuest = ($target === 'manager') ? null : $okGuest;
 
     echo json_encode([
         'ok' => true,
-        'group_ok' => $okGroup,
-        'guest_ok' => $okGuest,
+        'group_ok' => $respGroup,
+        'guest_ok' => $respGuest,
         'has_tg' => $tgUid > 0
     ], JSON_UNESCAPED_UNICODE);
     exit;
@@ -271,10 +280,11 @@ if ($ajax === 'toggle_deleted') {
         $row = $db->query("SELECT id, deleted_at, deleted_by FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
         $deletedAt = (string)($row['deleted_at'] ?? '');
         $deletedBy = (string)($row['deleted_by'] ?? '');
+        $isDeleted = $deletedAt !== '' && $deletedAt !== '0000-00-00 00:00:00';
         echo json_encode([
             'ok' => true,
-            'deleted' => $deletedAt !== '',
-            'deleted_at' => $deletedAt !== '' ? date('d.m.Y H:i', strtotime($deletedAt)) : '',
+            'deleted' => $isDeleted,
+            'deleted_at' => $isDeleted ? date('d.m.Y H:i', strtotime($deletedAt)) : '',
             'deleted_by' => $deletedBy,
         ], JSON_UNESCAPED_UNICODE);
         exit;
@@ -390,7 +400,7 @@ if (!is_array($rows)) {
                                     }
                                     $deletedAt = (string)($r['deleted_at'] ?? '');
                                     $deletedBy = (string)($r['deleted_by'] ?? '');
-                                    $isDeleted = $deletedAt !== '' && $deletedAt !== null;
+                                    $isDeleted = $deletedAt !== '' && $deletedAt !== null && $deletedAt !== '0000-00-00 00:00:00';
                                     $deletedAtHuman = $isDeleted ? date('d.m.Y H:i', strtotime($deletedAt)) : '';
                                 ?>
                                 <tr data-id="<?= (int)$r['id'] ?>" class="<?= $isDeleted ? 'is-deleted' : '' ?>">
@@ -433,7 +443,8 @@ if (!is_array($rows)) {
                                     </td>
                                     <td data-label="Действия">
                                         <div class="res-actions">
-                                            <button type="button" class="res-btn primary btn-resend" data-id="<?= (int)$r['id'] ?>">Повторить</button>
+                                            <button type="button" class="res-btn primary btn-resend" data-id="<?= (int)$r['id'] ?>" data-target="guest">Повторить гостю</button>
+                                            <button type="button" class="res-btn primary btn-resend" data-id="<?= (int)$r['id'] ?>" data-target="manager">Повторить менеджеру</button>
                                             <button type="button" class="res-btn danger btn-delete" data-id="<?= (int)$r['id'] ?>"><?= $isDeleted ? 'Восстановить' : 'Удалить' ?></button>
                                         </div>
                                         <div class="res-status" id="resend-status-<?= (int)$r['id'] ?>"></div>
@@ -448,6 +459,6 @@ if (!is_array($rows)) {
     </div>
 
     <script src="/assets/user_menu.js?v=20260410_0410"></script>
-    <script src="/assets/js/reservations.js?v=20260410_0510"></script>
+    <script src="/assets/js/reservations.js?v=20260410_0540"></script>
 </body>
 </html>

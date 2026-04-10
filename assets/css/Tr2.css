@@ -242,6 +242,9 @@
       aspect-ratio: 820 / 620;
       max-height: 80vh;
     }
+    @media (min-width: 900px) {
+      .map-shell { aspect-ratio: 875 / 620; }
+    }
     .map-shell > * { position: relative; z-index: 1; }
     .map-shell > .tile-layer { position: absolute; z-index: 0; }
   
@@ -965,7 +968,6 @@
     .phone-row, .name-row { display: flex; align-items: center; gap: 10px; }
     .phone-row input, .name-row input { flex: 1 1 auto; min-width: 0; }
     .phone-row input { flex: 0 0 60%; }
-    @media (max-width: 640px) { .phone-row input { flex: 1 1 auto; } }
     .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; }
     .msgr-btn-inline svg { width: 22px; height: 22px; }
     .modal input[type="text"], .modal input[type="tel"], .modal input[type="number"], .modal input[type="time"], .modal select {
@@ -981,6 +983,9 @@
       transition: border-color .2s ease;
       appearance: none;
     }
+    .modal { color-scheme: dark; }
+    .modal select { background: rgba(0,0,0,0.22); }
+    .modal select:invalid { color: rgba(255,255,255,0.62); }
     .modal select {
       cursor: pointer;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='rgba(255,255,255,0.65)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
