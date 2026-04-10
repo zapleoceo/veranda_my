@@ -332,18 +332,25 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
         $api = new \App\Classes\PosterAPI($_ENV['POSTER_API_TOKEN']);
         
         // Fetch all tables to map table_id to table_num
-        $allTables = $api->request('spots.getTables', ['spot_id' => 1]);
         $tableNameMap = [];
-        if (is_array($allTables)) {
-            foreach ($allTables as $t) {
-                $tableNameMap[(int)$t['table_id']] = $t['table_num'];
+        try {
+            $allTables = $api->request('spots.getTables');
+            if (is_array($allTables)) {
+                foreach ($allTables as $t) {
+                    if (isset($t['table_id'])) {
+                        $tableNameMap[(int)$t['table_id']] = $t['table_num'] ?? $t['table_name'] ?? $t['table_id'];
+                    }
+                }
             }
+        } catch (\Throwable $e_tables) {
+            // Table mapping failed, will use ID as fallback
         }
 
         $resp = $api->request('incomingOrders.getReservations', [
             'date_from' => $dateFrom . ' 00:00:00',
             'date_to' => $dateTo . ' 23:59:59',
         ], 'GET');
+        
         if (is_array($resp)) {
             foreach ($resp as $pr) {
                 $status = (int)($pr['status'] ?? 0);
@@ -373,7 +380,8 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
             }
         }
     } catch (\Throwable $e) {
-        // Log or ignore
+        // Log error to PHP error log for debugging
+        error_log("Poster Reservations Error: " . $e->getMessage());
     }
 }
 
