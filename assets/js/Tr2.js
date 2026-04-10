@@ -1000,17 +1000,25 @@
         if (tableBusyWarning) tableBusyWarning.style.display = 'none';
       }
 
+      console.log('checkModalAvailability: un=', un, ' modalTableBusy=', modalTableBusy);
       syncSubmitState();
     };
 
-    const syncSubmitState = () => {
-      if (!reqSubmit) return;
-      const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
-      if (linked && !modalTableBusy) reqSubmit.classList.remove('is-disabled');
-      else reqSubmit.classList.add('is-disabled');
-      reqSubmit.setAttribute('aria-disabled', (linked && !modalTableBusy) ? 'false' : 'true');
-      reqSubmit.disabled = !!submitBusy || modalTableBusy;
-    };
+      const syncSubmitState = () => {
+        if (!reqSubmit) return;
+        const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
+        const canSubmit = linked && !modalTableBusy && !submitBusy;
+        
+        if (canSubmit) {
+          reqSubmit.classList.remove('is-disabled');
+          reqSubmit.setAttribute('aria-disabled', 'false');
+          reqSubmit.disabled = false;
+        } else {
+          reqSubmit.classList.add('is-disabled');
+          reqSubmit.setAttribute('aria-disabled', 'true');
+          reqSubmit.disabled = true;
+        }
+      };
     const openRequestForm = ({ tableNum, guests, start, name, phone, comment, preorder, keepFields }) => {
       if (reqHint) {
         reqHint.hidden = true;
@@ -1249,7 +1257,16 @@
     if (reqForm) {
       reqForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (submitBusy || modalTableBusy) return;
+        
+        // Log explicitly for debugging if it prevents
+        if (submitBusy) {
+            console.log('submit prevented: submitBusy is true');
+            return;
+        }
+        if (modalTableBusy) {
+            console.log('submit prevented: modalTableBusy is true');
+            return;
+        }
         const name = reqName ? String(reqName.value || '').trim() : '';
         const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
         const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
@@ -1506,7 +1523,8 @@
         timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':00';
       }
       if (reqStart && reqStart.value) {
-        timeStr = reqStart.value + ':00';
+        const p = reqStart.value.split(':');
+        if (p.length >= 2) timeStr = p[0] + ':' + p[1] + ':00';
       }
       
       const guests = reqGuests ? parseInt(reqGuests.value, 10) : 1;
