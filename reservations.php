@@ -320,7 +320,7 @@ if (!is_array($rows)) {
     <title>Брони</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="/assets/app.css">
-    <link rel="stylesheet" href="/assets/css/reservations.css?v=20260410_0300">
+    <link rel="stylesheet" href="/assets/css/reservations.css?v=20260410_0410">
 </head>
 <body>
     <div class="container res-page">
@@ -447,7 +447,7 @@ if (!is_array($rows)) {
         </div>
     </div>
 
-    <script src="/assets/user_menu.js?v=20260410_0330"></script>
-    <script src="/assets/js/reservations.js?v=20260410_0330"></script>
+    <script src="/assets/user_menu.js?v=20260410_0410"></script>
+    <script src="/assets/js/reservations.js?v=20260410_0410"></script>
 </body>
 </html>
