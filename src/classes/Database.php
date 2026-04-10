@@ -576,5 +576,10 @@ class Database {
             qr_code VARCHAR(64) NULL,
             KEY idx_start_time (start_time)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        try { $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN preorder_ru TEXT NULL"); } catch (\Throwable $e) {}
+        try { $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN total_amount INT DEFAULT 0"); } catch (\Throwable $e) {}
+        try { $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN qr_url VARCHAR(255) NULL"); } catch (\Throwable $e) {}
+        try { $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN qr_code VARCHAR(64) NULL"); } catch (\Throwable $e) {}
     }
 }

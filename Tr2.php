@@ -1080,103 +1080,102 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $text .= "\n\n@Ollushka90 @ce_akh1  свяжитесь с гостем";
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-  $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
-  if (!$ok) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение в Telegram'], JSON_UNESCAPED_UNICODE);
-    exit;
-  }
+  $okGroup = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
 
-  if ($tgUid <= 0) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Telegram не привязан'], JSON_UNESCAPED_UNICODE);
-    exit;
-  }
-  $userText = '<b>' . htmlspecialchars($trFor('tg_thanks_title')) . '</b> ' . htmlspecialchars($trFor('tg_thanks_body')) . "\n\n";
-  if ($qrUrl !== '') {
-      $userText .= '<b>' . htmlspecialchars($trFor('qr_payment_title') ?? 'Оплата предзаказа') . '</b>' . "\n";
-      $userText .= htmlspecialchars($trFor('qr_payment_body') ?? 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.') . "\n\n";
-      $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">Ссылка на QR-код для оплаты</a>' . "\n\n";
-  }
-  $userText .= '<b>' . htmlspecialchars($trFor('tg_booking_title')) . '</b>' . "\n";
-  $userText .= htmlspecialchars($trFor('tg_date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
-  $userText .= htmlspecialchars($trFor('tg_time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
-  $userText .= htmlspecialchars($trFor('tg_guests')) . ': <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
-  $userText .= htmlspecialchars($trFor('tg_table')) . ': <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
-  $userText .= htmlspecialchars($trFor('tg_name')) . ': <b>' . htmlspecialchars($name) . '</b>' . "\n";
-  $userText .= htmlspecialchars($trFor('tg_phone')) . ': <b>' . htmlspecialchars($phoneNorm) . '</b>';
-  if ($comment !== '') {
-    $userText .= "\n";
-    $userText .= '<b>' . htmlspecialchars($trFor('tg_comment')) . ':</b>' . "\n" . htmlspecialchars($comment);
-  }
-  if ($preorder !== '') {
-    $userText .= "\n";
-    $userText .= '<b>' . htmlspecialchars($trFor('tg_preorder')) . ':</b>' . "\n" . htmlspecialchars($preorder);
-  }
+  $okGuest = true;
+  if ($tgUid > 0) {
+      $userText = '<b>' . htmlspecialchars($trFor('tg_thanks_title')) . '</b> ' . htmlspecialchars($trFor('tg_thanks_body')) . "\n\n";
+      if ($qrUrl !== '') {
+          $userText .= '<b>' . htmlspecialchars($trFor('qr_payment_title') ?? 'Оплата предзаказа') . '</b>' . "\n";
+          $userText .= htmlspecialchars($trFor('qr_payment_body') ?? 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.') . "\n\n";
+          $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">Ссылка на QR-код для оплаты</a>' . "\n\n";
+      }
+      $userText .= '<b>' . htmlspecialchars($trFor('tg_booking_title')) . '</b>' . "\n";
+      $userText .= htmlspecialchars($trFor('tg_date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
+      $userText .= htmlspecialchars($trFor('tg_time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
+      $userText .= htmlspecialchars($trFor('tg_guests')) . ': <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
+      $userText .= htmlspecialchars($trFor('tg_table')) . ': <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
+      $userText .= htmlspecialchars($trFor('tg_name')) . ': <b>' . htmlspecialchars($name) . '</b>' . "\n";
+      $userText .= htmlspecialchars($trFor('tg_phone')) . ': <b>' . htmlspecialchars($phoneNorm) . '</b>';
+      if ($comment !== '') {
+        $userText .= "\n";
+        $userText .= '<b>' . htmlspecialchars($trFor('tg_comment')) . ':</b>' . "\n" . htmlspecialchars($comment);
+      }
+      if ($preorder !== '') {
+        $userText .= "\n";
+        $userText .= '<b>' . htmlspecialchars($trFor('tg_preorder')) . ':</b>' . "\n" . htmlspecialchars($preorder);
+      }
 
-  $ch = curl_init();
-  if ($qrUrl !== '') {
-      $chImg = curl_init($qrUrl);
-      curl_setopt($chImg, CURLOPT_RETURNTRANSFER, true);
-      curl_setopt($chImg, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
-      curl_setopt($chImg, CURLOPT_FOLLOWLOCATION, true);
-      $imgData = curl_exec($chImg);
-      curl_close($chImg);
-
-      $tmpFile = tempnam(sys_get_temp_dir(), 'qr_');
-      file_put_contents($tmpFile, $imgData);
-
-      curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
-      curl_setopt($ch, CURLOPT_POST, true);
-      curl_setopt($ch, CURLOPT_POSTFIELDS, [
-          'chat_id' => (string)$tgUid,
-          'photo' => new CURLFile($tmpFile, 'image/png', 'qr.png'),
-          'caption' => $userText,
-          'parse_mode' => 'HTML',
-      ]);
-      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-      curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-      $resp = curl_exec($ch);
-      curl_close($ch);
-      @unlink($tmpFile);
-  } else {
-      curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
-      curl_setopt($ch, CURLOPT_POST, true);
-      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-          'chat_id' => (string)$tgUid,
-          'text' => $userText,
-          'parse_mode' => 'HTML',
-      ]));
-      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-      curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-      $resp = curl_exec($ch);
-      curl_close($ch);
-  }
-  $data = $resp ? json_decode($resp, true) : null;
-  
-  if ($qrUrl !== '' && (!is_array($data) || empty($data['ok']))) {
-      // Fallback to text message
       $ch = curl_init();
-      curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
-      curl_setopt($ch, CURLOPT_POST, true);
-      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-          'chat_id' => (string)$tgUid,
-          'text' => $userText,
-          'parse_mode' => 'HTML',
-      ]));
-      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-      curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-      $resp = curl_exec($ch);
-      curl_close($ch);
+      if ($qrUrl !== '') {
+          $chImg = curl_init($qrUrl);
+          curl_setopt($chImg, CURLOPT_RETURNTRANSFER, true);
+          curl_setopt($chImg, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+          curl_setopt($chImg, CURLOPT_FOLLOWLOCATION, true);
+          $imgData = curl_exec($chImg);
+          curl_close($chImg);
+
+          $tmpFile = tempnam(sys_get_temp_dir(), 'qr_');
+          file_put_contents($tmpFile, $imgData);
+
+          curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
+          curl_setopt($ch, CURLOPT_POST, true);
+          curl_setopt($ch, CURLOPT_POSTFIELDS, [
+              'chat_id' => (string)$tgUid,
+              'photo' => new CURLFile($tmpFile, 'image/png', 'qr.png'),
+              'caption' => $userText,
+              'parse_mode' => 'HTML',
+          ]);
+          curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+          curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+          $resp = curl_exec($ch);
+          curl_close($ch);
+          @unlink($tmpFile);
+      } else {
+          curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+          curl_setopt($ch, CURLOPT_POST, true);
+          curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+              'chat_id' => (string)$tgUid,
+              'text' => $userText,
+              'parse_mode' => 'HTML',
+          ]));
+          curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+          curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+          $resp = curl_exec($ch);
+          curl_close($ch);
+      }
       $data = $resp ? json_decode($resp, true) : null;
+      
+      if ($qrUrl !== '' && (!is_array($data) || empty($data['ok']))) {
+          // Fallback to text message
+          $ch = curl_init();
+          curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+          curl_setopt($ch, CURLOPT_POST, true);
+          curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+              'chat_id' => (string)$tgUid,
+              'text' => $userText,
+              'parse_mode' => 'HTML',
+          ]));
+          curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+          curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+          $resp = curl_exec($ch);
+          curl_close($ch);
+          $data = $resp ? json_decode($resp, true) : null;
+      }
+
+      if (!is_array($data) || empty($data['ok'])) {
+          $okGuest = false;
+      }
+  } else {
+      $okGuest = false;
   }
 
-  if (!is_array($data) || empty($data['ok'])) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение гостю в Telegram'], JSON_UNESCAPED_UNICODE);
-    exit;
-  }
-  echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+  echo json_encode([
+      'ok' => true,
+      'group_ok' => $okGroup,
+      'guest_ok' => $okGuest,
+      'has_tg' => $tgUid > 0
+  ], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
