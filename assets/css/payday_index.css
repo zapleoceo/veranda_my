@@ -9,7 +9,7 @@
         .btn.loading::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 6px; height: 3px; border-radius: 999px; background: rgba(17, 24, 39, 0.12); }
         .btn.loading::before { content: ''; position: absolute; left: 10px; bottom: 6px; height: 3px; width: 22px; border-radius: 999px; background: currentColor; opacity: 0.75; animation: btnbar 900ms ease-in-out infinite alternate; }
         @keyframes btnbar { from { transform: translateX(0); } to { transform: translateX(22px); } }
-        .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-weight: 800; cursor: pointer; }
+        .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-weight: 800; cursor: pointer; color: var(--text); }
         .btn.primary { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
         .btn:disabled { opacity: 0.6; cursor: default; }
         .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color: var(--text); }
@@ -26,7 +26,7 @@
         .confirm-modal .
         .confirm-modal .sub { margin-top: 10px; color: var(--muted); font-weight: 800; font-size: 12px; }
         .confirm-modal .actions { display:flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
-        .confirm-modal .btn2 { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; }
+        .confirm-modal .btn2 { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; color: var(--text); }
         .confirm-modal .btn2.primary { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
         .confirm-modal .btn2:disabled { opacity: 0.6; cursor: default; }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
@@ -90,7 +90,7 @@
         .cell-anchor { display:flex; align-items:center; gap: 8px; }
         .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
         .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding: 10px 8px 12px; margin-top: 6px; border-radius: 14px; background: var(--card); backdrop-filter: blur(2px); border: 1px solid var(--border); position: relative; z-index: 3; }
-        .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; position: relative; overflow: hidden; }
+        .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; position: relative; overflow: hidden; color: var(--text); }
         .mid-btn.primary { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
         .mid-btn.active { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
         .mid-btn:disabled { opacity: 0.5; cursor: default; }

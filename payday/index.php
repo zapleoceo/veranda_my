@@ -2713,7 +2713,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260410_0008">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260410_0009">
 </head>
 <body>
 <div class="container">
