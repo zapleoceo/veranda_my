@@ -735,7 +735,7 @@
         if (!isMobile) {
           const totalEl = document.createElement('div');
           totalEl.className = 'preorder-total';
-          totalEl.textContent = fmtPrice(totalPrice);
+          totalEl.textContent = t('preorder_amount').replace('{amount}', new Intl.NumberFormat(UI_LOCALE).format(Math.round(totalPrice)));
           targetBox.appendChild(totalEl);
         }
       };
@@ -982,7 +982,7 @@
       if (isToday) {
         if (selMin < nowMin) {
           // Time passed while form was open
-          showToast(reqStart, 'Ошибка времени', 'Время уже прошло');
+          showToast(reqStart, t('time_error') || 'Ошибка времени', t('time_passed') || 'Время уже прошло');
           selMin = nowMin;
           selEnd = selMin + durMin;
           busy = true; // explicitly mark as busy
@@ -1389,8 +1389,8 @@
       if (!toastEl || !toastTitleEl || !toastReasonEl) return;
       if (toastHideTimer) { clearTimeout(toastHideTimer); toastHideTimer = null; }
       positionToast(target);
-      toastTitleEl.textContent = 'Этот столик не доступен';
-      toastReasonEl.innerHTML = 'Причина: <b>' + esc(reason) + '</b>' + (detail ? (' · ' + esc(detail)) : '');
+      toastTitleEl.textContent = t('table_unavailable') || 'Этот столик не доступен';
+      toastReasonEl.innerHTML = (t('reason') || 'Причина: ') + '<b>' + esc(reason) + '</b>' + (detail ? (' · ' + esc(detail)) : '');
       toastEl.classList.add('on');
       if (toastTimer) clearTimeout(toastTimer);
       toastTimer = setTimeout(hideToast, 2200);
@@ -1399,7 +1399,7 @@
     const getUnavailableReason = (tableNum, current) => {
       const tEl = tables.find((x) => String(x.dataset.table || '') === String(tableNum));
       if (!tEl) return null;
-      if (tEl.classList.contains('disabled')) return { reason: 'отключено в настройках', detail: '' };
+      if (tEl.classList.contains('disabled')) return { reason: t('reason_disabled') || 'отключено в настройках', detail: '' };
       if (!last || !current) return null;
       const ps = parseSel(current.dtRaw);
       const ranges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
@@ -1408,12 +1408,12 @@
         const overlaps = ranges.some(([s, e]) => s < selEnd && e > ps.selMin);
         if (overlaps) {
           const txt = ranges.slice(0, 2).map(([s, e]) => fmtMin(s) + '-' + fmtMin(e)).join(' · ');
-          return { reason: 'там есть бронь', detail: txt };
+          return { reason: t('reason_booking') || 'там есть бронь', detail: txt };
         }
       }
       if (!freeNums.has(String(tableNum))) {
-        if (ps && ps.isToday) return { reason: 'гости сейчас сидят', detail: '' };
-        return { reason: 'недоступен на это время', detail: '' };
+        if (ps && ps.isToday) return { reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
+        return { reason: t('reason_time') || 'недоступен на это время', detail: '' };
       }
       return null;
     };
@@ -1557,7 +1557,7 @@
 
         if (table.classList.contains('disabled')) {
           selectedTableNum = '';
-          showToast(table, 'отключено в настройках', '');
+          showToast(table, t('reason_disabled') || 'отключено в настройках', '');
           return;
         }
 
@@ -1566,7 +1566,7 @@
           const ok = await confirmCapacity(Math.max(1, Math.floor(cap)), current.guests);
           if (!ok) {
             selectedTableNum = '';
-            setOutput('Исправь кол-во гостей и выбери столик снова.');
+            setOutput(t('fix_guests_table') || 'Исправь кол-во гостей и выбери столик снова.');
             return;
           }
         }
@@ -1731,8 +1731,8 @@
           messengerLinked.telegram = true;
           linkedTg = tg ? { user_id: Number(tg.user_id || 0) || 0, username: String(tg.username || ''), name: String(tg.name || '') } : null;
           openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
-          if (linkedTg && linkedTg.username) setMsgrHint('Telegram привязан ✅ @' + String(linkedTg.username).replace(/^@+/, ''));
-          else setMsgrHint('Telegram привязан ✅');
+          if (linkedTg && linkedTg.username) setMsgrHint((t('tg_linked') || 'Telegram привязан ✅') + ' @' + String(linkedTg.username).replace(/^@+/, ''));
+          else setMsgrHint(t('tg_linked') || 'Telegram привязан ✅');
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);
         }

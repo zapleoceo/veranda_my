@@ -115,6 +115,21 @@ $I18N = [
     'sending' => 'Отправляю…',
     'submit_success' => 'Спасибо, мы с вами свяжемся в ближайшее время.\n\nСтарт: {start}\nСтол: {table}\nГостей: {guests}\nИмя: {name}\nТелефон: {phone}',
     'cap_warn' => 'Мы добавим вам стул, но вам может быть тесно за этим столиком',
+    'preorder_amount' => 'Сумма предзаказа: {amount} ₫',
+    'h_short' => 'ч',
+    'no_time_available' => 'Нет времени',
+    'time_error' => 'Ошибка времени',
+    'time_passed' => 'Время уже прошло',
+    'decrease_guests' => 'Уменьшить кол-во гостей',
+    'increase_guests' => 'Увеличить кол-во гостей',
+    'table_unavailable' => 'Этот столик не доступен',
+    'reason' => 'Причина: ',
+    'reason_disabled' => 'отключено в настройках',
+    'reason_booking' => 'там есть бронь',
+    'reason_sitting' => 'гости сейчас сидят',
+    'reason_time' => 'недоступен на это время',
+    'fix_guests_table' => 'Исправь кол-во гостей и выбери столик снова.',
+    'tg_linked' => 'Telegram привязан ✅',
   ],
   'en' => [
     'page_title' => 'Booking Map',
@@ -190,6 +205,21 @@ $I18N = [
     'sending' => 'Sending…',
     'submit_success' => 'Thank you, we will contact you shortly.\n\nStart: {start}\nTable: {table}\nGuests: {guests}\nName: {name}\nPhone: {phone}',
     'cap_warn' => 'We can add an extra chair, but it may be tight at this table :)',
+    'preorder_amount' => 'Pre-order amount: {amount} ₫',
+    'h_short' => 'h',
+    'no_time_available' => 'No time available',
+    'time_error' => 'Time error',
+    'time_passed' => 'Time has already passed',
+    'decrease_guests' => 'Decrease guests',
+    'increase_guests' => 'Increase guests',
+    'table_unavailable' => 'This table is unavailable',
+    'reason' => 'Reason: ',
+    'reason_disabled' => 'disabled in settings',
+    'reason_booking' => 'there is a booking',
+    'reason_sitting' => 'guests are currently sitting',
+    'reason_time' => 'unavailable at this time',
+    'fix_guests_table' => 'Adjust the number of guests and select the table again.',
+    'tg_linked' => 'Telegram linked ✅',
   ],
   'vi' => [
     'page_title' => 'Sơ đồ đặt bàn',
@@ -265,6 +295,21 @@ $I18N = [
     'sending' => 'Đang gửi…',
     'submit_success' => 'Cảm ơn, chúng tôi sẽ liên hệ sớm.\n\nBắt đầu: {start}\nBàn: {table}\nSố khách: {guests}\nTên: {name}\nSĐT: {phone}',
     'cap_warn' => 'Chúng tôi có thể thêm ghế, nhưng bàn này có thể hơi chật :)',
+    'preorder_amount' => 'Tổng tiền đặt trước: {amount} ₫',
+    'h_short' => 'g',
+    'no_time_available' => 'Hết giờ',
+    'time_error' => 'Lỗi thời gian',
+    'time_passed' => 'Thời gian đã trôi qua',
+    'decrease_guests' => 'Giảm số khách',
+    'increase_guests' => 'Tăng số khách',
+    'table_unavailable' => 'Bàn này không trống',
+    'reason' => 'Lý do: ',
+    'reason_disabled' => 'đã tắt trong cài đặt',
+    'reason_booking' => 'đã có lịch đặt',
+    'reason_sitting' => 'khách đang ngồi',
+    'reason_time' => 'không khả dụng vào lúc này',
+    'fix_guests_table' => 'Điều chỉnh số lượng khách và chọn lại bàn.',
+    'tg_linked' => 'Telegram đã được liên kết ✅',
   ],
   'ko' => [
     'booking_request' => '테이블 예약 요청',
@@ -272,6 +317,21 @@ $I18N = [
     'start_time' => '시작 시간',
     'duration' => '소요 시간',
     'table_busy_warning' => '죄송합니다. 선택한 시간에는 이 테이블이 예약되어 있습니다. 다른 시간이나 테이블을 선택해주세요.',
+    'preorder_amount' => '선주문 금액: {amount} ₫',
+    'h_short' => '시간',
+    'no_time_available' => '시간 없음',
+    'time_error' => '시간 오류',
+    'time_passed' => '시간이 이미 지났습니다',
+    'decrease_guests' => '인원 수 감소',
+    'increase_guests' => '인원 수 증가',
+    'table_unavailable' => '이 테이블은 사용할 수 없습니다',
+    'reason' => '이유: ',
+    'reason_disabled' => '설정에서 비활성화됨',
+    'reason_booking' => '예약이 있습니다',
+    'reason_sitting' => '손님이 현재 앉아 있습니다',
+    'reason_time' => '이 시간에는 사용할 수 없습니다',
+    'fix_guests_table' => '손님 수를 조정하고 테이블을 다시 선택하세요.',
+    'tg_linked' => '텔레그램 연동됨 ✅',
   ],
 ];
 if (!isset($I18N[$lang])) $lang = 'ru';
@@ -1313,7 +1373,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0005">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0007">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1474,9 +1534,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 <label class="modal-label">
                   <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
                   <div class="num-step">
-                    <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
+                    <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="<?= htmlspecialchars(tr('decrease_guests')) ?>">−</button>
                     <input type="number" id="reqGuests" min="1" max="99">
-                    <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
+                    <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="<?= htmlspecialchars(tr('increase_guests')) ?>">+</button>
                   </div>
                 </label>
                 <label class="modal-label">
@@ -1486,15 +1546,13 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 <label class="modal-label">
                   <span data-i18n="duration"><?= htmlspecialchars(tr('duration')) ?></span>
                   <select id="reqDuration">
-                    <option value="60">1 ч</option>
-                    <option value="90">1.5 ч</option>
-                    <option value="120" selected>2 ч</option>
-                    <option value="150">2.5 ч</option>
-                    <option value="180">3 ч</option>
-                    <option value="210">3.5 ч</option>
-                    <option value="240">4 ч</option>
-                    <option value="270">4.5 ч</option>
-                    <option value="300">5 ч</option>
+                    <?php
+                    $durations = [60 => '1', 90 => '1.5', 120 => '2', 150 => '2.5', 180 => '3', 210 => '3.5', 240 => '4', 270 => '4.5', 300 => '5'];
+                    foreach ($durations as $v => $lbl) {
+                      $sel = $v === 120 ? ' selected' : '';
+                      echo "<option value=\"$v\"$sel>$lbl " . htmlspecialchars(tr('h_short')) . "</option>";
+                    }
+                    ?>
                   </select>
                 </label>
               </div>
@@ -1586,6 +1644,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_0005"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_0007"></script>
 </body>
 </html>
