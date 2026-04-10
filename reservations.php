@@ -664,6 +664,25 @@ $rows = $allRows;
         </div>
     </div>
 
+    <!-- VPoster Confirmation Modal -->
+    <div id="vposterModal" class="res-modal" hidden>
+        <div class="res-modal-card">
+            <div class="res-modal-title">Создание брони в Poster</div>
+            <div class="res-modal-body">
+                Вы собираетесь отправить эту бронь в Poster POS.<br><br>
+                Это создаст официальную бронь на терминале официанта. Убедитесь, что все данные верны.
+            </div>
+            <label class="res-modal-check">
+                <input type="checkbox" id="vposterConfirmCheck">
+                <span>проверил</span>
+            </label>
+            <div class="res-modal-actions">
+                <button type="button" class="res-btn" id="vposterCancel">Отмена</button>
+                <button type="button" class="res-btn primary" id="vposterOk" disabled>ОК</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/assets/user_menu.js?v=20260410_0410"></script>
     <script src="/assets/js/reservations.js?v=20260410_0715"></script>
 </body>
