@@ -1319,6 +1319,7 @@
         let preorderRu = '';
         let tableNum = '';
         let getTotalPreorderAmount = () => 0;
+        let submitPrevText = '';
 
         try {
           name = reqName ? String(reqName.value || '').trim() : '';
@@ -1368,7 +1369,7 @@
           if (reqSubmit) {
             submitPrevText = String(reqSubmit.textContent || '');
             reqSubmit.textContent = t('sending');
-            reqSubmit.disabled = true;
+            reqSubmit.disabled = true; // prevent double clicks
           }
         } catch (jsErr) {
           await logJs('submit JS ERROR', { err: String(jsErr.message || jsErr) });
