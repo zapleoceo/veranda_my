@@ -640,7 +640,7 @@ $firstOfMonth = date('Y-m-01');
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/banya.css?v=20260410_0001">
+  <link rel="stylesheet" href="/assets/css/banya.css?v=20260410_0002">
 </head>
 <body>
 <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 16px;">
@@ -676,19 +676,21 @@ $firstOfMonth = date('Y-m-01');
                     <div class="desc" id="progDesc" style="font-size: 12px; color:var(--muted); font-weight: 800;"></div>
                 </div>
                 <div class="loader" id="loader" style="display:none;"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
-                <div class="toggle-wrap" title="Страницы">
-                    <span class="toggle-text">страницы</span>
-                    <label class="switch">
-                        <input type="checkbox" id="noPages">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="toggle-wrap" title="Группировать по дням">
-                    <span class="toggle-text">по дням</span>
-                    <label class="switch">
-                        <input type="checkbox" id="groupByDay">
-                        <span class="slider"></span>
-                    </label>
+                <div class="toggles-mobile">
+                    <div class="toggle-wrap" title="Страницы">
+                        <span class="toggle-text">страницы</span>
+                        <label class="switch">
+                            <input type="checkbox" id="noPages">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-wrap" title="Группировать по дням">
+                        <span class="toggle-text">по дням</span>
+                        <label class="switch">
+                            <input type="checkbox" id="groupByDay">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                 </div>
                 <div class="pager" id="pagerTop"></div>
             </div>
