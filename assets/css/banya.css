@@ -51,7 +51,7 @@
         .detail-line:last-child { border-bottom: 0; }
         .detail-sum { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 900; }
         .pager { display:flex; align-items:center; gap: 6px; flex-wrap: wrap; }
-        .page-btn { border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 4px 9px; border-radius: 10px; font-weight: 900; cursor: pointer; }
+        .page-btn { border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 4px 9px; border-radius: 10px; font-weight: 900; cursor: pointer; font-size: 13px; }
         .page-btn.active { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
         .page-dots { color: var(--muted); padding: 0 4px; font-weight: 900; }
         .hookah-ico { width: 18px; height: 18px; vertical-align: middle; margin-left: 8px; }
@@ -84,10 +84,10 @@
             .row input[type="date"] { width: 100%; }
             .controls { flex-direction: column; align-items: stretch; width: 100%; gap: 12px; }
             .controls button { width: 100%; padding: 12px; font-size: 16px; }
-            .toggles-mobile { display: flex; gap: 10px; width: 100%; justify-content: space-between; }
-            .toggle-wrap { flex: 1; justify-content: center; padding: 12px 10px; background: var(--card); border-radius: 10px; border: 1px solid var(--border); margin: 0; }
+            .toggles-mobile { display: flex; gap: 16px; width: 100%; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+            .toggle-wrap { justify-content: center; margin: 0; background: transparent; border: none; padding: 0; border-radius: 0; }
             .pager { justify-content: center; width: 100%; margin-top: 8px; gap: 4px; }
-            .page-btn { padding: 4px 8px; font-size: 13px; }
+            .page-btn { padding: 4px 8px; }
             .totals { flex-direction: column; align-items: stretch; margin-top: 16px; gap: 8px; }
             .pill { text-align: center; }
             .progress { width: 100%; justify-content: center; margin-left: 0 !important; margin-top: 8px; }
