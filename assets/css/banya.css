@@ -35,7 +35,7 @@
         .table-filter { position: relative; display: inline-flex; align-items: center; gap: 8px; }
         .table-filter-btn { width: 18px; height: 18px; border-radius: 8px; padding: 0; background: transparent; border: 1px solid rgba(182,89,48,0.22); color: rgba(182,89,48,0.85); font-weight: 900; line-height: 1; cursor: pointer; }
         .table-filter-btn:hover { border-color: rgba(182,89,48,0.42); }
-        .table-filter-pop { position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; box-shadow: 0 10px 24px rgba(182,89,48,0.18); padding: 8px; min-width: 240px; max-height: 280px; overflow: auto; z-index: 50; text-transform: none; letter-spacing: 0; }
+        .table-filter-pop { position: absolute; right: 0; top: calc(100% + 6px); background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; box-shadow: 0 10px 24px rgba(182,89,48,0.18); padding: 8px; min-width: 240px; max-height: 280px; overflow: auto; z-index: 50; text-transform: none; letter-spacing: 0; }
         .table-filter-pop label:hover { background: rgba(239,219,206,0.35); }
         .day-group td { background: rgba(239,219,206,0.55); color: var(--brand-text); font-weight: 900; }
         .day-toggle { border: 0; background: transparent; color: var(--brand-text); font-weight: 900; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
@@ -46,7 +46,7 @@
         .pill.ok { border-color: rgba(182,89,48,0.22); background: rgba(239,219,206,0.25); color: #1f2937; }
         .error { margin-top: 10px; color:#b91c1c; font-weight: 700; }
         .details-row td { background: rgba(17,24,39,0.02); }
-        .details-box { padding: 10px 12px; border: 1px solid rgba(182,89,48,0.18); border-radius: 12px; background: #fff; }
+        .details-box { padding: 10px 12px; border: 1px solid rgba(182,89,48,0.18); border-radius: 12px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
         .detail-line { display:flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed rgba(17,24,39,0.10); }
         .detail-line:last-child { border-bottom: 0; }
         .detail-sum { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 900; }
@@ -60,7 +60,7 @@
         .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid rgba(182,89,48,0.22); border-radius: 999px; background: #fff; color: #1f2937; font-weight: 900; cursor: default; }
         .user-icon { width: 22px; height: 22px; border-radius: 50%; background: rgba(239,219,206,0.75); display: inline-flex; align-items: center; justify-content: center; color: var(--brand-text); font-weight: 900; font-size: 12px; overflow: hidden; }
         .user-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; box-shadow: 0 10px 24px rgba(182,89,48,0.18); padding: 8px; min-width: 220px; display: none; z-index: 1000; }
+        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(182,89,48,0.22); border-radius: 12px; box-shadow: 0 10px 24px rgba(182,89,48,0.18); padding: 8px; min-width: 220px; display: none; z-index: 1000; }
         .user-menu.open .user-dropdown { display: block; }
         .user-dropdown a { display: block; padding: 8px 10px; border-radius: 10px; color: #1f2937; text-decoration: none; font-weight: 900; }
         .user-dropdown a:hover { background: rgba(239,219,206,0.55); }

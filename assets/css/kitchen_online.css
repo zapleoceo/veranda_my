@@ -15,7 +15,7 @@
         .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text); font-weight: 600; cursor: default; }
         .user-icon { width: 22px; height: 22px; border-radius: 50%; background: var(--accent2); display: inline-flex; align-items: center; justify-content: center; color: var(--accent); font-weight: 800; font-size: 12px; overflow: hidden; }
         .user-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.5); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
+        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: var(--card); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.5); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
         .user-menu.open .user-dropdown { display: block; }
         .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; font-weight: 600; }
         .user-dropdown a:hover { background: #f5f6fa; }

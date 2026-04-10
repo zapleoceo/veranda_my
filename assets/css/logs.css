@@ -9,7 +9,7 @@
         .user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text); font-weight: 600; cursor: default; }
         .user-icon { width: 22px; height: 22px; border-radius: 50%; background: var(--accent2); display: inline-flex; align-items: center; justify-content: center; color: var(--accent); font-weight: 800; font-size: 12px; overflow: hidden; }
         .user-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.5); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
+        .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: var(--card); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.5); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
         .user-menu.open .user-dropdown { display: block; }
         .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; font-weight: 600; }
         .user-dropdown a:hover { background: transparent; }
@@ -32,5 +32,5 @@
         .pill.ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
         .pill.bad { background: rgba(211,47,47,0.2); color: #d32f2f; border: 1px solid #f5c2c7; }
         .info-icon { position: relative; display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; border: 1px solid #cbd5e1; color: var(--accent); font-weight:800; font-size:12px; cursor:help; background: var(--card); }
-        .info-icon::after { content: attr(data-tip); position:absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); min-width: 280px; max-width: 520px; width: max-content; padding: 10px 12px; border-radius: 12px; background: rgba(17, 24, 39, 0.96); color: #fffaf4; font-size: 12px; line-height: 1.35; font-weight: 600; text-transform: none; box-shadow: 0 16px 32px rgba(0,0,0,0.22); opacity: 0; pointer-events: none; transition: opacity 0.12s ease-out; z-index: 2000; }
+        .info-icon::after { content: attr(data-tip); position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(-50%); min-width: 280px; max-width: 520px; width: max-content; padding: 10px 12px; border-radius: 12px; background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #fffaf4; font-size: 12px; line-height: 1.35; font-weight: 600; text-transform: none; box-shadow: 0 16px 32px rgba(0,0,0,0.22); opacity: 0; pointer-events: none; transition: opacity 0.12s ease-out; z-index: 2000; }
         .info-icon:hover::after { opacity: 1; }

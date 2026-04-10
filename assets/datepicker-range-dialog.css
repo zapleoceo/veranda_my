@@ -4,7 +4,7 @@
  .dp-open { height: 36px; width: 42px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; cursor: pointer; font-size: 18px; line-height: 1; }
  .dp-open:hover { background: #f6f8fb; }
  .dp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 10000; }
- .dp-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(320px, calc(100vw - 24px)); background: #fff; border: 1px solid #d0d5dd; border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.25); z-index: 10001; padding: 12px; box-sizing: border-box; }
+ .dp-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(320px, calc(100vw - 24px)); background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid #d0d5dd; border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.25); z-index: 10001; padding: 12px; box-sizing: border-box; }
  .dp-dialog button { appearance: none; -webkit-appearance: none; background: transparent; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; line-height: normal; }
  .dp-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
  .dp-month-year { font-weight: 700; color: #1f2937; text-align: center; flex: 1; }

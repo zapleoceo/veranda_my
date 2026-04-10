@@ -5,7 +5,7 @@
     .user-chip::after { content: attr(data-name); position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); background: rgba(17,24,39,0.92); color: rgba(255,255,255,0.95); padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
     .user-menu.open .user-chip::after,
     .user-menu:hover .user-chip::after { opacity: 1; }
-    .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.5); padding: 8px; min-width: 160px; z-index: 1000; display: block; opacity: 0; visibility: hidden; transform: translateY(-6px); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease; }
+    .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: var(--card); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.5); padding: 8px; min-width: 160px; z-index: 1000; display: block; opacity: 0; visibility: hidden; transform: translateY(-6px); pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease; }
     .user-menu.open .user-dropdown { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; }
     .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; font-weight: 600; }
     .user-dropdown a:hover { background: transparent; }
