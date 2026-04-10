@@ -657,6 +657,9 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
 
     $rows = is_array($resp) ? $resp : [];
     $items = [];
+  $debugOn = (string)($_GET['debug'] ?? '') === '1';
+  $targetDay = $dtDisplay->format('Y-m-d');
+  $debugRows = [];
 
     $extractNums = function ($value) use (&$extractNums) {
       $out = [];
@@ -760,6 +763,25 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         }
       }
 
+      $mappedNums = [];
+      foreach (array_keys($mappedIds ?: $tableIds) as $tableId) {
+        if (isset($tableNameById[$tableId])) $mappedNums[] = $tableNameById[$tableId];
+      }
+      if ($debugOn && $startDt->format('Y-m-d') === $targetDay) {
+        $debugRows[] = [
+          'incoming_order_id' => $incomingOrderId,
+          'status' => $status,
+          'date_reservation_raw' => $start,
+          'date_start' => $startDt->format('Y-m-d H:i:s'),
+          'date_end' => $endDt->format('Y-m-d H:i:s'),
+          'guest_name' => $guestName,
+          'guests_count' => $guestsCount,
+          'table_ids_extracted' => array_values(array_keys($tableIds)),
+          'table_ids_mapped' => array_values(array_keys($mappedIds)),
+          'table_nums_mapped' => $mappedNums,
+        ];
+      }
+
       if (!$tableIds) {
         $items[] = [
           'table_id' => '—',
@@ -800,6 +822,11 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         'api_timezone' => $apiTzName,
         'count_raw' => is_array($resp) ? count($resp) : 0,
       ],
+      'debug' => $debugOn ? [
+        'target_day' => $targetDay,
+        'count_target_day' => count($debugRows),
+        'rows' => $debugRows,
+      ] : null,
       'reservations_items' => $items,
     ], JSON_UNESCAPED_UNICODE);
   } catch (\Throwable $e) {
