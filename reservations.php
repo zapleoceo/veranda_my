@@ -194,6 +194,9 @@ $rows = $db->query("
     WHERE DATE(start_time) BETWEEN ? AND ? 
     ORDER BY {$sort} {$order}
 ", [$dateFrom, $dateTo])->fetchAll();
+if (!is_array($rows)) {
+    $rows = [];
+}
 
 ?>
 <!DOCTYPE html>
@@ -274,6 +277,14 @@ $rows = $db->query("
                             <tr><td colspan="9" style="text-align:center; padding:20px; color:var(--muted);">Нет броней за выбранный период</td></tr>
                         <?php else: ?>
                             <?php foreach ($rows as $r): ?>
+                                <?php
+                                    // Parse TG username correctly if it exists
+                                    $tgUsername = (string)($r['tg_username'] ?? '');
+                                    $tgUsername = trim($tgUsername);
+                                    if ($tgUsername !== '') {
+                                        $tgUsername = ltrim($tgUsername, '@');
+                                    }
+                                ?>
                                 <tr>
                                     <td><?= (int)$r['id'] ?></td>
                                     <td style="white-space:nowrap;"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['created_at']))) ?></td>
@@ -283,8 +294,8 @@ $rows = $db->query("
                                     <td>
                                         <div style="font-weight:bold;"><?= htmlspecialchars($r['name']) ?></div>
                                         <div style="font-size:12px; color:var(--muted);"><?= htmlspecialchars($r['phone']) ?></div>
-                                        <?php if ($r['tg_username']): ?>
-                                            <div style="font-size:12px;"><a href="https://t.me/<?= htmlspecialchars($r['tg_username']) ?>" target="_blank" style="color:var(--accent);">@<?= htmlspecialchars($r['tg_username']) ?></a></div>
+                                        <?php if ($tgUsername !== ''): ?>
+                                            <div style="font-size:12px;"><a href="https://t.me/<?= htmlspecialchars($tgUsername) ?>" target="_blank" style="color:var(--accent);">@<?= htmlspecialchars($tgUsername) ?></a></div>
                                         <?php endif; ?>
                                     </td>
                                     <td><?= $r['total_amount'] > 0 ? number_format($r['total_amount'], 0, '.', ' ') . ' ₫' : '—' ?></td>

@@ -130,6 +130,8 @@ $I18N = [
     'reason_time' => 'недоступен на это время',
     'fix_guests_table' => 'Исправь кол-во гостей и выбери столик снова.',
     'tg_linked' => 'Telegram привязан ✅',
+    'qr_payment_title' => 'Оплата предзаказа',
+    'qr_payment_body' => 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.',
   ],
   'en' => [
     'page_title' => 'Booking Map',
@@ -204,10 +206,10 @@ $I18N = [
     'missing_telegram' => 'Telegram (link)',
     'sending' => 'Sending…',
     'submit_success' => 'Thank you, we will contact you shortly.\n\nStart: {start}\nTable: {table}\nGuests: {guests}\nName: {name}\nPhone: {phone}',
-    'cap_warn' => 'We can add an extra chair, but it may be tight at this table :)',
+    'cap_warn' => 'We can add a chair, but it might be tight at this table :)',
     'preorder_amount' => 'Pre-order amount: {amount} ₫',
     'h_short' => 'h',
-    'no_time_available' => 'No time available',
+    'no_time_available' => 'No time',
     'time_error' => 'Time error',
     'time_passed' => 'Time has already passed',
     'decrease_guests' => 'Decrease guests',
@@ -220,6 +222,8 @@ $I18N = [
     'reason_time' => 'unavailable at this time',
     'fix_guests_table' => 'Adjust the number of guests and select the table again.',
     'tg_linked' => 'Telegram linked ✅',
+    'qr_payment_title' => 'Pre-order Payment',
+    'qr_payment_body' => 'Please scan the QR code to pay for your pre-order. The reservation number is already included in the payment description.',
   ],
   'vi' => [
     'page_title' => 'Sơ đồ đặt bàn',
@@ -310,6 +314,8 @@ $I18N = [
     'reason_time' => 'không khả dụng vào lúc này',
     'fix_guests_table' => 'Điều chỉnh số lượng khách và chọn lại bàn.',
     'tg_linked' => 'Telegram đã được liên kết ✅',
+    'qr_payment_title' => 'Thanh toán đặt trước',
+    'qr_payment_body' => 'Vui lòng quét mã QR để thanh toán đặt trước. Số đặt bàn của bạn đã được bao gồm trong mô tả thanh toán.',
   ],
   'ko' => [
     'booking_request' => '테이블 예약 요청',
@@ -331,7 +337,9 @@ $I18N = [
     'reason_sitting' => '손님이 현재 앉아 있습니다',
     'reason_time' => '이 시간에는 사용할 수 없습니다',
     'fix_guests_table' => '손님 수를 조정하고 테이블을 다시 선택하세요.',
-    'tg_linked' => '텔레그램 연동됨 ✅',
+    'tg_linked' => 'Telegram 연동됨 ✅',
+    'qr_payment_title' => '사전 주문 결제',
+    'qr_payment_body' => '사전 주문 금액을 결제하려면 QR 코드를 스캔하세요. 예약 번호가 이미 결제 내역에 포함되어 있습니다.',
   ],
 ];
 if (!isset($I18N[$lang])) $lang = 'ru';
