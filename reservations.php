@@ -192,11 +192,11 @@ if ($ajax === 'resend') {
     exit;
 }
 
-$dateFrom = $_GET['date_from'] ?? date('Y-m-01');
-$dateTo = $_GET['date_to'] ?? date('Y-m-t');
+$dateFrom = $_GET['date_from'] ?? date('Y-m-d', strtotime('-1 week'));
+$dateTo = $_GET['date_to'] ?? date('Y-m-d', strtotime('+1 month'));
 
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-t');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-d', strtotime('-1 week'));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d', strtotime('+1 month'));
 
 $sort = $_GET['sort'] ?? 'start_time';
 $order = strtolower($_GET['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
