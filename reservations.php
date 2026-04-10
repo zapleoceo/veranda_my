@@ -588,6 +588,7 @@ $rows = $allRows;
                                     $isPoster = !empty($r['is_poster']);
                                 ?>
                                 <tr data-id="<?= htmlspecialchars((string)$r['id']) ?>" class="<?= $isDeleted ? 'is-deleted' : '' ?> <?= $isPoster ? 'is-poster' : '' ?>">
+                                    <td data-label="ID">
                                         <div>#<?= htmlspecialchars((string)$r['id']) ?></div>
                                         <?php if ($isPoster): ?>
                                             <div class="tag poster">POSTER</div>
