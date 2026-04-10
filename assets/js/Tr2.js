@@ -316,6 +316,7 @@
     const reqSubmit = document.getElementById('reqSubmit');
     const msgrTgBtn = document.getElementById('msgrTgBtn');
     const msgrHint = document.getElementById('msgrHint');
+    const tgNick = document.getElementById('tgNick');
     const toastEl = document.getElementById('tableToast');
     const toastTitleEl = document.getElementById('toastTitle');
     const toastReasonEl = document.getElementById('toastReason');
@@ -347,6 +348,16 @@
         if (reqPhone.value !== d) reqPhone.value = d;
         syncSubmitState();
       });
+    }
+    if (reqGuests) {
+      reqGuests.readOnly = true;
+      reqGuests.addEventListener('keydown', (e) => {
+        const k = String(e.key || '');
+        if (k === 'Tab' || k.startsWith('Arrow') || k === 'Shift' || k === 'Escape') return;
+        e.preventDefault();
+      });
+      reqGuests.addEventListener('paste', (e) => e.preventDefault());
+      reqGuests.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
     }
 
     const pad2 = (n) => String(n).padStart(2, '0');
@@ -1057,7 +1068,12 @@
         const phoneOk = !!(reqPhone && isPhoneValid(reqPhone.value));
         const startOk = !!(reqStart && String(reqStart.value || '').trim());
         const guestsOk = !!(reqGuests && (Number(reqGuests.value || 0) || 0) > 0);
-        const canSubmit = linked && nameOk && phoneOk && startOk && guestsOk && !modalTableBusy && !submitBusy;
+        const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
+        const preorderText = (typeof getPreorderText === 'function') ? String(getPreorderText('ui') || '') : '';
+        const preorderOk = guests <= 5 || !!preorderText.trim();
+        if (reqPreorderLabel) reqPreorderLabel.hidden = guests <= 5;
+        if (reqPreorderBox) reqPreorderBox.classList.toggle('preorder-missing', guests > 5 && !preorderOk);
+        const canSubmit = linked && nameOk && phoneOk && startOk && guestsOk && preorderOk && !modalTableBusy && !submitBusy;
         
         if (canSubmit) {
           reqSubmit.classList.remove('is-disabled');
@@ -1160,9 +1176,8 @@
       renderPreorderBox();
       if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) {
         setMsgrHint(t('link_tg_hint'));
-      } else if (messengerLinked.telegram && linkedTg) {
-        const un = String(linkedTg.username || '').replace(/^@+/, '').trim();
-        setMsgrHint('✅' + (un ? (' @' + un) : ''));
+      } else {
+        setMsgrHint('');
       }
       syncTgButtonState();
       checkModalAvailability();
@@ -1183,6 +1198,16 @@
       if (!msgrTgBtn) return;
       const linked = !!(messengerLinked.telegram && linkedTg && linkedTg.user_id);
       msgrTgBtn.classList.toggle('tg-linked', linked);
+      if (tgNick) {
+        if (linked) {
+          const un = String(linkedTg && linkedTg.username ? linkedTg.username : '').replace(/^@+/, '').trim();
+          tgNick.textContent = un ? ('✅ @' + un) : '✅';
+          tgNick.hidden = false;
+        } else {
+          tgNick.textContent = '';
+          tgNick.hidden = true;
+        }
+      }
       if (linked) {
         msgrTgBtn.title = t('tg_unlink_hover');
         msgrTgBtn.setAttribute('aria-label', t('tg_unlink_hover'));
@@ -1196,8 +1221,7 @@
       if (!msgrTgBtn || msgrBusy) return;
       if (!pendingBooking) { setMsgrHint(t('hint_pick_table_first')); return; }
       if (messengerLinked.telegram && linkedTg && linkedTg.user_id) {
-         const un = String(linkedTg.username || '').replace(/^@+/, '').trim();
-         setMsgrHint('✅' + (un ? (' @' + un) : ''));
+         setMsgrHint('');
          return;
       }
       
@@ -1942,8 +1966,7 @@
           }
 
           openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
-          const un = linkedTg ? String(linkedTg.username || '').replace(/^@+/, '').trim() : '';
-          setMsgrHint('✅' + (un ? (' @' + un) : ''));
+          setMsgrHint('');
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);
         }

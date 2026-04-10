@@ -518,7 +518,7 @@
     }
     .dtp.on .dtp-card { transform: translateY(0) scale(1); opacity: 1; }
     .dtp-title { font-weight: 900; font-size: 16px; font-family: var(--font-display); }
-    .dtp-wheels { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 10px; margin-top: 12px; }
+    .dtp-wheels { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
     .wheel {
       position: relative;
       border-radius: 16px;
@@ -971,6 +971,9 @@
     .phone-row, .name-row { display: flex; align-items: center; gap: 10px; }
     .phone-row input, .name-row input { flex: 1 1 auto; min-width: 0; }
     .phone-row input { flex: 0 0 60%; }
+    .tg-stack { display: grid; justify-items: center; gap: 4px; }
+    .tg-nick { font-size: 10px; font-weight: 900; letter-spacing: -0.02em; color: rgba(245,238,228,0.82); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tg-nick[hidden] { display: none; }
     .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; }
     .msgr-btn-inline svg { width: 22px; height: 22px; }
     .modal input[type="text"], .modal input[type="tel"], .modal input[type="number"], .modal input[type="time"], .modal select {
@@ -989,6 +992,17 @@
     .modal { color-scheme: dark; }
     .modal select { background: rgba(0,0,0,0.22); }
     .modal select:invalid { color: rgba(255,255,255,0.62); }
+
+    .preorder-missing {
+      border-color: rgba(229,115,115,0.75) !important;
+      box-shadow: 0 0 0 3px rgba(229,115,115,0.14);
+      animation: preorderPulse 0.9s ease-in-out infinite;
+    }
+    @keyframes preorderPulse {
+      0% { box-shadow: 0 0 0 3px rgba(229,115,115,0.10); }
+      50% { box-shadow: 0 0 0 6px rgba(229,115,115,0.18); }
+      100% { box-shadow: 0 0 0 3px rgba(229,115,115,0.10); }
+    }
     .modal select {
       cursor: pointer;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M6 9l6 6 6-6' stroke='rgba(255,255,255,0.65)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -1265,6 +1279,7 @@
       font-weight: 900;
       line-height: 1;
     }
+    #reqGuests[readonly] { caret-color: transparent; }
     .msgr {
       margin-top: 12px;
       padding: 10px 12px;

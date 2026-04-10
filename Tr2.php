@@ -186,7 +186,7 @@ $I18N = [
     'select_date_time' => 'Select date and time',
     'try_ok_again' => 'Request failed. Please press “OK” again.',
     'confirm_capacity' => 'Do you want to book a table for {max} when you have {guests} guests?',
-    'busy_now' => 'busy\nnow',
+    'busy_now' => 'Busy now',
     'dtp_title' => 'Pick date & time',
     'status_free' => 'Free',
     'status_busy' => 'Busy',
@@ -287,7 +287,7 @@ $I18N = [
     'select_date_time' => 'Chọn ngày và giờ',
     'try_ok_again' => 'Lỗi yêu cầu. Hãy nhấn “OK” lại.',
     'confirm_capacity' => 'Bạn muốn đặt bàn {max} chỗ cho {guests} khách phải không?',
-    'busy_now' => 'bận\nhiện tại',
+    'busy_now' => 'Đang bận',
     'dtp_title' => 'Chọn ngày & giờ',
     'status_free' => 'Trống',
     'status_busy' => 'Bận',
@@ -350,6 +350,7 @@ $I18N = [
     'start_time' => '시작 시간',
     'duration' => '소요 시간',
     'table_busy_warning' => '죄송합니다. 선택한 시간에는 이 테이블이 예약되어 있습니다. 다른 시간이나 테이블을 선택해주세요.',
+    'busy_now' => '지금 사용 중',
     'preorder_amount' => '선주문 금액: {amount} ₫',
     'h_short' => '시간',
     'no_time_available' => '시간 없음',
@@ -1144,6 +1145,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     $userText .= "\n";
     $userText .= '<b>' . htmlspecialchars($trFor('tg_preorder')) . ':</b>' . "\n" . htmlspecialchars($preorder);
   }
+  $userText .= "\n\n" . htmlspecialchars($trFor('booking_note'));
 
   $ch = curl_init();
   if ($qrUrl !== '') {
@@ -1507,7 +1509,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0835">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0910">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1671,7 +1673,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
                   <div class="num-step">
                     <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="<?= htmlspecialchars(tr('decrease_guests')) ?>">−</button>
-                    <input type="number" id="reqGuests" min="1" max="99">
+                    <input type="number" id="reqGuests" min="1" max="99" readonly>
                     <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="<?= htmlspecialchars(tr('increase_guests')) ?>">+</button>
                   </div>
                 </div>
@@ -1703,17 +1705,20 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 </div>
                 <div class="phone-row">
                   <input type="tel" id="reqPhone" autocomplete="tel" inputmode="numeric" pattern="[1-9][0-9]{8,14}">
-                  <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
-                    <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
-                      <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
-                    </svg>
-                    <svg class="ico-unlink" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M10.6 13.4a3 3 0 0 0 0-4.2l-.4-.4a3 3 0 0 0-4.2 0l-2.1 2.1a3 3 0 0 0 0 4.2l.4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                      <path d="M13.4 10.6a3 3 0 0 0 0 4.2l.4.4a3 3 0 0 0 4.2 0l2.1-2.1a3 3 0 0 0 0-4.2l-.4-.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                      <path d="M8 16l8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                  </button>
+                  <div class="tg-stack">
+                    <div class="tg-nick" id="tgNick" hidden></div>
+                    <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
+                      <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
+                        <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
+                      </svg>
+                      <svg class="ico-unlink" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M10.6 13.4a3 3 0 0 0 0-4.2l-.4-.4a3 3 0 0 0-4.2 0l-2.1 2.1a3 3 0 0 0 0 4.2l.4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M13.4 10.6a3 3 0 0 0 0 4.2l.4.4a3 3 0 0 0 4.2 0l2.1-2.1a3 3 0 0 0 0-4.2l-.4-.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M8 16l8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </label>
               <label class="modal-label full" id="reqCommentLabel">
@@ -1782,6 +1787,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_0835"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_0910"></script>
 </body>
 </html>
