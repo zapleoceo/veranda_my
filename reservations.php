@@ -74,7 +74,7 @@ if ($ajax === 'resend') {
     $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
     $okGroup = true;
     if ($target === 'both' || $target === 'manager') {
-        $text = '<b>[Повтор] Новая бронь с сайта</b>' . "\n";
+        $text = '<b>[Повтор] Новая бронь с сайта #' . htmlspecialchars((string)$row['id']) . '</b>' . "\n";
         $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
         $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
         $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
@@ -165,7 +165,7 @@ if ($ajax === 'resend') {
             $userText .= htmlspecialchars($tr('payment_body')) . "\n\n";
             $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">' . htmlspecialchars($tr('payment_link')) . '</a>' . "\n\n";
         }
-        $userText .= '<b>' . htmlspecialchars($tr('booking_title')) . '</b>' . "\n";
+        $userText .= '<b>' . htmlspecialchars($tr('booking_title')) . ' #' . htmlspecialchars((string)$row['id']) . '</b>' . "\n";
         $userText .= htmlspecialchars($tr('date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
         $userText .= htmlspecialchars($tr('time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
         $userText .= htmlspecialchars($tr('guests')) . ': <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
@@ -304,7 +304,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d', strto
 
 $sort = $_GET['sort'] ?? 'start_time';
 $order = strtolower($_GET['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-$validSorts = ['id', 'created_at', 'start_time', 'table_num', 'guests', 'name', 'phone', 'total_amount'];
+$validSorts = ['id', 'qr_code', 'created_at', 'start_time', 'table_num', 'guests', 'name', 'phone', 'total_amount'];
 if (!in_array($sort, $validSorts, true)) $sort = 'start_time';
 
 $where = "DATE(start_time) BETWEEN ? AND ?";
@@ -376,6 +376,7 @@ if (!is_array($rows)) {
                     <thead>
                         <tr>
                             <th data-sort="id">ID<?= $sort==='id'?($order==='asc'?' ↑':' ↓'):'' ?></th>
+                            <th data-sort="qr_code">Код<?= $sort==='qr_code'?($order==='asc'?' ↑':' ↓'):'' ?></th>
                             <th data-sort="created_at">Создано<?= $sort==='created_at'?($order==='asc'?' ↑':' ↓'):'' ?></th>
                             <th data-sort="start_time">Время брони<?= $sort==='start_time'?($order==='asc'?' ↑':' ↓'):'' ?></th>
                             <th data-sort="table_num">Стол<?= $sort==='table_num'?($order==='asc'?' ↑':' ↓'):'' ?></th>
@@ -388,7 +389,7 @@ if (!is_array($rows)) {
                     </thead>
                     <tbody>
                         <?php if (empty($rows)): ?>
-                            <tr><td colspan="9" style="text-align:center; padding:20px; color:var(--muted);">Нет броней за выбранный период</td></tr>
+                            <tr><td colspan="10" style="text-align:center; padding:20px; color:var(--muted);">Нет броней за выбранный период</td></tr>
                         <?php else: ?>
                             <?php foreach ($rows as $r): ?>
                                 <?php
@@ -405,9 +406,16 @@ if (!is_array($rows)) {
                                 ?>
                                 <tr data-id="<?= (int)$r['id'] ?>" class="<?= $isDeleted ? 'is-deleted' : '' ?>">
                                     <td data-label="ID">
-                                        <div><?= (int)$r['id'] ?></div>
+                                        <div>#<?= (int)$r['id'] ?></div>
                                         <div class="tag deleted" id="deleted-tag-<?= (int)$r['id'] ?>" <?= $isDeleted ? '' : 'hidden' ?>>Удалено<?= $deletedBy !== '' ? ' · ' . htmlspecialchars($deletedBy) : '' ?></div>
                                         <div class="res-muted" id="deleted-meta-<?= (int)$r['id'] ?>" <?= $isDeleted ? '' : 'hidden' ?>><?= htmlspecialchars($deletedAtHuman) ?></div>
+                                    </td>
+                                    <td data-label="Код">
+                                        <?php if (!empty($r['qr_code'])): ?>
+                                            <span class="tag"><?= htmlspecialchars($r['qr_code']) ?></span>
+                                        <?php else: ?>
+                                            <span class="res-muted">—</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td data-label="Создано"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['created_at']))) ?></td>
                                     <td data-label="Время" class="res-strong"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['start_time']))) ?></td>
@@ -459,6 +467,6 @@ if (!is_array($rows)) {
     </div>
 
     <script src="/assets/user_menu.js?v=20260410_0410"></script>
-    <script src="/assets/js/reservations.js?v=20260410_0610"></script>
+    <script src="/assets/js/reservations.js?v=20260410_0715"></script>
 </body>
 </html>

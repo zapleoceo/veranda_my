@@ -41,8 +41,8 @@
       const withKey = rows.map((r, i) => ({ r, i }));
 
       const colIdx = (() => {
-        const map = { id: 0, created_at: 1, start_time: 2, table_num: 3, guests: 4, name: 5, total_amount: 6 };
-        return map[sort] != null ? map[sort] : 2;
+        const map = { id: 0, qr_code: 1, created_at: 2, start_time: 3, table_num: 4, guests: 5, name: 6, total_amount: 7 };
+        return map[sort] != null ? map[sort] : 3;
       })();
 
       const cmp = (a, b) => {

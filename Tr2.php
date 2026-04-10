@@ -1026,8 +1026,13 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $qrUrl = '';
   $qrCode = '';
   if ($totalAmount > 0) {
-    $qrCode = strtoupper(bin2hex(random_bytes(2))) . $guests;
-        $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES {$qrCode}");
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    $code = '';
+    for ($i = 0; $i < 8; $i++) {
+      $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+    }
+    $qrCode = $code;
+    $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES{$qrCode}");
   }
 
   $db->query("INSERT INTO {$resTable} (
@@ -1063,7 +1068,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     exit;
   }
 
-  $text = '<b>Новая бронь с сайта</b>' . "\n";
+  $text = '<b>Новая бронь с сайта #' . htmlspecialchars((string)$resId) . '</b>' . "\n";
   $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
   $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
   if ($duration_m > 0) {
@@ -1117,7 +1122,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $userText .= htmlspecialchars($trFor('qr_payment_body') ?? 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.') . "\n\n";
       $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">Ссылка на QR-код для оплаты</a>' . "\n\n";
   }
-  $userText .= '<b>' . htmlspecialchars($trFor('tg_booking_title')) . '</b>' . "\n";
+  $userText .= '<b>' . htmlspecialchars($trFor('tg_booking_title')) . ' #' . htmlspecialchars((string)$resId) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_guests')) . ': <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
@@ -1495,7 +1500,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0615">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0720">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1655,14 +1660,14 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           <div class="req-left" id="reqLeft">
             <div class="modal-grid">
               <div class="guests-time-row full">
-                <label class="modal-label">
+                <div class="modal-label">
                   <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
                   <div class="num-step">
                     <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="<?= htmlspecialchars(tr('decrease_guests')) ?>">−</button>
                     <input type="number" id="reqGuests" min="1" max="99">
                     <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="<?= htmlspecialchars(tr('increase_guests')) ?>">+</button>
                   </div>
-                </label>
+                </div>
                 <label class="modal-label">
                   <span data-i18n="start_time"><?= htmlspecialchars(tr('start_time')) ?></span>
                   <select id="reqStart" required></select>
@@ -1770,6 +1775,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_0615"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_0720"></script>
 </body>
 </html>
