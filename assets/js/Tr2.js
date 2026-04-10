@@ -1126,6 +1126,12 @@
     const startTelegramFlow = async () => {
       if (!msgrTgBtn || msgrBusy) return;
       if (!pendingBooking) { setMsgrHint(t('hint_pick_table_first')); return; }
+      
+      const getTotalPreorderAmount = () => {
+        const counts = normalizePreorder(preorderCounts);
+        return Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
+      };
+      
       const tableNum = String(pendingBooking.tableNum || '');
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
