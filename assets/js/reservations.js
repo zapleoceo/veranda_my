@@ -215,8 +215,49 @@
     if (pcb) pcb.addEventListener('change', reload);
   };
 
+  const bindVPoster = () => {
+    qa('.btn-vposter').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = String(btn.dataset.id || '');
+        if (!id) return;
+        if (!confirm('Создать эту бронь в Poster POS?')) return;
+        
+        const statusEl = q(`#resend-status-${id}`);
+        btn.disabled = true;
+        if (statusEl) {
+          statusEl.textContent = 'Создание в Poster…';
+          statusEl.style.color = 'var(--muted)';
+        }
+        
+        try {
+          const { res, j } = await postForm('reservations.php?ajax=vposter', { id });
+          if (res.ok && j && j.ok) {
+            if (statusEl) {
+              statusEl.textContent = 'В Poster: Создано ✅';
+              statusEl.style.color = '#81c784';
+            }
+            btn.remove(); // Remove button after success
+          } else {
+            if (statusEl) {
+              statusEl.textContent = 'Ошибка Poster: ' + (j && j.error ? String(j.error) : 'Network error');
+              statusEl.style.color = '#e57373';
+            }
+          }
+        } catch (e) {
+          if (statusEl) {
+            statusEl.textContent = 'Ошибка запроса';
+            statusEl.style.color = '#e57373';
+          }
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  };
+
   bindSort();
   bindResend();
+  bindVPoster();
   bindDelete();
   bindShowDeleted();
 })();

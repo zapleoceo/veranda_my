@@ -940,7 +940,7 @@ if (($_GET['ajax'] ?? '') === 'cap_check') {
 
   $tableNum = trim((string)($_GET['table_num'] ?? ''));
   $guests = (int)($_GET['guests'] ?? 0);
-  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) {
+  if ($tableNum === '') {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Некорректный номер стола'], JSON_UNESCAPED_UNICODE);
     exit;
@@ -1000,7 +1000,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $start = trim((string)($payload['start'] ?? ''));
   $duration_m = (int)($payload['duration_m'] ?? 120);
 
-  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) {
+  if ($tableNum === '') {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Некорректный номер стола'], JSON_UNESCAPED_UNICODE);
     exit;
@@ -1140,7 +1140,18 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $text .= "\n\n@Ollushka90 @ce_akh1  свяжитесь с гостем";
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-  $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
+  
+  $keyboard = [];
+  $keyboard[] = [[
+      'text' => 'вPoster',
+      'callback_data' => 'vposter:' . $resId
+  ]];
+  
+  if (!empty($keyboard)) {
+      $ok = $bot->sendMessageGetIdWithKeyboard($text, $keyboard, $tgThreadNum > 0 ? $tgThreadNum : null);
+  } else {
+      $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
+  }
   if (!$ok) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение в Telegram'], JSON_UNESCAPED_UNICODE);

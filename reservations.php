@@ -28,7 +28,107 @@ $db = new \App\Classes\Database(
 $db->createReservationsTable();
 $resTable = $db->t('reservations');
 
+// Check permissions for Poster button
+$userPermissions = veranda_get_user_permissions($db, $_SESSION['user_email'] ?? '');
+$hasPosterAccess = !empty($userPermissions['vposter_button']);
+
 $ajax = $_GET['ajax'] ?? '';
+if ($ajax === 'vposter') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if (!$hasPosterAccess) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'У вас нет прав для создания брони в Poster'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $id = (int)($_POST['id'] ?? 0);
+    if ($id <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid ID'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $row = $db->query("SELECT * FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
+    if (!$row) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'Reservation not found'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if (empty($_ENV['POSTER_API_TOKEN'])) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Poster API not configured'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    try {
+        $api = new \App\Classes\PosterAPI($_ENV['POSTER_API_TOKEN']);
+        
+        // Find table_id by table_num using spots.getTableHallTables
+        $tableId = null;
+        $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2]);
+        if (is_array($allTables)) {
+            foreach ($allTables as $t) {
+                if (trim((string)($t['table_num'] ?? '')) === trim((string)($row['table_num'] ?? ''))) {
+                    $tableId = (int)$t['table_id'];
+                    break;
+                }
+            }
+        }
+
+        if (!$tableId) {
+            // Fallback: try spots.getTables if hall 2 mapping failed
+            $allTablesFallback = $api->request('spots.getTables', ['spot_id' => 1]);
+            if (is_array($allTablesFallback)) {
+                foreach ($allTablesFallback as $t) {
+                    if (trim((string)($t['table_num'] ?? '')) === trim((string)($row['table_num'] ?? ''))) {
+                        $tableId = (int)$t['table_id'];
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!$tableId) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Не удалось найти ID стола в Poster для номера ' . $row['table_num']], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $fullName = trim((string)$row['name']);
+        $nameParts = explode(' ', $fullName, 2);
+        $firstName = $nameParts[0] ?? 'Guest';
+        $lastName = $nameParts[1] ?? '';
+
+        $reservationData = [
+            'spot_id' => 1,
+            'type' => 2, // Reservation
+            'table_id' => $tableId,
+            'guests_count' => (int)$row['guests'],
+            'date_reservation' => date('Y-m-d H:i:s', strtotime($row['start_time'])),
+            'duration' => 7200, // 2 hours default
+            'phone' => preg_replace('/\D+/', '', (string)$row['phone']),
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'comment' => trim(($row['comment'] ?? '') . ' (Site #' . $row['id'] . ')')
+        ];
+
+        $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
+        
+        echo json_encode(['ok' => true, 'poster_res' => $resp], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Poster API error: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if ($ajax === 'resend') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -538,8 +638,11 @@ $rows = $allRows;
                                     <td data-label="Действия">
                                         <?php if (!$isPoster): ?>
                                             <div class="res-actions">
-                                                <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="guest">Повторить гостю</button>
-                                                <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="manager">Повторить менеджеру</button>
+                                                <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="guest">ReGuest</button>
+                                                <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="manager">ReManager</button>
+                                                <?php if ($hasPosterAccess): ?>
+                                                    <button type="button" class="res-btn primary btn-vposter" data-id="<?= htmlspecialchars((string)$r['id']) ?>">вPoster</button>
+                                                <?php endif; ?>
                                                 <button type="button" class="res-btn danger btn-delete" data-id="<?= htmlspecialchars((string)$r['id']) ?>"><?= $isDeleted ? 'Восстановить' : 'Удалить' ?></button>
                                             </div>
                                             <div class="res-status" id="resend-status-<?= htmlspecialchars((string)$r['id']) ?>"></div>

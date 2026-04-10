@@ -41,6 +41,7 @@ if (!function_exists('veranda_get_user_permissions')) {
             'banya' => false,
             'employees' => false,
             'reservations' => false,
+            'vposter_button' => false,
             'exclude_toggle' => true,
             'telegram_ack' => false,
             'payday' => false,

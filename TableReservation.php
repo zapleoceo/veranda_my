@@ -790,7 +790,7 @@ if (($_GET['ajax'] ?? '') === 'cap_check') {
 
   $tableNum = trim((string)($_GET['table_num'] ?? ''));
   $guests = (int)($_GET['guests'] ?? 0);
-  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) {
+  if ($tableNum === '') {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Некорректный номер стола'], JSON_UNESCAPED_UNICODE);
     exit;
@@ -848,7 +848,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
 
-  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) {
+  if ($tableNum === '') {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Некорректный номер стола'], JSON_UNESCAPED_UNICODE);
     exit;
@@ -934,6 +934,37 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $tgUid = isset($tg['user_id']) ? (int)$tg['user_id'] : 0;
   $tgUn = strtolower(trim((string)($tg['username'] ?? '')));
   $tgUn = ltrim($tgUn, '@');
+
+  if (isset($db) && ($db instanceof \App\Classes\Database)) {
+    $db->createReservationsTable();
+    $resTable = $db->t('reservations');
+    $qrCode = '';
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    for ($i = 0; $i < 8; $i++) {
+      $qrCode .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+    }
+    $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount=0&des=" . urlencode("RES{$qrCode}");
+
+    $db->query("INSERT INTO {$resTable} (
+      created_at, start_time, guests, table_num, name, phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, qr_url, qr_code
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+      (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
+      $startDt->format('Y-m-d H:i:s'),
+      $guests,
+      $tableNum,
+      $name,
+      $phoneNorm,
+      $comment,
+      $preorder,
+      $preorderRu,
+      $tgUid > 0 ? $tgUid : null,
+      $tgUn !== '' ? $tgUn : null,
+      $userLang,
+      $qrUrl,
+      $qrCode
+    ]);
+  }
+
   if ($tgUn !== '' || $tgUid > 0) {
     $text .= "\n";
     $text .= 'Telegram: ';
@@ -947,7 +978,18 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $text .= "\n\n@Ollushka90 @ce_akh1  свяжитесь с гостем";
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-  $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
+  
+  $keyboard = [];
+  $keyboard[] = [[
+      'text' => 'вPoster',
+      'callback_data' => 'vposter:' . $resId
+  ]];
+  
+  if (!empty($keyboard)) {
+      $ok = $bot->sendMessageGetIdWithKeyboard($text, $keyboard, $tgThreadNum > 0 ? $tgThreadNum : null);
+  } else {
+      $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
+  }
   if (!$ok) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение в Telegram'], JSON_UNESCAPED_UNICODE);

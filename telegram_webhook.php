@@ -177,7 +177,7 @@ $message = $callback['message'] ?? [];
 $messageId = isset($message['message_id']) ? (int)$message['message_id'] : 0;
 $chatId = isset($message['chat']['id']) ? (string)$message['chat']['id'] : '';
 
-if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx):(\d+)$/', $data, $m)) {
+if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx|vposter):(\d+)$/', $data, $m)) {
     echo 'ok';
     exit;
 }
@@ -194,11 +194,13 @@ try {
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
     $usersTable = $db->t('users');
     $ks = $db->t('kitchen_stats');
+    $resTable = $db->t('reservations');
     $ackAt = date('Y-m-d H:i:s');
 
     $username = strtolower(trim((string)($from['username'] ?? '')));
     $username = ltrim($username, '@');
     $isAllowed = false;
+    $userPermissions = [];
     if ($username !== '') {
         $uRow = $db->query(
             "SELECT permissions_json
@@ -207,11 +209,16 @@ try {
              LIMIT 1",
             [$username]
         )->fetch();
-        $perms = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
-        if (is_array($perms) && (!empty($perms['exclude_toggle']) || !empty($perms['telegram_ack']) || !empty($perms['admin']))) {
+        $userPermissions = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
+        if (is_array($userPermissions) && (!empty($userPermissions['admin']) || !empty($userPermissions['exclude_toggle']) || !empty($userPermissions['telegram_ack']) || !empty($userPermissions['vposter_button']))) {
             $isAllowed = true;
         }
     }
+    
+    if ($action === 'vposter' && empty($userPermissions['vposter_button']) && empty($userPermissions['admin'])) {
+        $isAllowed = false; // Specific check for vposter button
+    }
+
     if (!$isAllowed) {
         if ($callbackId !== '') {
             $postJson('answerCallbackQuery', [
@@ -220,6 +227,80 @@ try {
                 'show_alert' => true
             ]);
         }
+        echo 'ok';
+        exit;
+    }
+
+    if ($action === 'vposter' && $id > 0) {
+        $row = $db->query("SELECT * FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
+        if (!$row) {
+            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь не найдена в БД', 'show_alert' => true]);
+            exit;
+        }
+
+        if (empty($_ENV['POSTER_API_TOKEN'])) {
+            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Poster API не настроен', 'show_alert' => true]);
+            exit;
+        }
+
+        require_once __DIR__ . '/src/classes/PosterAPI.php';
+        $api = new \App\Classes\PosterAPI($_ENV['POSTER_API_TOKEN']);
+        
+        $tableId = null;
+        $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2]);
+        if (is_array($allTables)) {
+            foreach ($allTables as $t) {
+                if (trim((string)($t['table_num'] ?? '')) === trim((string)($row['table_num'] ?? ''))) {
+                    $tableId = (int)$t['table_id'];
+                    break;
+                }
+            }
+        }
+        if (!$tableId) {
+            $allTablesFallback = $api->request('spots.getTables', ['spot_id' => 1]);
+            if (is_array($allTablesFallback)) {
+                foreach ($allTablesFallback as $t) {
+                    if (trim((string)($t['table_num'] ?? '')) === trim((string)($row['table_num'] ?? ''))) {
+                        $tableId = (int)$t['table_id'];
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!$tableId) {
+            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Стол ' . $row['table_num'] . ' не найден в Poster', 'show_alert' => true]);
+            exit;
+        }
+
+        $nameParts = explode(' ', trim((string)$row['name']), 2);
+        $reservationData = [
+            'spot_id' => 1,
+            'type' => 2,
+            'table_id' => $tableId,
+            'guests_count' => (int)$row['guests'],
+            'date_reservation' => date('Y-m-d H:i:s', strtotime($row['start_time'])),
+            'duration' => 7200,
+            'phone' => preg_replace('/\D+/', '', (string)$row['phone']),
+            'first_name' => $nameParts[0] ?? 'Guest',
+            'last_name' => $nameParts[1] ?? '',
+            'comment' => trim(($row['comment'] ?? '') . ' (TG ' . $ackBy . ')')
+        ];
+
+        $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
+        
+        $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь создана в Poster!']);
+        
+        // Update message to show who sent it to Poster
+        $oldText = $message['text'] ?? '';
+        $newText = $oldText . "\n\n🚀 <b>Отправлено в Poster</b> (" . htmlspecialchars($ackBy) . ")";
+        $postJson('editMessageText', [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'text' => $newText,
+            'parse_mode' => 'HTML',
+            'reply_markup' => ['inline_keyboard' => []] // Remove buttons
+        ]);
         echo 'ok';
         exit;
     }

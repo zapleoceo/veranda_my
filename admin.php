@@ -65,6 +65,7 @@ $permissionKeys = [
     'roma' => 'Roma (кальяны)',
     'banya' => 'Отчет баня',
     'reservations' => 'Брони',
+    'vposter_button' => 'Кнопка "Бронь в Постере"',
     'exclude_toggle' => 'Игнор + ✅ Принято (Telegram)',
     'telegram_ack' => '✅ Принято (Telegram)',
 ];
