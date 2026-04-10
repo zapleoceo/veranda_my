@@ -795,7 +795,8 @@
       if (totalPrice > 0 && text) {
         const amountStr = new Intl.NumberFormat(UI_LOCALE).format(Math.round(totalPrice));
         if (m === 'ru') {
-          text += '\n\n' + (I18N && I18N.ru && I18N.ru.preorder_amount ? I18N.ru.preorder_amount : 'Сумма предзаказа: {amount} ₫').replace('{amount}', amountStr);
+          const ruAmount = (typeof window !== 'undefined' && window.I18N && window.I18N.ru && window.I18N.ru.preorder_amount) ? window.I18N.ru.preorder_amount : 'Сумма предзаказа: {amount} ₫';
+          text += '\n\n' + ruAmount.replace('{amount}', amountStr);
         } else {
           text += '\n\n' + t('preorder_amount').replace('{amount}', amountStr);
         }
