@@ -1,7 +1,14 @@
 <?php
+/**
+ * ИНСТРУКЦИЯ ПО ВОЗВРАТУ АВТОРИЗАЦИИ:
+ * 1. Раскомментируйте строку: require_once __DIR__ . '/auth_check.php';
+ * 2. Удалите весь блок кода между "START AUTO-SETUP" и "END AUTO-SETUP" ниже.
+ * 3. Раскомментируйте строку: veranda_require('errors');
+ */
+
 // require_once __DIR__ . '/auth_check.php';
 
-// Load .env
+// --- START AUTO-SETUP (Удалить этот блок при возврате авторизации) ---
 if (file_exists(__DIR__ . '/.env')) {
     $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
@@ -27,7 +34,9 @@ if (!function_exists('veranda_require')) {
 }
 
 $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+// --- END AUTO-SETUP ---
 
+// veranda_require('errors');
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
