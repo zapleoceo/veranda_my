@@ -19,7 +19,7 @@
         .loader { display:none; align-items:center; gap: 10px; margin-left: 10px; }
         .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        table { width:100%; border-collapse: collapse; margin-top: 12px; }
+        table { width:100%; border-collapse: collapse; }
         th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text); }
         th { text-align:left; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: transparent; border-bottom: 2px solid var(--border); }
         td.num { text-align:right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -75,3 +75,17 @@
         .user-dropdown details[open] .ud-summary { background: var(--card2); }
         .user-dropdown .ud-summary::after { content: "›"; float: right; color: var(--muted); font-weight: 900; }
         .user-dropdown details[open] .ud-summary::after { content: "⌄"; }
+
+        @media (max-width: 768px) {
+            .row { flex-direction: column; align-items: stretch; gap: 12px; }
+            .row > div:first-child { width: 100% !important; text-align: center; margin-bottom: 8px; }
+            .row label { width: 100%; }
+            .row input[type="date"] { width: 100%; }
+            .controls { flex-direction: column; align-items: stretch; width: 100%; gap: 12px; }
+            .controls button { width: 100%; padding: 12px; font-size: 16px; }
+            .toggle-wrap { justify-content: space-between; padding: 8px 12px; background: var(--card); border-radius: 10px; border: 1px solid var(--border); }
+            .pager { justify-content: center; width: 100%; margin-top: 8px; }
+            .totals { flex-direction: column; align-items: stretch; margin-top: 16px; gap: 8px; }
+            .pill { text-align: center; }
+            .progress { width: 100%; justify-content: center; margin-left: 0 !important; margin-top: 8px; }
+        }

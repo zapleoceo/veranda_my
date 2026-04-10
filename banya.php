@@ -640,7 +640,7 @@ $firstOfMonth = date('Y-m-01');
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/banya.css">
+  <link rel="stylesheet" href="/assets/css/banya.css?v=20260410_0001">
 </head>
 <body>
 <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 16px;">
@@ -695,26 +695,28 @@ $firstOfMonth = date('Y-m-01');
         </div>
         <div class="error" id="err" style="display:none;"></div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th id="thDate" data-sort="date" style="width:170px; cursor:pointer;">Дата<span class="sort-arrow"></span></th>
-                    <th id="thHall" data-sort="hall" style="width:80px; cursor:pointer;">Hall<span class="sort-arrow"></span></th>
-                    <th id="thTable" data-sort="table" style="width:140px; cursor:pointer;">
-                        <div class="table-filter">
-                            <span>Стол</span><span class="sort-arrow"></span>
-                            <button type="button" id="tableFilterBtn" class="table-filter-btn" title="Фильтр столов" aria-label="Фильтр столов">▾</button>
-                            <div id="tableFilterPop" class="table-filter-pop" style="display:none;"></div>
-                        </div>
-                    </th>
-                    <th id="thReceipt" data-sort="receipt" style="width:120px; cursor:pointer;">Чек<span class="sort-arrow"></span></th>
-                    <th id="thWaiter" data-sort="waiter" style="cursor:pointer;">Официант<span class="sort-arrow"></span></th>
-                    <th id="thSum" data-sort="sum_minor" style="width:140px; text-align:right; cursor:pointer;">Сумма<span class="sort-arrow"></span></th>
-                    <th style="width:120px;"></th>
-                </tr>
-            </thead>
-            <tbody id="tbody"></tbody>
-        </table>
+        <div class="table-wrap" style="overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 12px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th id="thDate" data-sort="date" style="width:170px; cursor:pointer;">Дата<span class="sort-arrow"></span></th>
+                        <th id="thHall" data-sort="hall" style="width:80px; cursor:pointer;">Hall<span class="sort-arrow"></span></th>
+                        <th id="thTable" data-sort="table" style="width:140px; cursor:pointer;">
+                            <div class="table-filter">
+                                <span>Стол</span><span class="sort-arrow"></span>
+                                <button type="button" id="tableFilterBtn" class="table-filter-btn" title="Фильтр столов" aria-label="Фильтр столов">▾</button>
+                                <div id="tableFilterPop" class="table-filter-pop" style="display:none;"></div>
+                            </div>
+                        </th>
+                        <th id="thReceipt" data-sort="receipt" style="width:120px; cursor:pointer;">Чек<span class="sort-arrow"></span></th>
+                        <th id="thWaiter" data-sort="waiter" style="cursor:pointer;">Официант<span class="sort-arrow"></span></th>
+                        <th id="thSum" data-sort="sum_minor" style="width:140px; text-align:right; cursor:pointer;">Сумма<span class="sort-arrow"></span></th>
+                        <th style="width:120px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="tbody"></tbody>
+            </table>
+        </div>
         <div style="display:flex; justify-content:flex-end; margin-top: 10px;">
             <div class="pager" id="pagerBottom"></div>
         </div>
