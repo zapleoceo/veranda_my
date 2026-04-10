@@ -1,6 +1,44 @@
 <?php
-// require_once __DIR__ . '/Tr2.php';
-// __halt_compiler();
+
+if (file_exists(__DIR__ . '/.env')) {
+  $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+  foreach ($lines as $line) {
+    $t = trim($line);
+    if ($t === '' || strpos($t, '#') === 0) continue;
+    if (strpos($t, '=') === false) continue;
+    [$name, $value] = explode('=', $line, 2);
+    $_ENV[$name] = trim($value);
+  }
+}
+
+$supportedLangs = ['ru', 'en', 'vi'];
+$lang = null;
+if (isset($_GET['lang'])) {
+  $candidate = strtolower(trim((string)$_GET['lang']));
+  if (in_array($candidate, $supportedLangs, true)) {
+    $lang = $candidate;
+    setcookie('links_lang', $lang, [
+      'expires' => time() + 31536000,
+      'path' => '/',
+      'samesite' => 'Lax'
+    ]);
+  }
+}
+if ($lang === null) {
+  $cookieLang = strtolower(trim((string)($_COOKIE['links_lang'] ?? '')));
+  if (in_array($cookieLang, $supportedLangs, true)) $lang = $cookieLang;
+}
+if ($lang === null) {
+  $accept = (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '');
+  $parts = preg_split('/\s*,\s*/', $accept);
+  foreach ($parts as $part) {
+    if ($part === '') continue;
+    $code = strtolower(trim(explode(';', $part, 2)[0]));
+    $base = explode('-', $code, 2)[0];
+    if (in_array($base, $supportedLangs, true)) { $lang = $base; break; }
+  }
+}
+if ($lang === null) $lang = 'ru';
 
 $I18N = [
   'ru' => [
@@ -9,6 +47,7 @@ $I18N = [
     'pick_date' => 'Выбрать дату',
     'comment_placeholder' => 'Пожелания, особые условия…',
     'booking_note' => 'Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.',
+
     'zoom' => 'Масштаб',
     'musicians' => 'Музыканты',
     'cashier' => 'Касса',
@@ -20,20 +59,20 @@ $I18N = [
     'confirm' => 'Подтвердите',
     'yes' => 'Да',
     'no' => 'Нет',
-    'booking_request' => 'Заявка на бронь на столик',
-    'on_date' => 'на дату',
+    'booking_request' => 'Бронирование столика',
+    'on_date' => 'на',
     'your_name' => 'Ваше имя',
     'your_phone' => 'Ваш номер телефона',
     'comment' => 'Комментарий',
     'guests_count' => 'Кол-во гостей',
-    'start_time' => 'Время старта брони',
+    'start_time' => 'Время старта',
     'duration' => 'Продолжительность',
-    'decrease_guests' => 'Уменьшить гостей',
-    'increase_guests' => 'Увеличить гостей',
+    'table_busy_warning' => 'К сожалению, этот столик занят в выбранное время. Пожалуйста, выберите другое время или столик.',
+    'table_busy_no_booking' => 'Столик занят, бронирование не доступно',
     'messenger' => 'ВАШ МЕССЕНДЖЕР',
     'link_tg_hint' => 'Мессенджер обязателен',
     'preorder_title' => 'Предзаказ',
-    'preorder_title_mobile' => 'Предзаказ. Нажмите кнопку меню ниже',
+    'preorder_title_mobile' => 'Предзаказ. Нажмите кнопку',
     'preorder_required' => 'Предзаказ обязателен для компаний больше 5 гостей.',
     'menu_btn' => 'Меню',
     'menu_loading' => 'Загрузка меню…',
@@ -42,6 +81,7 @@ $I18N = [
     'checking' => 'Проверяю…',
     'press_ok' => 'Нажми “Ок”, чтобы проверить столики.',
     'press_ok_then_tables' => 'Выбери дату и нажми “Ок”. Потом кликай по столам.',
+    'tap_table_to_book' => 'Нажмите на столик, который хотите забронировать.',
     'select_date_time' => 'Выбери дату и время',
     'try_ok_again' => 'Ошибка запроса. Попробуй нажать “Ок” ещё раз.',
     'confirm_capacity' => 'Вы хотите забронировать столик для {max} для {guests} гостей?',
@@ -49,16 +89,6 @@ $I18N = [
     'dtp_title' => 'Выбор даты',
     'status_free' => 'Свободен',
     'status_busy' => 'Занят',
-    'h_short' => 'ч',
-    'no_time_available' => 'Нет доступного времени',
-    'time_error' => 'Ошибка времени',
-    'table_unavailable' => 'Этот столик не доступен',
-    'reason' => 'Причина: ',
-    'reason_sitting' => 'Сейчас занят',
-    'reason_time' => 'недоступен на это время',
-    'reason_disabled' => 'отключено в настройках',
-    'reason_booking' => 'есть бронь',
-    'fix_guests_table' => 'Измени кол-во гостей и выбери стол снова.',
     'tg_thanks_title' => 'Спасибо!',
     'tg_thanks_body' => 'Мы с вами свяжемся в ближайшее время.',
     'tg_booking_title' => 'Ваша бронь',
@@ -76,8 +106,6 @@ $I18N = [
     'hint_pick_table_first' => 'Сначала выбери столик.',
     'hint_opening_tg' => 'Открываю Telegram…',
     'hint_tg_back' => 'В Telegram нажми “Вернуться на сайт”.',
-    'tg_unlink_confirm' => 'Отвязать Telegram аккаунт? После этого можно привязать другой.',
-    'tg_unlinked' => 'Telegram отвязан',
     'missing_prefix' => 'Не хватает: ',
     'missing_table' => 'выбери стол',
     'missing_start' => 'время старта',
@@ -86,17 +114,41 @@ $I18N = [
     'missing_phone' => 'телефон',
     'missing_preorder' => 'предзаказ',
     'missing_telegram' => 'Telegram (привязать)',
-    'phone_invalid' => 'неверный номер (международный формат, только цифры)',
     'sending' => 'Отправляю…',
     'submit_success' => 'Спасибо, мы с вами свяжемся в ближайшее время.\n\nСтарт: {start}\nСтол: {table}\nГостей: {guests}\nИмя: {name}\nТелефон: {phone}',
     'cap_warn' => 'Мы добавим вам стул, но вам может быть тесно за этим столиком',
+    'preorder_amount' => 'Сумма предзаказа: {amount} ₫',
+    'h_short' => 'ч',
+    'no_time_available' => 'Нет времени',
+    'time_error' => 'Ошибка времени',
+    'time_passed' => 'Время уже прошло',
+    'decrease_guests' => 'Уменьшить кол-во гостей',
+    'increase_guests' => 'Увеличить кол-во гостей',
+    'table_unavailable' => 'Этот столик не доступен',
+    'reason' => 'Причина: ',
+    'reason_disabled' => 'отключено в настройках',
+    'reason_booking' => 'есть бронь',
+    'booking_tag' => 'Бронь',
+    'booking_until_prefix' => 'до',
+    'phone_invalid' => 'неверный номер (международный формат, только цифры)',
+    'reason_sitting' => 'гости сейчас сидят',
+    'reason_time' => 'недоступен на это время',
+    'fix_guests_table' => 'Исправь кол-во гостей и выбери столик снова.',
+    'tg_linked' => 'Telegram привязан ✅',
+    'tg_unlink_hover' => 'Отвязать Telegram',
+    'tg_unlink_confirm' => 'Отвязать Telegram аккаунт? После этого можно привязать другой.',
+    'tg_unlinked' => 'Telegram отвязан',
+    'tg_link_hover' => 'Привязать Telegram',
+    'qr_payment_title' => 'Оплата предзаказа',
+    'qr_payment_body' => 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.',
   ],
   'en' => [
     'page_title' => 'Booking Map',
     'data_on' => 'Data for',
     'pick_date' => 'Pick date',
     'comment_placeholder' => 'Wishes, special conditions…',
-    'booking_note' => 'Hold time is 30 minutes from start. If guest is late more than 30 minutes — reservation is cancelled.',
+    'booking_note' => 'Your reservation is held for 30 min from the start time. If guests do not arrive within 30 min, the booking is cancelled.',
+
     'zoom' => 'Zoom',
     'musicians' => 'Musicians',
     'cashier' => 'Cashier',
@@ -109,19 +161,19 @@ $I18N = [
     'yes' => 'Yes',
     'no' => 'No',
     'booking_request' => 'Booking request for table',
-    'on_date' => 'for date',
+    'on_date' => 'on',
     'your_name' => 'Your name',
     'your_phone' => 'Your phone',
     'comment' => 'Comment',
     'guests_count' => 'Guests',
     'start_time' => 'Start time',
     'duration' => 'Duration',
-    'decrease_guests' => 'Decrease guests',
-    'increase_guests' => 'Increase guests',
+    'table_busy_warning' => 'Unfortunately, this table is busy at the selected time. Please choose another time or table.',
+    'table_busy_no_booking' => 'Table is occupied, booking is not available',
     'messenger' => 'YOUR MESSENGER',
     'link_tg_hint' => 'Messenger is required',
     'preorder_title' => 'Pre-order',
-    'preorder_title_mobile' => 'Pre-order. Click the menu button below',
+    'preorder_title_mobile' => 'Pre-order. Click the button',
     'preorder_required' => 'Pre-order is required for parties over 5 guests.',
     'menu_btn' => 'Menu',
     'menu_loading' => 'Loading menu…',
@@ -130,6 +182,7 @@ $I18N = [
     'checking' => 'Checking…',
     'press_ok' => 'Press “OK” to check availability.',
     'press_ok_then_tables' => 'Pick a date and press “OK”. Then tap tables.',
+    'tap_table_to_book' => 'Tap the table you want to book.',
     'select_date_time' => 'Select date and time',
     'try_ok_again' => 'Request failed. Please press “OK” again.',
     'confirm_capacity' => 'Do you want to book a table for {max} when you have {guests} guests?',
@@ -137,16 +190,6 @@ $I18N = [
     'dtp_title' => 'Pick date',
     'status_free' => 'Free',
     'status_busy' => 'Busy',
-    'h_short' => 'h',
-    'no_time_available' => 'No time available',
-    'time_error' => 'Time error',
-    'table_unavailable' => 'This table is unavailable',
-    'reason' => 'Reason: ',
-    'reason_sitting' => 'Busy now',
-    'reason_time' => 'not available at this time',
-    'reason_disabled' => 'disabled',
-    'reason_booking' => 'has booking',
-    'fix_guests_table' => 'Change guests count and select the table again.',
     'tg_thanks_title' => 'Thank you!',
     'tg_thanks_body' => 'We will contact you shortly.',
     'tg_booking_title' => 'Your reservation',
@@ -164,8 +207,6 @@ $I18N = [
     'hint_pick_table_first' => 'Pick a table first.',
     'hint_opening_tg' => 'Opening Telegram…',
     'hint_tg_back' => 'In Telegram press “Back to site”.',
-    'tg_unlink_confirm' => 'Unlink Telegram account? After that you can link another one.',
-    'tg_unlinked' => 'Telegram unlinked',
     'missing_prefix' => 'Missing: ',
     'missing_table' => 'pick table',
     'missing_start' => 'start time',
@@ -174,17 +215,41 @@ $I18N = [
     'missing_phone' => 'phone',
     'missing_preorder' => 'pre-order',
     'missing_telegram' => 'Telegram (link)',
-    'phone_invalid' => 'invalid phone (international format, digits only)',
     'sending' => 'Sending…',
     'submit_success' => 'Thank you, we will contact you shortly.\n\nStart: {start}\nTable: {table}\nGuests: {guests}\nName: {name}\nPhone: {phone}',
-    'cap_warn' => 'We can add an extra chair, but it may be tight at this table :)',
+    'cap_warn' => 'We can add a chair, but it might be tight at this table :)',
+    'preorder_amount' => 'Pre-order amount: {amount} ₫',
+    'h_short' => 'h',
+    'no_time_available' => 'No time',
+    'time_error' => 'Time error',
+    'time_passed' => 'Time has already passed',
+    'decrease_guests' => 'Decrease guests',
+    'increase_guests' => 'Increase guests',
+    'table_unavailable' => 'This table is unavailable',
+    'reason' => 'Reason: ',
+    'reason_disabled' => 'disabled in settings',
+    'reason_booking' => 'there is a booking',
+    'booking_tag' => 'Booking',
+    'booking_until_prefix' => 'until',
+    'phone_invalid' => 'invalid phone (international format, digits only)',
+    'reason_sitting' => 'guests are currently sitting',
+    'reason_time' => 'unavailable at this time',
+    'fix_guests_table' => 'Adjust the number of guests and select the table again.',
+    'tg_linked' => 'Telegram linked ✅',
+    'tg_unlink_hover' => 'Unlink Telegram',
+    'tg_unlink_confirm' => 'Unlink Telegram account? After that you can link another one.',
+    'tg_unlinked' => 'Telegram unlinked',
+    'tg_link_hover' => 'Link Telegram',
+    'qr_payment_title' => 'Pre-order Payment',
+    'qr_payment_body' => 'Please scan the QR code to pay for your pre-order. The reservation number is already included in the payment description.',
   ],
   'vi' => [
     'page_title' => 'Sơ đồ đặt bàn',
     'data_on' => 'Dữ liệu ngày',
     'pick_date' => 'Chọn ngày',
     'comment_placeholder' => 'Yêu cầu, ghi chú…',
-    'booking_note' => 'Giữ bàn 30 phút từ lúc bắt đầu. Nếu khách đến muộn quá 30 phút — đặt bàn sẽ bị hủy.',
+    'booking_note' => 'Bàn của bạn được giữ trong 30 phút kể từ thời gian bắt đầu. Nếu khách không đến trong vòng 30 phút, đặt bàn sẽ bị hủy.',
+
     'zoom' => 'Thu phóng',
     'musicians' => 'Nhạc',
     'cashier' => 'Thu ngân',
@@ -197,19 +262,19 @@ $I18N = [
     'yes' => 'Có',
     'no' => 'Không',
     'booking_request' => 'Yêu cầu đặt bàn',
-    'on_date' => 'ngày',
+    'on_date' => 'vào ngày',
     'your_name' => 'Tên của bạn',
     'your_phone' => 'Số điện thoại',
     'comment' => 'Ghi chú',
     'guests_count' => 'Số khách',
-    'start_time' => 'Giờ bắt đầu',
+    'start_time' => 'Thời gian bắt đầu',
     'duration' => 'Thời lượng',
-    'decrease_guests' => 'Giảm số khách',
-    'increase_guests' => 'Tăng số khách',
+    'table_busy_warning' => 'Rất tiếc, bàn này đã được đặt trong thời gian bạn chọn. Vui lòng chọn thời gian hoặc bàn khác.',
+    'table_busy_no_booking' => 'Bàn đang có khách, không thể đặt hôm nay',
     'messenger' => 'MESSENGER CỦA BẠN',
     'link_tg_hint' => 'Cần messenger',
     'preorder_title' => 'Đặt trước',
-    'preorder_title_mobile' => 'Đặt trước. Nhấp vào nút menu bên dưới',
+    'preorder_title_mobile' => 'Đặt trước. Nhấp vào nút',
     'preorder_required' => 'Bắt buộc đặt trước cho nhóm trên 5 khách.',
     'menu_btn' => 'Menu',
     'menu_loading' => 'Đang tải menu…',
@@ -218,6 +283,7 @@ $I18N = [
     'checking' => 'Đang kiểm tra…',
     'press_ok' => 'Nhấn “OK” để kiểm tra bàn trống.',
     'press_ok_then_tables' => 'Chọn ngày và nhấn “OK”. Sau đó chạm vào bàn.',
+    'tap_table_to_book' => 'Chạm vào bàn bạn muốn đặt.',
     'select_date_time' => 'Chọn ngày và giờ',
     'try_ok_again' => 'Lỗi yêu cầu. Hãy nhấn “OK” lại.',
     'confirm_capacity' => 'Bạn muốn đặt bàn {max} chỗ cho {guests} khách phải không?',
@@ -225,16 +291,6 @@ $I18N = [
     'dtp_title' => 'Chọn ngày',
     'status_free' => 'Trống',
     'status_busy' => 'Bận',
-    'h_short' => 'giờ',
-    'no_time_available' => 'Không còn giờ trống',
-    'time_error' => 'Lỗi thời gian',
-    'table_unavailable' => 'Bàn này không khả dụng',
-    'reason' => 'Lý do: ',
-    'reason_sitting' => 'Đang bận',
-    'reason_time' => 'không thể đặt thời gian này',
-    'reason_disabled' => 'bị tắt',
-    'reason_booking' => 'có đặt',
-    'fix_guests_table' => 'Điều chỉnh số khách và chọn lại bàn.',
     'tg_thanks_title' => 'Cảm ơn!',
     'tg_thanks_body' => 'Chúng tôi sẽ liên hệ với bạn sớm.',
     'tg_booking_title' => 'Đặt bàn của bạn',
@@ -252,8 +308,6 @@ $I18N = [
     'hint_pick_table_first' => 'Hãy chọn bàn trước.',
     'hint_opening_tg' => 'Đang mở Telegram…',
     'hint_tg_back' => 'Trong Telegram nhấn “Quay lại trang”.',
-    'tg_unlink_confirm' => 'Hủy liên kết Telegram? Sau đó bạn có thể liên kết tài khoản khác.',
-    'tg_unlinked' => 'Đã hủy liên kết Telegram',
     'missing_prefix' => 'Thiếu: ',
     'missing_table' => 'chọn bàn',
     'missing_start' => 'giờ bắt đầu',
@@ -262,10 +316,58 @@ $I18N = [
     'missing_phone' => 'số điện thoại',
     'missing_preorder' => 'đặt trước',
     'missing_telegram' => 'Telegram (liên kết)',
-    'phone_invalid' => 'số điện thoại không hợp lệ (quốc tế, chỉ số)',
     'sending' => 'Đang gửi…',
     'submit_success' => 'Cảm ơn, chúng tôi sẽ liên hệ sớm.\n\nBắt đầu: {start}\nBàn: {table}\nSố khách: {guests}\nTên: {name}\nSĐT: {phone}',
     'cap_warn' => 'Chúng tôi có thể thêm ghế, nhưng bàn này có thể hơi chật :)',
+    'preorder_amount' => 'Tổng tiền đặt trước: {amount} ₫',
+    'h_short' => 'g',
+    'no_time_available' => 'Hết giờ',
+    'time_error' => 'Lỗi thời gian',
+    'time_passed' => 'Thời gian đã trôi qua',
+    'decrease_guests' => 'Giảm số khách',
+    'increase_guests' => 'Tăng số khách',
+    'table_unavailable' => 'Bàn này không trống',
+    'reason' => 'Lý do: ',
+    'reason_disabled' => 'đã tắt trong cài đặt',
+    'reason_booking' => 'đã có lịch đặt',
+    'booking_tag' => 'Có đặt',
+    'booking_until_prefix' => 'đến',
+    'phone_invalid' => 'số điện thoại không hợp lệ (quốc tế, chỉ số)',
+    'reason_sitting' => 'khách đang ngồi',
+    'reason_time' => 'không khả dụng vào lúc này',
+    'fix_guests_table' => 'Điều chỉnh số lượng khách và chọn lại bàn.',
+    'tg_linked' => 'Telegram đã được liên kết ✅',
+    'tg_unlink_hover' => 'Hủy liên kết Telegram',
+    'tg_unlink_confirm' => 'Hủy liên kết Telegram? Sau đó bạn có thể liên kết tài khoản khác.',
+    'tg_unlinked' => 'Đã hủy liên kết Telegram',
+    'tg_link_hover' => 'Liên kết Telegram',
+    'qr_payment_title' => 'Thanh toán đặt trước',
+    'qr_payment_body' => 'Vui lòng quét mã QR để thanh toán đặt trước. Số đặt bàn của bạn đã được bao gồm trong mô tả thanh toán.',
+  ],
+  'ko' => [
+    'booking_request' => '테이블 예약 요청',
+    'on_date' => '날짜',
+    'start_time' => '시작 시간',
+    'duration' => '소요 시간',
+    'table_busy_warning' => '죄송합니다. 선택한 시간에는 이 테이블이 예약되어 있습니다. 다른 시간이나 테이블을 선택해주세요.',
+    'busy_now' => '지금 사용 중',
+    'preorder_amount' => '선주문 금액: {amount} ₫',
+    'h_short' => '시간',
+    'no_time_available' => '시간 없음',
+    'time_error' => '시간 오류',
+    'time_passed' => '시간이 이미 지났습니다',
+    'decrease_guests' => '인원 수 감소',
+    'increase_guests' => '인원 수 증가',
+    'table_unavailable' => '이 테이블은 사용할 수 없습니다',
+    'reason' => '이유: ',
+    'reason_disabled' => '설정에서 비활성화됨',
+    'reason_booking' => '예약이 있습니다',
+    'reason_sitting' => '손님이 현재 앉아 있습니다',
+    'reason_time' => '이 시간에는 사용할 수 없습니다',
+    'fix_guests_table' => '손님 수를 조정하고 테이블을 다시 선택하세요.',
+    'tg_linked' => 'Telegram 연동됨 ✅',
+    'qr_payment_title' => '사전 주문 결제',
+    'qr_payment_body' => '사전 주문 금액을 결제하려면 QR 코드를 스캔하세요. 예약 번호가 이미 결제 내역에 포함되어 있습니다.',
   ],
 ];
 if (!isset($I18N[$lang])) $lang = 'ru';
@@ -293,7 +395,7 @@ $roundedNow = $now->setTime((int)$now->format('H'), (int)$now->format('i'), 0);
 $m = (int)$roundedNow->format('i');
 $add = (15 - ($m % 15)) % 15;
 if ($add > 0) $roundedNow = $roundedNow->modify('+' . $add . ' minutes');
-$defaultResDateLocal = $roundedNow->format('Y-m-d');
+$defaultResDateLocal = $roundedNow->format('Y-m-d\TH:i');
 $hallIdForSettings = 2;
 $allowedSchemeNums = null;
 $tableCapsByNum = [
@@ -363,6 +465,18 @@ try {
   $allowedSchemeNums = null;
 }
 
+if (($_GET['ajax'] ?? '') === 'log_js') {
+    $raw = file_get_contents('php://input');
+    $j = json_decode($raw, true);
+    if (is_array($j)) {
+        $logFile = __DIR__ . '/js_debug.log';
+        $entry = date('Y-m-d H:i:s') . ' | IP: ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . ' | MSG: ' . ($j['msg'] ?? '') . ' | DATA: ' . json_encode($j['data'] ?? [], JSON_UNESCAPED_UNICODE) . "\n";
+        file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
+    }
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'free_tables') {
   header('Content-Type: application/json; charset=utf-8');
   header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -378,11 +492,21 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $duration = (int)($_GET['duration'] ?? 0);
   $guests = (int)($_GET['guests_count'] ?? 0);
   $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
   $allowed = $allowedSchemeNums;
 
   $dateReservation = trim($dateReservation);
   $displayTz = new DateTimeZone($displayTzName);
+  $apiTz = new DateTimeZone($apiTzName);
   $dtDisplay = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $dateReservation, $displayTz);
+  if ($dtDisplay !== false) {
+    $nowDisplay = new DateTimeImmutable('now', $displayTz);
+    if ($dtDisplay->format('Y-m-d') === $nowDisplay->format('Y-m-d')) {
+      // For today, always use server's current time + 5 mins to avoid Poster API Error 155 (time in past)
+      // regardless of what the client sent, because client's clock might be wrong or in a different timezone.
+      $dtDisplay = $nowDisplay->modify('+5 minutes');
+    }
+  }
   if ($dtDisplay === false) {
     try { $dtDisplay = new DateTimeImmutable($dateReservation, $displayTz); } catch (\Throwable $e) { $dtDisplay = false; }
   }
@@ -391,6 +515,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
     exit;
   }
+  $dtApi = $dtDisplay->setTimezone($apiTz);
   if ($duration < 1800) $duration = 7200;
   if ($guests <= 0) $guests = 2;
   if ($spotId <= 0) $spotId = 1;
@@ -398,18 +523,42 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
     $resp = $api->request('incomingOrders.getTablesForReservation', [
-      'date_reservation' => $dtDisplay->format('Y-m-d H:i:s'),
+      'date_reservation' => $dtApi->format('Y-m-d H:i:s'),
       'duration' => $duration,
       'spot_id' => $spotId,
       'guests_count' => $guests,
     ], 'GET');
 
     $free = is_array($resp) && isset($resp['freeTables']) && is_array($resp['freeTables']) ? $resp['freeTables'] : [];
+    
+    // ПРОВЕРКА ЗАНЯТЫХ СТОЛИКОВ (Open Transactions)
+    // Если дата бронирования - сегодня, запрашиваем реально открытые чеки в Poster
+    $busyTableIds = [];
+    $isToday = $dtDisplay->format('Y-m-d') === $nowDisplay->format('Y-m-d');
+    if ($isToday) {
+      try {
+        $openTxs = $api->request('dash.getTransactions', ['status' => 1], 'GET');
+        if (is_array($openTxs)) {
+          foreach ($openTxs as $tx) {
+            if (isset($tx['table_id'])) $busyTableIds[(int)$tx['table_id']] = true;
+          }
+        }
+      } catch (\Throwable $e) {
+        // Игнорируем ошибку получения транзакций, чтобы не ломать весь запрос
+      }
+    }
+
     $filtered = [];
     $nums = [];
     $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
     foreach ($free as $row) {
       if (!is_array($row)) continue;
+      if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
+      
+      // Если столик занят гостями прямо сейчас, исключаем его из списка свободных
+      $tId = (int)($row['table_id'] ?? 0);
+      if ($isToday && isset($busyTableIds[$tId])) continue;
+
       $num = trim((string)($row['table_num'] ?? ''));
       if ($num === '') continue;
       if (is_array($allowedSet) && !isset($allowedSet[$num])) continue;
@@ -421,10 +570,11 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       'ok' => true,
       'request' => [
         'date_reservation' => $dtDisplay->format('Y-m-d H:i:s'),
-        'date_reservation_api' => $dtDisplay->format('Y-m-d H:i:s'),
+        'date_reservation_api' => $dtApi->format('Y-m-d H:i:s'),
         'duration' => $duration,
         'spot_id' => $spotId,
         'guests_count' => $guests,
+        'hall_id' => $hallId,
       ],
       'free_table_nums' => array_values(array_keys($nums)),
       'free_tables' => $filtered,
@@ -451,9 +601,11 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   $dateReservation = trim((string)($_GET['date_reservation'] ?? ''));
   $duration = (int)($_GET['duration'] ?? 0);
   $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
   $allowed = $allowedSchemeNums;
 
   $displayTz = new DateTimeZone($displayTzName);
+  $apiTz = new DateTimeZone($apiTzName);
   $dateReservation = trim($dateReservation);
   $dtDisplay = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $dateReservation, $displayTz);
   if ($dtDisplay === false) {
@@ -468,17 +620,21 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
 
   $dayStartDisplay = $dtDisplay->setTime(0, 0, 0);
   $dayEndDisplay = $dtDisplay->setTime(23, 59, 59);
+  $queryFromDisplay = $dayStartDisplay->modify('-1 day');
+  $queryToDisplay = $dayEndDisplay->modify('+1 day');
+  $dayStartApi = $queryFromDisplay->setTimezone($apiTz);
+  $dayEndApi = $queryToDisplay->setTimezone($apiTz);
 
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
     $resp = $api->request('incomingOrders.getReservations', [
-      'date_from' => $dayStartDisplay->format('Y-m-d H:i:s'),
-      'date_to' => $dayEndDisplay->format('Y-m-d H:i:s'),
-      'timezone' => 'client',
+      'date_from' => $dayStartApi->format('Y-m-d H:i:s'),
+      'date_to' => $dayEndApi->format('Y-m-d H:i:s'),
     ], 'GET');
 
-    $tablesResp = $api->request('spots.getTables', [
+    $tablesResp = $api->request('spots.getTableHallTables', [
       'spot_id' => $spotId,
+      'hall_id' => $hallId,
       'without_deleted' => 1,
     ], 'GET');
 
@@ -495,8 +651,11 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       if (preg_match('/^\d+$/', $num)) $scheme = $num;
       elseif (preg_match('/^\d+$/', $title)) $scheme = $title;
       if ($scheme === '') continue;
+      
+      // Разрешаем любые номера столов, которые есть в списке разрешенных или просто разумные
       $sStr = (string)$scheme;
       if (is_array($allowedSet) && !isset($allowedSet[$sStr])) continue;
+      
       $tableNameById[$id] = $sStr;
     }
 
@@ -533,11 +692,12 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       $start = trim((string)($row['date_reservation'] ?? ''));
       $dur = (int)($row['duration'] ?? 0);
       $guestsCount = trim((string)($row['guests_count'] ?? ''));
-      $startDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $start, $displayTz);
-      if ($startDt === false) {
-        try { $startDt = new DateTimeImmutable($start, $displayTz); } catch (\Throwable $e) { $startDt = false; }
+      $startDtApi = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $start, $apiTz);
+      if ($startDtApi === false) {
+        try { $startDtApi = new DateTimeImmutable($start, $apiTz); } catch (\Throwable $e) { $startDtApi = false; }
       }
-      if ($startDt === false) continue;
+      if ($startDtApi === false) continue;
+      $startDt = $startDtApi->setTimezone($displayTz);
       $endDt = $dur > 0 ? $startDt->modify('+' . $dur . ' seconds') : $startDt;
       $guestName = trim(((string)($row['first_name'] ?? '')) . ' ' . ((string)($row['last_name'] ?? '')));
       if ($guestName === '') $guestName = '—';
@@ -607,9 +767,10 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       'request' => [
         'date_from' => $dayStartDisplay->format('Y-m-d H:i:s'),
         'date_to' => $dayEndDisplay->format('Y-m-d H:i:s'),
-        'date_from_api' => $dayStartDisplay->format('Y-m-d H:i:s'),
-        'date_to_api' => $dayEndDisplay->format('Y-m-d H:i:s'),
+        'date_from_api' => $dayStartApi->format('Y-m-d H:i:s'),
+        'date_to_api' => $dayEndApi->format('Y-m-d H:i:s'),
         'spot_id' => $spotId,
+        'hall_id' => $hallId,
         'display_timezone' => $displayTzName,
         'api_timezone' => $apiTzName,
         'count_raw' => is_array($resp) ? count($resp) : 0,
@@ -834,8 +995,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $comment = trim((string)($payload['comment'] ?? ''));
   $preorder = trim((string)($payload['preorder'] ?? ''));
   $preorderRu = trim((string)($payload['preorder_ru'] ?? ''));
+  $totalAmount = (int)($payload['total_amount'] ?? 0);
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
+  $duration_m = (int)($payload['duration_m'] ?? 120);
 
   if ($tableNum === '') {
     http_response_code(400);
@@ -891,6 +1054,44 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     exit;
   }
 
+  $tg = is_array($payload['tg'] ?? null) ? $payload['tg'] : [];
+  $tgUid = isset($tg['user_id']) ? (int)$tg['user_id'] : 0;
+  $tgUn = strtolower(trim((string)($tg['username'] ?? '')));
+  $tgUn = ltrim($tgUn, '@');
+
+  $db->createReservationsTable();
+  $resTable = $db->t('reservations');
+  $qrUrl = '';
+  $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  $qrCode = '';
+  for ($i = 0; $i < 8; $i++) {
+    $qrCode .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+  }
+  if ($totalAmount > 0) {
+    $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES{$qrCode}");
+  }
+
+  $db->query("INSERT INTO {$resTable} (
+    created_at, start_time, guests, table_num, name, phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+    (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
+    $startDt->format('Y-m-d H:i:s'),
+    $guests,
+    $tableNum,
+    $name,
+    $phoneNorm,
+    $comment,
+    $preorder,
+    $preorderRu,
+    $tgUid > 0 ? $tgUid : null,
+    $tgUn !== '' ? $tgUn : null,
+    $userLang,
+    $totalAmount,
+    $qrUrl,
+    $qrCode
+  ]);
+  $resId = $db->getPdo()->lastInsertId();
+
   $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
   $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
   if ($tgChatId === '') $tgChatId = '3397075474';
@@ -903,9 +1104,15 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     exit;
   }
 
-  $text = '<b>Новая бронь с сайта</b>' . "\n";
+  $text = '<b>Новая бронь с сайта #' . htmlspecialchars((string)$qrCode) . '</b>' . "\n";
   $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
   $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
+  if ($duration_m > 0) {
+    $hours = floor($duration_m / 60);
+    $mins = $duration_m % 60;
+    $durStr = $hours . ' ч' . ($mins > 0 ? ' ' . $mins . ' м' : '');
+    $text .= 'Продолжительность: <b>' . htmlspecialchars($durStr) . '</b>' . "\n";
+  }
   $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
   $text .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
   $text .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
@@ -919,42 +1126,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     $text .= "\n";
     $text .= '<b>Предзаказ:</b>' . "\n" . htmlspecialchars($preForGroup);
   }
-  $tg = is_array($payload['tg'] ?? null) ? $payload['tg'] : [];
-  $tgUid = isset($tg['user_id']) ? (int)$tg['user_id'] : 0;
-  $tgUn = strtolower(trim((string)($tg['username'] ?? '')));
-  $tgUn = ltrim($tgUn, '@');
-
-  if (isset($db) && ($db instanceof \App\Classes\Database)) {
-    $db->createReservationsTable();
-    $resTable = $db->t('reservations');
-    $qrCode = '';
-    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    for ($i = 0; $i < 8; $i++) {
-      $qrCode .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-    }
-    $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount=0&des=" . urlencode("RES{$qrCode}");
-
-    $db->query("INSERT INTO {$resTable} (
-      created_at, start_time, guests, table_num, name, phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, qr_url, qr_code
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-      (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
-      $startDt->format('Y-m-d H:i:s'),
-      $guests,
-      $tableNum,
-      $name,
-      $phoneNorm,
-      $comment,
-      $preorder,
-      $preorderRu,
-      $tgUid > 0 ? $tgUid : null,
-      $tgUn !== '' ? $tgUn : null,
-      $userLang,
-      $qrUrl,
-      $qrCode
-    ]);
-    $resId = $db->getPdo()->lastInsertId();
-  }
-
+  
   if ($tgUn !== '' || $tgUid > 0) {
     $text .= "\n";
     $text .= 'Telegram: ';
@@ -992,7 +1164,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     exit;
   }
   $userText = '<b>' . htmlspecialchars($trFor('tg_thanks_title')) . '</b> ' . htmlspecialchars($trFor('tg_thanks_body')) . "\n\n";
-  $userText .= '<b>' . htmlspecialchars($trFor('tg_booking_title')) . '</b>' . "\n";
+  if ($qrUrl !== '') {
+      $userText .= '<b>' . htmlspecialchars($trFor('qr_payment_title') ?? 'Оплата предзаказа') . '</b>' . "\n";
+      $userText .= htmlspecialchars($trFor('qr_payment_body') ?? 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.') . "\n\n";
+      $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">Ссылка на QR-код для оплаты</a>' . "\n\n";
+  }
+  $userText .= '<b>' . htmlspecialchars($trFor('tg_booking_title')) . ' #' . htmlspecialchars((string)$qrCode) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_guests')) . ': <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
@@ -1010,18 +1187,62 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $userText .= "\n\n" . htmlspecialchars($trFor('booking_note'));
 
   $ch = curl_init();
-  curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
-  curl_setopt($ch, CURLOPT_POST, true);
-  curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-    'chat_id' => (string)$tgUid,
-    'text' => $userText,
-    'parse_mode' => 'HTML',
-  ]));
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-  curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-  $resp = curl_exec($ch);
-  curl_close($ch);
+  if ($qrUrl !== '') {
+      $chImg = curl_init($qrUrl);
+      curl_setopt($chImg, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($chImg, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+      curl_setopt($chImg, CURLOPT_FOLLOWLOCATION, true);
+      $imgData = curl_exec($chImg);
+      curl_close($chImg);
+
+      $tmpFile = tempnam(sys_get_temp_dir(), 'qr_');
+      file_put_contents($tmpFile, $imgData);
+
+      curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
+      curl_setopt($ch, CURLOPT_POST, true);
+      curl_setopt($ch, CURLOPT_POSTFIELDS, [
+          'chat_id' => (string)$tgUid,
+          'photo' => new CURLFile($tmpFile, 'image/png', 'qr.png'),
+          'caption' => $userText,
+          'parse_mode' => 'HTML',
+      ]);
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+      $resp = curl_exec($ch);
+      curl_close($ch);
+      @unlink($tmpFile);
+  } else {
+      curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+      curl_setopt($ch, CURLOPT_POST, true);
+      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+          'chat_id' => (string)$tgUid,
+          'text' => $userText,
+          'parse_mode' => 'HTML',
+      ]));
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+      $resp = curl_exec($ch);
+      curl_close($ch);
+  }
   $data = $resp ? json_decode($resp, true) : null;
+  
+  if ($qrUrl !== '' && (!is_array($data) || empty($data['ok']))) {
+      // Fallback to text message
+      $ch = curl_init();
+      curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+      curl_setopt($ch, CURLOPT_POST, true);
+      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+          'chat_id' => (string)$tgUid,
+          'text' => $userText,
+          'parse_mode' => 'HTML',
+      ]));
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+      $resp = curl_exec($ch);
+      curl_close($ch);
+      $data = $resp ? json_decode($resp, true) : null;
+  }
+
   if (!is_array($data) || empty($data['ok'])) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение гостю в Telegram'], JSON_UNESCAPED_UNICODE);
@@ -1062,8 +1283,9 @@ if (($_GET['ajax'] ?? '') === 'tg_state_create') {
     echo json_encode(['ok' => false, 'error' => 'Некорректное кол-во гостей'], JSON_UNESCAPED_UNICODE);
     exit;
   }
-  $sourcePage = trim((string)($payload['source_page'] ?? 'TableReservation.php'));
-  
+  $scriptBase = basename((string)($_SERVER['SCRIPT_NAME'] ?? 'Tr2.php'));
+  $sourcePage = trim((string)($payload['source_page'] ?? $scriptBase));
+
   if ($start === '' || mb_strlen($start) > 40) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Некорректное время'], JSON_UNESCAPED_UNICODE);
@@ -1327,7 +1549,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_1135">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_1200">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1338,7 +1560,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         <div class="title-wrap">
           <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
           <p><span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span> <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
-          <input type="datetime-local" id="resDate" step="1800" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
+          <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
         </div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
@@ -1368,6 +1590,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       </div>
   
       <section class="layout">
+        <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         <div class="map-shell">
           <div class="tile-layer" aria-hidden="true"></div>
             <div class="map-zoom-box" id="mapZoomBox">
@@ -1421,7 +1644,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             <button class="table small-vertical" style="left: 306px; top: 192px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
             <button class="table small-vertical" style="left: 194px; top: 192px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
             <button class="table small-vertical" style="left: 82px; top: 192px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
-            <button class="table large" style="left: -46px; top: 254px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
+            <button class="table large" style="left: -31px; top: 254px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
   
             <div class="bar-row">
               <div class="station-wrap">
@@ -1561,7 +1784,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           </div>
         </div>
         <div class="modal-hint" id="reqHint" hidden></div>
-        <div id="reqSubmitHint" class="submit-hint" hidden></div>
+
         <div class="modal-note" data-i18n="booking_note"><?= htmlspecialchars(tr('booking_note')) ?></div>
         <div class="modal-actions">
           <button class="btn btn-primary" type="submit" id="reqSubmit" data-i18n="send"><?= htmlspecialchars(tr('send')) ?></button>
@@ -1608,6 +1831,5 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     };
   </script>
   <script src="/assets/js/Tr2.js?v=20260410_1135"></script>
-  <script src="/links/table-reservation.js?v=20260410_1345"></script>
 </body>
 </html>
