@@ -105,7 +105,7 @@ if (!empty($update['message'])) {
                         [$tgUserId, ltrim($tgUsername, '@'), $tgName, $startCode]
                     );
                 }
-                $returnUrl = 'https://veranda.my/TableReservation.php?tg_state=' . rawurlencode($startCode);
+                $returnUrl = 'https://veranda.my/Tr2.php?tg_state=' . rawurlencode($startCode);
                 $postJson('sendMessage', [
                     'chat_id' => $chatId,
                     'text' => "Готово.\nНажми кнопку ниже, чтобы вернуться к заявке:",
