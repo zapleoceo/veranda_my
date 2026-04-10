@@ -1288,6 +1288,11 @@
           return;
         }
 
+        const getTotalPreorderAmount = () => {
+          const counts = normalizePreorder(preorderCounts);
+          return Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
+        };
+
         submitBusy = true;
         if (reqSubmit) {
           submitPrevText = String(reqSubmit.textContent || '');
@@ -1333,7 +1338,7 @@
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, duration_m, name, phone, comment, preorder, preorder_ru: preorderRu, lang: UI_LANG, tg: linkedTg }),
+            body: JSON.stringify({ table_num: tableNum, guests, start, duration_m, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: getTotalPreorderAmount(), lang: UI_LANG, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));

@@ -21,9 +21,10 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
             $canBanya = function_exists('veranda_can') && veranda_can('banya');
             $canRoma = function_exists('veranda_can') && veranda_can('roma');
             $canEmployees = function_exists('veranda_can') && veranda_can('employees');
+            $canReservations = function_exists('veranda_can') && veranda_can('reservations');
             $canPayday = function_exists('veranda_can') && veranda_can('payday');
             $canAdmin = function_exists('veranda_can') && veranda_can('admin');
-            $hasReports = $canDashboard || $canRaw || $canKitchen || $canCooked || $canZapara || $canBanya || $canRoma || $canEmployees;
+            $hasReports = $canDashboard || $canRaw || $canKitchen || $canCooked || $canZapara || $canBanya || $canRoma || $canEmployees || $canReservations;
         ?>
 
         <?php if ($hasReports): ?>
@@ -42,6 +43,7 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
 
             <?php if ($canBanya): ?><a class="ud-link ud-l1" href="/banya.php">Баня</a><?php endif; ?>
             <?php if ($canRoma): ?><a class="ud-link ud-l1" href="/roma.php">Кальяны</a><?php endif; ?>
+            <?php if ($canReservations): ?><a class="ud-link ud-l1" href="/reservations.php">Брони</a><?php endif; ?>
             <?php if ($canEmployees): ?><a class="ud-link ud-l1" href="/employees.php">ЗП сотрудников</a><?php endif; ?>
 
             <div class="ud-sep"></div>

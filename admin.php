@@ -64,6 +64,7 @@ $permissionKeys = [
     'admin' => 'УПРАВЛЕНИЕ',
     'roma' => 'Roma (кальяны)',
     'banya' => 'Отчет баня',
+    'reservations' => 'Брони',
     'exclude_toggle' => 'Игнор + ✅ Принято (Telegram)',
     'telegram_ack' => '✅ Принято (Telegram)',
 ];

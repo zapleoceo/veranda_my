@@ -920,6 +920,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $comment = trim((string)($payload['comment'] ?? ''));
   $preorder = trim((string)($payload['preorder'] ?? ''));
   $preorderRu = trim((string)($payload['preorder_ru'] ?? ''));
+  $totalAmount = (int)($payload['total_amount'] ?? 0);
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
   $duration_m = (int)($payload['duration_m'] ?? 120);
@@ -977,6 +978,40 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     exit;
   }
 
+  $tg = is_array($payload['tg'] ?? null) ? $payload['tg'] : [];
+  $tgUid = isset($tg['user_id']) ? (int)$tg['user_id'] : 0;
+  $tgUn = strtolower(trim((string)($tg['username'] ?? '')));
+  $tgUn = ltrim($tgUn, '@');
+
+  $db->createReservationsTable();
+  $resTable = $db->t('reservations');
+  $qrUrl = '';
+  $qrCode = '';
+  if ($totalAmount > 0) {
+    $qrCode = strtoupper(bin2hex(random_bytes(2))) . $guests;
+    $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES {$qrCode}");
+  }
+
+  $db->query("INSERT INTO {$resTable} (
+    created_at, start_time, guests, table_num, name, phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, total_amount, qr_url, qr_code
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+    (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
+    $startDt->format('Y-m-d H:i:s'),
+    $guests,
+    $tableNum,
+    $name,
+    $phoneNorm,
+    $comment,
+    $preorder,
+    $preorderRu,
+    $tgUid > 0 ? $tgUid : null,
+    $tgUn !== '' ? $tgUn : null,
+    $totalAmount,
+    $qrUrl,
+    $qrCode
+  ]);
+  $resId = $db->getPdo()->lastInsertId();
+
   $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
   $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
   if ($tgChatId === '') $tgChatId = '3397075474';
@@ -1011,10 +1046,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     $text .= "\n";
     $text .= '<b>Предзаказ:</b>' . "\n" . htmlspecialchars($preForGroup);
   }
-  $tg = is_array($payload['tg'] ?? null) ? $payload['tg'] : [];
-  $tgUid = isset($tg['user_id']) ? (int)$tg['user_id'] : 0;
-  $tgUn = strtolower(trim((string)($tg['username'] ?? '')));
-  $tgUn = ltrim($tgUn, '@');
+  
   if ($tgUn !== '' || $tgUid > 0) {
     $text .= "\n";
     $text .= 'Telegram: ';
@@ -1058,18 +1090,47 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   }
 
   $ch = curl_init();
-  curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
-  curl_setopt($ch, CURLOPT_POST, true);
-  curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-    'chat_id' => (string)$tgUid,
-    'text' => $userText,
-    'parse_mode' => 'HTML',
-  ]));
+  if ($qrUrl !== '') {
+      curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
+      curl_setopt($ch, CURLOPT_POST, true);
+      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+          'chat_id' => (string)$tgUid,
+          'photo' => $qrUrl,
+          'caption' => $userText,
+          'parse_mode' => 'HTML',
+      ]));
+  } else {
+      curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+      curl_setopt($ch, CURLOPT_POST, true);
+      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+          'chat_id' => (string)$tgUid,
+          'text' => $userText,
+          'parse_mode' => 'HTML',
+      ]));
+  }
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   curl_setopt($ch, CURLOPT_TIMEOUT, 10);
   $resp = curl_exec($ch);
   curl_close($ch);
   $data = $resp ? json_decode($resp, true) : null;
+  
+  if ($qrUrl !== '' && (!is_array($data) || empty($data['ok']))) {
+      // Fallback to text message
+      $ch = curl_init();
+      curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+      curl_setopt($ch, CURLOPT_POST, true);
+      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+          'chat_id' => (string)$tgUid,
+          'text' => $userText,
+          'parse_mode' => 'HTML',
+      ]));
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+      $resp = curl_exec($ch);
+      curl_close($ch);
+      $data = $resp ? json_decode($resp, true) : null;
+  }
+
   if (!is_array($data) || empty($data['ok'])) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение гостю в Telegram'], JSON_UNESCAPED_UNICODE);

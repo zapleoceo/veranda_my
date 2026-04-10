@@ -1,0 +1,355 @@
+<?php
+require __DIR__ . '/auth_check.php';
+veranda_require('reservations');
+
+require __DIR__ . '/src/classes/Database.php';
+require __DIR__ . '/src/classes/MetaRepository.php';
+require __DIR__ . '/src/classes/PosterAPI.php';
+require __DIR__ . '/src/classes/TelegramBot.php';
+
+if (file_exists(__DIR__ . '/.env')) {
+    $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        $t = trim($line);
+        if ($t === '' || strpos($t, '#') === 0) continue;
+        if (strpos($t, '=') === false) continue;
+        [$name, $value] = explode('=', $line, 2);
+        $_ENV[$name] = trim($value);
+    }
+}
+
+$db = new \App\Classes\Database();
+$db->createReservationsTable();
+$resTable = $db->t('reservations');
+
+$ajax = $_GET['ajax'] ?? '';
+if ($ajax === 'resend') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $id = (int)($_POST['id'] ?? 0);
+    if ($id <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid ID'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $row = $db->query("SELECT * FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
+    if (!$row) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'Reservation not found'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+    $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
+    if ($tgChatId === '') $tgChatId = '3397075474';
+    $tgThreadId = trim((string)($_ENV['TABLE_RESERVATION_THREAD_ID'] ?? ''));
+    $tgThreadNum = $tgThreadId !== '' ? (int)$tgThreadId : 1938;
+    if ($tgThreadNum <= 0) $tgThreadNum = 1938;
+
+    if ($tgToken === '' || $tgChatId === '') {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Telegram not configured'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $startDt = new DateTimeImmutable($row['start_time']);
+    
+    // Group Message
+    $text = '<b>[Повтор] Новая бронь с сайта</b>' . "\n";
+    $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
+    $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
+    $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
+    $text .= 'Номер стола: <b>' . htmlspecialchars($row['table_num']) . '</b>' . "\n";
+    $text .= 'Имя: <b>' . htmlspecialchars($row['name']) . '</b>' . "\n";
+    $text .= 'Номер телефона: <b>' . htmlspecialchars($row['phone']) . '</b>';
+    if ($row['comment'] !== '') {
+        $text .= "\n<b>Комментарий:</b>\n" . htmlspecialchars($row['comment']);
+    }
+    $preForGroup = $row['preorder_ru'] !== '' ? $row['preorder_ru'] : $row['preorder_text'];
+    if ($preForGroup !== '') {
+        $text .= "\n<b>Предзаказ:</b>\n" . htmlspecialchars($preForGroup);
+    }
+    $tgUid = (int)$row['tg_user_id'];
+    $tgUn = (string)$row['tg_username'];
+    if ($tgUn !== '' || $tgUid > 0) {
+        $text .= "\nTelegram: ";
+        if ($tgUn !== '') {
+            $text .= '<a href="https://t.me/' . htmlspecialchars($tgUn) . '">@' . htmlspecialchars($tgUn) . '</a>';
+            if ($tgUid > 0) $text .= ' · <a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a>';
+        } elseif ($tgUid > 0) {
+            $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
+        }
+    }
+    $text .= "\n\n@Ollushka90 @ce_akh1 свяжитесь с гостем";
+
+    $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
+    $okGroup = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
+
+    // Guest Message
+    $okGuest = true;
+    if ($tgUid > 0) {
+        $userText = '<b>Спасибо!</b> Мы с вами свяжемся в ближайшее время.' . "\n\n";
+        $userText .= '<b>Ваша бронь</b>' . "\n";
+        $userText .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
+        $userText .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
+        $userText .= 'Кол-во человек: <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
+        $userText .= 'Номер стола: <b>' . htmlspecialchars($row['table_num']) . '</b>' . "\n";
+        $userText .= 'Имя: <b>' . htmlspecialchars($row['name']) . '</b>' . "\n";
+        $userText .= 'Номер телефона: <b>' . htmlspecialchars($row['phone']) . '</b>';
+        if ($row['comment'] !== '') {
+            $userText .= "\n<b>Комментарий:</b>\n" . htmlspecialchars($row['comment']);
+        }
+        if ($row['preorder_text'] !== '') {
+            $userText .= "\n<b>Предзаказ:</b>\n" . htmlspecialchars($row['preorder_text']);
+        }
+
+        $ch = curl_init();
+        $qrUrl = (string)$row['qr_url'];
+        if ($qrUrl !== '') {
+            curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+                'chat_id' => (string)$tgUid,
+                'photo' => $qrUrl,
+                'caption' => $userText,
+                'parse_mode' => 'HTML',
+            ]));
+        } else {
+            curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+                'chat_id' => (string)$tgUid,
+                'text' => $userText,
+                'parse_mode' => 'HTML',
+            ]));
+        }
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        $data = $resp ? json_decode($resp, true) : null;
+        
+        if ($qrUrl !== '' && (!is_array($data) || empty($data['ok']))) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+                'chat_id' => (string)$tgUid,
+                'text' => $userText,
+                'parse_mode' => 'HTML',
+            ]));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            $resp = curl_exec($ch);
+            curl_close($ch);
+            $data = $resp ? json_decode($resp, true) : null;
+        }
+
+        if (!is_array($data) || empty($data['ok'])) {
+            $okGuest = false;
+        }
+    } else {
+        $okGuest = false; // No TG linked
+    }
+
+    echo json_encode([
+        'ok' => true,
+        'group_ok' => $okGroup,
+        'guest_ok' => $okGuest,
+        'has_tg' => $tgUid > 0
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$dateFrom = $_GET['date_from'] ?? date('Y-m-01');
+$dateTo = $_GET['date_to'] ?? date('Y-m-t');
+
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-01');
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-t');
+
+$sort = $_GET['sort'] ?? 'start_time';
+$order = strtolower($_GET['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+$validSorts = ['id', 'created_at', 'start_time', 'table_num', 'guests', 'name', 'phone', 'total_amount'];
+if (!in_array($sort, $validSorts, true)) $sort = 'start_time';
+
+$rows = $db->query("
+    SELECT * 
+    FROM {$resTable} 
+    WHERE DATE(start_time) BETWEEN ? AND ? 
+    ORDER BY {$sort} {$order}
+", [$dateFrom, $dateTo])->fetchAll();
+
+?>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Брони</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="/assets/app.css">
+    <style>
+        .res-table { width: 100%; border-collapse: collapse; min-width: 900px; }
+        .res-table th, .res-table td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+        .res-table th { background: var(--card2); font-weight: 700; cursor: pointer; color: var(--muted); user-select: none; }
+        .res-table th:hover { background: var(--card); color: var(--text); }
+        .res-table td { color: var(--text); }
+        .res-btn { padding: 6px 12px; background: var(--accent); color: #fffaf4; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; }
+        .res-btn:hover { opacity: 0.9; }
+        .res-btn:disabled { opacity: 0.5; cursor: default; }
+        .sort-arrow { margin-left: 4px; color: var(--accent); }
+        .filters { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
+        .filters label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 700; }
+        .filters input { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 14px; }
+        .filters button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fffaf4; font-weight: 700; cursor: pointer; font-size: 14px; height: 36px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-nav">
+            <div class="nav-left">
+                <a href="/dashboard.php">← Дашборд</a>
+                <span class="nav-title">Брони</span>
+            </div>
+            <?php require __DIR__ . '/partials/user_menu.php'; ?>
+        </div>
+
+        <div class="card">
+            <form method="GET" class="filters">
+                <label>
+                    Начало
+                    <input type="date" name="date_from" value="<?= htmlspecialchars($dateFrom) ?>">
+                </label>
+                <label>
+                    Конец
+                    <input type="date" name="date_to" value="<?= htmlspecialchars($dateTo) ?>">
+                </label>
+                <button type="submit">Показать</button>
+            </form>
+
+            <div style="overflow-x: auto;">
+                <table class="res-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="id">ID<?= $sort==='id'?($order==='asc'?' ↑':' ↓'):'' ?></th>
+                            <th data-sort="created_at">Создано<?= $sort==='created_at'?($order==='asc'?' ↑':' ↓'):'' ?></th>
+                            <th data-sort="start_time">Время брони<?= $sort==='start_time'?($order==='asc'?' ↑':' ↓'):'' ?></th>
+                            <th data-sort="table_num">Стол<?= $sort==='table_num'?($order==='asc'?' ↑':' ↓'):'' ?></th>
+                            <th data-sort="guests">Гостей<?= $sort==='guests'?($order==='asc'?' ↑':' ↓'):'' ?></th>
+                            <th data-sort="name">Гость<?= $sort==='name'?($order==='asc'?' ↑':' ↓'):'' ?></th>
+                            <th data-sort="total_amount">Сумма<?= $sort==='total_amount'?($order==='asc'?' ↑':' ↓'):'' ?></th>
+                            <th>QR</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($rows)): ?>
+                            <tr><td colspan="9" style="text-align:center; padding:20px; color:var(--muted);">Нет броней за выбранный период</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($rows as $r): ?>
+                                <tr>
+                                    <td><?= (int)$r['id'] ?></td>
+                                    <td style="white-space:nowrap;"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['created_at']))) ?></td>
+                                    <td style="white-space:nowrap; font-weight:bold; color:var(--accent);"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['start_time']))) ?></td>
+                                    <td><?= htmlspecialchars($r['table_num']) ?></td>
+                                    <td><?= (int)$r['guests'] ?></td>
+                                    <td>
+                                        <div style="font-weight:bold;"><?= htmlspecialchars($r['name']) ?></div>
+                                        <div style="font-size:12px; color:var(--muted);"><?= htmlspecialchars($r['phone']) ?></div>
+                                        <?php if ($r['tg_username']): ?>
+                                            <div style="font-size:12px;"><a href="https://t.me/<?= htmlspecialchars($r['tg_username']) ?>" target="_blank" style="color:var(--accent);">@<?= htmlspecialchars($r['tg_username']) ?></a></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= $r['total_amount'] > 0 ? number_format($r['total_amount'], 0, '.', ' ') . ' ₫' : '—' ?></td>
+                                    <td>
+                                        <?php if ($r['qr_url']): ?>
+                                            <a href="<?= htmlspecialchars($r['qr_url']) ?>" target="_blank" style="color:var(--accent); font-weight:bold; text-decoration:none;">QR</a>
+                                        <?php else: ?>
+                                            <span style="color:var(--muted);">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="res-btn btn-resend" data-id="<?= (int)$r['id'] ?>">Повторить отправку</button>
+                                        <div class="resend-status" style="font-size:11px; margin-top:4px; color:var(--muted);"></div>
+                                    </td>
+                                </tr>
+                                <?php if ($r['comment'] || $r['preorder_text']): ?>
+                                    <tr style="background:var(--bg);">
+                                        <td colspan="9" style="padding:10px 14px; font-size:13px;">
+                                            <?php if ($r['comment']): ?>
+                                                <div><b style="color:var(--muted);">Комментарий:</b> <?= htmlspecialchars($r['comment']) ?></div>
+                                            <?php endif; ?>
+                                            <?php if ($r['preorder_text']): ?>
+                                                <div style="margin-top:4px;"><b style="color:var(--muted);">Предзаказ:</b><br><span style="white-space:pre-wrap;"><?= htmlspecialchars($r['preorder_text']) ?></span></div>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const sort = th.dataset.sort;
+                const url = new URL(location.href);
+                const currentSort = url.searchParams.get('sort') || 'start_time';
+                let order = url.searchParams.get('order') || 'desc';
+                if (currentSort === sort) {
+                    order = order === 'asc' ? 'desc' : 'asc';
+                } else {
+                    order = 'desc';
+                }
+                url.searchParams.set('sort', sort);
+                url.searchParams.set('order', order);
+                location.href = url.toString();
+            });
+        });
+
+        document.querySelectorAll('.btn-resend').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm('Отправить сообщение в группу и гостю повторно?')) return;
+                const id = btn.dataset.id;
+                const statusEl = btn.nextElementSibling;
+                btn.disabled = true;
+                statusEl.textContent = 'Отправка...';
+                statusEl.style.color = 'var(--muted)';
+                try {
+                    const fd = new FormData();
+                    fd.append('id', id);
+                    const res = await fetch('reservations.php?ajax=resend', { method: 'POST', body: fd });
+                    const j = await res.json().catch(() => null);
+                    if (res.ok && j && j.ok) {
+                        let txt = [];
+                        if (j.group_ok) txt.push('Группа: ОК'); else txt.push('Группа: Ошибка');
+                        if (j.has_tg) {
+                            if (j.guest_ok) txt.push('Гость: ОК'); else txt.push('Гость: Ошибка');
+                        } else {
+                            txt.push('Гость: нет TG');
+                        }
+                        statusEl.textContent = txt.join(' | ');
+                        statusEl.style.color = '#81c784';
+                    } else {
+                        statusEl.textContent = 'Ошибка: ' + (j ? j.error : 'Network error');
+                        statusEl.style.color = '#e57373';
+                    }
+                } catch (e) {
+                    statusEl.textContent = 'Ошибка запроса';
+                    statusEl.style.color = '#e57373';
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
