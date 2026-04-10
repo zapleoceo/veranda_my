@@ -86,10 +86,7 @@ $I18N = [
     'missing_phone' => 'телефон',
     'missing_preorder' => 'предзаказ',
     'missing_telegram' => 'Telegram (привязать)',
-    'missing_zalo' => 'Zalo (привязать)',
     'phone_invalid' => 'неверный номер (международный формат, только цифры)',
-    'zalo_link_prompt' => 'Использовать этот номер для Zalo?',
-    'zalo_linked' => 'Zalo привязан',
     'sending' => 'Отправляю…',
     'submit_success' => 'Спасибо, мы с вами свяжемся в ближайшее время.\n\nСтарт: {start}\nСтол: {table}\nГостей: {guests}\nИмя: {name}\nТелефон: {phone}',
     'cap_warn' => 'Мы добавим вам стул, но вам может быть тесно за этим столиком',
@@ -177,10 +174,7 @@ $I18N = [
     'missing_phone' => 'phone',
     'missing_preorder' => 'pre-order',
     'missing_telegram' => 'Telegram (link)',
-    'missing_zalo' => 'Zalo (link)',
-    'phone_invalid' => 'invalid number (intl format, digits only)',
-    'zalo_link_prompt' => 'Use this number for Zalo?',
-    'zalo_linked' => 'Zalo linked',
+    'phone_invalid' => 'invalid phone (international format, digits only)',
     'sending' => 'Sending…',
     'submit_success' => 'Thank you, we will contact you shortly.\n\nStart: {start}\nTable: {table}\nGuests: {guests}\nName: {name}\nPhone: {phone}',
     'cap_warn' => 'We can add an extra chair, but it may be tight at this table :)',
@@ -268,10 +262,7 @@ $I18N = [
     'missing_phone' => 'số điện thoại',
     'missing_preorder' => 'đặt trước',
     'missing_telegram' => 'Telegram (liên kết)',
-    'missing_zalo' => 'Zalo (liên kết)',
     'phone_invalid' => 'số điện thoại không hợp lệ (quốc tế, chỉ số)',
-    'zalo_link_prompt' => 'Sử dụng số này cho Zalo?',
-    'zalo_linked' => 'Đã liên kết Zalo',
     'sending' => 'Đang gửi…',
     'submit_success' => 'Cảm ơn, chúng tôi sẽ liên hệ sớm.\n\nBắt đầu: {start}\nBàn: {table}\nSố khách: {guests}\nTên: {name}\nSĐT: {phone}',
     'cap_warn' => 'Chúng tôi có thể thêm ghế, nhưng bàn này có thể hơi chật :)',
@@ -856,7 +847,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $preorderRu = trim((string)($payload['preorder_ru'] ?? ''));
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
-  $zaloPhone = trim((string)($payload['zalo_phone'] ?? ''));
 
   if ($tableNum === '') {
     http_response_code(400);
@@ -892,9 +882,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     echo json_encode(['ok' => false, 'error' => $trFor('preorder_required')], JSON_UNESCAPED_UNICODE);
     exit;
   }
-
-  $zaloPhoneNorm = preg_replace('/\D+/', '', (string)$zaloPhone);
-  if ($zaloPhoneNorm !== '') $zaloPhoneNorm = '+' . $zaloPhoneNorm;
 
   $displayTz = new DateTimeZone($displayTzName);
   $startDt = null;
@@ -959,8 +946,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount=0&des=" . urlencode("RES{$qrCode}");
 
     $db->query("INSERT INTO {$resTable} (
-      created_at, start_time, guests, table_num, name, phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, zalo_phone, lang, qr_url, qr_code
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+      created_at, start_time, guests, table_num, name, phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, qr_url, qr_code
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
       (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
       $startDt->format('Y-m-d H:i:s'),
       $guests,
@@ -972,7 +959,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $preorderRu,
       $tgUid > 0 ? $tgUid : null,
       $tgUn !== '' ? $tgUn : null,
-      $zaloPhoneNorm !== '' ? $zaloPhoneNorm : null,
       $userLang,
       $qrUrl,
       $qrCode
@@ -990,44 +976,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
     }
   }
-  if ($zaloPhoneNorm !== '') {
-    $text .= "\n";
-    $text .= 'Zalo: <a href="https://zalo.me/' . htmlspecialchars(ltrim($zaloPhoneNorm, '+')) . '">' . htmlspecialchars($zaloPhoneNorm) . '</a>';
-  }
   $text .= "\n\n@Ollushka90 @ce_akh1  свяжитесь с гостем";
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
   
-  // Send Zalo confirmation if linked
-  if ($zaloPhoneNorm !== '' && !empty($_ENV['ZALO_OA_TOKEN'])) {
-      try {
-          require_once __DIR__ . '/src/classes/ZaloAPI.php';
-          $zalo = new \App\Classes\ZaloAPI($_ENV['ZALO_OA_TOKEN']);
-          
-          $zaloText = tr('tg_thanks_title') . ' ' . tr('tg_thanks_body') . "\n\n";
-          $zaloText .= tr('tg_booking_title') . "\n";
-          $zaloText .= tr('tg_date') . ': ' . $startDt->format('Y-m-d') . "\n";
-          $zaloText .= tr('tg_time') . ': ' . $startDt->format('H:i') . "\n";
-          $zaloText .= tr('tg_table') . ': ' . $tableNum . "\n";
-          $zaloText .= tr('tg_guests') . ': ' . $guests . "\n";
-          
-          // Note: Sending by phone requires ZNS template. 
-          // If we don't have a template ID, we can't send.
-          // For now, we just log it or try a generic template if configured.
-          if (!empty($_ENV['ZALO_ZNS_TEMPLATE_ID'])) {
-              $zalo->sendZNS($zaloPhoneNorm, $_ENV['ZALO_ZNS_TEMPLATE_ID'], [
-                  'date' => $startDt->format('Y-m-d'),
-                  'time' => $startDt->format('H:i'),
-                  'table' => $tableNum,
-                  'guests' => (string)$guests,
-                  'name' => $name
-              ]);
-          }
-      } catch (\Throwable $e_zalo) {
-          error_log("Zalo send error: " . $e_zalo->getMessage());
-      }
-  }
-
   $keyboard = [];
   $keyboard[] = [[
       'text' => 'вPoster',
@@ -1590,20 +1542,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                       <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
                         <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
-                      </svg>
-                      <svg class="ico-unlink" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M10.6 13.4a3 3 0 0 0 0-4.2l-.4-.4a3 3 0 0 0-4.2 0l-2.1 2.1a3 3 0 0 0 0 4.2l.4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <path d="M13.4 10.6a3 3 0 0 0 0 4.2l.4.4a3 3 0 0 0 4.2 0l2.1-2.1a3 3 0 0 0 0-4.2l-.4-.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        <path d="M8 16l8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                      </svg>
-                    </button>
-                  </div>
-                  <div class="zalo-stack">
-                    <div class="zalo-nick" id="zaloNick" hidden></div>
-                    <button type="button" class="msgr-btn msgr-btn-inline" id="msgrZaloBtn" aria-label="Zalo" title="Zalo">
-                      <svg class="ico-zalo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.5 14.5h-9v-9h9v9z" fill="currentColor" opacity=".9"/>
-                        <path d="M12 10.5v3m-1.5-1.5h3" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
                       </svg>
                       <svg class="ico-unlink" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M10.6 13.4a3 3 0 0 0 0-4.2l-.4-.4a3 3 0 0 0-4.2 0l-2.1 2.1a3 3 0 0 0 0 4.2l.4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
