@@ -2800,7 +2800,7 @@ $fmtVnd = function (int $v): string {
                         <div>→</div>
                         <div id="outSelPosterSum">0 ₫</div>
                         <div style="height: 10px;"></div>
-                        <div id="outSelMatch" style="font-size: 16px; color: #16a34a;">✅</div>
+                        <div id="outSelMatch" style="font-size: 16px; color: #34d399;">✅</div>
                         <div id="outSelDiff" style="font-weight: 900;">0 ₫</div>
                     </div>
                 </div>
@@ -3052,7 +3052,7 @@ $fmtVnd = function (int $v): string {
         <div class="divider"></div>
 
         <div class="bottom-two">
-        <div class="card card-finance" style="background:#fbfbfd;">
+        <div class="card card-finance">
             <div style="font-weight: 900; margin-bottom: 10px;">Финансовые транзакции</div>
 
             <?php
@@ -3158,7 +3158,7 @@ $fmtVnd = function (int $v): string {
                 </form>
             </div>
         </div>
-        <div class="card card-balances" style="background:#fbfbfd;">
+        <div class="card card-balances">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 10px; margin-bottom: 10px;">
                 <div style="font-weight: 900;">Обновляем Балансы Poster</div>
                 <div style="display:flex; gap: 8px; align-items:center;">
@@ -3214,10 +3214,10 @@ $fmtVnd = function (int $v): string {
                 </table>
             </div>
 
-            <div style="max-height: 260px; overflow:auto; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff;">
+            <div class="bal-grid" style="max-height: 260px; overflow:auto;">
                 <table style="width:100%; border-collapse: collapse;">
                     <thead>
-                    <tr style="background:#f9fafb;">
+                    <tr>
                         <th style="text-align:left; padding: 8px 10px; font-weight: 900;">ID</th>
                         <th style="text-align:left; padding: 8px 10px; font-weight: 900;">Счёт</th>
                         <th style="text-align:right; padding: 8px 10px; font-weight: 900;">Баланс</th>
@@ -3237,7 +3237,7 @@ $fmtVnd = function (int $v): string {
                         </tr>
                     <?php endforeach; ?>
                     <?php if (count($posterAccounts) === 0): ?>
-                        <tr><td colspan="3" style="padding: 10px; color:#6b7280; font-weight:900;">Нет данных: нажми 🔄</td></tr>
+                        <tr><td colspan="3" style="padding: 10px; color:var(--muted); font-weight:900;">Нет данных: нажми 🔄</td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>
@@ -4119,7 +4119,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             if (posterAccountsTbody) {
                 const rows = Array.isArray(j.accounts) ? j.accounts : [];
                 if (rows.length === 0) {
-                    posterAccountsTbody.innerHTML = '<tr><td colspan="3" style="padding: 10px; color:#6b7280; font-weight:900;">Нет данных</td></tr>';
+                    posterAccountsTbody.innerHTML = '<tr><td colspan="3" style="padding: 10px; color:var(--muted); font-weight:900;">Нет данных</td></tr>';
                 } else {
                     posterAccountsTbody.innerHTML = rows.map((a) => {
                         const id = Number(a.account_id || 0);
