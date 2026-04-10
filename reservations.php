@@ -96,28 +96,82 @@ if ($ajax === 'resend') {
     $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
     $okGroup = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
 
-    // Guest Message
+    // Guest Message (localized to reservation language)
     $okGuest = true;
     if ($tgUid > 0) {
-        $userText = '<b>Спасибо!</b> Мы с вами свяжемся в ближайшее время.' . "\n\n";
+        $langRow = strtolower(trim((string)($row['lang'] ?? 'ru')));
+        if (!in_array($langRow, ['ru', 'en', 'vi'], true)) $langRow = 'ru';
+        $T = [
+            'ru' => [
+                'thanks_title' => 'Спасибо!',
+                'thanks_body' => 'Мы с вами свяжемся в ближайшее время.',
+                'payment_title' => 'Оплата предзаказа',
+                'payment_body' => 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.',
+                'payment_link' => 'Ссылка на QR-код для оплаты',
+                'booking_title' => 'Ваша бронь',
+                'date' => 'Дата',
+                'time' => 'Время',
+                'guests' => 'Кол-во человек',
+                'table' => 'Номер стола',
+                'name' => 'Имя',
+                'phone' => 'Номер телефона',
+                'comment' => 'Комментарий',
+                'preorder' => 'Предзаказ',
+            ],
+            'en' => [
+                'thanks_title' => 'Thank you!',
+                'thanks_body' => 'We will contact you shortly.',
+                'payment_title' => 'Pre-order payment',
+                'payment_body' => 'Please scan the QR code to pay for the pre-order. The payment description already contains your reservation number.',
+                'payment_link' => 'Payment QR link',
+                'booking_title' => 'Your reservation',
+                'date' => 'Date',
+                'time' => 'Time',
+                'guests' => 'Guests',
+                'table' => 'Table',
+                'name' => 'Name',
+                'phone' => 'Phone',
+                'comment' => 'Comment',
+                'preorder' => 'Pre-order',
+            ],
+            'vi' => [
+                'thanks_title' => 'Cảm ơn!',
+                'thanks_body' => 'Chúng tôi sẽ liên hệ với bạn sớm.',
+                'payment_title' => 'Thanh toán đặt trước',
+                'payment_body' => 'Vui lòng quét QR để thanh toán đặt trước. Nội dung chuyển khoản đã có mã đặt bàn của bạn.',
+                'payment_link' => 'Link QR thanh toán',
+                'booking_title' => 'Đặt bàn của bạn',
+                'date' => 'Ngày',
+                'time' => 'Giờ',
+                'guests' => 'Số khách',
+                'table' => 'Bàn',
+                'name' => 'Tên',
+                'phone' => 'Số điện thoại',
+                'comment' => 'Ghi chú',
+                'preorder' => 'Đặt trước',
+            ],
+        ];
+        $tr = function (string $k) use ($T, $langRow): string { return $T[$langRow][$k] ?? $k; };
+
+        $userText = '<b>' . htmlspecialchars($tr('thanks_title')) . '</b> ' . htmlspecialchars($tr('thanks_body')) . "\n\n";
         $qrUrl = (string)$row['qr_url'];
         if ($qrUrl !== '') {
-            $userText .= "<b>Оплата предзаказа</b>\n";
-            $userText .= "Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.\n\n";
-            $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">Ссылка на QR-код для оплаты</a>' . "\n\n";
+            $userText .= '<b>' . htmlspecialchars($tr('payment_title')) . "</b>\n";
+            $userText .= htmlspecialchars($tr('payment_body')) . "\n\n";
+            $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">' . htmlspecialchars($tr('payment_link')) . '</a>' . "\n\n";
         }
-        $userText .= '<b>Ваша бронь</b>' . "\n";
-        $userText .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
-        $userText .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
-        $userText .= 'Кол-во человек: <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
-        $userText .= 'Номер стола: <b>' . htmlspecialchars($row['table_num']) . '</b>' . "\n";
-        $userText .= 'Имя: <b>' . htmlspecialchars($row['name']) . '</b>' . "\n";
-        $userText .= 'Номер телефона: <b>' . htmlspecialchars($row['phone']) . '</b>';
+        $userText .= '<b>' . htmlspecialchars($tr('booking_title')) . '</b>' . "\n";
+        $userText .= htmlspecialchars($tr('date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
+        $userText .= htmlspecialchars($tr('time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
+        $userText .= htmlspecialchars($tr('guests')) . ': <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
+        $userText .= htmlspecialchars($tr('table')) . ': <b>' . htmlspecialchars($row['table_num']) . '</b>' . "\n";
+        $userText .= htmlspecialchars($tr('name')) . ': <b>' . htmlspecialchars($row['name']) . '</b>' . "\n";
+        $userText .= htmlspecialchars($tr('phone')) . ': <b>' . htmlspecialchars($row['phone']) . '</b>';
         if ($row['comment'] !== '') {
-            $userText .= "\n<b>Комментарий:</b>\n" . htmlspecialchars($row['comment']);
+            $userText .= "\n<b>" . htmlspecialchars($tr('comment')) . ":</b>\n" . htmlspecialchars($row['comment']);
         }
         if ($row['preorder_text'] !== '') {
-            $userText .= "\n<b>Предзаказ:</b>\n" . htmlspecialchars($row['preorder_text']);
+            $userText .= "\n<b>" . htmlspecialchars($tr('preorder')) . ":</b>\n" . htmlspecialchars($row['preorder_text']);
         }
 
         $ch = curl_init();
@@ -393,6 +447,7 @@ if (!is_array($rows)) {
         </div>
     </div>
 
-    <script src="/assets/js/reservations.js?v=20260410_0300"></script>
+    <script src="/assets/user_menu.js?v=20260410_0330"></script>
+    <script src="/assets/js/reservations.js?v=20260410_0330"></script>
 </body>
 </html>

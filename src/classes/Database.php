@@ -571,6 +571,7 @@ class Database {
             preorder_ru TEXT,
             tg_user_id BIGINT NULL,
             tg_username VARCHAR(64) NULL,
+            lang VARCHAR(8) NULL,
             total_amount INT DEFAULT 0,
             qr_url VARCHAR(255) NULL,
             qr_code VARCHAR(64) NULL,
@@ -590,6 +591,9 @@ class Database {
             }
             if (empty($cols['deleted_by'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN deleted_by VARCHAR(255) NULL");
+            }
+            if (empty($cols['lang'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN lang VARCHAR(8) NULL");
             }
         } catch (\Throwable $e) {
         }

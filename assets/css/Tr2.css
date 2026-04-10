@@ -138,13 +138,7 @@
       border-color: rgba(184,135,70,0.35);
     }
   
-    .controls {
-      display: flex;
-      gap: var(--space-3);
-      align-items: center;
-      flex-wrap: wrap;
-      justify-self: center;
-    }
+    .controls { display: none; }
   
     .zoom {
       display: inline-flex;
@@ -224,13 +218,24 @@
       grid-template-columns: 1fr;
       gap: var(--space-6);
     }
+    .map-invite {
+      margin: 0;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.82);
+      font-size: 13px;
+      font-weight: 900;
+    }
   
     .map-shell {
       background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
       border-radius: calc(var(--radius-lg) - 8px);
       padding: 0 56px 56px 56px;
       border: 1px solid var(--color-border);
-      overflow: auto;
+      overflow: hidden;
+      touch-action: manipulation;
       --map-scale: 1;
       --inv-map-scale: 1;
       position: relative;
@@ -239,14 +244,6 @@
     }
     .map-shell > * { position: relative; z-index: 1; }
     .map-shell > .tile-layer { position: absolute; z-index: 0; }
-    .map-shell {
-      scrollbar-width: thin;
-      scrollbar-color: rgba(184,135,70,0.75) rgba(0,0,0,0.25);
-    }
-    .map-shell::-webkit-scrollbar { width: 12px; height: 12px; }
-    .map-shell::-webkit-scrollbar-track { background: rgba(0,0,0,0.22); border-radius: 999px; }
-    .map-shell::-webkit-scrollbar-thumb { background: rgba(184,135,70,0.60); border-radius: 999px; border: 3px solid rgba(0,0,0,0.22); }
-    .map-shell::-webkit-scrollbar-thumb:hover { background: rgba(184,135,70,0.82); }
   
     .map-zoom-box { width: 820px; height: 620px; }
     .map-zoom-inner { width: 820px; height: 620px; transform: scale(var(--map-scale)); transform-origin: top left; }

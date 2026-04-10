@@ -80,6 +80,7 @@ $I18N = [
     'checking' => 'Проверяю…',
     'press_ok' => 'Нажми “Ок”, чтобы проверить столики.',
     'press_ok_then_tables' => 'Выбери дату и нажми “Ок”. Потом кликай по столам.',
+    'tap_table_to_book' => 'Нажмите на столик, который хотите забронировать.',
     'select_date_time' => 'Выбери дату и время',
     'try_ok_again' => 'Ошибка запроса. Попробуй нажать “Ок” ещё раз.',
     'confirm_capacity' => 'Вы хотите забронировать столик для {max} для {guests} гостей?',
@@ -172,6 +173,7 @@ $I18N = [
     'checking' => 'Checking…',
     'press_ok' => 'Press “OK” to check availability.',
     'press_ok_then_tables' => 'Pick a date and press “OK”. Then tap tables.',
+    'tap_table_to_book' => 'Tap the table you want to book.',
     'select_date_time' => 'Select date and time',
     'try_ok_again' => 'Request failed. Please press “OK” again.',
     'confirm_capacity' => 'Do you want to book a table for {max} when you have {guests} guests?',
@@ -264,6 +266,7 @@ $I18N = [
     'checking' => 'Đang kiểm tra…',
     'press_ok' => 'Nhấn “OK” để kiểm tra bàn trống.',
     'press_ok_then_tables' => 'Chọn ngày và nhấn “OK”. Sau đó chạm vào bàn.',
+    'tap_table_to_book' => 'Chạm vào bàn bạn muốn đặt.',
     'select_date_time' => 'Chọn ngày và giờ',
     'try_ok_again' => 'Lỗi yêu cầu. Hãy nhấn “OK” lại.',
     'confirm_capacity' => 'Bạn muốn đặt bàn {max} chỗ cho {guests} khách phải không?',
@@ -1013,8 +1016,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   }
 
   $db->query("INSERT INTO {$resTable} (
-    created_at, start_time, guests, table_num, name, phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, total_amount, qr_url, qr_code
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+    created_at, start_time, guests, table_num, name, phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
     (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
     $startDt->format('Y-m-d H:i:s'),
     $guests,
@@ -1026,6 +1029,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     $preorderRu,
     $tgUid > 0 ? $tgUid : null,
     $tgUn !== '' ? $tgUn : null,
+    $userLang,
     $totalAmount,
     $qrUrl,
     $qrCode
@@ -1517,6 +1521,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       </div>
   
       <section class="layout">
+        <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         <div class="map-shell">
           <div class="tile-layer" aria-hidden="true"></div>
             <div class="map-zoom-box" id="mapZoomBox">
