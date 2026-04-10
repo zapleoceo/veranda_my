@@ -307,8 +307,6 @@
     const reqPreorderLabel = document.getElementById('reqPreorderLabel');
     const reqPreorderBox = document.getElementById('reqPreorderBox');
     const reqModalTable = document.getElementById('reqModalTable');
-    const reqModalDate = document.getElementById('reqModalDate');
-    const reqModalBusy = document.getElementById('reqModalBusy');
     const reqGuests = document.getElementById('reqGuests');
     const reqGuestsMinus = document.getElementById('reqGuestsMinus');
     const reqGuestsPlus = document.getElementById('reqGuestsPlus');
@@ -1075,24 +1073,6 @@
     const openRequestForm = ({ tableNum, guests, start, name, phone, comment, preorder, keepFields }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
-      if (reqModalDate) {
-        const d = parseIsoLocal(start);
-        if (d) {
-          reqModalDate.textContent = new Intl.DateTimeFormat(UI_LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
-        } else {
-          reqModalDate.textContent = '';
-        }
-      }
-      if (reqModalBusy) {
-        const dStr = String(start || '');
-        const day = dStr.slice(0, 10);
-        const today = new Date();
-        const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-        const isToday = day === todayStr;
-        const isOcc = isToday && occupiedNowNums && occupiedNowNums.has(String(tableNum || ''));
-        reqModalBusy.hidden = !isOcc;
-        reqModalBusy.textContent = isOcc ? t('busy_now') : '';
-      }
       if (reqGuests) reqGuests.value = String(guests);
       if (reqStart) {
         const iso = String(start || '').trim();
