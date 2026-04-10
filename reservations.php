@@ -212,10 +212,20 @@ $rows = $db->query("
         .res-btn:hover { opacity: 0.9; }
         .res-btn:disabled { opacity: 0.5; cursor: default; }
         .sort-arrow { margin-left: 4px; color: var(--accent); }
+        
         .filters { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
-        .filters label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 700; }
-        .filters input { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 14px; }
-        .filters button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fffaf4; font-weight: 700; cursor: pointer; font-size: 14px; height: 36px; }
+        .filters label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 700; flex: 1; min-width: 140px; }
+        .filters input { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 14px; box-sizing: border-box; }
+        .filters button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fffaf4; font-weight: 700; cursor: pointer; font-size: 14px; height: 36px; white-space: nowrap; }
+        
+        .date-inputs { display: flex; gap: 10px; flex-wrap: wrap; flex: 1 1 auto; }
+        .date-inputs label { flex: 1; min-width: 0; }
+        
+        @media (max-width: 768px) {
+            .filters { flex-direction: column; align-items: stretch; }
+            .date-inputs { width: 100%; flex-wrap: nowrap; }
+            .filters button { width: 100%; height: 42px; font-size: 16px; }
+        }
     </style>
 </head>
 <body>
@@ -230,14 +240,16 @@ $rows = $db->query("
 
         <div class="card">
             <form method="GET" class="filters">
-                <label>
-                    Начало
-                    <input type="date" name="date_from" value="<?= htmlspecialchars($dateFrom) ?>">
-                </label>
-                <label>
-                    Конец
-                    <input type="date" name="date_to" value="<?= htmlspecialchars($dateTo) ?>">
-                </label>
+                <div class="date-inputs">
+                    <label>
+                        Начало
+                        <input type="date" name="date_from" value="<?= htmlspecialchars($dateFrom) ?>">
+                    </label>
+                    <label>
+                        Конец
+                        <input type="date" name="date_to" value="<?= htmlspecialchars($dateTo) ?>">
+                    </label>
+                </div>
                 <button type="submit">Показать</button>
             </form>
 
