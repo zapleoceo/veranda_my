@@ -640,7 +640,7 @@ $firstOfMonth = date('Y-m-01');
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/banya.css?v=20260410_0004">
+  <link rel="stylesheet" href="/assets/css/banya.css?v=20260410_0005">
 </head>
 <body>
 <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 16px;">

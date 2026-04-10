@@ -76,7 +76,7 @@
         .user-dropdown .ud-summary::after { content: "›"; float: right; color: var(--muted); font-weight: 900; }
         .user-dropdown details[open] .ud-summary::after { content: "⌄"; }
 
-        .toggles-mobile { display: contents; }
+        .toggles-mobile { display: flex; gap: 16px; align-items: center; }
         @media (max-width: 768px) {
             .row { flex-direction: column; align-items: stretch; gap: 12px; }
             .row > div:first-child { display: none; }
@@ -84,7 +84,7 @@
             .row input[type="date"] { width: 100%; }
             .controls { flex-direction: column; align-items: stretch; width: 100%; gap: 12px; }
             .controls button { width: 100%; padding: 12px; font-size: 16px; }
-            .toggles-mobile { display: flex; gap: 16px; width: 100%; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+            .toggles-mobile { width: 100%; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
             .toggle-wrap { justify-content: center; margin: 0; background: transparent; border: none; padding: 0; border-radius: 0; }
             .pager { justify-content: center; width: 100%; margin-top: 8px; gap: 4px; }
             .page-btn { padding: 4px 8px; }
