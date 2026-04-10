@@ -164,8 +164,8 @@ $bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title><?= htmlspecialchars($pageTitle) ?> | Veranda</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260410_0130">
-  <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260410_0130">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260410_0145">
+  <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260410_0145">
 </head>
 <body>
     <div class="parallax-bg" data-bg="<?= htmlspecialchars($bgImageUrl) ?>" aria-hidden="true"></div>
@@ -247,6 +247,6 @@ $bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
             </div>
         <?php endif; ?>
     </div>
-    <script src="/assets/js/menu-beta.js?v=20260410_0130"></script>
+    <script src="/assets/js/menu-beta.js?v=20260410_0145"></script>
 </body>
 </html>

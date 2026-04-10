@@ -1,4 +1,4 @@
-        html { background: var(--bg); }
+        html { background: transparent; }
         body { background: transparent !important; position: relative; }
         .parallax-bg {
             position: fixed;

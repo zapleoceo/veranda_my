@@ -6,7 +6,7 @@
             top: -35%; left: -20%; right: -20%; bottom: -35%;
             background-size: cover;
             background-position: center center;
-            filter: brightness(0.22) blur(5px);
+            filter: brightness(0.6) blur(5px);
             will-change: transform;
             z-index: -1;
             /* Optional: ensure it behaves as a separate hardware layer */
@@ -23,7 +23,7 @@
                 radial-gradient(1100px 900px at 50% 70%, rgba(0,0,0,0.55), rgba(0,0,0,0.85));
         }
         @media (max-width: 520px) {
-            .parallax-bg { filter: brightness(0.20) blur(7px); }
+            .parallax-bg { filter: brightness(0.6) blur(7px); }
         }
         .wrap { max-width: 920px; margin: 0 auto; padding: 26px 18px 40px; position: relative; z-index: 1; }
         .header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
