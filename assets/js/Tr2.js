@@ -1069,8 +1069,9 @@
         const startOk = !!(reqStart && String(reqStart.value || '').trim());
         const guestsOk = !!(reqGuests && (Number(reqGuests.value || 0) || 0) > 0);
         const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
-        const preorderText = (typeof getPreorderText === 'function') ? String(getPreorderText('ui') || '') : '';
-        const preorderOk = guests <= 5 || !!preorderText.trim();
+        const counts = normalizePreorder(preorderCounts);
+        const hasPreorder = Object.keys(counts).some((k) => (Number(counts[k] || 0) || 0) > 0);
+        const preorderOk = guests <= 5 || hasPreorder;
         if (reqPreorderLabel) reqPreorderLabel.hidden = guests <= 5;
         if (reqPreorderBox) reqPreorderBox.classList.toggle('preorder-missing', guests > 5 && !preorderOk);
         const canSubmit = linked && nameOk && phoneOk && startOk && guestsOk && preorderOk && !modalTableBusy && !submitBusy;
@@ -1434,7 +1435,9 @@
           if (!name) missing.push(t('missing_name'));
           if (!phone) missing.push(t('missing_phone'));
           else if (!isPhoneValid(phone)) missing.push(t('phone_invalid'));
-          if (guests > 5 && !String(preorder || '').trim()) missing.push(t('missing_preorder'));
+          const countsNow = normalizePreorder(preorderCounts);
+          const hasPreorderNow = Object.keys(countsNow).some((k) => (Number(countsNow[k] || 0) || 0) > 0);
+          if (guests > 5 && !hasPreorderNow) missing.push(t('missing_preorder'));
           if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push(t('missing_telegram'));
           if (missing.length) {
             const msg = t('missing_prefix') + missing.join(', ');

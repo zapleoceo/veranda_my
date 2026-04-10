@@ -1,4 +1,4 @@
-﻿﻿(() => {
+(() => {
   const cfg = window.__TR_CONFIG__ || {};
   let UI_LANG = cfg.lang || 'ru';
   let UI_LOCALE = cfg.locale || (UI_LANG === 'vi' ? 'vi-VN' : (UI_LANG === 'en' ? 'en-US' : 'ru-RU'));
@@ -317,8 +317,10 @@
     const reqSubmit = document.getElementById('reqSubmit');
     const msgrTgBtn = document.getElementById('msgrTgBtn');
     const msgrHint = document.getElementById('msgrHint');
+    const tgNick = document.getElementById('tgNick');
     const toastEl = document.getElementById('tableToast');
     const toastTitleEl = document.getElementById('toastTitle');
+    const toastReasonEl = document.getElementById('toastReason');
     const dtpModal = document.getElementById('dtpModal');
     const dtpDateList = document.getElementById('dtpDateList');
     const dtpTimeList = document.getElementById('dtpTimeList');
@@ -338,6 +340,27 @@
     let dtpSelDate = null;
     let dtpSelTime = null;
     let skipNextResDateAutoLoad = false;
+
+    const normPhone = (raw) => String(raw || '').replace(/\D+/g, '').slice(0, 15);
+    const isPhoneValid = (raw) => /^[1-9]\d{8,14}$/.test(normPhone(raw));
+    if (reqPhone) {
+      reqPhone.addEventListener('input', () => {
+        const d = normPhone(reqPhone.value);
+        if (reqPhone.value !== d) reqPhone.value = d;
+        saveDraft();
+        syncSubmitState();
+      });
+    }
+    if (reqGuests) {
+      reqGuests.readOnly = true;
+      reqGuests.addEventListener('keydown', (e) => {
+        const k = String(e.key || '');
+        if (k === 'Tab' || k.startsWith('Arrow') || k === 'Shift' || k === 'Escape') return;
+        e.preventDefault();
+      });
+      reqGuests.addEventListener('paste', (e) => e.preventDefault());
+      reqGuests.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+    }
 
     const pad2 = (n) => String(n).padStart(2, '0');
     const isoDate = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
@@ -989,10 +1012,20 @@
     const syncSubmitState = () => {
       if (!reqSubmit) return;
       const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
-      if (linked) reqSubmit.classList.remove('is-disabled');
+      const nameOk = !!(reqName && String(reqName.value || '').trim());
+      const phoneOk = !!(reqPhone && isPhoneValid(reqPhone.value));
+      const startOk = !!(reqStart && String(reqStart.dataset.iso || reqStart.value || '').trim());
+      const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
+      const guestsOk = guests > 0;
+      const counts = normalizePreorder(preorderCounts);
+      const hasPreorder = Object.keys(counts).some((k) => (Number(counts[k] || 0) || 0) > 0);
+      const preorderOk = guests <= 5 || hasPreorder;
+      if (reqPreorderBox) reqPreorderBox.classList.toggle('preorder-missing', guests > 5 && !preorderOk);
+      const can = linked && nameOk && phoneOk && startOk && guestsOk && preorderOk && !submitBusy;
+      if (can) reqSubmit.classList.remove('is-disabled');
       else reqSubmit.classList.add('is-disabled');
-      reqSubmit.setAttribute('aria-disabled', linked ? 'false' : 'true');
-      reqSubmit.disabled = !!submitBusy;
+      reqSubmit.setAttribute('aria-disabled', can ? 'false' : 'true');
+      reqSubmit.disabled = !can;
     };
     const openRequestForm = ({ tableNum, guests, start, name, phone, comment, preorder, keepFields }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
@@ -1022,6 +1055,8 @@
       updatePreorderUi();
       renderPreorderBox();
       if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) setMsgrHint(t('link_tg_hint'));
+      else setMsgrHint('');
+      syncTgButtonState();
       setModal(reqModal, true);
       if (reqName) reqName.focus();
     };
@@ -1033,6 +1068,22 @@
       if (!t) { msgrHint.hidden = true; msgrHint.textContent = ''; return; }
       msgrHint.hidden = false;
       msgrHint.textContent = t;
+    };
+
+    const syncTgButtonState = () => {
+      if (!msgrTgBtn) return;
+      const linked = !!(messengerLinked.telegram && linkedTg && linkedTg.user_id);
+      msgrTgBtn.classList.toggle('tg-linked', linked);
+      if (tgNick) {
+        if (linked) {
+          const un = String(linkedTg && linkedTg.username ? linkedTg.username : '').replace(/^@+/, '').trim();
+          tgNick.textContent = un ? ('✅ @' + un) : '✅';
+          tgNick.hidden = false;
+        } else {
+          tgNick.textContent = '';
+          tgNick.hidden = true;
+        }
+      }
     };
 
     const startTelegramFlow = async () => {
@@ -1075,7 +1126,23 @@
       }
     };
 
-    if (msgrTgBtn) msgrTgBtn.addEventListener('click', () => { startTelegramFlow().catch(() => null); });
+    const unlinkTelegram = () => {
+      messengerLinked.telegram = false;
+      linkedTg = null;
+      try { localStorage.removeItem('veranda_linked_tg'); } catch (_) {}
+      setMsgrHint(t('tg_unlinked'));
+      syncTgButtonState();
+      syncSubmitState();
+    };
+
+    if (msgrTgBtn) msgrTgBtn.addEventListener('click', () => {
+      if (messengerLinked.telegram && linkedTg && linkedTg.user_id) {
+        const ok = confirm(t('tg_unlink_confirm'));
+        if (ok) unlinkTelegram();
+        return;
+      }
+      startTelegramFlow().catch(() => null);
+    });
 
     const updateReqGuestsHint = async () => {
       if (!reqHint) return;
@@ -1156,7 +1223,7 @@
         e.preventDefault();
         if (submitBusy) return;
         const name = reqName ? String(reqName.value || '').trim() : '';
-        const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
+        const phone = reqPhone ? normPhone(reqPhone.value) : '';
         const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
         const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || '').trim() : '';
         const comment = reqComment ? String(reqComment.value || '').trim() : '';
@@ -1169,7 +1236,10 @@
         if (!isFinite(guests) || guests <= 0) missing.push(t('missing_guests'));
         if (!name) missing.push(t('missing_name'));
         if (!phone) missing.push(t('missing_phone'));
-        if (guests > 5 && !String(preorder || '').trim()) missing.push(t('missing_preorder'));
+        else if (!isPhoneValid(phone)) missing.push(t('phone_invalid'));
+        const countsNow = normalizePreorder(preorderCounts);
+        const hasPreorderNow = Object.keys(countsNow).some((k) => (Number(countsNow[k] || 0) || 0) > 0);
+        if (guests > 5 && !hasPreorderNow) missing.push(t('missing_preorder'));
         if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push(t('missing_telegram'));
         if (missing.length) {
           const msg = t('missing_prefix') + missing.join(', ');
@@ -1585,8 +1655,8 @@
           messengerLinked.telegram = true;
           linkedTg = tg ? { user_id: Number(tg.user_id || 0) || 0, username: String(tg.username || ''), name: String(tg.name || '') } : null;
           openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
-          if (linkedTg && linkedTg.username) setMsgrHint('Telegram привязан ✅ @' + String(linkedTg.username).replace(/^@+/, ''));
-          else setMsgrHint('Telegram привязан ✅');
+          setMsgrHint('');
+          syncTgButtonState();
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);
         }

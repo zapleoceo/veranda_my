@@ -79,7 +79,7 @@ $I18N = [
     'select_date_time' => 'Выбери дату и время',
     'try_ok_again' => 'Ошибка запроса. Попробуй нажать “Ок” ещё раз.',
     'confirm_capacity' => 'Вы хотите забронировать столик для {max} для {guests} гостей?',
-    'busy_now' => 'занят\nсейчас',
+    'busy_now' => 'Сейчас занят',
     'dtp_title' => 'Выбор даты и времени',
     'status_free' => 'Свободен',
     'status_busy' => 'Занят',
@@ -100,6 +100,8 @@ $I18N = [
     'hint_pick_table_first' => 'Сначала выбери столик.',
     'hint_opening_tg' => 'Открываю Telegram…',
     'hint_tg_back' => 'В Telegram нажми “Вернуться на сайт”.',
+    'tg_unlink_confirm' => 'Отвязать Telegram аккаунт? После этого можно привязать другой.',
+    'tg_unlinked' => 'Telegram отвязан',
     'missing_prefix' => 'Не хватает: ',
     'missing_table' => 'выбери стол',
     'missing_start' => 'время старта',
@@ -108,6 +110,7 @@ $I18N = [
     'missing_phone' => 'телефон',
     'missing_preorder' => 'предзаказ',
     'missing_telegram' => 'Telegram (привязать)',
+    'phone_invalid' => 'неверный номер (международный формат, только цифры)',
     'sending' => 'Отправляю…',
     'submit_success' => 'Спасибо, мы с вами свяжемся в ближайшее время.\n\nСтарт: {start}\nСтол: {table}\nГостей: {guests}\nИмя: {name}\nТелефон: {phone}',
     'cap_warn' => 'Мы добавим вам стул, но вам может быть тесно за этим столиком',
@@ -150,7 +153,7 @@ $I18N = [
     'select_date_time' => 'Select date and time',
     'try_ok_again' => 'Request failed. Please press “OK” again.',
     'confirm_capacity' => 'Do you want to book a table for {max} when you have {guests} guests?',
-    'busy_now' => 'busy\nnow',
+    'busy_now' => 'Busy now',
     'dtp_title' => 'Pick date & time',
     'status_free' => 'Free',
     'status_busy' => 'Busy',
@@ -171,6 +174,8 @@ $I18N = [
     'hint_pick_table_first' => 'Pick a table first.',
     'hint_opening_tg' => 'Opening Telegram…',
     'hint_tg_back' => 'In Telegram press “Back to site”.',
+    'tg_unlink_confirm' => 'Unlink Telegram account? After that you can link another one.',
+    'tg_unlinked' => 'Telegram unlinked',
     'missing_prefix' => 'Missing: ',
     'missing_table' => 'pick table',
     'missing_start' => 'start time',
@@ -179,6 +184,7 @@ $I18N = [
     'missing_phone' => 'phone',
     'missing_preorder' => 'pre-order',
     'missing_telegram' => 'Telegram (link)',
+    'phone_invalid' => 'invalid phone (international format, digits only)',
     'sending' => 'Sending…',
     'submit_success' => 'Thank you, we will contact you shortly.\n\nStart: {start}\nTable: {table}\nGuests: {guests}\nName: {name}\nPhone: {phone}',
     'cap_warn' => 'We can add an extra chair, but it may be tight at this table :)',
@@ -221,7 +227,7 @@ $I18N = [
     'select_date_time' => 'Chọn ngày và giờ',
     'try_ok_again' => 'Lỗi yêu cầu. Hãy nhấn “OK” lại.',
     'confirm_capacity' => 'Bạn muốn đặt bàn {max} chỗ cho {guests} khách phải không?',
-    'busy_now' => 'bận\nhiện tại',
+    'busy_now' => 'Đang bận',
     'dtp_title' => 'Chọn ngày & giờ',
     'status_free' => 'Trống',
     'status_busy' => 'Bận',
@@ -242,6 +248,8 @@ $I18N = [
     'hint_pick_table_first' => 'Hãy chọn bàn trước.',
     'hint_opening_tg' => 'Đang mở Telegram…',
     'hint_tg_back' => 'Trong Telegram nhấn “Quay lại trang”.',
+    'tg_unlink_confirm' => 'Hủy liên kết Telegram? Sau đó bạn có thể liên kết tài khoản khác.',
+    'tg_unlinked' => 'Đã hủy liên kết Telegram',
     'missing_prefix' => 'Thiếu: ',
     'missing_table' => 'chọn bàn',
     'missing_start' => 'giờ bắt đầu',
@@ -250,6 +258,7 @@ $I18N = [
     'missing_phone' => 'số điện thoại',
     'missing_preorder' => 'đặt trước',
     'missing_telegram' => 'Telegram (liên kết)',
+    'phone_invalid' => 'số điện thoại không hợp lệ (quốc tế, chỉ số)',
     'sending' => 'Đang gửi…',
     'submit_success' => 'Cảm ơn, chúng tôi sẽ liên hệ sớm.\n\nBắt đầu: {start}\nBàn: {table}\nSố khách: {guests}\nTên: {name}\nSĐT: {phone}',
     'cap_warn' => 'Chúng tôi có thể thêm ghế, nhưng bàn này có thể hơi chật :)',
@@ -851,11 +860,11 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     echo json_encode(['ok' => false, 'error' => 'Некорректное имя'], JSON_UNESCAPED_UNICODE);
     exit;
   }
-  $phoneNorm = preg_replace('/[^\d\+\-\(\)\s]/u', '', $phone);
+  $phoneNorm = preg_replace('/\D+/', '', (string)$phone);
   $phoneNorm = trim((string)$phoneNorm);
-  if ($phoneNorm === '' || mb_strlen($phoneNorm) > 40) {
+  if ($phoneNorm === '' || !preg_match('/^[1-9]\d{8,14}$/', $phoneNorm)) {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Некорректный номер телефона'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => false, 'error' => $trFor('phone_invalid')], JSON_UNESCAPED_UNICODE);
     exit;
   }
   $comment = str_replace(["\r\n", "\r"], "\n", $comment);
@@ -962,6 +971,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     $userText .= "\n";
     $userText .= '<b>' . htmlspecialchars($trFor('tg_preorder')) . ':</b>' . "\n" . htmlspecialchars($preorder);
   }
+  $userText .= "\n\n" . htmlspecialchars($trFor('booking_note'));
 
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
@@ -1281,7 +1291,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260410_0002">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260410_1000">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1447,13 +1457,21 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   <div class="msgr-hint" id="msgrHint" hidden></div>
                 </div>
                 <div class="phone-row">
-                  <input type="tel" id="reqPhone" autocomplete="tel">
-                  <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
-                      <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
-                    </svg>
-                  </button>
+                  <input type="tel" id="reqPhone" autocomplete="tel" inputmode="numeric" pattern="[1-9][0-9]{8,14}">
+                  <div class="tg-stack">
+                    <div class="tg-nick" id="tgNick" hidden></div>
+                    <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
+                      <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
+                        <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
+                      </svg>
+                      <svg class="ico-unlink" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M10.6 13.4a3 3 0 0 0 0-4.2l-.4-.4a3 3 0 0 0-4.2 0l-2.1 2.1a3 3 0 0 0 0 4.2l.4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M13.4 10.6a3 3 0 0 0 0 4.2l.4.4a3 3 0 0 0 4.2 0l2.1-2.1a3 3 0 0 0 0-4.2l-.4-.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M8 16l8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </label>
               <label class="modal-label full" id="reqCommentLabel">
@@ -1470,7 +1488,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
                   <div class="num-step">
                     <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
-                    <input type="number" id="reqGuests" min="1" max="99">
+                    <input type="number" id="reqGuests" min="1" max="99" readonly>
                     <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
                     <button type="button" class="btn btn-secondary btn-preorder-mobile" id="btnOpenMobilePreorder" hidden aria-label="Menu">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -1537,6 +1555,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260410_0021"></script>
+  <script src="/links/table-reservation.js?v=20260410_1000"></script>
 </body>
 </html>
