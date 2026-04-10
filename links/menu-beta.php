@@ -145,9 +145,9 @@ foreach ($groups as $station => $cats) {
 $pageTitle = $lang === 'ru' ? 'Online меню' : ($lang === 'vi' ? 'Thực đơn online' : ($lang === 'ko' ? '온라인 메뉴' : 'Online menu'));
 $bgImageUrls = [
     'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg',
-    'https://images.pexels.com/photos/1059905/pexels-photo-1059905.jpeg',
-    'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg',
-    'https://images.pexels.com/photos/566566/pexels-photo-566566.jpeg',
+    'https://images.pexels.com/photos/376464/pexels-photo-376464.jpeg',
+    'https://images.pexels.com/photos/769289/pexels-photo-769289.jpeg',
+    'https://images.pexels.com/photos/70497/pexels-photo-70497.jpeg',
 ];
 $bgIdx = (int)date('z') % max(1, count($bgImageUrls));
 if (isset($_GET['bg']) && is_numeric($_GET['bg'])) {
@@ -164,11 +164,12 @@ $bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title><?= htmlspecialchars($pageTitle) ?> | Veranda</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260410_001">
-  <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260410_001">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260410_0130">
+  <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260410_0130">
 </head>
 <body>
-    <div class="parallax-bg" style="background-image: url('<?= htmlspecialchars($bgImageUrl) ?>');" aria-hidden="true"></div>
+    <div class="parallax-bg" data-bg="<?= htmlspecialchars($bgImageUrl) ?>" aria-hidden="true"></div>
+    <div class="parallax-vignette" aria-hidden="true"></div>
     <div class="wrap">
         <div class="header">
             <div class="header-top">
@@ -246,6 +247,6 @@ $bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
             </div>
         <?php endif; ?>
     </div>
-    <script src="/assets/js/menu-beta.js?v=20260410_001"></script>
+    <script src="/assets/js/menu-beta.js?v=20260410_0130"></script>
 </body>
 </html>

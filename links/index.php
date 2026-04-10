@@ -128,8 +128,8 @@ $icons = [
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>Links | Veranda</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260410_0110">
-  <link rel="stylesheet" href="/assets/css/links_index.css?v=20260410_0110">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260410_0125">
+  <link rel="stylesheet" href="/assets/css/links_index.css?v=20260410_0125">
 </head>
 <body>
     <div class="parallax-bg" aria-hidden="true"></div>
@@ -177,6 +177,6 @@ $icons = [
             <div>© <?= date('Y') ?> Veranda</div>
         </div>
     </div>
-    <script src="/assets/js/links_index.js?v=20260410_0110"></script>
+    <script src="/assets/js/links_index.js?v=20260410_0125"></script>
 </body>
 </html>
