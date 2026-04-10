@@ -85,7 +85,7 @@ $I18N = [
     'select_date_time' => 'Выбери дату и время',
     'try_ok_again' => 'Ошибка запроса. Попробуй нажать “Ок” ещё раз.',
     'confirm_capacity' => 'Вы хотите забронировать столик для {max} для {guests} гостей?',
-    'busy_now' => 'занят\nсейчас',
+    'busy_now' => 'Сейчас занят',
     'dtp_title' => 'Выбор даты и времени',
     'status_free' => 'Свободен',
     'status_busy' => 'Занят',
@@ -127,7 +127,10 @@ $I18N = [
     'table_unavailable' => 'Этот столик не доступен',
     'reason' => 'Причина: ',
     'reason_disabled' => 'отключено в настройках',
-    'reason_booking' => 'там есть бронь',
+    'reason_booking' => 'есть бронь',
+    'booking_tag' => 'Бронь',
+    'booking_until_prefix' => 'до',
+    'phone_invalid' => 'неверный номер (международный формат, только цифры)',
     'reason_sitting' => 'гости сейчас сидят',
     'reason_time' => 'недоступен на это время',
     'fix_guests_table' => 'Исправь кол-во гостей и выбери столик снова.',
@@ -226,6 +229,9 @@ $I18N = [
     'reason' => 'Reason: ',
     'reason_disabled' => 'disabled in settings',
     'reason_booking' => 'there is a booking',
+    'booking_tag' => 'Booking',
+    'booking_until_prefix' => 'until',
+    'phone_invalid' => 'invalid phone (international format, digits only)',
     'reason_sitting' => 'guests are currently sitting',
     'reason_time' => 'unavailable at this time',
     'fix_guests_table' => 'Adjust the number of guests and select the table again.',
@@ -324,6 +330,9 @@ $I18N = [
     'reason' => 'Lý do: ',
     'reason_disabled' => 'đã tắt trong cài đặt',
     'reason_booking' => 'đã có lịch đặt',
+    'booking_tag' => 'Có đặt',
+    'booking_until_prefix' => 'đến',
+    'phone_invalid' => 'số điện thoại không hợp lệ (quốc tế, chỉ số)',
     'reason_sitting' => 'khách đang ngồi',
     'reason_time' => 'không khả dụng vào lúc này',
     'fix_guests_table' => 'Điều chỉnh số lượng khách và chọn lại bàn.',
@@ -978,11 +987,11 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     echo json_encode(['ok' => false, 'error' => 'Некорректное имя'], JSON_UNESCAPED_UNICODE);
     exit;
   }
-  $phoneNorm = preg_replace('/[^\d\+\-\(\)\s]/u', '', $phone);
+  $phoneNorm = preg_replace('/\D+/', '', (string)$phone);
   $phoneNorm = trim((string)$phoneNorm);
-  if ($phoneNorm === '' || mb_strlen($phoneNorm) > 40) {
+  if ($phoneNorm === '' || !preg_match('/^[1-9]\d{8,14}$/', $phoneNorm)) {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Некорректный номер телефона'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => false, 'error' => $trFor('phone_invalid')], JSON_UNESCAPED_UNICODE);
     exit;
   }
   $comment = str_replace(["\r\n", "\r"], "\n", $comment);
@@ -1024,14 +1033,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $db->createReservationsTable();
   $resTable = $db->t('reservations');
   $qrUrl = '';
+  $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   $qrCode = '';
+  for ($i = 0; $i < 8; $i++) {
+    $qrCode .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+  }
   if ($totalAmount > 0) {
-    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    $code = '';
-    for ($i = 0; $i < 8; $i++) {
-      $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-    }
-    $qrCode = $code;
     $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES{$qrCode}");
   }
 
@@ -1068,7 +1075,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     exit;
   }
 
-  $text = '<b>Новая бронь с сайта #' . htmlspecialchars((string)$resId) . '</b>' . "\n";
+  $text = '<b>Новая бронь с сайта #' . htmlspecialchars((string)$qrCode) . '</b>' . "\n";
   $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
   $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
   if ($duration_m > 0) {
@@ -1122,7 +1129,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $userText .= htmlspecialchars($trFor('qr_payment_body') ?? 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.') . "\n\n";
       $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">Ссылка на QR-код для оплаты</a>' . "\n\n";
   }
-  $userText .= '<b>' . htmlspecialchars($trFor('tg_booking_title')) . ' #' . htmlspecialchars((string)$resId) . '</b>' . "\n";
+  $userText .= '<b>' . htmlspecialchars($trFor('tg_booking_title')) . ' #' . htmlspecialchars((string)$qrCode) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_guests')) . ': <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
@@ -1500,7 +1507,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0720">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0835">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1695,7 +1702,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   <div class="msgr-hint" id="msgrHint" hidden></div>
                 </div>
                 <div class="phone-row">
-                  <input type="tel" id="reqPhone" autocomplete="tel">
+                  <input type="tel" id="reqPhone" autocomplete="tel" inputmode="numeric" pattern="[1-9][0-9]{8,14}">
                   <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
                     <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
@@ -1775,6 +1782,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_0720"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_0835"></script>
 </body>
 </html>

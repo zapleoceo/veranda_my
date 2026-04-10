@@ -318,6 +318,7 @@
     const msgrHint = document.getElementById('msgrHint');
     const toastEl = document.getElementById('tableToast');
     const toastTitleEl = document.getElementById('toastTitle');
+    const toastReasonEl = document.getElementById('toastReason');
     const dtpModal = document.getElementById('dtpModal');
     const dtpDateList = document.getElementById('dtpDateList');
     const dtpTimeList = document.getElementById('dtpTimeList');
@@ -337,6 +338,16 @@
     let dtpSelDate = null;
     let dtpSelTime = null;
     let skipNextResDateAutoLoad = false;
+
+    const normPhone = (raw) => String(raw || '').replace(/\D+/g, '').slice(0, 15);
+    const isPhoneValid = (raw) => /^[1-9]\d{8,14}$/.test(normPhone(raw));
+    if (reqPhone) {
+      reqPhone.addEventListener('input', () => {
+        const d = normPhone(reqPhone.value);
+        if (reqPhone.value !== d) reqPhone.value = d;
+        syncSubmitState();
+      });
+    }
 
     const pad2 = (n) => String(n).padStart(2, '0');
     const isoDate = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
@@ -1015,9 +1026,14 @@
       if (un) {
         modalTableBusy = true;
         const isSitting = String(un.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят');
+        const isBooking = String(un.reason || '') === String(t('reason_booking') || 'есть бронь');
         if (busyTag) {
           if (isSitting) {
             busyTag.textContent = String(un.reason || '');
+            busyTag.hidden = false;
+          } else if (isBooking) {
+            const d = String(un.detail || '').trim();
+            busyTag.textContent = String(t('booking_tag') || 'Бронь') + (d ? (' ' + d) : '');
             busyTag.hidden = false;
           } else {
             busyTag.hidden = true;
@@ -1037,7 +1053,11 @@
       const syncSubmitState = () => {
         if (!reqSubmit) return;
         const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
-        const canSubmit = linked && !modalTableBusy && !submitBusy;
+        const nameOk = !!(reqName && String(reqName.value || '').trim());
+        const phoneOk = !!(reqPhone && isPhoneValid(reqPhone.value));
+        const startOk = !!(reqStart && String(reqStart.value || '').trim());
+        const guestsOk = !!(reqGuests && (Number(reqGuests.value || 0) || 0) > 0);
+        const canSubmit = linked && nameOk && phoneOk && startOk && guestsOk && !modalTableBusy && !submitBusy;
         
         if (canSubmit) {
           reqSubmit.classList.remove('is-disabled');
@@ -1364,7 +1384,7 @@
 
         try {
           name = reqName ? String(reqName.value || '').trim() : '';
-          phone = reqPhone ? String(reqPhone.value || '').trim() : '';
+          phone = reqPhone ? normPhone(reqPhone.value) : '';
           guests = reqGuests ? Number(reqGuests.value || 0) : 0;
           if (pendingBooking && pendingBooking.start && reqStart && reqStart.value) {
             const dPart = String(pendingBooking.start).slice(0, 10);
@@ -1389,6 +1409,7 @@
           if (!isFinite(guests) || guests <= 0) missing.push(t('missing_guests'));
           if (!name) missing.push(t('missing_name'));
           if (!phone) missing.push(t('missing_phone'));
+          else if (!isPhoneValid(phone)) missing.push(t('phone_invalid'));
           if (guests > 5 && !String(preorder || '').trim()) missing.push(t('missing_preorder'));
           if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push(t('missing_telegram'));
           if (missing.length) {
@@ -1550,7 +1571,16 @@
         const overlaps = ranges.some(([s, e]) => s < selEnd && e > ps.selMin);
         if (overlaps) {
           const txt = ranges.slice(0, 2).map(([s, e]) => fmtMin(s) + '-' + fmtMin(e)).join(' · ');
-          return { reason: t('reason_booking') || 'там есть бронь', detail: txt };
+          return { reason: t('reason_booking') || 'есть бронь', detail: txt };
+        }
+        const nextStarts = ranges.map(([s]) => Number(s)).filter((s) => isFinite(s) && s >= ps.selMin);
+        const nextStart = nextStarts.length ? Math.min(...nextStarts) : null;
+        if (nextStart != null && isFinite(nextStart)) {
+          const mustEndAt = nextStart - 60;
+          if (selEnd > mustEndAt) {
+            const pref = t('booking_until_prefix') || 'до';
+            return { reason: t('reason_booking') || 'есть бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
+          }
         }
       }
       

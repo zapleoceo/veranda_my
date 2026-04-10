@@ -74,7 +74,9 @@ if ($ajax === 'resend') {
     $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
     $okGroup = true;
     if ($target === 'both' || $target === 'manager') {
-        $text = '<b>[Повтор] Новая бронь с сайта #' . htmlspecialchars((string)$row['id']) . '</b>' . "\n";
+        $code = preg_replace('/[^A-Z0-9]/', '', strtoupper((string)($row['qr_code'] ?? '')));
+        if ($code === '') $code = (string)$row['id'];
+        $text = '<b>[Повтор] Новая бронь с сайта #' . htmlspecialchars($code) . '</b>' . "\n";
         $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
         $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
         $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
@@ -165,7 +167,7 @@ if ($ajax === 'resend') {
             $userText .= htmlspecialchars($tr('payment_body')) . "\n\n";
             $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">' . htmlspecialchars($tr('payment_link')) . '</a>' . "\n\n";
         }
-        $userText .= '<b>' . htmlspecialchars($tr('booking_title')) . ' #' . htmlspecialchars((string)$row['id']) . '</b>' . "\n";
+        $userText .= '<b>' . htmlspecialchars($tr('booking_title')) . ' #' . htmlspecialchars($code) . '</b>' . "\n";
         $userText .= htmlspecialchars($tr('date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
         $userText .= htmlspecialchars($tr('time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
         $userText .= htmlspecialchars($tr('guests')) . ': <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
