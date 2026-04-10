@@ -1681,7 +1681,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                                 exec($cmd . ' 2>&1', $out, $code);
                             }
                             if (count($out) > 200) $out = array_slice($out, -200);
-                            echo '<pre style="margin-top:12px; white-space:pre-wrap; word-break:break-word; background:#0b1020; color:#e5e7eb; padding:12px; border-radius:12px; overflow:auto; max-height:360px;">' . htmlspecialchars("exit={$code}\n" . implode("\n", $out)) . '</pre>';
+                            echo '<pre style="margin-top:12px; white-space:pre-wrap; word-break:break-word; background:var(--card); color:var(--text); padding:12px; border-radius:12px; overflow:auto; max-height:360px;">' . htmlspecialchars("exit={$code}\n" . implode("\n", $out)) . '</pre>';
                         } else {
                             echo '<div class="error">Неизвестный скрипт</div>';
                         }
@@ -1837,7 +1837,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                         <input type="hidden" name="save_user_permissions" value="1">
                         <input type="hidden" name="perm_email" id="permEmail" value="">
                         <div class="form-group" style="margin-bottom: 12px;">
-                            <label style="font-size:12px; font-weight:800; text-transform:uppercase; color:#6b7280;">Telegram username</label>
+                            <label style="font-size:12px; font-weight:800; text-transform:uppercase; color:var(--muted);">Telegram username</label>
                             <input type="text" name="perm_tg_username" id="permTgUsername" placeholder="например: zapleosoft">
                             <div class="muted" style="margin-top:6px;">Нужен для кнопки «ПРИНЯТО» в Telegram. Пиши без @.</div>
                         </div>
@@ -1870,8 +1870,8 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <form method="POST" style="margin:0;">
                         <button type="submit" name="autofill_menu" title="Разовая привязка по ID: связывает menu_items.category_id и menu_categories.workshop_id из данных Poster там, где сейчас пусто. Не трогает переводы и ручные значения.">Привязать ID (разово)</button>
                     </form>
-                    <a href="admin.php?tab=menu&export=csv" style="text-decoration:none; font-weight:600; color:#1a73e8;" title="Выгрузка CSV со всеми активными позициями и текущими переводами/категориями.">CSV меню</a>
-                    <a href="admin.php?tab=menu&export=categories_csv" style="text-decoration:none; font-weight:600; color:#1a73e8;" title="Выгрузка CSV справочников цехов и категорий с переводами.">CSV категорий</a>
+                    <a href="admin.php?tab=menu&export=csv" style="text-decoration:none; font-weight:600; color:var(--accent);" title="Выгрузка CSV со всеми активными позициями и текущими переводами/категориями.">CSV меню</a>
+                    <a href="admin.php?tab=menu&export=categories_csv" style="text-decoration:none; font-weight:600; color:var(--accent);" title="Выгрузка CSV справочников цехов и категорий с переводами.">CSV категорий</a>
                     <?php if (!empty($menuSyncMeta['last_sync_at'])): ?>
                         <span class="muted">Последняя синхронизация: <span class="js-local-dt" data-iso="<?= htmlspecialchars($menuSyncAtIso) ?>"><?= htmlspecialchars($menuSyncMeta['last_sync_at']) ?></span></span>
                     <?php endif; ?>
@@ -1983,7 +1983,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 </form>
             <?php elseif ($menuView === 'edit' && $menuEdit): ?>
                 <div style="margin-top: 14px;">
-                    <a href="admin.php?tab=menu&view=list" style="text-decoration:none; font-weight:600; color:#1a73e8;">← Назад к списку</a>
+                    <a href="admin.php?tab=menu&view=list" style="text-decoration:none; font-weight:600; color:var(--accent);">← Назад к списку</a>
                 </div>
 
                 <form method="POST" style="margin-top: 14px;">
@@ -2283,13 +2283,13 @@ if ($tab === 'menu' || $tab === 'categories') {
                     </div>
                     <div style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center;">
                         <button type="submit">Применить</button>
-                        <a href="admin.php?tab=menu&view=list" style="text-decoration:none; color:#666; font-weight:600;">Сбросить</a>
+                        <a href="admin.php?tab=menu&view=list" style="text-decoration:none; color:var(--muted); font-weight:600;">Сбросить</a>
                         <span class="muted">Всего: <?= (int)$menuTotal ?></span>
                     </div>
                 </form>
 
                 <details style="margin-top: 12px;">
-                    <summary style="cursor:pointer; font-weight:700; color:#1a73e8;">Поля таблицы</summary>
+                    <summary style="cursor:pointer; font-weight:700; color:var(--accent);">Поля таблицы</summary>
                     <div style="margin-top: 10px; display:flex; flex-wrap:wrap; gap: 10px;">
                         <?php foreach ($columnDefs as $key => $def): ?>
                             <label style="display:flex; align-items:center; gap: 8px; font-size: 13px; border:1px solid #eee; padding: 8px 10px; border-radius: 999px; background:#fafafa;">
@@ -2379,7 +2379,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                                            <?= !$isActive ? 'disabled' : '' ?>>
                                 </td>
                                 <td>
-                                    <a href="admin.php?tab=menu&view=edit&poster_id=<?= (int)$it['poster_id'] ?>" style="text-decoration:none; color:#1a73e8; font-weight:800;" title="Редактировать">&#9998;</a>
+                                    <a href="admin.php?tab=menu&view=edit&poster_id=<?= (int)$it['poster_id'] ?>" style="text-decoration:none; color:var(--accent); font-weight:800;" title="Редактировать">&#9998;</a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

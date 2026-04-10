@@ -1,30 +1,30 @@
  .dp-range { position: relative; }
  .dp-field { display: flex; align-items: center; gap: 8px; }
- .dp-display { padding: 8px 12px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; min-width: 190px; cursor: pointer; }
- .dp-open { height: 36px; width: 42px; border-radius: 6px; border: 1px solid #d0d5dd; background: #fff; cursor: pointer; font-size: 18px; line-height: 1; }
- .dp-open:hover { background: #f6f8fb; }
- .dp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 10000; }
- .dp-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(320px, calc(100vw - 24px)); background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid #d0d5dd; border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.25); z-index: 10001; padding: 12px; box-sizing: border-box; }
+ .dp-display { padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--text); min-width: 190px; cursor: pointer; }
+ .dp-open { height: 36px; width: 42px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; font-size: 18px; line-height: 1; }
+ .dp-open:hover { background: var(--card2); }
+ .dp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; }
+ .dp-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(320px, calc(100vw - 24px)); background: var(--card); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,0.5); z-index: 10001; padding: 12px; box-sizing: border-box; }
  .dp-dialog button { appearance: none; -webkit-appearance: none; background: transparent; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; line-height: normal; }
  .dp-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
- .dp-month-year { font-weight: 700; color: #1f2937; text-align: center; flex: 1; }
- .dp-nav { border: 1px solid #d0d5dd; background: #fff; border-radius: 8px; width: 36px; height: 34px; cursor: pointer; font-size: 18px; }
- .dp-nav:hover { background: #f6f8fb; }
+ .dp-month-year { font-weight: 700; color: var(--text); text-align: center; flex: 1; }
+ .dp-nav { border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px; width: 36px; height: 34px; cursor: pointer; font-size: 18px; }
+ .dp-nav:hover { background: var(--card2); }
  .dp-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
- .dp-grid thead th { font-size: 12px; color: #65676b; font-weight: 700; text-transform: uppercase; padding: 6px 0; }
- .dp-grid tbody td { padding: 0; }
- .dp-cell { width: calc(100% - 4px); height: 28px; border: 0; background: transparent; cursor: pointer; border-radius: 6px; margin: 2px; display: block; font-weight: 600; font-size: 13px; color: #1f2937; }
- .dp-cell:hover { background: #f6f8fb; }
- .dp-cell:focus { outline: 2px solid #1a73e8; outline-offset: 1px; }
- .dp-cell[disabled] { cursor: default; color: #c4c7c5; }
+ .dp-grid thead th { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; padding: 6px 0; background: transparent; border-bottom: none; }
+ .dp-grid tbody td { padding: 0; border: none; }
+ .dp-cell { width: calc(100% - 4px); height: 28px; border: 0; background: transparent; cursor: pointer; border-radius: 6px; margin: 2px; display: block; font-weight: 600; font-size: 13px; color: var(--text); }
+ .dp-cell:hover { background: var(--card2); }
+ .dp-cell:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+ .dp-cell[disabled] { cursor: default; color: var(--muted); opacity: 0.4; }
  .dp-cell[disabled]:hover { background: transparent; }
-.dp-cell.in-range { background: rgba(26, 115, 232, 0.14); }
+.dp-cell.in-range { background: var(--accent2); color: var(--text); }
 .dp-cell.in-range.range-start, .dp-cell.in-range.range-end { background: transparent; }
- .dp-cell.range-start, .dp-cell.range-end { background: transparent; color: #1f2937; outline: 2px solid #1a73e8; outline-offset: -2px; }
+ .dp-cell.range-start, .dp-cell.range-end { background: transparent; color: var(--text); outline: 2px solid var(--accent); outline-offset: -2px; }
  .dp-footer { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
- .dp-hint { font-size: 12px; color: #65676b; flex: 1; min-height: 16px; }
+ .dp-hint { font-size: 12px; color: var(--muted); flex: 1; min-height: 16px; }
  .dp-actions { display: flex; gap: 8px; }
- .dp-action { border: 1px solid #d0d5dd; background: #fff; border-radius: 8px; padding: 7px 10px; cursor: pointer; font-weight: 700; }
- .dp-action:hover { background: #f6f8fb; }
- .dp-action.primary { background: #fff; border-color: #d0d5dd; color: #1f2937; }
- .dp-action.primary:hover { background: #f6f8fb; border-color: #d0d5dd; }
+ .dp-action { border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px; padding: 7px 10px; cursor: pointer; font-weight: 700; }
+ .dp-action:hover { background: var(--card2); }
+ .dp-action.primary { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
+ .dp-action.primary:hover { background: var(--accent); opacity: 0.9; border-color: var(--accent); }

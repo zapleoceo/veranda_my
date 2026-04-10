@@ -136,7 +136,7 @@ $fileInfo = function (string $filePath): array {
                     <tr>
                         <td style="font-weight:700;"><?= htmlspecialchars($job['label']) ?></td>
                         <td><span class="pill ok" title="<?= htmlspecialchars($cronHuman($job['cron']) . ' (' . $job['cron'] . ')', ENT_QUOTES) ?>"><?= htmlspecialchars($job['cron']) ?></span></td>
-                        <td><a href="logs.php?view=<?= urlencode($job['key']) ?>&lines=<?= (int)$lines ?>" style="text-decoration:none; color:#1a73e8; font-weight:600;"><?= htmlspecialchars($job['log']) ?></a></td>
+                        <td><a href="logs.php?view=<?= urlencode($job['key']) ?>&lines=<?= (int)$lines ?>" style="text-decoration:none; color:var(--accent); font-weight:600;"><?= htmlspecialchars($job['log']) ?></a></td>
                         <td>
                             <?php if (!empty($fi['exists'])): ?>
                                 <span class="pill ok">есть</span>

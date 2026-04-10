@@ -13,7 +13,7 @@
         .day .num { font-weight: 900; display:flex; align-items: baseline; justify-content: space-between; gap: 6px; }
         .day .pct { font-size: 10px; font-weight: 900; color: var(--muted); }
         .day .pct.bad { color: #b91c1c; }
-        .day .mini { font-size: 10px; color: #374151; display:flex; align-items:center; gap: 4px; justify-content: flex-start; white-space: normal; line-height: 1.1; }
+        .day .mini { font-size: 10px; color: var(--muted); display:flex; align-items:center; gap: 4px; justify-content: flex-start; white-space: normal; line-height: 1.1; }
         .day .sep { color: var(--muted); font-weight: 900; }
         .day .miss { color: #b91c1c; }
         .kpis { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
@@ -39,7 +39,7 @@
         .prog-inline .pct { font-weight: 900; color: var(--text); font-size: 12px; min-width: 40px; }
         .prog-inline .desc { font-weight: 800; color: var(--muted); font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .checks { margin-top: 12px; border-top: 1px solid #eef2f7; padding-top: 12px; }
-        .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color: #374151; }
+        .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color: var(--text); }
         .toggle-wrap .toggle-text { user-select:none; }
         .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
         .switch input { opacity: 0; width: 0; height: 0; }

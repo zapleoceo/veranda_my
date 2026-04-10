@@ -6,12 +6,12 @@
         .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 16px; box-sizing: border-box; }
         button { background: var(--accent); color: #fffaf4; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500; }
         button:hover { background: var(--accent); }
-        .success { background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #c8e6c9; }
-        .error { background: rgba(211,47,47,0.2); color: #d32f2f; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #f5c2c7; }
+        .success { background: rgba(46, 125, 50, 0.2); color: #81c784; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #4caf50; }
+        .error { background: rgba(211,47,47,0.2); color: #ef5350; padding: 15px; border-radius: 6px; margin-bottom: 20px; border: 1px solid #e53935; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border); }
         th { background: transparent; color: var(--muted); font-size: 13px; text-transform: uppercase; font-weight: 600; }
-        .delete-btn { color: #d32f2f; text-decoration: none; font-size: 14px; }
+        .delete-btn { color: #ef5350; text-decoration: none; font-size: 14px; }
         .delete-btn:hover { text-decoration: underline; }
         .perm-gear { border: 0; background: transparent; cursor: pointer; font-size: 16px; color: var(--muted); padding: 4px 8px; }
         .perm-gear:hover { color: var(--accent); }
@@ -35,20 +35,20 @@
         .user-dropdown { position: absolute; right: 0; top: calc(100% + 8px); background: var(--card); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 18px rgba(0,0,0,0.5); padding: 8px; min-width: 160px; display: none; z-index: 1000; }
         .user-menu.open .user-dropdown { display: block; }
         .user-dropdown a { display: block; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; font-weight: 600; }
-        .user-dropdown a:hover { background: #f5f6fa; }
+        .user-dropdown a:hover { background: var(--card2); }
         .tab-links { text-align: center; margin: -10px 0 24px; }
-        .tab-links a { display: inline-block; padding: 8px 14px; border-radius: 999px; margin: 0 6px; text-decoration: none; font-weight: 600; color: var(--accent); background: rgba(26,115,232,0.08); }
-        .tab-links a.active { color: #fffaf4; background: var(--accent); }
-        .tab-links a:hover { background: rgba(26,115,232,0.14); }
+        .tab-links a { display: inline-block; padding: 8px 14px; border-radius: 999px; margin: 0 6px; text-decoration: none; font-weight: 600; color: var(--accent); background: var(--card); border: 1px solid var(--border); }
+        .tab-links a.active { color: #fffaf4; background: var(--accent); border-color: var(--accent); }
+        .tab-links a:hover { background: var(--card2); }
         .description-card { background: var(--card); border-left: 4px solid var(--accent); padding: 20px; border-radius: 4px; font-size: 14px; line-height: 1.6; color: var(--text); }
         .description-card h4 { margin-top: 0; color: var(--accent); }
         .description-card ul { padding-left: 20px; }
         .settings-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
         textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
         .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-        .pill.ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-        .pill.bad { background: rgba(211,47,47,0.2); color: #d32f2f; border: 1px solid #f5c2c7; }
-        .pill.warn { background: var(--card)8e1; color: #8d6e00; border: 1px solid #ffe0b2; }
+        .pill.ok { background: rgba(46, 125, 50, 0.2); color: #81c784; border: 1px solid #4caf50; }
+        .pill.bad { background: rgba(211,47,47,0.2); color: #ef5350; border: 1px solid #e53935; }
+        .pill.warn { background: rgba(255, 160, 0, 0.2); color: #ffb74d; border: 1px solid #ffa000; }
         .menu-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
         .menu-actions .left { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .menu-actions .right { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }

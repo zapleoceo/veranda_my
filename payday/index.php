@@ -3092,7 +3092,7 @@ $fmtVnd = function (int $v): string {
                     <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать перевод</button>
                     <div class="muted finance-status">
                         <?php if ($transferVietnamExists): ?>
-                            <span style="color:#16a34a; font-weight:900;">Найдены транзакции за день:</span>
+                            <span style="color:#81c784; font-weight:900;">Найдены транзакции за день:</span>
                             <?php foreach ($transferVietnamFoundList as $f): ?>
                                 <?php
                                     $ts = (int)($f['ts'] ?? 0);
@@ -3136,7 +3136,7 @@ $fmtVnd = function (int $v): string {
                     <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать перевод</button>
                     <div class="muted finance-status">
                         <?php if ($transferTipsExists): ?>
-                            <span style="color:#16a34a; font-weight:900;">Найдены транзакции за день:</span>
+                            <span style="color:#81c784; font-weight:900;">Найдены транзакции за день:</span>
                             <?php foreach ($transferTipsFoundList as $f): ?>
                                 <?php
                                     $ts = (int)($f['ts'] ?? 0);
@@ -5017,7 +5017,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     const line = `${j.date || ''} - ${j.time || ''} - ${Number(j.sum || 0).toLocaleString('en-US')} ₫${whoPart} - ${j.comment || ''}`.trim();
                     if (statusEl) {
                         const label = j.already ? 'Найдена транзакция:' : 'Транзакция создана:';
-                        statusEl.innerHTML = `<span style="color:#16a34a; font-weight:900;">${label}</span> <span>${line}</span>`;
+                        statusEl.innerHTML = `<span style="color:#81c784; font-weight:900;">${label}</span> <span>${line}</span>`;
                     }
                     if (btn) {
                         btn.classList.remove('loading');

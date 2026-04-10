@@ -639,6 +639,7 @@ $firstOfMonth = date('Y-m-01');
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+  <link rel="stylesheet" href="/assets/css/common.css">
   <link rel="stylesheet" href="/assets/css/banya.css">
 </head>
 <body>
@@ -671,8 +672,8 @@ $firstOfMonth = date('Y-m-01');
                     <div class="bar" style="width: 104px; height: 10px; border-radius: 999px; background: rgba(182,89,48,0.12); overflow: hidden;">
                         <span id="progBar" style="display:block; height:100%; width:0; background: rgba(182,89,48,0.95); transition: width 0.15s ease;"></span>
                     </div>
-                    <div class="label" id="progLabel" style="font-size: 12px; color:#1f2937; font-weight: 900; min-width: 44px;">0%</div>
-                    <div class="desc" id="progDesc" style="font-size: 12px; color:#6b7280; font-weight: 800;"></div>
+                    <div class="label" id="progLabel" style="font-size: 12px; color:var(--text); font-weight: 900; min-width: 44px;">0%</div>
+                    <div class="desc" id="progDesc" style="font-size: 12px; color:var(--muted); font-weight: 800;"></div>
                 </div>
                 <div class="loader" id="loader" style="display:none;"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
                 <div class="toggle-wrap" title="Страницы">

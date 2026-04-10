@@ -5,7 +5,7 @@
         .chart-container { background: var(--card); padding: 14px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 0; border: 1px solid var(--border); }
         h2 { margin: 0 0 10px; color: var(--text); font-size: 1.05em; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
         .chart-canvas { width: 100% !important; height: 280px !important; }
-        .error { color: #d32f2f; background: rgba(211,47,47,0.2); padding: 15px; border-radius: 8px; border: 1px solid #f5c2c7; text-align: center; }
+        .error { color: #e57373; background: rgba(211,47,47,0.2); padding: 15px; border-radius: 8px; border: 1px solid #e53935; text-align: center; }
         .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
         .nav-left { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; min-width: 0; }
         .nav-left a { color: var(--accent); text-decoration: none; font-weight: 500; }

@@ -530,7 +530,7 @@ try {
             <div class="spacer"></div>
             <button type="submit">Применить</button>
             <?php if ($selectedStatus !== 'all' || $dateFrom !== date('Y-m-d') || $dateTo !== date('Y-m-d') || $hourStart !== 0 || $hourEnd !== 23 || $stationFilter !== 'all'): ?>
-                <a href="rawdata.php" style="font-size: 0.9em; color: #666; margin-left: 10px;">Сбросить</a>
+                <a href="rawdata.php" style="font-size: 0.9em; color: var(--muted); margin-left: 10px;">Сбросить</a>
             <?php endif; ?>
         </form>
         
@@ -545,7 +545,7 @@ try {
             <div data-sort="wait">Макс. ожидание <span class="sort-icon"></span></div>
         </div>
 
-        <div id="lazyStatus" style="text-align:center; color:#65676b; height:0; margin:0; overflow:hidden;"></div>
+        <div id="lazyStatus" style="text-align:center; color:var(--muted); height:0; margin:0; overflow:hidden;"></div>
         <div id="receiptsList"></div>
         <div id="lazySentinel" style="height:1px;"></div>
     </div>

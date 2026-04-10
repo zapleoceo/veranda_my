@@ -702,7 +702,7 @@ $todayStr = date('Y-m-d');
                 <td>${String(r.table || '')}</td>
                 <td>${String(r.waiter || '')}</td>
                 <td class="num">${fmtVnd(r.sum_minor || 0)}</td>
-                <td>${r.missing ? '<span style="color:#b91c1c; font-weight:900;">ошибка</span>' : '<span style="color:#16a34a; font-weight:900;">ок</span>'}</td>
+                <td>${r.missing ? '<span style="color:#e57373; font-weight:900;">ошибка</span>' : '<span style="color:#81c784; font-weight:900;">ок</span>'}</td>
             `;
             tbody.appendChild(tr);
             const trD = document.createElement('tr');

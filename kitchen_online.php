@@ -158,7 +158,7 @@ $renderCards = function (array $rows, int $waitLimitMinutes): string {
                 <div class="ko-meta">
                     <span>Офик: <?= htmlspecialchars($waiter) ?></span>
                     <?php if (!empty($c['comment'])): ?>
-                        <span class="ko-comment" style="display:inline-block; margin-left: 8px; font-size:12px; font-style:italic; color:#6b7280;" title="Комментарий к чеку"><?= htmlspecialchars($c['comment']) ?></span>
+                        <span class="ko-comment" style="display:inline-block; margin-left: 8px; font-size:12px; font-style:italic; color:var(--muted);" title="Комментарий к чеку"><?= htmlspecialchars($c['comment']) ?></span>
                     <?php endif; ?>
                 </div>
             </div>

@@ -15,7 +15,7 @@
         .day.disabled { opacity: 0.35; cursor: default; }
         .day.active { outline: 2px solid #1a73e8; outline-offset: -2px; }
         .day .num { font-weight: 900; }
-        .day .mini { font-size: 10px; color: #374151; display:flex; align-items:center; gap: 4px; justify-content: flex-start; white-space: nowrap; }
+        .day .mini { font-size: 10px; color: var(--muted); display:flex; align-items:center; gap: 4px; justify-content: flex-start; white-space: nowrap; }
         .day .sep { color: var(--muted); font-weight: 900; }
         .day .miss { color: #b91c1c; }
         .pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); }

@@ -84,7 +84,7 @@
         .link-x:hover { background: var(--border); }
         .sepay-hide { width: 14px; height: 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); display:inline-flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; margin-right: 6px; }
         .sepay-hide:hover { background: var(--border); }
-        .finance-del { width: 14px; height: 14px; border-radius: 999px; border: 1px solid rgba(220, 38, 38, 0.5); background: var(--card); color: #dc2626; display:inline-flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; margin-right: 6px; }
+        .finance-del { width: 14px; height: 14px; border-radius: 999px; border: 1px solid rgba(239, 83, 80, 0.5); background: var(--card); color: #ef5350; display:inline-flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; margin-right: 6px; }
         .finance-del:hover { background: rgba(220, 38, 38, 0.08); }
         .cell-anchor { display:flex; align-items:center; gap: 8px; }
         .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
@@ -98,7 +98,7 @@
         .vc-toggle { display:inline-flex; align-items:center; justify-content:center; width: 22px; height: 22px; border-radius: 8px; border: 1px solid rgba(26, 115, 232, 0.35); background: rgba(26, 115, 232, 0.08); color: var(--accent); cursor: pointer; font-weight: 900; line-height: 1; padding: 0; }
         .vc-toggle.on { border-color: var(--accent); background: var(--accent); color: #fffaf4; }
         .hidden-toggle { border-color: rgba(107, 114, 128, 0.45); background: rgba(107, 114, 128, 0.10); color: var(--muted); }
-        .hidden-toggle.on { border-color: #6b7280; background: #6b7280; color: #fffaf4; }
+        .hidden-toggle.on { border-color: var(--muted); background: var(--muted); color: #111; }
         @media (max-width: 1050px) {
             .grid { grid-template-columns: 1fr 70px 1fr; }
             .mid-col { padding-top: 10px; gap: 6px; }
@@ -116,8 +116,8 @@
         .bal-grid th, .bal-grid td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 12px; }
         .bal-grid th { background: transparent; text-transform:none; letter-spacing: 0; }
         .bal-grid input { width: 140px; max-width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; font-weight: 900; font-size: 12px; background: transparent; color: var(--text); }
-        .bal-diff-pos { color: #16a34a; font-weight: 900; }
-        .bal-diff-neg { color: #dc2626; font-weight: 900; }
+        .bal-diff-pos { color: #81c784; font-weight: 900; }
+        .bal-diff-neg { color: #ef5350; font-weight: 900; }
         body.mode-lite .col-sepay-content { display: none; }
         body.mode-lite .col-poster-num,
         body.mode-lite .col-poster-card,
