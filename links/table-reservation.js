@@ -199,7 +199,6 @@
       });
     };
 
-    let occupiedNowNums = new Set();
     let lastReservationsByTable = {};
     const applyReservationsItemsToTables = (items, dateStr, dtValue) => {
       const list = Array.isArray(items) ? items : [];
@@ -269,7 +268,7 @@
         if (overlapsSel) tableEl.dataset.resBusy = '1';
         else delete tableEl.dataset.resBusy;
         let txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
-        if (isToday && selMin != null && !overlapsSel && !ranges.length && last && occupiedNowNums.has(n)) {
+        if (isToday && selMin != null && !overlapsSel && !ranges.length && last && !freeNums.has(n)) {
           txt = t('busy_now');
         }
         let el = tableEl.querySelector('.res-time');
@@ -1455,7 +1454,6 @@
         t.classList.remove('free', 'busy');
         if (!last) return;
         if (t.dataset.resBusy === '1') { t.classList.add('busy'); return; }
-        if (occupiedNowNums && occupiedNowNums.has(n)) { t.classList.add('busy'); return; }
         if (freeNums.has(n)) t.classList.add('free');
         else t.classList.add('busy');
       });
@@ -1619,20 +1617,6 @@
         return rJ;
       };
 
-      const loadOccupiedNow = async () => {
-        const now = new Date();
-        const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-        if (String(dateStr || '').slice(0, 10) !== todayStr) return [];
-        const oUrl = new URL(location.href);
-        oUrl.searchParams.set('ajax', 'occupied_now');
-        oUrl.searchParams.set('spot_id', '1');
-        const oX = await fetchJson(oUrl.toString());
-        const oRes = oX.res;
-        const oJ = oX.json;
-        if (!oRes.ok || !oJ || !oJ.ok) return [];
-        return Array.isArray(oJ.occupied_table_nums) ? oJ.occupied_table_nums.map(String) : [];
-      };
-
       try {
         const x = await fetchJson(url.toString());
         const res = x.res;
@@ -1640,7 +1624,6 @@
         if (!res.ok || !j || !j.ok) {
           last = null;
           freeNums = new Set();
-          occupiedNowNums = new Set();
           lastKey = '';
           applyAvailabilityStyles();
           setOutput(j && typeof j === 'object' ? fmtJson(j) : t('try_ok_again'));
@@ -1651,7 +1634,6 @@
         last = j;
         lastKey = key;
         freeNums = new Set(Array.isArray(j.free_table_nums) ? j.free_table_nums.map(String) : []);
-        occupiedNowNums = new Set(await loadOccupiedNow().catch(() => []));
         applyAvailabilityStyles();
         const r = await loadReservations().catch(() => null);
         if (r) {
@@ -1669,7 +1651,6 @@
       } catch (_) {
         last = null;
         freeNums = new Set();
-        occupiedNowNums = new Set();
         lastKey = '';
         applyAvailabilityStyles();
         if (!silent) setOutput(t('try_ok_again'));

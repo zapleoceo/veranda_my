@@ -631,86 +631,6 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   exit;
 }
 
-if (($_GET['ajax'] ?? '') === 'occupied_now') {
-  header('Content-Type: application/json; charset=utf-8');
-  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-  header('Pragma: no-cache');
-
-  if ($posterToken === '') {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'POSTER_API_TOKEN не задан'], JSON_UNESCAPED_UNICODE);
-    exit;
-  }
-
-  $spotId = (int)($_GET['spot_id'] ?? 1);
-  $hallId = 2;
-  if ($spotId <= 0) $spotId = 1;
-
-  $displayTz = new DateTimeZone($displayTzName);
-  $today = (new DateTimeImmutable('now', $displayTz))->format('Y-m-d');
-  $dateFrom = str_replace('-', '', $today);
-  $dateTo = $dateFrom;
-
-  $api = new \App\Classes\PosterAPI($posterToken);
-  try {
-    $tx = $api->request('dash.getTransactions', [
-      'dateFrom' => $dateFrom,
-      'dateTo' => $dateTo,
-      'type' => 'spots',
-      'id' => $spotId,
-      'status' => 1,
-      'include_products' => 'false',
-      'include_history' => 'false',
-      'include_delivery' => 'false',
-      'timezone' => 'client',
-    ], 'GET');
-
-    $tablesResp = $api->request('spots.getTableHallTables', [
-      'spot_id' => $spotId,
-      'hall_id' => $hallId,
-      'without_deleted' => 1,
-    ], 'GET');
-
-    $idToNum = [];
-    if (is_array($tablesResp)) {
-      foreach ($tablesResp as $row) {
-        if (!is_array($row)) continue;
-        $id = trim((string)($row['table_id'] ?? ''));
-        $num = trim((string)($row['table_num'] ?? ''));
-        if ($id !== '' && $num !== '') $idToNum[$id] = $num;
-      }
-    }
-
-    $openNums = [];
-    $openIds = [];
-    if (is_array($tx)) {
-      foreach ($tx as $row) {
-        if (!is_array($row)) continue;
-        $tid = trim((string)($row['table_id'] ?? ''));
-        if ($tid === '') continue;
-        $openIds[$tid] = true;
-        if (isset($idToNum[$tid])) $openNums[$idToNum[$tid]] = true;
-      }
-    }
-
-    echo json_encode([
-      'ok' => true,
-      'request' => [
-        'spot_id' => $spotId,
-        'hall_id' => $hallId,
-        'dateFrom' => $dateFrom,
-        'dateTo' => $dateTo,
-      ],
-      'occupied_table_ids' => array_values(array_keys($openIds)),
-      'occupied_table_nums' => array_values(array_keys($openNums)),
-    ], JSON_UNESCAPED_UNICODE);
-  } catch (\Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-  }
-  exit;
-}
-
 if (($_GET['ajax'] ?? '') === 'busy_ranges') {
   header('Content-Type: application/json; charset=utf-8');
   header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -1696,6 +1616,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     };
   </script>
   <script src="/assets/js/Tr2.js?v=20260410_1135"></script>
-  <script src="/links/table-reservation.js?v=20260410_2210"></script>
+  <script src="/links/table-reservation.js?v=20260410_1345"></script>
 </body>
 </html>
