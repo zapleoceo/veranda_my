@@ -459,6 +459,6 @@ if (!is_array($rows)) {
     </div>
 
     <script src="/assets/user_menu.js?v=20260410_0410"></script>
-    <script src="/assets/js/reservations.js?v=20260410_0540"></script>
+    <script src="/assets/js/reservations.js?v=20260410_0610"></script>
 </body>
 </html>

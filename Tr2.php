@@ -68,6 +68,7 @@ $I18N = [
     'start_time' => 'Время старта',
     'duration' => 'Продолжительность',
     'table_busy_warning' => 'К сожалению, этот столик занят в выбранное время. Пожалуйста, выберите другое время или столик.',
+    'table_busy_no_booking' => 'Столик занят, бронирование не доступно',
     'messenger' => 'ВАШ МЕССЕНДЖЕР',
     'link_tg_hint' => 'Мессенджер обязателен',
     'preorder_title' => 'Предзаказ',
@@ -165,6 +166,7 @@ $I18N = [
     'start_time' => 'Start time',
     'duration' => 'Duration',
     'table_busy_warning' => 'Unfortunately, this table is busy at the selected time. Please choose another time or table.',
+    'table_busy_no_booking' => 'Table is occupied, booking is not available',
     'messenger' => 'YOUR MESSENGER',
     'link_tg_hint' => 'Messenger is required',
     'preorder_title' => 'Pre-order',
@@ -262,6 +264,7 @@ $I18N = [
     'start_time' => 'Thời gian bắt đầu',
     'duration' => 'Thời lượng',
     'table_busy_warning' => 'Rất tiếc, bàn này đã được đặt trong thời gian bạn chọn. Vui lòng chọn thời gian hoặc bàn khác.',
+    'table_busy_no_booking' => 'Bàn đang có khách, không thể đặt hôm nay',
     'messenger' => 'MESSENGER CỦA BẠN',
     'link_tg_hint' => 'Cần messenger',
     'preorder_title' => 'Đặt trước',
@@ -1492,7 +1495,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0545">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0615">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1643,6 +1646,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           <span class="framed-box" id="reqModalTable"></span>
           <span data-i18n="on_date"><?= htmlspecialchars(tr('on_date')) ?></span>
           <span class="framed-box" id="reqModalDate"></span>
+          <span class="framed-box busy-tag" id="reqModalBusy" hidden></span>
         </div>
         <button class="btn-close-modal" type="button" data-modal-close="reqModal" aria-label="Close">×</button>
       </div>
@@ -1700,9 +1704,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   </button>
                 </div>
               </label>
-              <div id="tableBusyWarning" style="display:none; color: #ff4d4d; font-size: 13px; margin-top: 10px; line-height: 1.4; padding: 10px; background: rgba(255,0,0,0.1); border-radius: 8px;">
-                <span data-i18n="table_busy_warning"><?= htmlspecialchars(tr('table_busy_warning')) ?></span>
-              </div>
               <label class="modal-label full" id="reqCommentLabel">
                 <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
                 <textarea id="reqComment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
@@ -1769,6 +1770,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_0545"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_0615"></script>
 </body>
 </html>

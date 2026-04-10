@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const cfg = window.__TR_CONFIG__ || {};
   let UI_LANG = cfg.lang || 'ru';
   let UI_LOCALE = cfg.locale || (UI_LANG === 'vi' ? 'vi-VN' : (UI_LANG === 'en' ? 'en-US' : 'ru-RU'));
@@ -1011,16 +1011,22 @@
       
       logJs('checkModalAvailability: start', { tableNum, current, un, modalTableBusy });
 
-      const tableBusyWarning = document.getElementById('tableBusyWarning');
+      const busyTag = document.getElementById('reqModalBusy');
       if (un) {
         modalTableBusy = true;
-        if (tableBusyWarning) {
-          tableBusyWarning.style.display = 'block';
-          tableBusyWarning.innerHTML = esc(un.reason) + (un.detail ? ' · ' + esc(un.detail) : '');
+        const isSitting = String(un.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят');
+        if (busyTag) {
+          if (isSitting) {
+            busyTag.textContent = String(un.reason || '');
+            busyTag.hidden = false;
+          } else {
+            busyTag.hidden = true;
+            busyTag.textContent = '';
+          }
         }
       } else {
         modalTableBusy = false;
-        if (tableBusyWarning) tableBusyWarning.style.display = 'none';
+        if (busyTag) { busyTag.hidden = true; busyTag.textContent = ''; }
       }
 
       logJs('checkModalAvailability: end', { un, modalTableBusy });
@@ -1135,7 +1141,8 @@
       if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) {
         setMsgrHint(t('link_tg_hint'));
       } else if (messengerLinked.telegram && linkedTg) {
-        setMsgrHint((t('tg_linked') || 'Telegram привязан ✅') + ' @' + String(linkedTg.username || '').replace(/^@+/, ''));
+        const un = String(linkedTg.username || '').replace(/^@+/, '').trim();
+        setMsgrHint('✅' + (un ? (' @' + un) : ''));
       }
       syncTgButtonState();
       checkModalAvailability();
@@ -1169,7 +1176,8 @@
       if (!msgrTgBtn || msgrBusy) return;
       if (!pendingBooking) { setMsgrHint(t('hint_pick_table_first')); return; }
       if (messengerLinked.telegram && linkedTg && linkedTg.user_id) {
-         setMsgrHint((t('tg_linked') || 'Telegram привязан ✅') + ' @' + String(linkedTg.username || '').replace(/^@+/, ''));
+         const un = String(linkedTg.username || '').replace(/^@+/, '').trim();
+         setMsgrHint('✅' + (un ? (' @' + un) : ''));
          return;
       }
       
@@ -1454,13 +1462,11 @@
         } catch (err) {
           const errMsg = String(err && err.message ? err.message : err);
           setOutput({ ok: false, error: errMsg });
-          const tableBusyWarning = document.getElementById('tableBusyWarning');
-          if (tableBusyWarning) {
-            tableBusyWarning.textContent = errMsg;
-            tableBusyWarning.style.display = 'block';
-          } else {
-            setMsgrHint(errMsg);
-          }
+          if (reqHint) {
+            reqHint.hidden = false;
+            reqHint.classList.add('warn');
+            reqHint.textContent = errMsg;
+          } else setMsgrHint(errMsg);
         } finally {
           submitBusy = false;
           if (reqSubmit) {
@@ -1519,6 +1525,19 @@
       toastTimer = setTimeout(hideToast, 2200);
     };
 
+    const showBusyToast = (target) => {
+      if (!toastEl || !toastTitleEl || !toastReasonEl) return;
+      if (toastHideTimer) { clearTimeout(toastHideTimer); toastHideTimer = null; }
+      positionToast(target);
+      toastTitleEl.textContent = t('table_busy_no_booking');
+      toastReasonEl.textContent = '';
+      toastEl.classList.add('on');
+      toastEl.classList.remove('pulse');
+      requestAnimationFrame(() => toastEl.classList.add('pulse'));
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, 1000);
+    };
+
     const getUnavailableReason = (tableNum, current) => {
       const tEl = tables.find((x) => String(x.dataset.table || '') === String(tableNum));
       if (!tEl) return null;
@@ -1544,12 +1563,7 @@
       }
 
       if (!freeNums.has(String(tableNum))) {
-        if (isToday) {
-            if (ps && ps.selMin > nowMin + 120) {
-               return null;
-            }
-            return { reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
-        }
+        if (isToday) return { reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
         return { reason: t('reason_time') || 'недоступен на это время', detail: '' };
       }
       return null;
@@ -1689,6 +1703,13 @@
           return;
         }
 
+        const preUn = getUnavailableReason(id, current);
+        if (preUn && String(preUn.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят')) {
+          selectedTableNum = '';
+          showBusyToast(table);
+          return;
+        }
+
         const key = current.dt + '|' + String(current.guests);
         if ((!last || lastKey !== key) && !isLoading) {
           try {
@@ -1697,6 +1718,13 @@
             setOutput({ ok: false, error: String(e && e.message ? e.message : e) });
             return;
           }
+        }
+
+        const un = getUnavailableReason(id, current);
+        if (un && String(un.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят')) {
+          selectedTableNum = '';
+          showBusyToast(table);
+          return;
         }
 
         if (table.classList.contains('disabled')) {
@@ -1884,8 +1912,8 @@
           }
 
           openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
-          if (linkedTg && linkedTg.username) setMsgrHint((t('tg_linked') || 'Telegram привязан ✅') + ' @' + String(linkedTg.username).replace(/^@+/, ''));
-          else setMsgrHint(t('tg_linked') || 'Telegram привязан ✅');
+          const un = linkedTg ? String(linkedTg.username || '').replace(/^@+/, '').trim() : '';
+          setMsgrHint('✅' + (un ? (' @' + un) : ''));
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);
         }
