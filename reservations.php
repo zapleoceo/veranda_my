@@ -331,14 +331,17 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
     try {
         $api = new \App\Classes\PosterAPI($_ENV['POSTER_API_TOKEN']);
         
-        // Fetch all tables to map table_id to table_num
+        // Fetch all tables to map table_id to table_title
         $tableNameMap = [];
         try {
-            $allTables = $api->request('spots.getTables');
+            // Using spots.getTableHallTables to get table_title as requested
+            // Assuming hall_id 2 is the main hall as used in other parts of the project
+            $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2]);
             if (is_array($allTables)) {
                 foreach ($allTables as $t) {
                     if (isset($t['table_id'])) {
-                        $tableNameMap[(int)$t['table_id']] = $t['table_num'] ?? $t['table_name'] ?? $t['table_id'];
+                        // Prefer table_title as requested, fallback to table_num
+                        $tableNameMap[(int)$t['table_id']] = $t['table_title'] ?? $t['table_num'] ?? $t['table_id'];
                     }
                 }
             }
