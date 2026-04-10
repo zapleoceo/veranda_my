@@ -1519,7 +1519,10 @@
     };
 
     const getCurrentRequest = () => {
-      const dtRaw = resDate ? String(resDate.value || '').trim() : '';
+      let dtRaw = resDate ? String(resDate.value || '').trim() : '';
+      if (pendingBooking && pendingBooking.start) {
+        dtRaw = String(pendingBooking.start || '').slice(0, 10);
+      }
       if (!dtRaw) return null;
       // dtRaw is YYYY-MM-DD
       const now = new Date();
@@ -1749,9 +1752,9 @@
         if (!res.ok || !j || !j.ok || !j.payload) throw new Error((j && j.error) ? j.error : t('err_generic'));
         const p = j.payload || {};
         const resDt = String(p.res_date || '').trim();
-        if (resDate && resDt && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(resDt)) {
+        if (resDate && resDt && /^\d{4}-\d{2}-\d{2}/.test(resDt)) {
           skipNextResDateAutoLoad = true;
-          resDate.value = resDt;
+          resDate.value = resDt.slice(0, 10);
           if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
           setBusyLabel(String(resDate.value || '').slice(0, 10));
           invalidateLast();
