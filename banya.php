@@ -640,7 +640,7 @@ $firstOfMonth = date('Y-m-01');
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/banya.css?v=20260410_0002">
+  <link rel="stylesheet" href="/assets/css/banya.css?v=20260410_0003">
 </head>
 <body>
 <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 16px;">
@@ -655,8 +655,8 @@ $firstOfMonth = date('Y-m-01');
 <div class="wrap">
     <div class="card">
         <div class="row">
-            <div style="width: max-content;">
-                <h1>Отчет баня</h1>
+            <div>
+                <h1 style="display:none;">Отчет баня</h1>
             </div>
             <label>
                 Дата начала

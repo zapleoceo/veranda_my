@@ -79,14 +79,15 @@
         .toggles-mobile { display: contents; }
         @media (max-width: 768px) {
             .row { flex-direction: column; align-items: stretch; gap: 12px; }
-            .row > div:first-child { width: 100% !important; text-align: center; margin-bottom: 8px; }
+            .row > div:first-child { display: none; }
             .row label { width: 100%; }
             .row input[type="date"] { width: 100%; }
             .controls { flex-direction: column; align-items: stretch; width: 100%; gap: 12px; }
             .controls button { width: 100%; padding: 12px; font-size: 16px; }
             .toggles-mobile { display: flex; gap: 10px; width: 100%; justify-content: space-between; }
             .toggle-wrap { flex: 1; justify-content: center; padding: 12px 10px; background: var(--card); border-radius: 10px; border: 1px solid var(--border); margin: 0; }
-            .pager { justify-content: center; width: 100%; margin-top: 8px; }
+            .pager { justify-content: center; width: 100%; margin-top: 8px; gap: 4px; }
+            .page-btn { padding: 4px 8px; font-size: 13px; }
             .totals { flex-direction: column; align-items: stretch; margin-top: 16px; gap: 8px; }
             .pill { text-align: center; }
             .progress { width: 100%; justify-content: center; margin-left: 0 !important; margin-top: 8px; }
