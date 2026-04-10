@@ -325,6 +325,11 @@ $action = (string)($m[1] ?? '');
             'comment' => trim(($row['comment'] ?? '') . ' (TG ' . $ackBy . ')')
         ];
 
+        // If phone starts with 380, Poster might expect + prefix or specific format
+        if (strpos($reservationData['phone'], '380') === 0) {
+            $reservationData['phone'] = '+' . $reservationData['phone'];
+        }
+
         $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
         
         $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь создана в Poster!']);

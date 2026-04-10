@@ -106,9 +106,10 @@ if ($ajax === 'vposter') {
         $firstName = $nameParts[0] ?? 'Guest';
         $lastName = $nameParts[1] ?? '';
 
+        // Prepare reservation data for Poster API
         $reservationData = [
             'spot_id' => 1,
-            'type' => 2, // Reservation
+            'type' => 2, // 2 = Reservation
             'table_id' => $tableId,
             'guests_count' => (int)$row['guests'],
             'date_reservation' => date('Y-m-d H:i:s', strtotime($row['start_time'])),
@@ -118,6 +119,11 @@ if ($ajax === 'vposter') {
             'last_name' => $lastName,
             'comment' => trim(($row['comment'] ?? '') . ' (Site #' . $row['id'] . ')')
         ];
+
+        // If phone starts with 380, Poster might expect + prefix or specific format
+        if (strpos($reservationData['phone'], '380') === 0) {
+            $reservationData['phone'] = '+' . $reservationData['phone'];
+        }
 
         $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
         
