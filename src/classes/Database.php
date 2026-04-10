@@ -574,7 +574,24 @@ class Database {
             total_amount INT DEFAULT 0,
             qr_url VARCHAR(255) NULL,
             qr_code VARCHAR(64) NULL,
+            deleted_at DATETIME NULL,
+            deleted_by VARCHAR(255) NULL,
             KEY idx_start_time (start_time)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        try {
+            $cols = [];
+            foreach ($this->pdo->query("SHOW COLUMNS FROM {$t}") as $c) {
+                $f = strtolower((string)($c['Field'] ?? ''));
+                if ($f !== '') $cols[$f] = true;
+            }
+            if (empty($cols['deleted_at'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN deleted_at DATETIME NULL");
+            }
+            if (empty($cols['deleted_by'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN deleted_by VARCHAR(255) NULL");
+            }
+        } catch (\Throwable $e) {
+        }
     }
 }

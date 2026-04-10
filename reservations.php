@@ -192,8 +192,48 @@ if ($ajax === 'resend') {
     exit;
 }
 
+if ($ajax === 'toggle_deleted') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $id = (int)($_POST['id'] ?? 0);
+    if ($id <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid ID'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $deleted = (int)($_POST['deleted'] ?? 1) === 1;
+    $userEmail = (string)($_SESSION['user_email'] ?? '');
+
+    try {
+        if ($deleted) {
+            $db->query("UPDATE {$resTable} SET deleted_at = NOW(), deleted_by = ? WHERE id = ? LIMIT 1", [$userEmail, $id]);
+        } else {
+            $db->query("UPDATE {$resTable} SET deleted_at = NULL, deleted_by = NULL WHERE id = ? LIMIT 1", [$id]);
+        }
+        $row = $db->query("SELECT id, deleted_at, deleted_by FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
+        $deletedAt = (string)($row['deleted_at'] ?? '');
+        $deletedBy = (string)($row['deleted_by'] ?? '');
+        echo json_encode([
+            'ok' => true,
+            'deleted' => $deletedAt !== '',
+            'deleted_at' => $deletedAt !== '' ? date('d.m.Y H:i', strtotime($deletedAt)) : '',
+            'deleted_by' => $deletedBy,
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'DB error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 $dateFrom = $_GET['date_from'] ?? date('Y-m-d', strtotime('-1 week'));
 $dateTo = $_GET['date_to'] ?? date('Y-m-d', strtotime('+1 month'));
+$showDeleted = !empty($_GET['show_deleted']);
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-d', strtotime('-1 week'));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d', strtotime('+1 month'));
@@ -203,12 +243,17 @@ $order = strtolower($_GET['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 $validSorts = ['id', 'created_at', 'start_time', 'table_num', 'guests', 'name', 'phone', 'total_amount'];
 if (!in_array($sort, $validSorts, true)) $sort = 'start_time';
 
+$where = "DATE(start_time) BETWEEN ? AND ?";
+$params = [$dateFrom, $dateTo];
+if (!$showDeleted) {
+    $where .= " AND deleted_at IS NULL";
+}
 $rows = $db->query("
     SELECT * 
     FROM {$resTable} 
-    WHERE DATE(start_time) BETWEEN ? AND ? 
+    WHERE {$where}
     ORDER BY {$sort} {$order}
-", [$dateFrom, $dateTo])->fetchAll();
+", $params)->fetchAll();
 if (!is_array($rows)) {
     $rows = [];
 }
@@ -221,34 +266,10 @@ if (!is_array($rows)) {
     <title>Брони</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="/assets/app.css">
-    <style>
-        .res-table { width: 100%; border-collapse: collapse; min-width: 900px; }
-        .res-table th, .res-table td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-        .res-table th { background: var(--card2); font-weight: 700; cursor: pointer; color: var(--muted); user-select: none; }
-        .res-table th:hover { background: var(--card); color: var(--text); }
-        .res-table td { color: var(--text); }
-        .res-btn { padding: 6px 12px; background: var(--accent); color: #fffaf4; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; }
-        .res-btn:hover { opacity: 0.9; }
-        .res-btn:disabled { opacity: 0.5; cursor: default; }
-        .sort-arrow { margin-left: 4px; color: var(--accent); }
-        
-        .filters { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
-        .filters label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); font-weight: 700; flex: 1; min-width: 140px; }
-        .filters input { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 14px; box-sizing: border-box; }
-        .filters button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fffaf4; font-weight: 700; cursor: pointer; font-size: 14px; height: 36px; white-space: nowrap; }
-        
-        .date-inputs { display: flex; gap: 10px; flex-wrap: wrap; flex: 1 1 auto; }
-        .date-inputs label { flex: 1; min-width: 0; }
-        
-        @media (max-width: 768px) {
-            .filters { flex-direction: column; align-items: stretch; }
-            .date-inputs { width: 100%; flex-wrap: nowrap; }
-            .filters button { width: 100%; height: 42px; font-size: 16px; }
-        }
-    </style>
+    <link rel="stylesheet" href="/assets/css/reservations.css?v=20260410_0300">
 </head>
 <body>
-    <div class="container">
+    <div class="container res-page">
         <div class="top-nav">
             <div class="nav-left">
                 <a href="/dashboard.php">← Дашборд</a>
@@ -258,6 +279,17 @@ if (!is_array($rows)) {
         </div>
 
         <div class="card">
+            <div class="res-header">
+                <div>
+                    <div class="title">Брони</div>
+                    <div class="sub">Период и управление заявками</div>
+                </div>
+                <label class="res-switch">
+                    <input id="showDeleted" type="checkbox" <?= $showDeleted ? 'checked' : '' ?>>
+                    <span>Показывать удалённые</span>
+                </label>
+            </div>
+
             <form method="GET" class="filters">
                 <div class="date-inputs">
                     <label>
@@ -269,10 +301,13 @@ if (!is_array($rows)) {
                         <input type="date" name="date_to" value="<?= htmlspecialchars($dateTo) ?>">
                     </label>
                 </div>
-                <button type="submit">Показать</button>
+                <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>">
+                <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
+                <?php if ($showDeleted): ?><input type="hidden" name="show_deleted" value="1"><?php endif; ?>
+                <button type="submit" class="btn-primary">Показать</button>
             </form>
 
-            <div style="overflow-x: auto;">
+            <div class="table-wrap">
                 <table class="res-table">
                     <thead>
                         <tr>
@@ -299,45 +334,57 @@ if (!is_array($rows)) {
                                     if ($tgUsername !== '') {
                                         $tgUsername = ltrim($tgUsername, '@');
                                     }
+                                    $deletedAt = (string)($r['deleted_at'] ?? '');
+                                    $deletedBy = (string)($r['deleted_by'] ?? '');
+                                    $isDeleted = $deletedAt !== '' && $deletedAt !== null;
+                                    $deletedAtHuman = $isDeleted ? date('d.m.Y H:i', strtotime($deletedAt)) : '';
                                 ?>
-                                <tr>
-                                    <td><?= (int)$r['id'] ?></td>
-                                    <td style="white-space:nowrap;"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['created_at']))) ?></td>
-                                    <td style="white-space:nowrap; font-weight:bold; color:var(--accent);"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['start_time']))) ?></td>
-                                    <td><?= htmlspecialchars($r['table_num']) ?></td>
-                                    <td><?= (int)$r['guests'] ?></td>
-                                    <td>
-                                        <div style="font-weight:bold;"><?= htmlspecialchars($r['name']) ?></div>
-                                        <div style="font-size:12px; color:var(--muted);"><?= htmlspecialchars($r['phone']) ?></div>
+                                <tr data-id="<?= (int)$r['id'] ?>" class="<?= $isDeleted ? 'is-deleted' : '' ?>">
+                                    <td data-label="ID">
+                                        <div><?= (int)$r['id'] ?></div>
+                                        <div class="tag deleted" id="deleted-tag-<?= (int)$r['id'] ?>" <?= $isDeleted ? '' : 'hidden' ?>>Удалено<?= $deletedBy !== '' ? ' · ' . htmlspecialchars($deletedBy) : '' ?></div>
+                                        <div class="res-muted" id="deleted-meta-<?= (int)$r['id'] ?>" <?= $isDeleted ? '' : 'hidden' ?>><?= htmlspecialchars($deletedAtHuman) ?></div>
+                                    </td>
+                                    <td data-label="Создано"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['created_at']))) ?></td>
+                                    <td data-label="Время" class="res-strong"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['start_time']))) ?></td>
+                                    <td data-label="Стол"><?= htmlspecialchars($r['table_num']) ?></td>
+                                    <td data-label="Гостей"><?= (int)$r['guests'] ?></td>
+                                    <td data-label="Гость">
+                                        <div style="font-weight:900;"><?= htmlspecialchars($r['name']) ?></div>
+                                        <div class="res-muted"><?= htmlspecialchars($r['phone']) ?></div>
                                         <?php if ($tgUsername !== ''): ?>
-                                            <div style="font-size:12px;"><a href="https://t.me/<?= htmlspecialchars($tgUsername) ?>" target="_blank" style="color:var(--accent);">@<?= htmlspecialchars($tgUsername) ?></a></div>
+                                            <div class="res-muted"><a href="https://t.me/<?= htmlspecialchars($tgUsername) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">@<?= htmlspecialchars($tgUsername) ?></a></div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($r['comment']) || !empty($r['preorder_text'])): ?>
+                                            <details class="res-more">
+                                                <summary>Комментарий / предзаказ</summary>
+                                                <div class="box">
+                                                    <?php if (!empty($r['comment'])): ?>
+                                                        <div><b>Комментарий:</b> <?= htmlspecialchars($r['comment']) ?></div>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($r['preorder_text'])): ?>
+                                                        <div style="margin-top:6px;"><b>Предзаказ:</b><div class="pre"><?= htmlspecialchars($r['preorder_text']) ?></div></div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </details>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?= $r['total_amount'] > 0 ? number_format($r['total_amount'], 0, '.', ' ') . ' ₫' : '—' ?></td>
-                                    <td>
-                                        <?php if ($r['qr_url']): ?>
-                                            <a href="<?= htmlspecialchars($r['qr_url']) ?>" target="_blank" style="color:var(--accent); font-weight:bold; text-decoration:none;">QR</a>
+                                    <td data-label="Сумма"><?= $r['total_amount'] > 0 ? number_format($r['total_amount'], 0, '.', ' ') . ' ₫' : '—' ?></td>
+                                    <td data-label="QR">
+                                        <?php if (!empty($r['qr_url'])): ?>
+                                            <a href="<?= htmlspecialchars($r['qr_url']) ?>" target="_blank" style="color:var(--accent); font-weight:900; text-decoration:none;">QR</a>
                                         <?php else: ?>
-                                            <span style="color:var(--muted);">—</span>
+                                            <span class="res-muted">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
-                                        <button type="button" class="res-btn btn-resend" data-id="<?= (int)$r['id'] ?>">Повторить отправку</button>
-                                        <div class="resend-status" style="font-size:11px; margin-top:4px; color:var(--muted);"></div>
+                                    <td data-label="Действия">
+                                        <div class="res-actions">
+                                            <button type="button" class="res-btn primary btn-resend" data-id="<?= (int)$r['id'] ?>">Повторить</button>
+                                            <button type="button" class="res-btn danger btn-delete" data-id="<?= (int)$r['id'] ?>"><?= $isDeleted ? 'Восстановить' : 'Удалить' ?></button>
+                                        </div>
+                                        <div class="res-status" id="resend-status-<?= (int)$r['id'] ?>"></div>
                                     </td>
                                 </tr>
-                                <?php if ($r['comment'] || $r['preorder_text']): ?>
-                                    <tr style="background:var(--bg);">
-                                        <td colspan="9" style="padding:10px 14px; font-size:13px;">
-                                            <?php if ($r['comment']): ?>
-                                                <div><b style="color:var(--muted);">Комментарий:</b> <?= htmlspecialchars($r['comment']) ?></div>
-                                            <?php endif; ?>
-                                            <?php if ($r['preorder_text']): ?>
-                                                <div style="margin-top:4px;"><b style="color:var(--muted);">Предзаказ:</b><br><span style="white-space:pre-wrap;"><?= htmlspecialchars($r['preorder_text']) ?></span></div>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endif; ?>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
@@ -346,59 +393,6 @@ if (!is_array($rows)) {
         </div>
     </div>
 
-    <script>
-        document.querySelectorAll('th[data-sort]').forEach(th => {
-            th.addEventListener('click', () => {
-                const sort = th.dataset.sort;
-                const url = new URL(location.href);
-                const currentSort = url.searchParams.get('sort') || 'start_time';
-                let order = url.searchParams.get('order') || 'desc';
-                if (currentSort === sort) {
-                    order = order === 'asc' ? 'desc' : 'asc';
-                } else {
-                    order = 'desc';
-                }
-                url.searchParams.set('sort', sort);
-                url.searchParams.set('order', order);
-                location.href = url.toString();
-            });
-        });
-
-        document.querySelectorAll('.btn-resend').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                if (!confirm('Отправить сообщение в группу и гостю повторно?')) return;
-                const id = btn.dataset.id;
-                const statusEl = btn.nextElementSibling;
-                btn.disabled = true;
-                statusEl.textContent = 'Отправка...';
-                statusEl.style.color = 'var(--muted)';
-                try {
-                    const fd = new FormData();
-                    fd.append('id', id);
-                    const res = await fetch('reservations.php?ajax=resend', { method: 'POST', body: fd });
-                    const j = await res.json().catch(() => null);
-                    if (res.ok && j && j.ok) {
-                        let txt = [];
-                        if (j.group_ok) txt.push('Группа: ОК'); else txt.push('Группа: Ошибка');
-                        if (j.has_tg) {
-                            if (j.guest_ok) txt.push('Гость: ОК'); else txt.push('Гость: Ошибка');
-                        } else {
-                            txt.push('Гость: нет TG');
-                        }
-                        statusEl.textContent = txt.join(' | ');
-                        statusEl.style.color = '#81c784';
-                    } else {
-                        statusEl.textContent = 'Ошибка: ' + (j ? j.error : 'Network error');
-                        statusEl.style.color = '#e57373';
-                    }
-                } catch (e) {
-                    statusEl.textContent = 'Ошибка запроса';
-                    statusEl.style.color = '#e57373';
-                } finally {
-                    btn.disabled = false;
-                }
-            });
-        });
-    </script>
+    <script src="/assets/js/reservations.js?v=20260410_0300"></script>
 </body>
 </html>
