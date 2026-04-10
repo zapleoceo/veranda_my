@@ -280,7 +280,7 @@ if ($displayTzName === '' || !in_array($displayTzName, timezone_identifiers_list
 }
 $apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
 if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
-  $apiTzName = 'Europe/Kyiv';
+  $apiTzName = $displayTzName;
 }
 date_default_timezone_set($apiTzName);
 
