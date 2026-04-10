@@ -605,6 +605,18 @@
     let pendingBooking = null;
     let messengerLinked = { telegram: false, whatsapp: false, zalo: false };
     let linkedTg = null;
+
+    try {
+      const savedTgStr = localStorage.getItem('veranda_linked_tg');
+      if (savedTgStr) {
+        const parsed = JSON.parse(savedTgStr);
+        if (parsed && parsed.user_id) {
+          linkedTg = parsed;
+          messengerLinked.telegram = true;
+        }
+      }
+    } catch(e) {}
+
     let submitBusy = false;
     let submitPrevText = '';
     let preorderMenu = null;
@@ -964,12 +976,14 @@
 
     const logJs = async (msg, data = {}) => {
       try {
+        let safeData = {};
+        try { safeData = JSON.parse(JSON.stringify(data)); } catch(e) { safeData = { err: 'Unstringifyable data' }; }
         const url = new URL(location.href);
         url.searchParams.set('ajax', 'log_js');
         await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ msg, data })
+          body: JSON.stringify({ msg, data: safeData })
         });
       } catch (e) {}
     };
@@ -1110,7 +1124,11 @@
       syncSubmitState();
       updatePreorderUi();
       renderPreorderBox();
-      if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) setMsgrHint(t('link_tg_hint'));
+      if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) {
+        setMsgrHint(t('link_tg_hint'));
+      } else if (messengerLinked.telegram && linkedTg) {
+        setMsgrHint((t('tg_linked') || 'Telegram привязан ✅') + ' @' + String(linkedTg.username || '').replace(/^@+/, ''));
+      }
       checkModalAvailability();
       setModal(reqModal, true);
       if (reqName) reqName.focus();
@@ -1128,6 +1146,10 @@
     const startTelegramFlow = async () => {
       if (!msgrTgBtn || msgrBusy) return;
       if (!pendingBooking) { setMsgrHint(t('hint_pick_table_first')); return; }
+      if (messengerLinked.telegram && linkedTg && linkedTg.user_id) {
+         setMsgrHint((t('tg_linked') || 'Telegram привязан ✅') + ' @' + String(linkedTg.username || '').replace(/^@+/, ''));
+         return;
+      }
       
       const getTotalPreorderAmount = () => {
         const counts = normalizePreorder(preorderCounts);
@@ -1266,60 +1288,69 @@
       reqForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        logJs('submit click', { submitBusy, modalTableBusy });
+        await logJs('submit click', { submitBusy, modalTableBusy });
 
         // Log explicitly for debugging if it prevents
         if (submitBusy) {
-            logJs('submit prevented: submitBusy is true', {});
-            console.log('submit prevented: submitBusy is true');
+            await logJs('submit prevented: submitBusy is true', {});
             return;
         }
         if (modalTableBusy) {
-            logJs('submit prevented: modalTableBusy is true', {});
-            console.log('submit prevented: modalTableBusy is true');
+            await logJs('submit prevented: modalTableBusy is true', {});
             return;
         }
-        const name = reqName ? String(reqName.value || '').trim() : '';
-        const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
-        const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
-        let start = '';
-        if (pendingBooking && pendingBooking.start && reqStart && reqStart.value) {
-          const dPart = String(pendingBooking.start).slice(0, 10);
-          const tPart = String(reqStart.value);
-          start = `${dPart}T${tPart}:00`;
-        }
-        const duration_m = reqDuration ? parseInt(reqDuration.value, 10) : 120;
-        const comment = reqComment ? String(reqComment.value || '').trim() : '';
-        const preorder = guests > 5 ? getPreorderText('ui') : '';
-        const preorderRu = guests > 5 ? getPreorderText('ru') : '';
-        const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
-        const missing = [];
-        if (!tableNum) missing.push(t('missing_table'));
-        if (!start) missing.push(t('missing_start'));
-        if (!isFinite(guests) || guests <= 0) missing.push(t('missing_guests'));
-        if (!name) missing.push(t('missing_name'));
-        if (!phone) missing.push(t('missing_phone'));
-        if (guests > 5 && !String(preorder || '').trim()) missing.push(t('missing_preorder'));
-        if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push(t('missing_telegram'));
-        if (missing.length) {
-          const msg = t('missing_prefix') + missing.join(', ');
-          logJs('submit prevented: missing fields', { missing });
-          setOutput({ ok: false, error: msg });
-          setMsgrHint(msg);
-          syncSubmitState();
+        try {
+          const name = reqName ? String(reqName.value || '').trim() : '';
+          const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
+          const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
+          let start = '';
+          if (pendingBooking && pendingBooking.start && reqStart && reqStart.value) {
+            const dPart = String(pendingBooking.start).slice(0, 10);
+            const tPart = String(reqStart.value);
+            start = `${dPart}T${tPart}:00`;
+          }
+          const duration_m = reqDuration ? parseInt(reqDuration.value, 10) : 120;
+          const comment = reqComment ? String(reqComment.value || '').trim() : '';
+          
+          await logJs('submit trace 1', { name, phone, guests, start, duration_m });
+          
+          const preorder = guests > 5 ? getPreorderText('ui') : '';
+          const preorderRu = guests > 5 ? getPreorderText('ru') : '';
+          
+          await logJs('submit trace 2', { preorder, preorderRu });
+          
+          const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
+          const missing = [];
+          if (!tableNum) missing.push(t('missing_table'));
+          if (!start) missing.push(t('missing_start'));
+          if (!isFinite(guests) || guests <= 0) missing.push(t('missing_guests'));
+          if (!name) missing.push(t('missing_name'));
+          if (!phone) missing.push(t('missing_phone'));
+          if (guests > 5 && !String(preorder || '').trim()) missing.push(t('missing_preorder'));
+          if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push(t('missing_telegram'));
+          if (missing.length) {
+            const msg = t('missing_prefix') + missing.join(', ');
+            await logJs('submit prevented: missing fields', { missing });
+            setOutput({ ok: false, error: msg });
+            setMsgrHint(msg);
+            syncSubmitState();
+            return;
+          }
+
+          const getTotalPreorderAmount = () => {
+            const counts = normalizePreorder(preorderCounts);
+            return Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
+          };
+
+          submitBusy = true;
+          if (reqSubmit) {
+            submitPrevText = String(reqSubmit.textContent || '');
+            reqSubmit.textContent = t('sending');
+            reqSubmit.disabled = true;
+          }
+        } catch (jsErr) {
+          await logJs('submit JS ERROR', { err: String(jsErr.message || jsErr) });
           return;
-        }
-
-        const getTotalPreorderAmount = () => {
-          const counts = normalizePreorder(preorderCounts);
-          return Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
-        };
-
-        submitBusy = true;
-        if (reqSubmit) {
-          submitPrevText = String(reqSubmit.textContent || '');
-          reqSubmit.textContent = t('sending');
-          reqSubmit.disabled = true;
         }
         try {
           // Double check availability before submit
@@ -1792,6 +1823,10 @@
           selectedTableNum = tableNum;
           messengerLinked.telegram = true;
           linkedTg = tg ? { user_id: Number(tg.user_id || 0) || 0, username: String(tg.username || ''), name: String(tg.name || '') } : null;
+          
+          if (linkedTg && linkedTg.user_id) {
+            try { localStorage.setItem('veranda_linked_tg', JSON.stringify(linkedTg)); } catch(e) {}
+          }
           
           if (!last || !freeNums || !freeNums.size) {
             await loadFree(true).catch(() => null);
