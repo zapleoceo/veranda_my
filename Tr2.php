@@ -131,6 +131,10 @@ $I18N = [
     'reason_time' => 'недоступен на это время',
     'fix_guests_table' => 'Исправь кол-во гостей и выбери столик снова.',
     'tg_linked' => 'Telegram привязан ✅',
+    'tg_unlink_hover' => 'Отвязать Telegram',
+    'tg_unlink_confirm' => 'Отвязать Telegram аккаунт? После этого можно привязать другой.',
+    'tg_unlinked' => 'Telegram отвязан',
+    'tg_link_hover' => 'Привязать Telegram',
     'qr_payment_title' => 'Оплата предзаказа',
     'qr_payment_body' => 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.',
   ],
@@ -224,6 +228,10 @@ $I18N = [
     'reason_time' => 'unavailable at this time',
     'fix_guests_table' => 'Adjust the number of guests and select the table again.',
     'tg_linked' => 'Telegram linked ✅',
+    'tg_unlink_hover' => 'Unlink Telegram',
+    'tg_unlink_confirm' => 'Unlink Telegram account? After that you can link another one.',
+    'tg_unlinked' => 'Telegram unlinked',
+    'tg_link_hover' => 'Link Telegram',
     'qr_payment_title' => 'Pre-order Payment',
     'qr_payment_body' => 'Please scan the QR code to pay for your pre-order. The reservation number is already included in the payment description.',
   ],
@@ -317,6 +325,10 @@ $I18N = [
     'reason_time' => 'không khả dụng vào lúc này',
     'fix_guests_table' => 'Điều chỉnh số lượng khách và chọn lại bàn.',
     'tg_linked' => 'Telegram đã được liên kết ✅',
+    'tg_unlink_hover' => 'Hủy liên kết Telegram',
+    'tg_unlink_confirm' => 'Hủy liên kết Telegram? Sau đó bạn có thể liên kết tài khoản khác.',
+    'tg_unlinked' => 'Đã hủy liên kết Telegram',
+    'tg_link_hover' => 'Liên kết Telegram',
     'qr_payment_title' => 'Thanh toán đặt trước',
     'qr_payment_body' => 'Vui lòng quét mã QR để thanh toán đặt trước. Số đặt bàn của bạn đã được bao gồm trong mô tả thanh toán.',
   ],
@@ -1480,7 +1492,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0345">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_0515">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1676,9 +1688,14 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 <div class="phone-row">
                   <input type="tel" id="reqPhone" autocomplete="tel">
                   <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
                       <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
+                    </svg>
+                    <svg class="ico-unlink" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M10.6 13.4a3 3 0 0 0 0-4.2l-.4-.4a3 3 0 0 0-4.2 0l-2.1 2.1a3 3 0 0 0 0 4.2l.4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <path d="M13.4 10.6a3 3 0 0 0 0 4.2l.4.4a3 3 0 0 0 4.2 0l2.1-2.1a3 3 0 0 0 0-4.2l-.4-.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <path d="M8 16l8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                   </button>
                 </div>
@@ -1752,6 +1769,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_0220"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_0515"></script>
 </body>
 </html>

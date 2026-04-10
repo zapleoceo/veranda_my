@@ -964,6 +964,8 @@
     .guests-time-row.full { grid-column: 1 / -1; }
     .phone-row, .name-row { display: flex; align-items: center; gap: 10px; }
     .phone-row input, .name-row input { flex: 1 1 auto; min-width: 0; }
+    .phone-row input { flex: 0 0 60%; }
+    @media (max-width: 640px) { .phone-row input { flex: 1 1 auto; } }
     .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; }
     .msgr-btn-inline svg { width: 22px; height: 22px; }
     .modal input[type="text"], .modal input[type="tel"], .modal input[type="number"], .modal input[type="time"], .modal select {
@@ -1286,6 +1288,12 @@
       justify-content: center;
     }
     .msgr-btn svg { width: 22px; height: 22px; }
+    #msgrTgBtn .ico-unlink { display: none; }
+    #msgrTgBtn:not(.tg-linked):hover { color: rgba(42,171,238,0.98); border-color: rgba(42,171,238,0.45); background: rgba(42,171,238,0.10); }
+    #msgrTgBtn.tg-linked { border-color: rgba(129,199,132,0.45); background: rgba(129,199,132,0.10); }
+    #msgrTgBtn.tg-linked:hover { color: rgba(229,115,115,0.95); border-color: rgba(229,115,115,0.55); background: rgba(229,115,115,0.12); }
+    #msgrTgBtn.tg-linked:hover .ico-tg { display: none; }
+    #msgrTgBtn.tg-linked:hover .ico-unlink { display: block; }
     .msgr-btn:hover { transform: translateY(-1px); filter: saturate(1.05); }
     .msgr-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
     .label-row {

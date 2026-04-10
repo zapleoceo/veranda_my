@@ -1137,6 +1137,7 @@
       } else if (messengerLinked.telegram && linkedTg) {
         setMsgrHint((t('tg_linked') || 'Telegram привязан ✅') + ' @' + String(linkedTg.username || '').replace(/^@+/, ''));
       }
+      syncTgButtonState();
       checkModalAvailability();
       setModal(reqModal, true);
       if (reqName) reqName.focus();
@@ -1149,6 +1150,19 @@
       if (!t) { msgrHint.hidden = true; msgrHint.textContent = ''; return; }
       msgrHint.hidden = false;
       msgrHint.textContent = t;
+    };
+
+    const syncTgButtonState = () => {
+      if (!msgrTgBtn) return;
+      const linked = !!(messengerLinked.telegram && linkedTg && linkedTg.user_id);
+      msgrTgBtn.classList.toggle('tg-linked', linked);
+      if (linked) {
+        msgrTgBtn.title = t('tg_unlink_hover');
+        msgrTgBtn.setAttribute('aria-label', t('tg_unlink_hover'));
+      } else {
+        msgrTgBtn.title = t('tg_link_hover');
+        msgrTgBtn.setAttribute('aria-label', t('tg_link_hover'));
+      }
     };
 
     const startTelegramFlow = async () => {
@@ -1202,7 +1216,23 @@
       }
     };
 
-    if (msgrTgBtn) msgrTgBtn.addEventListener('click', () => { startTelegramFlow().catch(() => null); });
+    const unlinkTelegram = () => {
+      messengerLinked.telegram = false;
+      linkedTg = null;
+      try { localStorage.removeItem('veranda_linked_tg'); } catch (_) {}
+      setMsgrHint(t('tg_unlinked'));
+      syncTgButtonState();
+      syncSubmitState();
+    };
+
+    if (msgrTgBtn) msgrTgBtn.addEventListener('click', () => {
+      if (messengerLinked.telegram && linkedTg && linkedTg.user_id) {
+        const ok = confirm(t('tg_unlink_confirm'));
+        if (ok) unlinkTelegram();
+        return;
+      }
+      startTelegramFlow().catch(() => null);
+    });
 
     async function updateReqGuestsHint() {
       if (!reqHint) return;
