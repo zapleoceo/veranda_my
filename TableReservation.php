@@ -1279,7 +1279,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260410_0001">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260410_0002">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1535,6 +1535,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260410_0001"></script>
+  <script src="/links/table-reservation.js?v=20260410_0002"></script>
 </body>
 </html>
