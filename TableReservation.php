@@ -790,7 +790,7 @@ if (($_GET['ajax'] ?? '') === 'cap_check') {
   }
 
   $cap = isset($tableCapsByNum[$tableNum]) ? (int)$tableCapsByNum[$tableNum] : null;
-  if ($cap !== null && $cap > 0 && $guests > ($cap + 1)) {
+  if ($cap !== null && $cap > 0 && $guests > $cap) {
     echo json_encode([
       'ok' => true,
       'cap' => $cap,

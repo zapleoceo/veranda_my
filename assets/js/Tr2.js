@@ -1014,8 +1014,7 @@
         reqHint.textContent = '';
         reqHint.classList.remove('warn');
       }
-      const tightWarning = document.getElementById('tightWarning');
-      if (tightWarning) tightWarning.hidden = true;
+
 
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
@@ -1158,16 +1157,7 @@
       const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
       const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
 
-      const tightWarning = document.getElementById('tightWarning');
-      const cap = tableCapsByNum && tableCapsByNum[tableNum] != null ? Number(tableCapsByNum[tableNum]) : null;
-      
-      if (tightWarning) {
-        if (cap != null && isFinite(cap) && guests > cap) {
-          tightWarning.hidden = false;
-        } else {
-          tightWarning.hidden = true;
-        }
-      }
+
       if (!tableNum || !isFinite(guests) || guests <= 0) {
         reqHint.hidden = true;
         reqHint.textContent = '';

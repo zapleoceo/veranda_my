@@ -1311,7 +1311,7 @@
       line-height: 1.35;
       color: rgba(255, 250, 244, 0.90);
     }
-    .modal-hint:empty, .modal-note:empty, .tight-warning:empty {
+    .modal-hint:empty, .modal-note:empty {
       display: none !important;
       margin: 0 !important;
       padding: 0 !important;
@@ -1339,7 +1339,7 @@
       100% { background-position: 0% 50%; }
     }
     .modal-note { margin-top: 10px; color: var(--color-text-muted); font-size: 12px; line-height: 1.35; }
-    .tight-warning { color: var(--color-primary); font-weight: 500; margin-bottom: 8px; }
+
     @media (max-width: 640px) { .modal-grid { grid-template-columns: 1fr; } }
   
     .btn {
