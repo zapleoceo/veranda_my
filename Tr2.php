@@ -1211,6 +1211,8 @@ if (($_GET['ajax'] ?? '') === 'tg_state_create') {
     echo json_encode(['ok' => false, 'error' => 'Некорректное кол-во гостей'], JSON_UNESCAPED_UNICODE);
     exit;
   }
+  $sourcePage = trim((string)($payload['source_page'] ?? 'Tr2.php'));
+
   if ($start === '' || mb_strlen($start) > 40) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Некорректное время'], JSON_UNESCAPED_UNICODE);
@@ -1271,7 +1273,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_create') {
 
   $host = (string)($_SERVER['HTTP_HOST'] ?? '');
   $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-  $returnUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/Tr2.php?tg_state=' . rawurlencode($code);
+  $returnUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/' . ltrim($sourcePage, '/') . '?tg_state=' . rawurlencode($code);
   $botUrl = 'https://t.me/' . rawurlencode($tgUserBot) . '?start=' . rawurlencode($code);
 
   echo json_encode(['ok' => true, 'code' => $code, 'bot_url' => $botUrl, 'return_url' => $returnUrl], JSON_UNESCAPED_UNICODE);
@@ -1745,6 +1747,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_0020"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_0021"></script>
 </body>
 </html>

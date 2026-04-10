@@ -80,7 +80,7 @@ if (!empty($update['message'])) {
             } catch (\Throwable $e) {
             }
             $row = $db->query(
-                "SELECT code
+                "SELECT code, payload_json
                  FROM {$t}
                  WHERE code = ?
                    AND used_at IS NULL
@@ -105,7 +105,11 @@ if (!empty($update['message'])) {
                         [$tgUserId, ltrim($tgUsername, '@'), $tgName, $startCode]
                     );
                 }
-                $returnUrl = 'https://veranda.my/Tr2.php?tg_state=' . rawurlencode($startCode);
+                $payloadJsonStr = $row['payload_json'] ?? '{}';
+                $payloadData = json_decode($payloadJsonStr, true);
+                $sourcePage = (is_array($payloadData) && !empty($payloadData['source_page'])) ? $payloadData['source_page'] : 'Tr2.php';
+
+                $returnUrl = 'https://veranda.my/' . ltrim($sourcePage, '/') . '?tg_state=' . rawurlencode($startCode);
                 $postJson('sendMessage', [
                     'chat_id' => $chatId,
                     'text' => "Готово.\nНажми кнопку ниже, чтобы вернуться к заявке:",
