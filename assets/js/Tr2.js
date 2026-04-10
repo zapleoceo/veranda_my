@@ -1325,7 +1325,7 @@
           name = reqName ? String(reqName.value || '').trim() : '';
           phone = reqPhone ? String(reqPhone.value || '').trim() : '';
           guests = reqGuests ? Number(reqGuests.value || 0) : 0;
-          start = '';
+          start = pendingBooking ? String(pendingBooking.start || '') : '';
           if (pendingBooking && pendingBooking.start && reqStart && reqStart.value) {
             const dPart = String(pendingBooking.start).slice(0, 10);
             const tPart = String(reqStart.value);
