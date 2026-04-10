@@ -657,9 +657,8 @@
     }
 
     let pendingBooking = null;
-    let messengerLinked = { telegram: false, zalo: false };
+    let messengerLinked = { telegram: false, whatsapp: false, zalo: false };
     let linkedTg = null;
-    let linkedZaloPhone = null;
     let submitBusy = false;
     let submitPrevText = '';
     let preorderMenu = null;
@@ -1005,7 +1004,7 @@
     };
     const syncSubmitState = () => {
       if (!reqSubmit) return;
-      const linked = !!(messengerLinked.telegram || messengerLinked.zalo);
+      const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
       const nameOk = !!(reqName && String(reqName.value || '').trim());
       const phoneOk = !!(reqPhone && isPhoneValid(reqPhone.value));
       const startOk = !!(reqStart && String(reqStart.dataset.iso || reqStart.value || '').trim());
@@ -1026,7 +1025,7 @@
     let hintTimer = null;
     const showSubmitHint = () => {
       if (!reqSubmitHint) return;
-      const linked = !!(messengerLinked.telegram || messengerLinked.zalo);
+      const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
       const nameOk = !!(reqName && String(reqName.value || '').trim());
       const phoneOk = !!(reqPhone && isPhoneValid(reqPhone.value));
       const startOk = !!(reqStart && String(reqStart.dataset.iso || reqStart.value || '').trim());
@@ -1037,16 +1036,16 @@
       const preorderOk = guests <= 5 || hasPreorder;
 
       const missing = [];
-      if (!linked) missing.push(t('link_tg_hint').toLowerCase());
-      if (!nameOk) missing.push(t('missing_name'));
-      if (!phoneOk) missing.push(t('missing_phone'));
-      if (!guestsOk) missing.push(t('missing_guests'));
-      if (guests > 5 && !preorderOk) missing.push(t('missing_preorder'));
+      if (!linked) missing.push("привяжите Telegram");
+      if (!nameOk) missing.push("введите имя");
+      if (!phoneOk) missing.push("введите номер телефона");
+      if (!guestsOk) missing.push("укажите количество гостей");
+      if (guests > 5 && !preorderOk) missing.push("выберите блюда для предзаказа");
 
       if (missing.length === 0) return;
 
       if (hintTimer) clearTimeout(hintTimer);
-      reqSubmitHint.textContent = t('missing_prefix') + missing.join(", ");
+      reqSubmitHint.textContent = "Для отправки не хватает: " + missing.join(", ");
       reqSubmitHint.style.color = "#ef5350";
       reqSubmitHint.style.opacity = "1";
       reqSubmitHint.style.transition = "none";
@@ -1097,10 +1096,9 @@
       syncSubmitState();
       updatePreorderUi();
       renderPreorderBox();
-      if (!(messengerLinked.telegram || messengerLinked.zalo)) setMsgrHint(t('link_tg_hint'));
+      if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) setMsgrHint(t('link_tg_hint'));
       else setMsgrHint('');
       syncTgButtonState();
-      syncZaloButtonState();
       setModal(reqModal, true);
       if (reqName) reqName.focus();
     };
@@ -1129,61 +1127,6 @@
         }
       }
     };
-
-    const syncZaloButtonState = () => {
-      if (!msgrZaloBtn) return;
-      const linked = !!(messengerLinked.zalo && linkedZaloPhone);
-      msgrZaloBtn.classList.toggle('active', linked);
-      if (zaloNick) {
-        if (linked) {
-          zaloNick.textContent = '✅ ' + linkedZaloPhone;
-          zaloNick.hidden = false;
-        } else {
-          zaloNick.textContent = '';
-          zaloNick.hidden = true;
-        }
-      }
-    };
-
-    const startZaloFlow = () => {
-      const phone = String(reqPhone ? reqPhone.value : '').trim();
-      if (!isPhoneValid(phone)) {
-        if (reqPhone) reqPhone.focus();
-        showSubmitHint();
-        return;
-      }
-
-      if (messengerLinked.zalo) {
-        if (confirm(t('tg_unlink_confirm'))) {
-          messengerLinked.zalo = false;
-          linkedZaloPhone = null;
-          localStorage.removeItem('veranda_zalo_phone');
-          syncZaloButtonState();
-          syncSubmitState();
-        }
-        return;
-      }
-
-      if (confirm(t('zalo_link_prompt') + "\n" + phone)) {
-        messengerLinked.zalo = true;
-        linkedZaloPhone = phone;
-        localStorage.setItem('veranda_zalo_phone', phone);
-        syncZaloButtonState();
-        syncSubmitState();
-        setMsgrHint(t('zalo_linked'));
-      }
-    };
-
-    if (msgrZaloBtn) msgrZaloBtn.addEventListener('click', startZaloFlow);
-
-    // Initial Zalo state from localStorage
-    try {
-      const savedZalo = localStorage.getItem('veranda_zalo_phone');
-      if (savedZalo && isPhoneValid(savedZalo)) {
-        linkedZaloPhone = savedZalo;
-        messengerLinked.zalo = true;
-      }
-    } catch (_) {}
 
     const startTelegramFlow = async () => {
       if (!msgrTgBtn || msgrBusy) return;
@@ -1339,7 +1282,7 @@
         const countsNow = normalizePreorder(preorderCounts);
         const hasPreorderNow = Object.keys(countsNow).some((k) => (Number(countsNow[k] || 0) || 0) > 0);
         if (guests > 5 && !hasPreorderNow) missing.push(t('missing_preorder'));
-        if (!(messengerLinked.telegram || messengerLinked.zalo)) missing.push(t('link_tg_hint').toLowerCase());
+        if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push(t('missing_telegram'));
         if (missing.length) {
           const msg = t('missing_prefix') + missing.join(', ');
           setOutput({ ok: false, error: msg });
@@ -1360,19 +1303,7 @@
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ 
-              table_num: tableNum, 
-              guests, 
-              start, 
-              name, 
-              phone, 
-              comment, 
-              preorder, 
-              preorder_ru: preorderRu, 
-              lang: UI_LANG, 
-              tg: linkedTg,
-              zalo_phone: linkedZaloPhone
-            }),
+            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, lang: UI_LANG, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
