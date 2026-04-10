@@ -212,18 +212,7 @@ if ($ajax === 'resend') {
             }
         }
         $text .= "\n\n@Ollushka90 @ce_akh1 свяжитесь с гостем";
-
-        $keyboard = [];
-        $keyboard[] = [[
-            'text' => 'вPoster',
-            'callback_data' => 'vposter:' . $id
-        ]];
-
-        if (!empty($keyboard)) {
-            $okGroup = $bot->sendMessageGetIdWithKeyboard($text, $keyboard, $tgThreadNum > 0 ? $tgThreadNum : null);
-        } else {
-            $okGroup = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
-        }
+        $okGroup = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
     }
 
     // Guest Message (localized to reservation language)
