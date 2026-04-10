@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/Tr2.php';
-__halt_compiler();
+// require_once __DIR__ . '/Tr2.php';
+// __halt_compiler();
 
 $I18N = [
   'ru' => [
@@ -1571,6 +1571,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           </div>
         </div>
         <div class="modal-hint" id="reqHint" hidden></div>
+        <div id="reqSubmitHint" class="submit-hint" hidden></div>
         <div class="modal-note" data-i18n="booking_note"><?= htmlspecialchars(tr('booking_note')) ?></div>
         <div class="modal-actions">
           <button class="btn btn-primary" type="submit" id="reqSubmit" data-i18n="send"><?= htmlspecialchars(tr('send')) ?></button>
@@ -1617,5 +1618,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     };
   </script>
   <script src="/assets/js/Tr2.js?v=20260410_1135"></script>
+  <script src="/links/table-reservation.js?v=20260410_1345"></script>
 </body>
 </html>

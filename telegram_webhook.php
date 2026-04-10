@@ -183,14 +183,52 @@ if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx|vposter):(\d+)$/', $d
 }
 
 $action = (string)($m[1] ?? '');
-$id = (int)($m[2] ?? 0);
-$from = $callback['from'] ?? [];
-$ackBy = trim(($from['first_name'] ?? '') . ' ' . ($from['last_name'] ?? ''));
-if ($ackBy === '') {
-    $ackBy = $from['username'] ?? 'unknown';
-}
+    $id = (int)($m[2] ?? 0);
+    $from = $callback['from'] ?? [];
+    $ackBy = trim(($from['first_name'] ?? '') . ' ' . ($from['last_name'] ?? ''));
+    if ($ackBy === '') {
+        $ackBy = $from['username'] ?? 'unknown';
+    }
 
-try {
+    // New logic: Check for confirmation
+    if ($action === 'vposter' && empty($callback['game_short_name'])) {
+        $isConfirmed = isset($update['callback_query']['data_confirmed']); // Custom flag for internal use or check if we need to show alert first
+        // Telegram doesn't have a built-in 'confirm' for buttons, so we use answerCallbackQuery with show_alert
+        // But the user wants a description of what will happen.
+        if (!strpos($data, '_confirmed')) {
+            $postJson('answerCallbackQuery', [
+                'callback_query_id' => $callbackId,
+                'text' => "Вы собираетесь отправить эту бронь в Poster POS.\nЭто создаст официальную бронь на терминале официанта.\nНажмите еще раз для подтверждения.",
+                'show_alert' => true
+            ]);
+            // We update the data to include _confirmed for the next click
+            $newKeyboard = $message['reply_markup']['inline_keyboard'] ?? [];
+            foreach ($newKeyboard as &$row_kb) {
+                foreach ($row_kb as &$btn_kb) {
+                    if ($btn_kb['callback_data'] === $data) {
+                        $btn_kb['callback_data'] .= '_confirmed';
+                    }
+                }
+            }
+            $postJson('editMessageReplyMarkup', [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'reply_markup' => ['inline_keyboard' => $newKeyboard]
+            ]);
+            echo 'ok';
+            exit;
+        }
+    }
+
+    $data = str_replace('_confirmed', '', $data); // Clean up for actual processing
+    if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx|vposter):(\d+)$/', $data, $m)) {
+        echo 'ok';
+        exit;
+    }
+    $action = (string)($m[1] ?? '');
+    $id = (int)($m[2] ?? 0);
+
+    try {
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
     $usersTable = $db->t('users');
     $ks = $db->t('kitchen_stats');

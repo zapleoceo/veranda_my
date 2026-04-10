@@ -1428,6 +1428,19 @@
     }
     .modal-note { margin-top: 10px; color: var(--color-text-muted); font-size: 12px; line-height: 1.35; }
 
+    .submit-hint {
+      margin-top: 10px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.35;
+      text-align: center;
+      border-radius: 14px;
+      background: rgba(239, 83, 80, 0.08);
+      border: 1px solid rgba(239, 83, 80, 0.2);
+      color: #ef5350;
+      transition: opacity 2s ease-out;
+    }
+
     @media (max-width: 640px) { .modal-grid { grid-template-columns: 1fr; } }
   
     .btn {

@@ -588,13 +588,18 @@ $rows = $allRows;
                                     $isPoster = !empty($r['is_poster']);
                                 ?>
                                 <tr data-id="<?= htmlspecialchars((string)$r['id']) ?>" class="<?= $isDeleted ? 'is-deleted' : '' ?> <?= $isPoster ? 'is-poster' : '' ?>">
-                                    <td data-label="ID">
                                         <div>#<?= htmlspecialchars((string)$r['id']) ?></div>
                                         <?php if ($isPoster): ?>
                                             <div class="tag poster">POSTER</div>
                                         <?php endif; ?>
-                                        <div class="tag deleted" id="deleted-tag-<?= htmlspecialchars((string)$r['id']) ?>" <?= $isDeleted ? '' : 'hidden' ?>><?= $isPoster ? ($r['status_text'] ?? 'Удалено') : 'Удалено' ?><?= $deletedBy !== '' ? ' · ' . htmlspecialchars($deletedBy) : '' ?></div>
-                                        <div class="res-muted" id="deleted-meta-<?= htmlspecialchars((string)$r['id']) ?>" <?= $isDeleted ? '' : 'hidden' ?>><?= htmlspecialchars($deletedAtHuman) ?></div>
+                                        <?php if ($isDeleted): ?>
+                                            <div class="tag deleted" id="deleted-tag-<?= htmlspecialchars((string)$r['id']) ?>">
+                                                <?= $isPoster ? ($r['status_text'] ?? 'Удалено') : 'Удалено' ?><?= $deletedBy !== '' ? ' · ' . htmlspecialchars($deletedBy) : '' ?>
+                                            </div>
+                                            <div class="res-muted" id="deleted-meta-<?= htmlspecialchars((string)$r['id']) ?>">
+                                                <?= htmlspecialchars($deletedAtHuman) ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td data-label="Код">
                                         <?php if (!empty($r['qr_code'])): ?>

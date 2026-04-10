@@ -1015,11 +1015,60 @@
       const preorderOk = guests <= 5 || hasPreorder;
       if (reqPreorderBox) reqPreorderBox.classList.toggle('preorder-missing', guests > 5 && !preorderOk);
       const can = linked && nameOk && phoneOk && startOk && guestsOk && preorderOk && !submitBusy;
-      if (can) reqSubmit.classList.remove('is-disabled');
-      else reqSubmit.classList.add('is-disabled');
+      
+      // Remove disabled attribute to allow clicks for hints
+      reqSubmit.classList.toggle('is-disabled', !can);
       reqSubmit.setAttribute('aria-disabled', can ? 'false' : 'true');
-      reqSubmit.disabled = !can;
+      // reqSubmit.disabled = !can; // Keep enabled to catch clicks
     };
+
+    let hintTimer = null;
+    const showSubmitHint = () => {
+      if (!reqSubmitHint) return;
+      const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
+      const nameOk = !!(reqName && String(reqName.value || '').trim());
+      const phoneOk = !!(reqPhone && isPhoneValid(reqPhone.value));
+      const startOk = !!(reqStart && String(reqStart.dataset.iso || reqStart.value || '').trim());
+      const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
+      const guestsOk = guests > 0;
+      const counts = normalizePreorder(preorderCounts);
+      const hasPreorder = Object.keys(counts).some((k) => (Number(counts[k] || 0) || 0) > 0);
+      const preorderOk = guests <= 5 || hasPreorder;
+
+      const missing = [];
+      if (!linked) missing.push("привяжите Telegram");
+      if (!nameOk) missing.push("введите имя");
+      if (!phoneOk) missing.push("введите номер телефона");
+      if (!guestsOk) missing.push("укажите количество гостей");
+      if (guests > 5 && !preorderOk) missing.push("выберите блюда для предзаказа");
+
+      if (missing.length === 0) return;
+
+      if (hintTimer) clearTimeout(hintTimer);
+      reqSubmitHint.textContent = "Для отправки не хватает: " + missing.join(", ");
+      reqSubmitHint.style.color = "#ef5350";
+      reqSubmitHint.style.opacity = "1";
+      reqSubmitHint.style.transition = "none";
+      reqSubmitHint.hidden = false;
+
+      hintTimer = setTimeout(() => {
+        reqSubmitHint.style.transition = "opacity 2s ease-out";
+        reqSubmitHint.style.opacity = "0";
+        hintTimer = setTimeout(() => {
+          reqSubmitHint.hidden = true;
+        }, 2000);
+      }, 3000);
+    };
+
+    if (reqSubmit) {
+      reqSubmit.addEventListener('click', (e) => {
+        if (reqSubmit.classList.contains('is-disabled')) {
+          e.preventDefault();
+          e.stopPropagation();
+          showSubmitHint();
+        }
+      });
+    }
     const openRequestForm = ({ tableNum, guests, start, name, phone, comment, preorder, keepFields }) => {
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
