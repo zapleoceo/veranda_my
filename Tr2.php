@@ -382,7 +382,7 @@ if ($displayTzName === '' || !in_array($displayTzName, timezone_identifiers_list
 }
 $apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
 if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
-  $apiTzName = 'Europe/Kyiv';
+  $apiTzName = $displayTzName;
 }
 date_default_timezone_set($apiTzName);
 
@@ -1245,7 +1245,8 @@ if (($_GET['ajax'] ?? '') === 'tg_state_create') {
     echo json_encode(['ok' => false, 'error' => 'Некорректное кол-во гостей'], JSON_UNESCAPED_UNICODE);
     exit;
   }
-  $sourcePage = trim((string)($payload['source_page'] ?? 'Tr2.php'));
+  $scriptBase = basename((string)($_SERVER['SCRIPT_NAME'] ?? 'Tr2.php'));
+  $sourcePage = trim((string)($payload['source_page'] ?? $scriptBase));
 
   if ($start === '' || mb_strlen($start) > 40) {
     http_response_code(400);

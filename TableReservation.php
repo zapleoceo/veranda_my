@@ -1,44 +1,6 @@
 <?php
-
-if (file_exists(__DIR__ . '/.env')) {
-  $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-  foreach ($lines as $line) {
-    $t = trim($line);
-    if ($t === '' || strpos($t, '#') === 0) continue;
-    if (strpos($t, '=') === false) continue;
-    [$name, $value] = explode('=', $line, 2);
-    $_ENV[$name] = trim($value);
-  }
-}
-
-$supportedLangs = ['ru', 'en', 'vi'];
-$lang = null;
-if (isset($_GET['lang'])) {
-  $candidate = strtolower(trim((string)$_GET['lang']));
-  if (in_array($candidate, $supportedLangs, true)) {
-    $lang = $candidate;
-    setcookie('links_lang', $lang, [
-      'expires' => time() + 31536000,
-      'path' => '/',
-      'samesite' => 'Lax'
-    ]);
-  }
-}
-if ($lang === null) {
-  $cookieLang = strtolower(trim((string)($_COOKIE['links_lang'] ?? '')));
-  if (in_array($cookieLang, $supportedLangs, true)) $lang = $cookieLang;
-}
-if ($lang === null) {
-  $accept = (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '');
-  $parts = preg_split('/\s*,\s*/', $accept);
-  foreach ($parts as $part) {
-    if ($part === '') continue;
-    $code = strtolower(trim(explode(';', $part, 2)[0]));
-    $base = explode('-', $code, 2)[0];
-    if (in_array($base, $supportedLangs, true)) { $lang = $base; break; }
-  }
-}
-if ($lang === null) $lang = 'ru';
+require_once __DIR__ . '/Tr2.php';
+__halt_compiler();
 
 $I18N = [
   'ru' => [
