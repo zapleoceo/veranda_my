@@ -59,11 +59,15 @@ $I18N = [
     'yes' => 'Да',
     'no' => 'Нет',
     'booking_request' => 'Заявка на бронь на столик',
+    'on_date' => 'на дату',
     'your_name' => 'Ваше имя',
     'your_phone' => 'Ваш номер телефона',
     'comment' => 'Комментарий',
     'guests_count' => 'Кол-во гостей',
     'start_time' => 'Время старта брони',
+    'duration' => 'Продолжительность',
+    'decrease_guests' => 'Уменьшить гостей',
+    'increase_guests' => 'Увеличить гостей',
     'messenger' => 'ВАШ МЕССЕНДЖЕР',
     'link_tg_hint' => 'Мессенджер обязателен',
     'preorder_title' => 'Предзаказ',
@@ -83,6 +87,16 @@ $I18N = [
     'dtp_title' => 'Выбор даты',
     'status_free' => 'Свободен',
     'status_busy' => 'Занят',
+    'h_short' => 'ч',
+    'no_time_available' => 'Нет доступного времени',
+    'time_error' => 'Ошибка времени',
+    'table_unavailable' => 'Этот столик не доступен',
+    'reason' => 'Причина: ',
+    'reason_sitting' => 'Сейчас занят',
+    'reason_time' => 'недоступен на это время',
+    'reason_disabled' => 'отключено в настройках',
+    'reason_booking' => 'есть бронь',
+    'fix_guests_table' => 'Измени кол-во гостей и выбери стол снова.',
     'tg_thanks_title' => 'Спасибо!',
     'tg_thanks_body' => 'Мы с вами свяжемся в ближайшее время.',
     'tg_booking_title' => 'Ваша бронь',
@@ -133,11 +147,15 @@ $I18N = [
     'yes' => 'Yes',
     'no' => 'No',
     'booking_request' => 'Booking request for table',
+    'on_date' => 'for date',
     'your_name' => 'Your name',
     'your_phone' => 'Your phone',
     'comment' => 'Comment',
     'guests_count' => 'Guests',
     'start_time' => 'Start time',
+    'duration' => 'Duration',
+    'decrease_guests' => 'Decrease guests',
+    'increase_guests' => 'Increase guests',
     'messenger' => 'YOUR MESSENGER',
     'link_tg_hint' => 'Messenger is required',
     'preorder_title' => 'Pre-order',
@@ -157,6 +175,16 @@ $I18N = [
     'dtp_title' => 'Pick date',
     'status_free' => 'Free',
     'status_busy' => 'Busy',
+    'h_short' => 'h',
+    'no_time_available' => 'No time available',
+    'time_error' => 'Time error',
+    'table_unavailable' => 'This table is unavailable',
+    'reason' => 'Reason: ',
+    'reason_sitting' => 'Busy now',
+    'reason_time' => 'not available at this time',
+    'reason_disabled' => 'disabled',
+    'reason_booking' => 'has booking',
+    'fix_guests_table' => 'Change guests count and select the table again.',
     'tg_thanks_title' => 'Thank you!',
     'tg_thanks_body' => 'We will contact you shortly.',
     'tg_booking_title' => 'Your reservation',
@@ -207,11 +235,15 @@ $I18N = [
     'yes' => 'Có',
     'no' => 'Không',
     'booking_request' => 'Yêu cầu đặt bàn',
+    'on_date' => 'ngày',
     'your_name' => 'Tên của bạn',
     'your_phone' => 'Số điện thoại',
     'comment' => 'Ghi chú',
     'guests_count' => 'Số khách',
     'start_time' => 'Giờ bắt đầu',
+    'duration' => 'Thời lượng',
+    'decrease_guests' => 'Giảm số khách',
+    'increase_guests' => 'Tăng số khách',
     'messenger' => 'MESSENGER CỦA BẠN',
     'link_tg_hint' => 'Cần messenger',
     'preorder_title' => 'Đặt trước',
@@ -231,6 +263,16 @@ $I18N = [
     'dtp_title' => 'Chọn ngày',
     'status_free' => 'Trống',
     'status_busy' => 'Bận',
+    'h_short' => 'giờ',
+    'no_time_available' => 'Không còn giờ trống',
+    'time_error' => 'Lỗi thời gian',
+    'table_unavailable' => 'Bàn này không khả dụng',
+    'reason' => 'Lý do: ',
+    'reason_sitting' => 'Đang bận',
+    'reason_time' => 'không thể đặt thời gian này',
+    'reason_disabled' => 'bị tắt',
+    'reason_booking' => 'có đặt',
+    'fix_guests_table' => 'Điều chỉnh số khách và chọn lại bàn.',
     'tg_thanks_title' => 'Cảm ơn!',
     'tg_thanks_body' => 'Chúng tôi sẽ liên hệ với bạn sớm.',
     'tg_booking_title' => 'Đặt bàn của bạn',
@@ -289,7 +331,7 @@ $roundedNow = $now->setTime((int)$now->format('H'), (int)$now->format('i'), 0);
 $m = (int)$roundedNow->format('i');
 $add = (15 - ($m % 15)) % 15;
 if ($add > 0) $roundedNow = $roundedNow->modify('+' . $add . ' minutes');
-$defaultResDateLocal = $roundedNow->format('Y-m-d\TH:i');
+$defaultResDateLocal = $roundedNow->format('Y-m-d');
 $hallIdForSettings = 2;
 $allowedSchemeNums = null;
 $tableCapsByNum = [
@@ -1292,7 +1334,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260410_1135">
+  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_1135">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1303,7 +1345,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         <div class="title-wrap">
           <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
           <p><span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span> <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
-          <input type="datetime-local" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
+          <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
         </div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
@@ -1440,13 +1482,45 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     <div class="modal-backdrop" data-modal-close="reqModal"></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle" id="reqModalCard">
       <div class="modal-title-bar">
-        <div class="modal-title" id="reqModalTitle"><span data-i18n="booking_request"><?= htmlspecialchars(tr('booking_request')) ?></span> <span id="reqModalTable"></span></div>
+        <div class="modal-title" id="reqModalTitle">
+          <span data-i18n="booking_request"><?= htmlspecialchars(tr('booking_request')) ?></span>
+          <span class="framed-box" id="reqModalTable"></span>
+          <span data-i18n="on_date"><?= htmlspecialchars(tr('on_date')) ?></span>
+          <span class="framed-box" id="reqModalDate"></span>
+          <span class="framed-box busy-tag" id="reqModalBusy" hidden></span>
+        </div>
         <button class="btn-close-modal" type="button" data-modal-close="reqModal" aria-label="Close">×</button>
       </div>
       <form id="reqForm">
         <div class="req-layout">
           <div class="req-left" id="reqLeft">
             <div class="modal-grid">
+              <div class="guests-time-row full">
+                <div class="modal-label">
+                  <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
+                  <div class="num-step">
+                    <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="<?= htmlspecialchars(tr('decrease_guests')) ?>">−</button>
+                    <input type="number" id="reqGuests" min="1" max="99" readonly>
+                    <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="<?= htmlspecialchars(tr('increase_guests')) ?>">+</button>
+                  </div>
+                </div>
+                <label class="modal-label">
+                  <span data-i18n="start_time"><?= htmlspecialchars(tr('start_time')) ?></span>
+                  <select id="reqStart" required></select>
+                </label>
+                <label class="modal-label">
+                  <span data-i18n="duration"><?= htmlspecialchars(tr('duration')) ?></span>
+                  <select id="reqDuration">
+                    <?php
+                    $durations = [60 => '1', 90 => '1.5', 120 => '2', 150 => '2.5', 180 => '3', 210 => '3.5', 240 => '4', 270 => '4.5', 300 => '5'];
+                    foreach ($durations as $v => $lbl) {
+                      $sel = $v === 120 ? ' selected' : '';
+                      echo "<option value=\"$v\"$sel>$lbl " . htmlspecialchars(tr('h_short')) . "</option>";
+                    }
+                    ?>
+                  </select>
+                </label>
+              </div>
               <label class="modal-label">
                 <span data-i18n="your_name"><?= htmlspecialchars(tr('your_name')) ?></span>
                 <input type="text" id="reqName" autocomplete="name">
@@ -1480,27 +1554,12 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               </label>
               <label class="modal-label full" id="reqPreorderLabel" hidden>
                 <span class="desktop-text" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
-                <span class="mobile-text" data-i18n="preorder_title_mobile"><?= htmlspecialchars(tr('preorder_title_mobile')) ?></span>
+                <div class="mobile-text mobile-preorder-title-wrap">
+                  <span data-i18n="preorder_title_mobile"><?= htmlspecialchars(tr('preorder_title_mobile')) ?></span>
+                  <button type="button" class="btn-preorder-mobile-inline" id="btnOpenMobilePreorder" aria-label="Menu" data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></button>
+                </div>
                 <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
               </label>
-              <div class="guests-time-row full">
-                <label class="modal-label">
-                  <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
-                  <div class="num-step">
-                    <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="Уменьшить кол-во гостей">−</button>
-                    <input type="number" id="reqGuests" min="1" max="99" readonly>
-                    <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="Увеличить кол-во гостей">+</button>
-                    <button type="button" class="btn btn-secondary btn-preorder-mobile" id="btnOpenMobilePreorder" hidden aria-label="Menu">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-                      <span data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></span>
-                    </button>
-                  </div>
-                </label>
-                <label class="modal-label">
-                  <span data-i18n="start_time"><?= htmlspecialchars(tr('start_time')) ?></span>
-                  <input type="text" id="reqStart" readonly>
-                </label>
-              </div>
             </div>
           </div>
           <div class="req-right" id="preorderPanel" hidden>
@@ -1509,7 +1568,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           </div>
         </div>
         <div class="modal-hint" id="reqHint" hidden></div>
-        <div class="modal-hint preorder" id="preorderReqHint" hidden data-i18n="preorder_required"><?= htmlspecialchars(tr('preorder_required')) ?></div>
         <div class="modal-note" data-i18n="booking_note"><?= htmlspecialchars(tr('booking_note')) ?></div>
         <div class="modal-actions">
           <button class="btn btn-primary" type="submit" id="reqSubmit" data-i18n="send"><?= htmlspecialchars(tr('send')) ?></button>
@@ -1555,6 +1613,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260410_1135"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_1135"></script>
 </body>
 </html>
