@@ -324,6 +324,67 @@ if (!is_array($rows)) {
     $rows = [];
 }
 
+// FETCH FROM POSTER
+$posterRows = [];
+if (!empty($_ENV['POSTER_API_TOKEN'])) {
+    try {
+        $api = new \App\Classes\PosterAPI($_ENV['POSTER_API_TOKEN']);
+        
+        // Fetch all tables to map table_id to table_num
+        $allTables = $api->request('spots.getTables', ['spot_id' => 1]);
+        $tableNameMap = [];
+        if (is_array($allTables)) {
+            foreach ($allTables as $t) {
+                $tableNameMap[(int)$t['table_id']] = $t['table_num'];
+            }
+        }
+
+        $resp = $api->request('incomingOrders.getReservations', [
+            'date_from' => $dateFrom . ' 00:00:00',
+            'date_to' => $dateTo . ' 23:59:59',
+        ], 'GET');
+        if (is_array($resp)) {
+            foreach ($resp as $pr) {
+                $status = (int)($pr['status'] ?? 0);
+                if (!$showDeleted && $status === 0) continue; // Skip cancelled if not showing deleted
+                
+                $tId = (int)($pr['table_id'] ?? 0);
+                $displayTable = isset($tableNameMap[$tId]) ? $tableNameMap[$tId] : ($tId > 0 ? $tId : '?');
+
+                $posterRows[] = [
+                    'id' => 'P' . ($pr['incoming_order_id'] ?? 0),
+                    'qr_code' => 'POSTER',
+                    'created_at' => $pr['date_created'] ?? '',
+                    'start_time' => $pr['date_reservation'] ?? '',
+                    'table_num' => $displayTable,
+                    'guests' => $pr['guests_count'] ?? 0,
+                    'name' => trim(($pr['first_name'] ?? '') . ' ' . ($pr['last_name'] ?? '')),
+                    'phone' => $pr['phone'] ?? '',
+                    'comment' => $pr['comment'] ?? '',
+                    'preorder_text' => '',
+                    'preorder_ru' => '',
+                    'total_amount' => 0,
+                    'qr_url' => '',
+                    'is_poster' => true,
+                    'status_text' => ($status === 0 ? 'Отменено' : 'Активно'),
+                    'deleted_at' => ($status === 0 ? ($pr['date_updated'] ?? '1') : null),
+                ];
+            }
+        }
+    } catch (\Throwable $e) {
+        // Log or ignore
+    }
+}
+
+$allRows = array_merge($rows, $posterRows);
+usort($allRows, function($a, $b) use ($sort, $order) {
+    $valA = $a[$sort] ?? '';
+    $valB = $b[$sort] ?? '';
+    if ($order === 'asc') return $valA <=> $valB;
+    return $valB <=> $valA;
+});
+$rows = $allRows;
+
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -405,12 +466,16 @@ if (!is_array($rows)) {
                                     $deletedBy = (string)($r['deleted_by'] ?? '');
                                     $isDeleted = $deletedAt !== '' && $deletedAt !== null && $deletedAt !== '0000-00-00 00:00:00';
                                     $deletedAtHuman = $isDeleted ? date('d.m.Y H:i', strtotime($deletedAt)) : '';
+                                    $isPoster = !empty($r['is_poster']);
                                 ?>
-                                <tr data-id="<?= (int)$r['id'] ?>" class="<?= $isDeleted ? 'is-deleted' : '' ?>">
+                                <tr data-id="<?= htmlspecialchars((string)$r['id']) ?>" class="<?= $isDeleted ? 'is-deleted' : '' ?> <?= $isPoster ? 'is-poster' : '' ?>">
                                     <td data-label="ID">
-                                        <div>#<?= (int)$r['id'] ?></div>
-                                        <div class="tag deleted" id="deleted-tag-<?= (int)$r['id'] ?>" <?= $isDeleted ? '' : 'hidden' ?>>Удалено<?= $deletedBy !== '' ? ' · ' . htmlspecialchars($deletedBy) : '' ?></div>
-                                        <div class="res-muted" id="deleted-meta-<?= (int)$r['id'] ?>" <?= $isDeleted ? '' : 'hidden' ?>><?= htmlspecialchars($deletedAtHuman) ?></div>
+                                        <div>#<?= htmlspecialchars((string)$r['id']) ?></div>
+                                        <?php if ($isPoster): ?>
+                                            <div class="tag poster">POSTER</div>
+                                        <?php endif; ?>
+                                        <div class="tag deleted" id="deleted-tag-<?= htmlspecialchars((string)$r['id']) ?>" <?= $isDeleted ? '' : 'hidden' ?>><?= $isPoster ? ($r['status_text'] ?? 'Удалено') : 'Удалено' ?><?= $deletedBy !== '' ? ' · ' . htmlspecialchars($deletedBy) : '' ?></div>
+                                        <div class="res-muted" id="deleted-meta-<?= htmlspecialchars((string)$r['id']) ?>" <?= $isDeleted ? '' : 'hidden' ?>><?= htmlspecialchars($deletedAtHuman) ?></div>
                                     </td>
                                     <td data-label="Код">
                                         <?php if (!empty($r['qr_code'])): ?>
@@ -419,8 +484,8 @@ if (!is_array($rows)) {
                                             <span class="res-muted">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td data-label="Создано"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['created_at']))) ?></td>
-                                    <td data-label="Время" class="res-strong"><?= htmlspecialchars(date('d.m.Y H:i', strtotime($r['start_time']))) ?></td>
+                                    <td data-label="Создано"><?= !empty($r['created_at']) ? htmlspecialchars(date('d.m.Y H:i', strtotime($r['created_at']))) : '—' ?></td>
+                                    <td data-label="Время" class="res-strong"><?= !empty($r['start_time']) ? htmlspecialchars(date('d.m.Y H:i', strtotime($r['start_time']))) : '—' ?></td>
                                     <td data-label="Стол"><?= htmlspecialchars($r['table_num']) ?></td>
                                     <td data-label="Гостей"><?= (int)$r['guests'] ?></td>
                                     <td data-label="Гость">
@@ -452,12 +517,16 @@ if (!is_array($rows)) {
                                         <?php endif; ?>
                                     </td>
                                     <td data-label="Действия">
-                                        <div class="res-actions">
-                                            <button type="button" class="res-btn primary btn-resend" data-id="<?= (int)$r['id'] ?>" data-target="guest">Повторить гостю</button>
-                                            <button type="button" class="res-btn primary btn-resend" data-id="<?= (int)$r['id'] ?>" data-target="manager">Повторить менеджеру</button>
-                                            <button type="button" class="res-btn danger btn-delete" data-id="<?= (int)$r['id'] ?>"><?= $isDeleted ? 'Восстановить' : 'Удалить' ?></button>
-                                        </div>
-                                        <div class="res-status" id="resend-status-<?= (int)$r['id'] ?>"></div>
+                                        <?php if (!$isPoster): ?>
+                                            <div class="res-actions">
+                                                <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="guest">Повторить гостю</button>
+                                                <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="manager">Повторить менеджеру</button>
+                                                <button type="button" class="res-btn danger btn-delete" data-id="<?= htmlspecialchars((string)$r['id']) ?>"><?= $isDeleted ? 'Восстановить' : 'Удалить' ?></button>
+                                            </div>
+                                            <div class="res-status" id="resend-status-<?= htmlspecialchars((string)$r['id']) ?>"></div>
+                                        <?php else: ?>
+                                            <span class="res-muted">Управление в Poster POS</span>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
