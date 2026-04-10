@@ -571,6 +571,8 @@ class Database {
             preorder_ru TEXT,
             tg_user_id BIGINT NULL,
             tg_username VARCHAR(64) NULL,
+            zalo_user_id VARCHAR(64) NULL,
+            zalo_phone VARCHAR(64) NULL,
             lang VARCHAR(8) NULL,
             total_amount INT DEFAULT 0,
             qr_url VARCHAR(255) NULL,
