@@ -476,15 +476,8 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
     $resp = $api->request('incomingOrders.getReservations', [
-      'date_from' => $dayStartDisplay->format('Y-m-d H:i:s'),
-      'date_to' => $dayEndDisplay->format('Y-m-d H:i:s'),
       'timezone' => 'client',
     ], 'GET');
-    if (!is_array($resp) || count($resp) === 0) {
-      $resp = $api->request('incomingOrders.getReservations', [
-        'timezone' => 'client',
-      ], 'GET');
-    }
 
     $tablesResp = $api->request('spots.getTableHallTables', [
       'spot_id' => $spotId,
@@ -1703,6 +1696,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     };
   </script>
   <script src="/assets/js/Tr2.js?v=20260410_1135"></script>
-  <script src="/links/table-reservation.js?v=20260410_2335"></script>
+  <script src="/links/table-reservation.js?v=20260410_2210"></script>
 </body>
 </html>
