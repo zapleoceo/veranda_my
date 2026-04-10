@@ -104,6 +104,7 @@ if ($ajax === 'resend') {
         if ($qrUrl !== '') {
             $userText .= "<b>Оплата предзаказа</b>\n";
             $userText .= "Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.\n\n";
+            $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">Ссылка на QR-код для оплаты</a>' . "\n\n";
         }
         $userText .= '<b>Ваша бронь</b>' . "\n";
         $userText .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
@@ -123,12 +124,12 @@ if ($ajax === 'resend') {
         if ($qrUrl !== '') {
             curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
             curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+            curl_setopt($ch, CURLOPT_POSTFIELDS, [
                 'chat_id' => (string)$tgUid,
                 'photo' => $qrUrl,
                 'caption' => $userText,
                 'parse_mode' => 'HTML',
-            ]));
+            ]);
         } else {
             curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
             curl_setopt($ch, CURLOPT_POST, true);

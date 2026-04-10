@@ -989,7 +989,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $qrCode = '';
   if ($totalAmount > 0) {
     $qrCode = strtoupper(bin2hex(random_bytes(2))) . $guests;
-    $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES {$qrCode}");
+        $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES {$qrCode}");
   }
 
   $db->query("INSERT INTO {$resTable} (
@@ -1076,6 +1076,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   if ($qrUrl !== '') {
       $userText .= '<b>' . htmlspecialchars($trFor('qr_payment_title') ?? 'Оплата предзаказа') . '</b>' . "\n";
       $userText .= htmlspecialchars($trFor('qr_payment_body') ?? 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.') . "\n\n";
+      $userText .= '<a href="' . htmlspecialchars($qrUrl) . '">Ссылка на QR-код для оплаты</a>' . "\n\n";
   }
   $userText .= '<b>' . htmlspecialchars($trFor('tg_booking_title')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
@@ -1097,12 +1098,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   if ($qrUrl !== '') {
       curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
       curl_setopt($ch, CURLOPT_POST, true);
-      curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+      curl_setopt($ch, CURLOPT_POSTFIELDS, [
           'chat_id' => (string)$tgUid,
           'photo' => $qrUrl,
           'caption' => $userText,
           'parse_mode' => 'HTML',
-      ]));
+      ]);
   } else {
       curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
       curl_setopt($ch, CURLOPT_POST, true);
