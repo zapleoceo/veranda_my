@@ -92,7 +92,7 @@ $links = [
     ['href' => 'https://t.me/gamezone_vietnam', 'icon' => 'telegram'],
     ['href' => 'https://www.instagram.com/veranda.my', 'icon' => 'instagram'],
     ['href' => '/links/menu-beta.php', 'icon' => 'menu'],
-    ['href' => '/TableReservation', 'icon' => 'reserve'],
+    ['href' => '/Tr2', 'icon' => 'reserve'],
     ['href' => 'https://t.me/Veranda_my', 'icon' => 'manager'],
     ['href' => 'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9', 'icon' => 'map'],
 ];

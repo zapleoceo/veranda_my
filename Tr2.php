@@ -630,6 +630,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
     $resp = $api->request('incomingOrders.getReservations', [
       'date_from' => $dayStartApi->format('Y-m-d H:i:s'),
       'date_to' => $dayEndApi->format('Y-m-d H:i:s'),
+      'timezone' => 'client',
     ], 'GET');
 
     $tablesResp = $api->request('spots.getTableHallTables', [
@@ -709,7 +710,8 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       }
 
       $incomingOrderId = trim((string)($row['incoming_order_id'] ?? ''));
-      if ($incomingOrderId !== '' && count($tableCandidates) === 0) {
+      $getDetail = function () use (&$detailCache, $api, $incomingOrderId) {
+        if ($incomingOrderId === '') return null;
         if (!array_key_exists($incomingOrderId, $detailCache)) {
           try {
             $detailCache[$incomingOrderId] = $api->request('incomingOrders.getReservation', [
@@ -719,7 +721,11 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
             $detailCache[$incomingOrderId] = null;
           }
         }
-        $detail = $detailCache[$incomingOrderId];
+        return $detailCache[$incomingOrderId];
+      };
+
+      if ($incomingOrderId !== '' && count($tableCandidates) === 0) {
+        $detail = $getDetail();
         if (is_array($detail)) {
           foreach (['table_id', 'table_ids', 'tables', 'table'] as $k) {
             if (!array_key_exists($k, $detail)) continue;
@@ -733,6 +739,31 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         $id = (string)$n;
         if ($id === '' || isset($tableIds[$id])) continue;
         $tableIds[$id] = true;
+      }
+      $mappedIds = [];
+      foreach (array_keys($tableIds) as $tableId) {
+        if (isset($tableNameById[$tableId])) $mappedIds[$tableId] = true;
+      }
+
+      if ($incomingOrderId !== '' && !$mappedIds) {
+        $detail = $getDetail();
+        if (is_array($detail)) {
+          $tableCandidates = [];
+          foreach (['table_id', 'table_ids', 'tables', 'table'] as $k) {
+            if (!array_key_exists($k, $detail)) continue;
+            foreach ($extractNums($detail[$k]) as $n) $tableCandidates[] = $n;
+          }
+          $tableIds = [];
+          foreach ($tableCandidates as $n) {
+            $id = (string)$n;
+            if ($id === '' || isset($tableIds[$id])) continue;
+            $tableIds[$id] = true;
+          }
+          $mappedIds = [];
+          foreach (array_keys($tableIds) as $tableId) {
+            if (isset($tableNameById[$tableId])) $mappedIds[$tableId] = true;
+          }
+        }
       }
 
       if (!$tableIds) {
@@ -748,7 +779,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         continue;
       }
 
-      foreach (array_keys($tableIds) as $tableId) {
+      foreach (array_keys($mappedIds ?: $tableIds) as $tableId) {
         if (!isset($tableNameById[$tableId])) continue;
         $items[] = [
           'table_id' => $tableId,
