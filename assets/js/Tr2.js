@@ -1092,7 +1092,8 @@
         preorderCounts = parsePreorderTextToCounts(preorder);
       }
       if (pendingBooking && reqGuests) pendingBooking.guests = Number(reqGuests.value || pendingBooking.guests || 0) || pendingBooking.guests;
-      if (reqHint) { reqHint.hidden = true; reqHint.textContent = ''; reqHint.classList.remove('warn'); }
+      updateReqGuestsHint().catch(() => null);
+      
       syncSubmitState();
       updatePreorderUi();
       renderPreorderBox();
