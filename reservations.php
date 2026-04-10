@@ -18,23 +18,6 @@ require_once __DIR__ . '/src/classes/TelegramBot.php';
 
 veranda_require('reservations');
 
-$displayTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
-if ($displayTzName === '' || !in_array($displayTzName, timezone_identifiers_list(), true)) {
-    $displayTzName = 'Asia/Ho_Chi_Minh';
-}
-$displayTz = new DateTimeZone($displayTzName);
-$parseDisplayDt = function ($s) use ($displayTz) {
-    $v = trim((string)$s);
-    if ($v === '') return null;
-    $dt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $v, $displayTz);
-    if ($dt instanceof DateTimeImmutable) return $dt;
-    try { return new DateTimeImmutable($v, $displayTz); } catch (Throwable $e) { return null; }
-};
-$fmtDisplayDt = function ($s, string $fmt = 'd.m.Y H:i') use ($parseDisplayDt) {
-    $dt = $parseDisplayDt($s);
-    return $dt ? $dt->format($fmt) : '';
-};
-
 $db = new \App\Classes\Database(
     $_ENV['DB_HOST'] ?? 'localhost',
     $_ENV['DB_NAME'] ?? 'veranda_my',
@@ -141,7 +124,7 @@ if ($ajax === 'vposter') {
             'phone'            => $phone,
             'table_id'         => (string)$tableId,
             'guests_count'     => (string)$row['guests'],
-            'date_reservation' => ($fmtDisplayDt($row['start_time'], 'Y-m-d H:i:s') ?: (string)$row['start_time']),
+            'date_reservation' => date('Y-m-d H:i:s', strtotime($row['start_time'])),
             'duration'         => '7200', // 2 hours default in seconds
             'first_name'       => $firstName,
             'last_name'        => $lastName,
@@ -194,8 +177,7 @@ if ($ajax === 'resend') {
         exit;
     }
 
-    $startDt = $parseDisplayDt($row['start_time']);
-    if (!$startDt) $startDt = new DateTimeImmutable('now', $displayTz);
+    $startDt = new DateTimeImmutable($row['start_time']);
     
     // Group Message
     $tgUid = (int)$row['tg_user_id'];
@@ -465,11 +447,6 @@ $rows = $db->query("
 if (!is_array($rows)) {
     $rows = [];
 }
-foreach ($rows as &$r0) {
-    if (!is_array($r0)) continue;
-    if (!array_key_exists('duration_sec', $r0)) $r0['duration_sec'] = 0;
-}
-unset($r0);
 
 // FETCH FROM POSTER
 $posterRows = [];
@@ -498,7 +475,6 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
         $resp = $api->request('incomingOrders.getReservations', [
             'date_from' => $dateFrom . ' 00:00:00',
             'date_to' => $dateTo . ' 23:59:59',
-            'timezone' => 'client',
         ], 'GET');
         
         if (is_array($resp)) {
@@ -524,7 +500,6 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
                     'total_amount' => 0,
                     'qr_url' => '',
                     'is_poster' => true,
-                    'duration_sec' => (int)($pr['duration'] ?? 0),
                     'status_text' => ($status === 7 ? 'Отменено' : ($status === 1 ? 'Принято' : 'Новый')),
                     'deleted_at' => ($status === 7 ? ($pr['updated_at'] ?? '') : null),
                 ];
@@ -632,16 +607,8 @@ $rows = $allRows;
                                     $deletedAt = (string)($r['deleted_at'] ?? '');
                                     $deletedBy = (string)($r['deleted_by'] ?? '');
                                     $isDeleted = $deletedAt !== '' && $deletedAt !== null && $deletedAt !== '0000-00-00 00:00:00';
-                                    $deletedAtHuman = $isDeleted ? ($fmtDisplayDt($deletedAt) ?: '') : '';
+                                    $deletedAtHuman = $isDeleted ? date('d.m.Y H:i', strtotime($deletedAt)) : '';
                                     $isPoster = !empty($r['is_poster']);
-                                    $createdAtHuman = !empty($r['created_at']) ? ($fmtDisplayDt($r['created_at']) ?: '') : '';
-                                    $startHuman = !empty($r['start_time']) ? ($fmtDisplayDt($r['start_time']) ?: '') : '';
-                                    $durSec = (int)($r['duration_sec'] ?? 0);
-                                    $endHuman = '';
-                                    if ($durSec > 0 && !empty($r['start_time'])) {
-                                        $sdt = $parseDisplayDt($r['start_time']);
-                                        if ($sdt) $endHuman = $sdt->modify('+' . $durSec . ' seconds')->format('H:i');
-                                    }
                                 ?>
                                 <tr data-id="<?= htmlspecialchars((string)$r['id']) ?>" class="<?= $isDeleted ? 'is-deleted' : '' ?> <?= $isPoster ? 'is-poster' : '' ?>">
                                     <td data-label="ID">
@@ -665,8 +632,8 @@ $rows = $allRows;
                                             <span class="res-muted">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td data-label="Создано"><?= $createdAtHuman !== '' ? htmlspecialchars($createdAtHuman) : '—' ?></td>
-                                    <td data-label="Время" class="res-strong"><?= $startHuman !== '' ? htmlspecialchars($startHuman . ($endHuman !== '' ? ('–' . $endHuman) : '')) : '—' ?></td>
+                                    <td data-label="Создано"><?= !empty($r['created_at']) ? htmlspecialchars(date('d.m.Y H:i', strtotime($r['created_at']))) : '—' ?></td>
+                                    <td data-label="Время" class="res-strong"><?= !empty($r['start_time']) ? htmlspecialchars(date('d.m.Y H:i', strtotime($r['start_time']))) : '—' ?></td>
                                     <td data-label="Стол"><?= htmlspecialchars($r['table_num']) ?></td>
                                     <td data-label="Гостей"><?= (int)$r['guests'] ?></td>
                                     <td data-label="Гость">
