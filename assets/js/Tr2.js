@@ -968,24 +968,11 @@
         syncSubmitState();
         return;
       }
-      const isoDateStr = String(pendingBooking.start || '').slice(0, 10);
-      if (!isoDateStr) return;
-
-      const timeParts = reqStart.value.split(':');
-      if (timeParts.length < 2) {
-        modalTableBusy = true;
-        syncSubmitState();
-        return;
-      }
-      const selMin = parseInt(timeParts[0], 10) * 60 + parseInt(timeParts[1], 10);
-      const durMin = parseInt(reqDuration.value, 10);
-      const selEnd = selMin + durMin;
 
       const tableNum = String(pendingBooking.tableNum);
-      const ranges = Array.isArray(lastReservationsByTable[tableNum]) ? lastReservationsByTable[tableNum] : [];
-
       const current = getCurrentRequest();
       if (!current) return;
+      
       const un = getUnavailableReason(tableNum, current);
       
       const tableBusyWarning = document.getElementById('tableBusyWarning');
@@ -1437,15 +1424,29 @@
       const ps = parseSel(current.dtRaw);
       const ranges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
       if (ps && ranges.length) {
-        const selEnd = ps.selMin + 120;
+        const selEnd = ps.selMin + Math.floor(current.durationSec / 60);
         const overlaps = ranges.some(([s, e]) => s < selEnd && e > ps.selMin);
         if (overlaps) {
           const txt = ranges.slice(0, 2).map(([s, e]) => fmtMin(s) + '-' + fmtMin(e)).join(' · ');
           return { reason: t('reason_booking') || 'там есть бронь', detail: txt };
         }
       }
+      
+      const isToday = ps ? ps.isToday : false;
+      const now = new Date();
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+
+      if (isToday && ps && ps.selMin < nowMin) {
+         return { reason: t('time_passed') || 'Время уже прошло', detail: '' };
+      }
+
       if (!freeNums.has(String(tableNum))) {
-        if (ps && ps.isToday) return { reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
+        if (isToday) {
+            if (ps && ps.selMin > nowMin + 120) {
+               return null;
+            }
+            return { reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
+        }
         return { reason: t('reason_time') || 'недоступен на это время', detail: '' };
       }
       return null;
@@ -1519,10 +1520,7 @@
     };
 
     const getCurrentRequest = () => {
-      let dtRaw = resDate ? String(resDate.value || '').trim() : '';
-      if (pendingBooking && pendingBooking.start) {
-        dtRaw = String(pendingBooking.start || '').slice(0, 10);
-      }
+      const dtRaw = resDate ? String(resDate.value || '').trim() : '';
       if (!dtRaw) return null;
       // dtRaw is YYYY-MM-DD
       const now = new Date();
