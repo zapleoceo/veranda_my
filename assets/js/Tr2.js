@@ -1,4 +1,4 @@
-﻿﻿(() => {
+﻿(() => {
   const cfg = window.__TR_CONFIG__ || {};
   let UI_LANG = cfg.lang || 'ru';
   let UI_LOCALE = cfg.locale || (UI_LANG === 'vi' ? 'vi-VN' : (UI_LANG === 'en' ? 'en-US' : 'ru-RU'));
@@ -1308,27 +1308,43 @@
             await logJs('submit prevented: modalTableBusy is true', {});
             return;
         }
+        let name = '';
+        let phone = '';
+        let guests = 0;
+        let start = '';
+        let duration_m = 120;
+        let comment = '';
+        let preorder = '';
+        let preorderRu = '';
+        let tableNum = '';
+        let totalAmount = 0;
+
+        const getTotalPreorderAmount = () => {
+          const counts = normalizePreorder(preorderCounts);
+          return Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
+        };
+
         try {
-          const name = reqName ? String(reqName.value || '').trim() : '';
-          const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
-          const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
-          let start = '';
+          name = reqName ? String(reqName.value || '').trim() : '';
+          phone = reqPhone ? String(reqPhone.value || '').trim() : '';
+          guests = reqGuests ? Number(reqGuests.value || 0) : 0;
           if (pendingBooking && pendingBooking.start && reqStart && reqStart.value) {
             const dPart = String(pendingBooking.start).slice(0, 10);
             const tPart = String(reqStart.value);
             start = `${dPart}T${tPart}:00`;
           }
-          const duration_m = reqDuration ? parseInt(reqDuration.value, 10) : 120;
-          const comment = reqComment ? String(reqComment.value || '').trim() : '';
+          duration_m = reqDuration ? parseInt(reqDuration.value, 10) : 120;
+          if (!isFinite(duration_m) || duration_m <= 0) duration_m = 120;
+          comment = reqComment ? String(reqComment.value || '').trim() : '';
           
           await logJs('submit trace 1', { name, phone, guests, start, duration_m });
           
-          const preorder = guests > 5 ? getPreorderText('ui') : '';
-          const preorderRu = guests > 5 ? getPreorderText('ru') : '';
+          preorder = guests > 5 ? getPreorderText('ui') : '';
+          preorderRu = guests > 5 ? getPreorderText('ru') : '';
           
           await logJs('submit trace 2', { preorder, preorderRu });
           
-          const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
+          tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
           const missing = [];
           if (!tableNum) missing.push(t('missing_table'));
           if (!start) missing.push(t('missing_start'));
@@ -1345,11 +1361,7 @@
             syncSubmitState();
             return;
           }
-
-          const getTotalPreorderAmount = () => {
-            const counts = normalizePreorder(preorderCounts);
-            return Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
-          };
+          totalAmount = getTotalPreorderAmount();
 
           submitBusy = true;
           if (reqSubmit) {
@@ -1402,7 +1414,7 @@
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, duration_m, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: getTotalPreorderAmount(), lang: UI_LANG, tg: linkedTg }),
+            body: JSON.stringify({ table_num: tableNum, guests, start, duration_m, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
