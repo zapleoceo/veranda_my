@@ -382,7 +382,7 @@ if ($displayTzName === '' || !in_array($displayTzName, timezone_identifiers_list
 }
 $apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
 if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
-  $apiTzName = 'Europe/Kyiv';
+  $apiTzName = $displayTzName;
 }
 date_default_timezone_set($apiTzName);
 
@@ -497,10 +497,9 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
 
   $dateReservation = trim($dateReservation);
   $displayTz = new DateTimeZone($displayTzName);
-  $apiTz = new DateTimeZone($apiTzName);
+  $nowDisplay = new DateTimeImmutable('now', $displayTz);
   $dtDisplay = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $dateReservation, $displayTz);
   if ($dtDisplay !== false) {
-    $nowDisplay = new DateTimeImmutable('now', $displayTz);
     if ($dtDisplay->format('Y-m-d') === $nowDisplay->format('Y-m-d')) {
       // For today, always use server's current time + 5 mins to avoid Poster API Error 155 (time in past)
       // regardless of what the client sent, because client's clock might be wrong or in a different timezone.
@@ -515,7 +514,6 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     echo json_encode(['ok' => false, 'error' => 'Некорректная дата'], JSON_UNESCAPED_UNICODE);
     exit;
   }
-  $dtApi = $dtDisplay->setTimezone($apiTz);
   if ($duration < 1800) $duration = 7200;
   if ($guests <= 0) $guests = 2;
   if ($spotId <= 0) $spotId = 1;
@@ -523,7 +521,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
     $resp = $api->request('incomingOrders.getTablesForReservation', [
-      'date_reservation' => $dtApi->format('Y-m-d H:i:s'),
+      'date_reservation' => $dtDisplay->format('Y-m-d H:i:s'),
       'duration' => $duration,
       'spot_id' => $spotId,
       'guests_count' => $guests,
@@ -570,7 +568,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       'ok' => true,
       'request' => [
         'date_reservation' => $dtDisplay->format('Y-m-d H:i:s'),
-        'date_reservation_api' => $dtApi->format('Y-m-d H:i:s'),
+        'date_reservation_api' => $dtDisplay->format('Y-m-d H:i:s'),
         'duration' => $duration,
         'spot_id' => $spotId,
         'guests_count' => $guests,
@@ -605,7 +603,6 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   $allowed = $allowedSchemeNums;
 
   $displayTz = new DateTimeZone($displayTzName);
-  $apiTz = new DateTimeZone($apiTzName);
   $dateReservation = trim($dateReservation);
   $dtDisplay = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $dateReservation, $displayTz);
   if ($dtDisplay === false) {
@@ -622,14 +619,12 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   $dayEndDisplay = $dtDisplay->setTime(23, 59, 59);
   $queryFromDisplay = $dayStartDisplay->modify('-1 day');
   $queryToDisplay = $dayEndDisplay->modify('+1 day');
-  $dayStartApi = $queryFromDisplay->setTimezone($apiTz);
-  $dayEndApi = $queryToDisplay->setTimezone($apiTz);
 
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
     $resp = $api->request('incomingOrders.getReservations', [
-      'date_from' => $dayStartApi->format('Y-m-d H:i:s'),
-      'date_to' => $dayEndApi->format('Y-m-d H:i:s'),
+      'date_from' => $queryFromDisplay->format('Y-m-d H:i:s'),
+      'date_to' => $queryToDisplay->format('Y-m-d H:i:s'),
       'timezone' => 'client',
     ], 'GET');
 
@@ -693,12 +688,11 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       $start = trim((string)($row['date_reservation'] ?? ''));
       $dur = (int)($row['duration'] ?? 0);
       $guestsCount = trim((string)($row['guests_count'] ?? ''));
-      $startDtApi = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $start, $apiTz);
-      if ($startDtApi === false) {
-        try { $startDtApi = new DateTimeImmutable($start, $apiTz); } catch (\Throwable $e) { $startDtApi = false; }
+      $startDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $start, $displayTz);
+      if ($startDt === false) {
+        try { $startDt = new DateTimeImmutable($start, $displayTz); } catch (\Throwable $e) { $startDt = false; }
       }
-      if ($startDtApi === false) continue;
-      $startDt = $startDtApi->setTimezone($displayTz);
+      if ($startDt === false) continue;
       $endDt = $dur > 0 ? $startDt->modify('+' . $dur . ' seconds') : $startDt;
       $guestName = trim(((string)($row['first_name'] ?? '')) . ' ' . ((string)($row['last_name'] ?? '')));
       if ($guestName === '') $guestName = '—';
@@ -798,8 +792,8 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       'request' => [
         'date_from' => $dayStartDisplay->format('Y-m-d H:i:s'),
         'date_to' => $dayEndDisplay->format('Y-m-d H:i:s'),
-        'date_from_api' => $dayStartApi->format('Y-m-d H:i:s'),
-        'date_to_api' => $dayEndApi->format('Y-m-d H:i:s'),
+        'date_from_api' => $queryFromDisplay->format('Y-m-d H:i:s'),
+        'date_to_api' => $queryToDisplay->format('Y-m-d H:i:s'),
         'spot_id' => $spotId,
         'hall_id' => $hallId,
         'display_timezone' => $displayTzName,
