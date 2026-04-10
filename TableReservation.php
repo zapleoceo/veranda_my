@@ -963,6 +963,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $qrUrl,
       $qrCode
     ]);
+    $resId = $db->getPdo()->lastInsertId();
   }
 
   if ($tgUn !== '' || $tgUid > 0) {
