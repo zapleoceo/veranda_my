@@ -984,31 +984,22 @@
       const tableNum = String(pendingBooking.tableNum);
       const ranges = Array.isArray(lastReservationsByTable[tableNum]) ? lastReservationsByTable[tableNum] : [];
 
-      const now = new Date();
-      const isToday = isoDateStr === now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-      const nowMin = now.getHours() * 60 + now.getMinutes();
-
-      let busy = false;
-      const overlaps = ranges.some(([s, e]) => s < selEnd + 30 && e > selMin - 30);
-      if (overlaps) busy = true;
-      if (isToday) {
-        if (selMin < nowMin) {
-          // Time passed while form was open
-          showToast(reqStart, t('time_error') || 'Ошибка времени', t('time_passed') || 'Время уже прошло');
-          selMin = nowMin;
-          selEnd = selMin + durMin;
-          busy = true; // explicitly mark as busy
+      const current = getCurrentRequest();
+      if (!current) return;
+      const un = getUnavailableReason(tableNum, current);
+      
+      const tableBusyWarning = document.getElementById('tableBusyWarning');
+      if (un) {
+        modalTableBusy = true;
+        if (tableBusyWarning) {
+          tableBusyWarning.style.display = 'block';
+          tableBusyWarning.innerHTML = esc(un.reason) + (un.detail ? ' · ' + esc(un.detail) : '');
         }
-        if (freeNums && !freeNums.has(tableNum)) {
-          if (selMin < nowMin + 120) {
-            busy = true;
-          }
-        }
+      } else {
+        modalTableBusy = false;
+        if (tableBusyWarning) tableBusyWarning.style.display = 'none';
       }
 
-      modalTableBusy = busy;
-      const tableBusyWarning = document.getElementById('tableBusyWarning');
-      if (tableBusyWarning) tableBusyWarning.style.display = busy ? 'block' : 'none';
       syncSubmitState();
     };
 
@@ -1514,9 +1505,15 @@
       if (dtRaw === todayStr) {
         timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':00';
       }
+      if (reqStart && reqStart.value) {
+        timeStr = reqStart.value + ':00';
+      }
       
+      const guests = reqGuests ? parseInt(reqGuests.value, 10) : 1;
+      const durationSec = reqDuration ? parseInt(reqDuration.value, 10) * 60 : 7200;
+
       const dt = dtRaw + ' ' + timeStr;
-      return { dt, guests: 1, dtRaw: dtRaw + 'T' + timeStr.slice(0, 5), durationSec: 7200, durationHours: 2 };
+      return { dt, guests: guests || 1, dtRaw: dtRaw + 'T' + timeStr.slice(0, 5), durationSec: durationSec, durationHours: durationSec / 3600 };
     };
 
     const invalidateLast = () => {
@@ -1748,6 +1745,11 @@
           selectedTableNum = tableNum;
           messengerLinked.telegram = true;
           linkedTg = tg ? { user_id: Number(tg.user_id || 0) || 0, username: String(tg.username || ''), name: String(tg.name || '') } : null;
+          
+          if (!last || !freeNums || !freeNums.size) {
+            await loadFree(true).catch(() => null);
+          }
+
           openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
           if (linkedTg && linkedTg.username) setMsgrHint((t('tg_linked') || 'Telegram привязан ✅') + ' @' + String(linkedTg.username).replace(/^@+/, ''));
           else setMsgrHint(t('tg_linked') || 'Telegram привязан ✅');
