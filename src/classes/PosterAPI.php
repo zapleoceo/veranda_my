@@ -33,7 +33,7 @@ class PosterAPI {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-
+        
         if ($httpMethod === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
             $postParams = $params;

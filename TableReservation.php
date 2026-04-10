@@ -504,10 +504,9 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       if (preg_match('/^\d+$/', $num)) $scheme = $num;
       elseif (preg_match('/^\d+$/', $title)) $scheme = $title;
       if ($scheme === '') continue;
-      $sInt = (int)$scheme;
-      if ($sInt < 1 || $sInt > 20) continue;
-      if (is_array($allowedSet) && !isset($allowedSet[(string)$sInt])) continue;
-      $tableNameById[$id] = (string)$sInt;
+      $sStr = (string)$scheme;
+      if (is_array($allowedSet) && !isset($allowedSet[$sStr])) continue;
+      $tableNameById[$id] = $sStr;
     }
 
     $rows = is_array($resp) ? $resp : [];

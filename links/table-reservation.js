@@ -135,8 +135,8 @@
     const shiftTablesUp = (px) => {
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');
-        const num = Number(n);
-        if (!isFinite(num) || num < 1 || num > 20) return;
+        const num = parseInt(n, 10);
+        if (!isFinite(num) || num < 1 || num > 500) return;
         const topStr = String(t.style.top || '').trim();
         const m = topStr.match(/^(-?\d+(?:\.\d+)?)px$/);
         if (!m) return;

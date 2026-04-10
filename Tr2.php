@@ -382,7 +382,7 @@ if ($displayTzName === '' || !in_array($displayTzName, timezone_identifiers_list
 }
 $apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
 if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
-  $apiTzName = $displayTzName;
+  $apiTzName = 'Europe/Kyiv';
 }
 date_default_timezone_set($apiTzName);
 
@@ -530,12 +530,35 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     ], 'GET');
 
     $free = is_array($resp) && isset($resp['freeTables']) && is_array($resp['freeTables']) ? $resp['freeTables'] : [];
+    
+    // ПРОВЕРКА ЗАНЯТЫХ СТОЛИКОВ (Open Transactions)
+    // Если дата бронирования - сегодня, запрашиваем реально открытые чеки в Poster
+    $busyTableIds = [];
+    $isToday = $dtDisplay->format('Y-m-d') === $nowDisplay->format('Y-m-d');
+    if ($isToday) {
+      try {
+        $openTxs = $api->request('dash.getTransactions', ['status' => 1], 'GET');
+        if (is_array($openTxs)) {
+          foreach ($openTxs as $tx) {
+            if (isset($tx['table_id'])) $busyTableIds[(int)$tx['table_id']] = true;
+          }
+        }
+      } catch (\Throwable $e) {
+        // Игнорируем ошибку получения транзакций, чтобы не ломать весь запрос
+      }
+    }
+
     $filtered = [];
     $nums = [];
     $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
     foreach ($free as $row) {
       if (!is_array($row)) continue;
       if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
+      
+      // Если столик занят гостями прямо сейчас, исключаем его из списка свободных
+      $tId = (int)($row['table_id'] ?? 0);
+      if ($isToday && isset($busyTableIds[$tId])) continue;
+
       $num = trim((string)($row['table_num'] ?? ''));
       if ($num === '') continue;
       if (is_array($allowedSet) && !isset($allowedSet[$num])) continue;
@@ -597,8 +620,10 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
 
   $dayStartDisplay = $dtDisplay->setTime(0, 0, 0);
   $dayEndDisplay = $dtDisplay->setTime(23, 59, 59);
-  $dayStartApi = $dayStartDisplay->setTimezone($apiTz);
-  $dayEndApi = $dayEndDisplay->setTimezone($apiTz);
+  $queryFromDisplay = $dayStartDisplay->modify('-1 day');
+  $queryToDisplay = $dayEndDisplay->modify('+1 day');
+  $dayStartApi = $queryFromDisplay->setTimezone($apiTz);
+  $dayEndApi = $queryToDisplay->setTimezone($apiTz);
 
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
@@ -626,10 +651,12 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       if (preg_match('/^\d+$/', $num)) $scheme = $num;
       elseif (preg_match('/^\d+$/', $title)) $scheme = $title;
       if ($scheme === '') continue;
-      $sInt = (int)$scheme;
-      if ($sInt < 1 || $sInt > 20) continue;
-      if (is_array($allowedSet) && !isset($allowedSet[(string)$sInt])) continue;
-      $tableNameById[$id] = (string)$sInt;
+      
+      // Разрешаем любые номера столов, которые есть в списке разрешенных или просто разумные
+      $sStr = (string)$scheme;
+      if (is_array($allowedSet) && !isset($allowedSet[$sStr])) continue;
+      
+      $tableNameById[$id] = $sStr;
     }
 
     $rows = is_array($resp) ? $resp : [];
@@ -1511,7 +1538,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_1135">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_1200">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
