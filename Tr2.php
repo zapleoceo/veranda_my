@@ -622,6 +622,28 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
 
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
+    $apiRawOn = (string)($_GET['api_raw'] ?? '') === '1';
+    if ($apiRawOn) {
+      $params = [
+        'date_from' => $dayStartDisplay->format('Y-m-d H:i:s'),
+        'date_to' => $dayEndDisplay->format('Y-m-d H:i:s'),
+        'timezone' => 'client',
+      ];
+      $resp = $api->request('incomingOrders.getReservations', $params, 'GET');
+      echo json_encode([
+        'ok' => true,
+        'request' => [
+          'method' => 'incomingOrders.getReservations',
+          'params' => $params,
+          'display_timezone' => $displayTzName,
+          'api_timezone' => $apiTzName,
+        ],
+        'count_raw' => is_array($resp) ? count($resp) : 0,
+        'poster_response' => $resp,
+      ], JSON_UNESCAPED_UNICODE);
+      exit;
+    }
+
     $resp = $api->request('incomingOrders.getReservations', [
       'date_from' => $queryFromDisplay->format('Y-m-d H:i:s'),
       'date_to' => $queryToDisplay->format('Y-m-d H:i:s'),
