@@ -1,3 +1,29 @@
+        html { background: var(--bg); }
+        body { background: transparent !important; }
+        .parallax-bg {
+            position: fixed;
+            top: -35%; left: -20%; right: -20%; bottom: -35%;
+            background-color: rgba(18, 12, 8, 1);
+            background-image: url('/assets/img/gora2.png?v=20260410_0110');
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: cover;
+            background-blend-mode: multiply;
+            filter: brightness(0.22) blur(8px);
+            will-change: transform;
+            z-index: -1;
+            transform: translate3d(0,0,0) scale(1.12);
+        }
+        .parallax-vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: -1;
+            background:
+                radial-gradient(900px 420px at 20% -10%, rgba(184,135,70,0.16), transparent 60%),
+                radial-gradient(900px 420px at 85% 0%, rgba(184,135,70,0.08), transparent 55%),
+                radial-gradient(1100px 900px at 50% 70%, rgba(0,0,0,0.55), rgba(0,0,0,0.85));
+        }
         .auth-float {
             position: fixed;
             top: 10px;
