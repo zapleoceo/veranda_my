@@ -122,14 +122,29 @@ if ($ajax === 'resend') {
 
         $ch = curl_init();
         if ($qrUrl !== '') {
+            $chImg = curl_init($qrUrl);
+            curl_setopt($chImg, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($chImg, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+            curl_setopt($chImg, CURLOPT_FOLLOWLOCATION, true);
+            $imgData = curl_exec($chImg);
+            curl_close($chImg);
+
+            $tmpFile = tempnam(sys_get_temp_dir(), 'qr_');
+            file_put_contents($tmpFile, $imgData);
+
             curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, [
                 'chat_id' => (string)$tgUid,
-                'photo' => $qrUrl,
+                'photo' => new CURLFile($tmpFile, 'image/png', 'qr.png'),
                 'caption' => $userText,
                 'parse_mode' => 'HTML',
             ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            $resp = curl_exec($ch);
+            curl_close($ch);
+            @unlink($tmpFile);
         } else {
             curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
             curl_setopt($ch, CURLOPT_POST, true);
@@ -138,11 +153,11 @@ if ($ajax === 'resend') {
                 'text' => $userText,
                 'parse_mode' => 'HTML',
             ]));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            $resp = curl_exec($ch);
+            curl_close($ch);
         }
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        $resp = curl_exec($ch);
-        curl_close($ch);
         $data = $resp ? json_decode($resp, true) : null;
         
         if ($qrUrl !== '' && (!is_array($data) || empty($data['ok']))) {
