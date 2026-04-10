@@ -478,8 +478,14 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
     $resp = $api->request('incomingOrders.getReservations', [
       'date_from' => $dayStartDisplay->format('Y-m-d H:i:s'),
       'date_to' => $dayEndDisplay->format('Y-m-d H:i:s'),
-      'timezone' => 'client',
     ], 'GET');
+    if (!is_array($resp) || count($resp) === 0) {
+      $resp = $api->request('incomingOrders.getReservations', [
+        'date_from' => $dayStartDisplay->format('Y-m-d H:i:s'),
+        'date_to' => $dayEndDisplay->format('Y-m-d H:i:s'),
+        'timezone' => 'client',
+      ], 'GET');
+    }
     if (!is_array($resp) || count($resp) === 0) {
       $resp = $api->request('incomingOrders.getReservations', [
         'timezone' => 'client',
@@ -1594,7 +1600,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                 </div>
                 <label class="modal-label">
                   <span data-i18n="start_time"><?= htmlspecialchars(tr('start_time')) ?></span>
-                  <select id="reqStart" required></select>
+                  <input type="text" id="reqStart" readonly required>
                 </label>
                 <label class="modal-label">
                   <span data-i18n="duration"><?= htmlspecialchars(tr('duration')) ?></span>
@@ -1703,6 +1709,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     };
   </script>
   <script src="/assets/js/Tr2.js?v=20260410_1135"></script>
-  <script src="/links/table-reservation.js?v=20260410_2335"></script>
+  <script src="/links/table-reservation.js?v=20260411_0015"></script>
 </body>
 </html>
