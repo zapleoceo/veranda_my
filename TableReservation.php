@@ -378,6 +378,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
   $duration = (int)($_GET['duration'] ?? 0);
   $guests = (int)($_GET['guests_count'] ?? 0);
   $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
   $allowed = $allowedSchemeNums;
 
   $dateReservation = trim($dateReservation);
@@ -410,6 +411,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
     $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
     foreach ($free as $row) {
       if (!is_array($row)) continue;
+      if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
       $num = trim((string)($row['table_num'] ?? ''));
       if ($num === '') continue;
       if (is_array($allowedSet) && !isset($allowedSet[$num])) continue;
@@ -425,6 +427,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
         'duration' => $duration,
         'spot_id' => $spotId,
         'guests_count' => $guests,
+        'hall_id' => $hallId,
       ],
       'free_table_nums' => array_values(array_keys($nums)),
       'free_tables' => $filtered,
@@ -451,6 +454,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   $dateReservation = trim((string)($_GET['date_reservation'] ?? ''));
   $duration = (int)($_GET['duration'] ?? 0);
   $spotId = (int)($_GET['spot_id'] ?? 1);
+  $hallId = 2;
   $allowed = $allowedSchemeNums;
 
   $displayTz = new DateTimeZone($displayTzName);
@@ -472,13 +476,12 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
     $resp = $api->request('incomingOrders.getReservations', [
-      'date_from' => $dayStartDisplay->format('Y-m-d H:i:s'),
-      'date_to' => $dayEndDisplay->format('Y-m-d H:i:s'),
       'timezone' => 'client',
     ], 'GET');
 
-    $tablesResp = $api->request('spots.getTables', [
+    $tablesResp = $api->request('spots.getTableHallTables', [
       'spot_id' => $spotId,
+      'hall_id' => $hallId,
       'without_deleted' => 1,
     ], 'GET');
 
@@ -500,7 +503,7 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
       $tableNameById[$id] = $sStr;
     }
 
-    $rows = is_array($resp) ? $resp : [];
+    $rowsAll = is_array($resp) ? $resp : [];
     $items = [];
 
     $extractNums = function ($value) use (&$extractNums) {
@@ -526,11 +529,14 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
     };
 
     $detailCache = [];
-    foreach ($rows as $row) {
+    foreach ($rowsAll as $row) {
       if (!is_array($row)) continue;
       $status = (int)($row['status'] ?? 0);
+      if ($status === 7) continue;
+      if ((int)($row['spot_id'] ?? 0) !== $spotId) continue;
 
       $start = trim((string)($row['date_reservation'] ?? ''));
+      if ($start === '' || substr($start, 0, 10) !== substr($dtDisplay->format('Y-m-d'), 0, 10)) continue;
       $dur = (int)($row['duration'] ?? 0);
       $guestsCount = trim((string)($row['guests_count'] ?? ''));
       $startDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $start, $displayTz);
@@ -610,9 +616,11 @@ if (($_GET['ajax'] ?? '') === 'reservations') {
         'date_from_api' => $dayStartDisplay->format('Y-m-d H:i:s'),
         'date_to_api' => $dayEndDisplay->format('Y-m-d H:i:s'),
         'spot_id' => $spotId,
+        'hall_id' => $hallId,
         'display_timezone' => $displayTzName,
         'api_timezone' => $apiTzName,
-        'count_raw' => is_array($resp) ? count($resp) : 0,
+        'count_raw' => is_array($rowsAll) ? count($rowsAll) : 0,
+        'count_filtered' => count($items),
       ],
       'reservations_items' => $items,
     ], JSON_UNESCAPED_UNICODE);
