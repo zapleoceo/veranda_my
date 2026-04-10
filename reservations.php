@@ -340,8 +340,8 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
             if (is_array($allTables)) {
                 foreach ($allTables as $t) {
                     if (isset($t['table_id'])) {
-                        // Prefer table_title as requested, fallback to table_num
-                        $tableNameMap[(int)$t['table_id']] = $t['table_title'] ?? $t['table_num'] ?? $t['table_id'];
+                        // Use table_num as requested, fallback to table_title
+                        $tableNameMap[(int)$t['table_id']] = $t['table_num'] ?? $t['table_title'] ?? $t['table_id'];
                     }
                 }
             }
