@@ -4,9 +4,7 @@ require_once __DIR__ . '/src/classes/PosterAPI.php';
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
-if (!veranda_can('admin')) {
-    veranda_require('banya');
-}
+veranda_require('banya');
 
 if (session_status() === PHP_SESSION_ACTIVE) {
     session_write_close();

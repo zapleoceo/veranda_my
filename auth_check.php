@@ -40,39 +40,45 @@ if (!function_exists('veranda_get_user_permissions')) {
             'roma' => false,
             'banya' => false,
             'employees' => false,
+            'reservations' => false,
             'exclude_toggle' => true,
             'telegram_ack' => false,
             'payday' => false,
         ];
         if ($email === '') return $defaults;
+        
+        $out = $defaults;
         try {
             $users = $db->t('users');
             $row = $db->query("SELECT permissions_json FROM {$users} WHERE email = ? LIMIT 1", [$email])->fetch();
             $raw = (string)($row['permissions_json'] ?? '');
-            if ($raw === '') return $defaults;
-            $decoded = json_decode($raw, true);
-            if (!is_array($decoded)) return $defaults;
-            $out = $defaults;
-            foreach ($defaults as $k => $_) {
-                if (array_key_exists($k, $decoded)) {
-                    $out[$k] = (bool)$decoded[$k];
+            if ($raw !== '') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    foreach ($defaults as $k => $_) {
+                        if (array_key_exists($k, $decoded)) {
+                            $out[$k] = (bool)$decoded[$k];
+                        }
+                    }
                 }
             }
-            if (!empty($out['exclude_toggle']) || !empty($out['telegram_ack'])) {
-                $out['exclude_toggle'] = true;
-                $out['telegram_ack'] = true;
-            }
-            if (!empty($out['admin'])) {
-                $out['roma'] = true;
-                $out['banya'] = true;
-                $out['employees'] = true;
-                $out['errors'] = true;
-                $out['zapara'] = true;
-            }
-            return $out;
         } catch (\Exception $e) {
-            return $defaults;
+            // keep defaults
         }
+
+        if (!empty($out['exclude_toggle']) || !empty($out['telegram_ack'])) {
+            $out['exclude_toggle'] = true;
+            $out['telegram_ack'] = true;
+        }
+        if (!empty($out['admin'])) {
+            $out['roma'] = true;
+            $out['banya'] = true;
+            $out['employees'] = true;
+            $out['errors'] = true;
+            $out['zapara'] = true;
+            $out['reservations'] = true;
+        }
+        return $out;
     }
 }
 

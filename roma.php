@@ -4,9 +4,7 @@ require_once __DIR__ . '/src/classes/PosterAPI.php';
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
-if (!veranda_can('admin')) {
-    veranda_require('roma');
-}
+veranda_require('roma');
 
 $token = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
 

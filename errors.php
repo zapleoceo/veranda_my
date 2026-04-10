@@ -1,25 +1,9 @@
 <?php
-// require_once __DIR__ . '/auth_check.php';
+require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/src/classes/Database.php';
-if (file_exists(__DIR__ . '/.env')) {
-    $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
-        if (strpos(trim($line), '#') === 0) continue;
-        if (strpos($line, '=') === false) continue;
-        [$name, $value] = explode('=', $line, 2);
-        $_ENV[$name] = trim($value);
-    }
-}
-$db = new \App\Classes\Database(
-    $_ENV['DB_HOST'] ?? 'localhost',
-    $_ENV['DB_NAME'] ?? 'veranda_my',
-    $_ENV['DB_USER'] ?? 'veranda_my',
-    $_ENV['DB_PASS'] ?? '',
-    (string)($_ENV['DB_TABLE_SUFFIX'] ?? '')
-);
-
 require_once __DIR__ . '/src/classes/PosterAPI.php';
-// veranda_require('errors');
+
+veranda_require('errors');
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
