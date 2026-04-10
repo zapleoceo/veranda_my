@@ -1343,9 +1343,10 @@
             }
           }
 
-          checkModalAvailability();
-          if (modalTableBusy) {
-            throw new Error(t('table_busy_warning'));
+          const currentReq = getCurrentRequest();
+          const un = getUnavailableReason(tableNum, currentReq);
+          if (un) {
+            throw new Error(un.reason + (un.detail ? ' · ' + un.detail : ''));
           }
 
           const url = new URL(location.href);
