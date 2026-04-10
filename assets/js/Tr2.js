@@ -962,6 +962,18 @@
     };
     let modalTableBusy = false;
 
+    const logJs = async (msg, data = {}) => {
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'log_js');
+        await fetch(url.toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ msg, data })
+        });
+      } catch (e) {}
+    };
+
     const checkModalAvailability = () => {
       if (!pendingBooking || !pendingBooking.tableNum || !reqStart || !reqStart.value || !reqDuration) {
         modalTableBusy = true;
@@ -975,6 +987,8 @@
       
       const un = getUnavailableReason(tableNum, current);
       
+      logJs('checkModalAvailability: start', { tableNum, current, un, modalTableBusy });
+
       const tableBusyWarning = document.getElementById('tableBusyWarning');
       if (un) {
         modalTableBusy = true;
@@ -987,6 +1001,7 @@
         if (tableBusyWarning) tableBusyWarning.style.display = 'none';
       }
 
+      logJs('checkModalAvailability: end', { un, modalTableBusy });
       console.log('checkModalAvailability: un=', un, ' modalTableBusy=', modalTableBusy);
       syncSubmitState();
     };
@@ -1251,12 +1266,16 @@
       reqForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
+        logJs('submit click', { submitBusy, modalTableBusy });
+
         // Log explicitly for debugging if it prevents
         if (submitBusy) {
+            logJs('submit prevented: submitBusy is true', {});
             console.log('submit prevented: submitBusy is true');
             return;
         }
         if (modalTableBusy) {
+            logJs('submit prevented: modalTableBusy is true', {});
             console.log('submit prevented: modalTableBusy is true');
             return;
         }
@@ -1284,6 +1303,7 @@
         if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push(t('missing_telegram'));
         if (missing.length) {
           const msg = t('missing_prefix') + missing.join(', ');
+          logJs('submit prevented: missing fields', { missing });
           setOutput({ ok: false, error: msg });
           setMsgrHint(msg);
           syncSubmitState();
@@ -1332,6 +1352,7 @@
 
           const currentReq = getCurrentRequest();
           const un = getUnavailableReason(tableNum, currentReq);
+          logJs('submit check un', { tableNum, currentReq, un });
           if (un) {
             throw new Error(un.reason + (un.detail ? ' · ' + un.detail : ''));
           }

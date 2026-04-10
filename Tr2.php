@@ -437,6 +437,18 @@ try {
   $allowedSchemeNums = null;
 }
 
+if (($_GET['ajax'] ?? '') === 'log_js') {
+    $raw = file_get_contents('php://input');
+    $j = json_decode($raw, true);
+    if (is_array($j)) {
+        $logFile = __DIR__ . '/js_debug.log';
+        $entry = date('Y-m-d H:i:s') . ' | IP: ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . ' | MSG: ' . ($j['msg'] ?? '') . ' | DATA: ' . json_encode($j['data'] ?? [], JSON_UNESCAPED_UNICODE) . "\n";
+        file_put_contents($logFile, $entry, FILE_APPEND);
+    }
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'free_tables') {
   header('Content-Type: application/json; charset=utf-8');
   header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -1733,6 +1745,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_0016"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_0017"></script>
 </body>
 </html>
