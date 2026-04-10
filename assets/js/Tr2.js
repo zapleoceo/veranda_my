@@ -321,8 +321,11 @@
     const toastTitleEl = document.getElementById('toastTitle');
     const toastReasonEl = document.getElementById('toastReason');
     const dtpModal = document.getElementById('dtpModal');
-    const dtpDateList = document.getElementById('dtpDateList');
-    const dtpTimeList = document.getElementById('dtpTimeList');
+    const dtpPrev = document.getElementById('dtpPrev');
+    const dtpNext = document.getElementById('dtpNext');
+    const dtpMonthLabel = document.getElementById('dtpMonthLabel');
+    const dtpWeek = document.getElementById('dtpWeek');
+    const dtpCalGrid = document.getElementById('dtpCalGrid');
     const dtpOk = document.getElementById('dtpOk');
 
     let last = null;
@@ -340,12 +343,26 @@
     let dtpSelTime = null;
     let skipNextResDateAutoLoad = false;
 
-    const normPhone = (raw) => String(raw || '').replace(/\D+/g, '').slice(0, 15);
-    const isPhoneValid = (raw) => /^[1-9]\d{8,14}$/.test(normPhone(raw));
+    const phoneDigits = (raw) => String(raw || '').replace(/\D+/g, '').slice(0, 15);
+    const isPhoneValid = (raw) => /^[1-9]\d{8,14}$/.test(phoneDigits(raw));
     if (reqPhone) {
+      const applyPhoneMask = () => {
+        const digits = phoneDigits(reqPhone.value);
+        const next = '+' + digits;
+        if (reqPhone.value !== next) reqPhone.value = next;
+        if (reqPhone.selectionStart != null && reqPhone.selectionStart < 1) reqPhone.setSelectionRange(1, 1);
+      };
+      reqPhone.addEventListener('focus', () => {
+        if (!String(reqPhone.value || '').trim()) reqPhone.value = '+';
+        applyPhoneMask();
+      });
+      reqPhone.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && (reqPhone.selectionStart || 0) <= 1 && (reqPhone.selectionEnd || 0) <= 1) {
+          e.preventDefault();
+        }
+      });
       reqPhone.addEventListener('input', () => {
-        const d = normPhone(reqPhone.value);
-        if (reqPhone.value !== d) reqPhone.value = d;
+        applyPhoneMask();
         syncSubmitState();
       });
     }
@@ -412,84 +429,100 @@
       }
     };
 
-    const wheelIndex = (el, count) => {
-      if (!el) return 0;
-      const idx = Math.round(el.scrollTop / 40);
-      return Math.max(0, Math.min((count || 1) - 1, idx));
-    };
+    let dtpView = null;
+    const weekStart = 1;
+    const weekdayIndex = (d) => (d.getDay() - weekStart + 7) % 7;
+    const formatMonth = (d) => new Intl.DateTimeFormat(UI_LOCALE, { month: 'long', year: 'numeric' }).format(d);
 
-    const updateWheelActive = (listEl, idx) => {
-      if (!listEl) return;
-      Array.from(listEl.children).forEach((c, i) => {
-        if (!(c instanceof HTMLElement)) return;
-        if (i === idx) c.classList.add('active');
-        else c.classList.remove('active');
-      });
-    };
-
-    const setWheelTo = (listEl, idx) => {
-      if (!listEl) return;
-      listEl.scrollTop = Math.max(0, idx) * 40;
-      updateWheelActive(listEl, idx);
-    };
-
-    const ensureDtpData = () => {
-      if (!dtpDateList) return;
-      if (!dtpDates.length) {
-        const minSlotDateStr = getMinSelectableSlot().dateVal;
-        const [y, m, d] = minSlotDateStr.split('-');
-        const base = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10), 0, 0, 0);
-        const days = 28;
-        dtpDates = [];
-        for (let i = 0; i < days; i++) {
-          const dt = new Date(base.getTime() + (i * 86400000));
-          dtpDates.push({ value: isoDate(dt), date: dt });
-        }
-        dtpDateList.innerHTML = '';
-        dtpDates.forEach(({ value, date }) => {
-          const label = new Intl.DateTimeFormat(UI_LOCALE, { weekday: 'short', day: '2-digit', month: 'short' }).format(date);
-          const it = document.createElement('div');
-          it.className = 'wheel-item';
-          it.dataset.value = value;
-          it.textContent = label;
-          dtpDateList.appendChild(it);
-        });
+    const ensureWeekHeader = () => {
+      if (!dtpWeek) return;
+      if (dtpWeek.childElementCount) return;
+      for (let i = 0; i < 7; i++) {
+        const base = new Date(2020, 5, 1 + i);
+        const idx = weekdayIndex(base);
+        const day = new Date(base.getTime() + (idx * 86400000));
+        const el = document.createElement('div');
+        el.className = 'cal-wd';
+        el.textContent = new Intl.DateTimeFormat(UI_LOCALE, { weekday: 'short' }).format(day);
+        dtpWeek.appendChild(el);
       }
     };
 
-    const syncDtpSelectionFromInput = () => {
-      ensureDtpData();
+    const parseInputDate = () => {
       const raw = resDate ? String(resDate.value || '').trim() : '';
       const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
       const fallback = getMinSelectableSlot();
-      const pickedDate = m ? m[1] : fallback.dateVal;
-      dtpSelDate = pickedDate;
-      const dIdx = Math.max(0, dtpDates.findIndex((x) => x.value === pickedDate));
-      setWheelTo(dtpDateList, dIdx);
+      const picked = clampToMinSlot(m ? m[1] : fallback.dateVal, fallback.timeVal);
+      return picked.dateVal;
+    };
+
+    const renderCalendar = () => {
+      if (!dtpCalGrid || !dtpMonthLabel) return;
+      ensureWeekHeader();
+      const minSlot = getMinSelectableSlot();
+      if (!dtpSelDate) dtpSelDate = parseInputDate();
+      const m = dtpSelDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      const selDateObj = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date();
+      if (!dtpView) dtpView = new Date(selDateObj.getFullYear(), selDateObj.getMonth(), 1);
+
+      dtpMonthLabel.textContent = formatMonth(dtpView);
+      dtpCalGrid.innerHTML = '';
+
+      const viewYear = dtpView.getFullYear();
+      const viewMonth = dtpView.getMonth();
+      const first = new Date(viewYear, viewMonth, 1);
+      const firstIdx = weekdayIndex(first);
+      const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+      const prevDays = new Date(viewYear, viewMonth, 0).getDate();
+      const today = new Date();
+      const todayVal = isoDate(today);
+
+      const addCell = (dateObj, inMonth) => {
+        const dateVal = isoDate(dateObj);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cal-day';
+        btn.textContent = String(dateObj.getDate());
+        if (!inMonth) btn.classList.add('out');
+        if (dateVal === todayVal) btn.classList.add('today');
+        if (dateVal === dtpSelDate) btn.classList.add('sel');
+        if (dateVal < minSlot.dateVal) btn.classList.add('dis');
+        btn.addEventListener('click', () => {
+          if (btn.classList.contains('dis')) return;
+          dtpSelDate = dateVal;
+          renderCalendar();
+        });
+        dtpCalGrid.appendChild(btn);
+      };
+
+      for (let i = 0; i < firstIdx; i++) {
+        const d = new Date(viewYear, viewMonth - 1, prevDays - firstIdx + 1 + i);
+        addCell(d, false);
+      }
+      for (let d = 1; d <= daysInMonth; d++) addCell(new Date(viewYear, viewMonth, d), true);
+      const cells = dtpCalGrid.childElementCount;
+      const rest = (7 - (cells % 7)) % 7;
+      for (let i = 1; i <= rest; i++) addCell(new Date(viewYear, viewMonth + 1, i), false);
+    };
+
+    const syncDtpSelectionFromInput = () => {
+      dtpSelDate = parseInputDate();
+      const m = dtpSelDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m) dtpView = new Date(Number(m[1]), Number(m[2]) - 1, 1);
+      renderCalendar();
     };
 
     const applyDtpToInput = () => {
       if (!resDate) return;
       const fallback = getMinSelectableSlot();
-      const pickedDate = dtpSelDate || fallback.dateVal;
-      resDate.value = pickedDate;
+      const picked = clampToMinSlot(dtpSelDate || fallback.dateVal, fallback.timeVal);
+      resDate.value = picked.dateVal;
       if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
       resDate.dispatchEvent(new Event('change', { bubbles: true }));
     };
 
-
-
-    if (dtpDateList) {
-      let t = null;
-      dtpDateList.addEventListener('scroll', () => {
-        if (t) clearTimeout(t);
-        t = setTimeout(() => {
-          const idx = wheelIndex(dtpDateList, dtpDates.length);
-          updateWheelActive(dtpDateList, idx);
-          dtpSelDate = dtpDates[idx] ? dtpDates[idx].value : dtpSelDate;
-        }, 80);
-      });
-    }
+    if (dtpPrev) dtpPrev.addEventListener('click', () => { if (!dtpView) syncDtpSelectionFromInput(); dtpView = new Date(dtpView.getFullYear(), dtpView.getMonth() - 1, 1); renderCalendar(); });
+    if (dtpNext) dtpNext.addEventListener('click', () => { if (!dtpView) syncDtpSelectionFromInput(); dtpView = new Date(dtpView.getFullYear(), dtpView.getMonth() + 1, 1); renderCalendar(); });
     if (dtpOk) dtpOk.addEventListener('click', () => {
       skipNextResDateAutoLoad = true;
       applyDtpToInput();
@@ -1235,7 +1268,7 @@
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
-      const phone = reqPhone ? String(reqPhone.value || '').trim() : '';
+      const phone = reqPhone ? ('+' + phoneDigits(reqPhone.value)) : '';
       const comment = reqComment ? String(reqComment.value || '').trim() : '';
       const preorder = guests > 5 ? getPreorderText('ui') : '';
       const preorderRu = guests > 5 ? getPreorderText('ru') : '';
@@ -1409,7 +1442,7 @@
 
         try {
           name = reqName ? String(reqName.value || '').trim() : '';
-          phone = reqPhone ? normPhone(reqPhone.value) : '';
+          phone = reqPhone ? ('+' + phoneDigits(reqPhone.value)) : '';
           guests = reqGuests ? Number(reqGuests.value || 0) : 0;
           if (pendingBooking && pendingBooking.start && reqStart && reqStart.value) {
             const dPart = String(pendingBooking.start).slice(0, 10);
@@ -1869,8 +1902,9 @@
       const loadReservations = async () => {
         const rUrl = new URL(location.href);
         rUrl.searchParams.set('ajax', 'reservations');
-        rUrl.searchParams.set('date_reservation', dt);
-        rUrl.searchParams.set('duration', String(current.durationSec || 7200));
+        const day = String(dt || '').slice(0, 10);
+        rUrl.searchParams.set('date_reservation', (day ? (day + ' 00:00:00') : dt));
+        rUrl.searchParams.set('duration', String(86400));
         rUrl.searchParams.set('spot_id', '1');
         const rX = await fetchJson(rUrl.toString());
         const rRes = rX.res;

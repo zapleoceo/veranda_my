@@ -518,6 +518,59 @@
     }
     .dtp.on .dtp-card { transform: translateY(0) scale(1); opacity: 1; }
     .dtp-title { font-weight: 900; font-size: 16px; font-family: var(--font-display); }
+    .cal {
+      margin-top: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(213,156,90,0.18);
+      background: rgba(255,255,255,0.03);
+      padding: 12px;
+    }
+    .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .cal-nav {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid rgba(213,156,90,0.22);
+      background: rgba(0,0,0,0.18);
+      color: rgba(255,250,244,0.92);
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .cal-nav:hover { background: rgba(213,156,90,0.10); }
+    .cal-month {
+      flex: 1 1 auto;
+      text-align: center;
+      font-family: var(--font-display);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 13px;
+      color: rgba(255,250,244,0.92);
+    }
+    .cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 10px; }
+    .cal-wd { text-align: center; font-size: 11px; font-weight: 800; color: rgba(245,238,228,0.58); text-transform: uppercase; letter-spacing: 0.06em; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 8px; }
+    .cal-day {
+      height: 42px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.12);
+      color: rgba(255,250,244,0.92);
+      font-weight: 900;
+      font-family: var(--font-display);
+      cursor: pointer;
+    }
+    .cal-day:hover { background: rgba(213,156,90,0.10); border-color: rgba(213,156,90,0.28); }
+    .cal-day.out { color: rgba(245,238,228,0.45); background: rgba(0,0,0,0.08); }
+    .cal-day.dis { opacity: 0.35; cursor: default; }
+    .cal-day.dis:hover { background: rgba(0,0,0,0.12); border-color: rgba(255,255,255,0.10); }
+    .cal-day.today { border-color: rgba(42,171,238,0.45); }
+    .cal-day.sel {
+      background: linear-gradient(180deg, rgba(213,156,90,0.95), rgba(154,108,52,0.95));
+      border-color: rgba(213,156,90,0.55);
+      color: rgba(11,7,5,0.98);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.30);
+    }
     .dtp-wheels { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 10px; margin-top: 12px; }
     .wheel {
       position: relative;

@@ -80,7 +80,7 @@ $I18N = [
     'try_ok_again' => 'Ошибка запроса. Попробуй нажать “Ок” ещё раз.',
     'confirm_capacity' => 'Вы хотите забронировать столик для {max} для {guests} гостей?',
     'busy_now' => 'Сейчас занят',
-    'dtp_title' => 'Выбор даты и времени',
+    'dtp_title' => 'Выбор даты',
     'status_free' => 'Свободен',
     'status_busy' => 'Занят',
     'tg_thanks_title' => 'Спасибо!',
@@ -154,7 +154,7 @@ $I18N = [
     'try_ok_again' => 'Request failed. Please press “OK” again.',
     'confirm_capacity' => 'Do you want to book a table for {max} when you have {guests} guests?',
     'busy_now' => 'Busy now',
-    'dtp_title' => 'Pick date & time',
+    'dtp_title' => 'Pick date',
     'status_free' => 'Free',
     'status_busy' => 'Busy',
     'tg_thanks_title' => 'Thank you!',
@@ -228,7 +228,7 @@ $I18N = [
     'try_ok_again' => 'Lỗi yêu cầu. Hãy nhấn “OK” lại.',
     'confirm_capacity' => 'Bạn muốn đặt bàn {max} chỗ cho {guests} khách phải không?',
     'busy_now' => 'Đang bận',
-    'dtp_title' => 'Chọn ngày & giờ',
+    'dtp_title' => 'Chọn ngày',
     'status_free' => 'Trống',
     'status_busy' => 'Bận',
     'tg_thanks_title' => 'Cảm ơn!',
@@ -867,6 +867,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     echo json_encode(['ok' => false, 'error' => $trFor('phone_invalid')], JSON_UNESCAPED_UNICODE);
     exit;
   }
+  $phoneNorm = '+' . $phoneNorm;
   $comment = str_replace(["\r\n", "\r"], "\n", $comment);
   if (mb_strlen($comment) > 600) $comment = mb_substr($comment, 0, 600);
   $preorder = str_replace(["\r\n", "\r"], "\n", $preorder);
@@ -1291,7 +1292,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/links/table-reservation.css?v=20260410_1000">
+    <link rel="stylesheet" href="/links/table-reservation.css?v=20260410_1135">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1407,15 +1408,14 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
     <div class="dtp-backdrop" data-dtp-close></div>
     <div class="dtp-card" role="dialog" aria-modal="true" aria-labelledby="dtpTitle">
       <div class="dtp-title" id="dtpTitle" data-i18n="dtp_title"><?= htmlspecialchars(tr('dtp_title')) ?></div>
-      <div class="dtp-wheels">
-        <div class="wheel">
-          <div class="wheel-mid"></div>
-          <div class="wheel-list" id="dtpDateList"></div>
+      <div class="cal">
+        <div class="cal-head">
+          <button type="button" class="cal-nav" id="dtpPrev" aria-label="Prev month">‹</button>
+          <div class="cal-month" id="dtpMonthLabel"></div>
+          <button type="button" class="cal-nav" id="dtpNext" aria-label="Next month">›</button>
         </div>
-        <div class="wheel">
-          <div class="wheel-mid"></div>
-          <div class="wheel-list" id="dtpTimeList"></div>
-        </div>
+        <div class="cal-week" id="dtpWeek"></div>
+        <div class="cal-grid" id="dtpCalGrid"></div>
       </div>
       <div class="dtp-actions">
         <button class="btn btn-secondary" type="button" data-dtp-close data-i18n="cancel"><?= htmlspecialchars(tr('cancel')) ?></button>
@@ -1457,7 +1457,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                   <div class="msgr-hint" id="msgrHint" hidden></div>
                 </div>
                 <div class="phone-row">
-                  <input type="tel" id="reqPhone" autocomplete="tel" inputmode="numeric" pattern="[1-9][0-9]{8,14}">
+                  <input type="tel" id="reqPhone" autocomplete="tel" inputmode="numeric" pattern="\+[1-9][0-9]{8,14}">
                   <div class="tg-stack">
                     <div class="tg-nick" id="tgNick" hidden></div>
                     <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
@@ -1555,6 +1555,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/links/table-reservation.js?v=20260410_1000"></script>
+  <script src="/links/table-reservation.js?v=20260410_1135"></script>
 </body>
 </html>
