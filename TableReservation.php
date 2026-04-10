@@ -1348,7 +1348,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
         <div class="title-wrap">
           <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
           <p><span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span> <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
-          <input type="datetime-local" id="resDate" step="1800" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
+          <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
         </div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
