@@ -1,6 +1,4 @@
 <?php
-require_once __DIR__ . '/src/classes/Database.php';
-
 if (file_exists(__DIR__ . '/.env')) {
     $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
@@ -13,13 +11,20 @@ if (file_exists(__DIR__ . '/.env')) {
 }
 
 require_once __DIR__ . '/auth_check.php';
+require_once __DIR__ . '/src/classes/Database.php';
 require_once __DIR__ . '/src/classes/MetaRepository.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 require_once __DIR__ . '/src/classes/TelegramBot.php';
 
 veranda_require('reservations');
 
-$db = new \App\Classes\Database();
+$db = new \App\Classes\Database(
+    $_ENV['DB_HOST'] ?? 'localhost',
+    $_ENV['DB_NAME'] ?? 'veranda_my',
+    $_ENV['DB_USER'] ?? 'veranda_my',
+    $_ENV['DB_PASS'] ?? '',
+    (string)($_ENV['DB_TABLE_SUFFIX'] ?? '')
+);
 $db->createReservationsTable();
 $resTable = $db->t('reservations');
 
@@ -95,6 +100,11 @@ if ($ajax === 'resend') {
     $okGuest = true;
     if ($tgUid > 0) {
         $userText = '<b>Спасибо!</b> Мы с вами свяжемся в ближайшее время.' . "\n\n";
+        $qrUrl = (string)$row['qr_url'];
+        if ($qrUrl !== '') {
+            $userText .= "<b>Оплата предзаказа</b>\n";
+            $userText .= "Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.\n\n";
+        }
         $userText .= '<b>Ваша бронь</b>' . "\n";
         $userText .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
         $userText .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
@@ -110,7 +120,6 @@ if ($ajax === 'resend') {
         }
 
         $ch = curl_init();
-        $qrUrl = (string)$row['qr_url'];
         if ($qrUrl !== '') {
             curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
             curl_setopt($ch, CURLOPT_POST, true);
