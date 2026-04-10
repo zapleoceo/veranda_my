@@ -555,4 +555,26 @@ class Database {
         } catch (\Throwable $e) {
         }
     }
+
+    public function createReservationsTable() {
+        $t = $this->t('reservations');
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$t} (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            created_at DATETIME NOT NULL,
+            start_time DATETIME NOT NULL,
+            guests INT NOT NULL,
+            table_num VARCHAR(32) NOT NULL,
+            name VARCHAR(128) NOT NULL,
+            phone VARCHAR(64) NOT NULL,
+            comment TEXT,
+            preorder_text TEXT,
+            preorder_ru TEXT,
+            tg_user_id BIGINT NULL,
+            tg_username VARCHAR(64) NULL,
+            total_amount INT DEFAULT 0,
+            qr_url VARCHAR(255) NULL,
+            qr_code VARCHAR(64) NULL,
+            KEY idx_start_time (start_time)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    }
 }
