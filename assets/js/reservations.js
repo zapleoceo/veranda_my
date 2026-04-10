@@ -197,13 +197,22 @@
 
   const bindShowDeleted = () => {
     const cb = q('#showDeleted');
-    if (!cb) return;
-    cb.addEventListener('change', () => {
+    const pcb = q('#showPoster');
+    if (!cb && !pcb) return;
+
+    const reload = () => {
       const url = new URL(location.href);
-      if (cb.checked) url.searchParams.set('show_deleted', '1');
+      if (cb && cb.checked) url.searchParams.set('show_deleted', '1');
       else url.searchParams.delete('show_deleted');
+
+      if (pcb && !pcb.checked) url.searchParams.set('show_poster', '0');
+      else url.searchParams.delete('show_poster');
+
       location.href = url.toString();
-    });
+    };
+
+    if (cb) cb.addEventListener('change', reload);
+    if (pcb) pcb.addEventListener('change', reload);
   };
 
   bindSort();

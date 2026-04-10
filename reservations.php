@@ -300,6 +300,7 @@ if ($ajax === 'toggle_deleted') {
 $dateFrom = $_GET['date_from'] ?? date('Y-m-d', strtotime('-1 week'));
 $dateTo = $_GET['date_to'] ?? date('Y-m-d', strtotime('+1 month'));
 $showDeleted = !empty($_GET['show_deleted']);
+$showPoster = isset($_GET['show_poster']) ? !empty($_GET['show_poster']) : true;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-d', strtotime('-1 week'));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d', strtotime('+1 month'));
@@ -326,7 +327,7 @@ if (!is_array($rows)) {
 
 // FETCH FROM POSTER
 $posterRows = [];
-if (!empty($_ENV['POSTER_API_TOKEN'])) {
+if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
     try {
         $api = new \App\Classes\PosterAPI($_ENV['POSTER_API_TOKEN']);
         
@@ -411,10 +412,16 @@ $rows = $allRows;
                     <div class="title">Брони</div>
                     <div class="sub">Период и управление заявками</div>
                 </div>
-                <label class="res-switch">
-                    <input id="showDeleted" type="checkbox" <?= $showDeleted ? 'checked' : '' ?>>
-                    <span>Показывать удалённые</span>
-                </label>
+                <div class="res-controls" style="display: flex; gap: 15px; align-items: center;">
+                    <label class="res-switch">
+                        <input id="showPoster" type="checkbox" <?= $showPoster ? 'checked' : '' ?>>
+                        <span>Брони Poster</span>
+                    </label>
+                    <label class="res-switch">
+                        <input id="showDeleted" type="checkbox" <?= $showDeleted ? 'checked' : '' ?>>
+                        <span>Удалённые</span>
+                    </label>
+                </div>
             </div>
 
             <form method="GET" class="filters">
@@ -430,7 +437,8 @@ $rows = $allRows;
                 </div>
                 <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>">
                 <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
-                <?php if ($showDeleted): ?><input type="hidden" name="show_deleted" value="1"><?php endif; ?>
+                <input type="hidden" name="show_deleted" value="<?= $showDeleted ? '1' : '' ?>">
+                <input type="hidden" name="show_poster" value="<?= $showPoster ? '1' : '' ?>">
                 <button type="submit" class="btn-primary">Показать</button>
             </form>
 
