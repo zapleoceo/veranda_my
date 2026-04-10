@@ -786,8 +786,8 @@
     .table .res-time {
       position: absolute;
       top: 34px;
-      left: 10px;
-      right: 10px;
+      left: 5px;
+      right: 5px;
       font-size: 0.6rem;
       font-weight: 800;
       letter-spacing: -0.02em;
