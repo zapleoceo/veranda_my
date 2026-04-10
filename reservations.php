@@ -1,11 +1,5 @@
 <?php
-require __DIR__ . '/auth_check.php';
-veranda_require('reservations');
-
-require __DIR__ . '/src/classes/Database.php';
-require __DIR__ . '/src/classes/MetaRepository.php';
-require __DIR__ . '/src/classes/PosterAPI.php';
-require __DIR__ . '/src/classes/TelegramBot.php';
+require_once __DIR__ . '/src/classes/Database.php';
 
 if (file_exists(__DIR__ . '/.env')) {
     $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -17,6 +11,13 @@ if (file_exists(__DIR__ . '/.env')) {
         $_ENV[$name] = trim($value);
     }
 }
+
+require_once __DIR__ . '/auth_check.php';
+require_once __DIR__ . '/src/classes/MetaRepository.php';
+require_once __DIR__ . '/src/classes/PosterAPI.php';
+require_once __DIR__ . '/src/classes/TelegramBot.php';
+
+veranda_require('reservations');
 
 $db = new \App\Classes\Database();
 $db->createReservationsTable();
