@@ -480,7 +480,7 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
         if (is_array($resp)) {
             foreach ($resp as $pr) {
                 $status = (int)($pr['status'] ?? 0);
-                if (!$showDeleted && $status === 7) continue;
+                if (!$showDeleted && $status === 0) continue; // Skip cancelled if not showing deleted
                 
                 $tId = (int)($pr['table_id'] ?? 0);
                 $displayTable = isset($tableNameMap[$tId]) ? $tableNameMap[$tId] : ($tId > 0 ? $tId : '?');
@@ -488,7 +488,7 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
                 $posterRows[] = [
                     'id' => 'P' . ($pr['incoming_order_id'] ?? 0),
                     'qr_code' => 'POSTER',
-                    'created_at' => $pr['created_at'] ?? '',
+                    'created_at' => $pr['date_created'] ?? '',
                     'start_time' => $pr['date_reservation'] ?? '',
                     'table_num' => $displayTable,
                     'guests' => $pr['guests_count'] ?? 0,
@@ -500,8 +500,8 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
                     'total_amount' => 0,
                     'qr_url' => '',
                     'is_poster' => true,
-                    'status_text' => ($status === 7 ? 'Отменено' : ($status === 1 ? 'Принято' : 'Новый')),
-                    'deleted_at' => ($status === 7 ? ($pr['updated_at'] ?? '') : null),
+                    'status_text' => ($status === 0 ? 'Отменено' : 'Активно'),
+                    'deleted_at' => ($status === 0 ? ($pr['date_updated'] ?? '1') : null),
                 ];
             }
         }
