@@ -1259,7 +1259,7 @@ if (($_GET['ajax'] ?? '') === 'tg_state_create') {
 
   $host = (string)($_SERVER['HTTP_HOST'] ?? '');
   $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-  $returnUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/TableReservation.php?tg_state=' . rawurlencode($code);
+  $returnUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/Tr2.php?tg_state=' . rawurlencode($code);
   $botUrl = 'https://t.me/' . rawurlencode($tgUserBot) . '?start=' . rawurlencode($code);
 
   echo json_encode(['ok' => true, 'code' => $code, 'bot_url' => $botUrl, 'return_url' => $returnUrl], JSON_UNESCAPED_UNICODE);
@@ -1733,6 +1733,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_0009"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_0010"></script>
 </body>
 </html>

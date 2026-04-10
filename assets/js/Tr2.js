@@ -1135,6 +1135,7 @@
       const comment = reqComment ? String(reqComment.value || '').trim() : '';
       const preorder = guests > 5 ? getPreorderText('ui') : '';
       const preorderRu = guests > 5 ? getPreorderText('ru') : '';
+      const totalAmount = getTotalPreorderAmount();
       const resDt = resDate ? String(resDate.value || '').trim() : '';
       const scrollY = Math.max(0, Math.floor(window.scrollY || 0));
 
@@ -1147,7 +1148,7 @@
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, lang: UI_LANG, res_date: resDt, scroll_y: scrollY }),
+            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, scroll_y: scrollY }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
