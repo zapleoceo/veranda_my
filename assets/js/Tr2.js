@@ -667,6 +667,13 @@
     };
 
     let preorderCounts = {};
+    const getPreorderPrice = (key) => {
+      const k = String(key || '').trim();
+      if (!k) return 0;
+      const map = window.preorderPriceByKey && typeof window.preorderPriceByKey === 'object' ? window.preorderPriceByKey : {};
+      const v = map[k];
+      return v != null ? Number(v) || 0 : 0;
+    };
     const getPreorderUiTitle = (key) => {
       const k = String(key || '').trim();
       if (!k) return '';

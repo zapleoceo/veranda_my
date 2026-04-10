@@ -1745,6 +1745,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_0018"></script>
+  <script src="/assets/js/Tr2.js?v=20260410_0019"></script>
 </body>
 </html>
