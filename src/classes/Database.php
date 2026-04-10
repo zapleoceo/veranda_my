@@ -572,6 +572,8 @@ class Database {
             tg_user_id BIGINT NULL,
             tg_username VARCHAR(64) NULL,
             tg_message_id BIGINT NULL,
+            zalo_user_id VARCHAR(64) NULL,
+            zalo_phone VARCHAR(64) NULL,
             lang VARCHAR(8) NULL,
             total_amount INT DEFAULT 0,
             qr_url VARCHAR(255) NULL,

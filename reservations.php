@@ -206,6 +206,9 @@ if ($ajax === 'resend') {
                 $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
             }
         }
+        if (!empty($row['zalo_phone'])) {
+            $text .= "\nZalo: <a href=\"https://zalo.me/" . htmlspecialchars(ltrim($row['zalo_phone'], '+')) . "\">" . htmlspecialchars($row['zalo_phone']) . "</a>";
+        }
         $text .= "\n\n@Ollushka90 @ce_akh1 свяжитесь с гостем";
         $okGroup = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
     }
@@ -346,6 +349,33 @@ if ($ajax === 'resend') {
 
         if (!is_array($data) || empty($data['ok'])) {
             $okGuest = false;
+        }
+
+        // Send Zalo confirmation if linked
+        if (!empty($row['zalo_phone']) && !empty($_ENV['ZALO_OA_TOKEN'])) {
+            try {
+                require_once __DIR__ . '/src/classes/ZaloAPI.php';
+                $zalo = new \App\Classes\ZaloAPI($_ENV['ZALO_OA_TOKEN']);
+                
+                $zaloText = $tr('thanks_title') . ' ' . $tr('thanks_body') . "\n\n";
+                $zaloText .= $tr('booking_title') . " #" . $code . "\n";
+                $zaloText .= $tr('date') . ': ' . $startDt->format('Y-m-d') . "\n";
+                $zaloText .= $tr('time') . ': ' . $startDt->format('H:i') . "\n";
+                $zaloText .= $tr('table') . ': ' . $row['table_num'] . "\n";
+                $zaloText .= $tr('guests') . ': ' . $row['guests'] . "\n";
+                
+                if (!empty($_ENV['ZALO_ZNS_TEMPLATE_ID'])) {
+                    $zalo->sendZNS($row['zalo_phone'], $_ENV['ZALO_ZNS_TEMPLATE_ID'], [
+                        'date' => $startDt->format('Y-m-d'),
+                        'time' => $startDt->format('H:i'),
+                        'table' => $row['table_num'],
+                        'guests' => (string)$row['guests'],
+                        'name' => $row['name']
+                    ]);
+                }
+            } catch (\Throwable $e_zalo) {
+                error_log("Zalo re-send error: " . $e_zalo->getMessage());
+            }
         }
     } else {
         if ($target === 'both' || $target === 'guest') $okGuest = false;
@@ -639,7 +669,10 @@ $rows = $allRows;
                                         <div style="font-weight:900;"><?= htmlspecialchars($r['name']) ?></div>
                                         <div class="res-muted"><?= htmlspecialchars($r['phone']) ?></div>
                                         <?php if ($tgUsername !== ''): ?>
-                                            <div class="res-muted"><a href="https://t.me/<?= htmlspecialchars($tgUsername) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">@<?= htmlspecialchars($tgUsername) ?></a></div>
+                                            <div class="res-muted"><a href="https://t.me/<?= htmlspecialchars($tgUsername) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">TG: @<?= htmlspecialchars($tgUsername) ?></a></div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($r['zalo_phone'])): ?>
+                                            <div class="res-muted"><a href="https://zalo.me/<?= htmlspecialchars(ltrim($r['zalo_phone'], '+')) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">Zalo: <?= htmlspecialchars($r['zalo_phone']) ?></a></div>
                                         <?php endif; ?>
                                         <?php if (!empty($r['comment']) || !empty($r['preorder_text'])): ?>
                                             <details class="res-more">

@@ -1367,6 +1367,45 @@
     }
     .msgr-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
     .msgr-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--color-text);
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    }
+    .msgr-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+    .msgr-btn svg { width: 18px; height: 18px; fill: currentColor; }
+    .msgr-btn.active {
+      background: rgba(184, 135, 70, 0.15);
+      border-color: rgba(184, 135, 70, 0.45);
+      color: var(--color-primary);
+    }
+    .msgr-btn-inline {
+      padding: 10px 14px;
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+    }
+    .tg-stack, .zalo-stack { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tg-nick, .zalo-nick {
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--color-primary);
+      background: rgba(184, 135, 70, 0.12);
+      padding: 4px 10px;
+      border-radius: 8px;
+    }
+    .msgr-btn {
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,0.14);
       background: rgba(255,255,255,0.06);
