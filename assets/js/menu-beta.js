@@ -9,7 +9,7 @@
         // When we scroll down (y > 0), moving the background up (negative px)
         // can reveal the bottom of the background image if we scroll too far.
         // By using calc and forcing the background-size to be larger, we prevent this.
-        bg.style.transform = `translate3d(0, ${-y * speed}px, 0) scale(1.1)`;
+        bg.style.transform = `translate3d(0, ${-y * speed}px, 0) scale(1.25)`;
         
         ticking = false;
     };

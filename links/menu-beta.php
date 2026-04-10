@@ -143,7 +143,18 @@ foreach ($groups as $station => $cats) {
 }
 
 $pageTitle = $lang === 'ru' ? 'Online меню' : ($lang === 'vi' ? 'Thực đơn online' : ($lang === 'ko' ? '온라인 메뉴' : 'Online menu'));
-$bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg';
+$bgImageUrls = [
+    'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg',
+    'https://images.pexels.com/photos/1059905/pexels-photo-1059905.jpeg',
+    'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg',
+    'https://images.pexels.com/photos/566566/pexels-photo-566566.jpeg',
+];
+$bgIdx = (int)date('z') % max(1, count($bgImageUrls));
+if (isset($_GET['bg']) && is_numeric($_GET['bg'])) {
+    $i = (int)$_GET['bg'];
+    if ($i >= 0 && $i < count($bgImageUrls)) $bgIdx = $i;
+}
+$bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
 ?>
 <!doctype html>
 <html lang="<?= htmlspecialchars($lang) ?>">
@@ -153,8 +164,8 @@ $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg'
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <title><?= htmlspecialchars($pageTitle) ?> | Veranda</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260409_002">
-  <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260409_002">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260410_001">
+  <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260410_001">
 </head>
 <body>
     <div class="parallax-bg" style="background-image: url('<?= htmlspecialchars($bgImageUrl) ?>');" aria-hidden="true"></div>
@@ -235,6 +246,6 @@ $bgImageUrl = 'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg'
             </div>
         <?php endif; ?>
     </div>
-    <script src="/assets/js/menu-beta.js?v=20260409_002"></script>
+    <script src="/assets/js/menu-beta.js?v=20260410_001"></script>
 </body>
 </html>
