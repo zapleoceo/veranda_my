@@ -1647,7 +1647,7 @@
       toastEl.classList.remove('pulse');
       requestAnimationFrame(() => toastEl.classList.add('pulse'));
       if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(hideToast, 1000);
+      toastTimer = setTimeout(hideToast, 2000);
     };
 
     const getUnavailableReason = (tableNum, current) => {
