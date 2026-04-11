@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0340">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0341">
 </head>
 <body>
 <div class="container">
@@ -5270,30 +5270,39 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const url = '?ajax=kashshift&dateFrom=' + encodeURIComponent(dFrom) + '&dateTo=' + encodeURIComponent(dTo);
             fetchJsonSafe(url).then(res => {
                 if (!res.ok) throw new Error(res.error || 'Ошибка');
-                let html = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap;"><thead><tr>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:1%;">Дата открытия</th>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:1%;">Дата закрытия</th>';
-                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">Сумма (cash)</th>';
-                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">Сумма (card)</th>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:auto;"></th>';
+                
+                if (!res.data || res.data.length === 0) {
+                    kashshiftBody.innerHTML = '<div style="text-align:center; padding:15px; color:var(--muted);">Нет данных за период</div>';
+                    return;
+                }
+                
+                // Сбор всех уникальных ключей для динамических колонок
+                const allKeys = new Set();
+                res.data.forEach(row => Object.keys(row).forEach(k => allKeys.add(k)));
+                const keys = Array.from(allKeys);
+                
+                let html = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap; font-size:13px;"><thead><tr>';
+                keys.forEach(k => {
+                    html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; background:var(--card);">' + escapeHtml(k) + '</th>';
+                });
                 html += '</tr></thead><tbody>';
                 
-                if (res.data && res.data.length > 0) {
-                    res.data.forEach(row => {
-                        html += '<tr style="cursor:pointer;" onclick="toggleShiftDetail(this, \'' + escapeHtml(row.cash_shift_id) + '\')">';
-                        html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(row.date_start) + '</td>';
-                        html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(row.date_end || '-') + '</td>';
-                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">' + fmtVnd2(posterMinorToVnd(row.amount_sell_cash)) + '</td>';
-                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">' + fmtVnd2(posterMinorToVnd(row.amount_sell_card)) + '</td>';
-                        html += '<td style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:auto;"></td>';
-                        html += '</tr>';
-                        html += '<tr id="shift_detail_' + escapeHtml(row.cash_shift_id) + '" style="display:none; background:var(--card2);">';
-                        html += '<td colspan="5" style="border-bottom:1px solid var(--border); padding:15px; white-space:normal;" class="shift-detail-content">Загрузка...</td>';
-                        html += '</tr>';
+                res.data.forEach(row => {
+                    html += '<tr style="cursor:pointer;" onclick="toggleShiftDetail(this, \'' + escapeHtml(row.cash_shift_id || row.shift_id || '') + '\')">';
+                    keys.forEach(k => {
+                        let val = row[k];
+                        if (val === null || val === undefined) val = '';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:6px;">' + escapeHtml(val) + '</td>';
                     });
-                } else {
-                    html += '<tr><td colspan="5" style="text-align:center; padding:15px; color:var(--muted);">Нет данных за период</td></tr>';
-                }
+                    html += '</tr>';
+                    const sId = escapeHtml(row.cash_shift_id || row.shift_id || '');
+                    if (sId) {
+                        html += '<tr id="shift_detail_' + sId + '" style="display:none; background:var(--card2);">';
+                        html += '<td colspan="' + keys.length + '" style="border-bottom:1px solid var(--border); padding:15px; white-space:normal;" class="shift-detail-content">Загрузка...</td>';
+                        html += '</tr>';
+                    }
+                });
+                
                 html += '</tbody></table></div>';
                 kashshiftBody.innerHTML = html;
             }).catch(e => {
@@ -5384,29 +5393,46 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     });
                 }
                 
-                let html = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap;"><thead><tr>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:1%;">Дата</th>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:1%;">Поставщик</th>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:1%;">Счет</th>';
-                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">Сумма</th>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:auto;"></th>';
+                if (!res.supplies || res.supplies.length === 0) {
+                    suppliesBody.innerHTML = '<div style="text-align:center; padding:15px; color:var(--muted);">Нет данных за период</div>';
+                    return;
+                }
+                
+                // Сбор всех уникальных ключей для динамических колонок
+                const allKeys = new Set();
+                res.supplies.forEach(row => Object.keys(row).forEach(k => allKeys.add(k)));
+                const keys = Array.from(allKeys);
+                
+                let html = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap; font-size:13px;"><thead><tr>';
+                keys.forEach(k => {
+                    html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; background:var(--card);">' + escapeHtml(k) + '</th>';
+                });
                 html += '</tr></thead><tbody>';
                 
-                if (res.supplies && res.supplies.length > 0) {
-                    res.supplies.forEach(row => {
-                        const accountId = row.account_id || (row.payed_sum && row.payed_sum.length > 0 ? row.payed_sum[0].account_id : null);
-                        const accName = accountId && accMap[accountId] ? accMap[accountId] : ('ID: ' + (accountId || '-'));
-                        html += '<tr>';
-                        html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(row.date) + '</td>';
-                        html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(row.supplier_name) + '</td>';
-                        html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(accName) + '</td>';
-                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">' + fmtVnd2(posterMinorToVnd(row.total_sum)) + '</td>';
-                        html += '<td style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:auto;"></td>';
-                        html += '</tr>';
+                res.supplies.forEach(row => {
+                    html += '<tr>';
+                    keys.forEach(k => {
+                        let val = row[k];
+                        if (val === null || val === undefined) val = '';
+                        
+                        // Специальная обработка для account_id
+                        if (k === 'account_id') {
+                            const accountId = row.account_id || (row.payed_sum && row.payed_sum.length > 0 ? row.payed_sum[0].account_id : null);
+                            if (accountId && accMap[accountId]) {
+                                val = accMap[accountId] + ' (' + accountId + ')';
+                            }
+                        }
+                        
+                        // Если значение объект/массив, выводим как JSON
+                        if (typeof val === 'object') {
+                            val = JSON.stringify(val);
+                        }
+                        
+                        html += '<td style="border-bottom:1px solid var(--border); padding:6px;">' + escapeHtml(val) + '</td>';
                     });
-                } else {
-                    html += '<tr><td colspan="5" style="text-align:center; padding:15px; color:var(--muted);">Нет данных за период</td></tr>';
-                }
+                    html += '</tr>';
+                });
+                
                 html += '</tbody></table></div>';
                 suppliesBody.innerHTML = html;
             }).catch(e => {
