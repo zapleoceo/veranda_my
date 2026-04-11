@@ -1860,6 +1860,21 @@ if (($_GET['ajax'] ?? '') === 'kashshift') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'kashshift_detail') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $apiKSDetail = new \App\Classes\PosterAPI((string)$token);
+        $shiftId = trim((string)($_GET['shiftId'] ?? ''));
+        if ($shiftId === '') throw new \Exception('No shift ID provided');
+        $data = $apiKSDetail->request('finance.getCashShift', ['cash_shift_id' => $shiftId]);
+        echo json_encode(['ok' => true, 'data' => is_array($data) ? $data : []], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'supplies') {
     header('Content-Type: application/json; charset=utf-8');
     try {
@@ -2752,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0336">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0337">
 </head>
 <body>
 <div class="container">
@@ -5255,26 +5270,31 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const url = '?ajax=kashshift&dateFrom=' + encodeURIComponent(dFrom) + '&dateTo=' + encodeURIComponent(dTo);
             fetchJsonSafe(url).then(res => {
                 if (!res.ok) throw new Error(res.error || 'Ошибка');
-                let html = '<table style="width:100%; border-collapse:collapse;"><thead><tr>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px;">Дата открытия</th>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px;">Дата закрытия</th>';
-                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">Сумма (cash)</th>';
-                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">Сумма (card)</th>';
+                let html = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap;"><thead><tr>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:1%;">Дата открытия</th>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:1%;">Дата закрытия</th>';
+                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">Сумма (cash)</th>';
+                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">Сумма (card)</th>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:auto;"></th>';
                 html += '</tr></thead><tbody>';
                 
                 if (res.data && res.data.length > 0) {
                     res.data.forEach(row => {
-                        html += '<tr>';
-                        html += '<td style="border-bottom:1px solid var(--border); padding:8px;">' + escapeHtml(row.date_start) + '</td>';
-                        html += '<td style="border-bottom:1px solid var(--border); padding:8px;">' + escapeHtml(row.date_end || '-') + '</td>';
-                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">' + fmtVnd2(posterMinorToVnd(row.amount_sell_cash)) + '</td>';
-                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">' + fmtVnd2(posterMinorToVnd(row.amount_sell_card)) + '</td>';
+                        html += '<tr style="cursor:pointer;" onclick="toggleShiftDetail(this, \'' + escapeHtml(row.cash_shift_id) + '\')">';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(row.date_start) + '</td>';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(row.date_end || '-') + '</td>';
+                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">' + fmtVnd2(posterMinorToVnd(row.amount_sell_cash)) + '</td>';
+                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">' + fmtVnd2(posterMinorToVnd(row.amount_sell_card)) + '</td>';
+                        html += '<td style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:auto;"></td>';
+                        html += '</tr>';
+                        html += '<tr id="shift_detail_' + escapeHtml(row.cash_shift_id) + '" style="display:none; background:var(--card2);">';
+                        html += '<td colspan="5" style="border-bottom:1px solid var(--border); padding:15px; white-space:normal;" class="shift-detail-content">Загрузка...</td>';
                         html += '</tr>';
                     });
                 } else {
-                    html += '<tr><td colspan="4" style="text-align:center; padding:15px; color:var(--muted);">Нет данных за период</td></tr>';
+                    html += '<tr><td colspan="5" style="text-align:center; padding:15px; color:var(--muted);">Нет данных за период</td></tr>';
                 }
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
                 kashshiftBody.innerHTML = html;
             }).catch(e => {
                 kashshiftBody.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>';
@@ -5285,6 +5305,49 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             kashshiftModal.style.display = 'none';
         });
     }
+    
+    window.toggleShiftDetail = function(tr, shiftId) {
+        const detailTr = document.getElementById('shift_detail_' + shiftId);
+        if (!detailTr) return;
+        if (detailTr.style.display === 'none') {
+            detailTr.style.display = 'table-row';
+            const contentDiv = detailTr.querySelector('.shift-detail-content');
+            if (contentDiv && contentDiv.innerHTML === 'Загрузка...') {
+                fetchJsonSafe('?ajax=kashshift_detail&shiftId=' + encodeURIComponent(shiftId))
+                    .then(res => {
+                        if (!res.ok) throw new Error(res.error || 'Ошибка загрузки смены');
+                        const d = res.data;
+                        if (!d || Object.keys(d).length === 0) {
+                            contentDiv.innerHTML = '<div style="color:var(--muted);">Нет деталей смены</div>';
+                            return;
+                        }
+                        
+                        let h = '<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; font-size:13px;">';
+                        
+                        const renderBox = (title, val, color) => {
+                            let cStyle = color ? 'color:' + color + ';' : '';
+                            return '<div style="background:var(--card); padding:8px; border-radius:4px; border:1px solid var(--border);"><div style="color:var(--muted); margin-bottom:4px; font-size:11px; text-transform:uppercase;">' + escapeHtml(title) + '</div><div style="font-weight:bold; font-size:14px;' + cStyle + '">' + escapeHtml(val) + '</div></div>';
+                        };
+                        
+                        const vCash = posterMinorToVnd(d.amount_sell_cash || 0);
+                        const vCard = posterMinorToVnd(d.amount_sell_card || 0);
+                        
+                        h += renderBox('Сумма наличными', fmtVnd2(vCash));
+                        h += renderBox('Сумма по карте', fmtVnd2(vCard));
+                        h += renderBox('Сумма инкассации', fmtVnd2(posterMinorToVnd(d.amount_collection || 0)));
+                        h += renderBox('Сумма возвратов', fmtVnd2(posterMinorToVnd(d.amount_refund || 0)));
+                        
+                        h += '</div>';
+                        contentDiv.innerHTML = h;
+                    })
+                    .catch(e => {
+                        contentDiv.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>';
+                    });
+            }
+        } else {
+            detailTr.style.display = 'none';
+        }
+    };
 
     const btnSupplies = document.getElementById('btnSupplies');
     const suppliesModal = document.getElementById('suppliesModal');
@@ -5310,27 +5373,29 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     });
                 }
                 
-                let html = '<table style="width:100%; border-collapse:collapse;"><thead><tr>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px;">Дата</th>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px;">Поставщик</th>';
-                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px;">Счет</th>';
-                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">Сумма</th>';
+                let html = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap;"><thead><tr>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:1%;">Дата</th>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:1%;">Поставщик</th>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:1%;">Счет</th>';
+                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">Сумма</th>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:auto;"></th>';
                 html += '</tr></thead><tbody>';
                 
                 if (res.supplies && res.supplies.length > 0) {
                     res.supplies.forEach(row => {
                         const accName = accMap[row.account_id] || ('ID: ' + row.account_id);
                         html += '<tr>';
-                        html += '<td style="border-bottom:1px solid var(--border); padding:8px;">' + escapeHtml(row.date) + '</td>';
-                        html += '<td style="border-bottom:1px solid var(--border); padding:8px;">' + escapeHtml(row.supplier_name) + '</td>';
-                        html += '<td style="border-bottom:1px solid var(--border); padding:8px;">' + escapeHtml(accName) + '</td>';
-                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">' + fmtVnd2(posterMinorToVnd(row.total_sum)) + '</td>';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(row.date) + '</td>';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(row.supplier_name) + '</td>';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(accName) + '</td>';
+                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px; width:1%;">' + fmtVnd2(posterMinorToVnd(row.total_sum)) + '</td>';
+                        html += '<td style="text-align:left; border-bottom:1px solid var(--border); padding:8px; width:auto;"></td>';
                         html += '</tr>';
                     });
                 } else {
-                    html += '<tr><td colspan="4" style="text-align:center; padding:15px; color:var(--muted);">Нет данных за период</td></tr>';
+                    html += '<tr><td colspan="5" style="text-align:center; padding:15px; color:var(--muted);">Нет данных за период</td></tr>';
                 }
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
                 suppliesBody.innerHTML = html;
             }).catch(e => {
                 suppliesBody.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>';
