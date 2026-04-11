@@ -9,6 +9,8 @@
   window.STR = STR;
   const t = (key) => (STR && Object.prototype.hasOwnProperty.call(STR, key)) ? STR[key] : String(key);
   const fmtVars = (str, vars) => String(str || '').replace(/\{(\w+)\}/g, (_, k) => (vars && vars[k] != null) ? String(vars[k]) : '');
+  const SOON_BOOK_HOURS = Number(cfg.soonBookingHours != null ? cfg.soonBookingHours : 2) || 2;
+  const SOON_BOOK_MIN = Math.max(0, Math.round(SOON_BOOK_HOURS * 60));
   const setLangCookie = (l) => { try { document.cookie = 'links_lang=' + encodeURIComponent(l) + '; path=/; samesite=lax; max-age=' + (365*24*3600); } catch (_) {} };
   const applyI18n = () => {
     document.documentElement.lang = UI_LANG;
@@ -201,6 +203,8 @@
 
     let lastReservationsByTable = {};
     let occupiedNowNums = new Set();
+    let soonBookingNums = new Set();
+    let soonBookingNextByTable = {};
     const applyReservationsItemsToTables = (items, dateStr, dtValue) => {
       const list = Array.isArray(items) ? items : [];
       const day = String(dateStr || '').slice(0, 10);
@@ -272,15 +276,26 @@
 
       lastReservationsByTable = byTable;
 
+      soonBookingNums = new Set();
+      soonBookingNextByTable = {};
+      if (isToday && nowMin != null && SOON_BOOK_MIN > 0) {
+        Object.keys(byTableEntries).forEach((n) => {
+          const arr = byTableEntries[n] || [];
+          const nextStarts = arr.map((r) => r.sm).filter((s) => s >= nowMin);
+          if (!nextStarts.length) return;
+          const nextStart = Math.min(...nextStarts);
+          if ((nextStart - nowMin) <= SOON_BOOK_MIN) {
+            soonBookingNums.add(String(n));
+            soonBookingNextByTable[String(n)] = nextStart;
+          }
+        });
+      }
+
       tables.forEach((tableEl) => {
         const n = String(tableEl.dataset.table || '');
         const entries0 = Array.isArray(byTableEntries[n]) ? byTableEntries[n] : [];
-        let entries = entries0;
-        let ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
-        if (isToday && nowMin != null) {
-          entries = entries.filter((r) => r.em > nowMin);
-          ranges = ranges.filter(([s, e]) => e > nowMin);
-        }
+        const entries = entries0;
+        const ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
         const selEnd = selMin != null ? (selMin + durMin) : null;
         const overlapsSel = (selMin != null && selEnd != null)
           ? ranges.some(([s, e]) => s < selEnd && e > selMin)
@@ -288,7 +303,7 @@
         if (overlapsSel) tableEl.dataset.resBusy = '1';
         else delete tableEl.dataset.resBusy;
         const isOccNow = isToday && occupiedNowNums && occupiedNowNums.has(n);
-        const isBusyByFree = isToday && last && !freeNums.has(n);
+        const isSoon = isToday && soonBookingNums && soonBookingNums.has(n);
         let txt = entries.length
           ? entries.slice(0, 2).map((r) => {
             const g = fmtGuest(r.name);
@@ -296,9 +311,12 @@
             return fmt(r.sm) + '-' + fmt(r.em) + (g ? (' ' + g) : '') + (cnt ? (' (' + cnt + ')') : '');
           }).join(' · ')
           : '';
-        if (isOccNow || isBusyByFree) {
+        if (isOccNow) {
           const occ = t('busy_now');
           txt = txt ? (occ + '\n' + txt) : occ;
+        } else if (isSoon) {
+          const soon = t('busy_soon_booking') || 'Скоро бронь';
+          txt = txt ? (soon + '\n' + txt) : soon;
         }
         let el = tableEl.querySelector('.res-time');
         if (!txt) {
@@ -1100,6 +1118,7 @@
         modalTableBusy = true;
         const isSitting = String(un.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят');
         const isBooking = String(un.reason || '') === String(t('reason_booking') || 'есть бронь');
+        const isSoon = String(un.reason || '') === String(t('reason_soon_booking') || 'скоро бронь');
         if (busyTag) {
           if (isSitting) {
             busyTag.textContent = String(un.reason || '');
@@ -1107,6 +1126,10 @@
           } else if (isBooking) {
             const d = String(un.detail || '').trim();
             busyTag.textContent = String(t('booking_tag') || 'Бронь') + (d ? (' ' + d) : '');
+            busyTag.hidden = false;
+          } else if (isSoon) {
+            const d = String(un.detail || '').trim();
+            busyTag.textContent = String(t('busy_soon_booking') || 'Скоро бронь') + (d ? (' ' + d) : '');
             busyTag.hidden = false;
           } else {
             busyTag.hidden = true;
@@ -1558,6 +1581,27 @@
             throw new Error(un.reason + (un.detail ? ' · ' + un.detail : ''));
           }
 
+          const fmtHm = (m) => {
+            const mm = Math.max(0, Math.round(Number(m) || 0));
+            const h = String(Math.floor(mm / 60)).padStart(2, '0');
+            const mi = String(mm % 60).padStart(2, '0');
+            return h + ':' + mi;
+          };
+          const tableRanges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
+          if (tableRanges.length) {
+            const sm = Number(String(start).slice(11, 13)) * 60 + Number(String(start).slice(14, 16));
+            const em = sm + Math.floor(duration_m);
+            const next = tableRanges.find(([s]) => Number(s) >= em);
+            if (next && Array.isArray(next)) {
+              const gap = Number(next[0]) - em;
+              if (isFinite(gap) && gap >= 0 && gap < 60) {
+                const rangeTxt = fmtHm(next[0]) + '-' + fmtHm(next[1]);
+                const msg = fmtVars(t('confirm_near_booking') || 'На этом столике будет бронь на {range}. Продолжить?', { range: rangeTxt });
+                if (!confirm(msg)) return;
+              }
+            }
+          }
+
           const url = new URL(location.href);
           url.searchParams.set('ajax', 'submit_booking');
           const res = await fetch(url.toString(), {
@@ -1682,6 +1726,14 @@
          return { reason: t('time_passed') || 'Время уже прошло', detail: '' };
       }
 
+      if (isToday && soonBookingNums && soonBookingNums.has(String(tableNum))) {
+        const nextStart = soonBookingNextByTable ? Number(soonBookingNextByTable[String(tableNum)]) : NaN;
+        if (isFinite(nextStart) && (nextStart - nowMin) <= SOON_BOOK_MIN && ps && ps.selMin < nextStart) {
+          const pref = t('at_prefix') || 'at';
+          return { reason: t('reason_soon_booking') || 'скоро бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
+        }
+      }
+
       if (!freeNums.has(String(tableNum))) {
         if (isToday) return { reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
         return { reason: t('reason_time') || 'недоступен на это время', detail: '' };
@@ -1741,7 +1793,7 @@
         if (statusLine) statusLine.textContent = t('press_ok');
         return;
       }
-      const isFree = freeNums.has(String(tableNum));
+      const isFree = freeNums.has(String(tableNum)) && !(soonBookingNums && soonBookingNums.has(String(tableNum)));
       if (statusLine) statusLine.textContent = isFree ? t('status_free') : t('status_busy');
     };
 
@@ -1751,6 +1803,7 @@
         t.classList.remove('free', 'busy');
         if (!last) return;
         if (t.dataset.resBusy === '1') { t.classList.add('busy'); return; }
+        if (soonBookingNums && soonBookingNums.has(n)) { t.classList.add('busy'); return; }
         if (freeNums.has(n)) t.classList.add('free');
         else t.classList.add('busy');
       });

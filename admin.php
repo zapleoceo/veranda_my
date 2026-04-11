@@ -218,12 +218,26 @@ $resHallId = max(1, (int)($_GET['hall_id'] ?? 2));
 $resSpotId = max(1, (int)($_GET['spot_id'] ?? 1));
 $resMetaKey = 'reservations_allowed_scheme_nums_hall_' . $resHallId;
 $resCapsMetaKey = 'reservations_table_caps_hall_' . $resHallId;
+$resSoonKey = 'reservations_soon_booking_hours';
 $resAllowedNums = [];
 $resCapsByNum = [];
 $resTables = [];
 
 if ($tab === 'reservations') {
     $metaRepo = new \App\Classes\MetaRepository($db);
+    $resSoonHours = 2;
+    if (isset($_POST['save_reservation_soon_hours'])) {
+        $h = (int)($_POST['soon_hours'] ?? 2);
+        if ($h < 0) $h = 0;
+        if ($h > 24) $h = 24;
+        $db->query(
+            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+            [$resSoonKey, (string)$h]
+        );
+        $message = 'Запас часов сохранён.';
+        $resSoonHours = $h;
+    }
     $defaultCaps = [
         '1' => 8, '2' => 8, '3' => 8,
         '4' => 5, '5' => 5, '6' => 5,
@@ -289,7 +303,7 @@ if ($tab === 'reservations') {
         $resCapsMetaKey = $resCapsMetaKeyPost;
     }
 
-    $saved = $metaRepo->getMany([$resMetaKey, $resCapsMetaKey]);
+    $saved = $metaRepo->getMany([$resMetaKey, $resCapsMetaKey, $resSoonKey]);
     $stored = array_key_exists($resMetaKey, $saved) ? trim((string)$saved[$resMetaKey]) : '';
     if ($stored !== '') {
         $decoded = json_decode($stored, true);
@@ -323,6 +337,11 @@ if ($tab === 'reservations') {
         }
     } else {
         $resCapsByNum = $defaultCaps;
+    }
+
+    $soonStored = array_key_exists($resSoonKey, $saved) ? trim((string)$saved[$resSoonKey]) : '';
+    if ($soonStored !== '' && is_numeric($soonStored)) {
+        $resSoonHours = max(0, min(24, (int)$soonStored));
     }
 
     if ($posterToken === '') {
@@ -1473,6 +1492,15 @@ if ($tab === 'menu' || $tab === 'categories') {
                     Здесь выбираются номера столов, которые доступны для бронирования в публичной форме.
                 </div>
 
+                <form method="post" action="admin.php?tab=reservations&hall_id=<?= (int)$resHallId ?>&spot_id=<?= (int)$resSpotId ?>" style="display:flex; gap: 12px; align-items:flex-end; margin-bottom: 12px;">
+                    <input type="hidden" name="save_reservation_soon_hours" value="1">
+                    <label style="display:grid; gap:6px;">
+                        <div class="small-muted">Запас часов</div>
+                        <input type="number" name="soon_hours" value="<?= (int)$resSoonHours ?>" min="0" max="24" step="1" style="width: 120px; padding: 8px 10px; border-radius: 10px; border: 1px solid #e5e7eb;">
+                    </label>
+                    <button type="submit" class="pill ok" style="border:0; cursor:pointer;">Сохранить</button>
+                </form>
+
                 <form method="post" action="admin.php?tab=reservations&hall_id=<?= (int)$resHallId ?>&spot_id=<?= (int)$resSpotId ?>" style="display:grid; gap: 12px;">
                     <input type="hidden" name="save_reservation_tables" value="1">
                     <div style="display:flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
@@ -1496,45 +1524,45 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <?php if (empty($resTables)): ?>
                         <div class="small-muted">Нет данных по столам (или ошибка Poster API).</div>
                     <?php else: ?>
-                        <div style="overflow:auto; border:1px solid #e5e7eb; border-radius: 12px; background:#fff;">
+                        <div style="overflow:auto; border:1px solid var(--border); border-radius: 12px; background: var(--card2);">
                             <table style="width:100%; border-collapse: collapse; min-width: 860px;">
                                 <thead>
-                                    <tr style="background:#f8fafc;">
-                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">Доступен</th>
-                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">Номер на схеме</th>
-                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">👤</th>
-                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">Table ID</th>
-                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">table_num</th>
-                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb;">table_title</th>
+                                    <tr style="background: var(--card);">
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">Доступен</th>
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">Номер на схеме</th>
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">👤</th>
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">Table ID</th>
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">table_num</th>
+                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">table_title</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($resTables as $r): ?>
                                         <tr>
-                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                                            <td style="padding:10px 12px; border-bottom:1px solid var(--border);">
                                                 <?php if (($r['scheme_num'] ?? '') !== ''): ?>
                                                     <input type="checkbox" name="allowed_nums[]" value="<?= htmlspecialchars((string)$r['scheme_num']) ?>" <?= !empty($r['is_allowed']) ? 'checked' : '' ?>>
                                                 <?php else: ?>
                                                     <span class="small-muted">—</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; font-weight:700;">
+                                            <td style="padding:10px 12px; border-bottom:1px solid var(--border); font-weight:700;">
                                                 <?= htmlspecialchars((string)($r['scheme_num'] ?? '—')) ?>
                                             </td>
-                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                                            <td style="padding:10px 12px; border-bottom:1px solid var(--border);">
                                                 <?php if (($r['scheme_num'] ?? '') !== ''): ?>
-                                                    <input type="number" name="caps[<?= htmlspecialchars((string)$r['scheme_num']) ?>]" value="<?= (int)($r['cap'] ?? 0) ?>" min="0" max="999" style="width: 56px; padding: 6px 8px; border-radius: 10px; border: 1px solid #e5e7eb;">
+                                                    <input type="number" name="caps[<?= htmlspecialchars((string)$r['scheme_num']) ?>]" value="<?= (int)($r['cap'] ?? 0) ?>" min="0" max="999" style="width: 56px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text);">
                                                 <?php else: ?>
                                                     <span class="small-muted">—</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                                            <td style="padding:10px 12px; border-bottom:1px solid var(--border);">
                                                 <?= htmlspecialchars((string)($r['table_id'] ?? '—')) ?>
                                             </td>
-                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                                            <td style="padding:10px 12px; border-bottom:1px solid var(--border);">
                                                 <?= htmlspecialchars((string)($r['table_num'] ?? '—')) ?>
                                             </td>
-                                            <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9;">
+                                            <td style="padding:10px 12px; border-bottom:1px solid var(--border);">
                                                 <?= htmlspecialchars((string)($r['table_title'] ?? '—')) ?>
                                             </td>
                                         </tr>

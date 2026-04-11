@@ -86,6 +86,8 @@ $I18N = [
     'try_ok_again' => 'Ошибка запроса. Попробуй нажать “Ок” ещё раз.',
     'confirm_capacity' => 'Вы хотите забронировать столик для {max} для {guests} гостей?',
     'busy_now' => 'Сейчас занят',
+    'busy_soon_booking' => 'Скоро бронь',
+    'confirm_near_booking' => 'На этом столике будет бронь на {range}. Продолжить?',
     'dtp_title' => 'Выбор даты',
     'status_free' => 'Свободен',
     'status_busy' => 'Занят',
@@ -130,8 +132,10 @@ $I18N = [
     'reason_booking' => 'есть бронь',
     'booking_tag' => 'Бронь',
     'booking_until_prefix' => 'до',
+    'at_prefix' => 'в',
     'phone_invalid' => 'неверный номер (международный формат, только цифры)',
     'reason_sitting' => 'гости сейчас сидят',
+    'reason_soon_booking' => 'скоро бронь',
     'reason_time' => 'недоступен на это время',
     'fix_guests_table' => 'Исправь кол-во гостей и выбери столик снова.',
     'tg_linked' => 'Telegram привязан ✅',
@@ -187,6 +191,8 @@ $I18N = [
     'try_ok_again' => 'Request failed. Please press “OK” again.',
     'confirm_capacity' => 'Do you want to book a table for {max} when you have {guests} guests?',
     'busy_now' => 'Busy now',
+    'busy_soon_booking' => 'Booking soon',
+    'confirm_near_booking' => 'This table has a reservation at {range}. Continue?',
     'dtp_title' => 'Pick date',
     'status_free' => 'Free',
     'status_busy' => 'Busy',
@@ -231,8 +237,10 @@ $I18N = [
     'reason_booking' => 'there is a booking',
     'booking_tag' => 'Booking',
     'booking_until_prefix' => 'until',
+    'at_prefix' => 'at',
     'phone_invalid' => 'invalid phone (international format, digits only)',
     'reason_sitting' => 'guests are currently sitting',
+    'reason_soon_booking' => 'booking soon',
     'reason_time' => 'unavailable at this time',
     'fix_guests_table' => 'Adjust the number of guests and select the table again.',
     'tg_linked' => 'Telegram linked ✅',
@@ -288,6 +296,8 @@ $I18N = [
     'try_ok_again' => 'Lỗi yêu cầu. Hãy nhấn “OK” lại.',
     'confirm_capacity' => 'Bạn muốn đặt bàn {max} chỗ cho {guests} khách phải không?',
     'busy_now' => 'Đang bận',
+    'busy_soon_booking' => 'Sắp có đặt bàn',
+    'confirm_near_booking' => 'Bàn này có đặt trước lúc {range}. Tiếp tục?',
     'dtp_title' => 'Chọn ngày',
     'status_free' => 'Trống',
     'status_busy' => 'Bận',
@@ -332,8 +342,10 @@ $I18N = [
     'reason_booking' => 'đã có lịch đặt',
     'booking_tag' => 'Có đặt',
     'booking_until_prefix' => 'đến',
+    'at_prefix' => 'lúc',
     'phone_invalid' => 'số điện thoại không hợp lệ (quốc tế, chỉ số)',
     'reason_sitting' => 'khách đang ngồi',
+    'reason_soon_booking' => 'sắp có đặt bàn',
     'reason_time' => 'không khả dụng vào lúc này',
     'fix_guests_table' => 'Điều chỉnh số lượng khách và chọn lại bàn.',
     'tg_linked' => 'Telegram đã được liên kết ✅',
@@ -398,6 +410,7 @@ if ($add > 0) $roundedNow = $roundedNow->modify('+' . $add . ' minutes');
 $defaultResDateLocal = $roundedNow->format('Y-m-d\TH:i');
 $hallIdForSettings = 2;
 $allowedSchemeNums = null;
+$soonBookingHours = 2;
 $tableCapsByNum = [
   '1' => 8, '2' => 8, '3' => 8,
   '4' => 5, '5' => 5, '6' => 5,
@@ -421,7 +434,8 @@ try {
     $metaRepo = new \App\Classes\MetaRepository($db);
     $key = 'reservations_allowed_scheme_nums_hall_' . $hallIdForSettings;
     $capsKey = 'reservations_table_caps_hall_' . $hallIdForSettings;
-    $vals = $metaRepo->getMany([$key]);
+    $soonKey = 'reservations_soon_booking_hours';
+    $vals = $metaRepo->getMany([$key, $soonKey]);
     $stored = array_key_exists($key, $vals) ? trim((string)$vals[$key]) : '';
     if ($stored !== '') {
       $decoded = json_decode($stored, true);
@@ -441,6 +455,10 @@ try {
       }
       $allowedSchemeNums = array_values(array_keys($tmp));
       usort($allowedSchemeNums, fn($a, $b) => (int)$a <=> (int)$b);
+    }
+    $soonStored = array_key_exists($soonKey, $vals) ? trim((string)$vals[$soonKey]) : '';
+    if ($soonStored !== '' && is_numeric($soonStored)) {
+      $soonBookingHours = max(0, min(24, (int)$soonStored));
     }
 
     $capsVals = $metaRepo->getMany([$capsKey]);
@@ -1604,7 +1622,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_1200">
+    <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260411_0605">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1616,6 +1634,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
           <p><span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span> <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
           <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
+          <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         </div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
@@ -1645,7 +1664,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       </div>
   
       <section class="layout">
-        <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         <div class="map-shell">
           <div class="tile-layer" aria-hidden="true"></div>
             <div class="map-zoom-box" id="mapZoomBox">
@@ -1883,8 +1901,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       defaultResDateLocal: <?= json_encode($defaultResDateLocal, JSON_UNESCAPED_UNICODE) ?>,
       allowedTableNums: <?= json_encode($allowedSchemeNums, JSON_UNESCAPED_UNICODE) ?>,
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
+      soonBookingHours: <?= json_encode($soonBookingHours, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260411_0350"></script>
+  <script src="/assets/js/Tr2.js?v=20260411_0605"></script>
 </body>
 </html>
