@@ -44,7 +44,7 @@ $loginUrl = $auth->getGoogleLoginUrl();
     <title>Вход - Kitchen Analytics</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/login.css">
+  <link rel="stylesheet" href="/assets/css/login.css?v=2">
 </head>
 <body>
     <div class="login-card">
