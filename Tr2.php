@@ -599,6 +599,24 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       $nums[$num] = true;
     }
 
+    $busyReasons = [];
+    if ($isToday) {
+      // not in free list
+      $allowedNums = is_array($allowed) ? array_map('strval', $allowed) : [];
+      foreach ($allowedNums as $n) {
+        if (!isset($nums[$n])) {
+          if (!isset($busyReasons[$n])) $busyReasons[$n] = [];
+          $busyReasons[$n][] = 'not_in_free_tables';
+        }
+      }
+      // occupied now by open checks
+      foreach ($occupiedNowNums as $n) {
+        $s = (string)$n;
+        if (!isset($busyReasons[$s])) $busyReasons[$s] = [];
+        if (!in_array('occupied_now', $busyReasons[$s], true)) $busyReasons[$s][] = 'occupied_now';
+      }
+    }
+
     echo json_encode([
       'ok' => true,
       'request' => [
@@ -611,6 +629,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       ],
       'free_table_nums' => array_values(array_keys($nums)),
       'occupied_now_nums' => $occupiedNowNums,
+      'busy_reasons' => $busyReasons,
       'free_tables' => $filtered,
       'raw' => $resp,
     ], JSON_UNESCAPED_UNICODE);
