@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0347">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0348">
 </head>
 <body>
 <div class="container">
@@ -5377,12 +5377,18 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         const getTypeLabel = (type) => {
                             if (type === 1) return '<span style="color:#4ade80;">Внесение</span>';
                             if (type === 2) return '<span style="color:#f87171;">Изъятие</span>';
+                            if (type === 3) return '<span style="color:#fbbf24;">Инкассация</span>';
                             return String(type);
                         };
                         
                         const formatDate = (tsStr) => {
                             if (!tsStr) return '';
-                            const d = new Date(Number(tsStr));
+                            let ts = Number(tsStr);
+                            // Если число небольшое, значит это секунды
+                            if (!isNaN(ts) && ts > 0 && String(Math.floor(ts)).length === 10) {
+                                ts = ts * 1000;
+                            }
+                            const d = new Date(ts);
                             if (isNaN(d.getTime())) return tsStr;
                             const p = n => String(n).padStart(2, '0');
                             return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -5394,7 +5400,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + getTypeLabel(Number(tx.type)) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(tx.category_name || '') + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(tx.user_name || '') + '</td>';
-                            h += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:6px; width:1%; font-weight:bold;">' + fmtVnd0(posterMinorToVnd(tx.amount || 0)) + '</td>';
+                            
+                            // В API поле суммы называется tr_amount
+                            const rawAmount = tx.tr_amount || tx.amount || 0;
+                            h += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:6px; width:1%; font-weight:bold;">' + fmtVnd0(posterMinorToVnd(rawAmount)) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:auto; white-space:normal;">' + escapeHtml(tx.comment || '') + '</td>';
                             h += '</tr>';
                         });
