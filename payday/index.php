@@ -1866,7 +1866,7 @@ if (($_GET['ajax'] ?? '') === 'kashshift_detail') {
         $apiKSDetail = new \App\Classes\PosterAPI((string)$token);
         $shiftId = trim((string)($_GET['shiftId'] ?? ''));
         if ($shiftId === '') throw new \Exception('No shift ID provided');
-        $data = $apiKSDetail->request('finance.getCashShiftTransactions', ['cash_shift_id' => $shiftId]);
+        $data = $apiKSDetail->request('finance.getCashShiftTransactions', ['shift_id' => $shiftId]);
         echo json_encode(['ok' => true, 'data' => is_array($data) ? $data : []], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0339">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0340">
 </head>
 <body>
 <div class="container">
