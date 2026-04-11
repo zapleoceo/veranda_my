@@ -2713,7 +2713,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0305">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0335">
 </head>
 <body>
 <div class="container">
@@ -2769,15 +2769,6 @@ $fmtVnd = function (int $v): string {
                 </label>
                 <span class="toggle-text">Full</span>
             </div>
-        </div>
-
-        <div class="loadbox" id="inLoadBox" hidden>
-            <div class="loadbox-title" id="inLoadText">Загрузка…</div>
-            <div class="loadbox-bar"><div class="loadbox-bar-fill"></div></div>
-        </div>
-        <div class="loadbox" id="outLoadBox" hidden style="display:none;">
-            <div class="loadbox-title" id="outLoadText">Загрузка…</div>
-            <div class="loadbox-bar"><div class="loadbox-bar-fill"></div></div>
         </div>
 
         <div class="divider"></div>
@@ -3287,10 +3278,6 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const outSection = document.getElementById('outSection');
     const outMailBtn = document.getElementById('outMailBtn');
     const outFinanceBtn = document.getElementById('outFinanceBtn');
-    const inLoadBox = document.getElementById('inLoadBox');
-    const inLoadText = document.getElementById('inLoadText');
-    const outLoadBox = document.getElementById('outLoadBox');
-    const outLoadText = document.getElementById('outLoadText');
     const outSepayTable = document.getElementById('outSepayTable');
     const outPosterTable = document.getElementById('outPosterTable');
     const toggleOutMailHiddenBtn = document.getElementById('toggleOutMailHiddenBtn');
@@ -3334,39 +3321,42 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const dtEl = document.querySelector('input[name="dateTo"]');
         return { dateFrom: dfEl ? dfEl.value : '', dateTo: dtEl ? dtEl.value : '' };
     };
-    const loaderState = {
-        inCount: 0,
-        outCount: 0,
-        inLabel: '',
-        outLabel: '',
-    };
-    const setLoadUi = () => {
-        const inOn = loaderState.inCount > 0;
-        const outOn = loaderState.outCount > 0;
-        if (inLoadBox) {
-            inLoadBox.hidden = !inOn;
-            if (inLoadText) inLoadText.textContent = loaderState.inLabel || 'Загрузка…';
-        }
-        if (outLoadBox) {
-            outLoadBox.hidden = !outOn;
-            if (outLoadText) outLoadText.textContent = loaderState.outLabel || 'Загрузка…';
-        }
-    };
-    const beginLoad = (mode, label) => {
-        const m = (mode === 'out') ? 'out' : 'in';
-        if (m === 'out') {
-            loaderState.outCount += 1;
-            loaderState.outLabel = String(label || '').trim() || loaderState.outLabel || 'Загрузка…';
-        } else {
-            loaderState.inCount += 1;
-            loaderState.inLabel = String(label || '').trim() || loaderState.inLabel || 'Загрузка…';
-        }
-        setLoadUi();
+    const setBtnBusy = (btn, state) => {
+        if (!btn) return () => {};
+        const origHtml = btn.innerHTML;
+        const title = String(state && state.title ? state.title : '').trim();
+        const step = String(state && state.step ? state.step : '').trim();
+        const pct = Number(state && state.pct != null ? state.pct : NaN);
+        const isPct = Number.isFinite(pct) && pct >= 0 && pct <= 100;
+        const fillW = isPct ? String(Math.max(6, Math.min(100, pct))) + '%' : '';
+        btn.innerHTML = `<div class="btn-busy"><div class="btn-busy-title">${escapeHtml(title || 'Загрузка')}</div><div class="btn-busy-step">${escapeHtml(step || 'Подождите…')}</div><div class="btn-busy-bar"><div class="btn-busy-fill${isPct ? '' : ' indeterminate'}"${isPct ? (' style="width:' + fillW + ';"') : ''}></div></div></div>`;
+        btn.classList.add('loading');
+        btn.disabled = true;
         return () => {
-            if (m === 'out') loaderState.outCount = Math.max(0, loaderState.outCount - 1);
-            else loaderState.inCount = Math.max(0, loaderState.inCount - 1);
-            setLoadUi();
+            btn.classList.remove('loading');
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
         };
+    };
+    const updateBtnBusy = (btn, state) => {
+        if (!btn) return;
+        const wrap = btn.querySelector('.btn-busy');
+        if (!wrap) return;
+        const titleEl = btn.querySelector('.btn-busy-title');
+        const stepEl = btn.querySelector('.btn-busy-step');
+        const fillEl = btn.querySelector('.btn-busy-fill');
+        if (titleEl && state && state.title != null) titleEl.textContent = String(state.title);
+        if (stepEl && state && state.step != null) stepEl.textContent = String(state.step);
+        const pct = Number(state && state.pct != null ? state.pct : NaN);
+        if (fillEl) {
+            if (Number.isFinite(pct) && pct >= 0 && pct <= 100) {
+                fillEl.classList.remove('indeterminate');
+                fillEl.style.width = String(Math.max(6, Math.min(100, pct))) + '%';
+            } else {
+                fillEl.classList.add('indeterminate');
+                fillEl.style.width = '';
+            }
+        }
     };
     let activeTab = 'in';
     const setTab = (m) => {
@@ -3385,8 +3375,6 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         if (posterSyncForm) posterSyncForm.style.display = inOn ? '' : 'none';
         if (sepaySyncForm) sepaySyncForm.style.display = inOn ? '' : 'none';
         if (clearDayForm) clearDayForm.style.display = inOn ? '' : 'none';
-        if (inLoadBox) inLoadBox.style.display = inOn ? '' : 'none';
-        if (outLoadBox) outLoadBox.style.display = inOn ? 'none' : '';
         activeTab = inOn ? 'in' : 'out';
         if (!inOn) outScheduleRelayout();
     };
@@ -3503,33 +3491,34 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         });
     };
     if (outMailBtn) outMailBtn.addEventListener('click', () => {
-        const orig = outMailBtn.textContent;
-        outMailBtn.classList.add('loading'); outMailBtn.textContent = 'Обновление…'; outMailBtn.disabled = true;
+        const restore = setBtnBusy(outMailBtn, { title: 'OUT', step: 'SePay: загрузка писем', pct: null });
         loadOutMail()
+            .then(() => updateBtnBusy(outMailBtn, { step: 'SePay: готово', pct: 100 }))
             .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
-            .finally(() => { outMailBtn.classList.remove('loading'); outMailBtn.textContent = orig; outMailBtn.disabled = false; outScheduleRelayout(); });
+            .finally(() => { restore(); outScheduleRelayout(); });
     });
     if (outFinanceBtn) outFinanceBtn.addEventListener('click', () => {
-        const orig = outFinanceBtn.textContent;
-        outFinanceBtn.classList.add('loading'); outFinanceBtn.textContent = 'Обновление…'; outFinanceBtn.disabled = true;
+        const restore = setBtnBusy(outFinanceBtn, { title: 'OUT', step: 'Poster: загрузка транзакций', pct: null });
         loadOutFinance()
+            .then(() => updateBtnBusy(outFinanceBtn, { step: 'Poster: готово', pct: 100 }))
             .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
-            .finally(() => { outFinanceBtn.classList.remove('loading'); outFinanceBtn.textContent = orig; outFinanceBtn.disabled = false; outScheduleRelayout(); });
+            .finally(() => { restore(); outScheduleRelayout(); });
     });
     const dateForm = document.getElementById('dateForm');
     if (dateForm) {
         dateForm.addEventListener('submit', (ev) => {
             if (activeTab === 'out') {
                 ev.preventDefault();
-                const origMail = outMailBtn ? outMailBtn.textContent : '';
-                const origFin = outFinanceBtn ? outFinanceBtn.textContent : '';
-                if (outMailBtn) { outMailBtn.classList.add('loading'); outMailBtn.textContent = 'Обновление…'; outMailBtn.disabled = true; }
-                if (outFinanceBtn) { outFinanceBtn.classList.add('loading'); outFinanceBtn.textContent = 'Обновление…'; outFinanceBtn.disabled = true; }
-                Promise.all([loadOutMail(), loadOutFinance()])
+                const restoreMail = outMailBtn ? setBtnBusy(outMailBtn, { title: 'OUT', step: 'SePay: загрузка писем', pct: null }) : null;
+                const restoreFin = outFinanceBtn ? setBtnBusy(outFinanceBtn, { title: 'OUT', step: 'Poster: загрузка транзакций', pct: null }) : null;
+                Promise.all([
+                    loadOutMail().then(() => updateBtnBusy(outMailBtn, { step: 'SePay: готово', pct: 100 })),
+                    loadOutFinance().then(() => updateBtnBusy(outFinanceBtn, { step: 'Poster: готово', pct: 100 })),
+                ])
                     .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
                     .finally(() => {
-                        if (outMailBtn) { outMailBtn.classList.remove('loading'); outMailBtn.textContent = origMail; outMailBtn.disabled = false; }
-                        if (outFinanceBtn) { outFinanceBtn.classList.remove('loading'); outFinanceBtn.textContent = origFin; outFinanceBtn.disabled = false; }
+                        if (restoreMail) restoreMail();
+                        if (restoreFin) restoreFin();
                         outScheduleRelayout();
                     });
             }
@@ -4040,18 +4029,17 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         }
     });
 
-    const setFormLoading = (formId, btnId) => {
+    const setFormLoading = (formId, btnId, title, step) => {
         const form = document.getElementById(formId);
         const btn = document.getElementById(btnId);
         if (!form || !btn) return;
         form.addEventListener('submit', () => {
-            btn.classList.add('loading');
-            btn.disabled = true;
+            setBtnBusy(btn, { title: title || 'IN', step: step || 'Загрузка…', pct: null });
         });
     };
-    setFormLoading('posterSyncForm', 'posterSyncBtn');
-    setFormLoading('sepaySyncForm', 'sepaySyncBtn');
-    setFormLoading('clearDayForm', 'clearDayBtn');
+    setFormLoading('posterSyncForm', 'posterSyncBtn', 'IN', 'Poster: загрузка чеков');
+    setFormLoading('sepaySyncForm', 'sepaySyncBtn', 'IN', 'SePay: загрузка платежей');
+    setFormLoading('clearDayForm', 'clearDayBtn', 'IN', 'Очистка дня');
 
     const posterAccountsBtn = document.getElementById('posterAccountsBtn');
     const posterAccountsTbody = document.getElementById('posterAccountsTbody');

@@ -18,6 +18,23 @@ require_once __DIR__ . '/src/classes/TelegramBot.php';
 
 veranda_require('reservations');
 
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+    $spotTzName = 'Asia/Ho_Chi_Minh';
+}
+$spotTz = new DateTimeZone($spotTzName);
+$parseSpotDt = function ($s) use ($spotTz) {
+    $v = trim((string)$s);
+    if ($v === '') return null;
+    $dt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $v, $spotTz);
+    if ($dt instanceof DateTimeImmutable) return $dt;
+    try { return new DateTimeImmutable($v, $spotTz); } catch (Throwable $e) { return null; }
+};
+$fmtSpotDt = function ($s, string $fmt = 'd.m.Y H:i') use ($parseSpotDt) {
+    $dt = $parseSpotDt($s);
+    return $dt ? $dt->format($fmt) : '';
+};
+
 $db = new \App\Classes\Database(
     $_ENV['DB_HOST'] ?? 'localhost',
     $_ENV['DB_NAME'] ?? 'veranda_my',
@@ -124,7 +141,7 @@ if ($ajax === 'vposter') {
             'phone'            => $phone,
             'table_id'         => (string)$tableId,
             'guests_count'     => (string)$row['guests'],
-            'date_reservation' => date('Y-m-d H:i:s', strtotime($row['start_time'])),
+            'date_reservation' => ($fmtSpotDt($row['start_time'], 'Y-m-d H:i:s') ?: (string)$row['start_time']),
             'duration'         => '7200', // 2 hours default in seconds
             'first_name'       => $firstName,
             'last_name'        => $lastName,
@@ -177,7 +194,8 @@ if ($ajax === 'resend') {
         exit;
     }
 
-    $startDt = new DateTimeImmutable($row['start_time']);
+        $startDt = $parseSpotDt($row['start_time']);
+        if (!$startDt) $startDt = new DateTimeImmutable('now', $spotTz);
     
     // Group Message
     $tgUid = (int)$row['tg_user_id'];
@@ -443,17 +461,23 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
     try {
         $api = new \App\Classes\PosterAPI($_ENV['POSTER_API_TOKEN']);
         
+        $spotId = (int)($_ENV['POSTER_SPOT_ID'] ?? 1);
+        if ($spotId <= 0) $spotId = 1;
+
         // Fetch all tables to map table_id to table_title
         $tableNameMap = [];
         try {
-            // Using spots.getTableHallTables to get table_title as requested
-            // Assuming hall_id 2 is the main hall as used in other parts of the project
-            $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2]);
+            $allTables = $api->request('spots.getTableHallTables', ['spot_id' => $spotId, 'without_deleted' => 1]);
             if (is_array($allTables)) {
                 foreach ($allTables as $t) {
                     if (isset($t['table_id'])) {
-                        // Use table_num as requested, fallback to table_title
-                        $tableNameMap[(int)$t['table_id']] = $t['table_num'] ?? $t['table_title'] ?? $t['table_id'];
+                        $id = (int)$t['table_id'];
+                        $num = trim((string)($t['table_num'] ?? ''));
+                        $title = trim((string)($t['table_title'] ?? ''));
+                        $scheme = '';
+                        if (preg_match('/^\d+$/', $title)) $scheme = $title;
+                        elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
+                        if ($scheme !== '') $tableNameMap[$id] = $scheme;
                     }
                 }
             }
@@ -462,14 +486,21 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
         }
 
         $resp = $api->request('incomingOrders.getReservations', [
-            'date_from' => $dateFrom . ' 00:00:00',
-            'date_to' => $dateTo . ' 23:59:59',
+            'timezone' => 'client',
         ], 'GET');
         
         if (is_array($resp)) {
+            $fromDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $dateFrom . ' 00:00:00', $spotTz);
+            $toDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $dateTo . ' 23:59:59', $spotTz);
             foreach ($resp as $pr) {
                 $status = (int)($pr['status'] ?? 0);
-                if (!$showDeleted && $status === 0) continue; // Skip cancelled if not showing deleted
+                if (!$showDeleted && $status === 7) continue;
+                if ((int)($pr['spot_id'] ?? 0) !== $spotId) continue;
+                $dr = trim((string)($pr['date_reservation'] ?? ''));
+                $drDt = $parseSpotDt($dr);
+                if (!$drDt) continue;
+                if ($fromDt instanceof DateTimeImmutable && $drDt < $fromDt) continue;
+                if ($toDt instanceof DateTimeImmutable && $drDt > $toDt) continue;
                 
                 $tId = (int)($pr['table_id'] ?? 0);
                 $displayTable = isset($tableNameMap[$tId]) ? $tableNameMap[$tId] : ($tId > 0 ? $tId : '?');
@@ -477,8 +508,8 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
                 $posterRows[] = [
                     'id' => 'P' . ($pr['incoming_order_id'] ?? 0),
                     'qr_code' => 'POSTER',
-                    'created_at' => $pr['date_created'] ?? '',
-                    'start_time' => $pr['date_reservation'] ?? '',
+                    'created_at' => $pr['created_at'] ?? '',
+                    'start_time' => $drDt->format('Y-m-d H:i:s'),
                     'table_num' => $displayTable,
                     'guests' => $pr['guests_count'] ?? 0,
                     'name' => trim(($pr['first_name'] ?? '') . ' ' . ($pr['last_name'] ?? '')),
@@ -489,8 +520,8 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
                     'total_amount' => 0,
                     'qr_url' => '',
                     'is_poster' => true,
-                    'status_text' => ($status === 0 ? 'Отменено' : 'Активно'),
-                    'deleted_at' => ($status === 0 ? ($pr['date_updated'] ?? '1') : null),
+                    'status_text' => ($status === 7 ? 'Отменено' : ($status === 1 ? 'Принято' : 'Новый')),
+                    'deleted_at' => ($status === 7 ? ($pr['updated_at'] ?? '') : null),
                 ];
             }
         }
@@ -596,8 +627,10 @@ $rows = $allRows;
                                     $deletedAt = (string)($r['deleted_at'] ?? '');
                                     $deletedBy = (string)($r['deleted_by'] ?? '');
                                     $isDeleted = $deletedAt !== '' && $deletedAt !== null && $deletedAt !== '0000-00-00 00:00:00';
-                                    $deletedAtHuman = $isDeleted ? date('d.m.Y H:i', strtotime($deletedAt)) : '';
+                                    $deletedAtHuman = $isDeleted ? ($fmtSpotDt($deletedAt) ?: '') : '';
                                     $isPoster = !empty($r['is_poster']);
+                                    $createdAtHuman = !empty($r['created_at']) ? ($fmtSpotDt($r['created_at']) ?: '') : '';
+                                    $startHuman = !empty($r['start_time']) ? ($fmtSpotDt($r['start_time']) ?: '') : '';
                                 ?>
                                 <tr data-id="<?= htmlspecialchars((string)$r['id']) ?>" class="<?= $isDeleted ? 'is-deleted' : '' ?> <?= $isPoster ? 'is-poster' : '' ?>">
                                     <td data-label="ID">
@@ -621,8 +654,8 @@ $rows = $allRows;
                                             <span class="res-muted">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td data-label="Создано"><?= !empty($r['created_at']) ? htmlspecialchars(date('d.m.Y H:i', strtotime($r['created_at']))) : '—' ?></td>
-                                    <td data-label="Время" class="res-strong"><?= !empty($r['start_time']) ? htmlspecialchars(date('d.m.Y H:i', strtotime($r['start_time']))) : '—' ?></td>
+                                    <td data-label="Создано"><?= $createdAtHuman !== '' ? htmlspecialchars($createdAtHuman) : '—' ?></td>
+                                    <td data-label="Время" class="res-strong"><?= $startHuman !== '' ? htmlspecialchars($startHuman) : '—' ?></td>
                                     <td data-label="Стол"><?= htmlspecialchars($r['table_num']) ?></td>
                                     <td data-label="Гостей"><?= (int)$r['guests'] ?></td>
                                     <td data-label="Гость">
