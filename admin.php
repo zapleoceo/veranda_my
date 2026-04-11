@@ -1537,7 +1537,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">👤</th>
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">Table ID</th>
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">table_num</th>
-                                        <th id="resTablesSortTitle" data-sort-key="title" style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); cursor:pointer; user-select:none;">table_title</th>
+                                        <th id="resTablesSortTitle" data-sort-key="title" style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); cursor:pointer; user-select:none;">table_title <span id="resTablesSortArrow">▲</span></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1578,7 +1578,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 </form>
             </div>
 
-            <script src="/assets/js/admin.js"></script>
+            <script src="/assets/js/admin.js?v=20260411_0635"></script>
         <?php elseif ($tab === 'sync'): ?>
             <?php
                 $syncDefs = [

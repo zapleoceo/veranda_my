@@ -8,6 +8,7 @@
 
                     const table = document.getElementById('resTablesTable');
                     const sortTh = document.getElementById('resTablesSortTitle');
+                    const sortArrow = document.getElementById('resTablesSortArrow');
                     const hideEmpty = document.getElementById('hideEmptyCaps');
                     if (table) {
                         const getRows = () => Array.from(table.tBodies[0] ? table.tBodies[0].rows : []);
@@ -39,13 +40,12 @@
                             return td ? String(td.textContent || '').trim().toLowerCase() : '';
                         };
                         const applySortIcon = () => {
-                            if (!sortTh) return;
-                            const base = 'table_title';
-                            sortTh.textContent = base + (sortState.dir === 'asc' ? ' ▲' : ' ▼');
+                            if (!sortArrow) return;
+                            sortArrow.textContent = sortState.dir === 'asc' ? '▲' : '▼';
                         };
                         const sortByTitle = () => {
                             if (!sortTh || !table.tBodies[0]) return;
-                            const idx = Array.from(sortTh.parentElement ? sortTh.parentElement.children : []).indexOf(sortTh);
+                            const idx = Number.isFinite(sortTh.cellIndex) ? sortTh.cellIndex : Array.from(sortTh.parentElement ? sortTh.parentElement.children : []).indexOf(sortTh);
                             if (idx < 0) return;
                             const rows = getRows();
                             const dir = sortState.dir === 'asc' ? 1 : -1;
