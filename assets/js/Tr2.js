@@ -223,25 +223,28 @@
       const nowMin = isToday ? (today.getHours() * 60 + today.getMinutes()) : null;
       const durMin = 120;
 
-      const byTable = {};
+      const byTableEntries = {};
       list.forEach((it) => {
         if (!it || typeof it !== 'object') return;
         const tableTitle = String(it.table_title ?? '').trim();
         const s = String(it.date_start ?? '').trim();
         const e = String(it.date_end ?? '').trim();
+        const name = String(it.guest_name ?? '').trim();
         if (!tableTitle || !s || !e) return;
         if (s.slice(0, 10) !== day) return;
         const sm = Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
         const em = Number(e.slice(11, 13)) * 60 + Number(e.slice(14, 16));
         if (!isFinite(sm) || !isFinite(em)) return;
-        if (!byTable[tableTitle]) byTable[tableTitle] = [];
-        byTable[tableTitle].push([sm, em]);
+        if (!byTableEntries[tableTitle]) byTableEntries[tableTitle] = [];
+        byTableEntries[tableTitle].push({ sm, em, name });
       });
 
-      Object.keys(byTable).forEach((k) => {
-        const arr = byTable[k].slice().sort((a, b) => a[0] - b[0]);
+      const byTable = {};
+      Object.keys(byTableEntries).forEach((k) => {
+        const arr = byTableEntries[k].slice().sort((a, b) => a.sm - b.sm);
+        byTableEntries[k] = arr;
         const merged = [];
-        arr.forEach(([s, e]) => {
+        arr.forEach(({ sm: s, em: e }) => {
           if (!merged.length) { merged.push([s, e]); return; }
           const last = merged[merged.length - 1];
           if (s <= last[1]) last[1] = Math.max(last[1], e);
@@ -252,13 +255,21 @@
 
       const pad2 = (x) => String(x).padStart(2, '0');
       const fmt = (m) => pad2(Math.floor(m / 60)) + ':' + pad2(m % 60);
+      const fmtGuest = (raw) => {
+        const s = String(raw || '').replace(/\s+/g, ' ').trim();
+        if (!s || s === '—') return '';
+        return s.length > 14 ? (s.slice(0, 13) + '…') : s;
+      };
 
       lastReservationsByTable = byTable;
 
       tables.forEach((tableEl) => {
         const n = String(tableEl.dataset.table || '');
+        const entries0 = Array.isArray(byTableEntries[n]) ? byTableEntries[n] : [];
+        let entries = entries0;
         let ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
         if (isToday && nowMin != null) {
+          entries = entries.filter((r) => r.em > nowMin);
           ranges = ranges.filter(([s, e]) => e > nowMin);
         }
         const selEnd = selMin != null ? (selMin + durMin) : null;
@@ -267,7 +278,12 @@
           : false;
         if (overlapsSel) tableEl.dataset.resBusy = '1';
         else delete tableEl.dataset.resBusy;
-        let txt = ranges.length ? ranges.slice(0, 2).map(([s, e]) => fmt(s) + '-' + fmt(e)).join(' · ') : '';
+        let txt = entries.length
+          ? entries.slice(0, 2).map((r) => {
+            const g = fmtGuest(r.name);
+            return fmt(r.sm) + '-' + fmt(r.em) + (g ? (' ' + g) : '');
+          }).join(' · ')
+          : '';
         if (isToday && selMin != null && !overlapsSel && !ranges.length && last && !freeNums.has(n)) {
           txt = t('busy_now');
         }
