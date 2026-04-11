@@ -3324,38 +3324,35 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const setBtnBusy = (btn, state) => {
         if (!btn) return () => {};
         const origHtml = btn.innerHTML;
-        const title = String(state && state.title ? state.title : '').trim();
-        const step = String(state && state.step ? state.step : '').trim();
-        const pct = Number(state && state.pct != null ? state.pct : NaN);
-        const isPct = Number.isFinite(pct) && pct >= 0 && pct <= 100;
-        const fillW = isPct ? String(Math.max(6, Math.min(100, pct))) + '%' : '';
-        btn.innerHTML = `<div class="btn-busy"><div class="btn-busy-title">${escapeHtml(title || 'Загрузка')}</div><div class="btn-busy-step">${escapeHtml(step || 'Подождите…')}</div><div class="btn-busy-bar"><div class="btn-busy-fill${isPct ? '' : ' indeterminate'}"${isPct ? (' style="width:' + fillW + ';"') : ''}></div></div></div>`;
+        btn.dataset.origHtml = origHtml;
+        const title = String(state && state.title ? state.title : btn.textContent || '').trim() || 'Загрузка';
+        const pct = Number(state && state.pct != null ? state.pct : 0);
+        const pctClamped = Math.max(0, Math.min(100, Math.round(pct)));
+        btn.innerHTML = `<span class="btn-label">${escapeHtml(title)} <span class="btn-pct">${pctClamped}%</span></span><span class="btn-busy-line"><span class="btn-busy-fill" style="width:${pctClamped}%"></span></span>`;
         btn.classList.add('loading');
         btn.disabled = true;
         return () => {
             btn.classList.remove('loading');
             btn.disabled = false;
-            btn.innerHTML = origHtml;
+            btn.innerHTML = btn.dataset.origHtml || origHtml;
+            delete btn.dataset.origHtml;
         };
     };
     const updateBtnBusy = (btn, state) => {
         if (!btn) return;
-        const wrap = btn.querySelector('.btn-busy');
-        if (!wrap) return;
-        const titleEl = btn.querySelector('.btn-busy-title');
-        const stepEl = btn.querySelector('.btn-busy-step');
+        const pctEl = btn.querySelector('.btn-pct');
         const fillEl = btn.querySelector('.btn-busy-fill');
-        if (titleEl && state && state.title != null) titleEl.textContent = String(state.title);
-        if (stepEl && state && state.step != null) stepEl.textContent = String(state.step);
-        const pct = Number(state && state.pct != null ? state.pct : NaN);
-        if (fillEl) {
-            if (Number.isFinite(pct) && pct >= 0 && pct <= 100) {
-                fillEl.classList.remove('indeterminate');
-                fillEl.style.width = String(Math.max(6, Math.min(100, pct))) + '%';
-            } else {
-                fillEl.classList.add('indeterminate');
-                fillEl.style.width = '';
+        if (state && state.title != null) {
+            const labelEl = btn.querySelector('.btn-label');
+            if (labelEl && pctEl) {
+                labelEl.innerHTML = escapeHtml(String(state.title)) + ' <span class="btn-pct">' + pctEl.textContent + '</span>';
             }
+        }
+        const pct = Number(state && state.pct != null ? state.pct : NaN);
+        if (Number.isFinite(pct) && pctEl && fillEl) {
+            const pctClamped = Math.max(0, Math.min(100, Math.round(pct)));
+            pctEl.textContent = String(pctClamped) + '%';
+            fillEl.style.width = String(pctClamped) + '%';
         }
     };
     let activeTab = 'in';
@@ -3381,10 +3378,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
     if (tabOut) tabOut.addEventListener('click', () => setTab('out'));
     setTab('in');
-    const loadOutMail = () => {
+    const loadOutMail = (onProgress) => {
         const { dateFrom, dateTo } = getDateRange();
         const qs = new URLSearchParams({ dateFrom, dateTo, include_hidden: '1' });
+        if (typeof onProgress === 'function') onProgress(10, 'SePay: начало');
         return fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=mail_out').then((j) => {
+            if (typeof onProgress === 'function') onProgress(50, 'SePay: письма загружены');
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка mail_out');
             const tbody = outSepayTable.tBodies[0]; tbody.innerHTML = '';
             (j.rows || []).forEach((row) => {
@@ -3411,6 +3410,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             });
             return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
         }).then((j2) => {
+            if (typeof onProgress === 'function') onProgress(80, 'SePay: связи загружены');
             if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
             outLinks.length = 0;
             outLinkByMail.clear();
@@ -3427,6 +3427,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             applyOutRowClasses();
             applyOutHideLinked();
             outScheduleRelayout();
+            if (typeof onProgress === 'function') onProgress(100, 'SePay: готово');
         });
     };
     let employeesMap = null;
@@ -3449,14 +3450,16 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 return categoriesMap;
             });
     };
-    const loadOutFinance = () => {
+    const loadOutFinance = (onProgress) => {
         const { dateFrom, dateTo } = getDateRange();
         const qs = new URLSearchParams({ dateFrom, dateTo });
+        if (typeof onProgress === 'function') onProgress(10, 'Poster: пользователи/категории');
         return Promise.all([
             ensureEmployees(),
             ensureCategories(),
             fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=finance_out'),
         ]).then(([emps, cats, j]) => {
+            if (typeof onProgress === 'function') onProgress(60, 'Poster: транзакции');
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_out');
             const tbody = outPosterTable.tBodies[0]; tbody.innerHTML = '';
             (j.rows || []).forEach((row) => {
@@ -3488,19 +3491,18 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             });
             applyOutRowClasses();
             applyOutHideLinked();
+            if (typeof onProgress === 'function') onProgress(100, 'Poster: готово');
         });
     };
     if (outMailBtn) outMailBtn.addEventListener('click', () => {
-        const restore = setBtnBusy(outMailBtn, { title: 'OUT', step: 'SePay: загрузка писем', pct: null });
-        loadOutMail()
-            .then(() => updateBtnBusy(outMailBtn, { step: 'SePay: готово', pct: 100 }))
+        const restore = setBtnBusy(outMailBtn, { title: 'OUT SePay', pct: 0 });
+        loadOutMail((pct) => updateBtnBusy(outMailBtn, { pct, title: 'OUT SePay' }))
             .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
             .finally(() => { restore(); outScheduleRelayout(); });
     });
     if (outFinanceBtn) outFinanceBtn.addEventListener('click', () => {
-        const restore = setBtnBusy(outFinanceBtn, { title: 'OUT', step: 'Poster: загрузка транзакций', pct: null });
-        loadOutFinance()
-            .then(() => updateBtnBusy(outFinanceBtn, { step: 'Poster: готово', pct: 100 }))
+        const restore = setBtnBusy(outFinanceBtn, { title: 'OUT Poster', pct: 0 });
+        loadOutFinance((pct) => updateBtnBusy(outFinanceBtn, { pct, title: 'OUT Poster' }))
             .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
             .finally(() => { restore(); outScheduleRelayout(); });
     });
@@ -3509,11 +3511,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         dateForm.addEventListener('submit', (ev) => {
             if (activeTab === 'out') {
                 ev.preventDefault();
-                const restoreMail = outMailBtn ? setBtnBusy(outMailBtn, { title: 'OUT', step: 'SePay: загрузка писем', pct: null }) : null;
-                const restoreFin = outFinanceBtn ? setBtnBusy(outFinanceBtn, { title: 'OUT', step: 'Poster: загрузка транзакций', pct: null }) : null;
+                const restoreMail = outMailBtn ? setBtnBusy(outMailBtn, { title: 'OUT SePay', pct: 0 }) : null;
+                const restoreFin = outFinanceBtn ? setBtnBusy(outFinanceBtn, { title: 'OUT Poster', pct: 0 }) : null;
                 Promise.all([
-                    loadOutMail().then(() => updateBtnBusy(outMailBtn, { step: 'SePay: готово', pct: 100 })),
-                    loadOutFinance().then(() => updateBtnBusy(outFinanceBtn, { step: 'Poster: готово', pct: 100 })),
+                    loadOutMail((pct) => updateBtnBusy(outMailBtn, { pct, title: 'OUT SePay' })),
+                    loadOutFinance((pct) => updateBtnBusy(outFinanceBtn, { pct, title: 'OUT Poster' })),
                 ])
                     .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
                     .finally(() => {
