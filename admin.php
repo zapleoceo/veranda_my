@@ -1524,8 +1524,12 @@ if ($tab === 'menu' || $tab === 'categories') {
                     <?php if (empty($resTables)): ?>
                         <div class="small-muted">Нет данных по столам (или ошибка Poster API).</div>
                     <?php else: ?>
+                        <label style="display:flex; gap:10px; align-items:center; user-select:none;">
+                            <input type="checkbox" id="hideEmptyCaps">
+                            <span class="small-muted">Скрыть пустые лимиты</span>
+                        </label>
                         <div style="overflow:auto; border:1px solid var(--border); border-radius: 12px; background: var(--card2);">
-                            <table style="width:100%; border-collapse: collapse; min-width: 860px;">
+                            <table id="resTablesTable" style="width:100%; border-collapse: collapse; min-width: 860px;">
                                 <thead>
                                     <tr style="background: var(--card);">
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">Доступен</th>
@@ -1533,12 +1537,12 @@ if ($tab === 'menu' || $tab === 'categories') {
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">👤</th>
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">Table ID</th>
                                         <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">table_num</th>
-                                        <th style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border);">table_title</th>
+                                        <th id="resTablesSortTitle" data-sort-key="title" style="text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); cursor:pointer; user-select:none;">table_title</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($resTables as $r): ?>
-                                        <tr>
+                                        <tr data-row="1">
                                             <td style="padding:10px 12px; border-bottom:1px solid var(--border);">
                                                 <?php if (($r['scheme_num'] ?? '') !== ''): ?>
                                                     <input type="checkbox" name="allowed_nums[]" value="<?= htmlspecialchars((string)$r['scheme_num']) ?>" <?= !empty($r['is_allowed']) ? 'checked' : '' ?>>
@@ -1551,7 +1555,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                                             </td>
                                             <td style="padding:10px 12px; border-bottom:1px solid var(--border);">
                                                 <?php if (($r['scheme_num'] ?? '') !== ''): ?>
-                                                    <input type="number" name="caps[<?= htmlspecialchars((string)$r['scheme_num']) ?>]" value="<?= (int)($r['cap'] ?? 0) ?>" min="0" max="999" style="width: 56px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text);">
+                                                    <input type="number" class="cap-input" name="caps[<?= htmlspecialchars((string)$r['scheme_num']) ?>]" value="<?= (int)($r['cap'] ?? 0) ?>" min="0" max="999" style="width: 56px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text);">
                                                 <?php else: ?>
                                                     <span class="small-muted">—</span>
                                                 <?php endif; ?>
