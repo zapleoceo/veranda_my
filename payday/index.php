@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0343">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0344">
 </head>
 <body>
 <div class="container">
@@ -5281,8 +5281,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 res.data.forEach(row => Object.keys(row).forEach(k => allKeys.add(k)));
                 const keys = Array.from(allKeys);
                 
+                // Заменяем account_id на Название Счета
+                const displayKeys = keys.map(k => k === 'account_id' ? 'Название Счета' : k);
+                
                 let html = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap; font-size:13px;"><thead><tr>';
-                keys.forEach(k => {
+                displayKeys.forEach(k => {
                     html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; background:var(--card);">' + escapeHtml(k) + '</th>';
                 });
                 html += '</tr></thead><tbody>';
@@ -5416,8 +5419,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 });
                 const keys = Array.from(allKeys);
                 
+                // Заменяем account_id на Название Счета
+                const displayKeys = keys.map(k => k === 'account_id' ? 'Название Счета' : k);
+                
                 let html = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap; font-size:13px;"><thead><tr>';
-                keys.forEach(k => {
+                displayKeys.forEach(k => {
                     html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; background:var(--card);">' + escapeHtml(k) + '</th>';
                 });
                 html += '</tr></thead><tbody>';
