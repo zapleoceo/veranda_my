@@ -1866,7 +1866,7 @@ if (($_GET['ajax'] ?? '') === 'kashshift_detail') {
         $apiKSDetail = new \App\Classes\PosterAPI((string)$token);
         $shiftId = trim((string)($_GET['shiftId'] ?? ''));
         if ($shiftId === '') throw new \Exception('No shift ID provided');
-        $data = $apiKSDetail->request('finance.getCashShift', ['cash_shift_id' => $shiftId]);
+        $data = $apiKSDetail->request('finance.getCashShiftTransactions', ['cash_shift_id' => $shiftId]);
         echo json_encode(['ok' => true, 'data' => is_array($data) ? $data : []], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0338">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0339">
 </head>
 <body>
 <div class="container">
@@ -5315,29 +5315,40 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             if (contentDiv && contentDiv.innerHTML === 'Загрузка...') {
                 fetchJsonSafe('?ajax=kashshift_detail&shiftId=' + encodeURIComponent(shiftId))
                     .then(res => {
-                        if (!res.ok) throw new Error(res.error || 'Ошибка загрузки смены');
-                        const d = res.data;
-                        if (!d || Object.keys(d).length === 0) {
-                            contentDiv.innerHTML = '<div style="color:var(--muted);">Нет деталей смены</div>';
+                        if (!res.ok) throw new Error(res.error || 'Ошибка загрузки транзакций смены');
+                        const arr = res.data;
+                        if (!Array.isArray(arr) || arr.length === 0) {
+                            contentDiv.innerHTML = '<div style="color:var(--muted);">Нет транзакций в этой смене</div>';
                             return;
                         }
                         
-                        let h = '<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; font-size:13px;">';
+                        let h = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap; font-size:13px; background:var(--card);"><thead><tr>';
+                        h += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; width:1%;">Дата</th>';
+                        h += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; width:1%;">Тип</th>';
+                        h += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; width:1%;">Категория</th>';
+                        h += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; width:1%;">Сотрудник</th>';
+                        h += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:6px; width:1%;">Сумма</th>';
+                        h += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; width:auto;">Комментарий</th>';
+                        h += '</tr></thead><tbody>';
                         
-                        const renderBox = (title, val, color) => {
-                            let cStyle = color ? 'color:' + color + ';' : '';
-                            return '<div style="background:var(--card); padding:8px; border-radius:4px; border:1px solid var(--border);"><div style="color:var(--muted); margin-bottom:4px; font-size:11px; text-transform:uppercase;">' + escapeHtml(title) + '</div><div style="font-weight:bold; font-size:14px;' + cStyle + '">' + escapeHtml(val) + '</div></div>';
+                        const getTypeLabel = (type) => {
+                            if (type === 1) return '<span style="color:#4ade80;">Внесение</span>';
+                            if (type === 2) return '<span style="color:#f87171;">Изъятие</span>';
+                            return String(type);
                         };
+
+                        arr.forEach(tx => {
+                            h += '<tr>';
+                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(tx.time || '') + '</td>';
+                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + getTypeLabel(Number(tx.type)) + '</td>';
+                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(tx.category_name || '') + '</td>';
+                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(tx.user_name || '') + '</td>';
+                            h += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:6px; width:1%; font-weight:bold;">' + fmtVnd2(posterMinorToVnd(tx.amount || 0)) + '</td>';
+                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:auto; white-space:normal;">' + escapeHtml(tx.comment || '') + '</td>';
+                            h += '</tr>';
+                        });
                         
-                        const vCash = posterMinorToVnd(d.amount_sell_cash || 0);
-                        const vCard = posterMinorToVnd(d.amount_sell_card || 0);
-                        
-                        h += renderBox('Сумма наличными', fmtVnd2(vCash));
-                        h += renderBox('Сумма по карте', fmtVnd2(vCard));
-                        h += renderBox('Сумма инкассации', fmtVnd2(posterMinorToVnd(d.amount_collection || 0)));
-                        h += renderBox('Сумма возвратов', fmtVnd2(posterMinorToVnd(d.amount_refund || 0)));
-                        
-                        h += '</div>';
+                        h += '</tbody></table></div>';
                         contentDiv.innerHTML = h;
                     })
                     .catch(e => {
