@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0349">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0350">
 </head>
 <body>
 <div class="container">
@@ -5373,9 +5373,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         h += '</tr></thead><tbody>';
                         
                         const getTypeLabel = (type) => {
+                            if (type === 0) return '<span style="color:#fbbf24;">Чек</span>';
                             if (type === 1) return '<span style="color:#4ade80;">Внесение</span>';
                             if (type === 2) return '<span style="color:#f87171;">Изъятие</span>';
-                            if (type === 3) return '<span style="color:#fbbf24;">Инкассация</span>';
+                            if (type === 3) return '<span style="color:#3b82f6;">Оплата поставки</span>';
                             return String(type);
                         };
                         
