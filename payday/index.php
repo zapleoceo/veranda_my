@@ -2713,7 +2713,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260410_0009">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0305">
 </head>
 <body>
 <div class="container">
@@ -2769,6 +2769,15 @@ $fmtVnd = function (int $v): string {
                 </label>
                 <span class="toggle-text">Full</span>
             </div>
+        </div>
+
+        <div class="loadbox" id="inLoadBox" hidden>
+            <div class="loadbox-title" id="inLoadText">Загрузка…</div>
+            <div class="loadbox-bar"><div class="loadbox-bar-fill"></div></div>
+        </div>
+        <div class="loadbox" id="outLoadBox" hidden style="display:none;">
+            <div class="loadbox-title" id="outLoadText">Загрузка…</div>
+            <div class="loadbox-bar"><div class="loadbox-bar-fill"></div></div>
         </div>
 
         <div class="divider"></div>
@@ -3278,6 +3287,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const outSection = document.getElementById('outSection');
     const outMailBtn = document.getElementById('outMailBtn');
     const outFinanceBtn = document.getElementById('outFinanceBtn');
+    const inLoadBox = document.getElementById('inLoadBox');
+    const inLoadText = document.getElementById('inLoadText');
+    const outLoadBox = document.getElementById('outLoadBox');
+    const outLoadText = document.getElementById('outLoadText');
     const outSepayTable = document.getElementById('outSepayTable');
     const outPosterTable = document.getElementById('outPosterTable');
     const toggleOutMailHiddenBtn = document.getElementById('toggleOutMailHiddenBtn');
@@ -3321,6 +3334,40 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const dtEl = document.querySelector('input[name="dateTo"]');
         return { dateFrom: dfEl ? dfEl.value : '', dateTo: dtEl ? dtEl.value : '' };
     };
+    const loaderState = {
+        inCount: 0,
+        outCount: 0,
+        inLabel: '',
+        outLabel: '',
+    };
+    const setLoadUi = () => {
+        const inOn = loaderState.inCount > 0;
+        const outOn = loaderState.outCount > 0;
+        if (inLoadBox) {
+            inLoadBox.hidden = !inOn;
+            if (inLoadText) inLoadText.textContent = loaderState.inLabel || 'Загрузка…';
+        }
+        if (outLoadBox) {
+            outLoadBox.hidden = !outOn;
+            if (outLoadText) outLoadText.textContent = loaderState.outLabel || 'Загрузка…';
+        }
+    };
+    const beginLoad = (mode, label) => {
+        const m = (mode === 'out') ? 'out' : 'in';
+        if (m === 'out') {
+            loaderState.outCount += 1;
+            loaderState.outLabel = String(label || '').trim() || loaderState.outLabel || 'Загрузка…';
+        } else {
+            loaderState.inCount += 1;
+            loaderState.inLabel = String(label || '').trim() || loaderState.inLabel || 'Загрузка…';
+        }
+        setLoadUi();
+        return () => {
+            if (m === 'out') loaderState.outCount = Math.max(0, loaderState.outCount - 1);
+            else loaderState.inCount = Math.max(0, loaderState.inCount - 1);
+            setLoadUi();
+        };
+    };
     let activeTab = 'in';
     const setTab = (m) => {
         const inOn = m === 'in';
@@ -3338,6 +3385,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         if (posterSyncForm) posterSyncForm.style.display = inOn ? '' : 'none';
         if (sepaySyncForm) sepaySyncForm.style.display = inOn ? '' : 'none';
         if (clearDayForm) clearDayForm.style.display = inOn ? '' : 'none';
+        if (inLoadBox) inLoadBox.style.display = inOn ? '' : 'none';
+        if (outLoadBox) outLoadBox.style.display = inOn ? 'none' : '';
         activeTab = inOn ? 'in' : 'out';
         if (!inOn) outScheduleRelayout();
     };
