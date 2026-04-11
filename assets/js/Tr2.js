@@ -287,6 +287,8 @@
           : false;
         if (overlapsSel) tableEl.dataset.resBusy = '1';
         else delete tableEl.dataset.resBusy;
+        const isOccNow = isToday && occupiedNowNums && occupiedNowNums.has(n);
+        const isBusyByFree = isToday && last && !freeNums.has(n);
         let txt = entries.length
           ? entries.slice(0, 2).map((r) => {
             const g = fmtGuest(r.name);
@@ -294,12 +296,9 @@
             return fmt(r.sm) + '-' + fmt(r.em) + (g ? (' ' + g) : '') + (cnt ? (' (' + cnt + ')') : '');
           }).join(' · ')
           : '';
-        const isOccNow = isToday && occupiedNowNums && occupiedNowNums.has(n);
-        if (isOccNow) {
+        if (isOccNow || isBusyByFree) {
           const occ = t('busy_now');
           txt = txt ? (occ + '\n' + txt) : occ;
-        } else if (isToday && selMin != null && !overlapsSel && !ranges.length && last && !freeNums.has(n)) {
-          txt = t('busy_now');
         }
         let el = tableEl.querySelector('.res-time');
         if (!txt) {
