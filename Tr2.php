@@ -520,96 +520,101 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
 
   $api = new \App\Classes\PosterAPI($posterToken);
   try {
-    $resp = $api->request('incomingOrders.getTablesForReservation', [
-      'date_reservation' => $dtDisplay->format('Y-m-d H:i:s'),
-      'duration' => $duration,
+    // Получаем список всех столов в зале, затем исключаем занятые по "открытым чекам"
+    $tablesResp = $api->request('spots.getTableHallTables', [
       'spot_id' => $spotId,
-      'guests_count' => $guests,
+      'hall_id' => $hallId,
+      'without_deleted' => 1,
     ], 'GET');
+    $tablesResp = is_array($tablesResp) ? $tablesResp : [];
+    $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
+    $schemeById = [];
+    $allAllowedNums = [];
+    foreach ($tablesResp as $tr) {
+      if (!is_array($tr)) continue;
+      $id = trim((string)($tr['table_id'] ?? ''));
+      if ($id === '') continue;
+      $num = trim((string)($tr['table_num'] ?? ''));
+      $title = trim((string)($tr['table_title'] ?? ''));
+      $scheme = '';
+      if (preg_match('/^\d+$/', $title)) $scheme = $title;
+      elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
+      if ($scheme === '') continue;
+      $sStr = (string)$scheme;
+      if (is_array($allowedSet) && !isset($allowedSet[$sStr])) continue;
+      $schemeById[$id] = $sStr;
+      $allAllowedNums[$sStr] = true;
+    }
 
-    $free = is_array($resp) && isset($resp['freeTables']) && is_array($resp['freeTables']) ? $resp['freeTables'] : [];
-    
-    // ПРОВЕРКА ЗАНЯТЫХ СТОЛИКОВ (Open Transactions)
-    // Если дата бронирования - сегодня, запрашиваем реально открытые чеки в Poster
+    // Определяем занятые "сейчас": открытые чеки
     $busyTableIds = [];
     $isToday = $dtDisplay->format('Y-m-d') === $nowDisplay->format('Y-m-d');
     if ($isToday) {
       try {
+        // Сначала пробуем получить открытые через dash.getTransactions (status=1)
         $openTxs = $api->request('dash.getTransactions', ['status' => 1], 'GET');
         if (is_array($openTxs)) {
           foreach ($openTxs as $tx) {
             if (isset($tx['table_id'])) $busyTableIds[(int)$tx['table_id']] = true;
           }
         }
+        // Фоллбек: transactions.getTransactions за сегодня (если вдруг dash.getTransactions пуст)
+        if (!$busyTableIds) {
+          $txResp = $api->request('transactions.getTransactions', [
+            'date_from' => $nowDisplay->format('Y-m-d'),
+            'date_to' => $nowDisplay->format('Y-m-d'),
+            'per_page' => 1000,
+            'page' => 1,
+          ], 'GET');
+          if (is_array($txResp) && isset($txResp['data']) && is_array($txResp['data'])) {
+            foreach ($txResp['data'] as $row) {
+              if (!is_array($row)) continue;
+              $tid = isset($row['table_id']) ? (int)$row['table_id'] : 0;
+              if ($tid > 0) {
+                // Если нет date_close или pay_type == 0 — считаем открытым
+                $dateClose = trim((string)($row['date_close'] ?? ''));
+                $payType = (int)($row['pay_type'] ?? -1);
+                if ($dateClose === '' || $payType === 0) $busyTableIds[$tid] = true;
+              }
+            }
+          }
+        }
       } catch (\Throwable $e) {
-        // Игнорируем ошибку получения транзакций, чтобы не ломать весь запрос
+        // Игнорируем ошибку получения транзакций
       }
     }
     $occupiedNowNums = [];
-    if ($isToday && $busyTableIds) {
-      try {
-        $tablesResp = $api->request('spots.getTableHallTables', [
-          'spot_id' => $spotId,
-          'hall_id' => $hallId,
-          'without_deleted' => 1,
-        ], 'GET');
-        $tableRows = is_array($tablesResp) ? $tablesResp : [];
-        $schemeById = [];
-        $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
-        foreach ($tableRows as $tr) {
-          if (!is_array($tr)) continue;
-          $id = trim((string)($tr['table_id'] ?? ''));
-          if ($id === '') continue;
-          $num = trim((string)($tr['table_num'] ?? ''));
-          $title = trim((string)($tr['table_title'] ?? ''));
-          $scheme = '';
-          if (preg_match('/^\d+$/', $title)) $scheme = $title;
-          elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
-          if ($scheme === '') continue;
-          $sStr = (string)$scheme;
-          if (is_array($allowedSet) && !isset($allowedSet[$sStr])) continue;
-          $schemeById[$id] = $sStr;
-        }
-        foreach (array_keys($busyTableIds) as $tId) {
-          $k = (string)$tId;
-          if (isset($schemeById[$k])) $occupiedNowNums[$schemeById[$k]] = true;
-        }
-        $occupiedNowNums = array_values(array_keys($occupiedNowNums));
-        usort($occupiedNowNums, fn($a, $b) => (int)$a <=> (int)$b);
-      } catch (\Throwable $e) {
-        $occupiedNowNums = [];
+    if ($busyTableIds) {
+      foreach (array_keys($busyTableIds) as $tId) {
+        $k = (string)$tId;
+        if (isset($schemeById[$k])) $occupiedNowNums[$schemeById[$k]] = true;
       }
+      $occupiedNowNums = array_values(array_keys($occupiedNowNums));
+      usort($occupiedNowNums, fn($a, $b) => (int)$a <=> (int)$b);
+    } else {
+      $occupiedNowNums = [];
     }
 
-    $filtered = [];
+    // Свободные: все разрешённые минус занятые сейчас
     $nums = [];
-    $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
-    foreach ($free as $row) {
-      if (!is_array($row)) continue;
-      if ((int)($row['hall_id'] ?? 0) !== $hallId) continue;
-      
-      // Если столик занят гостями прямо сейчас, исключаем его из списка свободных
-      $tId = (int)($row['table_id'] ?? 0);
-      if ($isToday && isset($busyTableIds[$tId])) continue;
-
-      $num = trim((string)($row['table_num'] ?? ''));
-      if ($num === '') continue;
-      if (is_array($allowedSet) && !isset($allowedSet[$num])) continue;
-      $filtered[] = $row;
-      $nums[$num] = true;
+    foreach (array_keys($allAllowedNums) as $n) {
+      if ($isToday && in_array($n, $occupiedNowNums, true)) continue;
+      $nums[$n] = true;
+    }
+    // Собираем список "free_tables" из исходных rows для совместимости
+    $filtered = [];
+    foreach ($tablesResp as $tr) {
+      if (!is_array($tr)) continue;
+      $id = trim((string)($tr['table_id'] ?? ''));
+      if ($id === '') continue;
+      $scheme = isset($schemeById[$id]) ? $schemeById[$id] : '';
+      if ($scheme === '' || !isset($nums[$scheme])) continue;
+      $filtered[] = $tr;
     }
 
     $busyReasons = [];
     if ($isToday) {
-      // not in free list
-      $allowedNums = is_array($allowed) ? array_map('strval', $allowed) : [];
-      foreach ($allowedNums as $n) {
-        if (!isset($nums[$n])) {
-          if (!isset($busyReasons[$n])) $busyReasons[$n] = [];
-          $busyReasons[$n][] = 'not_in_free_tables';
-        }
-      }
-      // occupied now by open checks
+      // только занятость по открытым чекам
       foreach ($occupiedNowNums as $n) {
         $s = (string)$n;
         if (!isset($busyReasons[$s])) $busyReasons[$s] = [];
@@ -631,7 +636,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
       'occupied_now_nums' => $occupiedNowNums,
       'busy_reasons' => $busyReasons,
       'free_tables' => $filtered,
-      'raw' => $resp,
+      'raw' => null,
     ], JSON_UNESCAPED_UNICODE);
   } catch (\Throwable $e) {
     http_response_code(500);
