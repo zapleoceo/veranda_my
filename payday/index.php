@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0342">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0343">
 </head>
 <body>
 <div class="container">
@@ -5313,6 +5313,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         kashshiftClose.addEventListener('click', () => {
             kashshiftModal.style.display = 'none';
         });
+        
+        kashshiftModal.addEventListener('click', (e) => {
+            if (e.target === kashshiftModal) {
+                kashshiftModal.style.display = 'none';
+            }
+        });
     }
     
     window.toggleShiftDetail = function(tr, shiftId) {
@@ -5456,6 +5462,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         
         suppliesClose.addEventListener('click', () => {
             suppliesModal.style.display = 'none';
+        });
+        
+        suppliesModal.addEventListener('click', (e) => {
+            if (e.target === suppliesModal) {
+                suppliesModal.style.display = 'none';
+            }
         });
     }
 
