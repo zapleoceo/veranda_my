@@ -1843,6 +1843,45 @@ if (($_GET['ajax'] ?? '') === 'finance_categories') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'kashshift') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $apiKS = new \App\Classes\PosterAPI((string)$token);
+        $dFrom = str_replace('-', '', trim((string)($_GET['dateFrom'] ?? '')));
+        $dTo = str_replace('-', '', trim((string)($_GET['dateTo'] ?? '')));
+        if ($dFrom === '') $dFrom = date('Ymd');
+        if ($dTo === '') $dTo = date('Ymd');
+        $rows = $apiKS->request('finance.getCashShifts', ['dateFrom' => $dFrom, 'dateTo' => $dTo]);
+        echo json_encode(['ok' => true, 'data' => is_array($rows) ? $rows : []], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'supplies') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $apiSup = new \App\Classes\PosterAPI((string)$token);
+        $dFrom = str_replace('-', '', trim((string)($_GET['dateFrom'] ?? '')));
+        $dTo = str_replace('-', '', trim((string)($_GET['dateTo'] ?? '')));
+        if ($dFrom === '') $dFrom = date('Ymd');
+        if ($dTo === '') $dTo = date('Ymd');
+        $supplies = $apiSup->request('storage.getSupplies', ['dateFrom' => $dFrom, 'dateTo' => $dTo]);
+        $accounts = $apiSup->request('finance.getAccounts', []);
+        
+        if (!is_array($supplies)) $supplies = [];
+        if (!is_array($accounts)) $accounts = [];
+        
+        echo json_encode(['ok' => true, 'supplies' => $supplies, 'accounts' => $accounts], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'out_links') {
     header('Content-Type: application/json; charset=utf-8');
     $dTo = trim((string)($_GET['dateTo'] ?? ''));
@@ -2713,7 +2752,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0335">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0336">
 </head>
 <body>
 <div class="container">
@@ -2723,6 +2762,8 @@ $fmtVnd = function (int $v): string {
             <div class="tabs">
                 <button type="button" class="tab active" id="tabIn">IN</button>
                 <button type="button" class="tab" id="tabOut">OUT</button>
+                <button type="button" class="tab" id="btnKashShift" style="margin-left: 15px; background: rgba(184,135,70,0.15); color: #B88746;">KashShift</button>
+                <button type="button" class="tab" id="btnSupplies" style="margin-left: 5px; background: rgba(184,135,70,0.15); color: #B88746;">Supplies</button>
             </div>
         </div>
         <?php require __DIR__ . '/../partials/user_menu.php'; ?>
@@ -2821,6 +2862,30 @@ $fmtVnd = function (int $v): string {
         </div>
 
         <div class="grid" id="tablesRoot">
+            <div class="confirm-backdrop" id="kashshiftModal" style="display:none; z-index: 9999;">
+                <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                        <h3 style="margin:0;">KashShift</h3>
+                        <button type="button" class="btn2" id="kashshiftClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
+                    </div>
+                    <div class="body" id="kashshiftBody" style="max-height: 70vh; overflow: auto;">
+                        <div style="text-align:center;">Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="confirm-backdrop" id="suppliesModal" style="display:none; z-index: 9999;">
+                <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                        <h3 style="margin:0;">Supplies</h3>
+                        <button type="button" class="btn2" id="suppliesClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
+                    </div>
+                    <div class="body" id="suppliesBody" style="max-height: 70vh; overflow: auto;">
+                        <div style="text-align:center;">Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="confirm-backdrop" id="financeConfirm">
                 <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="financeConfirmTitle">
                     <h3 id="financeConfirmTitle">Подтверждение</h3>
@@ -5173,6 +5238,110 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') clearCheckboxes();
     });
+
+    const btnKashShift = document.getElementById('btnKashShift');
+    const kashshiftModal = document.getElementById('kashshiftModal');
+    const kashshiftClose = document.getElementById('kashshiftClose');
+    const kashshiftBody = document.getElementById('kashshiftBody');
+
+    if (btnKashShift && kashshiftModal) {
+        btnKashShift.addEventListener('click', () => {
+            kashshiftModal.style.display = 'flex';
+            kashshiftBody.innerHTML = '<div style="text-align:center;">Загрузка...</div>';
+            
+            const dFrom = document.querySelector('input[name="dateFrom"]').value || '';
+            const dTo = document.querySelector('input[name="dateTo"]').value || '';
+            
+            const url = '?ajax=kashshift&dateFrom=' + encodeURIComponent(dFrom) + '&dateTo=' + encodeURIComponent(dTo);
+            fetchJsonSafe(url).then(res => {
+                if (!res.ok) throw new Error(res.error || 'Ошибка');
+                let html = '<table style="width:100%; border-collapse:collapse;"><thead><tr>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px;">Дата открытия</th>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px;">Дата закрытия</th>';
+                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">Сумма (cash)</th>';
+                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">Сумма (card)</th>';
+                html += '</tr></thead><tbody>';
+                
+                if (res.data && res.data.length > 0) {
+                    res.data.forEach(row => {
+                        html += '<tr>';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:8px;">' + escapeHtml(row.date_start) + '</td>';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:8px;">' + escapeHtml(row.date_end || '-') + '</td>';
+                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">' + fmtVnd2(posterMinorToVnd(row.amount_sell_cash)) + '</td>';
+                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">' + fmtVnd2(posterMinorToVnd(row.amount_sell_card)) + '</td>';
+                        html += '</tr>';
+                    });
+                } else {
+                    html += '<tr><td colspan="4" style="text-align:center; padding:15px; color:var(--muted);">Нет данных за период</td></tr>';
+                }
+                html += '</tbody></table>';
+                kashshiftBody.innerHTML = html;
+            }).catch(e => {
+                kashshiftBody.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>';
+            });
+        });
+        
+        kashshiftClose.addEventListener('click', () => {
+            kashshiftModal.style.display = 'none';
+        });
+    }
+
+    const btnSupplies = document.getElementById('btnSupplies');
+    const suppliesModal = document.getElementById('suppliesModal');
+    const suppliesClose = document.getElementById('suppliesClose');
+    const suppliesBody = document.getElementById('suppliesBody');
+
+    if (btnSupplies && suppliesModal) {
+        btnSupplies.addEventListener('click', () => {
+            suppliesModal.style.display = 'flex';
+            suppliesBody.innerHTML = '<div style="text-align:center;">Загрузка...</div>';
+            
+            const dFrom = document.querySelector('input[name="dateFrom"]').value || '';
+            const dTo = document.querySelector('input[name="dateTo"]').value || '';
+            
+            const url = '?ajax=supplies&dateFrom=' + encodeURIComponent(dFrom) + '&dateTo=' + encodeURIComponent(dTo);
+            fetchJsonSafe(url).then(res => {
+                if (!res.ok) throw new Error(res.error || 'Ошибка');
+                
+                const accMap = {};
+                if (res.accounts) {
+                    res.accounts.forEach(a => {
+                        accMap[a.account_id] = a.account_name;
+                    });
+                }
+                
+                let html = '<table style="width:100%; border-collapse:collapse;"><thead><tr>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px;">Дата</th>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px;">Поставщик</th>';
+                html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:8px;">Счет</th>';
+                html += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">Сумма</th>';
+                html += '</tr></thead><tbody>';
+                
+                if (res.supplies && res.supplies.length > 0) {
+                    res.supplies.forEach(row => {
+                        const accName = accMap[row.account_id] || ('ID: ' + row.account_id);
+                        html += '<tr>';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:8px;">' + escapeHtml(row.date) + '</td>';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:8px;">' + escapeHtml(row.supplier_name) + '</td>';
+                        html += '<td style="border-bottom:1px solid var(--border); padding:8px;">' + escapeHtml(accName) + '</td>';
+                        html += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:8px;">' + fmtVnd2(posterMinorToVnd(row.total_sum)) + '</td>';
+                        html += '</tr>';
+                    });
+                } else {
+                    html += '<tr><td colspan="4" style="text-align:center; padding:15px; color:var(--muted);">Нет данных за период</td></tr>';
+                }
+                html += '</tbody></table>';
+                suppliesBody.innerHTML = html;
+            }).catch(e => {
+                suppliesBody.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>';
+            });
+        });
+        
+        suppliesClose.addEventListener('click', () => {
+            suppliesModal.style.display = 'none';
+        });
+    }
+
 })();
 </script>
 </body>
