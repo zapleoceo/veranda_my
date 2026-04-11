@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0341">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0342">
 </head>
 <body>
 <div class="container">
@@ -5400,7 +5400,14 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 
                 // Сбор всех уникальных ключей для динамических колонок
                 const allKeys = new Set();
-                res.supplies.forEach(row => Object.keys(row).forEach(k => allKeys.add(k)));
+                const ignoredKeys = ['supply_sum_netto', 'supplier_id', 'storage_id', 'delete', 'supply_comment'];
+                res.supplies.forEach(row => {
+                    Object.keys(row).forEach(k => {
+                        if (!ignoredKeys.includes(k)) {
+                            allKeys.add(k);
+                        }
+                    });
+                });
                 const keys = Array.from(allKeys);
                 
                 let html = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap; font-size:13px;"><thead><tr>';
@@ -5419,8 +5426,15 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         if (k === 'account_id') {
                             const accountId = row.account_id || (row.payed_sum && row.payed_sum.length > 0 ? row.payed_sum[0].account_id : null);
                             if (accountId && accMap[accountId]) {
-                                val = accMap[accountId] + ' (' + accountId + ')';
+                                val = accMap[accountId];
+                            } else if (accountId) {
+                                val = accountId;
                             }
+                        }
+                        
+                        // Форматирование supply_sum и total_sum (в копейках -> без копеек с пробелами)
+                        if ((k === 'supply_sum' || k === 'total_sum') && val !== '') {
+                            val = fmtVnd0(posterMinorToVnd(val));
                         }
                         
                         // Если значение объект/массив, выводим как JSON
