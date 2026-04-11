@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0345">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0346">
 </head>
 <body>
 <div class="container">
@@ -5354,14 +5354,22 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                             if (type === 2) return '<span style="color:#f87171;">Изъятие</span>';
                             return String(type);
                         };
+                        
+                        const formatDate = (tsStr) => {
+                            if (!tsStr) return '';
+                            const d = new Date(Number(tsStr));
+                            if (isNaN(d.getTime())) return tsStr;
+                            const p = n => String(n).padStart(2, '0');
+                            return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+                        };
 
                         arr.forEach(tx => {
                             h += '<tr>';
-                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(tx.time || '') + '</td>';
+                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(formatDate(tx.time)) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + getTypeLabel(Number(tx.type)) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(tx.category_name || '') + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(tx.user_name || '') + '</td>';
-                            h += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:6px; width:1%; font-weight:bold;">' + fmtVnd2(posterMinorToVnd(tx.amount || 0)) + '</td>';
+                            h += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:6px; width:1%; font-weight:bold;">' + fmtVnd0(posterMinorToVnd(tx.amount || 0)) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:auto; white-space:normal;">' + escapeHtml(tx.comment || '') + '</td>';
                             h += '</tr>';
                         });
