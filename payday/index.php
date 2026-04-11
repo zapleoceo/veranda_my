@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0346">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0347">
 </head>
 <body>
 <div class="container">
@@ -5295,6 +5295,31 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     keys.forEach(k => {
                         let val = row[k];
                         if (val === null || val === undefined) val = '';
+                        
+                        // Форматирование сумм (убираем копейки)
+                        if ((k.includes('amount') || k.includes('sum')) && val !== '') {
+                            const nVal = Number(val);
+                            if (!isNaN(nVal)) {
+                                val = fmtVnd0(posterMinorToVnd(nVal));
+                            }
+                        }
+                        
+                        // Форматирование дат (могут приходить в миллисекундах)
+                        if ((k.includes('date') || k.includes('time')) && val !== '') {
+                            let ts = Number(val);
+                            // Если число небольшое, значит это секунды
+                            if (!isNaN(ts) && ts > 0 && String(Math.floor(ts)).length === 10) {
+                                ts = ts * 1000;
+                            }
+                            if (!isNaN(ts) && ts > 0) {
+                                const d = new Date(ts);
+                                if (!isNaN(d.getTime())) {
+                                    const p = n => String(n).padStart(2, '0');
+                                    val = `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+                                }
+                            }
+                        }
+
                         html += '<td style="border-bottom:1px solid var(--border); padding:6px;">' + escapeHtml(val) + '</td>';
                     });
                     html += '</tr>';
