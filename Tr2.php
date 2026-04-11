@@ -545,6 +545,41 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
         // Игнорируем ошибку получения транзакций, чтобы не ломать весь запрос
       }
     }
+    $occupiedNowNums = [];
+    if ($isToday && $busyTableIds) {
+      try {
+        $tablesResp = $api->request('spots.getTableHallTables', [
+          'spot_id' => $spotId,
+          'hall_id' => $hallId,
+          'without_deleted' => 1,
+        ], 'GET');
+        $tableRows = is_array($tablesResp) ? $tablesResp : [];
+        $schemeById = [];
+        $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
+        foreach ($tableRows as $tr) {
+          if (!is_array($tr)) continue;
+          $id = trim((string)($tr['table_id'] ?? ''));
+          if ($id === '') continue;
+          $num = trim((string)($tr['table_num'] ?? ''));
+          $title = trim((string)($tr['table_title'] ?? ''));
+          $scheme = '';
+          if (preg_match('/^\d+$/', $title)) $scheme = $title;
+          elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
+          if ($scheme === '') continue;
+          $sStr = (string)$scheme;
+          if (is_array($allowedSet) && !isset($allowedSet[$sStr])) continue;
+          $schemeById[$id] = $sStr;
+        }
+        foreach (array_keys($busyTableIds) as $tId) {
+          $k = (string)$tId;
+          if (isset($schemeById[$k])) $occupiedNowNums[$schemeById[$k]] = true;
+        }
+        $occupiedNowNums = array_values(array_keys($occupiedNowNums));
+        usort($occupiedNowNums, fn($a, $b) => (int)$a <=> (int)$b);
+      } catch (\Throwable $e) {
+        $occupiedNowNums = [];
+      }
+    }
 
     $filtered = [];
     $nums = [];
@@ -575,6 +610,7 @@ if (($_GET['ajax'] ?? '') === 'free_tables') {
         'hall_id' => $hallId,
       ],
       'free_table_nums' => array_values(array_keys($nums)),
+      'occupied_now_nums' => $occupiedNowNums,
       'free_tables' => $filtered,
       'raw' => $resp,
     ], JSON_UNESCAPED_UNICODE);
@@ -1825,6 +1861,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260411_0245"></script>
+  <script src="/assets/js/Tr2.js?v=20260411_0325"></script>
 </body>
 </html>

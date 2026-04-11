@@ -200,6 +200,7 @@
     };
 
     let lastReservationsByTable = {};
+    let occupiedNowNums = new Set();
     const applyReservationsItemsToTables = (items, dateStr, dtValue) => {
       const list = Array.isArray(items) ? items : [];
       const day = String(dateStr || '').slice(0, 10);
@@ -230,13 +231,14 @@
         const s = String(it.date_start ?? '').trim();
         const e = String(it.date_end ?? '').trim();
         const name = String(it.guest_name ?? '').trim();
+        const guests = String(it.guests_count ?? '').trim();
         if (!tableTitle || !s || !e) return;
         if (s.slice(0, 10) !== day) return;
         const sm = Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
         const em = Number(e.slice(11, 13)) * 60 + Number(e.slice(14, 16));
         if (!isFinite(sm) || !isFinite(em)) return;
         if (!byTableEntries[tableTitle]) byTableEntries[tableTitle] = [];
-        byTableEntries[tableTitle].push({ sm, em, name });
+        byTableEntries[tableTitle].push({ sm, em, name, guests });
       });
 
       const byTable = {};
@@ -260,6 +262,13 @@
         if (!s || s === '—') return '';
         return s.length > 14 ? (s.slice(0, 13) + '…') : s;
       };
+      const fmtGuests = (raw) => {
+        const s = String(raw || '').trim();
+        if (!s || s === '—') return '';
+        const n = Number(s);
+        if (!Number.isFinite(n) || n <= 0) return '';
+        return String(Math.floor(n));
+      };
 
       lastReservationsByTable = byTable;
 
@@ -281,10 +290,15 @@
         let txt = entries.length
           ? entries.slice(0, 2).map((r) => {
             const g = fmtGuest(r.name);
-            return fmt(r.sm) + '-' + fmt(r.em) + (g ? (' ' + g) : '');
+            const cnt = fmtGuests(r.guests);
+            return fmt(r.sm) + '-' + fmt(r.em) + (g ? (' ' + g) : '') + (cnt ? (' (' + cnt + ')') : '');
           }).join(' · ')
           : '';
-        if (isToday && selMin != null && !overlapsSel && !ranges.length && last && !freeNums.has(n)) {
+        const isOccNow = isToday && occupiedNowNums && occupiedNowNums.has(n);
+        if (isOccNow) {
+          const occ = t('busy_now');
+          txt = txt ? (occ + '\n' + txt) : occ;
+        } else if (isToday && selMin != null && !overlapsSel && !ranges.length && last && !freeNums.has(n)) {
           txt = t('busy_now');
         }
         let el = tableEl.querySelector('.res-time');
@@ -1523,6 +1537,7 @@
           
           if (rChk.ok && jChk && jChk.ok && Array.isArray(jChk.free_table_nums)) {
             freeNums = new Set(jChk.free_table_nums.map(String));
+            occupiedNowNums = new Set(Array.isArray(jChk.occupied_now_nums) ? jChk.occupied_now_nums.map(String) : []);
             
             // Also fetch reservations for exact ranges
             const rUrl = new URL(location.href);
@@ -1946,6 +1961,7 @@
         last = j;
         lastKey = key;
         freeNums = new Set(Array.isArray(j.free_table_nums) ? j.free_table_nums.map(String) : []);
+        occupiedNowNums = new Set(Array.isArray(j.occupied_now_nums) ? j.occupied_now_nums.map(String) : []);
         applyAvailabilityStyles();
         const r = await loadReservations().catch(() => null);
         if (r) {
