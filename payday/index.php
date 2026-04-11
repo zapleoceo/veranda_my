@@ -269,6 +269,19 @@ try {
     };
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'load_poster_checks') {
+        $isAjax = isset($_GET['ajax']) || (isset($_POST['ajax']) && $_POST['ajax'] === '1');
+        if ($isAjax) {
+            header('Content-Type: text/plain; charset=utf-8');
+            header('Cache-Control: no-cache');
+            while (ob_get_level()) ob_end_clean();
+        }
+        $sendProgress = function ($pct, $step) use ($isAjax) {
+            if ($isAjax) {
+                echo json_encode(['pct' => $pct, 'step' => $step], JSON_UNESCAPED_UNICODE) . "\n";
+                flush();
+            }
+        };
+
         $ymdFrom = str_replace('-', '', $dateFrom);
         $ymdTo = str_replace('-', '', $dateTo);
         $employeesById = null;
@@ -280,11 +293,13 @@ try {
         $datesSeen = [];
 
         $methods = [];
+        $sendProgress(5, 'Poster API: Запрос методов оплаты (1/2)...');
         try {
             $m1 = $api->request('settings.getPaymentMethods', ['money_type' => 2, 'payment_type' => 2]);
             if (is_array($m1)) $methods = array_merge($methods, $m1);
         } catch (\Throwable $e) {
         }
+        $sendProgress(10, 'Poster API: Запрос методов оплаты (2/2)...');
         try {
             $m2 = $api->request('settings.getPaymentMethods', ['money_type' => 2, 'payment_type' => 7]);
             if (is_array($m2)) $methods = array_merge($methods, $m2);
@@ -326,6 +341,7 @@ try {
         }
 
         $txs = [];
+        $sendProgress(20, 'Poster API: Загрузка транзакций...');
         try {
             $txs = $api->request('dash.getTransactions', [
                 'dateFrom' => $ymdFrom,
@@ -341,7 +357,12 @@ try {
 
         try { $db->query("DELETE FROM {$pt} WHERE day_date BETWEEN ? AND ?", [$dateFrom, $dateTo]); } catch (\Throwable $e) {}
 
-        foreach ($txs as $tx) {
+        $totalTxs = count($txs);
+        $sendProgress(40, 'Обработка ' . $totalTxs . ' чеков...');
+        foreach ($txs as $i => $tx) {
+            if ($totalTxs > 0 && $i % max(1, (int)($totalTxs / 20)) === 0) {
+                $sendProgress(40 + (int)(60 * $i / $totalTxs), "Чеки: {$i} из {$totalTxs}");
+            }
             if (!is_array($tx)) continue;
             $txId = (int)($tx['transaction_id'] ?? $tx['id'] ?? 0);
             if ($txId <= 0) continue;
@@ -493,6 +514,11 @@ try {
             'max_close_at' => $maxCloseAt,
             'payment_methods' => count($methodTitleById),
         ], JSON_UNESCAPED_UNICODE);
+        
+        if ($isAjax) {
+            echo json_encode(['ok' => true, 'pct' => 100, 'step' => 'Готово', 'message' => $message], JSON_UNESCAPED_UNICODE) . "\n";
+            exit;
+        }
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'load_poster_accounts') {
@@ -552,17 +578,36 @@ try {
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'reload_sepay_api') {
+        $isAjax = isset($_GET['ajax']) || (isset($_POST['ajax']) && $_POST['ajax'] === '1');
+        if ($isAjax) {
+            header('Content-Type: text/plain; charset=utf-8');
+            header('Cache-Control: no-cache');
+            while (ob_get_level()) ob_end_clean();
+        }
+        $sendProgress = function ($pct, $step) use ($isAjax) {
+            if ($isAjax) {
+                echo json_encode(['pct' => $pct, 'step' => $step], JSON_UNESCAPED_UNICODE) . "\n";
+                flush();
+            }
+        };
+
         if ($sepayApiToken === '') {
             throw new \Exception('Не задан SEPAY_API_TOKEN в .env');
         }
 
+        $sendProgress(10, 'SePay: Загрузка транзакций...');
         $txs = $sepayFetchTransactions($dateFrom, $dateTo, $sepayApiToken, $sepayAccountNumber);
 
         $inserted = 0;
         $updated = 0;
         $skipped = 0;
 
-        foreach ($txs as $tx) {
+        $totalTxs = count($txs);
+        $sendProgress(30, 'Обработка ' . $totalTxs . ' платежей...');
+        foreach ($txs as $i => $tx) {
+            if ($totalTxs > 0 && $i % max(1, (int)($totalTxs / 20)) === 0) {
+                $sendProgress(30 + (int)(70 * $i / $totalTxs), "Платежи: {$i} из {$totalTxs}");
+            }
             if (!is_array($tx)) continue;
             $sepayId = (int)($tx['id'] ?? 0);
             if ($sepayId <= 0) {
@@ -672,6 +717,11 @@ try {
 
         $label = $dateFrom === $dateTo ? $dateFrom : ($dateFrom . ' — ' . $dateTo);
         $message = 'SePay загружен по API за ' . $label . ': ' . json_encode(['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped, 'api_rows' => count($txs)], JSON_UNESCAPED_UNICODE);
+        
+        if ($isAjax) {
+            echo json_encode(['ok' => true, 'pct' => 100, 'step' => 'Готово', 'message' => $message], JSON_UNESCAPED_UNICODE) . "\n";
+            exit;
+        }
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'create_transfer') {
@@ -4111,12 +4161,47 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         }
     });
 
-    const setFormLoading = (formId, btnId, title, step) => {
+    const setFormLoading = (formId, btnId, defaultTitle, defaultStep) => {
         const form = document.getElementById(formId);
         const btn = document.getElementById(btnId);
         if (!form || !btn) return;
-        form.addEventListener('submit', () => {
-            setBtnBusy(btn, { title: title || 'IN', step: step || 'Загрузка…', pct: null });
+        form.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const restore = setBtnBusy(btn, { title: defaultStep || 'Загрузка…', pct: 0 });
+            try {
+                const fd = new FormData(form);
+                fd.append('ajax', '1');
+                const res = await fetch(location.href, { method: 'POST', body: fd });
+                if (!res.body) throw new Error('No response body');
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const j = JSON.parse(line);
+                            if (j.pct !== undefined) {
+                                updateBtnBusy(btn, { pct: j.pct, title: j.step || defaultStep });
+                            }
+                            if (j.ok) {
+                                updateBtnBusy(btn, { pct: 100, title: 'Готово. Обновление...' });
+                                setTimeout(() => location.reload(), 400);
+                                return;
+                            }
+                        } catch(e) {}
+                    }
+                }
+                location.reload();
+            } catch (err) {
+                alert(err && err.message ? err.message : 'Ошибка');
+                restore();
+            }
         });
     };
     setFormLoading('posterSyncForm', 'posterSyncBtn', 'IN', 'Poster: загрузка чеков');
