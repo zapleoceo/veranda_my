@@ -2767,7 +2767,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0337">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260411_0338">
 </head>
 <body>
 <div class="container">
@@ -5383,7 +5383,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 
                 if (res.supplies && res.supplies.length > 0) {
                     res.supplies.forEach(row => {
-                        const accName = accMap[row.account_id] || ('ID: ' + row.account_id);
+                        const accountId = row.account_id || (row.payed_sum && row.payed_sum.length > 0 ? row.payed_sum[0].account_id : null);
+                        const accName = accountId && accMap[accountId] ? accMap[accountId] : ('ID: ' + (accountId || '-'));
                         html += '<tr>';
                         html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(row.date) + '</td>';
                         html += '<td style="border-bottom:1px solid var(--border); padding:8px; width:1%;">' + escapeHtml(row.supplier_name) + '</td>';
