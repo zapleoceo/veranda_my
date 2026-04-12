@@ -66,10 +66,9 @@ $posterCentsToVnd = function (int $cents): int {
 $fmtVndCents = function (int $cents): string {
     $neg = $cents < 0;
     $abs = $neg ? -$cents : $cents;
-    $int = (int)floor($abs / 100);
-    $frac = (int)($abs % 100);
+    $int = (int)round($abs / 100);
     $intFmt = number_format($int, 0, '.', "\u{202F}");
-    return ($neg ? '-' : '') . $intFmt . '.' . str_pad((string)$frac, 2, '0', STR_PAD_LEFT) . ' ₫';
+    return ($neg && $int > 0 ? '-' : '') . $intFmt;
 };
 
 $parsePosterDateTime = function ($tx): ?string {
@@ -2810,7 +2809,7 @@ if (count($posterAccountsById) > 0) {
 }
 
 $fmtVnd = function (int $v): string {
-    return number_format($v, 0, '.', "\u{202F}") . ' ₫';
+    return number_format($v, 0, '.', "\u{202F}");
 };
 ?>
 <!DOCTYPE html>
@@ -2908,13 +2907,13 @@ $fmtVnd = function (int $v): string {
                     <button class="mid-btn" id="outLinkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
                     <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
                         <div>←</div>
-                        <div id="outSelSepaySum">0 ₫</div>
+                        <div id="outSelSepaySum">0</div>
                         <div style="height: 10px;"></div>
                         <div>→</div>
-                        <div id="outSelPosterSum">0 ₫</div>
+                        <div id="outSelPosterSum">0</div>
                         <div style="height: 10px;"></div>
                         <div id="outSelMatch" style="font-size: 16px; color: #34d399;">✅</div>
-                        <div id="outSelDiff" style="font-weight: 900;">0 ₫</div>
+                        <div id="outSelDiff" style="font-weight: 900;">0</div>
                     </div>
                 </div>
                 <div class="card" style="padding:0;">
@@ -3057,13 +3056,13 @@ $fmtVnd = function (int $v): string {
                 <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
                 <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
                     <div>←</div>
-                    <div id="selSepaySum">0 ₫</div>
+                    <div id="selSepaySum">0</div>
                     <div style="height: 10px;"></div>
                     <div>→</div>
-                    <div id="selPosterSum">0 ₫</div>
+                    <div id="selPosterSum">0</div>
                     <div style="height: 10px;"></div>
                     <div id="selMatch" style="font-size: 16px;">❗</div>
-                    <div id="selDiff" style="font-weight: 900;">0 ₫</div>
+                    <div id="selDiff" style="font-weight: 900;">0</div>
                 </div>
                 <div class="muted mid-legend" style="text-align:center; font-weight:900; line-height: 1.35;">
                     <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>Авто 1</div>
@@ -3425,10 +3424,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const fmtVnd2 = (v) => {
         try {
-            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0).replace(/,/g, '\u202F') + ' ₫';
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0)).replace(/,/g, '\u202F');
         } catch (_) {
-            const num = Number(v) || 0;
-            return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F') + ' ₫';
+            const num = Math.round(Number(v) || 0);
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
         }
     };
     const fmtVnd0 = (v) => {
@@ -3539,7 +3538,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
                     <td class="col-out-content">${escapeHtml(contentShow)}</td>
                     <td class="nowrap col-out-time"><div class="col-out-date-part">${escapeHtml(dt.date)}</div><div class="col-out-time-part">${escapeHtml(dt.time)}</div></td>
-                    <td class="sum col-out-sum">${Number(row.amount || 0).toLocaleString('en-US').replace(/,/g, '\u202F')} ₫</td>
+                    <td class="sum col-out-sum">${Math.round(Number(row.amount || 0)).toLocaleString('en-US').replace(/,/g, '\u202F')}</td>
                     <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
                     <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
                 `;
@@ -3909,9 +3908,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             return acc + Number(tr.getAttribute('data-sum') || 0);
         }, 0);
         const diff = Math.abs(sumMail - sumFin);
-        if (outSelSepaySumEl) outSelSepaySumEl.textContent = Number(sumMail).toLocaleString('en-US').replace(/,/g, '\u202F') + ' ₫';
-        if (outSelPosterSumEl) outSelPosterSumEl.textContent = Number(sumFin).toLocaleString('en-US').replace(/,/g, '\u202F') + ' ₫';
-        if (outSelDiffEl) outSelDiffEl.textContent = Number(diff).toLocaleString('en-US').replace(/,/g, '\u202F') + ' ₫';
+        if (outSelSepaySumEl) outSelSepaySumEl.textContent = Math.round(Number(sumMail)).toLocaleString('en-US').replace(/,/g, '\u202F');
+        if (outSelPosterSumEl) outSelPosterSumEl.textContent = Math.round(Number(sumFin)).toLocaleString('en-US').replace(/,/g, '\u202F');
+        if (outSelDiffEl) outSelDiffEl.textContent = Math.round(Number(diff)).toLocaleString('en-US').replace(/,/g, '\u202F');
         if (outSelMatchEl) outSelMatchEl.style.color = diff === 0 ? '#16a34a' : '#dc2626';
         if (outLinkMakeBtn) outLinkMakeBtn.disabled = (outSelectedMail.size === 0 || outSelectedFin.size === 0);
     };
@@ -4249,7 +4248,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const abs = Math.abs(Math.trunc(c));
         const i = Math.floor(abs / 100);
         const f = abs % 100;
-        return (neg ? '-' : '') + fmtIntSpaces(i) + '.' + String(f).padStart(2, '0') + ' ₫';
+        return (neg ? '-' : '') + fmtIntSpaces(i) + '.' + String(f).padStart(2, '0');
     };
     const parseVndCentsJs = (raw) => {
         const s = String(raw || '').trim();
@@ -4346,7 +4345,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     posterAccountsTbody.innerHTML = rows.map((a) => {
                         const id = Number(a.account_id || 0);
                         const name = String(a.name || '');
-                        const bal = String(a.balance || '0 ₫');
+                        const bal = String(a.balance || '0');
                         return `<tr>
                             <td style="padding: 8px 10px;">${String(id)}</td>
                             <td style="padding: 8px 10px;">${escapeHtml(name)}</td>
@@ -4421,7 +4420,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const type = Number(p.type || 0);
                 const action = type === 1 ? 'Начислить' : 'Списать';
                 const accLabel = accName ? `счёт ${accId} (${accName})` : `счёт ${accId}`;
-                const ok = confirm(`${action} ${sum} ₫ на ${accLabel}?\nКомментарий: ${String(p.comment || '')}`);
+                const ok = confirm(`${action} ${sum} на ${accLabel}?\nКомментарий: ${String(p.comment || '')}`);
                 if (!ok) return null;
 
                 const nonce = String(j.nonce || '');
@@ -4583,9 +4582,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
     const fmtVnd = (v) => {
         try {
-            return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Number(v) || 0).replace(/,/g, '\u202F') + ' ₫';
+            return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0)).replace(/,/g, '\u202F');
         } catch (_) {
-            return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F') + ' ₫';
+            return String(Math.round(Number(v) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
         }
     };
 
@@ -5202,7 +5201,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const accFromName = String(form.getAttribute('data-account-from-name') || '#1');
             const accToName = String(form.getAttribute('data-account-to-name') || (kind === 'vietnam' ? '#9' : '#8'));
             const sumVnd = Number(form.getAttribute('data-sum-vnd') || 0);
-            const sumTxt = sumVnd ? (Number(sumVnd).toLocaleString('en-US').replace(/,/g, '\u202F') + ' ₫') : '—';
+            const sumTxt = sumVnd ? (Math.round(Number(sumVnd)).toLocaleString('en-US').replace(/,/g, '\u202F')) : '—';
 
             const openConfirm = () => new Promise((resolve) => {
                 const backdrop = document.getElementById('financeConfirm');
@@ -5261,7 +5260,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
                     const who = String(j.user || '').trim();
                     const whoPart = who ? ` - ${who}` : '';
-                    const line = `${j.date || ''} - ${j.time || ''} - ${Number(j.sum || 0).toLocaleString('en-US').replace(/,/g, '\u202F')} ₫${whoPart} - ${j.comment || ''}`.trim();
+                    const line = `${j.date || ''} - ${j.time || ''} - ${Math.round(Number(j.sum || 0)).toLocaleString('en-US').replace(/,/g, '\u202F')}${whoPart} - ${j.comment || ''}`.trim();
                     if (statusEl) {
                         const label = j.already ? 'Найдена транзакция:' : 'Транзакция создана:';
                         statusEl.innerHTML = `<span style="color:#81c784; font-weight:900;">${label}</span> <span>${line}</span>`;
