@@ -2817,7 +2817,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260412_0130">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260412_0135">
 </head>
 <body>
 <div class="container">
@@ -3783,7 +3783,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const rootRect = outGrid.getBoundingClientRect();
         const w = Math.max(1, Math.round(rootRect.width));
         const h = Math.max(1, Math.round(rootRect.height));
-        outSvgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        const scrollW = outGrid.scrollWidth || w;
+        outSvgState.svg.setAttribute('viewBox', `0 0 ${scrollW} ${h}`);
+        outSvgState.svg.style.width = scrollW + 'px';
 
         outLinks.forEach((l) => {
             const s = document.getElementById('out-sepay-' + l.mail_uid);
@@ -3795,12 +3797,22 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const size = 2;
             const color = colorFor(l.link_type, l.link_type === 'manual');
 
-            const a0 = getAnchorPoint(s, 'right', rootRect);
-            const b0 = getAnchorPoint(p, 'left', rootRect);
+            const a0 = outGetAnchorPoint(s, 'right', rootRect);
+            const b0 = outGetAnchorPoint(p, 'left', rootRect);
             if (a0.y < 0 || b0.y < 0 || a0.y > h || b0.y > h) return;
+            
+            if (outSepayScroll) {
+                const sr = outSepayScroll.getBoundingClientRect();
+                a0.x = Math.max(sr.left - rootRect.left + outGrid.scrollLeft, Math.min(sr.right - rootRect.left + outGrid.scrollLeft, a0.x));
+            }
+            if (outPosterScroll) {
+                const sr = outPosterScroll.getBoundingClientRect();
+                b0.x = Math.max(sr.left - rootRect.left + outGrid.scrollLeft, Math.min(sr.right - rootRect.left + outGrid.scrollLeft, b0.x));
+            }
+
             const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-            const a = { x: clamp(a0.x, 0, w), y: clamp(a0.y, 0, h) };
-            const b = { x: clamp(b0.x, 0, w), y: clamp(b0.y, 0, h) };
+            const a = { x: clamp(a0.x, 0, w + outGrid.scrollLeft), y: clamp(a0.y, 0, h) };
+            const b = { x: clamp(b0.x, 0, w + outGrid.scrollLeft), y: clamp(b0.y, 0, h) };
             const dx = b.x - a.x;
             const cdx = Math.min(120, Math.max(40, Math.abs(dx) * 0.35));
             const c1x = a.x + cdx;
@@ -3838,7 +3850,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const tBtn = Math.min(0.99, Math.max(0.75, 1 - (insetPx / lenBtn)));
                 const mx = a.x + dxBtn * tBtn;
                 const my = a.y + dyBtn * tBtn;
-                const localX = Math.max(8, Math.min(w - 8, mx));
+                const localX = Math.max(8, Math.min(scrollW - 8, mx));
                 const localY = Math.max(8, Math.min(h - 8, my));
                 btn.style.left = Math.round(localX - 8) + 'px';
                 btn.style.top = Math.round(localY - 8) + 'px';
@@ -4510,7 +4522,22 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
     const getAnchorPoint = (el, side, rootRect) => {
         const r = el.getBoundingClientRect();
-        const cx = (r.left + r.width / 2) - rootRect.left;
+        // Shift X coordinate by tablesRoot scrollLeft
+        const scrollLeft = tablesRoot ? tablesRoot.scrollLeft : 0;
+        const cx = (r.left + r.width / 2) - rootRect.left + scrollLeft;
+        const cy = (r.top + r.height / 2) - rootRect.top;
+        const x = Math.round(cx) + 0.5;
+        let y = Math.round(cy) + 0.5;
+        const id = String(el.id || '');
+        if (id.startsWith('out-')) y -= 5;
+        return { x, y };
+    };
+
+    const outGetAnchorPoint = (el, side, rootRect) => {
+        const r = el.getBoundingClientRect();
+        // Shift X coordinate by outGrid scrollLeft
+        const scrollLeft = outGrid ? outGrid.scrollLeft : 0;
+        const cx = (r.left + r.width / 2) - rootRect.left + scrollLeft;
         const cy = (r.top + r.height / 2) - rootRect.top;
         const x = Math.round(cx) + 0.5;
         let y = Math.round(cy) + 0.5;
@@ -4743,7 +4770,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const rootRect = tablesRoot.getBoundingClientRect();
         const w = Math.max(1, Math.round(rootRect.width));
         const h = Math.max(1, Math.round(rootRect.height));
-        svgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        
+        const scrollW = tablesRoot.scrollWidth || w;
+        svgState.svg.setAttribute('viewBox', `0 0 ${scrollW} ${h}`);
+        svgState.svg.style.width = scrollW + 'px';
+        
         widgets.forEach((btn) => { btn.style.display = 'none'; });
 
         const isVisibleInScrollY = (el, scrollEl) => {
@@ -4780,11 +4811,21 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
             const a0 = getAnchorPoint(s, 'right', rootRect);
             const b0 = getAnchorPoint(p, 'left', rootRect);
-            if (a0.y < 0 || b0.y < 0 || a0.y > h || b0.y > h) return;
+            
+            if (a0.y < -50 || b0.y < -50 || a0.y > h + 50 || b0.y > h + 50) return;
+
+            if (sepayScroll) {
+                const sr = sepayScroll.getBoundingClientRect();
+                a0.x = Math.max(sr.left - rootRect.left + tablesRoot.scrollLeft, Math.min(sr.right - rootRect.left + tablesRoot.scrollLeft, a0.x));
+            }
+            if (posterScroll) {
+                const sr = posterScroll.getBoundingClientRect();
+                b0.x = Math.max(sr.left - rootRect.left + tablesRoot.scrollLeft, Math.min(sr.right - rootRect.left + tablesRoot.scrollLeft, b0.x));
+            }
 
             const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-            const a = { x: clamp(a0.x, 0, w), y: clamp(a0.y, 0, h) };
-            const b = { x: clamp(b0.x, 0, w), y: clamp(b0.y, 0, h) };
+            const a = { x: clamp(a0.x, 0, w + tablesRoot.scrollLeft), y: clamp(a0.y, 0, h) };
+            const b = { x: clamp(b0.x, 0, w + tablesRoot.scrollLeft), y: clamp(b0.y, 0, h) };
 
             const dx = b.x - a.x;
             const cdx = Math.min(120, Math.max(40, Math.abs(dx) * 0.35));
@@ -4823,7 +4864,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const tBtn = Math.min(0.99, Math.max(0.75, 1 - (insetPx / lenBtn)));
                 const mx = a.x + dxBtn * tBtn;
                 const my = a.y + dyBtn * tBtn;
-                const localX = Math.max(8, Math.min(w - 8, mx));
+                const localX = Math.max(8, Math.min(scrollW - 8, mx));
                 const localY = Math.max(8, Math.min(h - 8, my));
                 btn.style.left = Math.round(localX - 8) + 'px';
                 btn.style.top = Math.round(localY - 8) + 'px';
