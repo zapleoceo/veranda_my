@@ -2839,8 +2839,8 @@ $fmtVnd = function (int $v): string {
     <div class="card">
         <div class="toolbar toolbar-line" style="margin-bottom: 10px;">
             <form method="GET" id="dateForm">
-                <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px;">
-                <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px;">
+                <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 155px;">
+                <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 155px;">
                 <button class="btn" type="submit">Открыть</button>
             </form>
 
