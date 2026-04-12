@@ -135,6 +135,16 @@
         .btn .btn-pct { font-weight: 900; }
         .btn .btn-busy-line { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,0.18); }
         .btn .btn-busy-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: linear-gradient(90deg, rgba(26,115,232,0.35), rgba(26,115,232,0.95)); transition: width .2s ease; }
+        
+        @media (max-width: 800px) {
+            .nav-left { flex-direction: column; align-items: stretch; width: 100%; gap: 10px; }
+            .nav-title { margin-bottom: 4px; }
+            .tabs { margin-left: 0; flex-wrap: wrap; }
+            #dateForm { margin-left: 0 !important; width: 100%; display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; }
+            #dateForm button { grid-column: 1 / -1; }
+            #dateForm input[type="date"] { width: 100% !important; }
+        }
+
         body.mode-lite #outSepayTable .col-out-content { display: none; }
         body.mode-lite #outPosterTable .col-out-user,
         body.mode-lite #outPosterTable .col-out-category,
