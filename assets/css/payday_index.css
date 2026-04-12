@@ -158,6 +158,9 @@
             .toolbar-line { gap: 4px !important; justify-content: space-between; }
             .toolbar-line .btn { font-size: 10px !important; padding: 6px 6px !important; white-space: nowrap; letter-spacing: -0.2px; }
             .toggle-wrap { margin-left: 0; transform: scale(0.8); transform-origin: right center; }
+            
+            .bal-grid th, .bal-grid td { padding: 4px 2px !important; font-size: 11px !important; }
+            .bal-grid input { width: 70px !important; min-width: 70px !important; padding: 4px !important; font-size: 11px !important; }
         }
 
         body.mode-lite #outSepayTable .col-out-content { display: none; }
