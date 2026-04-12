@@ -108,9 +108,9 @@
             #sepayTable th.col-sepay-sum, #sepayTable td.col-sepay-sum { width: 80px; max-width: 80px; }
         }
         .bottom-two { display:flex; gap: 12px; align-items:flex-start; flex-wrap: wrap; }
-        .bottom-two > .card { flex: 1 1 420px; }
-        .bottom-two > .card.card-finance { flex: 0.7 1 360px; }
-        .bottom-two > .card.card-balances { flex: 1 1 560px; }
+        .bottom-two > .card { flex: 1 1 420px; min-width: 0; }
+        .bottom-two > .card.card-finance { flex: 0.7 1 360px; min-width: 0; }
+        .bottom-two > .card.card-balances { flex: 1 1 560px; min-width: 0; }
         .btn.tiny { padding: 6px 10px; border-radius: 10px; font-weight: 900; font-size: 11px; }
         .bal-grid { width: 100%; border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; overflow-y: hidden; background: var(--card); }
         .bal-grid table { width:100%; border-collapse: collapse; white-space: nowrap; }
