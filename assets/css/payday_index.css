@@ -164,8 +164,9 @@
             .tt-full { display: none; }
             .tt-short { display: inline; font-weight: 900; }
             
-            .bal-grid th, .bal-grid td { padding: 4px 2px !important; font-size: 11px !important; }
-            .bal-grid input { width: 70px !important; min-width: 70px !important; padding: 4px !important; font-size: 11px !important; }
+            .bal-grid table { width: auto !important; margin: 0 auto; }
+            .bal-grid th, .bal-grid td { padding: 4px 6px !important; font-size: 11px !important; }
+            .bal-grid input { width: 85px !important; min-width: 85px !important; padding: 4px !important; font-size: 11px !important; box-sizing: border-box; }
         }
 
         body.mode-lite #outSepayTable .col-out-content { display: none; }
