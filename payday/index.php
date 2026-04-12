@@ -3316,7 +3316,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;"><span id="balAndreyDiff">—</span></td>
                     </tr>
                     <tr data-key="vietnam">
-                        <td style="font-weight:900;">Вьетнамская компания</td>
+                        <td style="font-weight:900;">Вьет. счет</td>
                         <td style="text-align:right;">
                             <span id="balVietnam" data-cents="<?= $posterBalanceVietnam !== null ? (int)$posterBalanceVietnam : '' ?>"><?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceVietnam)) : '—' ?></span>
                         </td>
