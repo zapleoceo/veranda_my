@@ -2847,7 +2847,7 @@ $fmtVnd = function (int $v): string {
                 <input type="hidden" name="action" value="load_poster_checks">
                 <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                 <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                <button class="btn primary" id="posterSyncBtn" type="submit">Загрузить чеки из Poster</button>
+                <button class="btn primary" id="posterSyncBtn" type="submit">Загрузить чеки</button>
             </form>
 
             <form method="POST" id="sepaySyncForm">
