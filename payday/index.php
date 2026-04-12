@@ -2824,7 +2824,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0170">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260412_0195">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260412_0200">
 </head>
 <body>
 <div class="container">
@@ -3295,11 +3295,11 @@ $fmtVnd = function (int $v): string {
             </div>
         </div>
         <div class="card card-balances">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 10px; margin-bottom: 10px;">
+            <div style="display:flex; justify-content:flex-start; align-items:center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
                 <div style="font-weight: 900;">Обновляем Балансы Poster</div>
                 <div style="display:flex; gap: 8px; align-items:center;">
                     <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
-                    <button class="btn" id="posterAccountsBtn" type="button" title="Обновить балансы">🔄</button>
+                    <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" style="padding: 4px 10px;">🔄</button>
                 </div>
             </div>
 
