@@ -29,10 +29,10 @@
         .confirm-modal .btn2.primary { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
         .confirm-modal .btn2:disabled { opacity: 0.6; cursor: default; }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .grid { display:grid; grid-template-columns: minmax(max-content, 1fr) 104px minmax(max-content, 1fr); gap: 12px; align-items:start; }
+        .grid { display:grid; grid-template-columns: minmax(max-content, 1fr) 104px minmax(max-content, 1fr); gap: 12px; align-items:start; width: 100%; overflow-x: auto; }
         
-        #tablesRoot { position: relative; overflow-x: auto; overflow-y: hidden; }
-        #outGrid { position: relative; overflow-x: auto; overflow-y: hidden; }
+        #tablesRoot { position: relative; }
+        #outGrid { position: relative; }
         #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
         #outLineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
         table { width: 100%; border-collapse: collapse; }
