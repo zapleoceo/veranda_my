@@ -68,7 +68,7 @@ $fmtVndCents = function (int $cents): string {
     $abs = $neg ? -$cents : $cents;
     $int = (int)floor($abs / 100);
     $frac = (int)($abs % 100);
-    $intFmt = number_format($int, 0, '.', ' ');
+    $intFmt = number_format($int, 0, '.', "\u{202F}");
     return ($neg ? '-' : '') . $intFmt . '.' . str_pad((string)$frac, 2, '0', STR_PAD_LEFT) . ' ₫';
 };
 
@@ -2810,7 +2810,7 @@ if (count($posterAccountsById) > 0) {
 }
 
 $fmtVnd = function (int $v): string {
-    return number_format($v, 0, '.', ',') . ' ₫';
+    return number_format($v, 0, '.', "\u{202F}") . ' ₫';
 };
 ?>
 <!DOCTYPE html>
@@ -3425,18 +3425,18 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const fmtVnd2 = (v) => {
         try {
-            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0) + ' ₫';
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0).replace(/,/g, '\u202F') + ' ₫';
         } catch (_) {
             const num = Number(v) || 0;
-            return num.toFixed(2) + ' ₫';
+            return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F') + ' ₫';
         }
     };
     const fmtVnd0 = (v) => {
         try {
-            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0));
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0)).replace(/,/g, '\u202F');
         } catch (_) {
             const num = Math.round(Number(v) || 0);
-            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
         }
     };
     const formatOutDT = (txTime, dateStr) => {
@@ -3539,7 +3539,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
                     <td class="col-out-content">${escapeHtml(contentShow)}</td>
                     <td class="nowrap col-out-time"><div class="col-out-date-part">${escapeHtml(dt.date)}</div><div class="col-out-time-part">${escapeHtml(dt.time)}</div></td>
-                    <td class="sum col-out-sum">${Number(row.amount || 0).toLocaleString('en-US')} ₫</td>
+                    <td class="sum col-out-sum">${Number(row.amount || 0).toLocaleString('en-US').replace(/,/g, '\u202F')} ₫</td>
                     <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
                     <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
                 `;
@@ -3909,9 +3909,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             return acc + Number(tr.getAttribute('data-sum') || 0);
         }, 0);
         const diff = Math.abs(sumMail - sumFin);
-        if (outSelSepaySumEl) outSelSepaySumEl.textContent = Number(sumMail).toLocaleString('en-US') + ' ₫';
-        if (outSelPosterSumEl) outSelPosterSumEl.textContent = Number(sumFin).toLocaleString('en-US') + ' ₫';
-        if (outSelDiffEl) outSelDiffEl.textContent = Number(diff).toLocaleString('en-US') + ' ₫';
+        if (outSelSepaySumEl) outSelSepaySumEl.textContent = Number(sumMail).toLocaleString('en-US').replace(/,/g, '\u202F') + ' ₫';
+        if (outSelPosterSumEl) outSelPosterSumEl.textContent = Number(sumFin).toLocaleString('en-US').replace(/,/g, '\u202F') + ' ₫';
+        if (outSelDiffEl) outSelDiffEl.textContent = Number(diff).toLocaleString('en-US').replace(/,/g, '\u202F') + ' ₫';
         if (outSelMatchEl) outSelMatchEl.style.color = diff === 0 ? '#16a34a' : '#dc2626';
         if (outLinkMakeBtn) outLinkMakeBtn.disabled = (outSelectedMail.size === 0 || outSelectedFin.size === 0);
     };
@@ -4242,7 +4242,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const balCashDiffEl = document.getElementById('balCashDiff');
     const balTotalDiffEl = document.getElementById('balTotalDiff');
 
-    const fmtIntSpaces = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const fmtIntSpaces = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
     const fmtVndCentsJs = (cents) => {
         const c = Number(cents || 0) || 0;
         const neg = c < 0;
@@ -4254,7 +4254,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const parseVndCentsJs = (raw) => {
         const s = String(raw || '').trim();
         if (!s) return null;
-        const cleaned = s.replace(/[^\d.,-]/g, '').replaceAll(' ', '').replaceAll(',', '.').trim();
+        const cleaned = s.replace(/[^\d.,-]/g, '').replaceAll('\u202F', '').replaceAll(' ', '').replaceAll(',', '.').trim();
         if (!cleaned) return null;
         const n = Number(cleaned);
         if (!Number.isFinite(n)) return null;
@@ -4265,7 +4265,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const d = String(digits || '').replace(/\D+/g, '');
         if (!d) return '';
         const norm = d.replace(/^0+(?=\d)/, '');
-        return norm.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        return norm.replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
     };
     const sanitizeInputVndInt = (el) => {
         if (!el) return;
@@ -4583,9 +4583,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
     const fmtVnd = (v) => {
         try {
-            return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Number(v) || 0) + ' ₫';
+            return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Number(v) || 0).replace(/,/g, '\u202F') + ' ₫';
         } catch (_) {
-            return String(v) + ' ₫';
+            return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F') + ' ₫';
         }
     };
 
@@ -5202,7 +5202,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const accFromName = String(form.getAttribute('data-account-from-name') || '#1');
             const accToName = String(form.getAttribute('data-account-to-name') || (kind === 'vietnam' ? '#9' : '#8'));
             const sumVnd = Number(form.getAttribute('data-sum-vnd') || 0);
-            const sumTxt = sumVnd ? (Number(sumVnd).toLocaleString('en-US') + ' ₫') : '—';
+            const sumTxt = sumVnd ? (Number(sumVnd).toLocaleString('en-US').replace(/,/g, '\u202F') + ' ₫') : '—';
 
             const openConfirm = () => new Promise((resolve) => {
                 const backdrop = document.getElementById('financeConfirm');
@@ -5261,7 +5261,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
                     const who = String(j.user || '').trim();
                     const whoPart = who ? ` - ${who}` : '';
-                    const line = `${j.date || ''} - ${j.time || ''} - ${Number(j.sum || 0).toLocaleString('en-US')} ₫${whoPart} - ${j.comment || ''}`.trim();
+                    const line = `${j.date || ''} - ${j.time || ''} - ${Number(j.sum || 0).toLocaleString('en-US').replace(/,/g, '\u202F')} ₫${whoPart} - ${j.comment || ''}`.trim();
                     if (statusEl) {
                         const label = j.already ? 'Найдена транзакция:' : 'Транзакция создана:';
                         statusEl.innerHTML = `<span style="color:#81c784; font-weight:900;">${label}</span> <span>${line}</span>`;
