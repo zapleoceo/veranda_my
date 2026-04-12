@@ -149,6 +149,7 @@
         .tt-short { display: none; }
         
         @media (max-width: 800px) {
+            .card { padding: 5px !important; }
             .top-nav { display: grid !important; grid-template-columns: 1fr auto !important; gap: 10px; align-items: center; }
             .nav-left { display: contents !important; }
             .nav-title { grid-column: 1; grid-row: 1; margin-bottom: 0; }
