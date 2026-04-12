@@ -68,8 +68,7 @@
         .sum { font-weight: 900; white-space: nowrap; }
         .nowrap { white-space: nowrap; }
         .anchor { display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #9aa4b2; vertical-align: middle; line-height: 0; }
-        #outSepayTable .col-out-anchor,
-        #outPosterTable .col-out-anchor2 { vertical-align: middle; text-align: center; width: 1%; padding: 4px 6px; }
+        #outSepayTable .col-out-anchor { vertical-align: middle; text-align: center; width: 1%; padding: 4px 6px; }
         tr.row-green .anchor { background: #2e7d32; }
         tr.row-yellow .anchor { background: #f6c026; }
         tr.row-blue .anchor { background: var(--accent); }
@@ -138,10 +137,12 @@
         .btn .btn-busy-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: linear-gradient(90deg, rgba(26,115,232,0.35), rgba(26,115,232,0.95)); transition: width .2s ease; }
         
         @media (max-width: 800px) {
-            .nav-left { flex-direction: column; align-items: stretch; width: 100%; gap: 10px; }
-            .nav-title { margin-bottom: 4px; }
-            .tabs { margin-left: 0; flex-wrap: wrap; }
-            #dateForm { margin-left: 0 !important; width: 100%; display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; }
+            .top-nav { display: grid !important; grid-template-columns: 1fr auto !important; gap: 10px; align-items: center; }
+            .nav-left { display: contents !important; }
+            .nav-title { grid-column: 1; grid-row: 1; margin-bottom: 0; }
+            .user-menu { grid-column: 2; grid-row: 1; margin-left: 0 !important; }
+            .tabs { grid-column: 1 / -1; grid-row: 2; margin-left: 0; flex-wrap: wrap; }
+            #dateForm { grid-column: 1 / -1; grid-row: 3; margin-left: 0 !important; width: 100%; display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; }
             #dateForm button { grid-column: 1 / -1; }
             #dateForm input[type="date"] { width: 100% !important; }
         }

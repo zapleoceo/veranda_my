@@ -2824,8 +2824,8 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/app.js" defer></script>
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0165">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260412_0165">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0170">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260412_0170">
 </head>
 <body>
 <div class="container">
@@ -2886,8 +2886,8 @@ $fmtVnd = function (int $v): string {
 
         <div class="divider"></div>
 
-        <div id="outSection" class="card" style="padding:0; display:none;">
-            <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; padding: 12px; position: relative;">
+        <div id="outSection" style="display:none;">
+            <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; position: relative;">
                 <div id="outLineLayer"></div>
                 <div class="card" style="padding:0;">
                     <div style="padding:8px 12px; font-weight:900;" class="vc-subtitle">
@@ -2923,7 +2923,7 @@ $fmtVnd = function (int $v): string {
                         <table id="outPosterTable">
                             <thead>
                                 <tr>
-                                    <th class="col-out-anchor2"></th><th class="col-out-select2"></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
+                                    <th></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -3614,8 +3614,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 tr.setAttribute('data-sum', String(amountInt));
                 const dt2 = formatOutDT('', row.date);
                 tr.innerHTML = `
-                    <td class="col-out-anchor2"><span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
-                    <td class="nowrap col-out-select2"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
+                    <td class="nowrap"><div class="cell-anchor"><span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></div></td>
                     <td class="nowrap col-out-date"><div class="col-out-date-date">${escapeHtml(dt2.date)}</div><div class="col-out-date-time">${escapeHtml(dt2.time)}</div></td>
                     <td class="col-out-user">${escapeHtml(userName)}</td>
                     <td class="col-out-category">${escapeHtml(catName)}</td>
