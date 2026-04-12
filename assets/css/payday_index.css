@@ -65,6 +65,16 @@
         tr.row-hidden .col-sepay-content { font-weight: 900; }
         tr.row-selected { outline: 2px solid #1a73e8; outline-offset: -2px; }
         .muted { color: var(--muted); font-size: 12px; }
+        .sum,
+        .col-sepay-sum,
+        .col-poster-card,
+        .col-poster-tips,
+        .col-poster-total,
+        .col-out-sum,
+        .col-out-amount,
+        .col-out-balance {
+            text-align: right;
+        }
         .sum { font-weight: 900; white-space: nowrap; }
         .nowrap { white-space: nowrap; }
         .anchor { display:inline-block; width: 10px; height: 10px; border-radius: 50%; background: #9aa4b2; vertical-align: middle; line-height: 0; }
