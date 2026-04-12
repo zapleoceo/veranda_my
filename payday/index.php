@@ -4528,8 +4528,6 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const cy = (r.top + r.height / 2) - rootRect.top;
         const x = Math.round(cx) + 0.5;
         let y = Math.round(cy) + 0.5;
-        const id = String(el.id || '');
-        if (id.startsWith('out-')) y -= 5;
         return { x, y };
     };
 
@@ -4541,8 +4539,6 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const cy = (r.top + r.height / 2) - rootRect.top;
         const x = Math.round(cx) + 0.5;
         let y = Math.round(cy) + 0.5;
-        const id = String(el.id || '');
-        if (id.startsWith('out-')) y -= 5;
         return { x, y };
     };
 
