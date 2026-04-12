@@ -1672,10 +1672,13 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
         echo json_encode(['ok' => false, 'error' => 'IMAP open failed'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    $emails = imap_search($inbox, 'ALL') ?: [];
-    rsort($emails);
     $fromTs = strtotime($dFrom !== '' ? ($dFrom . ' 00:00:00') : ($dTo . ' 00:00:00'));
     $toTs = strtotime($dTo . ' 23:59:59');
+    
+    $searchQuery = 'FROM "bidvsmartbanking@bidv.com.vn" SINCE "' . date('d-M-Y', $fromTs) . '"';
+    $emails = imap_search($inbox, $searchQuery) ?: [];
+    rsort($emails);
+    
     $hidden = [];
     try {
         $hRows = $db->query("SELECT mail_uid, comment FROM {$mh} WHERE date_to = ?", [$dTo])->fetchAll();
@@ -1729,7 +1732,12 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
             $amountVnd = (int)str_replace([',','.'], ['', ''], $amtStr);
         }
         $useTs = $txTs > 0 ? $txTs : $tsHeader;
-        if ($useTs > 0 && ($useTs < $fromTs || $useTs > $toTs)) continue;
+        
+        // Если письмо старше начальной даты, прекращаем перебор (т.к. письма отсортированы по убыванию)
+        if ($useTs > 0 && $useTs < $fromTs) break;
+        // Если письмо новее конечной даты, просто пропускаем его
+        if ($useTs > 0 && $useTs > $toTs) continue;
+        
         $rows[] = [
             'mail_uid' => (int)@imap_uid($inbox, $num),
             'date' => $useTs > 0 ? date('Y-m-d H:i:s', $useTs) : '',
