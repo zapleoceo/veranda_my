@@ -3208,7 +3208,7 @@ $fmtVnd = function (int $v): string {
 
             <div class="finance-row">
                 <div class="finance-left">
-                    <div style="font-weight:900;">Vietnam Company — Card payments</div>
+                    <div style="font-weight:900;">Vietnam Company</div>
                     <div class="muted"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
                 </div>
                 <form method="POST" class="finance-transfer"
