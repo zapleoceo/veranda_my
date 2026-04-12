@@ -2824,7 +2824,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0170">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260412_0185">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260412_0190">
 </head>
 <body>
 <div class="container">
@@ -2874,12 +2874,12 @@ $fmtVnd = function (int $v): string {
             </form>
 
             <div class="toggle-wrap" title="Lite/Full">
-                <span class="toggle-text">Lite</span>
+                <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                 <label class="switch">
                     <input id="modeToggle" type="checkbox">
                     <span class="slider"></span>
                 </label>
-                <span class="toggle-text">Full</span>
+                <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
             </div>
         </div>
 
