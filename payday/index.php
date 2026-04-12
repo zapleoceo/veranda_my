@@ -3308,7 +3308,7 @@ $fmtVnd = function (int $v): string {
                     </thead>
                     <tbody>
                     <tr data-key="andrey">
-                        <td style="font-weight:900;">Баланс Счета Андрей</td>
+                        <td style="font-weight:900;">Счет Андрей</td>
                         <td style="text-align:right;">
                             <span id="balAndrey" data-cents="<?= $posterBalanceAndrey !== null ? (int)$posterBalanceAndrey : '' ?>"><?= $posterBalanceAndrey !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceAndrey)) : '—' ?></span>
                         </td>
@@ -3316,7 +3316,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;"><span id="balAndreyDiff">—</span></td>
                     </tr>
                     <tr data-key="vietnam">
-                        <td style="font-weight:900;">Баланс вьетнамской компании</td>
+                        <td style="font-weight:900;">Вьетнамская компания</td>
                         <td style="text-align:right;">
                             <span id="balVietnam" data-cents="<?= $posterBalanceVietnam !== null ? (int)$posterBalanceVietnam : '' ?>"><?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceVietnam)) : '—' ?></span>
                         </td>
@@ -3324,7 +3324,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;"><span id="balVietnamDiff">—</span></td>
                     </tr>
                     <tr data-key="cash">
-                        <td style="font-weight:900;">Баланс кассы</td>
+                        <td style="font-weight:900;">Касса</td>
                         <td style="text-align:right;">
                             <span id="balCash" data-cents="<?= $posterBalanceCash !== null ? (int)$posterBalanceCash : '' ?>"><?= $posterBalanceCash !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceCash)) : '—' ?></span>
                         </td>
