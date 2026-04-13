@@ -2933,25 +2933,25 @@ $fmtVnd = function (int $v): string {
         </div>
 
         <div class="grid" id="tablesRoot">
-            <div class="confirm-backdrop" id="kashshiftModal" style="display:none; z-index: 9999;">
+            <div class="confirm-backdrop" id="kashshiftModal" style="display:none; z-index: 9999; align-items: flex-start; padding-top: 5vh;">
                 <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
                         <h3 style="margin:0;">KashShift</h3>
                         <button type="button" class="btn2" id="kashshiftClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
                     </div>
-                    <div class="body" id="kashshiftBody" style="max-height: 70vh; overflow: auto;">
+                    <div class="body" id="kashshiftBody" style="max-height: 85vh; overflow: auto;">
                         <div style="text-align:center;">Загрузка...</div>
                     </div>
                 </div>
             </div>
 
-            <div class="confirm-backdrop" id="suppliesModal" style="display:none; z-index: 9999;">
+            <div class="confirm-backdrop" id="suppliesModal" style="display:none; z-index: 9999; align-items: flex-start; padding-top: 5vh;">
                 <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
                         <h3 style="margin:0;">Supplies</h3>
                         <button type="button" class="btn2" id="suppliesClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
                     </div>
-                    <div class="body" id="suppliesBody" style="max-height: 70vh; overflow: auto;">
+                    <div class="body" id="suppliesBody" style="max-height: 85vh; overflow: auto;">
                         <div style="text-align:center;">Загрузка...</div>
                     </div>
                 </div>
