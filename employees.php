@@ -987,8 +987,8 @@ $firstOfMonth = date('Y-m-01');
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0045">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0045">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0050">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0050">
 </head>
 <body>
 <div class="container">
@@ -1044,6 +1044,11 @@ $firstOfMonth = date('Y-m-01');
         </div>
         <div class="table-wrap" style="margin-top: 12px;">
             <table id="empTable">
+                <caption style="caption-side: bottom; text-align: right; margin-top: 6px; width: 0; min-width: 100%; white-space: normal;">
+                    <div class="muted" id="tipsBalanceTotals" style="font-weight:900; white-space: normal; line-height: 1.4;">
+                        Tips (на счету BIDV): <span id="tipsAccBalance">—</span> &middot; TTP в таблице: <span id="tipsTableSum">—</span> &middot; Остаток: <span id="tipsBalanceDiff">—</span>
+                    </div>
+                </caption>
                 <thead>
                 <tr>
                     <th id="thUid" class="col-id" data-sort="user_id" style="cursor:pointer;">ID</th>
@@ -1078,9 +1083,6 @@ $firstOfMonth = date('Y-m-01');
                 </tr>
                 </tfoot>
             </table>
-        </div>
-        <div class="muted" id="tipsBalanceTotals" style="margin-top: 6px; text-align:right; font-weight:900;">
-            Tips (на счету BIDV): <span id="tipsAccBalance">—</span> · TTP в таблице: <span id="tipsTableSum">—</span> · Остаток: <span id="tipsBalanceDiff">—</span>
         </div>
     </div>
 </div>
