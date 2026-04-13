@@ -1179,14 +1179,11 @@ $firstOfMonth = date('Y-m-01');
                 <b>Сортировка</b> — клик по заголовку колонки сортирует таблицу.
             </div>
             <div style="margin-bottom: 10px;">
-                <b>Rate</b> — ставка. Можно редактировать, сохраняется автоматически при выходе из поля или по Enter.
-            </div>
-            <div style="margin-bottom: 10px;">
                 <b>PAY</b> — создаёт финансовую транзакцию выплаты (Tips или Salary) на сумму “к выплате” по выбранному сотруднику.
                 Перед созданием нужно подтвердить чекбоксом “да проверил”.
             </div>
             <div style="margin-bottom: 10px;">
-                <b>TipsPaid / SlrPaid</b> — список прошлых выплат: слева дата/время, справа тип/сумма.
+                <b>TipsPaid / SlrPaid</b> — список прошлых выплат: слева дата/время, справа тип выплаты/сумма выплаты.
             </div>
             <div style="margin-bottom: 10px;">
                 <b>PayExtra</b> — ручная выплата (Tips/Salary) с выбором сотрудника, счета и комментарием.
@@ -1194,7 +1191,7 @@ $firstOfMonth = date('Y-m-01');
             <div style="margin-bottom: 10px;">
                 <b>ИТОГО</b> — сумма по колонкам внизу таблицы.
             </div>
-            <div style="margin: 14px 0 8px; font-weight: 900;">Колонки</div>
+            <div style="margin: 14px 0 8px; font-weight: 900;">Пояснения по колонкам</div>
             <div style="margin-bottom: 8px;">
                 <b>ID</b> — ID сотрудника в Poster.
             </div>
@@ -1202,7 +1199,7 @@ $firstOfMonth = date('Y-m-01');
                 <b>name</b> — имя сотрудника.
             </div>
             <div style="margin-bottom: 8px;">
-                <b>Rate</b> — ставка.
+                <b>Rate</b> — ставка. Можно редактировать, сохраняется автоматически при выходе из поля или по Enter.
             </div>
             <div style="margin-bottom: 8px;">
                 <b>role_name</b> — должность (роль).
