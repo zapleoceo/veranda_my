@@ -987,8 +987,8 @@ $firstOfMonth = date('Y-m-01');
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0015">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0015">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0030">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0030">
 </head>
 <body>
 <div class="container">
@@ -1036,6 +1036,10 @@ $firstOfMonth = date('Y-m-01');
                     Колонки
                 </button>
                 <div class="cols-menu" id="colsMenu" hidden></div>
+            </div>
+            <div class="cols-dd">
+                <button type="button" class="secondary" id="rolesBtn">Роли</button>
+                <div class="cols-menu" id="rolesMenu" hidden></div>
             </div>
         </div>
         <div class="table-wrap" style="margin-top: 12px;">
@@ -1195,6 +1199,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const hideZeroCb = document.getElementById('hideZero');
     const colsBtn = document.getElementById('colsBtn');
     const colsMenu = document.getElementById('colsMenu');
+    const rolesBtn = document.getElementById('rolesBtn');
+    const rolesMenu = document.getElementById('rolesMenu');
     const empTable = document.getElementById('empTable');
     const tableWrap = empTable ? empTable.closest('.table-wrap') : null;
     const totTipsEl = document.getElementById('totTips');
@@ -1286,6 +1292,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     let hideZero = !!prefs.hide_zero;
     if (hideZeroCb) hideZeroCb.checked = hideZero;
     const COLS_KEY = 'employees_cols_v1';
+    const ROLES_KEY = 'employees_roles_v1';
     const defaultCols = {
         id: true,
         name: true,
@@ -1312,6 +1319,25 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const saveCols = (cols) => { try { localStorage.setItem(COLS_KEY, JSON.stringify(cols || {})); } catch (_) {} };
     const colState = loadCols();
+    const loadRoles = () => {
+        try {
+            const raw = localStorage.getItem(ROLES_KEY) || '';
+            const j = raw ? JSON.parse(raw) : null;
+            if (!j || typeof j !== 'object') return {};
+            return j;
+        } catch (_) {
+            return {};
+        }
+    };
+    const saveRoles = (roles) => { try { localStorage.setItem(ROLES_KEY, JSON.stringify(roles || {})); } catch (_) {} };
+    const roleState = loadRoles();
+    const normRoleName = (s) => String(s || '').trim();
+    const roleLabel = (s) => {
+        const r = normRoleName(s);
+        return r ? r : '—';
+    };
+    const roleCollator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
+    let roleDefs = [];
     const colDefs = [
         { key: 'id', label: 'ID' },
         { key: 'name', label: 'name' },
@@ -1356,10 +1382,51 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const setColsMenuOpen = (on) => {
         if (!colsMenu) return;
+        if (on && rolesMenu) rolesMenu.hidden = true;
         colsMenu.hidden = !on;
+    };
+    const syncRolesFromData = () => {
+        const set = new Set();
+        dataRows.forEach((r) => set.add(normRoleName(r && r.role_name)));
+        roleDefs = Array.from(set);
+        roleDefs.sort((a, b) => roleCollator.compare(roleLabel(a), roleLabel(b)));
+        roleDefs.forEach((r) => {
+            if (!Object.prototype.hasOwnProperty.call(roleState, r)) roleState[r] = true;
+        });
+        Object.keys(roleState).forEach((k) => { if (!set.has(k)) delete roleState[k]; });
+        saveRoles(roleState);
+        renderRolesMenu();
+    };
+    const renderRolesMenu = () => {
+        if (!rolesMenu) return;
+        rolesMenu.innerHTML = '';
+        roleDefs.forEach((role) => {
+            const lab = document.createElement('label');
+            lab.className = 'cols-item';
+            const inp = document.createElement('input');
+            inp.type = 'checkbox';
+            inp.checked = !!roleState[role];
+            inp.addEventListener('change', () => {
+                roleState[role] = !!inp.checked;
+                saveRoles(roleState);
+                renderTable();
+                syncStickyHeader(true);
+            });
+            const text = document.createElement('span');
+            text.textContent = roleLabel(role);
+            lab.appendChild(inp);
+            lab.appendChild(text);
+            rolesMenu.appendChild(lab);
+        });
+    };
+    const setRolesMenuOpen = (on) => {
+        if (!rolesMenu) return;
+        if (on && colsMenu) colsMenu.hidden = true;
+        rolesMenu.hidden = !on;
     };
     applyCols();
     renderColsMenu();
+    renderRolesMenu();
     dateFrom.addEventListener('change', () => { const p = loadPrefs(); p.date_from = dateFrom.value; savePrefs(p); });
     dateTo.addEventListener('change', () => { const p = loadPrefs(); p.date_to = dateTo.value; savePrefs(p); });
     if (hideZeroCb) hideZeroCb.addEventListener('change', () => {
@@ -1380,6 +1447,21 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') setColsMenuOpen(false);
+        });
+    }
+    if (rolesBtn && rolesMenu) {
+        rolesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            setRolesMenuOpen(rolesMenu.hidden);
+        });
+        document.addEventListener('click', (e) => {
+            if (rolesMenu.hidden) return;
+            const t = e.target;
+            if (t === rolesBtn || (rolesMenu.contains && rolesMenu.contains(t))) return;
+            setRolesMenuOpen(false);
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') setRolesMenuOpen(false);
         });
     }
     let sortBy = prefs.sort_by || 'checks';
@@ -1638,7 +1720,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 return !(checks === 0 && hours === 0 && tips === 0 && tipsPaid === 0 && slrPaid === 0 && tipsToPay === 0 && salary === 0 && salaryToPay === 0);
             })
             : augmented;
-        const items = filtered.slice().sort((a, b) => {
+        const filteredByRole = (() => {
+            if (!roleDefs || roleDefs.length === 0) return filtered;
+            const anySelected = roleDefs.some((r) => !!roleState[r]);
+            if (!anySelected) return [];
+            return filtered.filter((r) => !!roleState[normRoleName(r && r.role_name)]);
+        })();
+        const items = filteredByRole.slice().sort((a, b) => {
             const av = a[sortBy];
             const bv = b[sortBy];
             if (typeof av === 'number' || typeof bv === 'number') {
@@ -1946,6 +2034,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     salary_minor: salary,
                 };
             });
+            syncRolesFromData();
             renderTable();
             prog.style.display = 'none';
             cancelBtn.style.display = 'none';
