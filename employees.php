@@ -1026,7 +1026,7 @@ $firstOfMonth = date('Y-m-01');
         <div style="display:flex; gap: 14px; align-items:center; flex-wrap: wrap; margin-top: 10px;">
             <label class="muted" style="display:flex; align-items:center; gap: 8px; margin: 0;">
                 <input type="checkbox" id="hideZero">
-                Скрыть нулевые
+                Пустые
             </label>
             <div class="cols-dd">
                 <button type="button" class="secondary" id="colsBtn">
@@ -1168,7 +1168,7 @@ $firstOfMonth = date('Y-m-01');
                 <b>Роли</b> — фильтр по должностям. Доступен после загрузки данных, сохраняется в браузере.
             </div>
             <div style="margin-bottom: 10px;">
-                <b>Скрыть нулевые</b> — скрывает строки, где все значения в строке равны 0.
+                <b>Пустые</b> — при включении показывает пустые строки, при выключении скрывает.
             </div>
             <div style="margin-bottom: 10px;">
                 <b>Сортировка</b> — клик по заголовку колонки сортирует таблицу.
@@ -1319,8 +1319,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const prefs = loadPrefs();
     if (prefs.date_from) dateFrom.value = prefs.date_from;
     if (prefs.date_to) dateTo.value = prefs.date_to;
-    let hideZero = !!prefs.hide_zero;
-    if (hideZeroCb) hideZeroCb.checked = hideZero;
+    let hideZero = (prefs.hide_zero === undefined) ? true : !!prefs.hide_zero;
+    if (hideZeroCb) hideZeroCb.checked = !hideZero;
     const COLS_KEY = 'employees_cols_v1';
     const ROLES_KEY = 'employees_roles_v1';
     const defaultCols = {
@@ -1460,7 +1460,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     dateFrom.addEventListener('change', () => { const p = loadPrefs(); p.date_from = dateFrom.value; savePrefs(p); });
     dateTo.addEventListener('change', () => { const p = loadPrefs(); p.date_to = dateTo.value; savePrefs(p); });
     if (hideZeroCb) hideZeroCb.addEventListener('change', () => {
-        hideZero = !!hideZeroCb.checked;
+        hideZero = !hideZeroCb.checked;
         const p = loadPrefs(); p.hide_zero = hideZero; savePrefs(p);
         renderTable();
     });
