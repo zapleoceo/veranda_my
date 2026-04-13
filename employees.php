@@ -987,8 +987,8 @@ $firstOfMonth = date('Y-m-01');
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0030">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0030">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0045">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0045">
 </head>
 <body>
 <div class="container">
@@ -1452,6 +1452,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     if (rolesBtn && rolesMenu) {
         rolesBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            if (!roleDefs || roleDefs.length === 0) {
+                alert('Сначала загрузите данные');
+                return;
+            }
             setRolesMenuOpen(rolesMenu.hidden);
         });
         document.addEventListener('click', (e) => {
@@ -1789,7 +1793,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         const acc = Number(it && it.account_id ? it.account_id : 0) || 0;
                         const ic = accountTagById(acc);
                         const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
-                        return `<div class="paid-item"><div class="paid-date">${esc(d)}${ic ? (' ' + ic) : ''}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
+                        return `<div class="paid-item">
+                                    <div class="pi-cell date-cell">${esc(d)}</div>
+                                    <div class="pi-cell type-cell">${ic ? ic : ''}</div>
+                                    <div class="pi-cell time-cell">${esc(tm)}</div>
+                                    <div class="pi-cell amt-cell">${esc(amt)}</div>
+                                </div>`;
                     }).join('') : ''}
                 </td>
                 <td class="col-ttp" style="text-align:right;">
@@ -1809,7 +1818,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         const acc = Number(it && it.account_id ? it.account_id : 0) || 0;
                         const ic = accountTagById(acc);
                         const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
-                        return `<div class="paid-item"><div class="paid-date">${esc(d)}${ic ? (' ' + ic) : ''}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
+                        return `<div class="paid-item">
+                                    <div class="pi-cell date-cell">${esc(d)}</div>
+                                    <div class="pi-cell type-cell">${ic ? ic : ''}</div>
+                                    <div class="pi-cell time-cell">${esc(tm)}</div>
+                                    <div class="pi-cell amt-cell">${esc(amt)}</div>
+                                </div>`;
                     }).join('') : ''}
                 </td>
                 <td class="col-salarytopay" style="text-align:right;">
