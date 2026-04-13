@@ -2829,6 +2829,7 @@ $fmtVnd = function (int $v): string {
                 <button type="button" class="tab" id="tabOut">OUT</button>
                 <button type="button" class="tab" id="btnKashShift" style="margin-left: 15px; background: rgba(184,135,70,0.15); color: #B88746;">KashShift</button>
                 <button type="button" class="tab" id="btnSupplies" style="margin-left: 5px; background: rgba(184,135,70,0.15); color: #B88746;">Supplies</button>
+                <button type="button" class="tab" id="btnLoadAll" style="margin-left: 5px; background: rgba(70,184,135,0.15); color: #46B887;">Загрузить всё</button>
             </div>
             <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin-left: 10px;">
                 <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
@@ -3536,6 +3537,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
                 `;
                 tbody.appendChild(tr);
+
             });
             return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
         }).then((j2) => {
@@ -3618,6 +3620,39 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
                 `;
                 tbody.appendChild(tr);
+                if (rawAmount > 0) {
+                    const inPosterTbody = document.querySelector('#posterTable tbody');
+                    if (inPosterTbody) {
+                        const trIn = document.createElement('tr');
+                        trIn.setAttribute('data-poster-id', String(row.transaction_id || 0));
+                        trIn.setAttribute('data-total', String(amountInt));
+                        trIn.className = 'row-out-positive';
+                        const dtIn = formatOutDT('', row.date);
+                        trIn.innerHTML = `
+                            <td class="nowrap col-poster-dot"><span class="anchor" id="poster-${Number(row.transaction_id || 0)}"></span></td>
+                            <td class="nowrap col-poster-num">${Number(row.transaction_id || 0)}</td>
+                            <td class="nowrap col-poster-time">${escapeHtml(dtIn.time)}</td>
+                            <td class="sum col-poster-card">${fmtVnd0(amountInt)}</td>
+                            <td class="sum col-poster-tips">0 ₫</td>
+                            <td class="sum col-poster-total">${fmtVnd0(amountInt)}</td>
+                            <td class="col-poster-method">${escapeHtml(catName)}</td>
+                            <td class="col-poster-waiter">${escapeHtml(userName)}</td>
+                            <td class="nowrap col-poster-table">${escapeHtml(row.comment || '—')}</td>
+                            <td class="col-poster-cb"><input type="checkbox" class="poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
+                        `;
+                        inPosterTbody.appendChild(trIn);
+                        const newCb = trIn.querySelector('input.poster-cb');
+                        if (newCb) {
+                            newCb.addEventListener('change', () => {
+                                const id = Number(newCb.getAttribute('data-id') || 0);
+                                if (!id) return;
+                                if (newCb.checked) selectedPoster.add(id);
+                                else selectedPoster.delete(id);
+                                updateLinkButtonState();
+                            });
+                        }
+                    }
+                }
             });
             applyOutRowClasses();
             applyOutHideLinked();
@@ -4992,6 +5027,383 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         updateLinkButtonState();
     };
 
+    const sendManualLinks = (sepayIds, posterIds) => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'manual_link'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sepay_ids: sepayIds, poster_transaction_ids: posterIds }),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            return refreshLinks();
+        });
+    };
+
+    const sendAutoLinks = () => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'auto_link'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            return refreshLinks();
+        });
+    };
+
+    const sendClearLinks = () => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'clear_links'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            return refreshLinks();
+        });
+    };
+
+    const applyHideLinked = () => {
+        const state = buildLinkState();
+        document.querySelectorAll('#sepayTable tbody tr[data-sepay-id]').forEach((tr) => {
+            const sid = Number(tr.getAttribute('data-sepay-id') || 0);
+            const linked = state.sepay.has(sid);
+            const isHiddenRow = String(tr.getAttribute('data-hidden') || '0') === '1';
+            const hidden = (hideLinked && linked) || (isHiddenRow && !showSepayHidden);
+            tr.style.display = hidden ? 'none' : '';
+            if (hidden) {
+                const cb = tr.querySelector('input.sepay-cb');
+                if (cb) cb.checked = false;
+                selectedSepay.delete(sid);
+            }
+        });
+        document.querySelectorAll('#posterTable tbody tr[data-poster-id]').forEach((tr) => {
+            const isVietnam = String(tr.getAttribute('data-vietnam') || '0') === '1';
+            const pid = Number(tr.getAttribute('data-poster-id') || 0);
+            const linked = state.poster.has(pid);
+            const hidden = (hideLinked && linked) || (hideVietnam && isVietnam);
+            tr.style.display = hidden ? 'none' : '';
+            if (hidden) {
+                const cb = tr.querySelector('input.poster-cb');
+                if (cb) cb.checked = false;
+                selectedPoster.delete(pid);
+            }
+        });
+        updateLinkButtonState();
+        updateStats();
+    };
+
+    const bindInTableEvents = () => {
+        document.querySelectorAll('input.poster-cb').forEach((cb) => {
+            cb.addEventListener('change', () => {
+                const id = Number(cb.getAttribute('data-id') || 0);
+                if (!id) return;
+                if (cb.checked) selectedPoster.add(id);
+                else selectedPoster.delete(id);
+                updateLinkButtonState();
+            });
+        });
+    };
+    bindInTableEvents();
+
+    const refreshLinks = () => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'links'])) ?>;
+        return fetch(url)
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                const rows = Array.isArray(j.links) ? j.links : [];
+                links = rows.map((l) => ({
+                    poster_transaction_id: Number(l.poster_transaction_id || 0),
+                    sepay_id: Number(l.sepay_id || 0),
+                    link_type: String(l.link_type || ''),
+                    is_manual: !!l.is_manual,
+                }));
+                drawLines();
+                applyRowClasses();
+                updateStats();
+                applyHideLinked();
+                setTimeout(() => { positionLines(); positionWidgets(); }, 0);
+                setTimeout(() => { positionLines(); positionWidgets(); }, 200);
+            });
+    };
+
+    const unlink = (sepayId, posterId) => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'unlink'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sepay_id: sepayId, poster_transaction_id: posterId }),
+        })
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                return refreshLinks();
+            });
+    };
+
+    const drawLines = () => {
+        ensureSvg();
+        clearLines();
+        syncButtons();
+        if (!tablesRoot || !svgState.svg || !svgState.group) return;
+        const rootRect = tablesRoot.getBoundingClientRect();
+        const w = Math.max(1, Math.round(rootRect.width));
+        const h = Math.max(1, Math.round(rootRect.height));
+        svgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        widgets.forEach((btn) => { btn.style.display = 'none'; });
+
+        const isVisibleInScrollY = (el, scrollEl) => {
+            if (!el || !scrollEl) return false;
+            const tr = el.closest('tr');
+            if (!tr) return false;
+            if (!tr.getClientRects().length) return false;
+            if (tr.style.display === 'none') return false;
+            const r = tr.getBoundingClientRect();
+            const sr = scrollEl.getBoundingClientRect();
+            return r.bottom >= sr.top && r.top <= sr.bottom;
+        };
+
+        const sepayCount = {};
+        const posterCount = {};
+        links.forEach((l) => {
+            const sid = Number(l.sepay_id || 0);
+            const pid = Number(l.poster_transaction_id || 0);
+            if (sid) sepayCount[sid] = (sepayCount[sid] || 0) + 1;
+            if (pid) posterCount[pid] = (posterCount[pid] || 0) + 1;
+        });
+
+        links.forEach((l) => {
+            const s = document.getElementById('sepay-' + l.sepay_id);
+            const p = document.getElementById('poster-' + l.poster_transaction_id);
+            if (!s || !p) return;
+            if (!s.getClientRects().length || !p.getClientRects().length) return;
+            if (sepayScroll && !isVisibleInScrollY(s, sepayScroll)) return;
+            if (posterScroll && !isVisibleInScrollY(p, posterScroll)) return;
+            const isMany = (sepayCount[l.sepay_id] || 0) > 1 || (posterCount[l.poster_transaction_id] || 0) > 1;
+            const isMainGreen = !isMany && !l.is_manual && l.link_type === 'auto_green';
+            const size = 2;
+            const color = colorFor(l.link_type, l.is_manual);
+
+            const a0 = getAnchorPoint(s, 'right', rootRect);
+            const b0 = getAnchorPoint(p, 'left', rootRect);
+            if (a0.y < 0 || b0.y < 0 || a0.y > h || b0.y > h) return;
+
+            const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+            const a = { x: clamp(a0.x, 0, w), y: clamp(a0.y, 0, h) };
+            const b = { x: clamp(b0.x, 0, w), y: clamp(b0.y, 0, h) };
+
+            const dx = b.x - a.x;
+            const cdx = Math.min(120, Math.max(40, Math.abs(dx) * 0.35));
+            const c1x = a.x + cdx;
+            const c1y = a.y;
+            const c2x = b.x - cdx;
+            const c2y = b.y;
+            const d = `M ${a.x} ${a.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${b.x} ${b.y}`;
+
+            const ns = 'http://www.w3.org/2000/svg';
+            const outline = document.createElementNS(ns, 'path');
+            outline.setAttribute('d', d);
+            outline.setAttribute('fill', 'none');
+            outline.setAttribute('stroke', 'rgba(255,255,255,0.65)');
+            outline.setAttribute('stroke-width', String(size + 2));
+            outline.setAttribute('stroke-linecap', 'round');
+            outline.setAttribute('stroke-linejoin', 'round');
+            svgState.group.appendChild(outline);
+
+            const path = document.createElementNS(ns, 'path');
+            path.setAttribute('d', d);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', color);
+            path.setAttribute('stroke-width', String(size));
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            svgState.group.appendChild(path);
+
+            const key = String(l.sepay_id) + ':' + String(l.poster_transaction_id);
+            const btn = widgets.get(key);
+            if (btn) {
+                const dxBtn = b.x - a.x;
+                const dyBtn = b.y - a.y;
+                const lenBtn = Math.hypot(dxBtn, dyBtn) || 1;
+                const insetPx = 6;
+                const tBtn = Math.min(0.99, Math.max(0.75, 1 - (insetPx / lenBtn)));
+                const mx = a.x + dxBtn * tBtn;
+                const my = a.y + dyBtn * tBtn;
+                const localX = Math.max(8, Math.min(w - 8, mx));
+                const localY = Math.max(8, Math.min(h - 8, my));
+                btn.style.left = Math.round(localX - 8) + 'px';
+                btn.style.top = Math.round(localY - 8) + 'px';
+                btn.style.display = 'flex';
+            }
+        });
+    };
+
+    const positionLines = () => {
+        drawLines();
+    };
+
+    const positionWidgets = () => {
+        return;
+    };
+
+    const tablesRoot = document.getElementById('tablesRoot');
+    const lineLayer = document.getElementById('lineLayer');
+    const sepayScroll = document.getElementById('sepayScroll');
+    const posterScroll = document.getElementById('posterScroll');
+
+    let relayoutRaf = 0;
+    const scheduleRelayout = () => {
+        if (relayoutRaf) return;
+        relayoutRaf = requestAnimationFrame(() => {
+            relayoutRaf = 0;
+            positionLines();
+            positionWidgets();
+        });
+    };
+    const scheduleRelayoutBurst = () => {
+        scheduleRelayout();
+        setTimeout(scheduleRelayout, 50);
+        setTimeout(scheduleRelayout, 200);
+        setTimeout(scheduleRelayout, 600);
+    };
+
+    if (tablesRoot) {
+        tablesRoot.addEventListener('scroll', () => scheduleRelayout(), { passive: true, capture: true });
+    }
+    if (sepayScroll) {
+        sepayScroll.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
+    }
+    if (posterScroll) {
+        posterScroll.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
+    }
+    window.addEventListener('resize', () => scheduleRelayoutBurst(), { passive: true });
+    window.addEventListener('pageshow', () => scheduleRelayoutBurst(), { passive: true });
+    try {
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => scheduleRelayoutBurst(), { passive: true });
+            window.visualViewport.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
+        }
+    } catch (_) {}
+
+    try {
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(() => scheduleRelayoutBurst());
+            if (tablesRoot) ro.observe(tablesRoot);
+            if (sepayScroll) ro.observe(sepayScroll);
+            if (posterScroll) ro.observe(posterScroll);
+        }
+    } catch (_) {}
+
+    window.addEventListener('load', () => {
+        drawLines();
+        applyRowClasses();
+        updateStats();
+        applyHideLinked();
+        scheduleRelayoutBurst();
+    });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            drawLines();
+            applyRowClasses();
+            updateStats();
+            applyHideLinked();
+            scheduleRelayoutBurst();
+        });
+    } else {
+        drawLines();
+        applyRowClasses();
+        updateStats();
+        applyHideLinked();
+        scheduleRelayoutBurst();
+    }
+
+    const sepayTable = document.getElementById('sepayTable');
+    const posterTable = document.getElementById('posterTable');
+    if (!sepayTable || !posterTable) return;
+
+    const selectedSepay = new Set();
+    const selectedPoster = new Set();
+
+    const linkMakeBtn = document.getElementById('linkMakeBtn');
+    const hideLinkedBtn = document.getElementById('hideLinkedBtn');
+    const linkAutoBtn = document.getElementById('linkAutoBtn');
+    const linkClearBtn = document.getElementById('linkClearBtn');
+    const selSepaySumEl = document.getElementById('selSepaySum');
+    const selPosterSumEl = document.getElementById('selPosterSum');
+    const selMatchEl = document.getElementById('selMatch');
+    const selDiffEl = document.getElementById('selDiff');
+
+    let hideLinked = false;
+    let hideVietnam = false;
+    try { hideVietnam = localStorage.getItem('payday_hide_vietnam') === '1'; } catch (e) {}
+    const toggleVietnamBtn = document.getElementById('toggleVietnamBtn');
+    let showSepayHidden = false;
+    try { showSepayHidden = localStorage.getItem('payday_show_sepay_hidden') === '1'; } catch (e) {}
+    const toggleSepayHiddenBtn = document.getElementById('toggleSepayHiddenBtn');
+
+    const updateSelectionSums = () => {
+        let sSum = 0;
+        selectedSepay.forEach((id) => {
+            const tr = document.querySelector(`#sepayTable tbody tr[data-sepay-id="${Number(id)}"]`);
+            if (!tr) return;
+            sSum += Number(tr.getAttribute('data-sum') || 0) || 0;
+        });
+        let pSum = 0;
+        selectedPoster.forEach((id) => {
+            const tr = document.querySelector(`#posterTable tbody tr[data-poster-id="${Number(id)}"]`);
+            if (!tr) return;
+            pSum += Number(tr.getAttribute('data-total') || 0) || 0;
+        });
+        if (selSepaySumEl) selSepaySumEl.textContent = fmtVnd(sSum);
+        if (selPosterSumEl) selPosterSumEl.textContent = fmtVnd(pSum);
+        if (selDiffEl) {
+            const diff = pSum - sSum;
+            selDiffEl.textContent = fmtVnd(Math.abs(diff));
+        }
+        if (selMatchEl) {
+            const ok = sSum === pSum;
+            selMatchEl.textContent = ok ? '✅' : '❗';
+            selMatchEl.style.color = ok ? '#16a34a' : '#dc2626';
+        }
+    };
+
+    const updateLinkButtonState = () => {
+        if (!linkMakeBtn) return;
+        const ok = (selectedSepay.size > 0 && selectedPoster.size > 0 && !(selectedSepay.size > 1 && selectedPoster.size > 1));
+        linkMakeBtn.disabled = !ok;
+        updateSelectionSums();
+    };
+
+    const updateHideButtonState = () => {
+        if (!hideLinkedBtn) return;
+        hideLinkedBtn.classList.toggle('active', hideLinked);
+    };
+
+    const updateVietnamButtonState = () => {
+        if (!toggleVietnamBtn) return;
+        toggleVietnamBtn.classList.toggle('on', hideVietnam);
+    };
+    const updateSepayHiddenButtonState = () => {
+        if (!toggleSepayHiddenBtn) return;
+        toggleSepayHiddenBtn.classList.toggle('on', showSepayHidden);
+    };
+
+    const clearCheckboxes = () => {
+        document.querySelectorAll('input.sepay-cb, input.poster-cb').forEach((cb) => {
+            cb.checked = false;
+        });
+        selectedSepay.clear();
+        selectedPoster.clear();
+        updateLinkButtonState();
+    };
+
     const setupSort = (table) => {
         const state = { key: null, dir: 'asc' };
         const ths = Array.from(table.querySelectorAll('th.sortable[data-sort-key]'));
@@ -5262,15 +5674,6 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         });
     });
-    document.querySelectorAll('input.poster-cb').forEach((cb) => {
-        cb.addEventListener('change', () => {
-            const id = Number(cb.getAttribute('data-id') || 0);
-            if (!id) return;
-            if (cb.checked) selectedPoster.add(id);
-            else selectedPoster.delete(id);
-            updateLinkButtonState();
-        });
-    });
 
     if (linkMakeBtn) {
         linkMakeBtn.addEventListener('click', () => {
@@ -5503,6 +5906,66 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const suppliesModal = document.getElementById('suppliesModal');
     const suppliesClose = document.getElementById('suppliesClose');
     const suppliesBody = document.getElementById('suppliesBody');
+
+
+    const btnLoadAll = document.getElementById('btnLoadAll');
+    if (btnLoadAll) {
+        btnLoadAll.addEventListener('click', async () => {
+            const restore = setBtnBusy(btnLoadAll, { title: 'Загрузить всё', pct: 0 });
+            try {
+                const fdPoster = new URLSearchParams();
+                fdPoster.append('action', 'load_poster_checks');
+                fdPoster.append('ajax', '1');
+                fdPoster.append('dateFrom', dateFrom.value);
+                fdPoster.append('dateTo', dateTo.value);
+
+                const fdSepay = new URLSearchParams();
+                fdSepay.append('action', 'reload_sepay_api');
+                fdSepay.append('ajax', '1');
+                fdSepay.append('dateFrom', dateFrom.value);
+                fdSepay.append('dateTo', dateTo.value);
+
+                const p1 = fetch(location.pathname, { method: 'POST', body: fdPoster }).then(r => r.text());
+                const p2 = fetch(location.pathname, { method: 'POST', body: fdSepay }).then(r => r.text());
+
+                const p3 = loadOutMail((pct, step) => updateBtnBusy(btnLoadAll, { pct, title: 'Загрузка...' }));
+                const p4 = loadOutFinance((pct, step) => updateBtnBusy(btnLoadAll, { pct, title: 'Загрузка...' }));
+
+                await Promise.all([p1, p2, p3, p4]);
+
+                const html = await fetch(location.href).then(r => r.text());
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+
+                const newSepayTbody = doc.querySelector('#sepayTable tbody');
+                const newPosterTbody = doc.querySelector('#posterTable tbody');
+
+                if (newSepayTbody) {
+                    const oldTbody = document.querySelector('#sepayTable tbody');
+                    if (oldTbody) oldTbody.innerHTML = newSepayTbody.innerHTML;
+                }
+                if (newPosterTbody) {
+                    const oldTbody = document.querySelector('#posterTable tbody');
+                    if (oldTbody) {
+                        const injectedRows = Array.from(oldTbody.querySelectorAll('tr.row-out-positive'));
+                        oldTbody.innerHTML = newPosterTbody.innerHTML;
+                        injectedRows.forEach(tr => oldTbody.appendChild(tr));
+                    }
+                }
+
+                if (typeof bindInTableEvents === 'function') bindInTableEvents();
+                updateStats();
+                applyHideLinked();
+                drawLines();
+                try { scheduleRelayoutBurst(); } catch (e) {}
+
+            } catch (e) {
+                alert(e && e.message ? e.message : 'Ошибка');
+            } finally {
+                restore();
+            }
+        });
+    }
 
     if (btnSupplies && suppliesModal) {
         btnSupplies.addEventListener('click', () => {
