@@ -987,8 +987,8 @@ $firstOfMonth = date('Y-m-01');
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0050">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0050">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0055">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0055">
 </head>
 <body>
 <div class="container">
@@ -1245,6 +1245,19 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         err.style.display = 'block';
         err.textContent = msg;
     };
+    const showToast = (msg) => {
+        let t = document.getElementById('empToast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'empToast';
+            t.className = 'emp-toast';
+            document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        t.classList.add('show');
+        if (t.timer) clearTimeout(t.timer);
+        t.timer = setTimeout(() => t.classList.remove('show'), 2000);
+    };
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
     const accountTagById = (acc) => {
@@ -1455,7 +1468,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         rolesBtn.addEventListener('click', (e) => {
             e.preventDefault();
             if (!roleDefs || roleDefs.length === 0) {
-                alert('Сначала загрузите данные');
+                showToast('Сначала загрузите данные');
                 return;
             }
             setRolesMenuOpen(rolesMenu.hidden);

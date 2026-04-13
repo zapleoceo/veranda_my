@@ -104,6 +104,28 @@
         .help-btn { width: 24px; height: 24px; border-radius: 999px; border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: var(--accent); font-weight: 900; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; line-height: 1; padding: 0; animation: helpPulse 1200ms ease-in-out infinite; }
         .help-btn:hover { box-shadow: 0 0 0 2px rgba(26,115,232,0.35); }
         @keyframes helpPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+        .emp-toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(17, 24, 39, 0.85);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 800;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            z-index: 10000;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .emp-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
         .cols-dd { position: relative; display: inline-flex; }
         .cols-dd > button { white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; }
         .cols-icon { width: 14px; height: 14px; display: inline-block; }
