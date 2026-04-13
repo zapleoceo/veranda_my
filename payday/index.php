@@ -3531,7 +3531,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
                     <td class="col-out-content">${escapeHtml(contentShow)}</td>
                     <td class="nowrap col-out-time"><div class="col-out-date-part">${escapeHtml(dt.date)}</div><div class="col-out-time-part">${escapeHtml(dt.time)}</div></td>
-                    <td class="sum col-out-sum">${Number(row.amount || 0).toLocaleString('en-US')} ₫</td>
+                    <td class="sum col-out-sum">−${Number(row.amount || 0).toLocaleString('en-US')} ₫</td>
                     <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
                     <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
                 `;
@@ -3601,6 +3601,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const userName = String(emps && emps[Number(row.user_id || 0)] ? emps[Number(row.user_id || 0)] : row.user_id || '');
                 let catName = String(cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : row.category_id || '');
                 if (catName === 'book_category_action_supplies') catName = 'поставки';
+                const amountColor = rawAmount > 0 ? 'color: var(--green);' : (rawAmount < 0 ? 'color: var(--red);' : '');
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
                 tr.setAttribute('data-sum', String(amountInt));
@@ -3612,7 +3613,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     <td class="col-out-user">${escapeHtml(userName)}</td>
                     <td class="col-out-category">${escapeHtml(catName)}</td>
                     <td class="col-out-type">${Number(row.type || 0)}</td>
-                    <td class="sum col-out-amount">${sign}${fmtVnd0(amountInt)}</td>
+                    <td class="sum col-out-amount" style="${amountColor}">${sign}${fmtVnd0(amountInt)}</td>
                     <td class="sum col-out-balance">${fmtVnd0(balanceInt)}</td>
                     <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
                 `;
