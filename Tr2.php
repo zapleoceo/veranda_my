@@ -1626,7 +1626,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0245">
-  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260412_0245">
+  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260413_0205">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1638,8 +1638,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
           <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
           <p><span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span> <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button><span class="mini-loader" id="busyDateLoader" hidden></span></p>
           <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
-          <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         </div>
+        <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
           <label class="zoom" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">

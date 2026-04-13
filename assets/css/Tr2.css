@@ -230,8 +230,11 @@
       color: rgba(255,255,255,0.82);
       font-size: 13px;
       font-weight: 900;
+      width: 100%;
+      text-align: center;
+      grid-column: 1 / -1;
     }
-    .title-wrap .map-invite { margin-top: var(--space-3); }
+    .map-invite { margin-top: var(--space-3); }
   
     .map-shell {
       background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
