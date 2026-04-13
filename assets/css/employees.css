@@ -1,4 +1,4 @@
-.filters { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; }
+.filters { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; position: relative; padding-right: 36px; }
         .filters label { font-size: 12px; color: var(--muted); display:flex; flex-direction: column; gap: 6px; }
         .filters input[type="date"] { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card); }
         .filters button { padding: 10px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fffaf4; font-weight: 800; cursor: pointer; }
@@ -105,9 +105,19 @@
             padding: 16px;
         }
         #payExtraModal.loading .payextra-overlay { display: flex; }
-        .help-btn { width: 24px; height: 24px; border-radius: 999px; border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: var(--accent); font-weight: 900; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; line-height: 1; padding: 0; animation: helpPulse 1200ms ease-in-out infinite; }
+        .help-btn { width: 24px; height: 24px; border-radius: 999px; border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: var(--accent); font-weight: 900; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; line-height: 1; padding: 0; animation: helpPulse 1200ms ease-in-out infinite; position: absolute; top: 10px; right: 10px; }
         .help-btn:hover { box-shadow: 0 0 0 2px rgba(26,115,232,0.35); }
         @keyframes helpPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+        @media (max-width: 560px) {
+            .filters { align-items: stretch; }
+            .filters label { width: 100%; }
+            .filters input[type="date"],
+            .filters #loadBtn,
+            .filters #payExtraBtn { width: 100%; }
+            .filters #loadBtn,
+            .filters #payExtraBtn { padding: 8px 10px; font-size: 14px; }
+        }
         .emp-toast {
             position: fixed;
             bottom: 20px;

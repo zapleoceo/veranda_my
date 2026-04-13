@@ -987,8 +987,8 @@ $firstOfMonth = date('Y-m-01');
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0115">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0115">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0130">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0130">
 </head>
 <body>
 <div class="container">
@@ -1018,16 +1018,12 @@ $firstOfMonth = date('Y-m-01');
                     <div class="desc" id="progDesc"></div>
                 </div>
                 <button type="button" class="secondary" id="payExtraBtn">PayExtra</button>
-                <button type="button" class="help-btn" id="helpBtn" title="Инструкция" style="margin-left:auto;">?</button>
             </div>
+            <button type="button" class="help-btn" id="helpBtn" title="Инструкция">?</button>
         </div>
         <div class="error" id="err" style="display:none;"></div>
         <div class="muted" id="ltpRangeNote" style="margin-top: 6px; font-size: 12px; font-weight: 800;"></div>
         <div style="display:flex; gap: 14px; align-items:center; flex-wrap: wrap; margin-top: 10px;">
-            <label class="muted" style="display:flex; align-items:center; gap: 8px; margin: 0;">
-                <input type="checkbox" id="hideZero">
-                Пустые
-            </label>
             <div class="cols-dd">
                 <button type="button" class="secondary" id="colsBtn">
                     <svg class="cols-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1038,9 +1034,18 @@ $firstOfMonth = date('Y-m-01');
                 <div class="cols-menu" id="colsMenu" hidden></div>
             </div>
             <div class="cols-dd">
-                <button type="button" class="secondary" id="rolesBtn">Роли</button>
+                <button type="button" class="secondary" id="rolesBtn">
+                    <svg class="cols-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M4 5h16M7 12h10M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    Роли
+                </button>
                 <div class="cols-menu" id="rolesMenu" hidden></div>
             </div>
+            <label class="muted" style="display:flex; align-items:center; gap: 8px; margin: 0;">
+                <input type="checkbox" id="hideZero">
+                Пустые
+            </label>
         </div>
         <div class="table-wrap" style="margin-top: 12px;">
             <div style="display: inline-flex; flex-direction: column;">
