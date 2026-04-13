@@ -1657,8 +1657,24 @@
     const positionToast = (target) => {
       if (!toastEl || !target) return;
       const r = target.getBoundingClientRect();
-      const x = Math.round(r.left + (r.width / 2));
-      const y = Math.round(r.top);
+      const toastWidth = Math.min(340, window.innerWidth - 24);
+      let x = Math.round(r.left + (r.width / 2));
+      
+      // Boundary checks
+      const minX = 12 + (toastWidth / 2);
+      const maxX = window.innerWidth - 12 - (toastWidth / 2);
+      if (x < minX) x = minX;
+      if (x > maxX) x = maxX;
+
+      let y = Math.round(r.top);
+      // If table is too close to top, show toast below the table
+      if (y < 80) {
+          y = Math.round(r.bottom) + 12;
+          toastEl.dataset.position = 'bottom';
+      } else {
+          toastEl.dataset.position = 'top';
+      }
+
       toastEl.style.left = String(x) + 'px';
       toastEl.style.top = String(y) + 'px';
     };
