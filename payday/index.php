@@ -5518,7 +5518,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
                         arr.forEach(tx => {
                             const isDeleted = (tx.delete_user_id && Number(tx.delete_user_id) > 0) || (tx.delete_time && Number(tx.delete_time) > 0) || Number(tx.status) === 2;
-                            const trStyle = isDeleted ? 'text-decoration: line-through; opacity: 0.6;' : '';
+                            const trStyle = isDeleted ? 'text-decoration: line-through;' : '';
                             h += `<tr style="${trStyle}">`;
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(formatDate(tx.time)) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + getTypeLabel(Number(tx.type)) + '</td>';
