@@ -5517,14 +5517,18 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         };
 
                         arr.forEach(tx => {
-                            h += '<tr>';
+                            const isDeleted = (tx.delete_user_id && Number(tx.delete_user_id) > 0) || (tx.delete_time && Number(tx.delete_time) > 0) || Number(tx.status) === 2;
+                            const trStyle = isDeleted ? 'text-decoration: line-through; opacity: 0.6;' : '';
+                            h += `<tr style="${trStyle}">`;
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(formatDate(tx.time)) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + getTypeLabel(Number(tx.type)) + '</td>';
                             
                             // В API поле суммы называется tr_amount
                             const rawAmount = tx.tr_amount || tx.amount || 0;
                             h += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:6px; width:1%; font-weight:bold;">' + fmtVnd0(posterMinorToVnd(rawAmount)) + '</td>';
-                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:auto; white-space:normal;">' + escapeHtml(tx.comment || '') + '</td>';
+                            let cmt = tx.comment || '';
+                            if (isDeleted) cmt = '(Удалено) ' + cmt;
+                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:auto; white-space:normal;">' + escapeHtml(cmt) + '</td>';
                             h += '</tr>';
                         });
                         
