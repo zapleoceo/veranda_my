@@ -987,8 +987,8 @@ $firstOfMonth = date('Y-m-01');
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0055">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0055">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0100">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0100">
 </head>
 <body>
 <div class="container">
@@ -1043,13 +1043,9 @@ $firstOfMonth = date('Y-m-01');
             </div>
         </div>
         <div class="table-wrap" style="margin-top: 12px;">
-            <table id="empTable">
-                <caption style="caption-side: bottom; text-align: right; margin-top: 6px; width: 0; min-width: 100%; white-space: normal;">
-                    <div class="muted" id="tipsBalanceTotals" style="font-weight:900; white-space: normal; line-height: 1.4;">
-                        Tips (на счету BIDV): <span id="tipsAccBalance">—</span> &middot; TTP в таблице: <span id="tipsTableSum">—</span> &middot; Остаток: <span id="tipsBalanceDiff">—</span>
-                    </div>
-                </caption>
-                <thead>
+            <div style="display: inline-flex; flex-direction: column;">
+                <table id="empTable">
+                    <thead>
                 <tr>
                     <th id="thUid" class="col-id" data-sort="user_id" style="cursor:pointer;">ID</th>
                     <th id="thName" class="col-name" data-sort="name" style="cursor:pointer;">name</th>
@@ -1083,6 +1079,10 @@ $firstOfMonth = date('Y-m-01');
                 </tr>
                 </tfoot>
             </table>
+            <div class="muted" id="tipsBalanceTotals" style="align-self: flex-end; width: 0; min-width: 100%; text-align: right; margin-top: 6px; font-weight: 900; line-height: 1.4; white-space: normal; word-break: break-word;">
+                Tips (на счету BIDV): <span id="tipsAccBalance">—</span> &middot; TTP в таблице: <span id="tipsTableSum">—</span> &middot; Остаток: <span id="tipsBalanceDiff">—</span>
+            </div>
+        </div>
         </div>
     </div>
 </div>
