@@ -1381,7 +1381,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
         )->fetchAll();
 
         $sepay = $db->query(
-            "SELECT s.sepay_id, s.transaction_date, s.transfer_amount
+            "SELECT s.sepay_id, s.transaction_date, ABS(s.transfer_amount) AS transfer_amount
              FROM {$st} s
              WHERE s.transaction_date BETWEEN ? AND ?
                AND s.transfer_type = 'in'
@@ -2395,7 +2395,7 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
 }
 
 $sepayRows = $db->query(
-    "SELECT s.sepay_id, s.transaction_date, s.transfer_amount, s.payment_method, s.content, s.reference_code
+    "SELECT s.sepay_id, s.transaction_date, ABS(s.transfer_amount) AS transfer_amount, s.payment_method, s.content, s.reference_code
      FROM {$st} s
      WHERE s.transaction_date BETWEEN ? AND ?
        AND s.transfer_type = 'in'
@@ -2407,7 +2407,7 @@ $sepayRows = $db->query(
 )->fetchAll();
 
 $sepayHiddenRows = $db->query(
-    "SELECT s.sepay_id, s.transaction_date, s.transfer_amount, s.payment_method, s.content, s.reference_code,
+    "SELECT s.sepay_id, s.transaction_date, ABS(s.transfer_amount) AS transfer_amount, s.payment_method, s.content, s.reference_code,
             h.comment AS hidden_comment
      FROM {$st} s
      JOIN {$sh} h ON h.sepay_id = s.sepay_id
@@ -2439,7 +2439,7 @@ $posterBybitVnd = 0;
 $posterVietVnd = 0;
 try {
     $sepayTotalVnd = (int)$db->query(
-        "SELECT COALESCE(SUM(s.transfer_amount), 0)
+        "SELECT COALESCE(SUM(ABS(s.transfer_amount)), 0)
          FROM {$st} s
          WHERE s.transaction_date BETWEEN ? AND ?
            AND s.transfer_type = 'in'
