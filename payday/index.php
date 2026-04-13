@@ -5526,9 +5526,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                             // В API поле суммы называется tr_amount
                             const rawAmount = tx.tr_amount || tx.amount || 0;
                             h += '<td style="text-align:right; border-bottom:1px solid var(--border); padding:6px; width:1%; font-weight:bold;">' + fmtVnd0(posterMinorToVnd(rawAmount)) + '</td>';
-                            let cmt = tx.comment || '';
-                            if (isDeleted) cmt = '(Удалено) ' + cmt;
-                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:auto; white-space:normal;">' + escapeHtml(cmt) + '</td>';
+                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:auto; white-space:normal;">' + escapeHtml(tx.comment || '') + '</td>';
                             h += '</tr>';
                         });
                         
