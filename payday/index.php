@@ -4208,13 +4208,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                             }
                             if (j.ok) {
                                 updateBtnBusy(btn, { pct: 100, title: 'Готово. Обновление...' });
-                                setTimeout(() => location.reload(), 400);
+                                setTimeout(() => { window.location.href = window.location.href; }, 400);
                                 return;
                             }
                         } catch(e) {}
                     }
                 }
-                location.reload();
+                window.location.href = window.location.href;
             } catch (err) {
                 alert(err && err.message ? err.message : 'Ошибка');
                 restore();
@@ -5298,7 +5298,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             .then((r) => r.json())
             .then((j) => {
                 if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                location.reload();
+                window.location.href = window.location.href;
             })
             .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         });
