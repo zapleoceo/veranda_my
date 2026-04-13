@@ -987,8 +987,8 @@ $firstOfMonth = date('Y-m-01');
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0100">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0100">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0115">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0115">
 </head>
 <body>
 <div class="container">
@@ -1154,7 +1154,7 @@ $firstOfMonth = date('Y-m-01');
 <div class="modal-backdrop" id="helpModal">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
         <h3 id="helpTitle">Инструкция</h3>
-        <div class="body">
+        <div class="body help-body">
             <div style="margin-bottom: 10px;">
                 <b>ЗАГРУЗИТЬ</b> — загружает данные по сотрудникам за выбранный период и считает все суммы в таблице.
             </div>
@@ -1188,6 +1188,43 @@ $firstOfMonth = date('Y-m-01');
             </div>
             <div style="margin-bottom: 10px;">
                 <b>ИТОГО</b> — сумма по колонкам внизу таблицы.
+            </div>
+            <div style="margin: 14px 0 8px; font-weight: 900;">Колонки</div>
+            <div style="margin-bottom: 8px;">
+                <b>ID</b> — ID сотрудника в Poster.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>name</b> — имя сотрудника.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>Rate</b> — ставка.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>role_name</b> — должность (роль).
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>Чеков</b> — количество чеков за период.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>ЧасыРаботы</b> — часы работы за период.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>Tips</b> — сумма чаевых за период (по данным Poster).
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>TipsPaid</b> — сколько чаевых уже выплачено сотруднику за период (по финансовым транзакциям).
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>TipsToPay</b> — сколько осталось выплатить чаевых: Tips − TipsPaid (если меньше 0, то 0).
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>Salary</b> — зарплата по ставке: Rate × ЧасыРаботы.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>SlrPaid</b> — сколько зарплаты уже выплачено (по финансовым транзакциям).
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>SalaryToPay</b> — сколько осталось выплатить зарплаты: Salary − SlrPaid (если меньше 0, то 0).
             </div>
             <div>
                 <b>Tips (на счету…)</b> — сверка суммы Tips по счёту с “TTP в таблице” и расчёт остатка.
