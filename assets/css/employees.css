@@ -100,15 +100,17 @@
             width: 260px;
             max-height: 340px;
             overflow: auto;
-            background: rgba(255,255,255,0.98);
-            border: 1px solid rgba(0,0,0,0.10);
+            background: var(--card);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
             border-radius: 12px;
-            box-shadow: 0 18px 45px rgba(0,0,0,0.18);
+            box-shadow: 0 18px 45px rgba(0,0,0,0.5);
             padding: 10px;
             z-index: 2200;
         }
         .cols-item { display:flex; align-items:center; gap: 10px; padding: 6px 8px; border-radius: 10px; cursor: pointer; user-select: none; }
-        .cols-item:hover { background: rgba(26,115,232,0.06); }
+        .cols-item:hover { background: var(--card2); }
         .cols-item input { width: 16px; height: 16px; }
         .cols-item span { font-weight: 900; font-size: 12px; color: var(--text); }
         #empTable.hide-col-id .col-id, #empStickyHead.hide-col-id .col-id { display: none; }
