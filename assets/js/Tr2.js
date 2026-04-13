@@ -50,6 +50,11 @@
     if (typeof renderSelectedTable === 'function') renderSelectedTable();
     if (typeof updatePreorderUi === 'function') updatePreorderUi();
     if (typeof renderPreorderBox === 'function') renderPreorderBox();
+
+    const fountainEl = document.getElementById('fountainEl');
+    if (fountainEl) {
+        fountainEl.title = t('fountain_tooltip') || '';
+    }
   };
   (() => {
     const langEl = document.querySelector('.lang');

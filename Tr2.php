@@ -145,6 +145,7 @@ $I18N = [
     'tg_link_hover' => 'Привязать Telegram',
     'qr_payment_title' => 'Оплата предзаказа',
     'qr_payment_body' => 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.',
+    'fountain_tooltip' => 'а тут у нас рыбки',
   ],
   'en' => [
     'page_title' => 'Booking Map',
@@ -250,6 +251,7 @@ $I18N = [
     'tg_link_hover' => 'Link Telegram',
     'qr_payment_title' => 'Pre-order Payment',
     'qr_payment_body' => 'Please scan the QR code to pay for your pre-order. The reservation number is already included in the payment description.',
+    'fountain_tooltip' => 'and here we have fishes',
   ],
   'vi' => [
     'page_title' => 'Sơ đồ đặt bàn',
@@ -355,6 +357,7 @@ $I18N = [
     'tg_link_hover' => 'Liên kết Telegram',
     'qr_payment_title' => 'Thanh toán đặt trước',
     'qr_payment_body' => 'Vui lòng quét mã QR để thanh toán đặt trước. Số đặt bàn của bạn đã được bao gồm trong mô tả thanh toán.',
+    'fountain_tooltip' => 'và đây chúng tôi có cá',
   ],
   'ko' => [
     'booking_request' => '테이블 예약 요청',
@@ -1622,8 +1625,8 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0240">
-  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260412_0240">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0245">
+  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260412_0245">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1682,7 +1685,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   
             <button class="table wide" style="left: 422px; top: 420px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
             <button class="table wide" style="left: 300px; top: 420px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
-            <div class="fountain" style="left: 532px; top: 316px;" aria-hidden="true">
+            <div class="fountain" style="left: 532px; top: 316px;" aria-hidden="true" id="fountainEl">
               <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
                   <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
@@ -1905,6 +1908,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       soonBookingHours: <?= json_encode($soonBookingHours, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260412_0240" defer></script>
+  <script src="/assets/js/Tr2.js?v=20260412_0245" defer></script>
 </body>
 </html>
