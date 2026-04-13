@@ -113,13 +113,19 @@
             .container { padding: 5px; }
             .card { padding: 5px; margin-bottom: 5px; }
             .filters { align-items: stretch; gap: 5px; padding-right: 34px; }
-            .filters label { width: 100%; }
+            .filters label { width: calc(50% - 2.5px); }
+            .filters > div { width: 100%; }
             .filters input[type="date"],
             .filters #loadBtn,
-            .filters #payExtraBtn { width: 100%; }
+            .filters #payExtraBtn { width: calc(50% - 2.5px); }
             .filters #loadBtn,
             .filters #payExtraBtn { padding: 8px 10px; font-size: 14px; }
-            .progress { margin-left: 5px; }
+            #loadBtn { order: 1; }
+            #payExtraBtn { order: 2; }
+            #loader { order: 3; flex: 1 1 100%; }
+            #cancelBtn { order: 4; flex: 1 1 100%; }
+            #prog { order: 5; flex: 1 1 100%; margin-left: 0; }
+            .progress { margin-left: 0; }
             .modal-backdrop { padding: 5px; }
         }
         .emp-toast {
