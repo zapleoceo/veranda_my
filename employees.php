@@ -1008,7 +1008,7 @@ $firstOfMonth = date('Y-m-01');
                 Дата конца
                 <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>">
             </label>
-            <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
+            <div style="display:flex; gap: 5px; align-items:center; flex-wrap: wrap;">
                 <button type="button" id="loadBtn">ЗАГРУЗИТЬ</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
                 <button type="button" class="secondary" id="cancelBtn" style="display:none;">Отменить</button>
@@ -1022,8 +1022,8 @@ $firstOfMonth = date('Y-m-01');
             <button type="button" class="help-btn" id="helpBtn" title="Инструкция">?</button>
         </div>
         <div class="error" id="err" style="display:none;"></div>
-        <div class="muted" id="ltpRangeNote" style="margin-top: 6px; font-size: 12px; font-weight: 800;"></div>
-        <div style="display:flex; gap: 14px; align-items:center; flex-wrap: wrap; margin-top: 10px;">
+        <div class="muted" id="ltpRangeNote" style="margin-top: 5px; font-size: 12px; font-weight: 800;"></div>
+        <div style="display:flex; gap: 5px; align-items:center; flex-wrap: wrap; margin-top: 5px;">
             <div class="cols-dd">
                 <button type="button" class="secondary" id="colsBtn">
                     <svg class="cols-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1042,12 +1042,12 @@ $firstOfMonth = date('Y-m-01');
                 </button>
                 <div class="cols-menu" id="rolesMenu" hidden></div>
             </div>
-            <label class="muted" style="display:flex; align-items:center; gap: 8px; margin: 0;">
+            <label class="muted" style="display:flex; align-items:center; gap: 5px; margin: 0;">
                 <input type="checkbox" id="hideZero">
                 Пустые
             </label>
         </div>
-        <div class="table-wrap" style="margin-top: 12px;">
+        <div class="table-wrap" style="margin-top: 5px;">
             <div style="display: inline-flex; flex-direction: column;">
                 <table id="empTable">
                     <thead>
@@ -1084,7 +1084,7 @@ $firstOfMonth = date('Y-m-01');
                 </tr>
                 </tfoot>
             </table>
-            <div class="muted" id="tipsBalanceTotals" style="align-self: flex-end; width: 0; min-width: 100%; text-align: right; margin-top: 6px; font-weight: 900; line-height: 1.4; white-space: normal; word-break: break-word;">
+            <div class="muted" id="tipsBalanceTotals" style="align-self: flex-end; width: 0; min-width: 100%; text-align: right; margin-top: 5px; font-weight: 900; line-height: 1.4; white-space: normal; word-break: break-word;">
                 Tips (на счету BIDV): <span id="tipsAccBalance">—</span> &middot; TTP в таблице: <span id="tipsTableSum">—</span> &middot; Остаток: <span id="tipsBalanceDiff">—</span>
             </div>
         </div>
@@ -1123,7 +1123,7 @@ $firstOfMonth = date('Y-m-01');
             </label>
         </div>
         <div class="sub">
-            <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
+            <label style="display:flex; align-items:center; gap: 5px; margin: 0;">
                 <input type="checkbox" id="payExtraChecked">
                 да проверил
             </label>
@@ -1144,7 +1144,7 @@ $firstOfMonth = date('Y-m-01');
         <h3 id="paidTitle">Подтверждение</h3>
         <div class="body" id="paidText"></div>
         <div class="sub">
-            <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
+            <label style="display:flex; align-items:center; gap: 5px; margin: 0;">
                 <input type="checkbox" id="paidChecked">
                 да проверил
             </label>
