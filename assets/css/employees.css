@@ -1,4 +1,4 @@
-.filters { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; position: relative; padding-right: 34px; }
+.filters { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; position: relative; padding-right: 28px; }
         .filters label { font-size: 12px; color: var(--muted); display:flex; flex-direction: column; gap: 6px; }
         .filters input[type="date"] { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card); }
         .filters button { padding: 10px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fffaf4; font-weight: 800; cursor: pointer; }
@@ -112,10 +112,10 @@
         @media (max-width: 560px) {
             .container { padding: 5px; }
             .card { padding: 5px; margin-bottom: 5px; }
-            .filters { align-items: stretch; gap: 5px; padding-right: 34px; }
+            .filters { align-items: stretch; gap: 5px; padding-right: 28px; }
             .filters label { width: calc(50% - 2.5px); }
             .filters > div { width: 100%; }
-            .filters input[type="date"],
+            .filters input[type="date"] { width: 100%; }
             .filters #loadBtn,
             .filters #payExtraBtn { width: calc(50% - 2.5px); }
             .filters #loadBtn,
