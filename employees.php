@@ -987,8 +987,8 @@ $firstOfMonth = date('Y-m-01');
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0130">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0130">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0140">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0140">
 </head>
 <body>
 <div class="container">
@@ -1184,6 +1184,9 @@ $firstOfMonth = date('Y-m-01');
             </div>
             <div style="margin-bottom: 10px;">
                 <b>TipsPaid / SlrPaid</b> — список прошлых выплат: слева дата/время, справа тип выплаты/сумма выплаты.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>Учет выплат</b> — для расчёта TipsPaid/SlrPaid выплаты берутся по смещённому периоду (например: 2026-04-09 — 2026-04-15). Смещение сделано, чтобы не захватывать выплаты прошлой недели и полностью захватить выплаты текущей недели.
             </div>
             <div style="margin-bottom: 10px;">
                 <b>PayExtra</b> — ручная выплата (Tips/Salary) с выбором сотрудника, счета и комментарием.
