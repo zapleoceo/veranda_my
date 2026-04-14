@@ -18,6 +18,13 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         exit;
     }
     try {
+        $api = new \App\Classes\PosterAPI((string)$token);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'API init error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
         $amountCents = 0;
         if ($kind === 'vietnam') {
             $amountCents = (int)$db->query(
@@ -80,8 +87,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $txs = [];
         try {
             $txs = $api->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
             
                 'timezone' => 'client',
             ]);
@@ -260,22 +267,39 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         exit;
     }
     try {
+        $api = new \App\Classes\PosterAPI((string)$token);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'API init error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
         $startTs = strtotime($dFrom . ' 00:00:00');
         $endTs = strtotime($dTo . ' 23:59:59');
         if ($startTs === false || $endTs === false) {
             throw new \Exception('Bad date');
         }
 
-        $rows = [];
+                $rows = [];
         try {
             $rows = $api->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
-            
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
                 'timezone' => 'client',
             ]);
         } catch (\Throwable $e) {
             $rows = [];
+        }
+        if (!is_array($rows) || count($rows) === 0) {
+            try {
+                $rows = $api->request('finance.getTransactions', [
+                    'dateFrom' => date('dmY', $startTs),
+                    'dateTo' => date('dmY', $endTs),
+                    'timezone' => 'client',
+                ]);
+            } catch (\Throwable $e) {
+                $rows = [];
+            }
         }
         if (!is_array($rows)) $rows = [];
 
