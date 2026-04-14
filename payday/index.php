@@ -963,6 +963,12 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             return mb_strtolower($t, 'UTF-8');
         };
 
+        $employeesMapFinance = [];
+        try {
+            $employeesMapFinance = $getEmployeesById($api);
+        } catch (\Throwable $e) {
+        }
+
         $found = null;
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
@@ -1031,10 +1037,14 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
             $uId = (int)($uRaw ?? 0);
             $userName = '';
-            $uObj = $row['user'] ?? $row['employee'] ?? null;
-            if (is_array($uObj)) {
-                $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
-                $userName = trim($userName);
+            if ($uId > 0 && isset($employeesMapFinance[$uId])) {
+                $userName = $employeesMapFinance[$uId];
+            } else {
+                $uObj = $row['user'] ?? $row['employee'] ?? null;
+                if (is_array($uObj)) {
+                    $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
+                    $userName = trim($userName);
+                }
             }
             if ($userName === '' && $uId > 0) $userName = '#' . $uId;
 
@@ -1080,7 +1090,7 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             'date' => date('d.m.Y', strtotime($targetDate) ?: time()),
             'time' => '23:55:00',
             'sum' => (int)$amountVnd,
-            'user' => '#' . (string)$expectedUserId,
+            'user' => isset($employeesMapFinance[$expectedUserId]) ? $employeesMapFinance[$expectedUserId] : ('#' . (string)$expectedUserId),
             'comment' => $comment,
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
@@ -2705,6 +2715,13 @@ try {
             $t = trim($s);
             return mb_strtolower($t, 'UTF-8');
         };
+
+        $employeesMapFinance = [];
+        try {
+            $employeesMapFinance = $getEmployeesById($apiFinance);
+        } catch (\Throwable $e) {
+        }
+
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
             $tRaw = (string)($r['type'] ?? '');
@@ -2746,10 +2763,14 @@ try {
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
             $uId = (int)($uRaw ?? 0);
             $userName = '';
-            $uObj = $r['user'] ?? $r['employee'] ?? null;
-            if (is_array($uObj)) {
-                $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
-                $userName = trim($userName);
+            if ($uId > 0 && isset($employeesMapFinance[$uId])) {
+                $userName = $employeesMapFinance[$uId];
+            } else {
+                $uObj = $r['user'] ?? $r['employee'] ?? null;
+                if (is_array($uObj)) {
+                    $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
+                    $userName = trim($userName);
+                }
             }
             if ($userName === '' && $uId > 0) $userName = '#' . $uId;
 
@@ -5352,7 +5373,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
         let html = '<div style="overflow-x:auto; max-width:100%;">';
         html += '<table class="table" style="margin-top:5px; font-size:12px; width:100%;">';
-        html += '<thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th></tr></thead><tbody>';
+        html += '<thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead><tbody>';
         match.forEach((x) => {
             const ts = Number(x.ts || 0);
             const d = ts ? new Date(ts * 1000) : null;
@@ -5363,11 +5384,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const sumSigned = isOut ? -Number(x.sum || 0) : Number(x.sum || 0);
             const comment = String(x.comment || '').trim();
             const user = String(x.user || '').trim();
-            const commentText = user ? `${comment} (${user})` : comment;
             html += '<tr>';
             html += `<td style="padding:2px 4px; white-space:nowrap;">${escapeHtml(dateStr)}<br><span class="muted">${escapeHtml(timeStr)}</span></td>`;
             html += `<td class="sum" style="padding:2px 4px; white-space:nowrap;">${escapeHtml(fmtSum(sumSigned))}</td>`;
-            html += `<td style="padding:2px 4px; line-height:1.2;">${escapeHtml(commentText)}</td>`;
+            html += `<td style="padding:2px 4px; white-space:nowrap;">${escapeHtml(user)}</td>`;
+            html += `<td style="padding:2px 4px; line-height:1.2;">${escapeHtml(comment)}</td>`;
             html += '</tr>';
         });
         html += '</tbody></table></div>';
