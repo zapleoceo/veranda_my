@@ -5424,7 +5424,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const pad = (n) => String(n).padStart(2, '0');
         const fmtSum = (v) => Math.round(Number(v || 0)).toLocaleString('en-US').replace(/,/g, '\u202F');
 
-        const match = rows.filter((x) => Math.abs(Number(x.sum || 0)) === expectedSum);
+        console.log('renderFinanceTable rows:', rows, 'expectedSum:', expectedSum);
+        // Compare with a tiny tolerance to account for floating point issues, or just convert to Int
+        const match = rows.filter((x) => {
+            const rowSum = Math.abs(Number(x.sum || 0));
+            const expSum = Math.abs(Number(expectedSum));
+            return Math.abs(rowSum - expSum) < 1; 
+        });
         if (!match.length) {
             statusEl.innerHTML = '<span style="color:var(--muted);">Транзакция не найдена</span>';
             return;
