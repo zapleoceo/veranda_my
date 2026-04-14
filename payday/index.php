@@ -174,7 +174,6 @@ $pt = $db->t('poster_transactions');
 $pa = $db->t('poster_accounts');
 $pl = $db->t('check_payment_links');
 $sh = $db->t('sepay_hidden');
-$pfh = $db->t('poster_finance_hidden');
 $mh = $db->t('mail_hidden');
 $ol = $db->t('out_links');
 
@@ -199,25 +198,6 @@ try {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (sepay_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
-    );
-} catch (\Throwable $e) {
-}
-try {
-    $db->query(
-        "CREATE TABLE IF NOT EXISTS {$pfh} (
-            id BIGINT NOT NULL AUTO_INCREMENT,
-            date_to DATE NOT NULL,
-            kind VARCHAR(32) NOT NULL,
-            transfer_id BIGINT NULL,
-            tx_id BIGINT NULL,
-            comment TEXT NULL,
-            created_by VARCHAR(255) NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_date_kind (date_to, kind),
-            KEY idx_transfer (transfer_id),
-            KEY idx_tx (tx_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     );
 } catch (\Throwable $e) {
@@ -1198,168 +1178,6 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         });
 
         echo json_encode(['ok' => true, 'rows' => $out], JSON_UNESCAPED_UNICODE);
-    } catch (\Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-    }
-    exit;
-}
-
-if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
-    header('Content-Type: application/json; charset=utf-8');
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
-        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    $raw = file_get_contents('php://input');
-    $payload = json_decode((string)$raw, true);
-    if (!is_array($payload)) $payload = [];
-    $kind = (string)($payload['kind'] ?? '');
-    $transferId = (int)($payload['transfer_id'] ?? 0);
-    $txId = (int)($payload['tx_id'] ?? 0);
-    $dTo = trim((string)($payload['dateTo'] ?? ''));
-    if (!in_array($kind, ['vietnam', 'tips'], true) || ($transferId <= 0 && $txId <= 0) || $dTo === '') {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    $startTs = strtotime($dTo . ' 00:00:00');
-    $endTs = strtotime($dTo . ' 23:59:59');
-    if ($startTs === false || $endTs === false) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Bad date'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    $comment = trim((string)($payload['comment'] ?? ''));
-    if (mb_strlen($comment, 'UTF-8') > 2000) $comment = mb_substr($comment, 0, 2000, 'UTF-8');
-    $by = '';
-    if (!isset($_SESSION)) {
-        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
-    }
-    $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
-    try {
-        $rows = [];
-        try {
-            $rows = $api->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
-            
-                'timezone' => $apiTzName,]);
-        } catch (\Throwable $e) {
-            $rows = [];
-        }
-        if (!is_array($rows)) $rows = [];
-
-        $isMatchKind = function (array $r, string $kind): bool {
-            if (((int)($r['status'] ?? 0)) === 3) return false;
-            $tRaw = (string)($r['type'] ?? '');
-            $type = (int)$tRaw;
-            $isTransfer = ($tRaw === '2');
-            $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
-            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-            
-            if ($isTransfer || $isIn || $isOut) {
-                if ($isTransfer || $isIn) {
-                    $accId = (int)($r['account_id'] ?? 0);
-                } else {
-                    $accId = (int)($r['recipient_id'] ?? $r['account_to'] ?? $r['account_to_id'] ?? 0);
-                }
-                $expectedTo = ($kind === 'vietnam') ? 9 : (($kind === 'tips') ? 8 : 0);
-                if ($accId === $expectedTo) {
-                    $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
-                    $cmt = mb_strtolower(trim($cmt), 'UTF-8');
-                    if ($kind === 'vietnam' && mb_stripos($cmt, 'вьетна', 0, 'UTF-8') !== false) return true;
-                    if ($kind === 'tips' && (mb_stripos($cmt, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmt, 'tips', 0, 'UTF-8') !== false)) return true;
-                }
-            }
-            return false;
-        };
-
-        $found = false;
-        foreach ($rows as $r) {
-            if (!is_array($r)) continue;
-            $tid = (int)($r['transaction_id'] ?? 0);
-            if ($txId > 0 && $tid !== $txId) continue;
-            if ($transferId > 0 && $txId <= 0) {
-                $bt = (int)($r['binding_type'] ?? 0);
-                $bid = (int)($r['binding_id'] ?? 0);
-                $rt = (int)($r['recipient_type'] ?? 0);
-                $rid = (int)($r['recipient_id'] ?? 0);
-                $match = false;
-                if ($bt === 1 && $bid === $transferId) $match = true;
-                if (!$match && $rt === 1 && $rid === $transferId) $match = true;
-                if (!$match) continue;
-            }
-            if (!$isMatchKind($r, $kind)) continue;
-            $found = true;
-            break;
-        }
-        if (!$found) {
-            http_response_code(404);
-            echo json_encode(['ok' => false, 'error' => 'Транзакция не найдена для выбранного дня'], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-
-        // Сначала удаляем транзакцию из Poster API
-        if ($txId > 0) {
-            try {
-                $api->request('finance.removeTransaction', [
-                    'transaction_id' => $txId
-                ], 'POST');
-            } catch (\Throwable $e) {
-                // Игнорируем ошибку удаления из API (возможно она уже удалена)
-            }
-        } elseif ($transferId > 0) {
-            try {
-                $api->request('finance.removeTransaction', [
-                    'transaction_id' => $transferId
-                ], 'POST');
-            } catch (\Throwable $e) {
-            }
-        }
-
-        $db->query(
-            "INSERT INTO {$pfh} (date_to, kind, transfer_id, tx_id, comment, created_by)
-             VALUES (?, ?, ?, ?, ?, ?)",
-            [$dTo, $kind, $transferId > 0 ? $transferId : null, $txId > 0 ? $txId : null, $comment !== '' ? $comment : null, $by !== '' ? $by : null]
-        );
-
-        $hiddenTx = [];
-        $hiddenTransfer = [];
-        try {
-            $hRows = $db->query(
-                "SELECT transfer_id, tx_id
-                 FROM {$pfh}
-                 WHERE date_to = ? AND kind = ?",
-                [$dTo, $kind]
-            )->fetchAll();
-            if (!is_array($hRows)) $hRows = [];
-            foreach ($hRows as $hr) {
-                $hidT = (int)($hr['transfer_id'] ?? 0);
-                $hidX = (int)($hr['tx_id'] ?? 0);
-                if ($hidT > 0) $hiddenTransfer[$hidT] = true;
-                if ($hidX > 0) $hiddenTx[$hidX] = true;
-            }
-        } catch (\Throwable $e) {
-        }
-
-        $remaining = 0;
-        foreach ($rows as $r) {
-            if (!is_array($r)) continue;
-            if (!$isMatchKind($r, $kind)) continue;
-            $tid = (int)($r['transaction_id'] ?? 0);
-            if ($tid > 0 && !empty($hiddenTx[$tid])) continue;
-            $bt = (int)($r['binding_type'] ?? 0);
-            $bid = (int)($r['binding_id'] ?? 0);
-            $rt = (int)($r['recipient_type'] ?? 0);
-            $rid = (int)($r['recipient_id'] ?? 0);
-            if ($bt === 1 && $bid > 0 && !empty($hiddenTransfer[$bid])) continue;
-            if ($rt === 1 && $rid > 0 && !empty($hiddenTransfer[$rid])) continue;
-            $remaining++;
-        }
-
-        echo json_encode(['ok' => true, 'remaining' => $remaining], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -2826,25 +2644,6 @@ $transferVietnamExists = false;
 $transferTipsExists = false;
 $transferVietnamFoundList = [];
 $transferTipsFoundList = [];
-$hiddenFinanceByKind = ['vietnam' => ['tx' => [], 'transfer' => []], 'tips' => ['tx' => [], 'transfer' => []]];
-try {
-    $hRows = $db->query(
-        "SELECT kind, transfer_id, tx_id
-         FROM {$pfh}
-         WHERE date_to = ?",
-        [$dateTo]
-    )->fetchAll();
-    if (!is_array($hRows)) $hRows = [];
-    foreach ($hRows as $r) {
-        $k = (string)($r['kind'] ?? '');
-        if (!isset($hiddenFinanceByKind[$k])) continue;
-        $tid = (int)($r['transfer_id'] ?? 0);
-        $xid = (int)($r['tx_id'] ?? 0);
-        if ($tid > 0) $hiddenFinanceByKind[$k]['transfer'][$tid] = true;
-        if ($xid > 0) $hiddenFinanceByKind[$k]['tx'][$xid] = true;
-    }
-} catch (\Throwable $e) {
-}
 try {
     $targetTs = strtotime($dateTo . ' 23:55:00');
     $startTs = strtotime($dateTo . ' 00:00:00');
@@ -2932,11 +2731,9 @@ try {
                 'type' => $tRaw,
             ];
             if ($isVietnam) {
-                if (!empty($hiddenFinanceByKind['vietnam']['transfer'][$transferId]) || !empty($hiddenFinanceByKind['vietnam']['tx'][$tid])) continue;
                 $transferVietnamFoundList[] = $rowOut;
             }
             if ($isTips) {
-                if (!empty($hiddenFinanceByKind['tips']['transfer'][$transferId]) || !empty($hiddenFinanceByKind['tips']['tx'][$tid])) continue;
                 $transferTipsFoundList[] = $rowOut;
             }
         }
@@ -3434,7 +3231,7 @@ $fmtVnd = function (int $v): string {
                         <?php if ($vietnamExists): ?>
                             <div style="overflow-x:auto; max-width:100%;">
                                 <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
-                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th><th style="padding:2px 0px; width:1%;"></th></tr></thead>
+                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
                                     <tbody>
                                     <?php foreach ($vietnamFound as $f): ?>
                                         <?php
@@ -3451,17 +3248,9 @@ $fmtVnd = function (int $v): string {
                                             $timeStr = date('H:i:s', $ts);
                                         ?>
                                         <tr>
-                                            <td>
-                                                <div><?= htmlspecialchars($dateStr) ?></div>
-                                                <div class="muted"><?= htmlspecialchars($timeStr) ?></div>
-                                            </td>
-                                            <td class="sum"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
-                                            <td>
-                                                <div style="display:flex; justify-content:space-between; gap: 8px; align-items:flex-start;">
-                                                    <div><?= htmlspecialchars($commentText) ?></div>
-                                                    <button type="button" class="finance-del btn tiny" style="padding:0 4px; flex:0 0 auto;" data-kind="vietnam" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button>
-                                                </div>
-                                            </td>
+                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
+                                            <td class="sum" style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
+                                            <td style="padding:2px 4px; line-height:1.2;"><?= htmlspecialchars($commentText) ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                     </tbody>
@@ -3499,7 +3288,7 @@ $fmtVnd = function (int $v): string {
                         <?php if ($tipsExists): ?>
                             <div style="overflow-x:auto; max-width:100%;">
                                 <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
-                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th><th style="padding:2px 0px; width:1%;"></th></tr></thead>
+                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
                                     <tbody>
                                     <?php foreach ($tipsFound as $f): ?>
                                         <?php
@@ -3516,17 +3305,9 @@ $fmtVnd = function (int $v): string {
                                             $timeStr = date('H:i:s', $ts);
                                         ?>
                                         <tr>
-                                            <td>
-                                                <div><?= htmlspecialchars($dateStr) ?></div>
-                                                <div class="muted"><?= htmlspecialchars($timeStr) ?></div>
-                                            </td>
-                                            <td class="sum"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
-                                            <td>
-                                                <div style="display:flex; justify-content:space-between; gap: 8px; align-items:flex-start;">
-                                                    <div><?= htmlspecialchars($commentText) ?></div>
-                                                    <button type="button" class="finance-del btn tiny" style="padding:0 4px; flex:0 0 auto;" data-kind="tips" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button>
-                                                </div>
-                                            </td>
+                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
+                                            <td class="sum" style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
+                                            <td style="padding:2px 4px; line-height:1.2;"><?= htmlspecialchars($commentText) ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                     </tbody>
@@ -5523,40 +5304,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             });
         });
     });
-    const bindFinanceDeleteBtn = (btn) => {
-        if (!btn) return;
-        if (btn.dataset.bound === '1') return;
-        btn.dataset.bound = '1';
-        btn.addEventListener('click', () => {
-            const transferId = Number(btn.getAttribute('data-transfer-id') || 0);
-            const txId = Number(btn.getAttribute('data-tx-id') || 0);
-            const dateTo = String(btn.getAttribute('data-date-to') || '');
-            const kind = String(btn.getAttribute('data-kind') || '');
-            if ((!transferId && !txId) || !dateTo || !kind) return;
-            const comment = prompt('Комментарий (почему скрываем):', '');
-            if (comment === null) return;
-            const c = String(comment || '').trim();
-            fetch('?ajax=delete_finance_transfer', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ kind, transfer_id: transferId, tx_id: txId, dateTo, comment: c }),
-            })
-            .then((r) => r.json())
-            .then((j) => {
-                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                window.location.href = window.location.href;
-            })
-            .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
-        });
-    };
-    const bindFinanceDeleteBtns = (root) => {
-        (root || document).querySelectorAll('button.finance-del').forEach(bindFinanceDeleteBtn);
-    };
-    bindFinanceDeleteBtns(document);
-
     const renderFinanceTable = (form, rows) => {
-        const kind = String(form.getAttribute('data-kind') || '');
-        const dateTo = String(form.getAttribute('data-date-to') || '');
         const expectedSum = Number(form.getAttribute('data-sum-vnd') || 0);
         const statusEl = form.querySelector('.finance-status');
         if (!statusEl) return;
@@ -5572,7 +5320,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
         let html = '<div style="overflow-x:auto; max-width:100%;">';
         html += '<table class="table" style="margin-top:5px; font-size:12px; width:100%;">';
-        html += '<thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th><th style="padding:2px 0px; width:1%;"></th></tr></thead><tbody>';
+        html += '<thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th></tr></thead><tbody>';
         match.forEach((x) => {
             const ts = Number(x.ts || 0);
             const d = ts ? new Date(ts * 1000) : null;
@@ -5584,18 +5332,14 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const comment = String(x.comment || '').trim();
             const user = String(x.user || '').trim();
             const commentText = user ? `${comment} (${user})` : comment;
-            const transferId = Number(x.transfer_id || 0);
-            const txId = Number(x.transaction_id || 0);
-            const delBtn = `<button type="button" class="finance-del btn tiny" style="padding:0 4px; flex:0 0 auto;" data-kind="${escapeHtml(kind)}" data-transfer-id="${transferId}" data-tx-id="${txId}" data-date-to="${escapeHtml(dateTo)}" title="Скрыть транзакцию">✕</button>`;
             html += '<tr>';
-            html += `<td><div>${escapeHtml(dateStr)}</div><div class="muted">${escapeHtml(timeStr)}</div></td>`;
-            html += `<td class="sum">${escapeHtml(fmtSum(sumSigned))}</td>`;
-            html += `<td><div style="display:flex; justify-content:space-between; gap: 8px; align-items:flex-start;"><div>${escapeHtml(commentText)}</div>${delBtn}</div></td>`;
+            html += `<td style="padding:2px 4px; white-space:nowrap;">${escapeHtml(dateStr)}<br><span class="muted">${escapeHtml(timeStr)}</span></td>`;
+            html += `<td class="sum" style="padding:2px 4px; white-space:nowrap;">${escapeHtml(fmtSum(sumSigned))}</td>`;
+            html += `<td style="padding:2px 4px; line-height:1.2;">${escapeHtml(commentText)}</td>`;
             html += '</tr>';
         });
         html += '</tbody></table></div>';
         statusEl.innerHTML = html;
-        bindFinanceDeleteBtns(statusEl);
     };
 
     window.refreshFinanceForm = (form, opts) => {
