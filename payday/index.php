@@ -1184,6 +1184,7 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
                 'sum' => (int)$sum,
                 'comment' => $cmt,
                 'user' => $userName,
+                'type' => $tRaw,
             ];
         }
 
@@ -2841,18 +2842,25 @@ try {
         };
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
-            $type = (int)($r['type'] ?? 0);
-            if ($type !== 1) continue;
+            $tRaw = (string)($r['type'] ?? '');
+            $isTransfer = ($tRaw === '2');
+            $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
+            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
+            if (!$isTransfer && !$isIn && !$isOut) continue;
 
             $dStr = (string)($r['date'] ?? '');
             $ts = $dStr !== '' ? strtotime($dStr) : false;
             if ($ts === false || $ts < $startTs || $ts > $endTs) continue;
 
-            $accId = (int)($r['account_id'] ?? 0);
+            if ($isTransfer || $isIn) {
+                $accId = (int)($r['account_id'] ?? 0);
+            } else {
+                $accId = (int)($r['recipient_id'] ?? $r['account_to'] ?? $r['account_to_id'] ?? 0);
+            }
             if ($accId !== 8 && $accId !== 9) continue;
 
             $amountMinor = (int)($r['amount'] ?? 0);
-            if ($amountMinor <= 0) continue;
+            if (abs($amountMinor) <= 0) continue;
 
             $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
             $cmtNorm = $normText($cmt);
@@ -2887,6 +2895,7 @@ try {
                 'sum_minor' => abs($amountMinor),
                 'comment' => $cmt,
                 'user' => $userName,
+                'type' => $tRaw,
             ];
             if ($isVietnam) {
                 if (!empty($hiddenFinanceByKind['vietnam']['transfer'][$transferId]) || !empty($hiddenFinanceByKind['vietnam']['tx'][$tid])) continue;
@@ -3323,7 +3332,10 @@ $fmtVnd = function (int $v): string {
 
         <div class="bottom-two">
         <div class="card card-finance">
-            <div style="font-weight: 900; margin-bottom: 10px;">Финансовые транзакции</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                <div style="font-weight: 900;">Финансовые транзакции</div>
+                <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить">🔄</button>
+            </div>
 
             <?php
             $vietnamCents = $financeVietnamCents;
@@ -3360,10 +3372,11 @@ $fmtVnd = function (int $v): string {
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                     <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать перевод</button>
-                    <button class="btn tiny finance-refresh" type="button" title="Обновить">🔄</button>
-                    <div class="muted finance-status">
+                                        <div class="muted finance-status">
                         <?php if ($transferVietnamExists): ?>
-                            <span style="color:#81c784; font-weight:900;">Найдены транзакции за день:</span>
+                            <table class="table" style="margin-top:5px; font-size:12px;">
+                                <thead><tr><th>Дата</th><th>Время</th><th>Сумма совпадает</th><th>Тип</th><th>Комментарий</th><th></th></tr></thead>
+                                <tbody>
                             <?php foreach ($transferVietnamFoundList as $f): ?>
                                 <?php
                                     $ts = (int)($f['ts'] ?? 0);
@@ -3372,12 +3385,29 @@ $fmtVnd = function (int $v): string {
                                     $u = trim((string)($f['user'] ?? ''));
                                     $bid = (int)($f['binding_id'] ?? 0);
                                     $sumVnd = $posterCentsToVnd($sumMinor);
-                                    $line = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVnd($sumVnd);
-                                    if ($u !== '') $line .= ' - ' . $u;
-                                    if ($cmt !== '') $line .= ' - ' . $cmt;
+                                    
+                                    $sumMatch = ($sumVnd === (int)($vietnamVnd ?? 0));
+                                    $sumIcon = $sumMatch ? '<span style="color:#81c784; font-weight:900;">✓</span>' : '<span style="color:#e57373; font-weight:900;">✕</span>';
+                                    
+                                    $tRaw = (string)($f['type'] ?? '');
+                                    $typeText = ($tRaw === '2') ? 'Перевод' : (($tRaw === '0' || strtolower($tRaw) === 'o' || strtolower($tRaw) === 'out') ? 'Расход' : (($tRaw === '1' || strtolower($tRaw) === 'i' || strtolower($tRaw) === 'in') ? 'Приход' : $tRaw));
+                                    
+                                    $commentText = $u !== '' ? "$cmt ($u)" : $cmt;
+                                    $dateStr = date('d.m.Y', $ts);
+                                    $timeStr = date('H:i:s', $ts);
+                                    $sumText = $sumIcon . ' ' . $fmtVnd($sumVnd);
                                 ?>
-                                <div><button type="button" class="finance-del" data-kind="vietnam" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
+                                <tr>
+                                    <td><?= htmlspecialchars($dateStr) ?></td>
+                                    <td><?= htmlspecialchars($timeStr) ?></td>
+                                    <td><?= $sumText ?></td>
+                                    <td><?= htmlspecialchars($typeText) ?></td>
+                                    <td><?= htmlspecialchars($commentText) ?></td>
+                                    <td style="text-align:right;"><button type="button" class="finance-del btn tiny" style="padding:0 4px;" data-kind="vietnam" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button></td>
+                                </tr>
                             <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         <?php elseif ($vietnamDisabled): ?>
                             <?= htmlspecialchars($vietnamDisabledReason) ?>
                         <?php endif; ?>
@@ -3405,10 +3435,11 @@ $fmtVnd = function (int $v): string {
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                     <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать перевод</button>
-                    <button class="btn tiny finance-refresh" type="button" title="Обновить">🔄</button>
-                    <div class="muted finance-status">
+                                        <div class="muted finance-status">
                         <?php if ($transferTipsExists): ?>
-                            <span style="color:#81c784; font-weight:900;">Найдены транзакции за день:</span>
+                            <table class="table" style="margin-top:5px; font-size:12px;">
+                                <thead><tr><th>Дата</th><th>Время</th><th>Сумма совпадает</th><th>Тип</th><th>Комментарий</th><th></th></tr></thead>
+                                <tbody>
                             <?php foreach ($transferTipsFoundList as $f): ?>
                                 <?php
                                     $ts = (int)($f['ts'] ?? 0);
@@ -3417,12 +3448,29 @@ $fmtVnd = function (int $v): string {
                                     $u = trim((string)($f['user'] ?? ''));
                                     $bid = (int)($f['binding_id'] ?? 0);
                                     $sumVnd = $posterCentsToVnd($sumMinor);
-                                    $line = date('d.m.Y', $ts) . ' - ' . date('H:i:s', $ts) . ' - ' . $fmtVnd($sumVnd);
-                                    if ($u !== '') $line .= ' - ' . $u;
-                                    if ($cmt !== '') $line .= ' - ' . $cmt;
+                                    
+                                    $sumMatch = ($sumVnd === (int)($tipsVnd ?? 0));
+                                    $sumIcon = $sumMatch ? '<span style="color:#81c784; font-weight:900;">✓</span>' : '<span style="color:#e57373; font-weight:900;">✕</span>';
+                                    
+                                    $tRaw = (string)($f['type'] ?? '');
+                                    $typeText = ($tRaw === '2') ? 'Перевод' : (($tRaw === '0' || strtolower($tRaw) === 'o' || strtolower($tRaw) === 'out') ? 'Расход' : (($tRaw === '1' || strtolower($tRaw) === 'i' || strtolower($tRaw) === 'in') ? 'Приход' : $tRaw));
+                                    
+                                    $commentText = $u !== '' ? "$cmt ($u)" : $cmt;
+                                    $dateStr = date('d.m.Y', $ts);
+                                    $timeStr = date('H:i:s', $ts);
+                                    $sumText = $sumIcon . ' ' . $fmtVnd($sumVnd);
                                 ?>
-                                <div><button type="button" class="finance-del" data-kind="tips" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
+                                <tr>
+                                    <td><?= htmlspecialchars($dateStr) ?></td>
+                                    <td><?= htmlspecialchars($timeStr) ?></td>
+                                    <td><?= $sumText ?></td>
+                                    <td><?= htmlspecialchars($typeText) ?></td>
+                                    <td><?= htmlspecialchars($commentText) ?></td>
+                                    <td style="text-align:right;"><button type="button" class="finance-del btn tiny" style="padding:0 4px;" data-kind="tips" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button></td>
+                                </tr>
                             <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         <?php elseif ($tipsDisabled): ?>
                             <?= htmlspecialchars($tipsDisabledReason) ?>
                         <?php endif; ?>
