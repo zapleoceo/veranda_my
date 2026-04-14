@@ -1219,7 +1219,8 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
             if ($kind === 'vietnam' && !$isVietnam) continue;
             if ($kind === 'tips' && !$isTips) continue;
             $sumRaw = $row['amount'] ?? $row['amount_to'] ?? $row['amount_from'] ?? $row['sum'] ?? 0;
-            $sum = abs($normMoney($sumRaw));
+            $sumMinor = abs($normMoney($sumRaw));
+            $sum = (int)$posterCentsToVnd($sumMinor);
 
             $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
