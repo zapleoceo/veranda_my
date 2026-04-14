@@ -167,6 +167,22 @@ $getEmployeesById = function (\App\Classes\PosterAPI $api): array {
     return $out;
 };
 
+$getAccountsById = function (\App\Classes\PosterAPI $api): array {
+    $out = [];
+    try {
+        $accounts = $api->request('finance.getAccounts');
+        if (!is_array($accounts)) return [];
+        foreach ($accounts as $a) {
+            $id = (int)($a['account_id'] ?? $a['accountId'] ?? 0);
+            $name = trim((string)($a['name'] ?? $a['account_name'] ?? ''));
+            if ($id > 0 && $name !== '') $out[$id] = $name;
+        }
+    } catch (\Throwable $e) {
+        return [];
+    }
+    return $out;
+};
+
 $st = $db->t('sepay_transactions');
 $pc = $db->t('poster_checks');
 $ppm = $db->t('poster_payment_methods');
@@ -966,6 +982,12 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $employeesMapFinance = [];
         try {
             $employeesMapFinance = $getEmployeesById($api);
+        } catch (\Throwable $e) {
+        }
+        
+        $accountsMapFinance = [];
+        try {
+            $accountsMapFinance = $getAccountsById($api);
         } catch (\Throwable $e) {
         }
 
