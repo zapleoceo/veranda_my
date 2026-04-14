@@ -770,7 +770,7 @@ try {
 
         $targetDate = $dateTo . ' 23:55:00';
         $targetTs = strtotime($targetDate);
-        $startTs = strtotime($dateTo . ' 00:00:00');
+        $startTs = strtotime($dateFrom . ' 00:00:00');
         $endTs = strtotime($dateTo . ' 23:59:59');
 
         $accountTo = $kind === 'vietnam' ? 9 : 8;
@@ -790,8 +790,8 @@ try {
         if (!is_array($txs) || count($txs) === 0) {
             try {
                 $txs = $api->request('finance.getTransactions', [
-                    'dateFrom' => date('dmY', $startTs !== false ? $startTs : time()),
-                    'dateTo' => date('dmY', $endTs !== false ? $endTs : time()),
+                    'dateFrom' => date('Ymd', $startTs !== false ? $startTs : time()),
+                    'dateTo' => date('Ymd', $endTs !== false ? $endTs : time()),
                 ]);
             } catch (\Throwable $e) {
                 $txs = [];
@@ -930,7 +930,7 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         }
 
         $targetDate = $dTo . ' 23:55:00';
-        $startTs = strtotime($dTo . ' 00:00:00');
+        $startTs = strtotime($dFrom . ' 00:00:00');
         $endTs = strtotime($dTo . ' 23:59:59');
         $windowStartTs = strtotime($dTo . ' 22:00:00');
         if ($startTs === false || $endTs === false || $windowStartTs === false) {
@@ -948,8 +948,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $txs = [];
         try {
             $txs = $api->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
             ]);
         } catch (\Throwable $e) {
             $txs = [];
@@ -1132,12 +1132,13 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
     $transferId = (int)($payload['transfer_id'] ?? 0);
     $txId = (int)($payload['tx_id'] ?? 0);
     $dTo = trim((string)($payload['dateTo'] ?? ''));
+    $dFrom = trim((string)($payload['dateFrom'] ?? $dTo));
     if (!in_array($kind, ['vietnam', 'tips'], true) || ($transferId <= 0 && $txId <= 0) || $dTo === '') {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    $startTs = strtotime($dTo . ' 00:00:00');
+    $startTs = strtotime($dFrom . ' 00:00:00');
     $endTs = strtotime($dTo . ' 23:59:59');
     if ($startTs === false || $endTs === false) {
         http_response_code(400);
@@ -1155,8 +1156,8 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
         $rows = [];
         try {
             $rows = $api->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
             ]);
         } catch (\Throwable $e) {
             $rows = [];
@@ -2748,15 +2749,15 @@ try {
 }
 try {
     $targetTs = strtotime($dateTo . ' 23:55:00');
-    $startTs = strtotime($dateTo . ' 00:00:00');
+    $startTs = strtotime($dateFrom . ' 00:00:00');
     $endTs = strtotime($dateTo . ' 23:59:59');
     if ($targetTs !== false && $startTs !== false && $endTs !== false) {
         $apiFinance = new \App\Classes\PosterAPI((string)$token);
         $rows = [];
         try {
             $rows = $apiFinance->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
             ]);
         } catch (\Throwable $e) {
             $rows = [];
@@ -3318,7 +3319,7 @@ $fmtVnd = function (int $v): string {
                                     if ($u !== '') $line .= ' - ' . $u;
                                     if ($cmt !== '') $line .= ' - ' . $cmt;
                                 ?>
-                                <div><button type="button" class="finance-del" data-kind="vietnam" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
+                                <div><button type="button" class="finance-del" data-kind="vietnam" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-from="<?= htmlspecialchars($dateFrom) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
                             <?php endforeach; ?>
                         <?php elseif ($vietnamDisabled): ?>
                             <?= htmlspecialchars($vietnamDisabledReason) ?>
@@ -3362,7 +3363,7 @@ $fmtVnd = function (int $v): string {
                                     if ($u !== '') $line .= ' - ' . $u;
                                     if ($cmt !== '') $line .= ' - ' . $cmt;
                                 ?>
-                                <div><button type="button" class="finance-del" data-kind="tips" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
+                                <div><button type="button" class="finance-del" data-kind="tips" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-from="<?= htmlspecialchars($dateFrom) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button><?= htmlspecialchars($line) ?></div>
                             <?php endforeach; ?>
                         <?php elseif ($tipsDisabled): ?>
                             <?= htmlspecialchars($tipsDisabledReason) ?>
@@ -5779,6 +5780,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const txId = Number(btn.getAttribute('data-tx-id') || 0);
             const dateTo = String(btn.getAttribute('data-date-to') || '');
             const kind = String(btn.getAttribute('data-kind') || '');
+            const dateFrom = String(btn.getAttribute('data-date-from') || dateTo);
             if ((!transferId && !txId) || !dateTo || !kind) return;
             const comment = prompt('Комментарий (почему скрываем):', '');
             if (comment === null) return;
@@ -5786,7 +5788,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             fetch('?ajax=delete_finance_transfer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ kind, transfer_id: transferId, tx_id: txId, dateTo, comment: c }),
+                body: JSON.stringify({ kind, transfer_id: transferId, tx_id: txId, dateFrom, dateTo, comment: c }),
             })
             .then((r) => r.json())
             .then((j) => {
