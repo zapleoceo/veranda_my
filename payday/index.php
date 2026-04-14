@@ -5399,7 +5399,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const pad = (n) => String(n).padStart(2, '0');
         const fmtSum = (v) => Math.round(Number(v || 0)).toLocaleString('en-US').replace(/,/g, '\u202F');
 
-        const match = rows.filter((x) => Number(x.sum || 0) === expectedSum);
+        const match = rows.filter((x) => Math.abs(Number(x.sum || 0)) === expectedSum);
         if (!match.length) {
             statusEl.innerHTML = '<span style="color:var(--muted);">Транзакция не найдена</span>';
             return;
