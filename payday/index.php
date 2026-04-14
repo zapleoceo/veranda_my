@@ -802,9 +802,15 @@ try {
         $expectedUserId = 4;
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
-            $type = (int)($row['type'] ?? 0);
-            if ($type !== 2) continue;
-            $toRaw = $row['account_to_id'] ?? $row['account_to'] ?? $row['accountToId'] ?? $row['accountTo'] ?? 0;
+            $tRaw = (string)($row['type'] ?? '');
+            $isTransfer = ($tRaw === '2');
+            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
+            if (!$isTransfer && !$isOut) continue;
+            if ($isTransfer) {
+                $toRaw = $row['account_to_id'] ?? $row['account_to'] ?? $row['accountToId'] ?? $row['accountTo'] ?? 0;
+            } else {
+                $toRaw = $row['recipient_id'] ?? $row['account_to_id'] ?? $row['account_to'] ?? 0;
+            }
             if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
             $toId = (int)$toRaw;
             if ($toId !== $accountTo) continue;
@@ -970,8 +976,11 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $found = null;
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
-            $type = (int)($row['type'] ?? 0);
-            if ($type !== 0 && $type !== 1) continue;
+            $tRaw = (string)($row['type'] ?? '');
+            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
+            $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
+            if (!$isOut && !$isIn) continue;
+            $type = $isOut ? 0 : 1;
 
             $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
             $ts = null;
@@ -989,6 +998,10 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             $accRaw = $row['account_id'] ?? $row['accountId'] ?? $row['account_from_id'] ?? $row['account_from'] ?? $row['accountFromId'] ?? $row['accountFrom'] ?? 0;
             if (is_array($accRaw)) $accRaw = $accRaw['account_id'] ?? $accRaw['id'] ?? 0;
             $accId = (int)$accRaw;
+            
+            $toRaw = $row['recipient_id'] ?? $row['account_to_id'] ?? $row['account_to'] ?? 0;
+            if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+            $toId = (int)$toRaw;
 
             $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
             $sumMaybe = $normMoney($sumRaw);
@@ -998,7 +1011,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             if ($normText($cmt !== '' ? $cmt : $comment) !== $normText($comment)) continue;
 
             $isMatch = false;
-            if ($type === 0 && $sumMaybe < 0 && $accId === 1) $isMatch = true;
+            // Support both sumMaybe < 0 and sumMaybe > 0 for type 0, because sometimes API returns absolute value
+            if ($type === 0 && $accId === 1 && $toId === $accountTo) $isMatch = true;
             if ($type === 1 && $sumMaybe > 0 && $accId === $accountTo) $isMatch = true;
             if (!$isMatch) continue;
 
@@ -1095,8 +1109,8 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         $rows = [];
         try {
             $rows = $api->request('finance.getTransactions', [
-                'dateFrom' => date('Ymd', $startTs),
-                'dateTo' => date('Ymd', $endTs),
+                'dateFrom' => date('dmY', $startTs),
+                'dateTo' => date('dmY', $endTs),
             ]);
         } catch (\Throwable $e) {
             $rows = [];
@@ -1115,8 +1129,10 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         foreach ($rows as $row) {
             if (!is_array($row)) continue;
             if (((int)($row['status'] ?? 0)) === 3) continue;
-            $type = (int)($row['type'] ?? -1);
-            if ($type !== 2) continue;
+            $tRaw = (string)($row['type'] ?? '');
+            $isTransfer = ($tRaw === '2');
+            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
+            if (!$isTransfer && !$isOut) continue;
 
             $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
             $ts = null;
@@ -1135,7 +1151,11 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
             if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
             $accFromId = (int)$accFromRaw;
 
-            $accToRaw = $row['account_to'] ?? $row['account_to_id'] ?? 0;
+            if ($isTransfer) {
+                $accToRaw = $row['account_to'] ?? $row['account_to_id'] ?? 0;
+            } else {
+                $accToRaw = $row['recipient_id'] ?? $row['account_to'] ?? $row['account_to_id'] ?? 0;
+            }
             if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
             $accToId = (int)$accToRaw;
 
