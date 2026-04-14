@@ -1,4 +1,34 @@
 <?php
+/**
+ * ==============================================================================
+ * 🛑 STOP! READ THIS BEFORE MODIFYING THIS FILE OR DIRECTORY 🛑
+ * ==============================================================================
+ *
+ * This directory (`payday2/`) strictly follows the principles of
+ * Separation of Concerns (SoC) and the MVC (Model-View-Controller) pattern.
+ *
+ * It was explicitly refactored from a monolithic "God Object" script.
+ * DO NOT write "spaghetti code" here!
+ *
+ * 📜 GUIDELINES:
+ * 1. `index.php` (THIS FILE): Is the FRONT CONTROLLER. Its only job is to handle
+ *    routing, initialization, and dispatching. DO NOT put business logic, HTML,
+ *    or raw SQL queries here.
+ * 2. `functions.php` / `src/Services`: Contains business logic, database queries,
+ *    and shared helper functions (The "Model" / Service layer).
+ * 3. `ajax.php`: Handles API endpoints returning JSON. Keep it lean; move heavy
+ *    logic to reusable functions or services.
+ * 4. `post.php`: Handles form submissions. It should process data and redirect.
+ * 5. `view.php`: The presentation layer (The "View"). NO SQL QUERIES allowed here.
+ *    Only use basic loops and variable outputs.
+ * 6. JavaScript: Must go to `assets/js/payday2.js`. Pass variables from PHP
+ *    using the `window.PAYDAY_CONFIG` object. DO NOT write inline `<script>`.
+ * 7. CSS: Must go to `assets/css/payday2.css`. DO NOT use inline `style="..."`.
+ *
+ * Please keep this ecosystem clean and maintainable.
+ * ==============================================================================
+ */
+
 require_once __DIR__ . '/../auth_check.php';
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
 
