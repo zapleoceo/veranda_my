@@ -456,6 +456,7 @@ $fmtVnd = function (int $v): string {
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
   <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260414_0100">
+  <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=1776176619">
 </head>
 <body>
 <div class="container">
