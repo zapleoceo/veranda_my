@@ -141,6 +141,7 @@ $getAccountsById = function (\App\Classes\PosterAPI $api): array {
     return $out;
 };
 
+global $db;
 $st = $db->t('sepay_transactions');
 $pc = $db->t('poster_checks');
 $ppm = $db->t('poster_payment_methods');
