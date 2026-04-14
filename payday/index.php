@@ -971,8 +971,12 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $found = null;
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
-            $type = (int)($row['type'] ?? 0);
-            if ($type !== 0 && $type !== 1) continue;
+            
+            // Пропускаем удаленные
+            if (((int)($row['status'] ?? 0)) === 3) continue;
+
+            $type = (int)($row['type'] ?? -1);
+            if ($type !== 2) continue; // Ищем только переводы
 
             $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
             $ts = null;
@@ -987,21 +991,22 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             if ($ts === null) continue;
             if ($ts < $startTs || $ts > $endTs) continue;
 
-            $accRaw = $row['account_id'] ?? $row['accountId'] ?? $row['account_from_id'] ?? $row['account_from'] ?? $row['accountFromId'] ?? $row['accountFrom'] ?? 0;
-            if (is_array($accRaw)) $accRaw = $accRaw['account_id'] ?? $accRaw['id'] ?? 0;
-            $accId = (int)$accRaw;
+            $accFromRaw = $row['account_from'] ?? $row['account_from_id'] ?? $row['account_id'] ?? 0;
+            if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
+            $accFromId = (int)$accFromRaw;
 
-            $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
-            $sumMaybe = $normMoney($sumRaw);
-            if (abs($sumMaybe) !== $amountVnd) continue;
+            $accToRaw = $row['account_to'] ?? $row['account_to_id'] ?? 0;
+            if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
+            $accToId = (int)$accToRaw;
+
+            // Тот же самый счет списания и зачисления
+            if ($accFromId !== 1 || $accToId !== $accountTo) continue;
 
             $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
-            if ($normText($cmt !== '' ? $cmt : $comment) !== $normText($comment)) continue;
+            if (mb_stripos($cmt, '[УДАЛЕНО', 0, 'UTF-8') !== false) continue;
 
-            $isMatch = false;
-            if ($type === 0 && $sumMaybe < 0 && $accId === 1) $isMatch = true;
-            if ($type === 1 && $sumMaybe > 0 && $accId === $accountTo) $isMatch = true;
-            if (!$isMatch) continue;
+            $sumRaw = $row['amount'] ?? $row['amount_to'] ?? $row['amount_from'] ?? $row['sum'] ?? 0;
+            $sumMaybe = $normMoney($sumRaw);
 
             $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
@@ -1014,11 +1019,15 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             }
             if ($userName === '' && $uId > 0) $userName = '#' . $uId;
 
+            $txId = (int)($row['transaction_id'] ?? $row['id'] ?? 0);
+
             $found = [
+                'tx_id' => $txId,
                 'ts' => $ts,
                 'sum' => abs($sumMaybe),
                 'comment' => $cmt !== '' ? $cmt : $comment,
                 'user' => $userName,
+                'original' => $row
             ];
             break;
         }
@@ -1027,11 +1036,13 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             echo json_encode([
                 'ok' => true,
                 'already' => true,
+                'tx_id' => $found['tx_id'],
                 'date' => date('d.m.Y', (int)$found['ts']),
                 'time' => date('H:i:s', (int)$found['ts']),
                 'sum' => (int)$found['sum'],
                 'user' => (string)($found['user'] ?? ''),
                 'comment' => (string)$found['comment'],
+                'original' => $found['original']
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -1059,6 +1070,47 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             'user' => '#' . (string)$expectedUserId,
             'comment' => $comment,
         ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'delete_duplicate_transfer') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $api = new \App\Classes\PosterAPI((string)$token);
+        
+        $req = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($req)) throw new \Exception('Invalid request');
+        
+        $original = $req['original'] ?? [];
+        $txId = (int)($original['transaction_id'] ?? $original['id'] ?? 0);
+        if ($txId <= 0) throw new \Exception('Invalid transaction ID');
+        
+        $reason = trim((string)($req['reason'] ?? ''));
+        $userEmail = $_SESSION['user_email'] ?? 'Unknown User';
+        
+        $oldComment = (string)($original['comment'] ?? '');
+        $newComment = "[УДАЛЕНО $userEmail: $reason] " . $oldComment;
+        
+        $updatePayload = [
+            'transaction_id' => $txId,
+            'type'           => (int)($original['type'] ?? 2),
+            'category'       => (int)($original['category_id'] ?? $original['category'] ?? 0),
+            'user_id'        => (int)($original['user_id'] ?? 0),
+            'amount_from'    => $original['amount_from'] ?? $original['amount'] ?? 0,
+            'amount_to'      => $original['amount_to'] ?? $original['amount'] ?? 0,
+            'account_from'   => (int)($original['account_from'] ?? $original['account_id'] ?? 1),
+            'account_to'     => (int)($original['account_to'] ?? $original['account_to_id'] ?? 0),
+            'date'           => date('Ymd', strtotime($original['date'] ?? 'today')),
+            'comment'        => mb_substr($newComment, 0, 250) // truncate if too long
+        ];
+        
+        $res = $api->request('finance.updateTransactions', $updatePayload, 'POST');
+        
+        echo json_encode(['ok' => true, 'response' => $res], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -1112,52 +1164,76 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
         if (!is_array($rows)) $rows = [];
 
         $isMatchKind = function (array $r, string $kind): bool {
-            $type = (int)($r['type'] ?? 0);
-            if ($type !== 1) return false;
-            $accId = (int)($r['account_id'] ?? 0);
-            $amount = (int)($r['amount'] ?? 0);
+            $type = (int)($r['type'] ?? -1);
+            if ($type !== 2) return false;
+            
+            $accToRaw = $r['account_to'] ?? $r['account_to_id'] ?? 0;
+            if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
+            $accId = (int)$accToRaw;
+
+            $amount = (int)($r['amount'] ?? $r['amount_to'] ?? 0);
             if ($amount <= 0) return false;
-            $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
-            $cmt = mb_strtolower(trim($cmt), 'UTF-8');
+            
             if ($kind === 'vietnam') {
-                return $accId === 9 && mb_stripos($cmt, 'вьетна', 0, 'UTF-8') !== false;
+                return $accId === 9;
             }
             if ($kind === 'tips') {
-                return $accId === 8 && (mb_stripos($cmt, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmt, 'tips', 0, 'UTF-8') !== false);
+                return $accId === 8;
             }
             return false;
         };
 
-        $found = false;
+        $foundRow = null;
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
-            $tid = (int)($r['transaction_id'] ?? 0);
+            if (((int)($r['status'] ?? 0)) === 3) continue;
+
+            $tid = (int)($r['transaction_id'] ?? $r['id'] ?? 0);
             if ($txId > 0 && $tid !== $txId) continue;
-            if ($transferId > 0 && $txId <= 0) {
-                $bt = (int)($r['binding_type'] ?? 0);
-                $bid = (int)($r['binding_id'] ?? 0);
-                $rt = (int)($r['recipient_type'] ?? 0);
-                $rid = (int)($r['recipient_id'] ?? 0);
-                $match = false;
-                if ($bt === 1 && $bid === $transferId) $match = true;
-                if (!$match && $rt === 1 && $rid === $transferId) $match = true;
-                if (!$match) continue;
-            }
+            
             if (!$isMatchKind($r, $kind)) continue;
-            $found = true;
+            $foundRow = $r;
             break;
         }
-        if (!$found) {
+        
+        if (!$foundRow) {
             http_response_code(404);
             echo json_encode(['ok' => false, 'error' => 'Транзакция не найдена для выбранного дня'], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
+        // 1. Помечаем в локальной базе как скрытую (если нужно)
         $db->query(
             "INSERT INTO {$pfh} (date_to, kind, transfer_id, tx_id, comment, created_by)
              VALUES (?, ?, ?, ?, ?, ?)",
             [$dTo, $kind, $transferId > 0 ? $transferId : null, $txId > 0 ? $txId : null, $comment !== '' ? $comment : null, $by !== '' ? $by : null]
         );
+
+        // 2. Реально "удаляем" (изменяем комментарий) в Poster
+        $reason = trim((string)($payload['comment'] ?? ''));
+        $userEmail = $_SESSION['user_email'] ?? 'Unknown User';
+        
+        $oldComment = (string)($foundRow['comment'] ?? '');
+        $newComment = "[УДАЛЕНО $userEmail: $reason] " . $oldComment;
+        
+        $updatePayload = [
+            'transaction_id' => (int)($foundRow['transaction_id'] ?? $foundRow['id'] ?? 0),
+            'type'           => (int)($foundRow['type'] ?? 2),
+            'category'       => (int)($foundRow['category_id'] ?? $foundRow['category'] ?? 0),
+            'user_id'        => (int)($foundRow['user_id'] ?? 0),
+            'amount_from'    => $foundRow['amount_from'] ?? $foundRow['amount'] ?? 0,
+            'amount_to'      => $foundRow['amount_to'] ?? $foundRow['amount'] ?? 0,
+            'account_from'   => (int)($foundRow['account_from'] ?? $foundRow['account_id'] ?? 1),
+            'account_to'     => (int)($foundRow['account_to'] ?? $foundRow['account_to_id'] ?? 0),
+            'date'           => date('Ymd', strtotime($foundRow['date'] ?? 'today')),
+            'comment'        => mb_substr($newComment, 0, 250)
+        ];
+        
+        try {
+            $api->request('finance.updateTransactions', $updatePayload, 'POST');
+        } catch (\Throwable $e) {
+            // Игнорируем ошибку постера, если он вдруг ругнется, но локально мы уже пометили как скрытую
+        }
 
         $hiddenTx = [];
         $hiddenTransfer = [];
@@ -2700,33 +2776,40 @@ try {
         };
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
-            $type = (int)($r['type'] ?? 0);
-            if ($type !== 1) continue;
+
+            // Пропускаем удаленные
+            if (((int)($r['status'] ?? 0)) === 3) continue;
+
+            $type = (int)($r['type'] ?? -1);
+            if ($type !== 2) continue; // Ищем переводы
 
             $dStr = (string)($r['date'] ?? '');
             $ts = $dStr !== '' ? strtotime($dStr) : false;
             if ($ts === false || $ts < $startTs || $ts > $endTs) continue;
 
-            $accId = (int)($r['account_id'] ?? 0);
-            if ($accId !== 8 && $accId !== 9) continue;
+            $accFromRaw = $r['account_from'] ?? $r['account_from_id'] ?? $r['account_id'] ?? 0;
+            if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
+            $accFromId = (int)$accFromRaw;
 
-            $amountMinor = (int)($r['amount'] ?? 0);
-            if ($amountMinor <= 0) continue;
+            $accToRaw = $r['account_to'] ?? $r['account_to_id'] ?? 0;
+            if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
+            $accToId = (int)$accToRaw;
+
+            if ($accFromId !== 1) continue;
+            if ($accToId !== 8 && $accToId !== 9) continue;
 
             $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
-            $cmtNorm = $normText($cmt);
-            $isVietnam = $accId === 9 && mb_stripos($cmtNorm, 'вьетна', 0, 'UTF-8') !== false;
-            $isTips = $accId === 8 && (mb_stripos($cmtNorm, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmtNorm, 'tips', 0, 'UTF-8') !== false);
+            if (mb_stripos($cmt, '[УДАЛЕНО', 0, 'UTF-8') !== false) continue;
+
+            $amountMinor = (int)($r['amount_to'] ?? $r['amount'] ?? 0);
+            if ($amountMinor <= 0) continue;
+
+            $isVietnam = $accToId === 9;
+            $isTips = $accToId === 8;
             if (!$isVietnam && !$isTips) continue;
 
-            $tid = (int)($r['transaction_id'] ?? 0);
-            $bt = (int)($r['binding_type'] ?? 0);
-            $bid = (int)($r['binding_id'] ?? 0);
-            $rt = (int)($r['recipient_type'] ?? 0);
-            $rid = (int)($r['recipient_id'] ?? 0);
-            $transferId = 0;
-            if ($rt === 1 && $rid > 0) $transferId = $rid;
-            elseif ($bt === 1 && $bid > 0) $transferId = $bid;
+            $tid = (int)($r['transaction_id'] ?? $r['id'] ?? 0);
+            $transferId = $tid;
 
             $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
@@ -5561,6 +5644,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const btn = form.querySelector('button.btn');
             const statusEl = form.querySelector('.finance-status');
             if (btn && btn.disabled) return;
+            if (btn) btn.disabled = true;
             const kind = String(form.getAttribute('data-kind') || '');
             const dateFrom = String(form.getAttribute('data-date-from') || '');
             const dateTo = String(form.getAttribute('data-date-to') || '');
@@ -5615,7 +5699,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             });
 
             openConfirm().then((confirmed) => {
-                if (!confirmed) return;
+                if (!confirmed) {
+                    if (btn) btn.disabled = false;
+                    return;
+                }
                 if (btn) {
                     btn.classList.add('loading');
                     btn.disabled = true;
@@ -5633,7 +5720,42 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     const line = `${j.date || ''} - ${j.time || ''} - ${Number(j.sum || 0).toLocaleString('en-US')} ₫${whoPart} - ${j.comment || ''}`.trim();
                     if (statusEl) {
                         const label = j.already ? 'Найдена транзакция:' : 'Транзакция создана:';
-                        statusEl.innerHTML = `<span style="color:#81c784; font-weight:900;">${label}</span> <span>${line}</span>`;
+                        let crossBtnHtml = '';
+                        if (j.already && j.tx_id) {
+                            crossBtnHtml = `<button type="button" class="btn2 js-del-dup" style="margin-left:8px; padding:2px 6px; color:#f87171; border-color:#f87171;" data-tx-id="${j.tx_id}">✕</button>`;
+                        }
+                        statusEl.innerHTML = `<span style="color:#81c784; font-weight:900;">${label}</span> <span>${line}</span>${crossBtnHtml}`;
+                        
+                        if (j.already && j.tx_id) {
+                            const crossBtn = statusEl.querySelector('.js-del-dup');
+                            if (crossBtn) {
+                                crossBtn.addEventListener('click', () => {
+                                    const reason = prompt('Причина удаления (будет добавлена в комментарий):');
+                                    if (reason === null) return;
+                                    crossBtn.disabled = true;
+                                    crossBtn.innerHTML = '...';
+                                    fetch('?ajax=delete_duplicate_transfer', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            original: j.original,
+                                            reason: reason
+                                        })
+                                    })
+                                    .then(r => r.json())
+                                    .then(res => {
+                                        if (!res || !res.ok) throw new Error(res.error || 'Ошибка удаления');
+                                        statusEl.innerHTML = '<span style="color:#f87171;">Транзакция помечена как удаленная в Poster</span>';
+                                        if (btn) btn.disabled = false;
+                                    })
+                                    .catch(err => {
+                                        alert(err.message || 'Ошибка');
+                                        crossBtn.disabled = false;
+                                        crossBtn.innerHTML = '✕';
+                                    });
+                                });
+                            }
+                        }
                     }
                     if (btn) {
                         btn.classList.remove('loading');
