@@ -765,7 +765,8 @@ try {
                 'dateFrom' => str_replace('-', '', $dateTo),
                 'dateTo' => str_replace('-', '', $dateTo),
             
-                'timezone' => $apiTzName,]);
+                'timezone' => 'client',
+            ]);
         } catch (\Throwable $e) {
             $txs = [];
         }
@@ -775,7 +776,8 @@ try {
                     'dateFrom' => date('dmY', $startTs !== false ? $startTs : time()),
                     'dateTo' => date('dmY', $endTs !== false ? $endTs : time()),
                 
-                'timezone' => $apiTzName,]);
+                'timezone' => 'client',
+            ]);
             } catch (\Throwable $e) {
                 $txs = [];
             }
@@ -788,8 +790,9 @@ try {
             if (!is_array($row)) continue;
             $tRaw = (string)($row['type'] ?? '');
             $isTransfer = ($tRaw === '2');
+            $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
             $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-            if (!$isTransfer && !$isOut) continue;
+            if (!$isTransfer && !$isIn && !$isOut) continue;
             if ($isTransfer) {
                 $toRaw = $row['account_to_id'] ?? $row['account_to'] ?? $row['accountToId'] ?? $row['accountTo'] ?? 0;
             } else {
@@ -927,9 +930,10 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         }
 
         $accountTo = $kind === 'vietnam' ? 9 : 8;
-        $comment = $kind === 'vietnam'
+        $commentBase = $kind === 'vietnam'
             ? 'Перевод чеков вьетнаской компании'
             : 'Перевод типсов';
+        $comment = $commentBase;
         $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
         if ($by !== '') $comment .= ' by ' . $by;
         $expectedUserId = 4;
@@ -940,7 +944,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
                 'dateFrom' => date('dmY', $startTs),
                 'dateTo' => date('dmY', $endTs),
             
-                'timezone' => $apiTzName,]);
+                'timezone' => 'client',
+            ]);
         } catch (\Throwable $e) {
             $txs = [];
         }
@@ -962,10 +967,10 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
             $tRaw = (string)($row['type'] ?? '');
+            $isTransfer = ($tRaw === '2');
             $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
             $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
-            if (!$isOut && !$isIn) continue;
-            $type = $isOut ? 0 : 1;
+            if (!$isTransfer && !$isOut && !$isIn) continue;
 
             $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
             $ts = null;
@@ -980,24 +985,46 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             if ($ts === null) continue;
             if ($ts < $startTs || $ts > $endTs) continue;
 
-            $accRaw = $row['account_id'] ?? $row['accountId'] ?? $row['account_from_id'] ?? $row['account_from'] ?? $row['accountFromId'] ?? $row['accountFrom'] ?? 0;
-            if (is_array($accRaw)) $accRaw = $accRaw['account_id'] ?? $accRaw['id'] ?? 0;
-            $accId = (int)$accRaw;
-            
-            $toRaw = $row['recipient_id'] ?? $row['account_to_id'] ?? $row['account_to'] ?? 0;
-            if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
-            $toId = (int)$toRaw;
+            $accFromId = 0;
+            $accToId = 0;
+            if ($isTransfer) {
+                $fromRaw = $row['account_from'] ?? $row['account_from_id'] ?? $row['account_id'] ?? 0;
+                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+                $accFromId = (int)$fromRaw;
+
+                $toRaw = $row['account_to'] ?? $row['account_to_id'] ?? $row['recipient_id'] ?? 0;
+                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+                $accToId = (int)$toRaw;
+            } elseif ($isOut) {
+                $fromRaw = $row['account_id'] ?? $row['accountId'] ?? $row['account_from_id'] ?? $row['account_from'] ?? $row['accountFromId'] ?? $row['accountFrom'] ?? 0;
+                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+                $accFromId = (int)$fromRaw;
+
+                $toRaw = $row['recipient_id'] ?? $row['account_to_id'] ?? $row['account_to'] ?? 0;
+                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+                $accToId = (int)$toRaw;
+            } else {
+                $fromRaw = $row['account_from'] ?? $row['account_from_id'] ?? 0;
+                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+                $accFromId = (int)$fromRaw;
+
+                $toRaw = $row['account_id'] ?? $row['account_to_id'] ?? $row['account_to'] ?? 0;
+                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+                $accToId = (int)$toRaw;
+            }
 
             $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
             $sumMaybe = $normMoney($sumRaw);
             if (abs($sumMaybe) !== $amountVnd) continue;
 
             $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
-            if ($normText($cmt !== '' ? $cmt : $comment) !== $normText($comment)) continue;
+            $cmtNorm = $normText($cmt);
+            if ($cmtNorm === '' || mb_stripos($cmtNorm, $normText($commentBase), 0, 'UTF-8') === false) continue;
 
             $isMatch = false;
-            if ($type === 0 && $accId === 1 && $toId === $accountTo) $isMatch = true;
-            if ($type === 1 && $sumMaybe > 0 && $accId === $accountTo) $isMatch = true;
+            if ($isTransfer && $accFromId === 1 && $accToId === $accountTo) $isMatch = true;
+            if ($isOut && $accFromId === 1 && $accToId === $accountTo) $isMatch = true;
+            if ($isIn && $accToId === $accountTo) $isMatch = true;
             if (!$isMatch) continue;
 
             $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
@@ -1096,7 +1123,8 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
                 'dateFrom' => date('dmY', $startTs),
                 'dateTo' => date('dmY', $endTs),
             
-                'timezone' => $apiTzName,]);
+                'timezone' => 'client',
+            ]);
         } catch (\Throwable $e) {
             $rows = [];
         }
@@ -1132,14 +1160,16 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
             if ($ts === null) continue;
             if ($ts < $startTs || $ts > $endTs) continue;
 
-            $accFromRaw = $row['account_from'] ?? $row['account_from_id'] ?? $row['account_id'] ?? 0;
+            $accFromRaw = $isIn ? ($row['account_from'] ?? $row['account_from_id'] ?? 0) : ($row['account_from'] ?? $row['account_from_id'] ?? $row['account_id'] ?? 0);
             if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
             $accFromId = (int)$accFromRaw;
 
             if ($isTransfer) {
                 $accToRaw = $row['account_to'] ?? $row['account_to_id'] ?? 0;
-            } else {
+            } elseif ($isOut) {
                 $accToRaw = $row['recipient_id'] ?? $row['account_to'] ?? $row['account_to_id'] ?? 0;
+            } else {
+                $accToRaw = $row['account_id'] ?? $row['account_to'] ?? $row['account_to_id'] ?? 0;
             }
             if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
             $accToId = (int)$accToRaw;
@@ -2329,7 +2359,8 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
                 'dateFrom' => str_replace('-', '', date('Y-m-d')),
                 'dateTo' => str_replace('-', '', date('Y-m-d')),
             
-                'timezone' => $apiTzName,]);
+                'timezone' => 'client',
+            ]);
             if (is_array($rows)) {
                 foreach ($rows as $r) {
                     if (!is_array($r)) continue;
@@ -2656,7 +2687,8 @@ try {
                 'dateFrom' => date('dmY', $startTs),
                 'dateTo' => date('dmY', $endTs),
             
-                'timezone' => $apiTzName,]);
+                'timezone' => 'client',
+            ]);
         } catch (\Throwable $e) {
             $rows = [];
         }
