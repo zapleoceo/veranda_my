@@ -1011,7 +1011,6 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             if ($normText($cmt !== '' ? $cmt : $comment) !== $normText($comment)) continue;
 
             $isMatch = false;
-            // Support both sumMaybe < 0 and sumMaybe > 0 for type 0, because sometimes API returns absolute value
             if ($type === 0 && $accId === 1 && $toId === $accountTo) $isMatch = true;
             if ($type === 1 && $sumMaybe > 0 && $accId === $accountTo) $isMatch = true;
             if (!$isMatch) continue;
@@ -3342,22 +3341,43 @@ $fmtVnd = function (int $v): string {
             $tipsCents = $financeTipsCents;
             $vietnamVnd = $vietnamCents !== null ? $posterCentsToVnd((int)$vietnamCents) : null;
             $tipsVnd = $tipsCents !== null ? $posterCentsToVnd((int)$tipsCents) : null;
-            $vietnamDisabled = $transferVietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
-            $tipsDisabled = $transferTipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             $vietnamDisabledReason = $vietnamCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за выбранный период.';
             $tipsDisabledReason = $tipsCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.';
+
+            $vietnamFound = [];
+            if ($vietnamVnd !== null) {
+                foreach ($transferVietnamFoundList as $f) {
+                    if (!is_array($f)) continue;
+                    $sumMinor = (int)($f['sum_minor'] ?? 0);
+                    $sumVnd = (int)$posterCentsToVnd($sumMinor);
+                    if ($sumVnd !== (int)$vietnamVnd) continue;
+                    $vietnamFound[] = $f;
+                }
+            }
+
+            $tipsFound = [];
+            if ($tipsVnd !== null) {
+                foreach ($transferTipsFoundList as $f) {
+                    if (!is_array($f)) continue;
+                    $sumMinor = (int)($f['sum_minor'] ?? 0);
+                    $sumVnd = (int)$posterCentsToVnd($sumMinor);
+                    if ($sumVnd !== (int)$tipsVnd) continue;
+                    $tipsFound[] = $f;
+                }
+            }
+
+            $vietnamExists = count($vietnamFound) > 0;
+            $tipsExists = count($tipsFound) > 0;
+            $vietnamDisabled = $vietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
+            $tipsDisabled = $tipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             ?>
 
             <div class="finance-row">
-                <div class="finance-left">
-                    <div style="font-weight:900;">Vietnam Company</div>
-                    <div class="muted"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
-                </div>
-                <form method="POST" class="finance-transfer"
+                <form method="POST" class="finance-transfer" style="width:100%;"
                       data-kind="vietnam"
                       data-date-from="<?= htmlspecialchars($dateFrom) ?>"
                       data-date-to="<?= htmlspecialchars($dateTo) ?>"
@@ -3365,62 +3385,64 @@ $fmtVnd = function (int $v): string {
                       data-account-to-id="9"
                       data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
                       data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[9]['name'] ?? '#9')) ?>"
-                      data-sum-vnd="<?= htmlspecialchars((string)($vietnamVnd !== null ? (int)$vietnamVnd : 0)) ?>"
-                      style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
+                      data-sum-vnd="<?= htmlspecialchars((string)($vietnamVnd !== null ? (int)$vietnamVnd : 0)) ?>">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="vietnam">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать перевод</button>
-                                        <div class="muted finance-status">
-                        <?php if ($transferVietnamExists): ?>
-                            <table class="table" style="margin-top:5px; font-size:12px;">
-                                <thead><tr><th>Дата</th><th>Время</th><th>Сумма совпадает</th><th>Тип</th><th>Комментарий</th><th></th></tr></thead>
-                                <tbody>
-                            <?php foreach ($transferVietnamFoundList as $f): ?>
-                                <?php
-                                    $ts = (int)($f['ts'] ?? 0);
-                                    $sumMinor = (int)($f['sum_minor'] ?? 0);
-                                    $cmt = trim((string)($f['comment'] ?? ''));
-                                    $u = trim((string)($f['user'] ?? ''));
-                                    $bid = (int)($f['binding_id'] ?? 0);
-                                    $sumVnd = $posterCentsToVnd($sumMinor);
-                                    
-                                    $sumMatch = ($sumVnd === (int)($vietnamVnd ?? 0));
-                                    $sumIcon = $sumMatch ? '<span style="color:#81c784; font-weight:900;">✓</span>' : '<span style="color:#e57373; font-weight:900;">✕</span>';
-                                    
-                                    $tRaw = (string)($f['type'] ?? '');
-                                    $typeText = ($tRaw === '2') ? 'Перевод' : (($tRaw === '0' || strtolower($tRaw) === 'o' || strtolower($tRaw) === 'out') ? 'Расход' : (($tRaw === '1' || strtolower($tRaw) === 'i' || strtolower($tRaw) === 'in') ? 'Приход' : $tRaw));
-                                    
-                                    $commentText = $u !== '' ? "$cmt ($u)" : $cmt;
-                                    $dateStr = date('d.m.Y', $ts);
-                                    $timeStr = date('H:i:s', $ts);
-                                    $sumText = $sumIcon . ' ' . $fmtVnd($sumVnd);
-                                ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($dateStr) ?></td>
-                                    <td><?= htmlspecialchars($timeStr) ?></td>
-                                    <td><?= $sumText ?></td>
-                                    <td><?= htmlspecialchars($typeText) ?></td>
-                                    <td><?= htmlspecialchars($commentText) ?></td>
-                                    <td style="text-align:right;"><button type="button" class="finance-del btn tiny" style="padding:0 4px;" data-kind="vietnam" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button></td>
-                                </tr>
-                            <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                    <div style="display:flex; align-items:center; gap: 10px;">
+                        <div style="font-weight:900; white-space:nowrap;">Vietnam Company</div>
+                        <div style="flex:1; text-align:center; font-weight:900;"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
+                        <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
+                    </div>
+                    <div class="muted finance-status" style="margin-top: 6px;">
+                        <?php if ($vietnamExists): ?>
+                            <div style="overflow-x:auto; max-width:100%;">
+                                <table class="table" style="margin-top:5px; font-size:12px; width:100%; min-width: 420px;">
+                                    <thead><tr><th>Дата</th><th>Сумма</th><th>Комментарий</th></tr></thead>
+                                    <tbody>
+                                    <?php foreach ($vietnamFound as $f): ?>
+                                        <?php
+                                            $ts = (int)($f['ts'] ?? 0);
+                                            $sumMinor = (int)($f['sum_minor'] ?? 0);
+                                            $sumVnd = (int)$posterCentsToVnd($sumMinor);
+                                            $tRaw = (string)($f['type'] ?? '');
+                                            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
+                                            $sumSignedVnd = $isOut ? -$sumVnd : $sumVnd;
+                                            $cmt = trim((string)($f['comment'] ?? ''));
+                                            $u = trim((string)($f['user'] ?? ''));
+                                            $commentText = $u !== '' ? "$cmt ($u)" : $cmt;
+                                            $dateStr = date('d.m.Y', $ts);
+                                            $timeStr = date('H:i:s', $ts);
+                                        ?>
+                                        <tr>
+                                            <td>
+                                                <div><?= htmlspecialchars($dateStr) ?></div>
+                                                <div class="muted"><?= htmlspecialchars($timeStr) ?></div>
+                                            </td>
+                                            <td class="sum"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
+                                            <td>
+                                                <div style="display:flex; justify-content:space-between; gap: 8px; align-items:flex-start;">
+                                                    <div><?= htmlspecialchars($commentText) ?></div>
+                                                    <button type="button" class="finance-del btn tiny" style="padding:0 4px; flex:0 0 auto;" data-kind="vietnam" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
                         <?php elseif ($vietnamDisabled): ?>
                             <?= htmlspecialchars($vietnamDisabledReason) ?>
+                        <?php else: ?>
+                            <span style="color:var(--muted);">Транзакция не найдена</span>
                         <?php endif; ?>
                     </div>
                 </form>
             </div>
 
             <div class="finance-row">
-                <div class="finance-left">
-                    <div style="font-weight:900;">Card tips per shift</div>
-                    <div class="muted"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
-                </div>
-                <form method="POST" class="finance-transfer"
+                <form method="POST" class="finance-transfer" style="width:100%;"
                       data-kind="tips"
                       data-date-from="<?= htmlspecialchars($dateFrom) ?>"
                       data-date-to="<?= htmlspecialchars($dateTo) ?>"
@@ -3428,51 +3450,57 @@ $fmtVnd = function (int $v): string {
                       data-account-to-id="8"
                       data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
                       data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[8]['name'] ?? '#8')) ?>"
-                      data-sum-vnd="<?= htmlspecialchars((string)($tipsVnd !== null ? (int)$tipsVnd : 0)) ?>"
-                      style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
+                      data-sum-vnd="<?= htmlspecialchars((string)($tipsVnd !== null ? (int)$tipsVnd : 0)) ?>">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="tips">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать перевод</button>
-                                        <div class="muted finance-status">
-                        <?php if ($transferTipsExists): ?>
-                            <table class="table" style="margin-top:5px; font-size:12px;">
-                                <thead><tr><th>Дата</th><th>Время</th><th>Сумма совпадает</th><th>Тип</th><th>Комментарий</th><th></th></tr></thead>
-                                <tbody>
-                            <?php foreach ($transferTipsFoundList as $f): ?>
-                                <?php
-                                    $ts = (int)($f['ts'] ?? 0);
-                                    $sumMinor = (int)($f['sum_minor'] ?? 0);
-                                    $cmt = trim((string)($f['comment'] ?? ''));
-                                    $u = trim((string)($f['user'] ?? ''));
-                                    $bid = (int)($f['binding_id'] ?? 0);
-                                    $sumVnd = $posterCentsToVnd($sumMinor);
-                                    
-                                    $sumMatch = ($sumVnd === (int)($tipsVnd ?? 0));
-                                    $sumIcon = $sumMatch ? '<span style="color:#81c784; font-weight:900;">✓</span>' : '<span style="color:#e57373; font-weight:900;">✕</span>';
-                                    
-                                    $tRaw = (string)($f['type'] ?? '');
-                                    $typeText = ($tRaw === '2') ? 'Перевод' : (($tRaw === '0' || strtolower($tRaw) === 'o' || strtolower($tRaw) === 'out') ? 'Расход' : (($tRaw === '1' || strtolower($tRaw) === 'i' || strtolower($tRaw) === 'in') ? 'Приход' : $tRaw));
-                                    
-                                    $commentText = $u !== '' ? "$cmt ($u)" : $cmt;
-                                    $dateStr = date('d.m.Y', $ts);
-                                    $timeStr = date('H:i:s', $ts);
-                                    $sumText = $sumIcon . ' ' . $fmtVnd($sumVnd);
-                                ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($dateStr) ?></td>
-                                    <td><?= htmlspecialchars($timeStr) ?></td>
-                                    <td><?= $sumText ?></td>
-                                    <td><?= htmlspecialchars($typeText) ?></td>
-                                    <td><?= htmlspecialchars($commentText) ?></td>
-                                    <td style="text-align:right;"><button type="button" class="finance-del btn tiny" style="padding:0 4px;" data-kind="tips" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button></td>
-                                </tr>
-                            <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                    <div style="display:flex; align-items:center; gap: 10px;">
+                        <div style="font-weight:900; white-space:nowrap;">Tips</div>
+                        <div style="flex:1; text-align:center; font-weight:900;"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
+                        <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
+                    </div>
+                    <div class="muted finance-status" style="margin-top: 6px;">
+                        <?php if ($tipsExists): ?>
+                            <div style="overflow-x:auto; max-width:100%;">
+                                <table class="table" style="margin-top:5px; font-size:12px; width:100%; min-width: 420px;">
+                                    <thead><tr><th>Дата</th><th>Сумма</th><th>Комментарий</th></tr></thead>
+                                    <tbody>
+                                    <?php foreach ($tipsFound as $f): ?>
+                                        <?php
+                                            $ts = (int)($f['ts'] ?? 0);
+                                            $sumMinor = (int)($f['sum_minor'] ?? 0);
+                                            $sumVnd = (int)$posterCentsToVnd($sumMinor);
+                                            $tRaw = (string)($f['type'] ?? '');
+                                            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
+                                            $sumSignedVnd = $isOut ? -$sumVnd : $sumVnd;
+                                            $cmt = trim((string)($f['comment'] ?? ''));
+                                            $u = trim((string)($f['user'] ?? ''));
+                                            $commentText = $u !== '' ? "$cmt ($u)" : $cmt;
+                                            $dateStr = date('d.m.Y', $ts);
+                                            $timeStr = date('H:i:s', $ts);
+                                        ?>
+                                        <tr>
+                                            <td>
+                                                <div><?= htmlspecialchars($dateStr) ?></div>
+                                                <div class="muted"><?= htmlspecialchars($timeStr) ?></div>
+                                            </td>
+                                            <td class="sum"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
+                                            <td>
+                                                <div style="display:flex; justify-content:space-between; gap: 8px; align-items:flex-start;">
+                                                    <div><?= htmlspecialchars($commentText) ?></div>
+                                                    <button type="button" class="finance-del btn tiny" style="padding:0 4px; flex:0 0 auto;" data-kind="tips" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" title="Скрыть транзакцию">✕</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
                         <?php elseif ($tipsDisabled): ?>
                             <?= htmlspecialchars($tipsDisabledReason) ?>
+                        <?php else: ?>
+                            <span style="color:var(--muted);">Транзакция не найдена</span>
                         <?php endif; ?>
                     </div>
                 </form>
@@ -5371,7 +5399,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     document.querySelectorAll('form.finance-transfer').forEach((form) => {
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            const btn = form.querySelector('button.btn');
+            const btn = form.querySelector('button[type="submit"]');
             const statusEl = form.querySelector('.finance-status');
             if (btn && btn.disabled) return;
             const kind = String(form.getAttribute('data-kind') || '');
@@ -5441,16 +5469,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 .then((r) => r.json())
                 .then((j) => {
                     if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                    const who = String(j.user || '').trim();
-                    const whoPart = who ? ` - ${who}` : '';
-                    const line = `${j.date || ''} - ${j.time || ''} - ${Math.round(Number(j.sum || 0)).toLocaleString('en-US').replace(/,/g, '\u202F')}${whoPart} - ${j.comment || ''}`.trim();
-                    if (statusEl) {
-                        const label = j.already ? 'Найдена транзакция:' : 'Транзакция создана:';
-                        statusEl.innerHTML = `<span style="color:#81c784; font-weight:900;">${label}</span> <span>${line}</span>`;
-                    }
                     if (btn) {
                         btn.classList.remove('loading');
                         btn.disabled = true;
+                    }
+                    if (typeof refreshFinanceForm === 'function') {
+                        refreshFinanceForm(form, { showLoading: false });
                     }
                 })
                 .catch((err) => {
@@ -5495,63 +5519,97 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     bindFinanceDeleteBtns(document);
 
-    document.querySelectorAll('button.finance-refresh').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const form = btn.closest('form.finance-transfer');
-            if (!form) return;
-            const kind = String(form.getAttribute('data-kind') || '');
-            const dateFrom = String(form.getAttribute('data-date-from') || '');
-            const dateTo = String(form.getAttribute('data-date-to') || '');
-            const accountFrom = Number(form.getAttribute('data-account-from-id') || 0);
-            const accountTo = Number(form.getAttribute('data-account-to-id') || 0);
-            const statusEl = form.querySelector('.finance-status');
-            if (!kind || !dateFrom || !dateTo || !accountFrom || !accountTo || !statusEl) return;
+    const renderFinanceTable = (form, rows) => {
+        const kind = String(form.getAttribute('data-kind') || '');
+        const dateTo = String(form.getAttribute('data-date-to') || '');
+        const expectedSum = Number(form.getAttribute('data-sum-vnd') || 0);
+        const statusEl = form.querySelector('.finance-status');
+        if (!statusEl) return;
+
+        const pad = (n) => String(n).padStart(2, '0');
+        const fmtSum = (v) => Math.round(Number(v || 0)).toLocaleString('en-US').replace(/,/g, '\u202F');
+
+        const match = rows.filter((x) => Number(x.sum || 0) === expectedSum);
+        if (!match.length) {
+            statusEl.innerHTML = '<span style="color:var(--muted);">Транзакция не найдена</span>';
+            return;
+        }
+
+        let html = '<div style="overflow-x:auto; max-width:100%;">';
+        html += '<table class="table" style="margin-top:5px; font-size:12px; width:100%; min-width: 420px;">';
+        html += '<thead><tr><th>Дата</th><th>Сумма</th><th>Комментарий</th></tr></thead><tbody>';
+        match.forEach((x) => {
+            const ts = Number(x.ts || 0);
+            const d = ts ? new Date(ts * 1000) : null;
+            const dateStr = d ? `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}` : '';
+            const timeStr = d ? `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` : '';
+            const typeRaw = String(x.type || '');
+            const isOut = (typeRaw === '0' || typeRaw.toUpperCase() === 'O' || typeRaw.toLowerCase() === 'out');
+            const sumSigned = isOut ? -Number(x.sum || 0) : Number(x.sum || 0);
+            const comment = String(x.comment || '').trim();
+            const user = String(x.user || '').trim();
+            const commentText = user ? `${comment} (${user})` : comment;
+            const transferId = Number(x.transfer_id || 0);
+            const txId = Number(x.transaction_id || 0);
+            const delBtn = `<button type="button" class="finance-del btn tiny" style="padding:0 4px; flex:0 0 auto;" data-kind="${escapeHtml(kind)}" data-transfer-id="${transferId}" data-tx-id="${txId}" data-date-to="${escapeHtml(dateTo)}" title="Скрыть транзакцию">✕</button>`;
+            html += '<tr>';
+            html += `<td><div>${escapeHtml(dateStr)}</div><div class="muted">${escapeHtml(timeStr)}</div></td>`;
+            html += `<td class="sum">${escapeHtml(fmtSum(sumSigned))}</td>`;
+            html += `<td><div style="display:flex; justify-content:space-between; gap: 8px; align-items:flex-start;"><div>${escapeHtml(commentText)}</div>${delBtn}</div></td>`;
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        statusEl.innerHTML = html;
+        bindFinanceDeleteBtns(statusEl);
+    };
+
+    window.refreshFinanceForm = (form, opts) => {
+        const options = opts && typeof opts === 'object' ? opts : {};
+        const showLoading = options.showLoading !== false;
+        const kind = String(form.getAttribute('data-kind') || '');
+        const dateFrom = String(form.getAttribute('data-date-from') || '');
+        const dateTo = String(form.getAttribute('data-date-to') || '');
+        const accountFrom = Number(form.getAttribute('data-account-from-id') || 0);
+        const accountTo = Number(form.getAttribute('data-account-to-id') || 0);
+        const statusEl = form.querySelector('.finance-status');
+        if (!kind || !dateFrom || !dateTo || !accountFrom || !accountTo || !statusEl) return Promise.resolve();
+
+        if (showLoading) statusEl.innerHTML = '<span style="color:var(--muted);">Обновление...</span>';
+        return fetch('?ajax=refresh_finance_transfers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kind, dateFrom, dateTo, accountFrom, accountTo }),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            const rows = Array.isArray(j.rows) ? j.rows : [];
+            renderFinanceTable(form, rows);
+        })
+        .catch((e) => {
+            statusEl.textContent = e && e.message ? e.message : 'Ошибка';
+        });
+    };
+
+    const refreshAllBtn = document.getElementById('finance-refresh-all');
+    if (refreshAllBtn) {
+        refreshAllBtn.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
             if (btn.disabled) return;
             const orig = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '...';
-            fetch('?ajax=refresh_finance_transfers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ kind, dateFrom, dateTo, accountFrom, accountTo }),
-            })
-            .then((r) => r.json())
-            .then((j) => {
-                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                const rows = Array.isArray(j.rows) ? j.rows : [];
-                if (!rows.length) {
-                    statusEl.innerHTML = '<span style=\"color:var(--muted);\">Транзакций не найдено</span>';
-                    return;
+            try {
+                const forms = document.querySelectorAll('form.finance-transfer');
+                for (const form of forms) {
+                    await window.refreshFinanceForm(form, { showLoading: true });
                 }
-                const header = '<span style=\"color:#81c784; font-weight:900;\">Найдены транзакции за период:</span>';
-                const items = rows.map((x) => {
-                    const ts = Number(x.ts || 0);
-                    const d = ts ? new Date(ts * 1000) : null;
-                    const pad = (n) => String(n).padStart(2, '0');
-                    const date = d ? `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}` : '';
-                    const time = d ? `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` : '';
-                    const sum = Number(x.sum || 0);
-                    const user = String(x.user || '').trim();
-                    const comment = String(x.comment || '').trim();
-                    let line = `${date} - ${time} - ${Math.round(sum).toLocaleString('en-US').replace(/,/g, '\\u202F')}`;
-                    if (user) line += ` - ${user}`;
-                    if (comment) line += ` - ${comment}`;
-                    const transferId = Number(x.transfer_id || 0);
-                    const txId = Number(x.transaction_id || 0);
-                    return `<div><button type=\"button\" class=\"finance-del\" data-kind=\"${escapeHtml(kind)}\" data-transfer-id=\"${transferId}\" data-tx-id=\"${txId}\" data-date-to=\"${escapeHtml(dateTo)}\" title=\"Скрыть транзакцию\">✕</button>${escapeHtml(line)}</div>`;
-                }).join('');
-                statusEl.innerHTML = header + items;
-                bindFinanceDeleteBtns(statusEl);
-            })
-            .catch((e) => {
-                statusEl.textContent = e && e.message ? e.message : 'Ошибка';
-            })
-            .finally(() => {
+            } finally {
                 btn.disabled = false;
                 btn.innerHTML = orig;
-            });
+            }
         });
-    });
+    }
     document.querySelectorAll('input.poster-cb').forEach((cb) => {
         cb.addEventListener('change', () => {
             const id = Number(cb.getAttribute('data-id') || 0);
