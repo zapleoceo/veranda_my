@@ -1209,12 +1209,13 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
                 $accToId = (int)$toRaw;
             }
 
-            if ($accToId !== 8 && $accToId !== 9) continue;
+            if ($accToId !== 8 && $accToId !== 9 && $accFromId !== 8 && $accFromId !== 9) continue;
+            $accId = ($accToId === 8 || $accToId === 9) ? $accToId : $accFromId;
 
             $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
             $cmtNorm = $normText($cmt);
-            $isVietnam = $accToId === 9 && mb_stripos($cmtNorm, 'вьетна', 0, 'UTF-8') !== false;
-            $isTips = $accToId === 8 && (mb_stripos($cmtNorm, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmtNorm, 'tips', 0, 'UTF-8') !== false);
+            $isVietnam = $accId === 9 && mb_stripos($cmtNorm, 'вьетна', 0, 'UTF-8') !== false;
+            $isTips = $accId === 8 && (mb_stripos($cmtNorm, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmtNorm, 'tips', 0, 'UTF-8') !== false);
             if ($kind === 'vietnam' && !$isVietnam) continue;
             if ($kind === 'tips' && !$isTips) continue;
             $sumRaw = $row['amount'] ?? $row['amount_to'] ?? $row['amount_from'] ?? $row['sum'] ?? 0;
@@ -2768,12 +2769,36 @@ try {
             $ts = $dStr !== '' ? strtotime($dStr) : false;
             if ($ts === false || $ts < $startTs || $ts > $endTs) continue;
 
-            if ($isTransfer || $isIn) {
-                $accId = (int)($r['account_id'] ?? 0);
+            $accFromId = 0;
+            $accToId = 0;
+            if ($isTransfer) {
+                $fromRaw = $r['account_from'] ?? $r['account_from_id'] ?? $r['account_id'] ?? 0;
+                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+                $accFromId = (int)$fromRaw;
+
+                $toRaw = $r['account_to'] ?? $r['account_to_id'] ?? $r['recipient_id'] ?? 0;
+                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+                $accToId = (int)$toRaw;
+            } elseif ($isOut) {
+                $fromRaw = $r['account_id'] ?? $r['accountId'] ?? $r['account_from_id'] ?? $r['account_from'] ?? $r['accountFromId'] ?? $r['accountFrom'] ?? 0;
+                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+                $accFromId = (int)$fromRaw;
+
+                $toRaw = $r['recipient_id'] ?? $r['account_to_id'] ?? $r['account_to'] ?? 0;
+                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+                $accToId = (int)$toRaw;
             } else {
-                $accId = (int)($r['recipient_id'] ?? $r['account_to'] ?? $r['account_to_id'] ?? 0);
+                $fromRaw = $r['account_from'] ?? $r['account_from_id'] ?? 0;
+                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+                $accFromId = (int)$fromRaw;
+
+                $toRaw = $r['account_id'] ?? $r['account_to_id'] ?? $r['account_to'] ?? 0;
+                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+                $accToId = (int)$toRaw;
             }
-            if ($accId !== 8 && $accId !== 9) continue;
+
+            if ($accToId !== 8 && $accToId !== 9 && $accFromId !== 8 && $accFromId !== 9) continue;
+            $accId = ($accToId === 8 || $accToId === 9) ? $accToId : $accFromId;
 
             $amountMinor = (int)($r['amount'] ?? 0);
             if (abs($amountMinor) <= 0) continue;
