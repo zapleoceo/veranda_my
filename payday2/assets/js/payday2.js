@@ -22,15 +22,25 @@ if (!window._paydayPjaxLoaded) {
 
             const configScript = Array.from(doc.querySelectorAll('script')).find(s => s.textContent.includes('window.PAYDAY_CONFIG ='));
             if (configScript) {
-                eval(configScript.textContent);
+                try {
+                    eval(configScript.textContent);
+                } catch(err) {
+                    console.error('Eval config error:', err);
+                }
             }
 
             if (options.method !== 'POST' || res.redirected) {
-                window.history.pushState({}, '', url);
+                try {
+                    window.history.pushState({}, '', url);
+                } catch(err) {}
             }
 
             if (typeof window.initPayday2 === 'function') {
-                window.initPayday2();
+                try {
+                    window.initPayday2();
+                } catch(err) {
+                    console.error('initPayday2 error:', err);
+                }
             }
         } catch (e) {
             console.error('PJAX Error:', e);
@@ -102,7 +112,9 @@ if (!window._paydayPjaxLoaded) {
             
             const formData = new FormData(form);
             if (method === 'GET') {
-                const url = new URL(action, window.location.origin);
+                // Fix: if action is just "?..." or empty, use window.location.href to preserve the path!
+                const baseUrl = action.startsWith('http') ? action : new URL(action, window.location.href).href;
+                const url = new URL(baseUrl);
                 for (const [k, v] of formData.entries()) {
                     url.searchParams.set(k, v);
                 }
@@ -2442,5 +2454,8 @@ window.initPayday2 = function() {
         });
     }
 
+    document.querySelectorAll('form.finance-transfer').forEach((form) => {
+        if (window.refreshFinanceForm) window.refreshFinanceForm(form, { showLoading: false });
+    });
 };
 window.initPayday2();

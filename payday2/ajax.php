@@ -80,8 +80,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $txs = [];
         try {
             $txs = $api->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
             
                 'timezone' => 'client',
             ]);
@@ -269,8 +269,8 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         $rows = [];
         try {
             $rows = $api->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
             
                 'timezone' => 'client',
             ]);
