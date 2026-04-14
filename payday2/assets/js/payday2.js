@@ -2026,11 +2026,7 @@ window.initPayday2 = function() {
 
         console.log('renderFinanceTable rows:', rows, 'expectedSum:', expectedSum);
         // Compare with a tiny tolerance to account for floating point issues, or just convert to Int
-        const match = rows.filter((x) => {
-            const rowSum = Math.abs(Number(x.sum || 0));
-            const expSum = Math.abs(Number(expectedSum));
-            return Math.abs(rowSum - expSum) < 1; 
-        });
+        const match = rows;
                 const btnSubmit = form.querySelector('button[type="submit"]');
         if (match.length > 0) {
             if (btnSubmit) btnSubmit.style.display = 'none';

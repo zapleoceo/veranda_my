@@ -1,27 +1,37 @@
 <?php
-$env = parse_ini_file(__DIR__ . '/.env');
-$token = $env['POSTER_API_TOKEN'] ?? '';
-require __DIR__ . '/src/classes/PosterAPI.php';
+require_once __DIR__ . '/vendor/autoload.php';
+
+$cfg = require __DIR__ . '/config.php';
+$token = $cfg['poster_api_token'] ?? '';
+if (!$token) {
+    // Try db
+    $db = new PDO('mysql:host=127.0.0.1;dbname=zapleoce_my;charset=utf8mb4', 'zapleoce_my', 'r5sR1c6s', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $token = $db->query("SELECT val FROM settings WHERE k='poster_api_token'")->fetchColumn();
+}
+if (!$token) {
+    echo "No token\n"; exit;
+}
 
 $api = new \App\Classes\PosterAPI($token);
 
-$dateFrom = '20260413';
-$dateTo = '20260413';
-$shifts = $api->request('finance.getCashShifts', ['dateFrom' => $dateFrom, 'dateTo' => $dateTo]);
+try {
+    $rows1 = $api->request('finance.getTransactions', [
+        'dateFrom' => '20240413',
+        'dateTo' => '20240414',
+        'timezone' => 'client',
+    ]);
+    echo "Ymd rows: " . count($rows1) . "\n";
+} catch (\Throwable $e) {
+    echo "Ymd error: " . $e->getMessage() . "\n";
+}
 
-if (!is_array($shifts)) die("No shifts\n");
-
-foreach ($shifts as $s) {
-    $shiftId = $s['cash_shift_id'] ?? 0;
-    if ($shiftId) {
-        $txs = $api->request('finance.getCashShiftTransactions', ['shift_id' => $shiftId]);
-        if (is_array($txs)) {
-            foreach ($txs as $tx) {
-                $cmt = $tx['comment'] ?? '';
-                if (strpos($cmt, 'Supply #1831') !== false) {
-                    echo json_encode($tx, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
-                }
-            }
-        }
-    }
+try {
+    $rows2 = $api->request('finance.getTransactions', [
+        'dateFrom' => '13042024',
+        'dateTo' => '14042024',
+        'timezone' => 'client',
+    ]);
+    echo "dmY rows: " . count($rows2) . "\n";
+} catch (\Throwable $e) {
+    echo "dmY error: " . $e->getMessage() . "\n";
 }

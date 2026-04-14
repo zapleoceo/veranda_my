@@ -80,8 +80,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $txs = [];
         try {
             $txs = $api->request('finance.getTransactions', [
-                'dateFrom' => date('Ymd', $startTs),
-                'dateTo' => date('Ymd', $endTs),
+                'dateFrom' => date('dmY', $startTs),
+                'dateTo' => date('dmY', $endTs),
             
                 'timezone' => 'client',
             ]);
@@ -269,8 +269,8 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         $rows = [];
         try {
             $rows = $api->request('finance.getTransactions', [
-                'dateFrom' => date('Ymd', $startTs),
-                'dateTo' => date('Ymd', $endTs),
+                'dateFrom' => date('dmY', $startTs),
+                'dateTo' => date('dmY', $endTs),
             
                 'timezone' => 'client',
             ]);
@@ -306,7 +306,7 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         $out = [];
         foreach ($rows as $row) {
             if (!is_array($row)) continue;
-            if (((int)($row['status'] ?? 0)) === 3) continue;
+            
             $tRaw = (string)($row['type'] ?? '');
             $isTransfer = ($tRaw === '2');
             $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
