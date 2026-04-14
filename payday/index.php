@@ -2884,8 +2884,8 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/app.js" defer></script>
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0170">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260413_1545">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260414_0100">
 </head>
 <body>
 <div class="container">
@@ -5817,5 +5817,6 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
 })();
 </script>
+<script src="/assets/payday.js?v=20260414_0100" defer></script>
 </body>
 </html>
