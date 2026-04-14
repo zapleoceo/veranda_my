@@ -3,7 +3,9 @@ require_once __DIR__ . '/../auth_check.php';
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
 
 veranda_require('payday');
-date_default_timezone_set('Asia/Ho_Chi_Minh');
+$apiTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? 'Asia/Ho_Chi_Minh'));
+if ($apiTzName === '') $apiTzName = 'Asia/Ho_Chi_Minh';
+date_default_timezone_set($apiTzName);
 
 $db->createPaydayTables();
 
@@ -782,7 +784,8 @@ try {
             $txs = $api->request('finance.getTransactions', [
                 'dateFrom' => str_replace('-', '', $dateTo),
                 'dateTo' => str_replace('-', '', $dateTo),
-            ]);
+            
+                'timezone' => $apiTzName,]);
         } catch (\Throwable $e) {
             $txs = [];
         }
@@ -791,7 +794,8 @@ try {
                 $txs = $api->request('finance.getTransactions', [
                     'dateFrom' => date('dmY', $startTs !== false ? $startTs : time()),
                     'dateTo' => date('dmY', $endTs !== false ? $endTs : time()),
-                ]);
+                
+                'timezone' => $apiTzName,]);
             } catch (\Throwable $e) {
                 $txs = [];
             }
@@ -955,7 +959,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             $txs = $api->request('finance.getTransactions', [
                 'dateFrom' => date('dmY', $startTs),
                 'dateTo' => date('dmY', $endTs),
-            ]);
+            
+                'timezone' => $apiTzName,]);
         } catch (\Throwable $e) {
             $txs = [];
         }
@@ -1110,7 +1115,8 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
             $rows = $api->request('finance.getTransactions', [
                 'dateFrom' => date('dmY', $startTs),
                 'dateTo' => date('dmY', $endTs),
-            ]);
+            
+                'timezone' => $apiTzName,]);
         } catch (\Throwable $e) {
             $rows = [];
         }
@@ -1238,7 +1244,8 @@ if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
             $rows = $api->request('finance.getTransactions', [
                 'dateFrom' => date('dmY', $startTs),
                 'dateTo' => date('dmY', $endTs),
-            ]);
+            
+                'timezone' => $apiTzName,]);
         } catch (\Throwable $e) {
             $rows = [];
         }
@@ -2477,7 +2484,8 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
             $rows = $api3->request('finance.getTransactions', [
                 'dateFrom' => str_replace('-', '', date('Y-m-d')),
                 'dateTo' => str_replace('-', '', date('Y-m-d')),
-            ]);
+            
+                'timezone' => $apiTzName,]);
             if (is_array($rows)) {
                 foreach ($rows as $r) {
                     if (!is_array($r)) continue;
@@ -2822,7 +2830,8 @@ try {
             $rows = $apiFinance->request('finance.getTransactions', [
                 'dateFrom' => date('dmY', $startTs),
                 'dateTo' => date('dmY', $endTs),
-            ]);
+            
+                'timezone' => $apiTzName,]);
         } catch (\Throwable $e) {
             $rows = [];
         }
@@ -3398,8 +3407,8 @@ $fmtVnd = function (int $v): string {
                     <div class="muted finance-status" style="margin-top: 6px;">
                         <?php if ($vietnamExists): ?>
                             <div style="overflow-x:auto; max-width:100%;">
-                                <table class="table" style="margin-top:5px; font-size:12px; width:100%; min-width: 420px;">
-                                    <thead><tr><th>Дата</th><th>Сумма</th><th>Комментарий</th></tr></thead>
+                                <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
+                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th><th style="padding:2px 0px; width:1%;"></th></tr></thead>
                                     <tbody>
                                     <?php foreach ($vietnamFound as $f): ?>
                                         <?php
@@ -3463,8 +3472,8 @@ $fmtVnd = function (int $v): string {
                     <div class="muted finance-status" style="margin-top: 6px;">
                         <?php if ($tipsExists): ?>
                             <div style="overflow-x:auto; max-width:100%;">
-                                <table class="table" style="margin-top:5px; font-size:12px; width:100%; min-width: 420px;">
-                                    <thead><tr><th>Дата</th><th>Сумма</th><th>Комментарий</th></tr></thead>
+                                <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
+                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th><th style="padding:2px 0px; width:1%;"></th></tr></thead>
                                     <tbody>
                                     <?php foreach ($tipsFound as $f): ?>
                                         <?php
@@ -5536,8 +5545,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         }
 
         let html = '<div style="overflow-x:auto; max-width:100%;">';
-        html += '<table class="table" style="margin-top:5px; font-size:12px; width:100%; min-width: 420px;">';
-        html += '<thead><tr><th>Дата</th><th>Сумма</th><th>Комментарий</th></tr></thead><tbody>';
+        html += '<table class="table" style="margin-top:5px; font-size:12px; width:100%;">';
+        html += '<thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th><th style="padding:2px 0px; width:1%;"></th></tr></thead><tbody>';
         match.forEach((x) => {
             const ts = Number(x.ts || 0);
             const d = ts ? new Date(ts * 1000) : null;
