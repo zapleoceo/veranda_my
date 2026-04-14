@@ -3,9 +3,7 @@ require_once __DIR__ . '/../auth_check.php';
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
 
 veranda_require('payday');
-$apiTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? 'Asia/Ho_Chi_Minh'));
-if ($apiTzName === '') $apiTzName = 'Asia/Ho_Chi_Minh';
-date_default_timezone_set($apiTzName);
+date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 $db->createPaydayTables();
 
@@ -68,9 +66,10 @@ $posterCentsToVnd = function (int $cents): int {
 $fmtVndCents = function (int $cents): string {
     $neg = $cents < 0;
     $abs = $neg ? -$cents : $cents;
-    $int = (int)round($abs / 100);
-    $intFmt = number_format($int, 0, '.', "\u{202F}");
-    return ($neg && $int > 0 ? '-' : '') . $intFmt;
+    $int = (int)floor($abs / 100);
+    $frac = (int)($abs % 100);
+    $intFmt = number_format($int, 0, '.', ' ');
+    return ($neg ? '-' : '') . $intFmt . '.' . str_pad((string)$frac, 2, '0', STR_PAD_LEFT) . ' ₫';
 };
 
 $parsePosterDateTime = function ($tx): ?string {
@@ -174,6 +173,7 @@ $pt = $db->t('poster_transactions');
 $pa = $db->t('poster_accounts');
 $pl = $db->t('check_payment_links');
 $sh = $db->t('sepay_hidden');
+$pfh = $db->t('poster_finance_hidden');
 $mh = $db->t('mail_hidden');
 $ol = $db->t('out_links');
 
@@ -198,6 +198,25 @@ try {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (sepay_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    );
+} catch (\Throwable $e) {
+}
+try {
+    $db->query(
+        "CREATE TABLE IF NOT EXISTS {$pfh} (
+            id BIGINT NOT NULL AUTO_INCREMENT,
+            date_to DATE NOT NULL,
+            kind VARCHAR(32) NOT NULL,
+            transfer_id BIGINT NULL,
+            tx_id BIGINT NULL,
+            comment TEXT NULL,
+            created_by VARCHAR(255) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_date_kind (date_to, kind),
+            KEY idx_transfer (transfer_id),
+            KEY idx_tx (tx_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     );
 } catch (\Throwable $e) {
@@ -751,7 +770,7 @@ try {
 
         $targetDate = $dateTo . ' 23:55:00';
         $targetTs = strtotime($targetDate);
-        $startTs = strtotime($dateTo . ' 00:00:00');
+        $startTs = strtotime($dateFrom . ' 00:00:00');
         $endTs = strtotime($dateTo . ' 23:59:59');
 
         $accountTo = $kind === 'vietnam' ? 9 : 8;
@@ -764,8 +783,6 @@ try {
             $txs = $api->request('finance.getTransactions', [
                 'dateFrom' => str_replace('-', '', $dateTo),
                 'dateTo' => str_replace('-', '', $dateTo),
-            
-                'timezone' => 'client',
             ]);
         } catch (\Throwable $e) {
             $txs = [];
@@ -773,11 +790,9 @@ try {
         if (!is_array($txs) || count($txs) === 0) {
             try {
                 $txs = $api->request('finance.getTransactions', [
-                    'dateFrom' => date('dmY', $startTs !== false ? $startTs : time()),
-                    'dateTo' => date('dmY', $endTs !== false ? $endTs : time()),
-                
-                'timezone' => 'client',
-            ]);
+                    'dateFrom' => date('Ymd', $startTs !== false ? $startTs : time()),
+                    'dateTo' => date('Ymd', $endTs !== false ? $endTs : time()),
+                ]);
             } catch (\Throwable $e) {
                 $txs = [];
             }
@@ -788,16 +803,9 @@ try {
         $expectedUserId = 4;
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
-            $tRaw = (string)($row['type'] ?? '');
-            $isTransfer = ($tRaw === '2');
-            $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
-            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-            if (!$isTransfer && !$isIn && !$isOut) continue;
-            if ($isTransfer) {
-                $toRaw = $row['account_to_id'] ?? $row['account_to'] ?? $row['accountToId'] ?? $row['accountTo'] ?? 0;
-            } else {
-                $toRaw = $row['recipient_id'] ?? $row['account_to_id'] ?? $row['account_to'] ?? 0;
-            }
+            $type = (int)($row['type'] ?? 0);
+            if ($type !== 2) continue;
+            $toRaw = $row['account_to_id'] ?? $row['account_to'] ?? $row['accountToId'] ?? $row['accountTo'] ?? 0;
             if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
             $toId = (int)$toRaw;
             if ($toId !== $accountTo) continue;
@@ -922,7 +930,7 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         }
 
         $targetDate = $dTo . ' 23:55:00';
-        $startTs = strtotime($dTo . ' 00:00:00');
+        $startTs = strtotime($dFrom . ' 00:00:00');
         $endTs = strtotime($dTo . ' 23:59:59');
         $windowStartTs = strtotime($dTo . ' 22:00:00');
         if ($startTs === false || $endTs === false || $windowStartTs === false) {
@@ -930,10 +938,9 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         }
 
         $accountTo = $kind === 'vietnam' ? 9 : 8;
-        $commentBase = $kind === 'vietnam'
+        $comment = $kind === 'vietnam'
             ? 'Перевод чеков вьетнаской компании'
             : 'Перевод типсов';
-        $comment = $commentBase;
         $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
         if ($by !== '') $comment .= ' by ' . $by;
         $expectedUserId = 4;
@@ -941,10 +948,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $txs = [];
         try {
             $txs = $api->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
-            
-                'timezone' => 'client',
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
             ]);
         } catch (\Throwable $e) {
             $txs = [];
@@ -963,14 +968,21 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             return mb_strtolower($t, 'UTF-8');
         };
 
+        $employeesMapFinance = [];
+        try {
+            $employeesMapFinance = $getEmployeesById($api);
+        } catch (\Throwable $e) {
+        }
+
         $found = null;
         foreach ($txs as $row) {
             if (!is_array($row)) continue;
-            $tRaw = (string)($row['type'] ?? '');
-            $isTransfer = ($tRaw === '2');
-            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-            $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
-            if (!$isTransfer && !$isOut && !$isIn) continue;
+            
+            // Пропускаем удаленные
+            if (((int)($row['status'] ?? 0)) === 3) continue;
+
+            $type = (int)($row['type'] ?? -1);
+            if ($type !== 2) continue; // Ищем только переводы
 
             $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
             $ts = null;
@@ -985,64 +997,47 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             if ($ts === null) continue;
             if ($ts < $startTs || $ts > $endTs) continue;
 
-            $accFromId = 0;
-            $accToId = 0;
-            if ($isTransfer) {
-                $fromRaw = $row['account_from'] ?? $row['account_from_id'] ?? $row['account_id'] ?? 0;
-                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
-                $accFromId = (int)$fromRaw;
+            $accFromRaw = $row['account_from'] ?? $row['account_from_id'] ?? $row['account_id'] ?? 0;
+            if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
+            $accFromId = (int)$accFromRaw;
 
-                $toRaw = $row['account_to'] ?? $row['account_to_id'] ?? $row['recipient_id'] ?? 0;
-                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
-                $accToId = (int)$toRaw;
-            } elseif ($isOut) {
-                $fromRaw = $row['account_id'] ?? $row['accountId'] ?? $row['account_from_id'] ?? $row['account_from'] ?? $row['accountFromId'] ?? $row['accountFrom'] ?? 0;
-                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
-                $accFromId = (int)$fromRaw;
+            $accToRaw = $row['account_to'] ?? $row['account_to_id'] ?? 0;
+            if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
+            $accToId = (int)$accToRaw;
 
-                $toRaw = $row['recipient_id'] ?? $row['account_to_id'] ?? $row['account_to'] ?? 0;
-                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
-                $accToId = (int)$toRaw;
-            } else {
-                $fromRaw = $row['account_from'] ?? $row['account_from_id'] ?? 0;
-                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
-                $accFromId = (int)$fromRaw;
-
-                $toRaw = $row['account_id'] ?? $row['account_to_id'] ?? $row['account_to'] ?? 0;
-                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
-                $accToId = (int)$toRaw;
-            }
-
-            $sumRaw = $row['amount_from'] ?? $row['amountFrom'] ?? $row['amount_to'] ?? $row['amountTo'] ?? $row['sum'] ?? $row['amount'] ?? 0;
-            $sumMaybe = $normMoney($sumRaw);
-            if (abs($sumMaybe) !== $amountVnd) continue;
+            // Тот же самый счет списания и зачисления
+            if ($accFromId !== 1 || $accToId !== $accountTo) continue;
 
             $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
-            $cmtNorm = $normText($cmt);
-            if ($cmtNorm === '' || mb_stripos($cmtNorm, $normText($commentBase), 0, 'UTF-8') === false) continue;
+            if (mb_stripos($cmt, '[УДАЛЕНО', 0, 'UTF-8') !== false) continue;
 
-            $isMatch = false;
-            if ($isTransfer && $accFromId === 1 && $accToId === $accountTo) $isMatch = true;
-            if ($isOut && $accFromId === 1 && $accToId === $accountTo) $isMatch = true;
-            if ($isIn && $accToId === $accountTo) $isMatch = true;
-            if (!$isMatch) continue;
+            $sumRaw = $row['amount'] ?? $row['amount_to'] ?? $row['amount_from'] ?? $row['sum'] ?? 0;
+            $sumMaybe = $normMoney($sumRaw);
 
             $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
             $uId = (int)($uRaw ?? 0);
             $userName = '';
-            $uObj = $row['user'] ?? $row['employee'] ?? null;
-            if (is_array($uObj)) {
-                $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
-                $userName = trim($userName);
+            if ($uId > 0 && isset($employeesMapFinance[$uId])) {
+                $userName = $employeesMapFinance[$uId];
+            } else {
+                $uObj = $row['user'] ?? $row['employee'] ?? null;
+                if (is_array($uObj)) {
+                    $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
+                    $userName = trim($userName);
+                }
             }
             if ($userName === '' && $uId > 0) $userName = '#' . $uId;
 
+            $txId = (int)($row['transaction_id'] ?? $row['id'] ?? 0);
+
             $found = [
+                'tx_id' => $txId,
                 'ts' => $ts,
                 'sum' => abs($sumMaybe),
                 'comment' => $cmt !== '' ? $cmt : $comment,
                 'user' => $userName,
+                'original' => $row
             ];
             break;
         }
@@ -1051,11 +1046,13 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             echo json_encode([
                 'ok' => true,
                 'already' => true,
+                'tx_id' => $found['tx_id'],
                 'date' => date('d.m.Y', (int)$found['ts']),
                 'time' => date('H:i:s', (int)$found['ts']),
                 'sum' => (int)$found['sum'],
                 'user' => (string)($found['user'] ?? ''),
                 'comment' => (string)$found['comment'],
+                'original' => $found['original']
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -1080,7 +1077,7 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             'date' => date('d.m.Y', strtotime($targetDate) ?: time()),
             'time' => '23:55:00',
             'sum' => (int)$amountVnd,
-            'user' => '#' . (string)$expectedUserId,
+            'user' => isset($employeesMapFinance[$expectedUserId]) ? $employeesMapFinance[$expectedUserId] : ('#' . (string)$expectedUserId),
             'comment' => $comment,
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
@@ -1090,7 +1087,48 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
     exit;
 }
 
-if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
+if (($_GET['ajax'] ?? '') === 'delete_duplicate_transfer') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $api = new \App\Classes\PosterAPI((string)$token);
+        
+        $req = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($req)) throw new \Exception('Invalid request');
+        
+        $original = $req['original'] ?? [];
+        $txId = (int)($original['transaction_id'] ?? $original['id'] ?? 0);
+        if ($txId <= 0) throw new \Exception('Invalid transaction ID');
+        
+        $reason = trim((string)($req['reason'] ?? ''));
+        $userEmail = $_SESSION['user_email'] ?? 'Unknown User';
+        
+        $oldComment = (string)($original['comment'] ?? '');
+        $newComment = "[УДАЛЕНО $userEmail: $reason] " . $oldComment;
+        
+        $updatePayload = [
+            'transaction_id' => $txId,
+            'type'           => (int)($original['type'] ?? 2),
+            'category'       => (int)($original['category_id'] ?? $original['category'] ?? 0),
+            'user_id'        => (int)($original['user_id'] ?? 0),
+            'amount_from'    => $original['amount_from'] ?? $original['amount'] ?? 0,
+            'amount_to'      => $original['amount_to'] ?? $original['amount'] ?? 0,
+            'account_from'   => (int)($original['account_from'] ?? $original['account_id'] ?? 1),
+            'account_to'     => (int)($original['account_to'] ?? $original['account_to_id'] ?? 0),
+            'date'           => date('Ymd', strtotime($original['date'] ?? 'today')),
+            'comment'        => mb_substr($newComment, 0, 250) // truncate if too long
+        ];
+        
+        $res = $api->request('finance.updateTransactions', $updatePayload, 'POST');
+        
+        echo json_encode(['ok' => true, 'response' => $res], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
@@ -1101,113 +1139,148 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
     $payload = json_decode((string)$raw, true);
     if (!is_array($payload)) $payload = [];
     $kind = (string)($payload['kind'] ?? '');
-    $dFrom = trim((string)($payload['dateFrom'] ?? ''));
+    $transferId = (int)($payload['transfer_id'] ?? 0);
+    $txId = (int)($payload['tx_id'] ?? 0);
     $dTo = trim((string)($payload['dateTo'] ?? ''));
-    $accountFrom = (int)($payload['accountFrom'] ?? 0);
-    $accountTo = (int)($payload['accountTo'] ?? 0);
-    if (!in_array($kind, ['vietnam', 'tips'], true) || $dFrom === '' || $dTo === '' || $accountFrom <= 0 || $accountTo <= 0) {
+    $dFrom = trim((string)($payload['dateFrom'] ?? $dTo));
+    if (!in_array($kind, ['vietnam', 'tips'], true) || ($transferId <= 0 && $txId <= 0) || $dTo === '') {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    $startTs = strtotime($dFrom . ' 00:00:00');
+    $endTs = strtotime($dTo . ' 23:59:59');
+    if ($startTs === false || $endTs === false) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad date'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $comment = trim((string)($payload['comment'] ?? ''));
+    if (mb_strlen($comment, 'UTF-8') > 2000) $comment = mb_substr($comment, 0, 2000, 'UTF-8');
+    $by = '';
+    if (!isset($_SESSION)) {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    }
+    $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
     try {
-        $startTs = strtotime($dFrom . ' 00:00:00');
-        $endTs = strtotime($dTo . ' 23:59:59');
-        if ($startTs === false || $endTs === false) {
-            throw new \Exception('Bad date');
-        }
-
         $rows = [];
         try {
             $rows = $api->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
-            
-                'timezone' => 'client',
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
             ]);
         } catch (\Throwable $e) {
             $rows = [];
         }
         if (!is_array($rows)) $rows = [];
 
-        $normMoney = function ($sumRaw): int {
-            $sumF = 0.0;
-            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
-            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
-            $sumInt = (int)round($sumF);
-            return ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
+        $isMatchKind = function (array $r, string $kind): bool {
+            $type = (int)($r['type'] ?? -1);
+            if ($type !== 2) return false;
+            
+            $accToRaw = $r['account_to'] ?? $r['account_to_id'] ?? 0;
+            if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
+            $accId = (int)$accToRaw;
+
+            $amount = (int)($r['amount'] ?? $r['amount_to'] ?? 0);
+            if ($amount <= 0) return false;
+            
+            if ($kind === 'vietnam') {
+                return $accId === 9;
+            }
+            if ($kind === 'tips') {
+                return $accId === 8;
+            }
+            return false;
         };
 
-        $out = [];
-        foreach ($rows as $row) {
-            if (!is_array($row)) continue;
-            if (((int)($row['status'] ?? 0)) === 3) continue;
-            $tRaw = (string)($row['type'] ?? '');
-            $isTransfer = ($tRaw === '2');
-            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-            if (!$isTransfer && !$isOut) continue;
+        $foundRow = null;
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            if (((int)($r['status'] ?? 0)) === 3) continue;
 
-            $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
-            $ts = null;
-            if (is_numeric($dRaw)) {
-                $n = (int)$dRaw;
-                if ($n > 2000000000000) $n = (int)round($n / 1000);
-                if ($n > 0) $ts = $n;
-            } elseif (is_string($dRaw) && trim($dRaw) !== '') {
-                $t = strtotime($dRaw);
-                if ($t !== false && $t > 0) $ts = $t;
-            }
-            if ($ts === null) continue;
-            if ($ts < $startTs || $ts > $endTs) continue;
-
-            $accFromRaw = $isIn ? ($row['account_from'] ?? $row['account_from_id'] ?? 0) : ($row['account_from'] ?? $row['account_from_id'] ?? $row['account_id'] ?? 0);
-            if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
-            $accFromId = (int)$accFromRaw;
-
-            if ($isTransfer) {
-                $accToRaw = $row['account_to'] ?? $row['account_to_id'] ?? 0;
-            } elseif ($isOut) {
-                $accToRaw = $row['recipient_id'] ?? $row['account_to'] ?? $row['account_to_id'] ?? 0;
-            } else {
-                $accToRaw = $row['account_id'] ?? $row['account_to'] ?? $row['account_to_id'] ?? 0;
-            }
-            if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
-            $accToId = (int)$accToRaw;
-
-            if ($accFromId !== $accountFrom || $accToId !== $accountTo) continue;
-
-            $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
-            $sumRaw = $row['amount'] ?? $row['amount_to'] ?? $row['amount_from'] ?? $row['sum'] ?? 0;
-            $sum = abs($normMoney($sumRaw));
-
-            $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
-            if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
-            $uId = (int)($uRaw ?? 0);
-            $userName = '';
-            $uObj = $row['user'] ?? $row['employee'] ?? null;
-            if (is_array($uObj)) {
-                $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
-                $userName = trim($userName);
-            }
-            if ($userName === '' && $uId > 0) $userName = '#' . $uId;
-
-            $txId = (int)($row['transaction_id'] ?? $row['id'] ?? 0);
-            $out[] = [
-                'transaction_id' => $txId,
-                'transfer_id' => $txId,
-                'ts' => (int)$ts,
-                'sum' => (int)$sum,
-                'comment' => $cmt,
-                'user' => $userName,
-                'type' => $tRaw,
-            ];
+            $tid = (int)($r['transaction_id'] ?? $r['id'] ?? 0);
+            if ($txId > 0 && $tid !== $txId) continue;
+            
+            if (!$isMatchKind($r, $kind)) continue;
+            $foundRow = $r;
+            break;
+        }
+        
+        if (!$foundRow) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Транзакция не найдена для выбранного дня'], JSON_UNESCAPED_UNICODE);
+            exit;
         }
 
-        usort($out, function ($a, $b) {
-            return ((int)($b['ts'] ?? 0)) <=> ((int)($a['ts'] ?? 0));
-        });
+        // 1. Помечаем в локальной базе как скрытую (если нужно)
+        $db->query(
+            "INSERT INTO {$pfh} (date_to, kind, transfer_id, tx_id, comment, created_by)
+             VALUES (?, ?, ?, ?, ?, ?)",
+            [$dTo, $kind, $transferId > 0 ? $transferId : null, $txId > 0 ? $txId : null, $comment !== '' ? $comment : null, $by !== '' ? $by : null]
+        );
 
-        echo json_encode(['ok' => true, 'rows' => $out], JSON_UNESCAPED_UNICODE);
+        // 2. Реально "удаляем" (изменяем комментарий) в Poster
+        $reason = trim((string)($payload['comment'] ?? ''));
+        $userEmail = $_SESSION['user_email'] ?? 'Unknown User';
+        
+        $oldComment = (string)($foundRow['comment'] ?? '');
+        $newComment = "[УДАЛЕНО $userEmail: $reason] " . $oldComment;
+        
+        $updatePayload = [
+            'transaction_id' => (int)($foundRow['transaction_id'] ?? $foundRow['id'] ?? 0),
+            'type'           => (int)($foundRow['type'] ?? 2),
+            'category'       => (int)($foundRow['category_id'] ?? $foundRow['category'] ?? 0),
+            'user_id'        => (int)($foundRow['user_id'] ?? 0),
+            'amount_from'    => $foundRow['amount_from'] ?? $foundRow['amount'] ?? 0,
+            'amount_to'      => $foundRow['amount_to'] ?? $foundRow['amount'] ?? 0,
+            'account_from'   => (int)($foundRow['account_from'] ?? $foundRow['account_id'] ?? 1),
+            'account_to'     => (int)($foundRow['account_to'] ?? $foundRow['account_to_id'] ?? 0),
+            'date'           => date('Ymd', strtotime($foundRow['date'] ?? 'today')),
+            'comment'        => mb_substr($newComment, 0, 250)
+        ];
+        
+        try {
+            $api->request('finance.updateTransactions', $updatePayload, 'POST');
+        } catch (\Throwable $e) {
+            // Игнорируем ошибку постера, если он вдруг ругнется, но локально мы уже пометили как скрытую
+        }
+
+        $hiddenTx = [];
+        $hiddenTransfer = [];
+        try {
+            $hRows = $db->query(
+                "SELECT transfer_id, tx_id
+                 FROM {$pfh}
+                 WHERE date_to = ? AND kind = ?",
+                [$dTo, $kind]
+            )->fetchAll();
+            if (!is_array($hRows)) $hRows = [];
+            foreach ($hRows as $hr) {
+                $hidT = (int)($hr['transfer_id'] ?? 0);
+                $hidX = (int)($hr['tx_id'] ?? 0);
+                if ($hidT > 0) $hiddenTransfer[$hidT] = true;
+                if ($hidX > 0) $hiddenTx[$hidX] = true;
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $remaining = 0;
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            if (!$isMatchKind($r, $kind)) continue;
+            $tid = (int)($r['transaction_id'] ?? 0);
+            if ($tid > 0 && !empty($hiddenTx[$tid])) continue;
+            $bt = (int)($r['binding_type'] ?? 0);
+            $bid = (int)($r['binding_id'] ?? 0);
+            $rt = (int)($r['recipient_type'] ?? 0);
+            $rid = (int)($r['recipient_id'] ?? 0);
+            if ($bt === 1 && $bid > 0 && !empty($hiddenTransfer[$bid])) continue;
+            if ($rt === 1 && $rid > 0 && !empty($hiddenTransfer[$rid])) continue;
+            $remaining++;
+        }
+
+        echo json_encode(['ok' => true, 'remaining' => $remaining], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
@@ -1395,7 +1468,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
         )->fetchAll();
 
         $sepay = $db->query(
-            "SELECT s.sepay_id, s.transaction_date, s.transfer_amount
+            "SELECT s.sepay_id, s.transaction_date, ABS(s.transfer_amount) AS transfer_amount
              FROM {$st} s
              WHERE s.transaction_date BETWEEN ? AND ?
                AND s.transfer_type = 'in'
@@ -1686,13 +1759,10 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
         echo json_encode(['ok' => false, 'error' => 'IMAP open failed'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    $emails = imap_search($inbox, 'ALL') ?: [];
+    rsort($emails);
     $fromTs = strtotime($dFrom !== '' ? ($dFrom . ' 00:00:00') : ($dTo . ' 00:00:00'));
     $toTs = strtotime($dTo . ' 23:59:59');
-    
-    $searchQuery = 'FROM "bidvsmartbanking@bidv.com.vn" SINCE "' . date('d-M-Y', $fromTs) . '"';
-    $emails = imap_search($inbox, $searchQuery) ?: [];
-    rsort($emails);
-    
     $hidden = [];
     try {
         $hRows = $db->query("SELECT mail_uid, comment FROM {$mh} WHERE date_to = ?", [$dTo])->fetchAll();
@@ -1746,12 +1816,7 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
             $amountVnd = (int)str_replace([',','.'], ['', ''], $amtStr);
         }
         $useTs = $txTs > 0 ? $txTs : $tsHeader;
-        
-        // Если письмо старше начальной даты, прекращаем перебор (т.к. письма отсортированы по убыванию)
-        if ($useTs > 0 && $useTs < $fromTs) break;
-        // Если письмо новее конечной даты, просто пропускаем его
-        if ($useTs > 0 && $useTs > $toTs) continue;
-        
+        if ($useTs > 0 && ($useTs < $fromTs || $useTs > $toTs)) continue;
         $rows[] = [
             'mail_uid' => (int)@imap_uid($inbox, $num),
             'date' => $useTs > 0 ? date('Y-m-d H:i:s', $useTs) : '',
@@ -2358,8 +2423,6 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
             $rows = $api3->request('finance.getTransactions', [
                 'dateFrom' => str_replace('-', '', date('Y-m-d')),
                 'dateTo' => str_replace('-', '', date('Y-m-d')),
-            
-                'timezone' => 'client',
             ]);
             if (is_array($rows)) {
                 foreach ($rows as $r) {
@@ -2419,7 +2482,7 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
 }
 
 $sepayRows = $db->query(
-    "SELECT s.sepay_id, s.transaction_date, s.transfer_amount, s.payment_method, s.content, s.reference_code
+    "SELECT s.sepay_id, s.transaction_date, ABS(s.transfer_amount) AS transfer_amount, s.payment_method, s.content, s.reference_code
      FROM {$st} s
      WHERE s.transaction_date BETWEEN ? AND ?
        AND s.transfer_type = 'in'
@@ -2431,7 +2494,7 @@ $sepayRows = $db->query(
 )->fetchAll();
 
 $sepayHiddenRows = $db->query(
-    "SELECT s.sepay_id, s.transaction_date, s.transfer_amount, s.payment_method, s.content, s.reference_code,
+    "SELECT s.sepay_id, s.transaction_date, ABS(s.transfer_amount) AS transfer_amount, s.payment_method, s.content, s.reference_code,
             h.comment AS hidden_comment
      FROM {$st} s
      JOIN {$sh} h ON h.sepay_id = s.sepay_id
@@ -2463,7 +2526,7 @@ $posterBybitVnd = 0;
 $posterVietVnd = 0;
 try {
     $sepayTotalVnd = (int)$db->query(
-        "SELECT COALESCE(SUM(s.transfer_amount), 0)
+        "SELECT COALESCE(SUM(ABS(s.transfer_amount)), 0)
          FROM {$st} s
          WHERE s.transaction_date BETWEEN ? AND ?
            AND s.transfer_type = 'in'
@@ -2675,19 +2738,36 @@ $transferVietnamExists = false;
 $transferTipsExists = false;
 $transferVietnamFoundList = [];
 $transferTipsFoundList = [];
+$hiddenFinanceByKind = ['vietnam' => ['tx' => [], 'transfer' => []], 'tips' => ['tx' => [], 'transfer' => []]];
+try {
+    $hRows = $db->query(
+        "SELECT kind, transfer_id, tx_id
+         FROM {$pfh}
+         WHERE date_to = ?",
+        [$dateTo]
+    )->fetchAll();
+    if (!is_array($hRows)) $hRows = [];
+    foreach ($hRows as $r) {
+        $k = (string)($r['kind'] ?? '');
+        if (!isset($hiddenFinanceByKind[$k])) continue;
+        $tid = (int)($r['transfer_id'] ?? 0);
+        $xid = (int)($r['tx_id'] ?? 0);
+        if ($tid > 0) $hiddenFinanceByKind[$k]['transfer'][$tid] = true;
+        if ($xid > 0) $hiddenFinanceByKind[$k]['tx'][$xid] = true;
+    }
+} catch (\Throwable $e) {
+}
 try {
     $targetTs = strtotime($dateTo . ' 23:55:00');
-    $startTs = strtotime($dateTo . ' 00:00:00');
+    $startTs = strtotime($dateFrom . ' 00:00:00');
     $endTs = strtotime($dateTo . ' 23:59:59');
     if ($targetTs !== false && $startTs !== false && $endTs !== false) {
         $apiFinance = new \App\Classes\PosterAPI((string)$token);
         $rows = [];
         try {
             $rows = $apiFinance->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
-            
-                'timezone' => 'client',
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
             ]);
         } catch (\Throwable $e) {
             $rows = [];
@@ -2705,51 +2785,62 @@ try {
             $t = trim($s);
             return mb_strtolower($t, 'UTF-8');
         };
+
+        $employeesMapFinance = [];
+        try {
+            $employeesMapFinance = $getEmployeesById($apiFinance);
+        } catch (\Throwable $e) {
+        }
+
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
-            $tRaw = (string)($r['type'] ?? '');
-            $isTransfer = ($tRaw === '2');
-            $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
-            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-            if (!$isTransfer && !$isIn && !$isOut) continue;
+
+            // Пропускаем удаленные
+            if (((int)($r['status'] ?? 0)) === 3) continue;
+
+            $type = (int)($r['type'] ?? -1);
+            if ($type !== 2) continue; // Ищем переводы
 
             $dStr = (string)($r['date'] ?? '');
             $ts = $dStr !== '' ? strtotime($dStr) : false;
             if ($ts === false || $ts < $startTs || $ts > $endTs) continue;
 
-            if ($isTransfer || $isIn) {
-                $accId = (int)($r['account_id'] ?? 0);
-            } else {
-                $accId = (int)($r['recipient_id'] ?? $r['account_to'] ?? $r['account_to_id'] ?? 0);
-            }
-            if ($accId !== 8 && $accId !== 9) continue;
+            $accFromRaw = $r['account_from'] ?? $r['account_from_id'] ?? $r['account_id'] ?? 0;
+            if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
+            $accFromId = (int)$accFromRaw;
 
-            $amountMinor = (int)($r['amount'] ?? 0);
-            if (abs($amountMinor) <= 0) continue;
+            $accToRaw = $r['account_to'] ?? $r['account_to_id'] ?? 0;
+            if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
+            $accToId = (int)$accToRaw;
+
+            if ($accFromId !== 1) continue;
+            if ($accToId !== 8 && $accToId !== 9) continue;
 
             $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
-            $cmtNorm = $normText($cmt);
-            $isVietnam = $accId === 9 && mb_stripos($cmtNorm, 'вьетна', 0, 'UTF-8') !== false;
-            $isTips = $accId === 8 && (mb_stripos($cmtNorm, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmtNorm, 'tips', 0, 'UTF-8') !== false);
+            if (mb_stripos($cmt, '[УДАЛЕНО', 0, 'UTF-8') !== false) continue;
+
+            $amountMinor = (int)($r['amount_to'] ?? $r['amount'] ?? 0);
+            if ($amountMinor <= 0) continue;
+
+            $isVietnam = $accToId === 9;
+            $isTips = $accToId === 8;
             if (!$isVietnam && !$isTips) continue;
 
-            $tid = (int)($r['transaction_id'] ?? 0);
-            $bt = (int)($r['binding_type'] ?? 0);
-            $bid = (int)($r['binding_id'] ?? 0);
-            $rt = (int)($r['recipient_type'] ?? 0);
-            $rid = (int)($r['recipient_id'] ?? 0);
-            $transferId = 0;
-            if ($rt === 1 && $rid > 0) $transferId = $rid;
-            elseif ($bt === 1 && $bid > 0) $transferId = $bid;
+            $tid = (int)($r['transaction_id'] ?? $r['id'] ?? 0);
+            $transferId = $tid;
 
             $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
             if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
             $uId = (int)($uRaw ?? 0);
             $userName = '';
-            $uObj = $r['user'] ?? $r['employee'] ?? null;
-            if (is_array($uObj)) {
-                $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
-                $userName = trim($userName);
+            if ($uId > 0 && isset($employeesMapFinance[$uId])) {
+                $userName = $employeesMapFinance[$uId];
+            } else {
+                $uObj = $r['user'] ?? $r['employee'] ?? null;
+                if (is_array($uObj)) {
+                    $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
+                    $userName = trim($userName);
+                }
             }
             if ($userName === '' && $uId > 0) $userName = '#' . $uId;
 
@@ -2760,12 +2851,13 @@ try {
                 'sum_minor' => abs($amountMinor),
                 'comment' => $cmt,
                 'user' => $userName,
-                'type' => $tRaw,
             ];
             if ($isVietnam) {
+                if (!empty($hiddenFinanceByKind['vietnam']['transfer'][$transferId]) || !empty($hiddenFinanceByKind['vietnam']['tx'][$tid])) continue;
                 $transferVietnamFoundList[] = $rowOut;
             }
             if ($isTips) {
+                if (!empty($hiddenFinanceByKind['tips']['transfer'][$transferId]) || !empty($hiddenFinanceByKind['tips']['tx'][$tid])) continue;
                 $transferTipsFoundList[] = $rowOut;
             }
         }
@@ -2815,7 +2907,7 @@ if (count($posterAccountsById) > 0) {
 }
 
 $fmtVnd = function (int $v): string {
-    return number_format($v, 0, '.', "\u{202F}");
+    return number_format($v, 0, '.', ',') . ' ₫';
 };
 ?>
 <!DOCTYPE html>
@@ -2829,8 +2921,8 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/app.js" defer></script>
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0170">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260413_1545">
+  <link rel="stylesheet" href="/assets/css/common.css">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260412_0120">
 </head>
 <body>
 <div class="container">
@@ -2842,6 +2934,7 @@ $fmtVnd = function (int $v): string {
                 <button type="button" class="tab" id="tabOut">OUT</button>
                 <button type="button" class="tab" id="btnKashShift" style="margin-left: 15px; background: rgba(184,135,70,0.15); color: #B88746;">KashShift</button>
                 <button type="button" class="tab" id="btnSupplies" style="margin-left: 5px; background: rgba(184,135,70,0.15); color: #B88746;">Supplies</button>
+                <button type="button" class="tab" id="btnLoadAll" style="margin-left: 5px; background: rgba(70,184,135,0.15); color: #46B887;">Загрузить всё</button>
             </div>
             <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin-left: 10px;">
                 <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
@@ -2880,19 +2973,19 @@ $fmtVnd = function (int $v): string {
             </form>
 
             <div class="toggle-wrap" title="Lite/Full">
-                <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
+                <span class="toggle-text">Lite</span>
                 <label class="switch">
                     <input id="modeToggle" type="checkbox">
                     <span class="slider"></span>
                 </label>
-                <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
+                <span class="toggle-text">Full</span>
             </div>
         </div>
 
         <div class="divider"></div>
 
-        <div id="outSection" style="display:none;">
-            <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; position: relative;">
+        <div id="outSection" class="card" style="padding:0; display:none;">
+            <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; padding: 12px; position: relative;">
                 <div id="outLineLayer"></div>
                 <div class="card" style="padding:0;">
                     <div style="padding:8px 12px; font-weight:900;" class="vc-subtitle">
@@ -2913,13 +3006,13 @@ $fmtVnd = function (int $v): string {
                     <button class="mid-btn" id="outLinkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
                     <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
                         <div>←</div>
-                        <div id="outSelSepaySum">0</div>
+                        <div id="outSelSepaySum">0 ₫</div>
                         <div style="height: 10px;"></div>
                         <div>→</div>
-                        <div id="outSelPosterSum">0</div>
+                        <div id="outSelPosterSum">0 ₫</div>
                         <div style="height: 10px;"></div>
                         <div id="outSelMatch" style="font-size: 16px; color: #34d399;">✅</div>
-                        <div id="outSelDiff" style="font-weight: 900;">0</div>
+                        <div id="outSelDiff" style="font-weight: 900;">0 ₫</div>
                     </div>
                 </div>
                 <div class="card" style="padding:0;">
@@ -2928,7 +3021,7 @@ $fmtVnd = function (int $v): string {
                         <table id="outPosterTable">
                             <thead>
                                 <tr>
-                                    <th></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
+                                    <th class="col-out-anchor2"></th><th class="col-out-select2"></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -2939,25 +3032,25 @@ $fmtVnd = function (int $v): string {
         </div>
 
         <div class="grid" id="tablesRoot">
-            <div class="confirm-backdrop" id="kashshiftModal" style="display:none; z-index: 9999; align-items: flex-start; padding-top: 5vh;">
+            <div class="confirm-backdrop" id="kashshiftModal" style="display:none; z-index: 9999;">
                 <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
                         <h3 style="margin:0;">KashShift</h3>
                         <button type="button" class="btn2" id="kashshiftClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
                     </div>
-                    <div class="body" id="kashshiftBody" style="max-height: 85vh; overflow: auto;">
+                    <div class="body" id="kashshiftBody" style="max-height: 70vh; overflow: auto;">
                         <div style="text-align:center;">Загрузка...</div>
                     </div>
                 </div>
             </div>
 
-            <div class="confirm-backdrop" id="suppliesModal" style="display:none; z-index: 9999; align-items: flex-start; padding-top: 5vh;">
+            <div class="confirm-backdrop" id="suppliesModal" style="display:none; z-index: 9999;">
                 <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
                         <h3 style="margin:0;">Supplies</h3>
                         <button type="button" class="btn2" id="suppliesClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
                     </div>
-                    <div class="body" id="suppliesBody" style="max-height: 85vh; overflow: auto;">
+                    <div class="body" id="suppliesBody" style="max-height: 70vh; overflow: auto;">
                         <div style="text-align:center;">Загрузка...</div>
                     </div>
                 </div>
@@ -3062,13 +3155,13 @@ $fmtVnd = function (int $v): string {
                 <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
                 <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
                     <div>←</div>
-                    <div id="selSepaySum">0</div>
+                    <div id="selSepaySum">0 ₫</div>
                     <div style="height: 10px;"></div>
                     <div>→</div>
-                    <div id="selPosterSum">0</div>
+                    <div id="selPosterSum">0 ₫</div>
                     <div style="height: 10px;"></div>
                     <div id="selMatch" style="font-size: 16px;">❗</div>
-                    <div id="selDiff" style="font-weight: 900;">0</div>
+                    <div id="selDiff" style="font-weight: 900;">0 ₫</div>
                 </div>
                 <div class="muted mid-legend" style="text-align:center; font-weight:900; line-height: 1.35;">
                     <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>Авто 1</div>
@@ -3195,53 +3288,29 @@ $fmtVnd = function (int $v): string {
 
         <div class="bottom-two">
         <div class="card card-finance">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
-                <div style="font-weight: 900;">Финансовые транзакции</div>
-                <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить">🔄</button>
-            </div>
+            <div style="font-weight: 900; margin-bottom: 10px;">Финансовые транзакции</div>
 
             <?php
             $vietnamCents = $financeVietnamCents;
             $tipsCents = $financeTipsCents;
             $vietnamVnd = $vietnamCents !== null ? $posterCentsToVnd((int)$vietnamCents) : null;
             $tipsVnd = $tipsCents !== null ? $posterCentsToVnd((int)$tipsCents) : null;
+            $vietnamDisabled = $transferVietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
+            $tipsDisabled = $transferTipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             $vietnamDisabledReason = $vietnamCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за выбранный период.';
             $tipsDisabledReason = $tipsCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.';
-
-            $vietnamFound = [];
-            if ($vietnamVnd !== null) {
-                foreach ($transferVietnamFoundList as $f) {
-                    if (!is_array($f)) continue;
-                    $sumMinor = (int)($f['sum_minor'] ?? 0);
-                    $sumVnd = (int)$posterCentsToVnd($sumMinor);
-                    if ($sumVnd !== (int)$vietnamVnd) continue;
-                    $vietnamFound[] = $f;
-                }
-            }
-
-            $tipsFound = [];
-            if ($tipsVnd !== null) {
-                foreach ($transferTipsFoundList as $f) {
-                    if (!is_array($f)) continue;
-                    $sumMinor = (int)($f['sum_minor'] ?? 0);
-                    $sumVnd = (int)$posterCentsToVnd($sumMinor);
-                    if ($sumVnd !== (int)$tipsVnd) continue;
-                    $tipsFound[] = $f;
-                }
-            }
-
-            $vietnamExists = count($vietnamFound) > 0;
-            $tipsExists = count($tipsFound) > 0;
-            $vietnamDisabled = $vietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
-            $tipsDisabled = $tipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             ?>
 
             <div class="finance-row">
-                <form method="POST" class="finance-transfer" style="width:100%;"
+                <div class="finance-left">
+                    <div style="font-weight:900;">Vietnam Company — Card payments</div>
+                    <div class="muted"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
+                </div>
+                <form method="POST" class="finance-transfer"
                       data-kind="vietnam"
                       data-date-from="<?= htmlspecialchars($dateFrom) ?>"
                       data-date-to="<?= htmlspecialchars($dateTo) ?>"
@@ -3249,56 +3318,63 @@ $fmtVnd = function (int $v): string {
                       data-account-to-id="9"
                       data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
                       data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[9]['name'] ?? '#9')) ?>"
-                      data-sum-vnd="<?= htmlspecialchars((string)($vietnamVnd !== null ? (int)$vietnamVnd : 0)) ?>">
+                      data-sum-vnd="<?= htmlspecialchars((string)($vietnamVnd !== null ? (int)$vietnamVnd : 0)) ?>"
+                      style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="vietnam">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <div style="display:flex; align-items:center; gap: 10px;">
-                        <div style="font-weight:900; white-space:nowrap;">Vietnam Company</div>
-                        <div style="flex:1; text-align:center; font-weight:900;"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
-                        <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
-                    </div>
-                    <div class="muted finance-status" style="margin-top: 6px;">
-                        <?php if ($vietnamExists): ?>
-                            <div style="overflow-x:auto; max-width:100%;">
-                                <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
-                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
-                                    <tbody>
-                                    <?php foreach ($vietnamFound as $f): ?>
-                                        <?php
-                                            $ts = (int)($f['ts'] ?? 0);
-                                            $sumMinor = (int)($f['sum_minor'] ?? 0);
-                                            $sumVnd = (int)$posterCentsToVnd($sumMinor);
-                                            $tRaw = (string)($f['type'] ?? '');
-                                            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-                                            $sumSignedVnd = $isOut ? -$sumVnd : $sumVnd;
-                                            $cmt = trim((string)($f['comment'] ?? ''));
-                                            $u = trim((string)($f['user'] ?? ''));
-                                            $commentText = $u !== '' ? "$cmt ($u)" : $cmt;
-                                            $dateStr = date('d.m.Y', $ts);
-                                            $timeStr = date('H:i:s', $ts);
-                                        ?>
-                                        <tr>
-                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
-                                            <td class="sum" style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
-                                            <td style="padding:2px 4px; line-height:1.2;"><?= htmlspecialchars($commentText) ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
+                    <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать перевод</button>
+                    <div class="muted finance-status" style="width:100%; overflow-x:auto;">
+                        <?php if ($transferVietnamExists): ?>
+                            <table style="width:100%; border-collapse:collapse; margin-top:5px; font-size:12px; white-space:nowrap;">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Дата</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Время</th>
+                                        <th style="text-align:right; padding:2px 4px; border-bottom:1px solid var(--border);">Сумма</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Кто</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Тип</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Комментарий</th>
+                                        <th style="width:1%; padding:2px 4px; border-bottom:1px solid var(--border);"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($transferVietnamFoundList as $f): ?>
+                                    <?php
+                                        $ts = (int)($f['ts'] ?? 0);
+                                        $sumMinor = (int)($f['sum_minor'] ?? 0);
+                                        $cmt = trim((string)($f['comment'] ?? ''));
+                                        $u = trim((string)($f['user'] ?? ''));
+                                        $sumVnd = $posterCentsToVnd($sumMinor);
+                                    ?>
+                                    <tr>
+                                        <td style="padding:2px 4px;"><?= date('d.m.Y', $ts) ?></td>
+                                        <td style="padding:2px 4px;"><?= date('H:i:s', $ts) ?></td>
+                                        <td style="padding:2px 4px; text-align:right; <?= $sumVnd === (int)$vietnamVnd ? 'color:#81c784;' : '' ?>"><?= htmlspecialchars($fmtVnd($sumVnd)) ?></td>
+                                        <td style="padding:2px 4px;"><?= htmlspecialchars($u) ?></td>
+                                        <td style="padding:2px 4px;">Перевод</td>
+                                        <td style="padding:2px 4px; white-space:normal; min-width:120px;"><?= htmlspecialchars($cmt) ?></td>
+                                        <td style="padding:2px 4px;">
+                                            <button type="button" class="finance-del btn2" data-kind="vietnam" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-from="<?= htmlspecialchars($dateFrom) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" style="padding:2px 6px; color:#f87171; border-color:#f87171;" title="Скрыть транзакцию">✕</button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         <?php elseif ($vietnamDisabled): ?>
                             <?= htmlspecialchars($vietnamDisabledReason) ?>
-                        <?php else: ?>
-                            <span style="color:var(--muted);">Транзакция не найдена</span>
                         <?php endif; ?>
                     </div>
                 </form>
             </div>
 
             <div class="finance-row">
-                <form method="POST" class="finance-transfer" style="width:100%;"
+                <div class="finance-left">
+                    <div style="font-weight:900;">Card tips per shift</div>
+                    <div class="muted"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
+                </div>
+                <form method="POST" class="finance-transfer"
                       data-kind="tips"
                       data-date-from="<?= htmlspecialchars($dateFrom) ?>"
                       data-date-to="<?= htmlspecialchars($dateTo) ?>"
@@ -3306,60 +3382,63 @@ $fmtVnd = function (int $v): string {
                       data-account-to-id="8"
                       data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
                       data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[8]['name'] ?? '#8')) ?>"
-                      data-sum-vnd="<?= htmlspecialchars((string)($tipsVnd !== null ? (int)$tipsVnd : 0)) ?>">
+                      data-sum-vnd="<?= htmlspecialchars((string)($tipsVnd !== null ? (int)$tipsVnd : 0)) ?>"
+                      style="display:flex; flex-direction:column; align-items:flex-end; gap: 4px;">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="tips">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <div style="display:flex; align-items:center; gap: 10px;">
-                        <div style="font-weight:900; white-space:nowrap;">Tips</div>
-                        <div style="flex:1; text-align:center; font-weight:900;"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
-                        <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
-                    </div>
-                    <div class="muted finance-status" style="margin-top: 6px;">
-                        <?php if ($tipsExists): ?>
-                            <div style="overflow-x:auto; max-width:100%;">
-                                <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
-                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
-                                    <tbody>
-                                    <?php foreach ($tipsFound as $f): ?>
-                                        <?php
-                                            $ts = (int)($f['ts'] ?? 0);
-                                            $sumMinor = (int)($f['sum_minor'] ?? 0);
-                                            $sumVnd = (int)$posterCentsToVnd($sumMinor);
-                                            $tRaw = (string)($f['type'] ?? '');
-                                            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-                                            $sumSignedVnd = $isOut ? -$sumVnd : $sumVnd;
-                                            $cmt = trim((string)($f['comment'] ?? ''));
-                                            $u = trim((string)($f['user'] ?? ''));
-                                            $commentText = $u !== '' ? "$cmt ($u)" : $cmt;
-                                            $dateStr = date('d.m.Y', $ts);
-                                            $timeStr = date('H:i:s', $ts);
-                                        ?>
-                                        <tr>
-                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
-                                            <td class="sum" style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
-                                            <td style="padding:2px 4px; line-height:1.2;"><?= htmlspecialchars($commentText) ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
+                    <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать перевод</button>
+                    <div class="muted finance-status" style="width:100%; overflow-x:auto;">
+                        <?php if ($transferTipsExists): ?>
+                            <table style="width:100%; border-collapse:collapse; margin-top:5px; font-size:12px; white-space:nowrap;">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Дата</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Время</th>
+                                        <th style="text-align:right; padding:2px 4px; border-bottom:1px solid var(--border);">Сумма</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Кто</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Тип</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Комментарий</th>
+                                        <th style="width:1%; padding:2px 4px; border-bottom:1px solid var(--border);"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($transferTipsFoundList as $f): ?>
+                                    <?php
+                                        $ts = (int)($f['ts'] ?? 0);
+                                        $sumMinor = (int)($f['sum_minor'] ?? 0);
+                                        $cmt = trim((string)($f['comment'] ?? ''));
+                                        $u = trim((string)($f['user'] ?? ''));
+                                        $sumVnd = $posterCentsToVnd($sumMinor);
+                                    ?>
+                                    <tr>
+                                        <td style="padding:2px 4px;"><?= date('d.m.Y', $ts) ?></td>
+                                        <td style="padding:2px 4px;"><?= date('H:i:s', $ts) ?></td>
+                                        <td style="padding:2px 4px; text-align:right; <?= $sumVnd === (int)$tipsVnd ? 'color:#81c784;' : '' ?>"><?= htmlspecialchars($fmtVnd($sumVnd)) ?></td>
+                                        <td style="padding:2px 4px;"><?= htmlspecialchars($u) ?></td>
+                                        <td style="padding:2px 4px;">Перевод</td>
+                                        <td style="padding:2px 4px; white-space:normal; min-width:120px;"><?= htmlspecialchars($cmt) ?></td>
+                                        <td style="padding:2px 4px;">
+                                            <button type="button" class="finance-del btn2" data-kind="tips" data-transfer-id="<?= (int)($f['transfer_id'] ?? 0) ?>" data-tx-id="<?= (int)($f['transaction_id'] ?? 0) ?>" data-date-from="<?= htmlspecialchars($dateFrom) ?>" data-date-to="<?= htmlspecialchars($dateTo) ?>" style="padding:2px 6px; color:#f87171; border-color:#f87171;" title="Скрыть транзакцию">✕</button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         <?php elseif ($tipsDisabled): ?>
                             <?= htmlspecialchars($tipsDisabledReason) ?>
-                        <?php else: ?>
-                            <span style="color:var(--muted);">Транзакция не найдена</span>
                         <?php endif; ?>
                     </div>
                 </form>
             </div>
         </div>
         <div class="card card-balances">
-            <div style="display:flex; justify-content:flex-start; align-items:center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 10px; margin-bottom: 10px;">
                 <div style="font-weight: 900;">Обновляем Балансы Poster</div>
                 <div style="display:flex; gap: 8px; align-items:center;">
                     <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
-                    <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" style="padding: 4px 10px;">🔄</button>
+                    <button class="btn" id="posterAccountsBtn" type="button" title="Обновить балансы">🔄</button>
                 </div>
             </div>
 
@@ -3375,7 +3454,7 @@ $fmtVnd = function (int $v): string {
                     </thead>
                     <tbody>
                     <tr data-key="andrey">
-                        <td style="font-weight:900;">Счет Андрей</td>
+                        <td style="font-weight:900;">Баланс Счета Андрей</td>
                         <td style="text-align:right;">
                             <span id="balAndrey" data-cents="<?= $posterBalanceAndrey !== null ? (int)$posterBalanceAndrey : '' ?>"><?= $posterBalanceAndrey !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceAndrey)) : '—' ?></span>
                         </td>
@@ -3383,7 +3462,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;"><span id="balAndreyDiff">—</span></td>
                     </tr>
                     <tr data-key="vietnam">
-                        <td style="font-weight:900;">Вьет. счет</td>
+                        <td style="font-weight:900;">Баланс вьетнамской компании</td>
                         <td style="text-align:right;">
                             <span id="balVietnam" data-cents="<?= $posterBalanceVietnam !== null ? (int)$posterBalanceVietnam : '' ?>"><?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceVietnam)) : '—' ?></span>
                         </td>
@@ -3391,7 +3470,7 @@ $fmtVnd = function (int $v): string {
                         <td style="text-align:right;"><span id="balVietnamDiff">—</span></td>
                     </tr>
                     <tr data-key="cash">
-                        <td style="font-weight:900;">Касса</td>
+                        <td style="font-weight:900;">Баланс кассы</td>
                         <td style="text-align:right;">
                             <span id="balCash" data-cents="<?= $posterBalanceCash !== null ? (int)$posterBalanceCash : '' ?>"><?= $posterBalanceCash !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceCash)) : '—' ?></span>
                         </td>
@@ -3484,18 +3563,18 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const fmtVnd2 = (v) => {
         try {
-            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0)).replace(/,/g, '\u202F');
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(v) || 0) + ' ₫';
         } catch (_) {
-            const num = Math.round(Number(v) || 0);
-            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
+            const num = Number(v) || 0;
+            return num.toFixed(2) + ' ₫';
         }
     };
     const fmtVnd0 = (v) => {
         try {
-            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0)).replace(/,/g, '\u202F');
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0));
         } catch (_) {
             const num = Math.round(Number(v) || 0);
-            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         }
     };
     const formatOutDT = (txTime, dateStr) => {
@@ -3598,11 +3677,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
                     <td class="col-out-content">${escapeHtml(contentShow)}</td>
                     <td class="nowrap col-out-time"><div class="col-out-date-part">${escapeHtml(dt.date)}</div><div class="col-out-time-part">${escapeHtml(dt.time)}</div></td>
-                    <td class="sum col-out-sum">${Math.round(Number(row.amount || 0)).toLocaleString('en-US').replace(/,/g, '\u202F')}</td>
+                    <td class="sum col-out-sum">−${Number(row.amount || 0).toLocaleString('en-US')} ₫</td>
                     <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
                     <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
                 `;
                 tbody.appendChild(tr);
+
             });
             return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
         }).then((j2) => {
@@ -3668,21 +3748,56 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const userName = String(emps && emps[Number(row.user_id || 0)] ? emps[Number(row.user_id || 0)] : row.user_id || '');
                 let catName = String(cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : row.category_id || '');
                 if (catName === 'book_category_action_supplies') catName = 'поставки';
+                const amountColor = rawAmount > 0 ? 'color: var(--green);' : (rawAmount < 0 ? 'color: var(--red);' : '');
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
                 tr.setAttribute('data-sum', String(amountInt));
                 const dt2 = formatOutDT('', row.date);
                 tr.innerHTML = `
-                    <td class="nowrap"><div class="cell-anchor"><span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></div></td>
+                    <td class="col-out-anchor2"><span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span></td>
+                    <td class="nowrap col-out-select2"><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
                     <td class="nowrap col-out-date"><div class="col-out-date-date">${escapeHtml(dt2.date)}</div><div class="col-out-date-time">${escapeHtml(dt2.time)}</div></td>
                     <td class="col-out-user">${escapeHtml(userName)}</td>
                     <td class="col-out-category">${escapeHtml(catName)}</td>
                     <td class="col-out-type">${Number(row.type || 0)}</td>
-                    <td class="sum col-out-amount">${sign}${fmtVnd0(amountInt)}</td>
+                    <td class="sum col-out-amount" style="${amountColor}">${sign}${fmtVnd0(amountInt)}</td>
                     <td class="sum col-out-balance">${fmtVnd0(balanceInt)}</td>
                     <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
                 `;
                 tbody.appendChild(tr);
+                if (rawAmount > 0) {
+                    const inPosterTbody = document.querySelector('#posterTable tbody');
+                    if (inPosterTbody) {
+                        const trIn = document.createElement('tr');
+                        trIn.setAttribute('data-poster-id', String(row.transaction_id || 0));
+                        trIn.setAttribute('data-total', String(amountInt));
+                        trIn.className = 'row-out-positive';
+                        const dtIn = formatOutDT('', row.date);
+                        trIn.innerHTML = `
+                            <td class="nowrap col-poster-dot"><span class="anchor" id="poster-${Number(row.transaction_id || 0)}"></span></td>
+                            <td class="nowrap col-poster-num">${Number(row.transaction_id || 0)}</td>
+                            <td class="nowrap col-poster-time">${escapeHtml(dtIn.time)}</td>
+                            <td class="sum col-poster-card">${fmtVnd0(amountInt)}</td>
+                            <td class="sum col-poster-tips">0 ₫</td>
+                            <td class="sum col-poster-total">${fmtVnd0(amountInt)}</td>
+                            <td class="col-poster-method">${escapeHtml(catName)}</td>
+                            <td class="col-poster-waiter">${escapeHtml(userName)}</td>
+                            <td class="nowrap col-poster-table">${escapeHtml(row.comment || '—')}</td>
+                            <td class="col-poster-cb"><input type="checkbox" class="poster-cb" data-id="${Number(row.transaction_id || 0)}"></td>
+                        `;
+                        inPosterTbody.appendChild(trIn);
+                        const newCb = trIn.querySelector('input.poster-cb');
+                        if (newCb) {
+                            newCb.addEventListener('change', () => {
+                                const id = Number(newCb.getAttribute('data-id') || 0);
+                                if (!id) return;
+                                if (newCb.checked) selectedPoster.add(id);
+                                else selectedPoster.delete(id);
+                                updateLinkButtonState();
+                            });
+                        }
+                    }
+                }
             });
             applyOutRowClasses();
             applyOutHideLinked();
@@ -3849,9 +3964,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const rootRect = outGrid.getBoundingClientRect();
         const w = Math.max(1, Math.round(rootRect.width));
         const h = Math.max(1, Math.round(rootRect.height));
-        const scrollW = outGrid.scrollWidth || w;
-        outSvgState.svg.setAttribute('viewBox', `0 0 ${scrollW} ${h}`);
-        outSvgState.svg.style.width = scrollW + 'px';
+        outSvgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
 
         outLinks.forEach((l) => {
             const s = document.getElementById('out-sepay-' + l.mail_uid);
@@ -3863,22 +3976,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const size = 2;
             const color = colorFor(l.link_type, l.link_type === 'manual');
 
-            const a0 = outGetAnchorPoint(s, 'right', rootRect);
-            const b0 = outGetAnchorPoint(p, 'left', rootRect);
+            const a0 = getAnchorPoint(s, 'right', rootRect);
+            const b0 = getAnchorPoint(p, 'left', rootRect);
             if (a0.y < 0 || b0.y < 0 || a0.y > h || b0.y > h) return;
-            
-            if (outSepayScroll) {
-                const sr = outSepayScroll.getBoundingClientRect();
-                a0.x = Math.max(sr.left - rootRect.left + outGrid.scrollLeft, Math.min(sr.right - rootRect.left + outGrid.scrollLeft, a0.x));
-            }
-            if (outPosterScroll) {
-                const sr = outPosterScroll.getBoundingClientRect();
-                b0.x = Math.max(sr.left - rootRect.left + outGrid.scrollLeft, Math.min(sr.right - rootRect.left + outGrid.scrollLeft, b0.x));
-            }
-
             const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-            const a = { x: clamp(a0.x, 0, w + outGrid.scrollLeft), y: clamp(a0.y, 0, h) };
-            const b = { x: clamp(b0.x, 0, w + outGrid.scrollLeft), y: clamp(b0.y, 0, h) };
+            const a = { x: clamp(a0.x, 0, w), y: clamp(a0.y, 0, h) };
+            const b = { x: clamp(b0.x, 0, w), y: clamp(b0.y, 0, h) };
             const dx = b.x - a.x;
             const cdx = Math.min(120, Math.max(40, Math.abs(dx) * 0.35));
             const c1x = a.x + cdx;
@@ -3916,7 +4019,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const tBtn = Math.min(0.99, Math.max(0.75, 1 - (insetPx / lenBtn)));
                 const mx = a.x + dxBtn * tBtn;
                 const my = a.y + dyBtn * tBtn;
-                const localX = Math.max(8, Math.min(scrollW - 8, mx));
+                const localX = Math.max(8, Math.min(w - 8, mx));
                 const localY = Math.max(8, Math.min(h - 8, my));
                 btn.style.left = Math.round(localX - 8) + 'px';
                 btn.style.top = Math.round(localY - 8) + 'px';
@@ -3968,9 +4071,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             return acc + Number(tr.getAttribute('data-sum') || 0);
         }, 0);
         const diff = Math.abs(sumMail - sumFin);
-        if (outSelSepaySumEl) outSelSepaySumEl.textContent = Math.round(Number(sumMail)).toLocaleString('en-US').replace(/,/g, '\u202F');
-        if (outSelPosterSumEl) outSelPosterSumEl.textContent = Math.round(Number(sumFin)).toLocaleString('en-US').replace(/,/g, '\u202F');
-        if (outSelDiffEl) outSelDiffEl.textContent = Math.round(Number(diff)).toLocaleString('en-US').replace(/,/g, '\u202F');
+        if (outSelSepaySumEl) outSelSepaySumEl.textContent = Number(sumMail).toLocaleString('en-US') + ' ₫';
+        if (outSelPosterSumEl) outSelPosterSumEl.textContent = Number(sumFin).toLocaleString('en-US') + ' ₫';
+        if (outSelDiffEl) outSelDiffEl.textContent = Number(diff).toLocaleString('en-US') + ' ₫';
         if (outSelMatchEl) outSelMatchEl.style.color = diff === 0 ? '#16a34a' : '#dc2626';
         if (outLinkMakeBtn) outLinkMakeBtn.disabled = (outSelectedMail.size === 0 || outSelectedFin.size === 0);
     };
@@ -4268,13 +4371,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                             }
                             if (j.ok) {
                                 updateBtnBusy(btn, { pct: 100, title: 'Готово. Обновление...' });
-                                setTimeout(() => { window.location.href = window.location.href; }, 400);
+                                setTimeout(() => location.reload(), 400);
                                 return;
                             }
                         } catch(e) {}
                     }
                 }
-                window.location.href = window.location.href;
+                location.reload();
             } catch (err) {
                 alert(err && err.message ? err.message : 'Ошибка');
                 restore();
@@ -4301,18 +4404,19 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const balCashDiffEl = document.getElementById('balCashDiff');
     const balTotalDiffEl = document.getElementById('balTotalDiff');
 
-    const fmtIntSpaces = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
+    const fmtIntSpaces = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     const fmtVndCentsJs = (cents) => {
         const c = Number(cents || 0) || 0;
         const neg = c < 0;
-        const abs = Math.abs(c);
-        const i = Math.round(abs / 100);
-        return (neg && i > 0 ? '-' : '') + fmtIntSpaces(i);
+        const abs = Math.abs(Math.trunc(c));
+        const i = Math.floor(abs / 100);
+        const f = abs % 100;
+        return (neg ? '-' : '') + fmtIntSpaces(i) + '.' + String(f).padStart(2, '0') + ' ₫';
     };
     const parseVndCentsJs = (raw) => {
         const s = String(raw || '').trim();
         if (!s) return null;
-        const cleaned = s.replace(/[^\d.,-]/g, '').replaceAll('\u202F', '').replaceAll(' ', '').replaceAll(',', '.').trim();
+        const cleaned = s.replace(/[^\d.,-]/g, '').replaceAll(' ', '').replaceAll(',', '.').trim();
         if (!cleaned) return null;
         const n = Number(cleaned);
         if (!Number.isFinite(n)) return null;
@@ -4323,7 +4427,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const d = String(digits || '').replace(/\D+/g, '');
         if (!d) return '';
         const norm = d.replace(/^0+(?=\d)/, '');
-        return norm.replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
+        return norm.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     };
     const sanitizeInputVndInt = (el) => {
         if (!el) return;
@@ -4404,7 +4508,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     posterAccountsTbody.innerHTML = rows.map((a) => {
                         const id = Number(a.account_id || 0);
                         const name = String(a.name || '');
-                        const bal = String(a.balance || '0');
+                        const bal = String(a.balance || '0 ₫');
                         return `<tr>
                             <td style="padding: 8px 10px;">${String(id)}</td>
                             <td style="padding: 8px 10px;">${escapeHtml(name)}</td>
@@ -4479,7 +4583,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const type = Number(p.type || 0);
                 const action = type === 1 ? 'Начислить' : 'Списать';
                 const accLabel = accName ? `счёт ${accId} (${accName})` : `счёт ${accId}`;
-                const ok = confirm(`${action} ${sum} на ${accLabel}?\nКомментарий: ${String(p.comment || '')}`);
+                const ok = confirm(`${action} ${sum} ₫ на ${accLabel}?\nКомментарий: ${String(p.comment || '')}`);
                 if (!ok) return null;
 
                 const nonce = String(j.nonce || '');
@@ -4587,23 +4691,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
     const getAnchorPoint = (el, side, rootRect) => {
         const r = el.getBoundingClientRect();
-        // Shift X coordinate by tablesRoot scrollLeft
-        const scrollLeft = tablesRoot ? tablesRoot.scrollLeft : 0;
-        const cx = (r.left + r.width / 2) - rootRect.left + scrollLeft;
+        const cx = (r.left + r.width / 2) - rootRect.left;
         const cy = (r.top + r.height / 2) - rootRect.top;
         const x = Math.round(cx) + 0.5;
         let y = Math.round(cy) + 0.5;
-        return { x, y };
-    };
-
-    const outGetAnchorPoint = (el, side, rootRect) => {
-        const r = el.getBoundingClientRect();
-        // Shift X coordinate by outGrid scrollLeft
-        const scrollLeft = outGrid ? outGrid.scrollLeft : 0;
-        const cx = (r.left + r.width / 2) - rootRect.left + scrollLeft;
-        const cy = (r.top + r.height / 2) - rootRect.top;
-        const x = Math.round(cx) + 0.5;
-        let y = Math.round(cy) + 0.5;
+        const id = String(el.id || '');
+        if (id.startsWith('out-')) y -= 5;
         return { x, y };
     };
 
@@ -4641,9 +4734,9 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
     const fmtVnd = (v) => {
         try {
-            return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(Number(v) || 0)).replace(/,/g, '\u202F');
+            return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Number(v) || 0) + ' ₫';
         } catch (_) {
-            return String(Math.round(Number(v) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
+            return String(v) + ' ₫';
         }
     };
 
@@ -4831,11 +4924,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         const rootRect = tablesRoot.getBoundingClientRect();
         const w = Math.max(1, Math.round(rootRect.width));
         const h = Math.max(1, Math.round(rootRect.height));
-        
-        const scrollW = tablesRoot.scrollWidth || w;
-        svgState.svg.setAttribute('viewBox', `0 0 ${scrollW} ${h}`);
-        svgState.svg.style.width = scrollW + 'px';
-        
+        svgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
         widgets.forEach((btn) => { btn.style.display = 'none'; });
 
         const isVisibleInScrollY = (el, scrollEl) => {
@@ -4872,21 +4961,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
             const a0 = getAnchorPoint(s, 'right', rootRect);
             const b0 = getAnchorPoint(p, 'left', rootRect);
-            
-            if (a0.y < -50 || b0.y < -50 || a0.y > h + 50 || b0.y > h + 50) return;
-
-            if (sepayScroll) {
-                const sr = sepayScroll.getBoundingClientRect();
-                a0.x = Math.max(sr.left - rootRect.left + tablesRoot.scrollLeft, Math.min(sr.right - rootRect.left + tablesRoot.scrollLeft, a0.x));
-            }
-            if (posterScroll) {
-                const sr = posterScroll.getBoundingClientRect();
-                b0.x = Math.max(sr.left - rootRect.left + tablesRoot.scrollLeft, Math.min(sr.right - rootRect.left + tablesRoot.scrollLeft, b0.x));
-            }
+            if (a0.y < 0 || b0.y < 0 || a0.y > h || b0.y > h) return;
 
             const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-            const a = { x: clamp(a0.x, 0, w + tablesRoot.scrollLeft), y: clamp(a0.y, 0, h) };
-            const b = { x: clamp(b0.x, 0, w + tablesRoot.scrollLeft), y: clamp(b0.y, 0, h) };
+            const a = { x: clamp(a0.x, 0, w), y: clamp(a0.y, 0, h) };
+            const b = { x: clamp(b0.x, 0, w), y: clamp(b0.y, 0, h) };
 
             const dx = b.x - a.x;
             const cdx = Math.min(120, Math.max(40, Math.abs(dx) * 0.35));
@@ -4925,7 +5004,384 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 const tBtn = Math.min(0.99, Math.max(0.75, 1 - (insetPx / lenBtn)));
                 const mx = a.x + dxBtn * tBtn;
                 const my = a.y + dyBtn * tBtn;
-                const localX = Math.max(8, Math.min(scrollW - 8, mx));
+                const localX = Math.max(8, Math.min(w - 8, mx));
+                const localY = Math.max(8, Math.min(h - 8, my));
+                btn.style.left = Math.round(localX - 8) + 'px';
+                btn.style.top = Math.round(localY - 8) + 'px';
+                btn.style.display = 'flex';
+            }
+        });
+    };
+
+    const positionLines = () => {
+        drawLines();
+    };
+
+    const positionWidgets = () => {
+        return;
+    };
+
+    const tablesRoot = document.getElementById('tablesRoot');
+    const lineLayer = document.getElementById('lineLayer');
+    const sepayScroll = document.getElementById('sepayScroll');
+    const posterScroll = document.getElementById('posterScroll');
+
+    let relayoutRaf = 0;
+    const scheduleRelayout = () => {
+        if (relayoutRaf) return;
+        relayoutRaf = requestAnimationFrame(() => {
+            relayoutRaf = 0;
+            positionLines();
+            positionWidgets();
+        });
+    };
+    const scheduleRelayoutBurst = () => {
+        scheduleRelayout();
+        setTimeout(scheduleRelayout, 50);
+        setTimeout(scheduleRelayout, 200);
+        setTimeout(scheduleRelayout, 600);
+    };
+
+    if (tablesRoot) {
+        tablesRoot.addEventListener('scroll', () => scheduleRelayout(), { passive: true, capture: true });
+    }
+    if (sepayScroll) {
+        sepayScroll.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
+    }
+    if (posterScroll) {
+        posterScroll.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
+    }
+    window.addEventListener('resize', () => scheduleRelayoutBurst(), { passive: true });
+    window.addEventListener('pageshow', () => scheduleRelayoutBurst(), { passive: true });
+    try {
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => scheduleRelayoutBurst(), { passive: true });
+            window.visualViewport.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
+        }
+    } catch (_) {}
+
+    try {
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(() => scheduleRelayoutBurst());
+            if (tablesRoot) ro.observe(tablesRoot);
+            if (sepayScroll) ro.observe(sepayScroll);
+            if (posterScroll) ro.observe(posterScroll);
+        }
+    } catch (_) {}
+
+    window.addEventListener('load', () => {
+        drawLines();
+        applyRowClasses();
+        updateStats();
+        applyHideLinked();
+        scheduleRelayoutBurst();
+    });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            drawLines();
+            applyRowClasses();
+            updateStats();
+            applyHideLinked();
+            scheduleRelayoutBurst();
+        });
+    } else {
+        drawLines();
+        applyRowClasses();
+        updateStats();
+        applyHideLinked();
+        scheduleRelayoutBurst();
+    }
+
+    const sepayTable = document.getElementById('sepayTable');
+    const posterTable = document.getElementById('posterTable');
+    if (!sepayTable || !posterTable) return;
+
+    const selectedSepay = new Set();
+    const selectedPoster = new Set();
+
+    const linkMakeBtn = document.getElementById('linkMakeBtn');
+    const hideLinkedBtn = document.getElementById('hideLinkedBtn');
+    const linkAutoBtn = document.getElementById('linkAutoBtn');
+    const linkClearBtn = document.getElementById('linkClearBtn');
+    const selSepaySumEl = document.getElementById('selSepaySum');
+    const selPosterSumEl = document.getElementById('selPosterSum');
+    const selMatchEl = document.getElementById('selMatch');
+    const selDiffEl = document.getElementById('selDiff');
+
+    let hideLinked = false;
+    let hideVietnam = false;
+    try { hideVietnam = localStorage.getItem('payday_hide_vietnam') === '1'; } catch (e) {}
+    const toggleVietnamBtn = document.getElementById('toggleVietnamBtn');
+    let showSepayHidden = false;
+    try { showSepayHidden = localStorage.getItem('payday_show_sepay_hidden') === '1'; } catch (e) {}
+    const toggleSepayHiddenBtn = document.getElementById('toggleSepayHiddenBtn');
+
+    const updateSelectionSums = () => {
+        let sSum = 0;
+        selectedSepay.forEach((id) => {
+            const tr = document.querySelector(`#sepayTable tbody tr[data-sepay-id="${Number(id)}"]`);
+            if (!tr) return;
+            sSum += Number(tr.getAttribute('data-sum') || 0) || 0;
+        });
+        let pSum = 0;
+        selectedPoster.forEach((id) => {
+            const tr = document.querySelector(`#posterTable tbody tr[data-poster-id="${Number(id)}"]`);
+            if (!tr) return;
+            pSum += Number(tr.getAttribute('data-total') || 0) || 0;
+        });
+        if (selSepaySumEl) selSepaySumEl.textContent = fmtVnd(sSum);
+        if (selPosterSumEl) selPosterSumEl.textContent = fmtVnd(pSum);
+        if (selDiffEl) {
+            const diff = pSum - sSum;
+            selDiffEl.textContent = fmtVnd(Math.abs(diff));
+        }
+        if (selMatchEl) {
+            const ok = sSum === pSum;
+            selMatchEl.textContent = ok ? '✅' : '❗';
+            selMatchEl.style.color = ok ? '#16a34a' : '#dc2626';
+        }
+    };
+
+    const updateLinkButtonState = () => {
+        if (!linkMakeBtn) return;
+        const ok = (selectedSepay.size > 0 && selectedPoster.size > 0 && !(selectedSepay.size > 1 && selectedPoster.size > 1));
+        linkMakeBtn.disabled = !ok;
+        updateSelectionSums();
+    };
+
+    const updateHideButtonState = () => {
+        if (!hideLinkedBtn) return;
+        hideLinkedBtn.classList.toggle('active', hideLinked);
+    };
+
+    const updateVietnamButtonState = () => {
+        if (!toggleVietnamBtn) return;
+        toggleVietnamBtn.classList.toggle('on', hideVietnam);
+    };
+    const updateSepayHiddenButtonState = () => {
+        if (!toggleSepayHiddenBtn) return;
+        toggleSepayHiddenBtn.classList.toggle('on', showSepayHidden);
+    };
+
+    const clearCheckboxes = () => {
+        document.querySelectorAll('input.sepay-cb, input.poster-cb').forEach((cb) => {
+            cb.checked = false;
+        });
+        selectedSepay.clear();
+        selectedPoster.clear();
+        updateLinkButtonState();
+    };
+
+    const sendManualLinks = (sepayIds, posterIds) => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'manual_link'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sepay_ids: sepayIds, poster_transaction_ids: posterIds }),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            return refreshLinks();
+        });
+    };
+
+    const sendAutoLinks = () => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'auto_link'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            return refreshLinks();
+        });
+    };
+
+    const sendClearLinks = () => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'clear_links'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        })
+        .then((r) => r.json())
+        .then((j) => {
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            return refreshLinks();
+        });
+    };
+
+    const applyHideLinked = () => {
+        const state = buildLinkState();
+        document.querySelectorAll('#sepayTable tbody tr[data-sepay-id]').forEach((tr) => {
+            const sid = Number(tr.getAttribute('data-sepay-id') || 0);
+            const linked = state.sepay.has(sid);
+            const isHiddenRow = String(tr.getAttribute('data-hidden') || '0') === '1';
+            const hidden = (hideLinked && linked) || (isHiddenRow && !showSepayHidden);
+            tr.style.display = hidden ? 'none' : '';
+            if (hidden) {
+                const cb = tr.querySelector('input.sepay-cb');
+                if (cb) cb.checked = false;
+                selectedSepay.delete(sid);
+            }
+        });
+        document.querySelectorAll('#posterTable tbody tr[data-poster-id]').forEach((tr) => {
+            const isVietnam = String(tr.getAttribute('data-vietnam') || '0') === '1';
+            const pid = Number(tr.getAttribute('data-poster-id') || 0);
+            const linked = state.poster.has(pid);
+            const hidden = (hideLinked && linked) || (hideVietnam && isVietnam);
+            tr.style.display = hidden ? 'none' : '';
+            if (hidden) {
+                const cb = tr.querySelector('input.poster-cb');
+                if (cb) cb.checked = false;
+                selectedPoster.delete(pid);
+            }
+        });
+        updateLinkButtonState();
+        updateStats();
+    };
+
+    const bindInTableEvents = () => {
+        document.querySelectorAll('input.poster-cb').forEach((cb) => {
+            cb.addEventListener('change', () => {
+                const id = Number(cb.getAttribute('data-id') || 0);
+                if (!id) return;
+                if (cb.checked) selectedPoster.add(id);
+                else selectedPoster.delete(id);
+                updateLinkButtonState();
+            });
+        });
+    };
+    bindInTableEvents();
+
+    const refreshLinks = () => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'links'])) ?>;
+        return fetch(url)
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                const rows = Array.isArray(j.links) ? j.links : [];
+                links = rows.map((l) => ({
+                    poster_transaction_id: Number(l.poster_transaction_id || 0),
+                    sepay_id: Number(l.sepay_id || 0),
+                    link_type: String(l.link_type || ''),
+                    is_manual: !!l.is_manual,
+                }));
+                drawLines();
+                applyRowClasses();
+                updateStats();
+                applyHideLinked();
+                setTimeout(() => { positionLines(); positionWidgets(); }, 0);
+                setTimeout(() => { positionLines(); positionWidgets(); }, 200);
+            });
+    };
+
+    const unlink = (sepayId, posterId) => {
+        const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'unlink'])) ?>;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sepay_id: sepayId, poster_transaction_id: posterId }),
+        })
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                return refreshLinks();
+            });
+    };
+
+    const drawLines = () => {
+        ensureSvg();
+        clearLines();
+        syncButtons();
+        if (!tablesRoot || !svgState.svg || !svgState.group) return;
+        const rootRect = tablesRoot.getBoundingClientRect();
+        const w = Math.max(1, Math.round(rootRect.width));
+        const h = Math.max(1, Math.round(rootRect.height));
+        svgState.svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        widgets.forEach((btn) => { btn.style.display = 'none'; });
+
+        const isVisibleInScrollY = (el, scrollEl) => {
+            if (!el || !scrollEl) return false;
+            const tr = el.closest('tr');
+            if (!tr) return false;
+            if (!tr.getClientRects().length) return false;
+            if (tr.style.display === 'none') return false;
+            const r = tr.getBoundingClientRect();
+            const sr = scrollEl.getBoundingClientRect();
+            return r.bottom >= sr.top && r.top <= sr.bottom;
+        };
+
+        const sepayCount = {};
+        const posterCount = {};
+        links.forEach((l) => {
+            const sid = Number(l.sepay_id || 0);
+            const pid = Number(l.poster_transaction_id || 0);
+            if (sid) sepayCount[sid] = (sepayCount[sid] || 0) + 1;
+            if (pid) posterCount[pid] = (posterCount[pid] || 0) + 1;
+        });
+
+        links.forEach((l) => {
+            const s = document.getElementById('sepay-' + l.sepay_id);
+            const p = document.getElementById('poster-' + l.poster_transaction_id);
+            if (!s || !p) return;
+            if (!s.getClientRects().length || !p.getClientRects().length) return;
+            if (sepayScroll && !isVisibleInScrollY(s, sepayScroll)) return;
+            if (posterScroll && !isVisibleInScrollY(p, posterScroll)) return;
+            const isMany = (sepayCount[l.sepay_id] || 0) > 1 || (posterCount[l.poster_transaction_id] || 0) > 1;
+            const isMainGreen = !isMany && !l.is_manual && l.link_type === 'auto_green';
+            const size = 2;
+            const color = colorFor(l.link_type, l.is_manual);
+
+            const a0 = getAnchorPoint(s, 'right', rootRect);
+            const b0 = getAnchorPoint(p, 'left', rootRect);
+            if (a0.y < 0 || b0.y < 0 || a0.y > h || b0.y > h) return;
+
+            const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+            const a = { x: clamp(a0.x, 0, w), y: clamp(a0.y, 0, h) };
+            const b = { x: clamp(b0.x, 0, w), y: clamp(b0.y, 0, h) };
+
+            const dx = b.x - a.x;
+            const cdx = Math.min(120, Math.max(40, Math.abs(dx) * 0.35));
+            const c1x = a.x + cdx;
+            const c1y = a.y;
+            const c2x = b.x - cdx;
+            const c2y = b.y;
+            const d = `M ${a.x} ${a.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${b.x} ${b.y}`;
+
+            const ns = 'http://www.w3.org/2000/svg';
+            const outline = document.createElementNS(ns, 'path');
+            outline.setAttribute('d', d);
+            outline.setAttribute('fill', 'none');
+            outline.setAttribute('stroke', 'rgba(255,255,255,0.65)');
+            outline.setAttribute('stroke-width', String(size + 2));
+            outline.setAttribute('stroke-linecap', 'round');
+            outline.setAttribute('stroke-linejoin', 'round');
+            svgState.group.appendChild(outline);
+
+            const path = document.createElementNS(ns, 'path');
+            path.setAttribute('d', d);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', color);
+            path.setAttribute('stroke-width', String(size));
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            svgState.group.appendChild(path);
+
+            const key = String(l.sepay_id) + ':' + String(l.poster_transaction_id);
+            const btn = widgets.get(key);
+            if (btn) {
+                const dxBtn = b.x - a.x;
+                const dyBtn = b.y - a.y;
+                const lenBtn = Math.hypot(dxBtn, dyBtn) || 1;
+                const insetPx = 6;
+                const tBtn = Math.min(0.99, Math.max(0.75, 1 - (insetPx / lenBtn)));
+                const mx = a.x + dxBtn * tBtn;
+                const my = a.y + dyBtn * tBtn;
+                const localX = Math.max(8, Math.min(w - 8, mx));
                 const localY = Math.max(8, Math.min(h - 8, my));
                 btn.style.left = Math.round(localX - 8) + 'px';
                 btn.style.top = Math.round(localY - 8) + 'px';
@@ -5247,9 +5703,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     document.querySelectorAll('form.finance-transfer').forEach((form) => {
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            const btn = form.querySelector('button[type="submit"]');
+            const btn = form.querySelector('button.btn');
             const statusEl = form.querySelector('.finance-status');
             if (btn && btn.disabled) return;
+            if (btn) btn.disabled = true;
             const kind = String(form.getAttribute('data-kind') || '');
             const dateFrom = String(form.getAttribute('data-date-from') || '');
             const dateTo = String(form.getAttribute('data-date-to') || '');
@@ -5260,7 +5717,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             const accFromName = String(form.getAttribute('data-account-from-name') || '#1');
             const accToName = String(form.getAttribute('data-account-to-name') || (kind === 'vietnam' ? '#9' : '#8'));
             const sumVnd = Number(form.getAttribute('data-sum-vnd') || 0);
-            const sumTxt = sumVnd ? (Math.round(Number(sumVnd)).toLocaleString('en-US').replace(/,/g, '\u202F')) : '—';
+            const sumTxt = sumVnd ? (Number(sumVnd).toLocaleString('en-US') + ' ₫') : '—';
 
             const openConfirm = () => new Promise((resolve) => {
                 const backdrop = document.getElementById('financeConfirm');
@@ -5304,7 +5761,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             });
 
             openConfirm().then((confirmed) => {
-                if (!confirmed) return;
+                if (!confirmed) {
+                    if (btn) btn.disabled = false;
+                    return;
+                }
                 if (btn) {
                     btn.classList.add('loading');
                     btn.disabled = true;
@@ -5317,12 +5777,80 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 .then((r) => r.json())
                 .then((j) => {
                     if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                    const who = String(j.user || '').trim();
+                    if (statusEl) {
+                        const label = j.already ? 'Найдена транзакция:' : 'Транзакция создана:';
+                        let crossBtnHtml = '';
+                        if (j.already && j.tx_id) {
+                            crossBtnHtml = `<button type="button" class="btn2 js-del-dup" style="padding:2px 6px; color:#f87171; border-color:#f87171;" data-tx-id="${j.tx_id}" title="Скрыть транзакцию">✕</button>`;
+                        }
+                        
+                        const sumVal = Number(j.sum || 0);
+                        const isMatch = sumVal === sumVnd;
+                        const sumColor = isMatch ? 'color:#81c784;' : '';
+                        
+                        statusEl.innerHTML = `
+                            <div style="font-weight:900; color:#81c784; margin-bottom:4px;">${label}</div>
+                            <table style="width:100%; border-collapse:collapse; margin-top:5px; font-size:12px; white-space:nowrap;">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Дата</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Время</th>
+                                        <th style="text-align:right; padding:2px 4px; border-bottom:1px solid var(--border);">Сумма</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Кто</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Тип</th>
+                                        <th style="text-align:left; padding:2px 4px; border-bottom:1px solid var(--border);">Комментарий</th>
+                                        <th style="width:1%; padding:2px 4px; border-bottom:1px solid var(--border);"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td style="padding:2px 4px;">${escapeHtml(j.date || '')}</td>
+                                        <td style="padding:2px 4px;">${escapeHtml(j.time || '')}</td>
+                                        <td style="padding:2px 4px; text-align:right; ${sumColor}">${sumVal.toLocaleString('en-US')} ₫</td>
+                                        <td style="padding:2px 4px;">${escapeHtml(who)}</td>
+                                        <td style="padding:2px 4px;">Перевод</td>
+                                        <td style="padding:2px 4px; white-space:normal; min-width:120px;">${escapeHtml(j.comment || '')}</td>
+                                        <td style="padding:2px 4px;">${crossBtnHtml}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        `;
+                        
+                        if (j.already && j.tx_id) {
+                            const crossBtn = statusEl.querySelector('.js-del-dup');
+                            if (crossBtn) {
+                                crossBtn.addEventListener('click', () => {
+                                    const reason = prompt('Причина удаления (будет добавлена в комментарий):');
+                                    if (reason === null) return;
+                                    crossBtn.disabled = true;
+                                    crossBtn.innerHTML = '...';
+                                    fetch('?ajax=delete_duplicate_transfer', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            original: j.original,
+                                            reason: reason
+                                        })
+                                    })
+                                    .then(r => r.json())
+                                    .then(res => {
+                                        if (!res || !res.ok) throw new Error(res.error || 'Ошибка удаления');
+                                        statusEl.innerHTML = '<span style="color:#f87171;">Транзакция помечена как удаленная в Poster</span>';
+                                        if (btn) btn.disabled = false;
+                                    })
+                                    .catch(err => {
+                                        alert(err.message || 'Ошибка');
+                                        crossBtn.disabled = false;
+                                        crossBtn.innerHTML = '✕';
+                                    });
+                                });
+                            }
+                        }
+                    }
                     if (btn) {
                         btn.classList.remove('loading');
                         btn.disabled = true;
-                    }
-                    if (typeof refreshFinanceForm === 'function') {
-                        refreshFinanceForm(form, { showLoading: false });
                     }
                 })
                 .catch((err) => {
@@ -5336,98 +5864,28 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             });
         });
     });
-    const renderFinanceTable = (form, rows) => {
-        const expectedSum = Number(form.getAttribute('data-sum-vnd') || 0);
-        const statusEl = form.querySelector('.finance-status');
-        if (!statusEl) return;
-
-        const pad = (n) => String(n).padStart(2, '0');
-        const fmtSum = (v) => Math.round(Number(v || 0)).toLocaleString('en-US').replace(/,/g, '\u202F');
-
-        const match = rows.filter((x) => Number(x.sum || 0) === expectedSum);
-        if (!match.length) {
-            statusEl.innerHTML = '<span style="color:var(--muted);">Транзакция не найдена</span>';
-            return;
-        }
-
-        let html = '<div style="overflow-x:auto; max-width:100%;">';
-        html += '<table class="table" style="margin-top:5px; font-size:12px; width:100%;">';
-        html += '<thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Комментарий</th></tr></thead><tbody>';
-        match.forEach((x) => {
-            const ts = Number(x.ts || 0);
-            const d = ts ? new Date(ts * 1000) : null;
-            const dateStr = d ? `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}` : '';
-            const timeStr = d ? `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` : '';
-            const typeRaw = String(x.type || '');
-            const isOut = (typeRaw === '0' || typeRaw.toUpperCase() === 'O' || typeRaw.toLowerCase() === 'out');
-            const sumSigned = isOut ? -Number(x.sum || 0) : Number(x.sum || 0);
-            const comment = String(x.comment || '').trim();
-            const user = String(x.user || '').trim();
-            const commentText = user ? `${comment} (${user})` : comment;
-            html += '<tr>';
-            html += `<td style="padding:2px 4px; white-space:nowrap;">${escapeHtml(dateStr)}<br><span class="muted">${escapeHtml(timeStr)}</span></td>`;
-            html += `<td class="sum" style="padding:2px 4px; white-space:nowrap;">${escapeHtml(fmtSum(sumSigned))}</td>`;
-            html += `<td style="padding:2px 4px; line-height:1.2;">${escapeHtml(commentText)}</td>`;
-            html += '</tr>';
-        });
-        html += '</tbody></table></div>';
-        statusEl.innerHTML = html;
-    };
-
-    window.refreshFinanceForm = (form, opts) => {
-        const options = opts && typeof opts === 'object' ? opts : {};
-        const showLoading = options.showLoading !== false;
-        const kind = String(form.getAttribute('data-kind') || '');
-        const dateFrom = String(form.getAttribute('data-date-from') || '');
-        const dateTo = String(form.getAttribute('data-date-to') || '');
-        const accountFrom = Number(form.getAttribute('data-account-from-id') || 0);
-        const accountTo = Number(form.getAttribute('data-account-to-id') || 0);
-        const statusEl = form.querySelector('.finance-status');
-        if (!kind || !dateFrom || !dateTo || !accountFrom || !accountTo || !statusEl) return Promise.resolve();
-
-        if (showLoading) statusEl.innerHTML = '<span style="color:var(--muted);">Обновление...</span>';
-        return fetch('?ajax=refresh_finance_transfers', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ kind, dateFrom, dateTo, accountFrom, accountTo }),
-        })
-        .then((r) => r.json())
-        .then((j) => {
-            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-            const rows = Array.isArray(j.rows) ? j.rows : [];
-            renderFinanceTable(form, rows);
-        })
-        .catch((e) => {
-            statusEl.textContent = e && e.message ? e.message : 'Ошибка';
-        });
-    };
-
-    const refreshAllBtn = document.getElementById('finance-refresh-all');
-    if (refreshAllBtn) {
-        refreshAllBtn.addEventListener('click', async (e) => {
-            const btn = e.currentTarget;
-            if (btn.disabled) return;
-            const orig = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '...';
-            try {
-                const forms = document.querySelectorAll('form.finance-transfer');
-                for (const form of forms) {
-                    await window.refreshFinanceForm(form, { showLoading: true });
-                }
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = orig;
-            }
-        });
-    }
-    document.querySelectorAll('input.poster-cb').forEach((cb) => {
-        cb.addEventListener('change', () => {
-            const id = Number(cb.getAttribute('data-id') || 0);
-            if (!id) return;
-            if (cb.checked) selectedPoster.add(id);
-            else selectedPoster.delete(id);
-            updateLinkButtonState();
+    document.querySelectorAll('button.finance-del').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const transferId = Number(btn.getAttribute('data-transfer-id') || 0);
+            const txId = Number(btn.getAttribute('data-tx-id') || 0);
+            const dateTo = String(btn.getAttribute('data-date-to') || '');
+            const kind = String(btn.getAttribute('data-kind') || '');
+            const dateFrom = String(btn.getAttribute('data-date-from') || dateTo);
+            if ((!transferId && !txId) || !dateTo || !kind) return;
+            const comment = prompt('Комментарий (почему скрываем):', '');
+            if (comment === null) return;
+            const c = String(comment || '').trim();
+            fetch('?ajax=delete_finance_transfer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind, transfer_id: transferId, tx_id: txId, dateFrom, dateTo, comment: c }),
+            })
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                location.reload();
+            })
+            .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         });
     });
 
@@ -5635,9 +6093,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         };
 
                         arr.forEach(tx => {
-                            const isDeleted = Number(tx.delete) === 1;
-                            const trStyle = isDeleted ? 'text-decoration: line-through;' : '';
-                            h += `<tr style="${trStyle}">`;
+                            h += '<tr>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(formatDate(tx.time)) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + getTypeLabel(Number(tx.type)) + '</td>';
                             
@@ -5664,6 +6120,66 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const suppliesModal = document.getElementById('suppliesModal');
     const suppliesClose = document.getElementById('suppliesClose');
     const suppliesBody = document.getElementById('suppliesBody');
+
+
+    const btnLoadAll = document.getElementById('btnLoadAll');
+    if (btnLoadAll) {
+        btnLoadAll.addEventListener('click', async () => {
+            const restore = setBtnBusy(btnLoadAll, { title: 'Загрузить всё', pct: 0 });
+            try {
+                const fdPoster = new URLSearchParams();
+                fdPoster.append('action', 'load_poster_checks');
+                fdPoster.append('ajax', '1');
+                fdPoster.append('dateFrom', dateFrom.value);
+                fdPoster.append('dateTo', dateTo.value);
+
+                const fdSepay = new URLSearchParams();
+                fdSepay.append('action', 'reload_sepay_api');
+                fdSepay.append('ajax', '1');
+                fdSepay.append('dateFrom', dateFrom.value);
+                fdSepay.append('dateTo', dateTo.value);
+
+                const p1 = fetch(location.pathname, { method: 'POST', body: fdPoster }).then(r => r.text());
+                const p2 = fetch(location.pathname, { method: 'POST', body: fdSepay }).then(r => r.text());
+
+                const p3 = loadOutMail((pct, step) => updateBtnBusy(btnLoadAll, { pct, title: 'Загрузка...' }));
+                const p4 = loadOutFinance((pct, step) => updateBtnBusy(btnLoadAll, { pct, title: 'Загрузка...' }));
+
+                await Promise.all([p1, p2, p3, p4]);
+
+                const html = await fetch(location.href).then(r => r.text());
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+
+                const newSepayTbody = doc.querySelector('#sepayTable tbody');
+                const newPosterTbody = doc.querySelector('#posterTable tbody');
+
+                if (newSepayTbody) {
+                    const oldTbody = document.querySelector('#sepayTable tbody');
+                    if (oldTbody) oldTbody.innerHTML = newSepayTbody.innerHTML;
+                }
+                if (newPosterTbody) {
+                    const oldTbody = document.querySelector('#posterTable tbody');
+                    if (oldTbody) {
+                        const injectedRows = Array.from(oldTbody.querySelectorAll('tr.row-out-positive'));
+                        oldTbody.innerHTML = newPosterTbody.innerHTML;
+                        injectedRows.forEach(tr => oldTbody.appendChild(tr));
+                    }
+                }
+
+                if (typeof bindInTableEvents === 'function') bindInTableEvents();
+                updateStats();
+                applyHideLinked();
+                drawLines();
+                try { scheduleRelayoutBurst(); } catch (e) {}
+
+            } catch (e) {
+                alert(e && e.message ? e.message : 'Ошибка');
+            } finally {
+                restore();
+            }
+        });
+    }
 
     if (btnSupplies && suppliesModal) {
         btnSupplies.addEventListener('click', () => {
