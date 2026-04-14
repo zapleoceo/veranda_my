@@ -987,8 +987,8 @@ $firstOfMonth = date('Y-m-01');
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0220">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260412_0220">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0200">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0200">
 </head>
 <body>
 <div class="container">
@@ -1008,7 +1008,7 @@ $firstOfMonth = date('Y-m-01');
                 Дата конца
                 <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>">
             </label>
-            <div style="display:flex; gap: 10px; align-items:center; flex-wrap: wrap;">
+            <div style="display:flex; gap: 5px; align-items:center; flex-wrap: wrap;">
                 <button type="button" id="loadBtn">ЗАГРУЗИТЬ</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
                 <button type="button" class="secondary" id="cancelBtn" style="display:none;">Отменить</button>
@@ -1018,16 +1018,12 @@ $firstOfMonth = date('Y-m-01');
                     <div class="desc" id="progDesc"></div>
                 </div>
                 <button type="button" class="secondary" id="payExtraBtn">PayExtra</button>
-                <button type="button" class="help-btn" id="helpBtn" title="Инструкция" style="margin-left:auto;">?</button>
             </div>
+            <button type="button" class="help-btn" id="helpBtn" title="Инструкция">?</button>
         </div>
         <div class="error" id="err" style="display:none;"></div>
-        <div class="muted" id="ltpRangeNote" style="margin-top: 6px; font-size: 12px; font-weight: 800;"></div>
-        <div style="display:flex; gap: 14px; align-items:center; flex-wrap: wrap; margin-top: 10px;">
-            <label class="muted" style="display:flex; align-items:center; gap: 8px; margin: 0;">
-                <input type="checkbox" id="hideZero">
-                Скрыть нулевые
-            </label>
+        <div class="muted" id="ltpRangeNote" style="margin-top: 5px; font-size: 12px; font-weight: 800;"></div>
+        <div style="display:flex; gap: 5px; align-items:center; flex-wrap: wrap; margin-top: 5px;">
             <div class="cols-dd">
                 <button type="button" class="secondary" id="colsBtn">
                     <svg class="cols-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1037,10 +1033,24 @@ $firstOfMonth = date('Y-m-01');
                 </button>
                 <div class="cols-menu" id="colsMenu" hidden></div>
             </div>
+            <div class="cols-dd">
+                <button type="button" class="secondary" id="rolesBtn">
+                    <svg class="cols-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M4 5h16M7 12h10M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    Роли
+                </button>
+                <div class="cols-menu" id="rolesMenu" hidden></div>
+            </div>
+            <label class="muted" style="display:flex; align-items:center; gap: 5px; margin: 0;">
+                <input type="checkbox" id="hideZero">
+                Пустые
+            </label>
         </div>
-        <div class="table-wrap" style="margin-top: 12px;">
-            <table id="empTable">
-                <thead>
+        <div class="table-wrap" style="margin-top: 5px;">
+            <div style="display: inline-flex; flex-direction: column;">
+                <table id="empTable">
+                    <thead>
                 <tr>
                     <th id="thUid" class="col-id" data-sort="user_id" style="cursor:pointer;">ID</th>
                     <th id="thName" class="col-name" data-sort="name" style="cursor:pointer;">name</th>
@@ -1074,9 +1084,10 @@ $firstOfMonth = date('Y-m-01');
                 </tr>
                 </tfoot>
             </table>
+            <div class="muted" id="tipsBalanceTotals" style="align-self: flex-end; width: 0; min-width: 100%; text-align: right; margin-top: 5px; font-weight: 900; line-height: 1.4; white-space: normal; word-break: break-word;">
+                Tips (на счету BIDV): <span id="tipsAccBalance">—</span> &middot; TTP в таблице: <span id="tipsTableSum">—</span> &middot; Остаток: <span id="tipsBalanceDiff">—</span>
+            </div>
         </div>
-        <div class="muted" id="tipsBalanceTotals" style="margin-top: 6px; text-align:right; font-weight:900;">
-            Tips (на счету BIDV): <span id="tipsAccBalance">—</span> · TTP в таблице: <span id="tipsTableSum">—</span> · Остаток: <span id="tipsBalanceDiff">—</span>
         </div>
     </div>
 </div>
@@ -1112,7 +1123,7 @@ $firstOfMonth = date('Y-m-01');
             </label>
         </div>
         <div class="sub">
-            <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
+            <label style="display:flex; align-items:center; gap: 5px; margin: 0;">
                 <input type="checkbox" id="payExtraChecked">
                 да проверил
             </label>
@@ -1133,7 +1144,7 @@ $firstOfMonth = date('Y-m-01');
         <h3 id="paidTitle">Подтверждение</h3>
         <div class="body" id="paidText"></div>
         <div class="sub">
-            <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
+            <label style="display:flex; align-items:center; gap: 5px; margin: 0;">
                 <input type="checkbox" id="paidChecked">
                 да проверил
             </label>
@@ -1148,28 +1159,80 @@ $firstOfMonth = date('Y-m-01');
 <div class="modal-backdrop" id="helpModal">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
         <h3 id="helpTitle">Инструкция</h3>
-        <div class="body">
+        <div class="body help-body">
             <div style="margin-bottom: 10px;">
-                <b>ЗАГРУЗИТЬ</b> — загружает данные по официантам за выбранный период и считает Tips.
+                <b>ЗАГРУЗИТЬ</b> — загружает данные по сотрудникам за выбранный период и считает все суммы в таблице.
             </div>
             <div style="margin-bottom: 10px;">
                 <b>Отменить</b> — останавливает текущую загрузку, если долго ждём.
             </div>
             <div style="margin-bottom: 10px;">
-                <b>Lite / Full</b> — переключает вид таблицы: Lite показывает только самое важное (name, Rate, Tips, Salary).
+                <b>Колонки</b> — выбор видимых колонок. Настройка сохраняется в браузере.
             </div>
             <div style="margin-bottom: 10px;">
-                <b>Скрыть нулевые</b> — скрывает строки, где ЧасыРаботы = 0.
+                <b>Роли</b> — фильтр по должностям. Доступен после загрузки данных, сохраняется в браузере.
             </div>
             <div style="margin-bottom: 10px;">
+                <b>Пустые</b> — при включении показывает пустые строки, при выключении скрывает.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>Сортировка</b> — клик по заголовку колонки сортирует таблицу.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>PAY</b> — создаёт финансовую транзакцию выплаты (Tips или Salary) на сумму “к выплате” по выбранному сотруднику.
+                Перед созданием нужно подтвердить чекбоксом “да проверил”.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>TipsPaid / SlrPaid</b> — список прошлых выплат: слева дата/время, справа тип выплаты/сумма выплаты.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>Учет выплат</b> — для расчёта TipsPaid/SlrPaid выплаты берутся по смещённому периоду (например: 2026-04-09 — 2026-04-15). Смещение сделано, чтобы не захватывать выплаты прошлой недели и полностью захватить выплаты текущей недели.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>PayExtra</b> — ручная выплата (Tips/Salary) с выбором сотрудника, счета и комментарием.
+            </div>
+            <div style="margin-bottom: 10px;">
+                <b>ИТОГО</b> — сумма по колонкам внизу таблицы.
+            </div>
+            <div style="margin: 14px 0 8px; font-weight: 900;">Пояснения по колонкам</div>
+            <div style="margin-bottom: 8px;">
+                <b>ID</b> — ID сотрудника в Poster.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>name</b> — имя сотрудника.
+            </div>
+            <div style="margin-bottom: 8px;">
                 <b>Rate</b> — ставка. Можно редактировать, сохраняется автоматически при выходе из поля или по Enter.
             </div>
-            <div style="margin-bottom: 10px;">
-                <b>PAID</b> — создаёт финансовую транзакцию “выплата типсов” на сумму Tips для выбранного сотрудника.
-                Перед созданием надо подтвердить чекбоксом “да проверил”.
+            <div style="margin-bottom: 8px;">
+                <b>role_name</b> — должность (роль).
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>Чеков</b> — количество чеков за период.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>ЧасыРаботы</b> — часы работы за период.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>Tips</b> — сумма чаевых за период (по данным Poster).
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>TipsPaid</b> — сколько чаевых уже выплачено сотруднику за период (по финансовым транзакциям).
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>TipsToPay</b> — сколько осталось выплатить чаевых: Tips − TipsPaid (если меньше 0, то 0).
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>Salary</b> — зарплата по ставке: Rate × ЧасыРаботы.
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>SlrPaid</b> — сколько зарплаты уже выплачено (по финансовым транзакциям).
+            </div>
+            <div style="margin-bottom: 8px;">
+                <b>SalaryToPay</b> — сколько осталось выплатить зарплаты: Salary − SlrPaid (если меньше 0, то 0).
             </div>
             <div>
-                <b>LTP</b> — дата и сумма последней выплаты типсов по этому сотруднику (берётся из финансовых транзакций Poster).
+                <b>Tips (на счету…)</b> — сверка суммы Tips по счёту с “TTP в таблице” и расчёт остатка.
             </div>
         </div>
         <div class="actions">
@@ -1195,6 +1258,8 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const hideZeroCb = document.getElementById('hideZero');
     const colsBtn = document.getElementById('colsBtn');
     const colsMenu = document.getElementById('colsMenu');
+    const rolesBtn = document.getElementById('rolesBtn');
+    const rolesMenu = document.getElementById('rolesMenu');
     const empTable = document.getElementById('empTable');
     const tableWrap = empTable ? empTable.closest('.table-wrap') : null;
     const totTipsEl = document.getElementById('totTips');
@@ -1236,6 +1301,19 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         if (!msg) { err.style.display = 'none'; err.textContent = ''; return; }
         err.style.display = 'block';
         err.textContent = msg;
+    };
+    const showToast = (msg) => {
+        let t = document.getElementById('empToast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'empToast';
+            t.className = 'emp-toast';
+            document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        t.classList.add('show');
+        if (t.timer) clearTimeout(t.timer);
+        t.timer = setTimeout(() => t.classList.remove('show'), 2000);
     };
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
@@ -1283,9 +1361,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const prefs = loadPrefs();
     if (prefs.date_from) dateFrom.value = prefs.date_from;
     if (prefs.date_to) dateTo.value = prefs.date_to;
-    let hideZero = !!prefs.hide_zero;
-    if (hideZeroCb) hideZeroCb.checked = hideZero;
+    let hideZero = (prefs.hide_zero === undefined) ? true : !!prefs.hide_zero;
+    if (hideZeroCb) hideZeroCb.checked = !hideZero;
     const COLS_KEY = 'employees_cols_v1';
+    const ROLES_KEY = 'employees_roles_v1';
     const defaultCols = {
         id: true,
         name: true,
@@ -1312,6 +1391,25 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const saveCols = (cols) => { try { localStorage.setItem(COLS_KEY, JSON.stringify(cols || {})); } catch (_) {} };
     const colState = loadCols();
+    const loadRoles = () => {
+        try {
+            const raw = localStorage.getItem(ROLES_KEY) || '';
+            const j = raw ? JSON.parse(raw) : null;
+            if (!j || typeof j !== 'object') return {};
+            return j;
+        } catch (_) {
+            return {};
+        }
+    };
+    const saveRoles = (roles) => { try { localStorage.setItem(ROLES_KEY, JSON.stringify(roles || {})); } catch (_) {} };
+    const roleState = loadRoles();
+    const normRoleName = (s) => String(s || '').trim();
+    const roleLabel = (s) => {
+        const r = normRoleName(s);
+        return r ? r : '—';
+    };
+    const roleCollator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
+    let roleDefs = [];
     const colDefs = [
         { key: 'id', label: 'ID' },
         { key: 'name', label: 'name' },
@@ -1356,14 +1454,55 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
     const setColsMenuOpen = (on) => {
         if (!colsMenu) return;
+        if (on && rolesMenu) rolesMenu.hidden = true;
         colsMenu.hidden = !on;
+    };
+    const syncRolesFromData = () => {
+        const set = new Set();
+        dataRows.forEach((r) => set.add(normRoleName(r && r.role_name)));
+        roleDefs = Array.from(set);
+        roleDefs.sort((a, b) => roleCollator.compare(roleLabel(a), roleLabel(b)));
+        roleDefs.forEach((r) => {
+            if (!Object.prototype.hasOwnProperty.call(roleState, r)) roleState[r] = true;
+        });
+        Object.keys(roleState).forEach((k) => { if (!set.has(k)) delete roleState[k]; });
+        saveRoles(roleState);
+        renderRolesMenu();
+    };
+    const renderRolesMenu = () => {
+        if (!rolesMenu) return;
+        rolesMenu.innerHTML = '';
+        roleDefs.forEach((role) => {
+            const lab = document.createElement('label');
+            lab.className = 'cols-item';
+            const inp = document.createElement('input');
+            inp.type = 'checkbox';
+            inp.checked = !!roleState[role];
+            inp.addEventListener('change', () => {
+                roleState[role] = !!inp.checked;
+                saveRoles(roleState);
+                renderTable();
+                syncStickyHeader(true);
+            });
+            const text = document.createElement('span');
+            text.textContent = roleLabel(role);
+            lab.appendChild(inp);
+            lab.appendChild(text);
+            rolesMenu.appendChild(lab);
+        });
+    };
+    const setRolesMenuOpen = (on) => {
+        if (!rolesMenu) return;
+        if (on && colsMenu) colsMenu.hidden = true;
+        rolesMenu.hidden = !on;
     };
     applyCols();
     renderColsMenu();
+    renderRolesMenu();
     dateFrom.addEventListener('change', () => { const p = loadPrefs(); p.date_from = dateFrom.value; savePrefs(p); });
     dateTo.addEventListener('change', () => { const p = loadPrefs(); p.date_to = dateTo.value; savePrefs(p); });
     if (hideZeroCb) hideZeroCb.addEventListener('change', () => {
-        hideZero = !!hideZeroCb.checked;
+        hideZero = !hideZeroCb.checked;
         const p = loadPrefs(); p.hide_zero = hideZero; savePrefs(p);
         renderTable();
     });
@@ -1380,6 +1519,25 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') setColsMenuOpen(false);
+        });
+    }
+    if (rolesBtn && rolesMenu) {
+        rolesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!roleDefs || roleDefs.length === 0) {
+                showToast('Сначала загрузите данные');
+                return;
+            }
+            setRolesMenuOpen(rolesMenu.hidden);
+        });
+        document.addEventListener('click', (e) => {
+            if (rolesMenu.hidden) return;
+            const t = e.target;
+            if (t === rolesBtn || (rolesMenu.contains && rolesMenu.contains(t))) return;
+            setRolesMenuOpen(false);
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') setRolesMenuOpen(false);
         });
     }
     let sortBy = prefs.sort_by || 'checks';
@@ -1638,7 +1796,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 return !(checks === 0 && hours === 0 && tips === 0 && tipsPaid === 0 && slrPaid === 0 && tipsToPay === 0 && salary === 0 && salaryToPay === 0);
             })
             : augmented;
-        const items = filtered.slice().sort((a, b) => {
+        const filteredByRole = (() => {
+            if (!roleDefs || roleDefs.length === 0) return filtered;
+            const anySelected = roleDefs.some((r) => !!roleState[r]);
+            if (!anySelected) return [];
+            return filtered.filter((r) => !!roleState[normRoleName(r && r.role_name)]);
+        })();
+        const items = filteredByRole.slice().sort((a, b) => {
             const av = a[sortBy];
             const bv = b[sortBy];
             if (typeof av === 'number' || typeof bv === 'number') {
@@ -1701,7 +1865,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         const acc = Number(it && it.account_id ? it.account_id : 0) || 0;
                         const ic = accountTagById(acc);
                         const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
-                        return `<div class="paid-item"><div class="paid-date">${esc(d)}${ic ? (' ' + ic) : ''}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
+                        return `<div class="paid-item">
+                                    <div class="pi-cell date-cell">${esc(d)}</div>
+                                    <div class="pi-cell type-cell">${ic ? ic : ''}</div>
+                                    <div class="pi-cell time-cell">${esc(tm)}</div>
+                                    <div class="pi-cell amt-cell">${esc(amt)}</div>
+                                </div>`;
                     }).join('') : ''}
                 </td>
                 <td class="col-ttp" style="text-align:right;">
@@ -1721,7 +1890,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                         const acc = Number(it && it.account_id ? it.account_id : 0) || 0;
                         const ic = accountTagById(acc);
                         const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
-                        return `<div class="paid-item"><div class="paid-date">${esc(d)}${ic ? (' ' + ic) : ''}</div><div class="paid-line"><span>${esc(tm)}</span><span class="amt">${esc(amt)}</span></div></div>`;
+                        return `<div class="paid-item">
+                                    <div class="pi-cell date-cell">${esc(d)}</div>
+                                    <div class="pi-cell type-cell">${ic ? ic : ''}</div>
+                                    <div class="pi-cell time-cell">${esc(tm)}</div>
+                                    <div class="pi-cell amt-cell">${esc(amt)}</div>
+                                </div>`;
                     }).join('') : ''}
                 </td>
                 <td class="col-salarytopay" style="text-align:right;">
@@ -1946,6 +2120,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                     salary_minor: salary,
                 };
             });
+            syncRolesFromData();
             renderTable();
             prog.style.display = 'none';
             cancelBtn.style.display = 'none';
