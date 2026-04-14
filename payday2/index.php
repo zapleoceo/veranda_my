@@ -37,6 +37,10 @@ if ($dateTo === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = $
 
 if ($dateFrom > $dateTo) {
     $tmp = $dateFrom;
+    $dateFrom = $dateTo;
+    $dateTo = $tmp;
+}
+
 
 // Include helper functions and table initializations
 require_once __DIR__ . '/functions.php';

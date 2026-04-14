@@ -1,8 +1,4 @@
 <?php
-    $dateFrom = $dateTo;
-    $dateTo = $tmp;
-}
-
 $date = $dateTo;
 $periodFrom = $dateFrom . ' 00:00:00';
 $periodTo = $dateTo . ' 23:59:59';
@@ -216,3 +212,4 @@ try {
     );
 } catch (\Throwable $e) {
 }
+
