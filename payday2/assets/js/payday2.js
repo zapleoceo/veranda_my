@@ -2019,6 +2019,12 @@ window.initPayday2 = function() {
             const expSum = Math.abs(Number(expectedSum));
             return Math.abs(rowSum - expSum) < 1; 
         });
+                const btnSubmit = form.querySelector('button[type="submit"]');
+        if (match.length > 0) {
+            if (btnSubmit) btnSubmit.style.display = 'none';
+        } else {
+            if (btnSubmit) btnSubmit.style.display = '';
+        }
         if (!match.length) {
             statusEl.innerHTML = '<span style="color:var(--muted);">Транзакция не найдена</span>';
             return;

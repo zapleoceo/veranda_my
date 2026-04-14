@@ -252,155 +252,6 @@ try {
     $financeTipsCents = null;
 }
 
-$transferVietnamExists = false;
-$transferTipsExists = false;
-$transferVietnamFoundList = [];
-$transferTipsFoundList = [];
-try {
-    $targetTs = strtotime($dateTo . ' 23:55:00');
-    $startTs = strtotime($dateTo . ' 00:00:00');
-    $endTs = strtotime($dateTo . ' 23:59:59');
-    if ($targetTs !== false && $startTs !== false && $endTs !== false) {
-        $apiFinance = new \App\Classes\PosterAPI((string)$token);
-        $rows = [];
-        try {
-            $rows = $apiFinance->request('finance.getTransactions', [
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
-            
-                'timezone' => 'client',
-            ]);
-        } catch (\Throwable $e) {
-            $rows = [];
-        }
-        if (!is_array($rows)) $rows = [];
-
-        $normMoney = function ($sumRaw): int {
-            $sumF = 0.0;
-            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
-            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
-            $sumInt = (int)round($sumF);
-            return ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
-        };
-        $normText = function (string $s): string {
-            $t = trim($s);
-            return mb_strtolower($t, 'UTF-8');
-        };
-
-        $employeesMapFinance = [];
-        try {
-            $employeesMapFinance = $getEmployeesById($apiFinance);
-        } catch (\Throwable $e) {
-        }
-
-        $accountsMapFinance = [];
-        try {
-            $accountsMapFinance = $getAccountsById($apiFinance);
-        } catch (\Throwable $e) {
-        }
-
-        foreach ($rows as $r) {
-            if (!is_array($r)) continue;
-            $tRaw = (string)($r['type'] ?? '');
-            $isTransfer = ($tRaw === '2');
-            $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
-            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-            if (!$isTransfer && !$isIn && !$isOut) continue;
-
-            $dStr = (string)($r['date'] ?? '');
-            $ts = $dStr !== '' ? strtotime($dStr) : false;
-            if ($ts === false || $ts < $startTs || $ts > $endTs) continue;
-
-            $accFromId = 0;
-            $accToId = 0;
-            if ($isTransfer) {
-                $fromRaw = $r['account_from'] ?? $r['account_from_id'] ?? $r['account_id'] ?? 0;
-                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
-                $accFromId = (int)$fromRaw;
-
-                $toRaw = $r['account_to'] ?? $r['account_to_id'] ?? $r['recipient_id'] ?? 0;
-                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
-                $accToId = (int)$toRaw;
-            } elseif ($isOut) {
-                $fromRaw = $r['account_id'] ?? $r['accountId'] ?? $r['account_from_id'] ?? $r['account_from'] ?? $r['accountFromId'] ?? $r['accountFrom'] ?? 0;
-                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
-                $accFromId = (int)$fromRaw;
-
-                $toRaw = $r['recipient_id'] ?? $r['account_to_id'] ?? $r['account_to'] ?? 0;
-                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
-                $accToId = (int)$toRaw;
-            } else {
-                $fromRaw = $r['account_from'] ?? $r['account_from_id'] ?? 0;
-                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
-                $accFromId = (int)$fromRaw;
-
-                $toRaw = $r['account_id'] ?? $r['account_to_id'] ?? $r['account_to'] ?? 0;
-                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
-                $accToId = (int)$toRaw;
-            }
-
-            if ($accToId !== 8 && $accToId !== 9 && $accFromId !== 8 && $accFromId !== 9) continue;
-            $accId = ($accToId === 8 || $accToId === 9) ? $accToId : $accFromId;
-
-            $amountMinor = (int)($r['amount'] ?? 0);
-            if (abs($amountMinor) <= 0) continue;
-
-            $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
-            $cmtNorm = $normText($cmt);
-            $isVietnam = $accId === 9 && mb_stripos($cmtNorm, 'вьетна', 0, 'UTF-8') !== false;
-            $isTips = $accId === 8 && (mb_stripos($cmtNorm, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmtNorm, 'tips', 0, 'UTF-8') !== false);
-            if (!$isVietnam && !$isTips) continue;
-
-            $tid = (int)($r['transaction_id'] ?? 0);
-            $bt = (int)($r['binding_type'] ?? 0);
-            $bid = (int)($r['binding_id'] ?? 0);
-            $rt = (int)($r['recipient_type'] ?? 0);
-            $rid = (int)($r['recipient_id'] ?? 0);
-            $transferId = 0;
-            if ($rt === 1 && $rid > 0) $transferId = $rid;
-            elseif ($bt === 1 && $bid > 0) $transferId = $bid;
-
-            $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
-            if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
-            $uId = (int)($uRaw ?? 0);
-            $userName = '';
-            if ($uId > 0 && isset($employeesMapFinance[$uId])) {
-                $userName = $employeesMapFinance[$uId];
-            } else {
-                $uObj = $r['user'] ?? $r['employee'] ?? null;
-                if (is_array($uObj)) {
-                    $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
-                    $userName = trim($userName);
-                }
-            }
-            if ($userName === '' && $uId > 0) $userName = '#' . $uId;
-
-            $accName = isset($accountsMapFinance[$accId]) ? $accountsMapFinance[$accId] : ('#' . $accId);
-
-            $rowOut = [
-                'transfer_id' => $transferId,
-                'transaction_id' => $tid,
-                'ts' => (int)$ts,
-                'sum_minor' => abs($amountMinor),
-                'comment' => $cmt,
-                'user' => $userName,
-                'account' => $accName,
-                'type' => $tRaw,
-            ];
-            if ($isVietnam) {
-                $transferVietnamFoundList[] = $rowOut;
-            }
-            if ($isTips) {
-                $transferTipsFoundList[] = $rowOut;
-            }
-        }
-    }
-} catch (\Throwable $e) {
-}
-
-$transferVietnamExists = count($transferVietnamFoundList) > 0;
-$transferTipsExists = count($transferTipsFoundList) > 0;
-
 $posterAccounts = [];
 $posterAccountsById = [];
 try {
@@ -565,46 +416,6 @@ $fmtVnd = function (int $v): string {
         </div>
 
         <div class="grid" id="tablesRoot">
-            <div class="confirm-backdrop" id="kashshiftModal" style="display:none; z-index: 9999; align-items: flex-start; padding-top: 5vh;">
-                <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-                        <h3 style="margin:0;">KashShift</h3>
-                        <button type="button" class="btn2" id="kashshiftClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
-                    </div>
-                    <div class="body" id="kashshiftBody" style="max-height: 85vh; overflow: auto;">
-                        <div style="text-align:center;">Загрузка...</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="confirm-backdrop" id="suppliesModal" style="display:none; z-index: 9999; align-items: flex-start; padding-top: 5vh;">
-                <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-                        <h3 style="margin:0;">Supplies</h3>
-                        <button type="button" class="btn2" id="suppliesClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
-                    </div>
-                    <div class="body" id="suppliesBody" style="max-height: 85vh; overflow: auto;">
-                        <div style="text-align:center;">Загрузка...</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="confirm-backdrop" id="financeConfirm">
-                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="financeConfirmTitle">
-                    <h3 id="financeConfirmTitle">Подтверждение</h3>
-                    <div class="body" id="financeConfirmText"></div>
-                    <div class="sub">
-                        <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
-                            <input type="checkbox" id="financeConfirmChecked">
-                            проверил
-                        </label>
-                    </div>
-                    <div class="actions">
-                        <button type="button" class="btn2" id="financeConfirmCancel">Отмена</button>
-                        <button type="button" class="btn2 primary" id="financeConfirmOk" disabled>OK</button>
-                    </div>
-                </div>
-            </div>
             <div id="lineLayer"></div>
             <div class="card" style="padding: 0;">
                 <div style="padding: 12px 12px 6px;">
@@ -838,30 +649,8 @@ $fmtVnd = function (int $v): string {
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.';
 
-            $vietnamFound = [];
-            if ($vietnamVnd !== null) {
-                foreach ($transferVietnamFoundList as $f) {
-                    if (!is_array($f)) continue;
-                    $sumMinor = (int)($f['sum_minor'] ?? 0);
-                    $sumVnd = (int)$posterCentsToVnd($sumMinor);
-                    if ($sumVnd !== (int)$vietnamVnd) continue;
-                    $vietnamFound[] = $f;
-                }
-            }
-
-            $tipsFound = [];
-            if ($tipsVnd !== null) {
-                foreach ($transferTipsFoundList as $f) {
-                    if (!is_array($f)) continue;
-                    $sumMinor = (int)($f['sum_minor'] ?? 0);
-                    $sumVnd = (int)$posterCentsToVnd($sumMinor);
-                    if ($sumVnd !== (int)$tipsVnd) continue;
-                    $tipsFound[] = $f;
-                }
-            }
-
-            $vietnamExists = count($vietnamFound) > 0;
-            $tipsExists = count($tipsFound) > 0;
+            $vietnamExists = false;
+            $tipsExists = false;
             $vietnamDisabled = $vietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
             $tipsDisabled = $tipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             ?>
@@ -883,46 +672,9 @@ $fmtVnd = function (int $v): string {
                     <div style="display:flex; align-items:center; gap: 10px;">
                         <div style="font-weight:900; white-space:nowrap;">Vietnam Company</div>
                         <div style="flex:1; text-align:center; font-weight:900;"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
-                        <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
+                        <button class="btn" type="submit" >Создать транзакцию</button>
                     </div>
-                    <div class="muted finance-status" style="margin-top: 6px;">
-                        <?php if ($vietnamExists): ?>
-                            <div style="overflow-x:auto; max-width:100%;">
-                                <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
-                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
-                                    <tbody>
-                                    <?php foreach ($vietnamFound as $f): ?>
-                                        <?php
-                                            $ts = (int)($f['ts'] ?? 0);
-                                            $sumMinor = (int)($f['sum_minor'] ?? 0);
-                                            $sumVnd = (int)$posterCentsToVnd($sumMinor);
-                                            $tRaw = (string)($f['type'] ?? '');
-                                            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-                                            $sumSignedVnd = $isOut ? -$sumVnd : $sumVnd;
-                                            $cmt = trim((string)($f['comment'] ?? ''));
-                                            $u = trim((string)($f['user'] ?? ''));
-                                              $acc = trim((string)($f['account'] ?? ''));
-                                            $dateStr = date('d.m.Y', $ts);
-                                            $timeStr = date('H:i:s', $ts);
-                                        ?>
-                                        <tr>
-                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
-                                            <td class="sum" style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
-                                              <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($acc) ?></td>
-                                              <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($u) ?></td>
-                                              <td style="padding:2px 4px; line-height:1.2;"><?= htmlspecialchars($cmt) ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php elseif ($vietnamDisabled): ?>
-                            <?= htmlspecialchars($vietnamDisabledReason) ?>
-                        <?php else: ?>
-                            <span style="color:var(--muted);">Транзакция не найдена</span>
-                        <?php endif; ?>
-                    </div>
-                </form>
+                    <div class="muted finance-status" style="margin-top: 6px;"><span style="color:var(--muted);">Загрузка...</span></div></form>
             </div>
 
             <div class="finance-row">
@@ -942,46 +694,9 @@ $fmtVnd = function (int $v): string {
                     <div style="display:flex; align-items:center; gap: 10px;">
                         <div style="font-weight:900; white-space:nowrap;">Tips</div>
                         <div style="flex:1; text-align:center; font-weight:900;"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
-                        <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
+                        <button class="btn" type="submit" >Создать транзакцию</button>
                     </div>
-                    <div class="muted finance-status" style="margin-top: 6px;">
-                        <?php if ($tipsExists): ?>
-                            <div style="overflow-x:auto; max-width:100%;">
-                                <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
-                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
-                                    <tbody>
-                                    <?php foreach ($tipsFound as $f): ?>
-                                        <?php
-                                            $ts = (int)($f['ts'] ?? 0);
-                                            $sumMinor = (int)($f['sum_minor'] ?? 0);
-                                            $sumVnd = (int)$posterCentsToVnd($sumMinor);
-                                            $tRaw = (string)($f['type'] ?? '');
-                                            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
-                                            $sumSignedVnd = $isOut ? -$sumVnd : $sumVnd;
-                                            $cmt = trim((string)($f['comment'] ?? ''));
-                                            $u = trim((string)($f['user'] ?? ''));
-                                              $acc = trim((string)($f['account'] ?? ''));
-                                            $dateStr = date('d.m.Y', $ts);
-                                            $timeStr = date('H:i:s', $ts);
-                                        ?>
-                                        <tr>
-                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
-                                            <td class="sum" style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
-                                              <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($acc) ?></td>
-                                              <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($u) ?></td>
-                                              <td style="padding:2px 4px; line-height:1.2;"><?= htmlspecialchars($cmt) ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php elseif ($tipsDisabled): ?>
-                            <?= htmlspecialchars($tipsDisabledReason) ?>
-                        <?php else: ?>
-                            <span style="color:var(--muted);">Транзакция не найдена</span>
-                        <?php endif; ?>
-                    </div>
-                </form>
+                    <div class="muted finance-status" style="margin-top: 6px;"><span style="color:var(--muted);">Загрузка...</span></div></form>
             </div>
         </div>
         <div class="card card-balances">
@@ -1073,6 +788,47 @@ $fmtVnd = function (int $v): string {
     </div>
 </div>
 
+<div class="confirm-backdrop" id="kashshiftModal" style="display:none; z-index: 9999; align-items: flex-start; padding-top: 5vh;">
+                <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                        <h3 style="margin:0;">KashShift</h3>
+                        <button type="button" class="btn2" id="kashshiftClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
+                    </div>
+                    <div class="body" id="kashshiftBody" style="max-height: 85vh; overflow: auto;">
+                        <div style="text-align:center;">Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="confirm-backdrop" id="suppliesModal" style="display:none; z-index: 9999; align-items: flex-start; padding-top: 5vh;">
+                <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                        <h3 style="margin:0;">Supplies</h3>
+                        <button type="button" class="btn2" id="suppliesClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
+                    </div>
+                    <div class="body" id="suppliesBody" style="max-height: 85vh; overflow: auto;">
+                        <div style="text-align:center;">Загрузка...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="confirm-backdrop" id="financeConfirm">
+                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="financeConfirmTitle">
+                    <h3 id="financeConfirmTitle">Подтверждение</h3>
+                    <div class="body" id="financeConfirmText"></div>
+                    <div class="sub">
+                        <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
+                            <input type="checkbox" id="financeConfirmChecked">
+                            проверил
+                        </label>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn2" id="financeConfirmCancel">Отмена</button>
+                        <button type="button" class="btn2 primary" id="financeConfirmOk" disabled>OK</button>
+                    </div>
+                </div>
+            </div>
+            
 <script>
 window.PAYDAY_CONFIG = {
     userEmail: <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>,
