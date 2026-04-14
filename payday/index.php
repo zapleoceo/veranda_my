@@ -1065,6 +1065,120 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    if (!is_array($payload)) $payload = [];
+    $kind = (string)($payload['kind'] ?? '');
+    $dFrom = trim((string)($payload['dateFrom'] ?? ''));
+    $dTo = trim((string)($payload['dateTo'] ?? ''));
+    $accountFrom = (int)($payload['accountFrom'] ?? 0);
+    $accountTo = (int)($payload['accountTo'] ?? 0);
+    if (!in_array($kind, ['vietnam', 'tips'], true) || $dFrom === '' || $dTo === '' || $accountFrom <= 0 || $accountTo <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $startTs = strtotime($dFrom . ' 00:00:00');
+        $endTs = strtotime($dTo . ' 23:59:59');
+        if ($startTs === false || $endTs === false) {
+            throw new \Exception('Bad date');
+        }
+
+        $rows = [];
+        try {
+            $rows = $api->request('finance.getTransactions', [
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
+            ]);
+        } catch (\Throwable $e) {
+            $rows = [];
+        }
+        if (!is_array($rows)) $rows = [];
+
+        $normMoney = function ($sumRaw): int {
+            $sumF = 0.0;
+            if (is_int($sumRaw) || is_float($sumRaw)) $sumF = (float)$sumRaw;
+            else if (is_string($sumRaw)) $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
+            $sumInt = (int)round($sumF);
+            return ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
+        };
+
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            if (((int)($row['status'] ?? 0)) === 3) continue;
+            $type = (int)($row['type'] ?? -1);
+            if ($type !== 2) continue;
+
+            $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
+            $ts = null;
+            if (is_numeric($dRaw)) {
+                $n = (int)$dRaw;
+                if ($n > 2000000000000) $n = (int)round($n / 1000);
+                if ($n > 0) $ts = $n;
+            } elseif (is_string($dRaw) && trim($dRaw) !== '') {
+                $t = strtotime($dRaw);
+                if ($t !== false && $t > 0) $ts = $t;
+            }
+            if ($ts === null) continue;
+            if ($ts < $startTs || $ts > $endTs) continue;
+
+            $accFromRaw = $row['account_from'] ?? $row['account_from_id'] ?? $row['account_id'] ?? 0;
+            if (is_array($accFromRaw)) $accFromRaw = $accFromRaw['account_id'] ?? $accFromRaw['id'] ?? 0;
+            $accFromId = (int)$accFromRaw;
+
+            $accToRaw = $row['account_to'] ?? $row['account_to_id'] ?? 0;
+            if (is_array($accToRaw)) $accToRaw = $accToRaw['account_id'] ?? $accToRaw['id'] ?? 0;
+            $accToId = (int)$accToRaw;
+
+            if ($accFromId !== $accountFrom || $accToId !== $accountTo) continue;
+
+            $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
+            $sumRaw = $row['amount'] ?? $row['amount_to'] ?? $row['amount_from'] ?? $row['sum'] ?? 0;
+            $sum = abs($normMoney($sumRaw));
+
+            $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
+            if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
+            $uId = (int)($uRaw ?? 0);
+            $userName = '';
+            $uObj = $row['user'] ?? $row['employee'] ?? null;
+            if (is_array($uObj)) {
+                $userName = (string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? '');
+                $userName = trim($userName);
+            }
+            if ($userName === '' && $uId > 0) $userName = '#' . $uId;
+
+            $txId = (int)($row['transaction_id'] ?? $row['id'] ?? 0);
+            $out[] = [
+                'transaction_id' => $txId,
+                'transfer_id' => $txId,
+                'ts' => (int)$ts,
+                'sum' => (int)$sum,
+                'comment' => $cmt,
+                'user' => $userName,
+            ];
+        }
+
+        usort($out, function ($a, $b) {
+            return ((int)($b['ts'] ?? 0)) <=> ((int)($a['ts'] ?? 0));
+        });
+
+        echo json_encode(['ok' => true, 'rows' => $out], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'delete_finance_transfer') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -3226,6 +3340,7 @@ $fmtVnd = function (int $v): string {
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                     <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать перевод</button>
+                    <button class="btn tiny finance-refresh" type="button" title="Обновить">🔄</button>
                     <div class="muted finance-status">
                         <?php if ($transferVietnamExists): ?>
                             <span style="color:#81c784; font-weight:900;">Найдены транзакции за день:</span>
@@ -3270,6 +3385,7 @@ $fmtVnd = function (int $v): string {
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                     <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать перевод</button>
+                    <button class="btn tiny finance-refresh" type="button" title="Обновить">🔄</button>
                     <div class="muted finance-status">
                         <?php if ($transferTipsExists): ?>
                             <span style="color:#81c784; font-weight:900;">Найдены транзакции за день:</span>
@@ -5280,7 +5396,10 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             });
         });
     });
-    document.querySelectorAll('button.finance-del').forEach((btn) => {
+    const bindFinanceDeleteBtn = (btn) => {
+        if (!btn) return;
+        if (btn.dataset.bound === '1') return;
+        btn.dataset.bound = '1';
         btn.addEventListener('click', () => {
             const transferId = Number(btn.getAttribute('data-transfer-id') || 0);
             const txId = Number(btn.getAttribute('data-tx-id') || 0);
@@ -5301,6 +5420,68 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 window.location.href = window.location.href;
             })
             .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+        });
+    };
+    const bindFinanceDeleteBtns = (root) => {
+        (root || document).querySelectorAll('button.finance-del').forEach(bindFinanceDeleteBtn);
+    };
+    bindFinanceDeleteBtns(document);
+
+    document.querySelectorAll('button.finance-refresh').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const form = btn.closest('form.finance-transfer');
+            if (!form) return;
+            const kind = String(form.getAttribute('data-kind') || '');
+            const dateFrom = String(form.getAttribute('data-date-from') || '');
+            const dateTo = String(form.getAttribute('data-date-to') || '');
+            const accountFrom = Number(form.getAttribute('data-account-from-id') || 0);
+            const accountTo = Number(form.getAttribute('data-account-to-id') || 0);
+            const statusEl = form.querySelector('.finance-status');
+            if (!kind || !dateFrom || !dateTo || !accountFrom || !accountTo || !statusEl) return;
+            if (btn.disabled) return;
+            const orig = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '...';
+            fetch('?ajax=refresh_finance_transfers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind, dateFrom, dateTo, accountFrom, accountTo }),
+            })
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                const rows = Array.isArray(j.rows) ? j.rows : [];
+                if (!rows.length) {
+                    statusEl.innerHTML = '<span style=\"color:var(--muted);\">Транзакций не найдено</span>';
+                    return;
+                }
+                const header = '<span style=\"color:#81c784; font-weight:900;\">Найдены транзакции за период:</span>';
+                const items = rows.map((x) => {
+                    const ts = Number(x.ts || 0);
+                    const d = ts ? new Date(ts * 1000) : null;
+                    const pad = (n) => String(n).padStart(2, '0');
+                    const date = d ? `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}` : '';
+                    const time = d ? `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` : '';
+                    const sum = Number(x.sum || 0);
+                    const user = String(x.user || '').trim();
+                    const comment = String(x.comment || '').trim();
+                    let line = `${date} - ${time} - ${Math.round(sum).toLocaleString('en-US').replace(/,/g, '\\u202F')}`;
+                    if (user) line += ` - ${user}`;
+                    if (comment) line += ` - ${comment}`;
+                    const transferId = Number(x.transfer_id || 0);
+                    const txId = Number(x.transaction_id || 0);
+                    return `<div><button type=\"button\" class=\"finance-del\" data-kind=\"${escapeHtml(kind)}\" data-transfer-id=\"${transferId}\" data-tx-id=\"${txId}\" data-date-to=\"${escapeHtml(dateTo)}\" title=\"Скрыть транзакцию\">✕</button>${escapeHtml(line)}</div>`;
+                }).join('');
+                statusEl.innerHTML = header + items;
+                bindFinanceDeleteBtns(statusEl);
+            })
+            .catch((e) => {
+                statusEl.textContent = e && e.message ? e.message : 'Ошибка';
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = orig;
+            });
         });
     });
     document.querySelectorAll('input.poster-cb').forEach((cb) => {
