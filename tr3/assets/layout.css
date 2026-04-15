@@ -1375,33 +1375,22 @@
       .modal-actions { gap: 5px; margin-top: 5px; }
       .req-layout { gap: 5px; }
       .phone-row, .name-row { gap: 5px; }
-      .guests-time-row { grid-template-columns: 1fr 1fr; gap: 5px; }
-      .guests-time-row .end-time-label { grid-column: 1 / -1; }
+      .guests-time-row { display: flex; flex-wrap: nowrap; gap: 5px; align-items: flex-end; }
+      .guests-time-row.full { overflow: hidden; }
+      .guests-time-row .modal-label { flex: 0 0 auto; min-width: 0; }
+      .guests-time-row .modal-label > span { font-size: 10px; max-width: 64px; }
+      .guests-time-row.full .end-time-label > span { display: none; }
       .modal input[type="text"],
       .modal input[type="tel"],
       .modal input[type="number"],
       .modal textarea { padding: 10px 10px; }
       .modal select { padding: 10px 34px 10px 10px; background-position: right 6px center; background-size: 14px; }
 
-      .guests-time-row .modal-label input { padding: 10px 10px; font-size: 14px; }
-      .guests-time-row.full > div:nth-child(1) > div { width: 100%; }
-      .guests-time-row.full .num-step { position: relative; width: 100%; gap: 0; }
-      .guests-time-row.full #reqGuests { width: 100%; max-width: none; text-align: center; padding-left: 36px; padding-right: 36px; }
-      .guests-time-row.full #reqGuestsMinus,
-      .guests-time-row.full #reqGuestsPlus {
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 32px;
-        height: 32px;
-        border-radius: 10px;
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.10);
-      }
-      .guests-time-row.full #reqGuestsMinus { left: 6px; }
-      .guests-time-row.full #reqGuestsPlus { right: 6px; }
+      .guests-time-row .modal-label input { padding: 10px 8px; font-size: 13px; }
+      .guests-time-row .modal-label select { padding: 10px 28px 10px 8px; font-size: 13px; background-position: right 5px center; background-size: 14px; }
+      .guests-time-row.full .num-step { width: auto; gap: 5px; }
+      .guests-time-row.full #reqGuests { width: 3.2ch; min-width: 3.2ch; max-width: 3.2ch; text-align: center; padding-left: 6px; padding-right: 6px; }
 
-      .guests-time-row .modal-label select { padding: 10px 34px 10px 10px; font-size: 14px; background-position: right 6px center; background-size: 14px; }
       .label-right { gap: 5px; }
       .msgr-actions { gap: 5px; }
       #reqModal.msgr-state-wa .phone-field input,
