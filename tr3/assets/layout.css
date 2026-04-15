@@ -508,7 +508,7 @@
       align-items: center;
       justify-content: center;
       padding: 14px;
-      z-index: 9999;
+      z-index: 10002;
     }
     .dtp.on { display: flex; }
     .dtp-backdrop { position: absolute; inset: 0; background: rgba(26, 12, 6, 0.92); backdrop-filter: blur(2px); }
@@ -1017,7 +1017,9 @@
     .modal.on { display: flex; }
     .modal-backdrop { position: absolute; inset: 0; background: rgba(26, 12, 6, 0.92); backdrop-filter: blur(2px); }
     .modal-backdrop-strong { background: rgba(0,0,0,0.92); backdrop-filter: blur(10px) saturate(1.15); }
-    #mobilePreorderModal { z-index: 10000; }
+    #reqModal { z-index: 10000; }
+    #mobilePreorderModal { z-index: 10001; }
+    #capModal { z-index: 10003; }
     .modal-card {
       position: relative;
       width: min(520px, 100%);
