@@ -1671,7 +1671,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/common.css?v=20260415_1500">
-  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260415_1530">
+  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260415_1600">
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
@@ -1723,14 +1723,14 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             <button class="table large" style="left: 712px; top: 528px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
             <button class="table small-vertical wide-1" style="left: 580px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 450px; top: 528px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 320px; top: 528px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 215px; top: 528px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 460px; top: 528px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 340px; top: 528px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 220px; top: 528px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
             <button class="table small-vertical wide-1" style="left: 110px; top: 528px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
-            <button class="table large" style="left: 12px; top: 512px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
+            <button class="table large" style="left: -30px; top: 512px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
   
             <button class="table wide" style="left: 422px; top: 420px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
-            <button class="table wide" style="left: 300px; top: 420px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
+            <button class="table wide" style="left: 310px; top: 420px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
             <div class="fountain" style="left: 532px; top: 316px;" aria-hidden="true" id="fountainEl">
               <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
@@ -1756,7 +1756,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               <div class="koi koi-2"></div>
             </div>
             <button class="table wide" style="left: 102px; top: 420px;" data-table="12"><span class="num">12</span><span class="cap"></span></button>
-            <button class="table wide" style="left: -20px; top: 420px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
+            <button class="table wide" style="left: -10px; top: 420px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
   
             <button class="table" style="left: 402px; top: 304px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
             <button class="table" style="left: 274px; top: 304px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
@@ -1967,6 +1967,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       soonBookingHours: <?= json_encode($soonBookingHours, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260415_1530" defer></script>
+  <script src="/assets/js/Tr2.js?v=20260415_1600" defer></script>
 </body>
 </html>
