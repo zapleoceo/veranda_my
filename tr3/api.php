@@ -1,5 +1,21 @@
 <?php
 
+/*
+TR3 API — Developer Note
+
+This file is the Controller for TR3 (all AJAX endpoints).
+
+MVC / Separation of Responsibility:
+- Controller (this file): validates input, coordinates services, returns JSON. Keep it thin.
+- Models/Services: all business logic + integrations (Poster/DB/Telegram/WhatsApp) must be extracted into service classes with clear interfaces.
+- View: /tr3/index.php (UI only).
+
+Rules:
+- One responsibility per function/class. Avoid huge “god controllers”.
+- No UI concerns here (no HTML rendering).
+- No dependency on previous versions/pages. TR3 must stay independent.
+*/
+
 $cfg = require __DIR__ . '/i18n.php';
 $supportedLangs = is_array($cfg['supported'] ?? null) ? $cfg['supported'] : ['ru', 'en', 'vi'];
 $I18N = is_array($cfg['i18n'] ?? null) ? $cfg['i18n'] : [];

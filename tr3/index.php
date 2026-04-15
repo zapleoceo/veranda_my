@@ -1,5 +1,21 @@
 <?php
 
+/*
+TR3 (Booking) — Developer Note
+
+Purpose: TR3 is a standalone booking page. Keep it clean and maintainable.
+
+MVC / Separation of Responsibility:
+- View (this file): renders UI only (HTML). No DB, no HTTP calls to external systems, no business rules.
+- Controller: /tr3/api.php is the only entrypoint for AJAX. Keep controllers thin.
+- Model/Services: Poster/DB/Telegram/WhatsApp integrations + business logic live behind clear interfaces (one responsibility per class).
+
+Rules:
+- No cross-layer leaks (Views never talk to DB; Models don’t know UI).
+- No coupling with previous versions (do not import/require old pages; do not reuse legacy names like “tr2” in TR3 assets).
+- TR3 assets must live in /tr3/assets with neutral names (app.js, base.css, layout.css, tr3.css, etc.).
+*/
+
 $cfg = require __DIR__ . '/i18n.php';
 $supportedLangs = is_array($cfg['supported'] ?? null) ? $cfg['supported'] : ['ru', 'en', 'vi'];
 $I18N = is_array($cfg['i18n'] ?? null) ? $cfg['i18n'] : [];
@@ -51,11 +67,6 @@ $mk = function (string $l) use ($self, $baseQs) {
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
-  <div class="map-invite" style="max-width:1180px; margin: 10px auto 0; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04);">
-    Tr3 — самостоятельная страница. Правки делаем по MVC и разделению ответственности:
-    Model: данные/репозитории/интеграции (Poster/DB/Telegram/WhatsApp). Controller: /tr3/api.php (все ajax). View: /tr3/index.php (только разметка).
-    Ресурсы Tr3 лежат в /tr3/assets (CSS/JS). Не используем названия и зависимости от прошлых версий.
-  </div>
   <div class="app">
     <main class="panel">
       <div class="topbar">
