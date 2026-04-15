@@ -63,7 +63,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0410">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0433">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -215,9 +215,10 @@ $mk = function (string $l) use ($self, $baseQs) {
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle" id="reqModalCard">
       <div class="modal-title-bar">
         <div class="modal-title" id="reqModalTitle">
-          <span data-i18n="booking_request"><?= htmlspecialchars(tr('booking_request')) ?></span>
+          <span class="desktop-text" data-i18n="booking_request"><?= htmlspecialchars(tr('booking_request')) ?></span>
+          <span class="mobile-text" data-i18n="booking_request_short"><?= htmlspecialchars(tr('booking_request_short')) ?></span>
           <span class="framed-box" id="reqModalTable"></span>
-          <span data-i18n="on_date"><?= htmlspecialchars(tr('on_date')) ?></span>
+          <span class="desktop-text" data-i18n="on_date"><?= htmlspecialchars(tr('on_date')) ?></span>
           <span class="framed-box" id="reqModalDate"></span>
           <span class="framed-box busy-tag" id="reqModalBusy" hidden></span>
         </div>
@@ -386,7 +387,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260416_0410" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260416_0433" defer></script>
 </body>
 </html>
 

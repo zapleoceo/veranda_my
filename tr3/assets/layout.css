@@ -1388,8 +1388,20 @@
 
       .guests-time-row .modal-label input { padding: 10px 8px; font-size: 13px; }
       .guests-time-row .modal-label select { padding: 10px 28px 10px 8px; font-size: 13px; background-position: right 5px center; background-size: 14px; }
-      .guests-time-row.full .num-step { width: auto; gap: 5px; }
-      .guests-time-row.full #reqGuests { width: 3.2ch; min-width: 3.2ch; max-width: 3.2ch; text-align: center; padding-left: 6px; padding-right: 6px; }
+      .guests-time-row.full .num-step { position: relative; width: 78px; gap: 0; }
+      .guests-time-row.full #reqGuests { width: 100%; max-width: none; text-align: center; padding-left: 24px; padding-right: 24px; }
+      .guests-time-row.full #reqGuestsMinus,
+      .guests-time-row.full #reqGuestsPlus {
+        position: absolute;
+        top: 0;
+        width: 24px;
+        height: 44px;
+        border-radius: 14px;
+        background: transparent;
+        border: 0;
+      }
+      .guests-time-row.full #reqGuestsMinus { left: 0; }
+      .guests-time-row.full #reqGuestsPlus { right: 0; }
 
       .label-right { gap: 5px; }
       .msgr-actions { gap: 5px; }
@@ -1408,6 +1420,8 @@
       }
       .modal-title { font-size: 15px; }
       .modal-title { font-size: 15px; }
+      #reqModalTitle { flex-wrap: nowrap; gap: 4px; overflow: hidden; }
+      #reqModalTitle .framed-box { padding: 1px 6px; }
       #reqForm { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
       .req-layout { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding-right: 2px; min-height: 0; }
       .modal-actions { position: sticky; bottom: 0; background: transparent; padding-top: 5px; margin-top: 5px; z-index: 2; }
