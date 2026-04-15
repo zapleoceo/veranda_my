@@ -68,6 +68,47 @@ date_default_timezone_set($apiTzName);
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
 require_once __DIR__ . '/../src/classes/TelegramBot.php';
 
+function wa_bridge_send(string $phone, string $text, string $imageUrl = ''): bool {
+  $host = trim((string)($_ENV['WA_HTTP_HOST'] ?? '127.0.0.1'));
+  $portRaw = trim((string)($_ENV['WA_HTTP_PORT'] ?? '3210'));
+  $port = is_numeric($portRaw) ? (int)$portRaw : 3210;
+  if ($port <= 0 || $port > 65535) $port = 3210;
+
+  $secret = trim((string)($_ENV['WA_NODE_SECRET'] ?? ($_ENV['WA_BRIDGE_SECRET'] ?? '')));
+  if ($secret === '') return false;
+
+  $url = 'http://' . $host . ':' . $port . '/send';
+
+  $payload = [
+    'phone' => $phone,
+    'text' => $text,
+  ];
+  if ($imageUrl !== '') $payload['image_url'] = $imageUrl;
+
+  $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+  if ($json === false) return false;
+
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, $url);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
+  curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Accept: application/json',
+    'X-WA-BRIDGE: ' . $secret,
+  ]);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+  $resp = curl_exec($ch);
+  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  curl_close($ch);
+
+  if ($resp === false || $httpCode < 200 || $httpCode >= 300) return false;
+  $j = json_decode($resp, true);
+  if (!is_array($j)) return false;
+  return !empty($j['ok']);
+}
+
 $posterToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
 $now = new DateTimeImmutable('now', new DateTimeZone($displayTzName));
 $roundedNow = $now->setTime((int)$now->format('H'), (int)$now->format('i'), 0);
@@ -781,39 +822,30 @@ if ($ajax === 'submit_booking') {
   }
 
   if ($waPhoneNorm !== '') {
-    $waToken = trim((string)($_ENV['WHATSAPP_TOKEN'] ?? ''));
-    $waInstanceId = trim((string)($_ENV['WHATSAPP_INSTANCE_ID'] ?? ''));
-    if ($waToken === '' || $waInstanceId === '') {
+    $waSecret = trim((string)($_ENV['WA_NODE_SECRET'] ?? ($_ENV['WA_BRIDGE_SECRET'] ?? '')));
+    if ($waSecret === '') {
       http_response_code(500);
       echo json_encode(['ok' => false, 'error' => $trFor('err_wa_not_configured')], JSON_UNESCAPED_UNICODE);
       exit;
     }
-    try {
-      require_once __DIR__ . '/../src/classes/WhatsAppAPI.php';
-      $wa = new \App\Classes\WhatsAppAPI($waToken, $waInstanceId);
-      $waText = $trFor('tg_thanks_title') . ' ' . $trFor('tg_thanks_body') . "\n\n";
-      if ($qrUrl !== '') {
-        $waText .= ($trFor('qr_payment_title') ?: 'Оплата предзаказа') . "\n";
-        $waText .= ($trFor('qr_payment_body') ?: '') . "\n";
-        $waText .= $qrUrl . "\n\n";
-      }
-      $waText .= $trFor('tg_booking_title') . ' #' . $qrCode . "\n";
-      $waText .= $trFor('tg_date') . ': ' . $startDt->format('Y-m-d') . "\n";
-      $waText .= $trFor('tg_time') . ': ' . $startDt->format('H:i') . "\n";
-      $waText .= $trFor('tg_guests') . ': ' . $guests . "\n";
-      $waText .= $trFor('tg_table') . ': ' . $tableNum . "\n";
-      $waText .= $trFor('tg_name') . ': ' . $name . "\n";
-      $waText .= $trFor('tg_phone') . ': ' . $phoneNorm;
-      if ($comment !== '') $waText .= "\n\n" . $trFor('tg_comment') . ":\n" . $comment;
-      if ($preorder !== '') $waText .= "\n\n" . $trFor('tg_preorder') . ":\n" . $preorder;
+    $waText = $trFor('tg_thanks_title') . ' ' . $trFor('tg_thanks_body') . "\n\n";
+    if ($qrUrl !== '') {
+      $waText .= ($trFor('qr_payment_title') ?: 'Оплата предзаказа') . "\n";
+      $waText .= ($trFor('qr_payment_body') ?: '') . "\n";
+      $waText .= $qrUrl . "\n\n";
+    }
+    $waText .= $trFor('tg_booking_title') . ' #' . $qrCode . "\n";
+    $waText .= $trFor('tg_date') . ': ' . $startDt->format('Y-m-d') . "\n";
+    $waText .= $trFor('tg_time') . ': ' . $startDt->format('H:i') . "\n";
+    $waText .= $trFor('tg_guests') . ': ' . $guests . "\n";
+    $waText .= $trFor('tg_table') . ': ' . $tableNum . "\n";
+    $waText .= $trFor('tg_name') . ': ' . $name . "\n";
+    $waText .= $trFor('tg_phone') . ': ' . $phoneNorm;
+    if ($comment !== '') $waText .= "\n\n" . $trFor('tg_comment') . ":\n" . $comment;
+    if ($preorder !== '') $waText .= "\n\n" . $trFor('tg_preorder') . ":\n" . $preorder;
 
-      $sent = $wa->sendMessage($waPhoneNorm, $waText);
-      if (!$sent) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $trFor('err_wa_send_failed')], JSON_UNESCAPED_UNICODE);
-        exit;
-      }
-    } catch (\Throwable $e) {
+    $sent = wa_bridge_send($waPhoneNorm, $waText);
+    if (!$sent) {
       http_response_code(500);
       echo json_encode(['ok' => false, 'error' => $trFor('err_wa_send_failed')], JSON_UNESCAPED_UNICODE);
       exit;
@@ -1025,9 +1057,8 @@ if ($ajax === 'wa_state_create') {
     echo json_encode(['ok' => false, 'error' => 'DB не настроена'], JSON_UNESCAPED_UNICODE);
     exit;
   }
-  $waToken = trim((string)($_ENV['WHATSAPP_TOKEN'] ?? ''));
-  $waInstanceId = trim((string)($_ENV['WHATSAPP_INSTANCE_ID'] ?? ''));
-  if ($waToken === '' || $waInstanceId === '') {
+  $waSecret = trim((string)($_ENV['WA_NODE_SECRET'] ?? ($_ENV['WA_BRIDGE_SECRET'] ?? '')));
+  if ($waSecret === '') {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => tr('err_wa_not_configured')], JSON_UNESCAPED_UNICODE);
     exit;
@@ -1092,17 +1123,9 @@ if ($ajax === 'wa_state_create') {
   $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
   $returnUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/' . ltrim($sourcePage, '/') . '?wa_state=' . rawurlencode($code);
 
-  try {
-    require_once __DIR__ . '/../src/classes/WhatsAppAPI.php';
-    $wa = new \App\Classes\WhatsAppAPI($waToken, $waInstanceId);
-    $msg = "Подтвердите WhatsApp номер:\n" . $returnUrl;
-    $sent = $wa->sendMessage($phoneNorm, $msg);
-    if (!$sent) {
-      http_response_code(500);
-      echo json_encode(['ok' => false, 'error' => tr('err_wa_send_failed')], JSON_UNESCAPED_UNICODE);
-      exit;
-    }
-  } catch (\Throwable $e) {
+  $msg = "Подтвердите WhatsApp номер:\n" . $returnUrl;
+  $sent = wa_bridge_send($phoneNorm, $msg);
+  if (!$sent) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => tr('err_wa_send_failed')], JSON_UNESCAPED_UNICODE);
     exit;
