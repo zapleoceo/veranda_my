@@ -1450,8 +1450,8 @@
       .phone-field input { order: 1; }
       .phone-field #msgrActions { order: 2; }
       .phone-field .msgr-hint { position: static; order: 3; flex: 1 0 100%; margin-top: 2px; text-align: right; pointer-events: none; }
-      .msgr-btn-inline { width: 30px; height: 30px; border-radius: 9px; }
-      .msgr-btn-inline svg { width: 16px; height: 16px; }
+      #reqModal #msgrActions .msgr-btn { width: 30px !important; height: 30px !important; border-radius: 9px; }
+      #reqModal #msgrActions .msgr-btn svg { width: 16px !important; height: 16px !important; }
       .msgr-cd { right: 2px; bottom: 2px; font-size: 8px; }
       #reqModal.msgr-state-wa .phone-field input,
       #reqModal.msgr-state-tg .phone-field input { padding-right: 42px; }
