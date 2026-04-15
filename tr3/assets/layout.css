@@ -665,7 +665,7 @@
       border-top-color: rgba(245,238,228,0.75);
       display: inline-block;
       vertical-align: middle;
-      margin-left: 6px;
+      margin-left: 0;
       animation: miniSpin 0.8s linear infinite;
     }
     @keyframes miniSpin {
