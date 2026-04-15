@@ -44,6 +44,15 @@ $db = new \App\Classes\Database(
 );
 $db->createReservationsTable();
 $resTable = $db->t('reservations');
+try {
+    $db->pdo->exec("ALTER TABLE {$resTable} ADD COLUMN poster_id INT NULL");
+} catch (\Throwable $e) {}
+try {
+    $db->pdo->exec("ALTER TABLE {$resTable} ADD COLUMN is_poster_pushed TINYINT(1) DEFAULT 0");
+} catch (\Throwable $e) {}
+try {
+    $db->pdo->exec("ALTER TABLE {$resTable} ADD COLUMN tg_message_id BIGINT NULL");
+} catch (\Throwable $e) {}
 
 // Check permissions for Poster button
 $userPermissions = veranda_get_user_permissions($db, $_SESSION['user_email'] ?? '');
@@ -83,78 +92,25 @@ if ($ajax === 'vposter') {
         echo json_encode(['ok' => false, 'error' => 'Poster API not configured'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-
-    try {
-        $api = new \App\Classes\PosterAPI($_ENV['POSTER_API_TOKEN']);
-        
-        // Find table_id by table_num using spots.getTableHallTables
-        $tableId = null;
-        $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2]);
-        if (is_array($allTables)) {
-            foreach ($allTables as $t) {
-                if (trim((string)($t['table_num'] ?? '')) === trim((string)($row['table_num'] ?? ''))) {
-                    $tableId = (int)$t['table_id'];
-                    break;
-                }
-            }
-        }
-
-        if (!$tableId) {
-            // Fallback: try spots.getTables if hall 2 mapping failed
-            $allTablesFallback = $api->request('spots.getTables', ['spot_id' => 1]);
-            if (is_array($allTablesFallback)) {
-                foreach ($allTablesFallback as $t) {
-                    if (trim((string)($t['table_num'] ?? '')) === trim((string)($row['table_num'] ?? ''))) {
-                        $tableId = (int)$t['table_id'];
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (!$tableId) {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Не удалось найти ID стола в Poster для номера ' . $row['table_num']], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-
-        $fullName = trim((string)$row['name']);
-        $nameParts = explode(' ', $fullName, 2);
-        $firstName = trim($nameParts[0] ?? 'Guest');
-        $lastName = trim($nameParts[1] ?? '');
-
-        // Use spot_id from environment if set, fallback to 1
-        $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
-        if ($spotId === '0') $spotId = '1';
-
-        $phone = preg_replace('/\D+/', '', (string)$row['phone']);
-        // If phone starts with 380, Poster might expect + prefix or specific format
-        if (strpos($phone, '380') === 0) {
-            $phone = '+' . $phone;
-        }
-
-        // Prepare reservation data for Poster API as per documentation:
-        // https://dev.joinposter.com/docs/v3/web/incomingOrders/createReservation
-        // Removed 'type' as it's not listed as an input parameter in the documentation example.
-        $reservationData = [
-            'spot_id'          => $spotId,
-            'phone'            => $phone,
-            'table_id'         => (string)$tableId,
-            'guests_count'     => (string)$row['guests'],
-            'date_reservation' => ($fmtSpotDt($row['start_time'], 'Y-m-d H:i:s') ?: (string)$row['start_time']),
-            'duration'         => '7200', // 2 hours default in seconds
-            'first_name'       => $firstName,
-            'last_name'        => $lastName,
-            'comment'          => trim(($row['comment'] ?? '') . ' (Site #' . $row['id'] . ')')
-        ];
-
-        $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
-        
-        echo json_encode(['ok' => true, 'poster_res' => $resp], JSON_UNESCAPED_UNICODE);
-    } catch (\Throwable $e) {
+    require_once __DIR__ . '/src/classes/PosterReservationHelper.php';
+    $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
+    $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId);
+    if (!$res['ok']) {
         http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'Poster API error: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    } else {
+        // Remove Telegram button
+        $rowMsg = $db->query("SELECT tg_message_id FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
+        if ($rowMsg && !empty($rowMsg['tg_message_id'])) {
+            require_once __DIR__ . '/src/classes/TelegramBot.php';
+            $tgToken = (string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? '');
+            $tgChatId = (string)($_ENV['TELEGRAM_GROUP_ID'] ?? $_ENV['TELEGRAM_CHAT_ID'] ?? '');
+            if ($tgToken !== '' && $tgChatId !== '') {
+                $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
+                $bot->editMessageReplyMarkup((int)$rowMsg['tg_message_id'], []);
+            }
+        }
     }
+    echo json_encode($res, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -691,7 +647,7 @@ $rows = $allRows;
                                             <div class="res-actions">
                                                 <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="guest">ReGuest</button>
                                                 <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="manager">ReManager</button>
-                                                <?php if ($hasPosterAccess): ?>
+                                                <?php if ($hasPosterAccess && empty($r['is_poster_pushed'])): ?>
                                                     <button type="button" class="res-btn primary btn-vposter" data-id="<?= htmlspecialchars((string)$r['id']) ?>">вPoster</button>
                                                 <?php endif; ?>
                                                 <button type="button" class="res-btn danger btn-delete" data-id="<?= htmlspecialchars((string)$r['id']) ?>"><?= $isDeleted ? 'Восстановить' : 'Удалить' ?></button>

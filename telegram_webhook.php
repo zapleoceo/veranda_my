@@ -281,66 +281,14 @@ $action = (string)($m[1] ?? '');
             exit;
         }
 
-        require_once __DIR__ . '/src/classes/PosterAPI.php';
-        $api = new \App\Classes\PosterAPI($_ENV['POSTER_API_TOKEN']);
+        require_once __DIR__ . '/src/classes/PosterReservationHelper.php';
+        $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
+        $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId, '(TG ' . $ackBy . ')');
         
-        $tableId = null;
-        $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2]);
-        if (is_array($allTables)) {
-            foreach ($allTables as $t) {
-                if (trim((string)($t['table_num'] ?? '')) === trim((string)($row['table_num'] ?? ''))) {
-                    $tableId = (int)$t['table_id'];
-                    break;
-                }
-            }
-        }
-        if (!$tableId) {
-            $allTablesFallback = $api->request('spots.getTables', ['spot_id' => 1]);
-            if (is_array($allTablesFallback)) {
-                foreach ($allTablesFallback as $t) {
-                    if (trim((string)($t['table_num'] ?? '')) === trim((string)($row['table_num'] ?? ''))) {
-                        $tableId = (int)$t['table_id'];
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (!$tableId) {
-            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Стол ' . $row['table_num'] . ' не найден в Poster', 'show_alert' => true]);
+        if (!$res['ok']) {
+            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Ошибка: ' . $res['error'], 'show_alert' => true]);
             exit;
         }
-
-        $nameParts = explode(' ', trim((string)$row['name']), 2);
-        $firstName = trim($nameParts[0] ?? 'Guest');
-        $lastName = trim($nameParts[1] ?? '');
-
-        // Use spot_id from environment if set, fallback to 1
-        $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
-        if ($spotId === '0') $spotId = '1';
-
-        $phone = preg_replace('/\D+/', '', (string)$row['phone']);
-        // If phone starts with 380, Poster might expect + prefix or specific format
-        if (strpos($phone, '380') === 0) {
-            $phone = '+' . $phone;
-        }
-
-        // Prepare reservation data for Poster API as per documentation:
-        // https://dev.joinposter.com/docs/v3/web/incomingOrders/createReservation
-        // Removed 'type' as it's not listed as an input parameter in the documentation example.
-        $reservationData = [
-            'spot_id'          => $spotId,
-            'phone'            => $phone,
-            'table_id'         => (string)$tableId,
-            'guests_count'     => (string)$row['guests'],
-            'date_reservation' => date('Y-m-d H:i:s', strtotime($row['start_time'])),
-            'duration'         => '7200', // 2 hours default in seconds
-            'first_name'       => $firstName,
-            'last_name'        => $lastName,
-            'comment'          => trim(($row['comment'] ?? '') . ' (TG ' . $ackBy . ')')
-        ];
-
-        $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
         
         $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь создана в Poster!']);
         

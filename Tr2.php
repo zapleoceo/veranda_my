@@ -1228,6 +1228,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   } else {
       $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
   }
+  if ($ok > 1) { $db->query("UPDATE {$resTable} SET tg_message_id = ? WHERE id = ?", [$ok, $resId]); }
   if (!$ok) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение в Telegram'], JSON_UNESCAPED_UNICODE);

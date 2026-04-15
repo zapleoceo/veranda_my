@@ -82,7 +82,7 @@
   .res-table thead { display: none; }
   .res-table, .res-table tbody, .res-table tr, .res-table td { display: block; width: 100%; }
   .res-table tr { border: 1px solid rgba(255,255,255,0.10); border-radius: 14px; background: rgba(0,0,0,0.18); margin-bottom: 12px; overflow: hidden; }
-  .res-table td { border-bottom: 1px solid rgba(255,255,255,0.08); padding: 10px 12px; display: flex; justify-content: space-between; gap: 12px; background: transparent !important; }
+  .res-table td { border-bottom: 1px solid rgba(255,255,255,0.08); padding: 10px 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; background: transparent !important; }
   .res-table td:last-child { border-bottom: 0; }
   .res-table td::before { content: attr(data-label); color: rgba(255,255,255,0.65); font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
   .res-actions { justify-content: flex-start; }
