@@ -1315,8 +1315,14 @@
       .req-layout { gap: 5px; }
       .phone-row, .name-row { gap: 5px; }
       .guests-time-row { gap: 5px; }
-      .guests-time-row .modal-label input { padding: 10px 6px; font-size: 14px; }
-      .guests-time-row .modal-label select { padding: 10px 24px 10px 6px; font-size: 14px; background-position: right 6px center; background-size: 14px; }
+      .modal input[type="text"],
+      .modal input[type="tel"],
+      .modal input[type="number"],
+      .modal textarea { padding: 10px 10px; }
+      .modal select { padding: 10px 34px 10px 10px; background-position: right 6px center; background-size: 14px; }
+
+      .guests-time-row .modal-label input { padding: 10px 10px; font-size: 14px; }
+      .guests-time-row .modal-label select { padding: 10px 34px 10px 10px; font-size: 14px; background-position: right 6px center; background-size: 14px; }
       .label-right { gap: 5px; }
       .msgr-actions { gap: 5px; }
       #reqModal.msgr-state-wa .phone-field input,
