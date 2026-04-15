@@ -1054,7 +1054,7 @@
     #reqModal .modal-grid { grid-template-columns: 0.45fr 0.55fr; }
     .modal-label { display: grid; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-top: 0; min-width: 0; }
     .modal-label.full { grid-column: 1 / -1; }
-    .guests-time-row { display: grid; grid-template-columns: max-content max-content max-content max-content; gap: 5px; align-items: start; }
+    .guests-time-row { display: grid; grid-template-columns: max-content max-content minmax(0, 1fr); gap: 5px; align-items: start; }
     .guests-time-row.full { grid-column: 1 / -1; }
     .guests-time-row .modal-label { gap: 5px; }
     .guests-time-row .modal-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -1063,6 +1063,9 @@
     .guests-time-row .modal-label select { width: auto; max-width: 100%; }
     .guests-time-row .modal-label select { padding-right: 34px; }
     .guests-time-row .end-time-value { padding: 0 8px; width: auto; }
+    .duration-pack-row { display: flex; align-items: center; gap: 5px; min-width: 0; }
+    .duration-pack-row select { width: auto; min-width: 0; }
+    .duration-pack-row .end-time-label { flex: 0 0 auto; min-width: 0; }
     .phone-row, .name-row { display: flex; align-items: center; gap: 10px; }
     .phone-row input, .name-row input { flex: 1 1 auto; min-width: 0; }
     .tg-nick {
@@ -1389,12 +1392,12 @@
       .guests-time-row .modal-label input { padding: 10px 8px; font-size: 13px; }
       .guests-time-row .modal-label select { padding: 10px 28px 10px 8px; font-size: 13px; background-position: right 5px center; background-size: 14px; }
       .guests-time-row.full .num-step { position: relative; width: 78px; gap: 0; }
-      .guests-time-row.full #reqGuests { width: 100%; max-width: none; text-align: center; padding-left: 24px; padding-right: 24px; }
+      .guests-time-row.full #reqGuests { width: 100%; max-width: none; text-align: center; padding-left: 22px; padding-right: 22px; }
       .guests-time-row.full #reqGuestsMinus,
       .guests-time-row.full #reqGuestsPlus {
         position: absolute;
         top: 0;
-        width: 24px;
+        width: 22px;
         height: 44px;
         border-radius: 14px;
         background: transparent;
@@ -1421,7 +1424,12 @@
       .modal-title { font-size: 15px; }
       .modal-title { font-size: 15px; }
       #reqModalTitle { flex-wrap: nowrap; gap: 4px; overflow: hidden; }
-      #reqModalTitle .framed-box { padding: 1px 6px; }
+      #reqModalTitle { font-size: 13px; }
+      #reqModalTitle .framed-box { padding: 1px 4px; }
+      #reqNameLabel > span { display: none; }
+      #reqNameLabel { gap: 0; }
+      #reqPhoneLabel .label-row { gap: 0; }
+      #reqPhoneLabel [data-i18n="your_phone"] { display: none; }
       #reqForm { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
       .req-layout { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding-right: 2px; min-height: 0; }
       .modal-actions { position: sticky; bottom: 0; background: transparent; padding-top: 5px; margin-top: 5px; z-index: 2; }
@@ -1451,7 +1459,7 @@
     #reqModal .modal-title-bar {
       justify-content: center;
       padding: 0 40px 10px 40px;
-      position: relative;
+      position: static;
     }
     #reqModalTitle {
       width: 100%;
@@ -1472,8 +1480,8 @@
       cursor: pointer;
       transition: color 0.15s ease, transform 0.15s ease;
       position: absolute;
-      top: 5px;
-      right: 5px;
+      top: 2px;
+      right: 2px;
     }
     .btn-close-modal:hover {
       color: rgba(255,255,255,1);

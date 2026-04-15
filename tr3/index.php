@@ -63,7 +63,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0433">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0503">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -267,28 +267,29 @@ $mk = function (string $l) use ($self, $baseQs) {
                     ?>
                   </select>
                 </label>
-                <label class="modal-label">
+                <div class="modal-label duration-pack">
                   <span data-i18n="duration"><?= htmlspecialchars(tr('duration')) ?></span>
-                  <select id="reqDuration" name="duration_m">
-                    <?php
-                    $durations = [60 => '1', 90 => '1.5', 120 => '2', 150 => '2.5', 180 => '3', 210 => '3.5', 240 => '4', 270 => '4.5', 300 => '5'];
-                    foreach ($durations as $v => $lbl) {
-                      $sel = $v === 120 ? ' selected' : '';
-                      echo "<option value=\"$v\"$sel>$lbl " . htmlspecialchars(tr('h_short')) . "</option>";
-                    }
-                    ?>
-                  </select>
-                </label>
-                <div class="modal-label end-time-label" aria-live="polite">
-                  <span>&nbsp;</span>
-                  <div class="end-time-value" id="reqEndTime">до —</div>
+                  <div class="duration-pack-row">
+                    <select id="reqDuration" name="duration_m">
+                      <?php
+                      $durations = [60 => '1', 90 => '1.5', 120 => '2', 150 => '2.5', 180 => '3', 210 => '3.5', 240 => '4', 270 => '4.5', 300 => '5'];
+                      foreach ($durations as $v => $lbl) {
+                        $sel = $v === 120 ? ' selected' : '';
+                        echo "<option value=\"$v\"$sel>$lbl " . htmlspecialchars(tr('h_short')) . "</option>";
+                      }
+                      ?>
+                    </select>
+                    <div class="end-time-label" aria-live="polite">
+                      <div class="end-time-value" id="reqEndTime">до —</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <label class="modal-label">
+              <label class="modal-label" id="reqNameLabel">
                 <span data-i18n="your_name"><?= htmlspecialchars(tr('your_name')) ?></span>
-                <input type="text" id="reqName" name="name" autocomplete="name" required maxlength="80">
+                <input type="text" id="reqName" name="name" autocomplete="name" required maxlength="80" placeholder="<?= htmlspecialchars(tr('your_name')) ?>">
               </label>
-              <label class="modal-label">
+              <label class="modal-label" id="reqPhoneLabel">
                 <div class="label-row">
                   <div class="label-left">
                     <span data-i18n="your_phone"><?= htmlspecialchars(tr('your_phone')) ?></span>
@@ -300,7 +301,7 @@ $mk = function (string $l) use ($self, $baseQs) {
                   </div>
                 </div>
                 <div class="phone-field">
-                  <input type="tel" id="reqPhone" name="phone" autocomplete="tel" inputmode="numeric" pattern="\+[1-9][0-9]{8,14}" required>
+                  <input type="tel" id="reqPhone" name="phone" autocomplete="tel" inputmode="numeric" pattern="\+[1-9][0-9]{8,14}" required placeholder="<?= htmlspecialchars(tr('your_phone')) ?>">
                   <div class="msgr-actions" id="msgrActions">
                     <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
                       <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -387,7 +388,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260416_0433" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260416_0503" defer></script>
 </body>
 </html>
 
