@@ -571,6 +571,7 @@ class Database {
             preorder_ru TEXT,
             tg_user_id BIGINT NULL,
             tg_username VARCHAR(64) NULL,
+            tg_message_id BIGINT NULL,
             lang VARCHAR(8) NULL,
             total_amount INT DEFAULT 0,
             qr_url VARCHAR(255) NULL,
@@ -594,6 +595,9 @@ class Database {
             }
             if (empty($cols['lang'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN lang VARCHAR(8) NULL");
+            }
+            if (empty($cols['tg_message_id'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_message_id BIGINT NULL");
             }
         } catch (\Throwable $e) {
         }
