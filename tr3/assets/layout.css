@@ -1433,7 +1433,7 @@
       padding: 0;
     }
     
-    #reqGuests { max-width: 42px; text-align: center; }
+    #reqGuests { max-width: 42px; text-align: center; padding-left: 6px; padding-right: 6px; }
     #reqGuests::-webkit-outer-spin-button,
     #reqGuests::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     #reqGuests { -moz-appearance: textfield; }
