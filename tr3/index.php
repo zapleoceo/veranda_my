@@ -47,10 +47,15 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260415_1930">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260415_2005">
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
+  <div class="map-invite" style="max-width:1180px; margin: 10px auto 0; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04);">
+    Tr3 — самостоятельная страница. Правки делаем по MVC и разделению ответственности:
+    Model: данные/репозитории/интеграции (Poster/DB/Telegram/WhatsApp). Controller: /tr3/api.php (все ajax). View: /tr3/index.php (только разметка).
+    Ресурсы Tr3 лежат в /tr3/assets (CSS/JS). Не используем названия и зависимости от прошлых версий.
+  </div>
   <div class="app">
     <main class="panel">
       <div class="topbar">
@@ -63,9 +68,7 @@ $mk = function (string $l) use ($self, $baseQs) {
           </p>
           <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
         </div>
-        <div class="map-invite">
-          Tr3: правки делаем в папке /tr3 (index.php, api.php). Скрипты: /assets/js (Tr3.boot.js + Tr2.js). Стили: /assets/css/Tr3.css. Переводы: /i18n/tr3.php
-        </div>
+        <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
           <label class="zoom" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
@@ -327,7 +330,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260415_1940" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260415_2005" defer></script>
 </body>
 </html>
 
