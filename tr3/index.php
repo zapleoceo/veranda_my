@@ -63,7 +63,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0516">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0532">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -296,9 +296,6 @@ $mk = function (string $l) use ($self, $baseQs) {
                     <span class="tg-nick" id="tgNick" hidden></span>
                     <span class="tg-nick" id="waNick" hidden></span>
                   </div>
-                  <div class="label-right">
-                    <div class="msgr-hint" id="msgrHint" hidden></div>
-                  </div>
                 </div>
                 <div class="phone-field">
                   <input type="tel" id="reqPhone" name="phone" autocomplete="tel" inputmode="numeric" pattern="\+[1-9][0-9]{8,14}" required placeholder="<?= htmlspecialchars(tr('your_phone')) ?>">
@@ -317,6 +314,7 @@ $mk = function (string $l) use ($self, $baseQs) {
                       <span class="msgr-cd" data-msgr-cd="wa" aria-hidden="true"></span>
                     </button>
                   </div>
+                  <div class="msgr-hint" id="msgrHint" hidden></div>
                   <div class="msgr-toast" id="msgrToast" hidden></div>
                   <button type="button" class="msgr-field-icon" id="msgrTgIcon" aria-label="Telegram verified" title="Telegram" hidden>
                     <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -388,7 +386,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260416_0516" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260416_0532" defer></script>
 </body>
 </html>
 

@@ -1087,7 +1087,7 @@
       display: inline;
     }
     .tg-nick[hidden] { display: none; }
-    .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; position: relative; }
+    .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; position: relative; padding: 0 !important; gap: 0 !important; justify-content: center; align-items: center; }
     .msgr-btn-inline svg { width: 22px; height: 22px; }
     .msgr-cd {
       position: absolute;
@@ -1126,6 +1126,17 @@
     .msgr-actions { display: inline-flex; align-items: center; gap: 6px; }
     .phone-field { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; }
     .phone-field input { flex: 1 1 auto; min-width: 0; padding-right: 14px; }
+    .phone-field .msgr-hint {
+      position: absolute;
+      right: 0;
+      top: -16px;
+      max-width: 100%;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
     #reqModal.msgr-state-none .phone-field input { flex: 1 1 auto; max-width: none; }
     #reqModal.msgr-state-none .phone-field .msgr-actions { margin-left: auto; flex: 0 0 auto; }
     #reqModal.msgr-state-wa .phone-field input,
@@ -1409,6 +1420,13 @@
 
       .label-right { gap: 5px; }
       .msgr-actions { gap: 5px; }
+      .phone-field { flex-wrap: wrap; }
+      .phone-field input { order: 1; }
+      .phone-field #msgrActions { order: 2; }
+      .phone-field .msgr-hint { position: static; order: 3; flex: 1 0 100%; margin-top: 2px; text-align: right; pointer-events: none; }
+      .msgr-btn-inline { width: 35px; height: 35px; border-radius: 10px; }
+      .msgr-btn-inline svg { width: 18px; height: 18px; }
+      .msgr-cd { right: 3px; bottom: 2px; font-size: 9px; }
       #reqModal.msgr-state-wa .phone-field input,
       #reqModal.msgr-state-tg .phone-field input { padding-right: 42px; }
       #reqModal.msgr-state-none .phone-field input { padding-right: 12px; }
