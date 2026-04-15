@@ -977,8 +977,16 @@ if ($ajax === 'tg_state_create') {
     exit;
   }
 
-  $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
-  if (!is_array($payload)) $payload = [];
+  $raw = file_get_contents('php://input');
+  if ($raw === false) $raw = '';
+  $ct = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+  $looksJson = preg_match('/^\s*[\{\[]/', (string)$raw) === 1;
+  if (strpos($ct, 'application/json') !== false || $looksJson) {
+    $payload = json_decode($raw !== '' ? $raw : '[]', true);
+    if (!is_array($payload)) $payload = [];
+  } else {
+    $payload = is_array($_POST ?? null) ? $_POST : [];
+  }
 
   $tableNum = trim((string)($payload['table_num'] ?? ''));
   $guests = (int)($payload['guests'] ?? 0);
@@ -1084,8 +1092,16 @@ if ($ajax === 'wa_state_create') {
     exit;
   }
 
-  $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
-  if (!is_array($payload)) $payload = [];
+  $raw = file_get_contents('php://input');
+  if ($raw === false) $raw = '';
+  $ct = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+  $looksJson = preg_match('/^\s*[\{\[]/', (string)$raw) === 1;
+  if (strpos($ct, 'application/json') !== false || $looksJson) {
+    $payload = json_decode($raw !== '' ? $raw : '[]', true);
+    if (!is_array($payload)) $payload = [];
+  } else {
+    $payload = is_array($_POST ?? null) ? $_POST : [];
+  }
 
   $tableNum = trim((string)($payload['table_num'] ?? ''));
   $guests = (int)($payload['guests'] ?? 0);

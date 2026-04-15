@@ -1056,7 +1056,24 @@
     .guests-time-row .end-time-value { padding: 0 8px; width: auto; }
     .phone-row, .name-row { display: flex; align-items: center; gap: 10px; }
     .phone-row input, .name-row input { flex: 1 1 auto; min-width: 0; }
-    .tg-nick { font-size: 11px; font-weight: 900; letter-spacing: -0.02em; color: rgba(129,199,132,0.95); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tg-nick {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: rgba(129,199,132,0.95);
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+      line-height: 1.1;
+      display: inline;
+    }
     .tg-nick[hidden] { display: none; }
     .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; position: relative; }
     .msgr-btn-inline svg { width: 22px; height: 22px; }
@@ -1154,7 +1171,7 @@
       padding-right: 36px;
     }
     .modal input:focus, .modal select:focus { border-color: rgba(184,135,70,0.6); outline: none; }
-    .modal input[type="text"], .modal input[type="tel"], .modal input[type="time"], .modal select { height: 44px; }
+    .modal input[type="text"], .modal input[type="tel"], .modal input[type="number"], .modal input[type="time"], .modal select { height: 44px; }
     .end-time-value {
       width: 100%;
       height: 44px;
@@ -1434,7 +1451,7 @@
       padding: 0;
     }
     
-    #reqGuests { max-width: 42px; text-align: center; padding-left: 6px; padding-right: 6px; }
+    #reqGuests { max-width: 63px; text-align: center; padding-left: 6px; padding-right: 6px; height: 44px; }
     #reqGuests::-webkit-outer-spin-button,
     #reqGuests::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     #reqGuests { -moz-appearance: textfield; }
