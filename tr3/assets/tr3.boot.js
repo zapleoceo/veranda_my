@@ -28,7 +28,7 @@
         soonBookingHours: j.soonBookingHours,
         apiBase: j.apiBase,
       };
-      return loadScript('/tr3/assets/tr2.js.php?v=20260415_1930');
+      return loadScript('/tr3/assets/tr2.js.php?v=20260415_1940');
     })
     .catch((e) => {
       const msg = document.createElement('div');
@@ -37,4 +37,3 @@
       document.body.appendChild(msg);
     });
 })();
-

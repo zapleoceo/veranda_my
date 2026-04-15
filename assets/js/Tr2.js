@@ -1382,7 +1382,7 @@
       try {
         const url = apiUrl();
         url.searchParams.set('ajax', 'wa_state_create');
-        const sourcePage = location.pathname.split('/').pop() || 'Tr2.php';
+        const sourcePage = (location && location.pathname) ? location.pathname : '/Tr2.php';
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -1456,7 +1456,7 @@
       try {
         const url = apiUrl();
         url.searchParams.set('ajax', 'tg_state_create');
-        const sourcePage = location.pathname.split('/').pop() || 'Tr2.php';
+        const sourcePage = (location && location.pathname) ? location.pathname : '/Tr2.php';
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
