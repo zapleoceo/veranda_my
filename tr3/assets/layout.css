@@ -1042,8 +1042,35 @@
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
     .modal-label { display: grid; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-top: 0; min-width: 0; }
     .modal-label.full { grid-column: 1 / -1; }
-    .guests-time-row { display: grid; grid-template-columns: minmax(120px, 160px) 1fr minmax(96px, 140px) minmax(84px, 120px); gap: 10px; }
+    .guests-time-row { display: grid; grid-template-columns: max-content minmax(80px, 1fr) max-content max-content; gap: 10px; align-items: center; }
     .guests-time-row.full { grid-column: 1 / -1; }
+    #reqLeft > div > div.guests-time-row.full > div:nth-child(1) { width: max-content; }
+    .guests-time-row.full > .modal-label,
+    .guests-time-row.full > div.modal-label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      min-width: 0;
+    }
+    .guests-time-row.full > .modal-label > span,
+    .guests-time-row.full > div.modal-label > span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      line-height: 1.1;
+    }
+    .guests-time-row.full > .modal-label > select,
+    .guests-time-row.full > .modal-label > input,
+    .guests-time-row.full > .modal-label > .num-step,
+    .guests-time-row.full > div.modal-label > select,
+    .guests-time-row.full > div.modal-label > input,
+    .guests-time-row.full > div.modal-label > .num-step,
+    .guests-time-row.full > .end-time-label > .end-time-value {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
     .phone-row, .name-row { display: flex; align-items: center; gap: 10px; }
     .phone-row input, .name-row input { flex: 1 1 auto; min-width: 0; }
     .tg-stack { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
@@ -1249,13 +1276,20 @@
       .req-right .pre-body { max-height: 340px; }
     }
     @media (max-width: 640px) {
-      .guests-time-row { grid-template-columns: 1fr 1fr; gap: 6px; }
-      .guests-time-row .modal-label input { padding: 12px 6px; font-size: 14px; }
-      .guests-time-row .modal-label select { padding: 12px 24px 12px 6px; font-size: 14px; background-position: right 6px center; background-size: 14px; }
-      .guests-time-row .modal-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+      .modal { padding: 5px; align-items: center; justify-content: center; }
+      .modal-card { padding: 10px 10px 8px; }
+      .modal-grid { gap: 5px; margin-top: 5px; }
+      .modal-label { gap: 5px; }
+      .modal-actions { gap: 5px; margin-top: 10px; }
+      .req-layout { gap: 5px; }
+      .phone-row, .name-row { gap: 5px; }
+      .guests-time-row { gap: 5px; }
+      .guests-time-row.full > .modal-label,
+      .guests-time-row.full > div.modal-label { gap: 5px; }
+      .guests-time-row .modal-label input { padding: 10px 6px; font-size: 14px; }
+      .guests-time-row .modal-label select { padding: 10px 24px 10px 6px; font-size: 14px; background-position: right 6px center; background-size: 14px; }
       .desktop-text { display: none; }
       .mobile-text { display: inline; }
-      .modal { padding: 10px; align-items: center; justify-content: center; }
       .modal-card {
         width: 100%;
         max-height: calc(100dvh - 20px);
