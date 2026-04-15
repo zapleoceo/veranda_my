@@ -1082,8 +1082,12 @@
     }
     .label-right { display: inline-flex; align-items: center; gap: 8px; }
     .msgr-actions { display: inline-flex; align-items: center; gap: 6px; }
-    .phone-field { position: relative; display: flex; align-items: center; min-width: 0; }
-    .phone-field input { flex: 1 1 auto; min-width: 0; padding-right: 44px; }
+    .phone-field { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .phone-field input { flex: 1 1 auto; min-width: 0; padding-right: 14px; }
+    #reqModal.msgr-state-none .phone-field input { flex: 0 0 45%; }
+    #reqModal.msgr-state-none .phone-field .msgr-actions { margin-left: auto; }
+    #reqModal.msgr-state-wa .phone-field input,
+    #reqModal.msgr-state-tg .phone-field input { padding-right: 44px; }
     .msgr-field-icon {
       position: absolute;
       right: 6px;
@@ -1307,7 +1311,7 @@
       .modal-card { padding: 10px 10px 8px; }
       .modal-grid { gap: 5px; margin-top: 5px; }
       .modal-label { gap: 5px; }
-      .modal-actions { gap: 5px; margin-top: 10px; }
+      .modal-actions { gap: 5px; margin-top: 5px; }
       .req-layout { gap: 5px; }
       .phone-row, .name-row { gap: 5px; }
       .guests-time-row { gap: 5px; }
@@ -1315,7 +1319,9 @@
       .guests-time-row .modal-label select { padding: 10px 24px 10px 6px; font-size: 14px; background-position: right 6px center; background-size: 14px; }
       .label-right { gap: 5px; }
       .msgr-actions { gap: 5px; }
-      .phone-field input { padding-right: 42px; }
+      #reqModal.msgr-state-wa .phone-field input,
+      #reqModal.msgr-state-tg .phone-field input { padding-right: 42px; }
+      #reqModal.msgr-state-none .phone-field input { padding-right: 12px; }
       .msgr-field-icon { right: 5px; width: 32px; height: 32px; }
       .desktop-text { display: none; }
       .mobile-text { display: inline; }
@@ -1329,7 +1335,7 @@
       .modal-title { font-size: 15px; }
       #reqForm { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
       .req-layout { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding-right: 2px; min-height: 0; }
-      .modal-actions { position: sticky; bottom: 0; background: transparent; padding-top: 10px; margin-top: 10px; z-index: 2; }
+      .modal-actions { position: sticky; bottom: 0; background: transparent; padding-top: 5px; margin-top: 5px; z-index: 2; }
       .req-right { display: none !important; }
       
 
