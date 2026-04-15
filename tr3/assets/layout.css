@@ -1077,6 +1077,18 @@
     .tg-nick[hidden] { display: none; }
     .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; position: relative; }
     .msgr-btn-inline svg { width: 22px; height: 22px; }
+    .msgr-cd {
+      position: absolute;
+      right: 4px;
+      bottom: 3px;
+      font-size: 10px;
+      font-weight: 900;
+      line-height: 1;
+      color: rgba(245, 238, 228, 0.92);
+      opacity: 0.92;
+      pointer-events: none;
+    }
+    .msgr-cd:empty { display: none; }
     .msgr-btn-inline.active { background: #25d366; color: white; border-color: #25d366; }
     .msgr-btn-inline.active .ico-wa { filter: brightness(0) invert(1); }
     .ico-wa { color: #25d366; }
@@ -1098,7 +1110,7 @@
       transition: border-color .2s ease;
       appearance: none;
     }
-    .label-right { display: inline-flex; align-items: center; gap: 8px; }
+    .label-right { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
     .msgr-actions { display: inline-flex; align-items: center; gap: 6px; }
     .phone-field { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; }
     .phone-field input { flex: 1 1 auto; min-width: 0; padding-right: 14px; }
@@ -1148,6 +1160,28 @@
     #reqModal.msgr-state-tg #msgrWaIcon { display: none !important; }
     #reqModal.msgr-state-wa #msgrTgIcon { display: none !important; }
     #reqModal.msgr-state-wa #reqPhone { opacity: 0.8; }
+    .msgr-toast {
+      position: absolute;
+      right: 0;
+      top: -28px;
+      max-width: 100%;
+      padding: 4px 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.55);
+      color: rgba(245, 238, 228, 0.92);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .msgr-toast.on { opacity: 1; transform: translateY(0); }
     .modal { color-scheme: dark; }
     .modal select { background: rgba(0,0,0,0.22); }
     .modal select:invalid { color: rgba(255,255,255,0.62); }
@@ -1383,6 +1417,16 @@
       border-bottom: none;
       background: transparent;
     }
+    #reqModal .modal-title-bar {
+      justify-content: center;
+      padding: 0 40px 10px 40px;
+      position: relative;
+    }
+    #reqModalTitle {
+      width: 100%;
+      justify-content: center;
+      text-align: center;
+    }
     .modal-title-left { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
     .modal-total { font-weight: 900; font-size: 12px; color: rgba(184,135,70,0.95); font-variant-numeric: tabular-nums; }
     .btn-close-modal {
@@ -1577,6 +1621,8 @@
       text-align: right;
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
     }
     .modal-hint {
       margin-top: 10px;

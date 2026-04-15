@@ -374,6 +374,7 @@
     const reqSubmit = document.getElementById('reqSubmit');
     const msgrTgBtn = document.getElementById('msgrTgBtn');
     const msgrHint = document.getElementById('msgrHint');
+    const msgrToast = document.getElementById('msgrToast');
     const tgNick = document.getElementById('tgNick');
     const waNick = document.getElementById('waNick');
     const reqPreorderHidden = document.getElementById('reqPreorderHidden');
@@ -1331,6 +1332,60 @@
       msgrHint.textContent = t;
     };
 
+    const MSGR_COOLDOWN_SEC = 20;
+    const msgrCooldownKey = (kind) => 'veranda_msgr_cd_' + String(kind || '');
+    const loadCooldownEnd = (kind) => {
+      try {
+        const v = Number(localStorage.getItem(msgrCooldownKey(kind)) || 0);
+        return isFinite(v) ? v : 0;
+      } catch (_) {
+        return 0;
+      }
+    };
+    const cooldownEndsAt = {
+      wa: loadCooldownEnd('wa'),
+      tg: loadCooldownEnd('tg'),
+    };
+    const getCooldownRemaining = (kind) => {
+      const end = Number(cooldownEndsAt[String(kind)] || 0);
+      const diff = end - Date.now();
+      if (!isFinite(diff) || diff <= 0) return 0;
+      return Math.max(1, Math.ceil(diff / 1000));
+    };
+    const startCooldown = (kind) => {
+      const end = Date.now() + (MSGR_COOLDOWN_SEC * 1000);
+      cooldownEndsAt[String(kind)] = end;
+      try { localStorage.setItem(msgrCooldownKey(kind), String(end)); } catch (_) {}
+    };
+
+    let msgrToastTimer = null;
+    let msgrToastHideTimer = null;
+    const showMsgrToast = (sec) => {
+      if (!msgrToast) return;
+      const s = Math.max(0, Number(sec || 0) || 0);
+      const msg = fmtVars(t('msgr_cooldown_toast'), { sec: String(s) });
+      msgrToast.textContent = msg;
+      msgrToast.hidden = false;
+      msgrToast.classList.add('on');
+      if (msgrToastTimer) clearTimeout(msgrToastTimer);
+      if (msgrToastHideTimer) clearTimeout(msgrToastHideTimer);
+      msgrToastTimer = setTimeout(() => {
+        msgrToast.classList.remove('on');
+        msgrToastHideTimer = setTimeout(() => { msgrToast.hidden = true; }, 260);
+      }, 2000);
+    };
+
+    const updateMsgrCountdownUi = () => {
+      const nodes = document.querySelectorAll('[data-msgr-cd]');
+      nodes.forEach((n) => {
+        const kind = String(n.getAttribute('data-msgr-cd') || '').trim();
+        const sec = getCooldownRemaining(kind);
+        n.textContent = sec > 0 ? String(sec) : '';
+      });
+    };
+    updateMsgrCountdownUi();
+    setInterval(updateMsgrCountdownUi, 250);
+
     const syncWaButtonState = () => {
       const msgrWaBtn = document.getElementById('msgrWaBtn');
       if (!msgrWaBtn) return;
@@ -1398,6 +1453,9 @@
       if (!msgrWaBtn || msgrBusy) return;
       if (!pendingBooking) { setMsgrHint(t('hint_pick_table_first')); return; }
 
+      const rem = getCooldownRemaining('wa');
+      if (rem > 0) { showMsgrToast(rem); return; }
+
       const phone = reqPhone ? ('+' + phoneDigits(reqPhone.value)) : '';
       if (!isPhoneValid(phone)) {
         if (reqPhone) reqPhone.focus();
@@ -1439,6 +1497,8 @@
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
         setMsgrHint(t('hint_wa_check_link'));
+        startCooldown('wa');
+        showMsgrToast(MSGR_COOLDOWN_SEC);
       } catch (e) {
         setMsgrHint(String(e && e.message ? e.message : e));
       } finally {
@@ -1448,7 +1508,11 @@
     };
 
     const msgrWaBtn = document.getElementById('msgrWaBtn');
-    if (msgrWaBtn) msgrWaBtn.addEventListener('click', startWhatsAppFlow);
+    if (msgrWaBtn) {
+      msgrWaBtn.addEventListener('click', startWhatsAppFlow);
+      msgrWaBtn.addEventListener('mouseenter', () => { const r = getCooldownRemaining('wa'); if (r > 0) showMsgrToast(r); });
+      msgrWaBtn.addEventListener('focus', () => { const r = getCooldownRemaining('wa'); if (r > 0) showMsgrToast(r); });
+    }
     const msgrWaIcon = document.getElementById('msgrWaIcon');
     if (msgrWaIcon) msgrWaIcon.addEventListener('click', async () => {
       if (msgrBusy) return;
@@ -1486,6 +1550,9 @@
          setMsgrHint('');
          return;
       }
+
+      const rem = getCooldownRemaining('tg');
+      if (rem > 0) { showMsgrToast(rem); return; }
       
       const getTotalPreorderAmount = () => {
         const counts = normalizePreorder(preorderCounts);
@@ -1526,7 +1593,9 @@
         const botUrl = String(j.bot_url || '').trim();
         if (!botUrl) throw new Error(t('err_no_bot_link'));
         setMsgrHint(t('hint_tg_back'));
-        window.location.href = botUrl;
+        startCooldown('tg');
+        showMsgrToast(MSGR_COOLDOWN_SEC);
+        setTimeout(() => { window.location.href = botUrl; }, 150);
       } catch (e) {
         setMsgrHint(String(e && e.message ? e.message : e));
       } finally {
@@ -1535,13 +1604,17 @@
       }
     };
 
-    if (msgrTgBtn) msgrTgBtn.addEventListener('click', () => {
+    if (msgrTgBtn) {
+      msgrTgBtn.addEventListener('mouseenter', () => { const r = getCooldownRemaining('tg'); if (r > 0) showMsgrToast(r); });
+      msgrTgBtn.addEventListener('focus', () => { const r = getCooldownRemaining('tg'); if (r > 0) showMsgrToast(r); });
+      msgrTgBtn.addEventListener('click', () => {
       if (messengerLinked.telegram && linkedTg && linkedTg.user_id) {
         confirmModal(t('tg_unlink_confirm')).then((ok) => { if (ok) unlinkAllMessengers(t('tg_unlinked')); });
         return;
       }
       startTelegramFlow().catch(() => null);
-    });
+      });
+    }
     const msgrTgIcon = document.getElementById('msgrTgIcon');
     if (msgrTgIcon) msgrTgIcon.addEventListener('click', async () => {
       if (msgrBusy) return;
