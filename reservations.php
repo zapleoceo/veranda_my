@@ -106,7 +106,28 @@ if ($ajax === 'vposter') {
             $tgChatId = (string)($_ENV['TELEGRAM_GROUP_ID'] ?? $_ENV['TELEGRAM_CHAT_ID'] ?? '');
             if ($tgToken !== '' && $tgChatId !== '') {
                 $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-                $bot->editMessageReplyMarkup((int)$rowMsg['tg_message_id'], []);
+                $startDt = $parseSpotDt($row['start_time']);
+                $datePart = $startDt ? $startDt->format('Y-m-d') : '';
+                $timePart = $startDt ? $startDt->format('H:i') : '';
+
+                $msgText = '<b>Бронь с сайта #' . htmlspecialchars((string)$id) . '</b>' . "\n";
+                if ($datePart !== '') $msgText .= 'Дата: <b>' . htmlspecialchars($datePart) . '</b>' . "\n";
+                if ($timePart !== '') $msgText .= 'Время: <b>' . htmlspecialchars($timePart) . '</b>' . "\n";
+                $msgText .= 'Кол-во человек: <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
+                $msgText .= 'Номер стола: <b>' . htmlspecialchars((string)$row['table_num']) . '</b>' . "\n";
+                $msgText .= 'Имя: <b>' . htmlspecialchars((string)$row['name']) . '</b>' . "\n";
+                $msgText .= 'Номер телефона: <b>' . htmlspecialchars((string)$row['phone']) . '</b>';
+                if (!empty($row['comment'])) {
+                    $msgText .= "\n<b>Комментарий:</b>\n" . htmlspecialchars((string)$row['comment']);
+                }
+
+                if (!empty($res['duplicate'])) {
+                    $msgText .= "\n\n🚀 <b>Уже была в Poster</b> (дубль предотвращен)";
+                } else {
+                    $msgText .= "\n\n🚀 <b>Отправлено в Poster</b> (через сайт)";
+                }
+
+                $bot->editMessageText((int)$rowMsg['tg_message_id'], $msgText, []);
             }
         }
     }
