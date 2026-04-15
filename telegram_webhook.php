@@ -290,11 +290,15 @@ $action = (string)($m[1] ?? '');
             exit;
         }
         
-        $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь создана в Poster!']);
         
-        // Update message to show who sent it to Poster
-        $oldText = $message['text'] ?? '';
-        $newText = $oldText . "\n\n🚀 <b>Отправлено в Poster</b> (" . htmlspecialchars($ackBy) . ")";
+        if (!empty($res['duplicate'])) {
+            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь уже была в Poster!']);
+            $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Уже была в Poster</b> (дубль предотвращен)";
+        } else {
+            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь создана в Poster!']);
+            $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Отправлено в Poster</b> (" . htmlspecialchars($ackBy) . ")";
+        }
+
         $postJson('editMessageText', [
             'chat_id' => $chatId,
             'message_id' => $messageId,
