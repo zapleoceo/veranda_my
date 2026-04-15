@@ -1383,6 +1383,7 @@
       .guests-time-row .modal-label { flex: 0 0 auto; min-width: 0; }
       .guests-time-row .modal-label > span { font-size: 10px; max-width: 64px; }
       .guests-time-row.full .end-time-label > span { display: none; }
+      .guests-time-row.full > .modal-label:first-child > span { display: block; width: 100%; }
       .modal input[type="text"],
       .modal input[type="tel"],
       .modal input[type="number"],
@@ -1416,7 +1417,7 @@
       .mobile-text { display: inline; }
       .modal-card {
         width: 100%;
-        max-height: calc(100dvh - 20px);
+        max-height: calc(100dvh - 10px);
         overflow: hidden;
         display: flex;
         flex-direction: column;
@@ -1734,6 +1735,14 @@
       color: rgba(255, 250, 244, 0.55);
       opacity: 0.7;
       cursor: not-allowed;
+    }
+    @media (max-width: 640px) {
+      #reqSubmit.btn-primary.is-disabled {
+        background: var(--color-primary);
+        border: 0;
+        color: #fffaf4;
+        opacity: 1;
+      }
     }
   
     .stats { display: none; }
