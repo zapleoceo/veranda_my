@@ -1532,10 +1532,6 @@
     .stat { display: none; }
     .footer-note { display: none; }
 
-    .table.free {
-      outline: 2px solid rgba(79,123,75,0.85);
-      outline-offset: 2px;
-    }
     .table.busy {
       filter: grayscale(0.85) brightness(0.82);
     }
