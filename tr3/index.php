@@ -63,7 +63,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0302">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0336">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -79,12 +79,12 @@ $mk = function (string $l) use ($self, $baseQs) {
       <div class="topbar">
         <div class="title-wrap">
           <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
-          <p>
-            <span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span>
-            <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button>
-            <span class="mini-loader" id="busyDateLoader" hidden></span>
-          </p>
           <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
+        </div>
+        <div class="date-wrap">
+          <span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span>
+          <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button>
+          <span class="mini-loader" id="busyDateLoader" hidden></span>
         </div>
         <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         <div class="busy-progress" id="busyProgress" hidden></div>
@@ -386,7 +386,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260416_0302" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260416_0336" defer></script>
 </body>
 </html>
 

@@ -65,6 +65,7 @@
       position: relative;
       z-index: 10;
     }
+    .title-wrap { justify-self: center; text-align: center; }
     .busy-progress {
       position: absolute;
       left: 0;
@@ -93,10 +94,18 @@
       text-overflow: ellipsis;
     }
   
-    .title-wrap p {
-      margin: var(--space-2) 0 0;
+    .date-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
       color: var(--color-text-muted);
       font-size: var(--text-sm);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      justify-self: center;
     }
     .lang {
       display: inline-flex;
@@ -108,21 +117,21 @@
       background: rgba(255,255,255,0.03);
       flex: 0 0 auto;
       justify-self: end;
-      position: fixed;
-      top: 14px;
-      right: 14px;
+      position: relative;
       z-index: 60;
     }
     @media (max-width: 640px) {
       .topbar {
-        grid-template-columns: 1fr auto;
-        grid-template-areas: 
-          "title lang"
-          "controls controls";
+        grid-template-columns: 1fr;
+        gap: 5px;
+        padding: 5px;
       }
-      .title-wrap { grid-area: title; }
-      .lang { grid-area: lang; align-self: start; top: 10px; right: 10px; }
-      .controls { grid-area: controls; justify-self: stretch; justify-content: center; }
+      .title-wrap { justify-self: stretch; }
+      .title-wrap h1 { text-align: left; }
+      .date-wrap { justify-content: flex-start; }
+      .lang { position: absolute; top: 5px; right: 5px; padding: 5px; }
+      .controls { justify-self: stretch; justify-content: center; }
+      .map-invite { margin-top: 5px; }
     }
     .lang a {
       text-decoration: none;
@@ -238,7 +247,7 @@
       text-align: center;
       grid-column: 1 / -1;
     }
-    .map-invite { margin-top: var(--space-3); }
+    .map-invite { margin-top: var(--space-2); }
   
     .map-shell {
       background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
@@ -1366,7 +1375,8 @@
       .modal-actions { gap: 5px; margin-top: 5px; }
       .req-layout { gap: 5px; }
       .phone-row, .name-row { gap: 5px; }
-      .guests-time-row { gap: 5px; }
+      .guests-time-row { grid-template-columns: 1fr 1fr; gap: 5px; }
+      .guests-time-row .end-time-label { grid-column: 1 / -1; }
       .modal input[type="text"],
       .modal input[type="tel"],
       .modal input[type="number"],
@@ -1374,6 +1384,23 @@
       .modal select { padding: 10px 34px 10px 10px; background-position: right 6px center; background-size: 14px; }
 
       .guests-time-row .modal-label input { padding: 10px 10px; font-size: 14px; }
+      .guests-time-row.full > div:nth-child(1) > div { width: 100%; }
+      .guests-time-row.full .num-step { position: relative; width: 100%; gap: 0; }
+      .guests-time-row.full #reqGuests { width: 100%; max-width: none; text-align: center; padding-left: 36px; padding-right: 36px; }
+      .guests-time-row.full #reqGuestsMinus,
+      .guests-time-row.full #reqGuestsPlus {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.10);
+      }
+      .guests-time-row.full #reqGuestsMinus { left: 6px; }
+      .guests-time-row.full #reqGuestsPlus { right: 6px; }
+
       .guests-time-row .modal-label select { padding: 10px 34px 10px 10px; font-size: 14px; background-position: right 6px center; background-size: 14px; }
       .label-right { gap: 5px; }
       .msgr-actions { gap: 5px; }
@@ -1390,6 +1417,7 @@
         display: flex;
         flex-direction: column;
       }
+      .modal-title { font-size: 15px; }
       .modal-title { font-size: 15px; }
       #reqForm { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
       .req-layout { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding-right: 2px; min-height: 0; }
