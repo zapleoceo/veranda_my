@@ -1,5 +1,7 @@
 (() => {
   const cfg = window.__TR_CONFIG__ || {};
+  const API_BASE = String(cfg.apiBase || '').trim();
+  const apiUrl = () => API_BASE ? new URL(API_BASE, location.href) : new URL(location.href);
   let UI_LANG = cfg.lang || 'ru';
   let UI_LOCALE = cfg.locale || (UI_LANG === 'vi' ? 'vi-VN' : (UI_LANG === 'en' ? 'en-US' : 'ru-RU'));
   let STR = cfg.str || {};
@@ -1015,7 +1017,7 @@
       if (!preorderBody) return;
       preorderMenuLoading = true;
       try {
-        const url = new URL(location.href);
+        const url = apiUrl();
         url.searchParams.set('ajax', 'menu_preorder');
         url.searchParams.set('lang', UI_LANG);
         const timeoutMs = 12000;
@@ -1099,7 +1101,7 @@
       try {
         let safeData = {};
         try { safeData = JSON.parse(JSON.stringify(data)); } catch(e) { safeData = { err: 'Unstringifyable data' }; }
-        const url = new URL(location.href);
+        const url = apiUrl();
         url.searchParams.set('ajax', 'log_js');
         await fetch(url.toString(), {
           method: 'POST',
@@ -1378,7 +1380,7 @@
       msgrWaBtn.disabled = true;
       setMsgrHint(t('hint_opening_wa'));
       try {
-        const url = new URL(location.href);
+        const url = apiUrl();
         url.searchParams.set('ajax', 'wa_state_create');
         const sourcePage = location.pathname.split('/').pop() || 'Tr2.php';
         const res = await fetch(url.toString(), {
@@ -1452,7 +1454,7 @@
       msgrTgBtn.disabled = true;
       setMsgrHint(t('hint_opening_tg'));
       try {
-        const url = new URL(location.href);
+        const url = apiUrl();
         url.searchParams.set('ajax', 'tg_state_create');
         const sourcePage = location.pathname.split('/').pop() || 'Tr2.php';
         const res = await fetch(url.toString(), {
@@ -1506,7 +1508,7 @@
         return;
       }
       try {
-        const url = new URL(location.href);
+        const url = apiUrl();
         url.searchParams.set('ajax', 'cap_check');
         url.searchParams.set('table_num', tableNum);
         url.searchParams.set('guests', String(Math.floor(guests)));
@@ -1669,7 +1671,7 @@
           // Double check availability before submit
           const dPart = String(pendingBooking.start).slice(0, 10);
           
-          const chkUrl = new URL(location.href);
+          const chkUrl = apiUrl();
           chkUrl.searchParams.set('ajax', 'free_tables');
           chkUrl.searchParams.set('date_reservation', dPart);
           chkUrl.searchParams.set('duration', String(duration_m * 60));
@@ -1683,7 +1685,7 @@
             occupiedNowNums = new Set(Array.isArray(jChk.occupied_now_nums) ? jChk.occupied_now_nums.map(String) : []);
             
             // Also fetch reservations for exact ranges
-            const rUrl = new URL(location.href);
+            const rUrl = apiUrl();
             rUrl.searchParams.set('ajax', 'reservations');
             rUrl.searchParams.set('date_reservation', dPart);
             rUrl.searchParams.set('duration', String(duration_m * 60));
@@ -1723,7 +1725,7 @@
             }
           }
 
-          const url = new URL(location.href);
+          const url = apiUrl();
           url.searchParams.set('ajax', 'submit_booking');
           const res = await fetch(url.toString(), {
             method: 'POST',
@@ -2094,7 +2096,7 @@
       setBusyLabel(dateStr);
       setBusyLoader(true);
 
-      const url = new URL(location.href);
+      const url = apiUrl();
       url.searchParams.set('ajax', 'free_tables');
       url.searchParams.set('date_reservation', dt);
       url.searchParams.set('duration', String(current.durationSec || 7200));
@@ -2120,7 +2122,7 @@
       };
 
       const loadReservations = async () => {
-        const rUrl = new URL(location.href);
+        const rUrl = apiUrl();
         rUrl.searchParams.set('ajax', 'reservations');
         const day = String(dt || '').slice(0, 10);
         rUrl.searchParams.set('date_reservation', (day ? (day + ' 00:00:00') : dt));
@@ -2185,7 +2187,7 @@
       const code = String(params.get('tg_state') || '').trim();
       if (!code) return;
       try {
-        const url = new URL(location.href);
+        const url = apiUrl();
         url.searchParams.set('ajax', 'tg_state_get');
         url.searchParams.set('code', code);
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
@@ -2245,7 +2247,7 @@
       const code = String(params.get('wa_state') || '').trim();
       if (!code) return;
       try {
-        const url = new URL(location.href);
+        const url = apiUrl();
         url.searchParams.set('ajax', 'wa_state_get');
         url.searchParams.set('code', code);
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
