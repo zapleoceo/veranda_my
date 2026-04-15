@@ -104,9 +104,14 @@ function wa_bridge_send(string $phone, string $text, string $imageUrl = ''): boo
   curl_close($ch);
 
   if ($resp === false || $httpCode < 200 || $httpCode >= 300) return false;
-  $j = json_decode($resp, true);
-  if (!is_array($j)) return false;
-  return !empty($j['ok']);
+  $body = trim((string)$resp);
+  if ($body === '') return true;
+  $j = json_decode($body, true);
+  if (!is_array($j)) return true;
+  if (array_key_exists('ok', $j)) return !empty($j['ok']);
+  if (array_key_exists('sent', $j)) return !empty($j['sent']);
+  if (array_key_exists('success', $j)) return !empty($j['success']);
+  return true;
 }
 
 $posterToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
@@ -609,16 +614,52 @@ if ($ajax === 'cap_check') {
 }
 
 if ($ajax === 'submit_booking') {
-  header('Content-Type: application/json; charset=utf-8');
-  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-  header('Pragma: no-cache');
+  $accept = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
+  $wantsJson = strpos($accept, 'application/json') !== false;
+  if ($wantsJson) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+  } else {
+    header('Content-Type: text/html; charset=utf-8');
+  }
   if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+    if ($wantsJson) echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+    else echo '<!doctype html><meta charset="utf-8"><h1>Method not allowed</h1>';
     exit;
   }
-  $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
-  if (!is_array($payload)) $payload = [];
+  $payload = [];
+  $ct = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+  if (strpos($ct, 'application/json') !== false) {
+    $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
+    if (!is_array($payload)) $payload = [];
+  } else {
+    $payload = is_array($_POST ?? null) ? $_POST : [];
+  }
+
+  $respondError = function (int $code, string $msg) use ($wantsJson): void {
+    http_response_code($code);
+    if ($wantsJson) {
+      echo json_encode(['ok' => false, 'error' => $msg], JSON_UNESCAPED_UNICODE);
+    } else {
+      $safe = htmlspecialchars($msg, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+      echo '<!doctype html><meta charset="utf-8"><h1>Ошибка</h1><p>' . $safe . '</p>';
+    }
+    exit;
+  };
+  $respondOk = function (array $data = []) use ($wantsJson): void {
+    if ($wantsJson) {
+      echo json_encode(array_merge(['ok' => true], $data), JSON_UNESCAPED_UNICODE);
+    } else {
+      $code = htmlspecialchars((string)($data['qr_code'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+      $id = htmlspecialchars((string)($data['id'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+      $body = $code !== '' ? ('<p>Код брони: <b>' . $code . '</b></p>') : '';
+      if ($id !== '') $body .= '<p>ID: <b>' . $id . '</b></p>';
+      echo '<!doctype html><meta charset="utf-8"><h1>Заявка отправлена</h1>' . $body . '<p>Мы с вами свяжемся в ближайшее время.</p>';
+    }
+    exit;
+  };
 
   $langIn = strtolower(trim((string)($payload['lang'] ?? '')));
   $userLang = in_array($langIn, ['ru', 'en', 'vi'], true) ? $langIn : $lang;
@@ -627,9 +668,11 @@ if ($ajax === 'submit_booking') {
   };
 
   $tableNum = trim((string)($payload['table_num'] ?? ''));
+  if ($tableNum === '') $tableNum = trim((string)($payload['table_num_manual'] ?? ''));
   $name = trim((string)($payload['name'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
   $waPhone = trim((string)($payload['whatsapp_phone'] ?? ''));
+  if (!$wantsJson && $waPhone === '') $waPhone = $phone;
   $comment = trim((string)($payload['comment'] ?? ''));
   $preorder = trim((string)($payload['preorder'] ?? ''));
   $preorderRu = trim((string)($payload['preorder_ru'] ?? ''));
@@ -637,28 +680,25 @@ if ($ajax === 'submit_booking') {
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
   $duration_m = (int)($payload['duration_m'] ?? 120);
-
-  if ($tableNum === '') {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Некорректный номер стола'], JSON_UNESCAPED_UNICODE);
-    exit;
+  if ($start === '') {
+    $d = trim((string)($payload['res_date'] ?? ''));
+    $t = trim((string)($payload['start_time'] ?? ''));
+    if ($d !== '' && $t !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) && preg_match('/^\d{2}:\d{2}$/', $t)) {
+      $start = $d . 'T' . $t . ':00';
+    }
   }
+
+  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) $respondError(400, 'Некорректный номер стола');
   if ($guests <= 0 || $guests > 99) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Некорректное кол-во гостей'], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondError(400, 'Некорректное кол-во гостей');
   }
   if ($name === '' || mb_strlen($name) > 80) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Некорректное имя'], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondError(400, 'Некорректное имя');
   }
   $phoneNorm = preg_replace('/\D+/', '', (string)$phone);
   $phoneNorm = trim((string)$phoneNorm);
   if ($phoneNorm === '' || !preg_match('/^[1-9]\d{8,14}$/', $phoneNorm)) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => $trFor('phone_invalid')], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondError(400, $trFor('phone_invalid'));
   }
   $phoneNorm = '+' . $phoneNorm;
   $waDigits = preg_replace('/\D+/', '', (string)$waPhone);
@@ -674,9 +714,7 @@ if ($ajax === 'submit_booking') {
   $preorderRu = str_replace(["\r\n", "\r"], "\n", $preorderRu);
   if (mb_strlen($preorderRu) > 1200) $preorderRu = mb_substr($preorderRu, 0, 1200);
   if ($guests > 5 && trim($preorder) === '') {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => $trFor('preorder_required')], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondError(400, $trFor('preorder_required'));
   }
 
   $displayTz = new DateTimeZone($displayTzName);
@@ -693,9 +731,7 @@ if ($ajax === 'submit_booking') {
     $startDt = null;
   }
   if (!$startDt) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Некорректное время'], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondError(400, 'Некорректное время');
   }
 
   $tg = is_array($payload['tg'] ?? null) ? $payload['tg'] : [];
@@ -708,9 +744,7 @@ if ($ajax === 'submit_booking') {
   }
 
   if (!isset($db) || !($db instanceof \App\Classes\Database)) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'DB не настроена'], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondError(500, 'DB не настроена');
   }
 
   $db->createReservationsTable();
@@ -754,9 +788,7 @@ if ($ajax === 'submit_booking') {
   $tgThreadNum = $tgThreadId !== '' ? (int)$tgThreadId : 1938;
   if ($tgThreadNum <= 0) $tgThreadNum = 1938;
   if ($tgToken === '' || $tgChatId === '') {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'Telegram не настроен'], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondError(500, 'Telegram не настроен');
   }
 
   $text = '<b>Новая бронь с сайта #' . htmlspecialchars((string)$qrCode) . '</b>' . "\n";
@@ -810,23 +842,17 @@ if ($ajax === 'submit_booking') {
   }
   if ($ok > 1) { $db->query("UPDATE {$resTable} SET tg_message_id = ? WHERE id = ?", [$ok, $resId]); }
   if (!$ok) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение в Telegram'], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondError(500, 'Не удалось отправить сообщение в Telegram');
   }
 
   if ($waPhoneNorm === '' && $tgUid <= 0) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Мессенджер не привязан'], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondError(400, 'Мессенджер не привязан');
   }
 
   if ($waPhoneNorm !== '') {
     $waSecret = trim((string)($_ENV['WA_NODE_SECRET'] ?? ($_ENV['WA_BRIDGE_SECRET'] ?? '')));
     if ($waSecret === '') {
-      http_response_code(500);
-      echo json_encode(['ok' => false, 'error' => $trFor('err_wa_not_configured')], JSON_UNESCAPED_UNICODE);
-      exit;
+      $respondError(500, $trFor('err_wa_not_configured'));
     }
     $waText = $trFor('tg_thanks_title') . ' ' . $trFor('tg_thanks_body') . "\n\n";
     if ($qrUrl !== '') {
@@ -846,12 +872,9 @@ if ($ajax === 'submit_booking') {
 
     $sent = wa_bridge_send($waPhoneNorm, $waText);
     if (!$sent) {
-      http_response_code(500);
-      echo json_encode(['ok' => false, 'error' => $trFor('err_wa_send_failed')], JSON_UNESCAPED_UNICODE);
-      exit;
+      $respondError(500, $trFor('err_wa_send_failed'));
     }
-    echo json_encode(['ok' => true, 'id' => $resId, 'qr_code' => $qrCode], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondOk(['id' => $resId, 'qr_code' => $qrCode]);
   }
 
   $userText = '<b>' . htmlspecialchars($trFor('tg_thanks_title')) . '</b> ' . htmlspecialchars($trFor('tg_thanks_body')) . "\n\n";
@@ -934,12 +957,9 @@ if ($ajax === 'submit_booking') {
   }
 
   if (!is_array($data) || empty($data['ok'])) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'Не удалось отправить сообщение гостю в Telegram'], JSON_UNESCAPED_UNICODE);
-    exit;
+    $respondError(500, 'Не удалось отправить сообщение гостю в Telegram');
   }
-  echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
-  exit;
+  $respondOk(['id' => $resId, 'qr_code' => $qrCode]);
 }
 
 if ($ajax === 'tg_state_create') {

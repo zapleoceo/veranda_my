@@ -1042,13 +1042,12 @@
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
     .modal-label { display: grid; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-top: 0; min-width: 0; }
     .modal-label.full { grid-column: 1 / -1; }
-    .guests-time-row { display: grid; grid-template-columns: auto 1fr 1fr; gap: 10px; }
+    .guests-time-row { display: grid; grid-template-columns: minmax(120px, 160px) 1fr minmax(96px, 140px) minmax(84px, 120px); gap: 10px; }
     .guests-time-row.full { grid-column: 1 / -1; }
     .phone-row, .name-row { display: flex; align-items: center; gap: 10px; }
     .phone-row input, .name-row input { flex: 1 1 auto; min-width: 0; }
-    .phone-row input { flex: 0 0 60%; }
-    .tg-stack { display: grid; justify-items: center; gap: 4px; }
-    .tg-nick { font-size: 10px; font-weight: 900; letter-spacing: -0.02em; color: rgba(245,238,228,0.82); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tg-stack { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    .tg-nick { font-size: 11px; font-weight: 900; letter-spacing: -0.02em; color: rgba(245,238,228,0.86); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tg-nick[hidden] { display: none; }
     .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; position: relative; }
     .msgr-btn-inline svg { width: 22px; height: 22px; }
@@ -1097,6 +1096,22 @@
     }
     .modal input:focus, .modal select:focus { border-color: rgba(184,135,70,0.6); outline: none; }
     .modal input[type="text"], .modal input[type="tel"], .modal input[type="time"], .modal select { height: 44px; }
+    .end-time-value {
+      width: 100%;
+      height: 44px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.04);
+      color: rgba(255, 250, 244, 0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 10px;
+      font-size: 14px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
     .modal textarea {
       width: 100%;
       border-radius: 14px;
@@ -1234,7 +1249,7 @@
       .req-right .pre-body { max-height: 340px; }
     }
     @media (max-width: 640px) {
-      .guests-time-row { grid-template-columns: auto 1fr 1fr; gap: 6px; }
+      .guests-time-row { grid-template-columns: 1fr 1fr; gap: 6px; }
       .guests-time-row .modal-label input { padding: 12px 6px; font-size: 14px; }
       .guests-time-row .modal-label select { padding: 12px 24px 12px 6px; font-size: 14px; background-position: right 6px center; background-size: 14px; }
       .guests-time-row .modal-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -1271,7 +1286,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 0 10px;
+      padding: 0 40px 10px 0;
       border-bottom: none;
       background: transparent;
     }
@@ -1284,8 +1299,13 @@
       font-size: 24px;
       line-height: 1;
       padding: 0;
+      width: 32px;
+      height: 32px;
       cursor: pointer;
       transition: color 0.15s ease, transform 0.15s ease;
+      position: absolute;
+      top: 5px;
+      right: 5px;
     }
     .btn-close-modal:hover {
       color: rgba(255,255,255,1);
@@ -1338,19 +1358,19 @@
       padding: 0;
     }
     
-    #reqGuests { max-width: 48px; text-align: center; }
+    #reqGuests { max-width: 42px; text-align: center; }
     #reqGuests::-webkit-outer-spin-button,
     #reqGuests::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     #reqGuests { -moz-appearance: textfield; }
     .num-step {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       width: 100%;
     }
     .num-step .num-btn {
-      width: 34px;
-      height: 34px;
+      width: 28px;
+      height: 28px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,0.14);
       background: rgba(255,255,255,0.06);
@@ -1449,6 +1469,18 @@
       gap: 4px;
       flex-wrap: nowrap;
       white-space: nowrap;
+    }
+    .label-left {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+    }
+    .msgr-badges {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      min-width: 0;
     }
     .msgr-hint {
       font-size: 10px;

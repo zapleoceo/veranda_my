@@ -94,7 +94,8 @@ if ($ajax === 'vposter') {
     }
     require_once __DIR__ . '/src/classes/PosterReservationHelper.php';
     $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
-    $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId);
+    $actor = (string)($_SESSION['user_email'] ?? '');
+    $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId, $actor);
     if (!$res['ok']) {
         http_response_code(500);
     } else {
@@ -755,7 +756,17 @@ $rows = $allRows;
                                                 <button type="button" class="res-btn btn-resend <?= htmlspecialchars($guestBtnClass) ?>" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="guest">ReGuest</button>
                                                 <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="manager">ReManager</button>
                                                 <?php if ($hasPosterAccess && empty($r['is_poster_pushed'])): ?>
-                                                    <button type="button" class="res-btn primary btn-vposter" data-id="<?= htmlspecialchars((string)$r['id']) ?>">вPoster</button>
+                                                    <button
+                                                        type="button"
+                                                        class="res-btn primary btn-vposter"
+                                                        data-id="<?= htmlspecialchars((string)$r['id']) ?>"
+                                                        data-code="<?= htmlspecialchars((string)($r['qr_code'] ?? '')) ?>"
+                                                        data-start="<?= htmlspecialchars((string)($r['start_time'] ?? '')) ?>"
+                                                        data-table="<?= htmlspecialchars((string)($r['table_num'] ?? '')) ?>"
+                                                        data-guests="<?= htmlspecialchars((string)($r['guests'] ?? '')) ?>"
+                                                        data-name="<?= htmlspecialchars((string)($r['name'] ?? '')) ?>"
+                                                        data-phone="<?= htmlspecialchars((string)($r['phone'] ?? '')) ?>"
+                                                    >вPoster</button>
                                                 <?php endif; ?>
                                                 <button type="button" class="res-btn danger btn-delete" data-id="<?= htmlspecialchars((string)$r['id']) ?>"><?= $isDeleted ? 'Восстановить' : 'Удалить' ?></button>
                                             </div>
@@ -780,6 +791,7 @@ $rows = $allRows;
             <div class="res-modal-body">
                 Вы собираетесь отправить эту бронь в Poster POS.<br><br>
                 Это создаст официальную бронь на терминале официанта. Убедитесь, что все данные верны.
+                <div id="vposterModalInfo" style="margin-top:12px; font-weight:900;"></div>
             </div>
             <label class="res-modal-check">
                 <input type="checkbox" id="vposterConfirmCheck">
@@ -792,7 +804,7 @@ $rows = $allRows;
         </div>
     </div>
 
-    <script src="/assets/user_menu.js?v=20260415_1730"></script>
-    <script src="/assets/js/reservations.js?v=20260415_1730"></script>
+    <script src="/assets/user_menu.js?v=20260415_2335"></script>
+    <script src="/assets/js/reservations.js?v=20260415_2335"></script>
 </body>
 </html>

@@ -63,7 +63,14 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260415_2005">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260415_2335">
+  <noscript>
+    <style>
+      .modal:target { display: flex !important; }
+      .modal:target .modal-card { transform: translateY(0) scale(1) !important; opacity: 1 !important; }
+      .nojs-only { display: grid !important; }
+    </style>
+  </noscript>
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
@@ -216,26 +223,52 @@ $mk = function (string $l) use ($self, $baseQs) {
         </div>
         <button class="btn-close-modal" type="button" data-modal-close="reqModal" aria-label="Close">×</button>
       </div>
-      <form id="reqForm">
+      <form id="reqForm" method="post" action="/tr3/api.php?ajax=submit_booking" accept-charset="utf-8">
+        <input type="hidden" id="reqTableNum" name="table_num" value="">
+        <input type="hidden" id="reqStartIso" name="start" value="">
         <div class="req-layout">
           <div class="req-left" id="reqLeft">
             <div class="modal-grid">
+              <div class="modal-label full nojs-only" style="display:none;">
+                <span>Без JavaScript</span>
+                <div class="modal-grid" style="margin-top:0;">
+                  <label class="modal-label">
+                    <span>Дата</span>
+                    <input type="date" name="res_date" value="<?= htmlspecialchars((string)date('Y-m-d')) ?>">
+                  </label>
+                  <label class="modal-label">
+                    <span>Стол</span>
+                    <input type="number" name="table_num_manual" min="1" max="500" inputmode="numeric">
+                  </label>
+                </div>
+              </div>
               <div class="guests-time-row full">
                 <div class="modal-label">
                   <span data-i18n="guests_count"><?= htmlspecialchars(tr('guests_count')) ?></span>
                   <div class="num-step">
                     <button class="num-btn" type="button" id="reqGuestsMinus" aria-label="<?= htmlspecialchars(tr('decrease_guests')) ?>">−</button>
-                    <input type="number" id="reqGuests" min="1" max="99" readonly>
+                    <input type="number" id="reqGuests" name="guests" min="1" max="99" value="2" inputmode="numeric">
                     <button class="num-btn" type="button" id="reqGuestsPlus" aria-label="<?= htmlspecialchars(tr('increase_guests')) ?>">+</button>
                   </div>
                 </div>
                 <label class="modal-label">
                   <span data-i18n="start_time"><?= htmlspecialchars(tr('start_time')) ?></span>
-                  <select id="reqStart" required></select>
+                  <select id="reqStart" name="start_time" required>
+                    <?php
+                    for ($h = 10; $h <= 21; $h++) {
+                      for ($m = 0; $m < 60; $m += 30) {
+                        if ($h === 21 && $m > 0) continue;
+                        $val = str_pad((string)$h, 2, '0', STR_PAD_LEFT) . ':' . str_pad((string)$m, 2, '0', STR_PAD_LEFT);
+                        $sel = ($h === 12 && $m === 0) ? ' selected' : '';
+                        echo "<option value=\"" . htmlspecialchars($val) . "\"$sel>" . htmlspecialchars($val) . "</option>";
+                      }
+                    }
+                    ?>
+                  </select>
                 </label>
                 <label class="modal-label">
                   <span data-i18n="duration"><?= htmlspecialchars(tr('duration')) ?></span>
-                  <select id="reqDuration">
+                  <select id="reqDuration" name="duration_m">
                     <?php
                     $durations = [60 => '1', 90 => '1.5', 120 => '2', 150 => '2.5', 180 => '3', 210 => '3.5', 240 => '4', 270 => '4.5', 300 => '5'];
                     foreach ($durations as $v => $lbl) {
@@ -245,20 +278,29 @@ $mk = function (string $l) use ($self, $baseQs) {
                     ?>
                   </select>
                 </label>
+                <div class="modal-label end-time-label" aria-live="polite">
+                  <span>&nbsp;</span>
+                  <div class="end-time-value" id="reqEndTime">до —</div>
+                </div>
               </div>
               <label class="modal-label">
                 <span data-i18n="your_name"><?= htmlspecialchars(tr('your_name')) ?></span>
-                <input type="text" id="reqName" autocomplete="name">
+                <input type="text" id="reqName" name="name" autocomplete="name" required maxlength="80">
               </label>
               <label class="modal-label">
                 <div class="label-row">
-                  <span data-i18n="your_phone"><?= htmlspecialchars(tr('your_phone')) ?></span>
+                  <div class="label-left">
+                    <span data-i18n="your_phone"><?= htmlspecialchars(tr('your_phone')) ?></span>
+                    <div class="msgr-badges">
+                      <span class="tg-nick" id="tgNick" hidden></span>
+                      <span class="tg-nick" id="waNick" hidden></span>
+                    </div>
+                  </div>
                   <div class="msgr-hint" id="msgrHint" hidden></div>
                 </div>
                 <div class="phone-row">
-                  <input type="tel" id="reqPhone" autocomplete="tel" inputmode="numeric" pattern="\+[1-9][0-9]{8,14}">
+                  <input type="tel" id="reqPhone" name="phone" autocomplete="tel" inputmode="numeric" pattern="\+[1-9][0-9]{8,14}" required>
                   <div class="tg-stack">
-                    <div class="tg-nick" id="tgNick" hidden></div>
                     <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
                       <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
@@ -272,7 +314,6 @@ $mk = function (string $l) use ($self, $baseQs) {
                     </button>
                   </div>
                   <div class="tg-stack">
-                    <div class="tg-nick" id="waNick" hidden></div>
                     <button type="button" class="msgr-btn msgr-btn-inline" id="msgrWaBtn" aria-label="WhatsApp" title="WhatsApp">
                       <svg class="ico-wa" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zM12.04 20.13c-1.55 0-3.07-.42-4.39-1.21l-.31-.19-3.11.82.83-3.04-.21-.33a8.103 8.103 0 0 1-1.24-4.27c0-4.47 3.64-8.11 8.11-8.11 2.17 0 4.2 0.84 5.73 2.38 1.53 1.53 2.38 3.56 2.38 5.73 0 4.47-3.64 8.12-8.11 8.12zM16.48 13.84c-.24-.12-1.44-.71-1.66-.79-.22-.08-.38-.12-.54.12-.16.24-.61.76-.75.91-.14.15-.28.17-.52.05-.24-.12-1.01-.37-1.92-1.18-.71-.63-1.19-1.41-1.33-1.65-.14-.24-.01-.37.11-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42s-.54-1.31-.74-1.79c-.2-.47-.4-.41-.54-.41-.14 0-.3 0-.46 0s-.42.06-.64.3c-.22.24-.84.82-.84 2s.86 2.33.98 2.49c.12.16 1.7 2.59 4.11 3.64.57.25 1.02.4 1.37.51.58.18 1.1.16 1.51.1.46-.07 1.44-.59 1.64-1.16.2-.57.2-1.06.14-1.16-.06-.1-.22-.16-.46-.28z" fill="currentColor"/>
@@ -288,7 +329,7 @@ $mk = function (string $l) use ($self, $baseQs) {
               </label>
               <label class="modal-label full" id="reqCommentLabel">
                 <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
-                <textarea id="reqComment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
+                <textarea id="reqComment" name="comment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
               </label>
               <label class="modal-label full" id="reqPreorderLabel" hidden>
                 <span class="desktop-text" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
@@ -297,6 +338,8 @@ $mk = function (string $l) use ($self, $baseQs) {
                   <button type="button" class="btn-preorder-mobile-inline" id="btnOpenMobilePreorder" aria-label="Menu" data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></button>
                 </div>
                 <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
+                <input type="hidden" id="reqPreorderHidden" name="preorder" value="">
+                <input type="hidden" id="reqPreorderRuHidden" name="preorder_ru" value="">
               </label>
             </div>
           </div>
@@ -341,7 +384,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260415_2005" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260415_2335" defer></script>
 </body>
 </html>
 

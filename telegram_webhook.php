@@ -196,9 +196,15 @@ $action = (string)($m[1] ?? '');
         // Telegram doesn't have a built-in 'confirm' for buttons, so we use answerCallbackQuery with show_alert
         // But the user wants a description of what will happen.
         if (!strpos($data, '_confirmed')) {
+            $rawText = (string)($message['text'] ?? '');
+            $plain = trim(preg_replace('/<[^>]+>/', '', $rawText));
+            $plain = preg_replace("/\r\n|\r/", "\n", $plain);
+            $lines = array_values(array_filter(array_map('trim', explode("\n", $plain)), fn($x) => $x !== ''));
+            $preview = implode("\n", array_slice($lines, 0, 7));
+            if ($preview !== '') $preview = "\n\n" . $preview;
             $postJson('answerCallbackQuery', [
                 'callback_query_id' => $callbackId,
-                'text' => "Вы собираетесь отправить эту бронь в Poster POS.\nЭто создаст официальную бронь на терминале официанта.\nНажмите еще раз для подтверждения.",
+                'text' => "Вы собираетесь отправить эту бронь в Poster POS.\nЭто создаст официальную бронь на терминале официанта.\nНажмите еще раз для подтверждения." . $preview,
                 'show_alert' => true
             ]);
             // We update the data to include _confirmed for the next click
@@ -283,7 +289,7 @@ $action = (string)($m[1] ?? '');
 
         require_once __DIR__ . '/src/classes/PosterReservationHelper.php';
         $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
-        $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId, '(TG ' . $ackBy . ')');
+        $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId, $ackBy);
         
         if (!$res['ok']) {
             $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Ошибка: ' . $res['error'], 'show_alert' => true]);

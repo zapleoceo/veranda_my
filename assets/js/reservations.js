@@ -223,10 +223,12 @@
     const check = q('#vposterConfirmCheck');
     const btnOk = q('#vposterOk');
     const btnCancel = q('#vposterCancel');
+    const info = q('#vposterModalInfo');
     if (!modal || !check || !btnOk || !btnCancel) return;
 
     let activeId = null;
     let activeBtn = null;
+    let inFlight = false;
 
     const closeModal = () => {
       modal.hidden = true;
@@ -234,6 +236,8 @@
       btnOk.disabled = true;
       activeId = null;
       activeBtn = null;
+      inFlight = false;
+      if (info) info.textContent = '';
     };
 
     check.addEventListener('change', () => {
@@ -243,9 +247,10 @@
     btnCancel.addEventListener('click', closeModal);
 
     btnOk.addEventListener('click', async () => {
-      if (!activeId || !activeBtn) return;
+      if (!activeId || !activeBtn || inFlight) return;
       const id = activeId;
       const btn = activeBtn;
+      inFlight = true;
       closeModal();
 
       const statusEl = q(`#resend-status-${id}`);
@@ -259,7 +264,7 @@
         const { res, j } = await postForm('reservations.php?ajax=vposter', { id });
         if (res.ok && j && j.ok) {
           if (statusEl) {
-            statusEl.textContent = 'В Poster: Создано ✅';
+            statusEl.textContent = j.duplicate ? 'В Poster: уже было ✅' : 'В Poster: создано ✅';
             statusEl.style.color = '#81c784';
           }
           btn.remove(); // Remove button after success
@@ -284,6 +289,22 @@
         activeId = String(btn.dataset.id || '');
         activeBtn = btn;
         if (!activeId) return;
+        if (info) {
+          const code = String(btn.dataset.code || '').trim();
+          const start = String(btn.dataset.start || '').trim();
+          const table = String(btn.dataset.table || '').trim();
+          const guests = String(btn.dataset.guests || '').trim();
+          const name = String(btn.dataset.name || '').trim();
+          const phone = String(btn.dataset.phone || '').trim();
+          const parts = [];
+          if (code) parts.push('Код: ' + code);
+          if (start) parts.push('Время: ' + start);
+          if (table) parts.push('Стол: ' + table);
+          if (guests) parts.push('Гости: ' + guests);
+          if (name) parts.push('Имя: ' + name);
+          if (phone) parts.push('Телефон: ' + phone);
+          info.textContent = parts.join(' · ');
+        }
         modal.hidden = false;
       });
     });

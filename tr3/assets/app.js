@@ -364,6 +364,10 @@
     const reqGuestsMinus = document.getElementById('reqGuestsMinus');
     const reqGuestsPlus = document.getElementById('reqGuestsPlus');
     const reqStart = document.getElementById('reqStart');
+    const reqDuration = document.getElementById('reqDuration');
+    const reqEndTime = document.getElementById('reqEndTime');
+    const reqTableNumInput = document.getElementById('reqTableNum');
+    const reqStartIsoInput = document.getElementById('reqStartIso');
     const reqHint = document.getElementById('reqHint');
     const preorderPanel = document.getElementById('preorderPanel');
     const preorderBody = document.getElementById('preorderBody');
@@ -371,6 +375,9 @@
     const msgrTgBtn = document.getElementById('msgrTgBtn');
     const msgrHint = document.getElementById('msgrHint');
     const tgNick = document.getElementById('tgNick');
+    const waNick = document.getElementById('waNick');
+    const reqPreorderHidden = document.getElementById('reqPreorderHidden');
+    const reqPreorderRuHidden = document.getElementById('reqPreorderRuHidden');
     const toastEl = document.getElementById('tableToast');
     const toastTitleEl = document.getElementById('toastTitle');
     const toastReasonEl = document.getElementById('toastReason');
@@ -1088,6 +1095,32 @@
       if (!m) return null;
       return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), 0);
     };
+    const setEndTimeLabel = (startIso, durationMin) => {
+      if (!reqEndTime) return;
+      const d0 = parseIsoLocal(startIso);
+      const dur = Number(durationMin || 0) || 0;
+      if (!d0 || !isFinite(d0.getTime()) || dur <= 0) {
+        reqEndTime.textContent = 'до —';
+        return;
+      }
+      const end = new Date(d0.getTime() + dur * 60 * 1000);
+      const hh = String(end.getHours()).padStart(2, '0');
+      const mm = String(end.getMinutes()).padStart(2, '0');
+      reqEndTime.textContent = 'до ' + hh + ':' + mm;
+    };
+    const syncStartIsoAndEnd = () => {
+      if (!pendingBooking || !pendingBooking.start || !reqStart || !reqStart.value) {
+        if (reqStartIsoInput) reqStartIsoInput.value = '';
+        setEndTimeLabel('', 0);
+        return;
+      }
+      const dPart = String(pendingBooking.start).slice(0, 10);
+      const tPart = String(reqStart.value);
+      const startIso = `${dPart}T${tPart}:00`;
+      if (reqStartIsoInput) reqStartIsoInput.value = startIso;
+      const durMin = reqDuration ? (parseInt(String(reqDuration.value || ''), 10) || 0) : 0;
+      setEndTimeLabel(startIso, durMin);
+    };
     const fmtStartHuman = (raw) => {
       const d = parseIsoLocal(raw);
       if (!d) return '';
@@ -1194,6 +1227,7 @@
 
       pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
+      if (reqTableNumInput) reqTableNumInput.value = String(tableNum || '');
       if (reqGuests) {
         reqGuests.value = String(guests);
         updateReqGuestsHint().catch(() => null);
@@ -1254,6 +1288,7 @@
           reqStart.disabled = false;
         }
       }
+      syncStartIsoAndEnd();
       if (!keepFields) {
         const d = loadDraft();
         if (reqName) reqName.value = d && typeof d.name === 'string' ? d.name : '';
@@ -1297,7 +1332,6 @@
 
     const syncWaButtonState = () => {
       const msgrWaBtn = document.getElementById('msgrWaBtn');
-      const waNick = document.getElementById('waNick');
       if (!msgrWaBtn) return;
       const linked = !!(messengerLinked.whatsapp && linkedWaPhone);
       msgrWaBtn.classList.toggle('active', linked);
@@ -1562,13 +1596,14 @@
       reqStart.addEventListener('change', () => {
         checkModalAvailability();
         saveDraft();
+        syncStartIsoAndEnd();
       });
     }
-    const reqDuration = document.getElementById('reqDuration');
     if (reqDuration) {
       reqDuration.addEventListener('change', () => {
         checkModalAvailability();
         saveDraft();
+        syncStartIsoAndEnd();
       });
     }
     if (reqComment) reqComment.addEventListener('input', () => { saveDraft(); });
@@ -1624,6 +1659,7 @@
             const tPart = String(reqStart.value);
             start = `${dPart}T${tPart}:00`;
           }
+          if (reqStartIsoInput) reqStartIsoInput.value = start;
           duration_m = reqDuration ? parseInt(reqDuration.value, 10) : 120;
           if (!isFinite(duration_m) || duration_m <= 0) duration_m = 120;
           comment = reqComment ? String(reqComment.value || '').trim() : '';
@@ -1632,6 +1668,8 @@
           
           preorder = guests > 5 ? getPreorderText('ui') : '';
           preorderRu = guests > 5 ? getPreorderText('ru') : '';
+          if (reqPreorderHidden) reqPreorderHidden.value = preorder;
+          if (reqPreorderRuHidden) reqPreorderRuHidden.value = preorderRu;
           
           await logJs('submit trace 2', { preorder, preorderRu });
           
