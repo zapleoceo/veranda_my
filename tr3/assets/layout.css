@@ -1085,8 +1085,8 @@
     .msgr-actions { display: inline-flex; align-items: center; gap: 6px; }
     .phone-field { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; }
     .phone-field input { flex: 1 1 auto; min-width: 0; padding-right: 14px; }
-    #reqModal.msgr-state-none .phone-field input { flex: 0 0 45%; }
-    #reqModal.msgr-state-none .phone-field .msgr-actions { margin-left: auto; }
+    #reqModal.msgr-state-none .phone-field input { flex: 0 1 45%; max-width: 45%; }
+    #reqModal.msgr-state-none .phone-field .msgr-actions { margin-left: 0; flex: 0 0 auto; }
     #reqModal.msgr-state-wa .phone-field input,
     #reqModal.msgr-state-tg .phone-field input { padding-right: 44px; }
     .msgr-field-icon {
