@@ -24,7 +24,7 @@ return [
       'booking_request' => 'Бронирование столика',
       'on_date' => 'на',
       'your_name' => 'Ваше имя',
-      'your_phone' => 'Ваш номер телефона',
+      'your_phone' => 'Номер телефона',
       'comment' => 'Комментарий',
       'guests_count' => 'Кол-во гостей',
       'start_time' => 'Время старта',
@@ -375,4 +375,3 @@ return [
     ],
   ],
 ];
-
