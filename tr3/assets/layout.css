@@ -1205,6 +1205,31 @@
       transition: opacity .2s ease, transform .2s ease;
     }
     .msgr-toast.on { opacity: 1; transform: translateY(0); }
+    .req-toast {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 56px;
+      max-width: calc(100% - 20px);
+      padding: 6px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.55);
+      color: rgba(245, 238, 228, 0.92);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.2;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity .22s ease, transform .22s ease;
+      z-index: 3;
+    }
+    .req-toast.on { opacity: 1; transform: translateY(0); }
     .modal { color-scheme: dark; }
     .modal select { background: rgba(0,0,0,0.22); }
     .modal select:invalid { color: rgba(255,255,255,0.62); }

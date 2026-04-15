@@ -372,6 +372,7 @@
     const preorderPanel = document.getElementById('preorderPanel');
     const preorderBody = document.getElementById('preorderBody');
     const reqSubmit = document.getElementById('reqSubmit');
+    const reqToast = document.getElementById('reqToast');
     const msgrTgBtn = document.getElementById('msgrTgBtn');
     const msgrHint = document.getElementById('msgrHint');
     const msgrToast = document.getElementById('msgrToast');
@@ -1375,6 +1376,26 @@
       }, 2000);
     };
 
+    let reqToastTimer = null;
+    let reqToastHideTimer = null;
+    let reqToastCooldownUntil = 0;
+    const showReqToast = (msg) => {
+      if (!reqToast) return;
+      const text = String(msg || '').trim();
+      if (!text) return;
+      const now = Date.now();
+      reqToastCooldownUntil = now + 2000;
+      reqToast.textContent = text;
+      reqToast.hidden = false;
+      reqToast.classList.add('on');
+      if (reqToastTimer) clearTimeout(reqToastTimer);
+      if (reqToastHideTimer) clearTimeout(reqToastHideTimer);
+      reqToastTimer = setTimeout(() => {
+        reqToast.classList.remove('on');
+        reqToastHideTimer = setTimeout(() => { reqToast.hidden = true; }, 260);
+      }, 2000);
+    };
+
     const updateMsgrCountdownUi = () => {
       const nodes = document.querySelectorAll('[data-msgr-cd]');
       nodes.forEach((n) => {
@@ -1715,6 +1736,7 @@
     if (reqForm) {
       reqForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (Date.now() < reqToastCooldownUntil) return;
         
         await logJs('submit click', { submitBusy, modalTableBusy });
 
@@ -1781,8 +1803,11 @@
           if (missing.length) {
             const msg = t('missing_prefix') + missing.join(', ');
             await logJs('submit prevented: missing fields', { missing });
-            setOutput({ ok: false, error: msg });
-            setMsgrHint(msg);
+            showReqToast(msg);
+            if (!name && reqName) reqName.focus();
+            else if ((!phone || !isPhoneValid(phone)) && reqPhone) reqPhone.focus();
+            else if (!start && reqStart) reqStart.focus();
+            else if (!isFinite(guests) || guests <= 0) { if (reqGuests) reqGuests.focus(); }
             syncSubmitState();
             return;
           }

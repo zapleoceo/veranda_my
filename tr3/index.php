@@ -63,7 +63,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0532">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0550">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -353,6 +353,7 @@ $mk = function (string $l) use ($self, $baseQs) {
         <div class="modal-hint" id="reqHint" hidden></div>
 
         <div class="modal-note" data-i18n="booking_note"><?= htmlspecialchars(tr('booking_note')) ?></div>
+        <div class="req-toast" id="reqToast" hidden></div>
         <div class="modal-actions">
           <button class="btn btn-primary" type="submit" id="reqSubmit" data-i18n="send"><?= htmlspecialchars(tr('send')) ?></button>
         </div>
@@ -386,7 +387,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260416_0532" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260416_0550" defer></script>
 </body>
 </html>
 
