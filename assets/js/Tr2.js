@@ -166,7 +166,7 @@
       });
     };
     shiftTablesUp(56);
-    shiftTablesRight(15, 19, 28);
+    shiftTablesRight(17, 21, 28);
     if (allowedSet !== null && allowedSet.size > 0) {
       tables.forEach((t) => {
         const n = String(t.dataset.table || '');

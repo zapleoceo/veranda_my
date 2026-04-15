@@ -431,12 +431,12 @@ $allowedSchemeNums = null;
 $soonBookingHours = 2;
 $tableCapsByNum = [
   '1' => 8, '2' => 8, '3' => 8,
-  '4' => 5, '5' => 5, '6' => 5,
-  '7' => 8,
-  '8' => 2, '9' => 2, '10' => 2, '11' => 2,
-  '12' => 3, '13' => 3, '14' => 3,
-  '15' => 5, '16' => 5, '17' => 5, '18' => 5, '19' => 5,
-  '20' => 15,
+  '4' => 5, '5' => 5, '6' => 5, '7' => 5, '8' => 5,
+  '9' => 8,
+  '10' => 2, '11' => 2, '12' => 2, '13' => 2,
+  '14' => 3, '15' => 3, '16' => 3,
+  '17' => 5, '18' => 5, '19' => 5, '20' => 5, '21' => 5,
+  '22' => 15,
 ];
 try {
   $dbHost = trim((string)($_ENV['DB_HOST'] ?? ''));
@@ -904,7 +904,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       if ($n >= 1 && $n <= 500) $allowedNums[(string)$n] = true;
     }
   } else {
-    for ($i = 1; $i <= 20; $i++) $allowedNums[(string)$i] = true;
+    for ($i = 1; $i <= 22; $i++) $allowedNums[(string)$i] = true;
   }
 
   $allowedList = array_values(array_keys($allowedNums));
@@ -1671,7 +1671,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/common.css?v=20260415_1500">
-  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260415_1500">
+  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260415_1530">
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
@@ -1722,13 +1722,15 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             <button class="table large" style="left: 712px; top: 402px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 528px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
-            <button class="table small-vertical wide-1" style="left: 534px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 370px; top: 528px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 222px; top: 528px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
-            <button class="table large" style="left: 12px; top: 512px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 580px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 450px; top: 528px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 320px; top: 528px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 215px; top: 528px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 110px; top: 528px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
+            <button class="table large" style="left: 12px; top: 512px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
   
-            <button class="table wide" style="left: 422px; top: 420px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
-            <button class="table wide" style="left: 300px; top: 420px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
+            <button class="table wide" style="left: 422px; top: 420px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
+            <button class="table wide" style="left: 300px; top: 420px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
             <div class="fountain" style="left: 532px; top: 316px;" aria-hidden="true" id="fountainEl">
               <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
@@ -1753,19 +1755,19 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               <div class="koi koi-1"></div>
               <div class="koi koi-2"></div>
             </div>
-            <button class="table wide" style="left: 102px; top: 420px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
-            <button class="table wide" style="left: -20px; top: 420px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
+            <button class="table wide" style="left: 102px; top: 420px;" data-table="12"><span class="num">12</span><span class="cap"></span></button>
+            <button class="table wide" style="left: -20px; top: 420px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
   
-            <button class="table" style="left: 402px; top: 304px;" data-table="12"><span class="num">12</span><span class="cap"></span></button>
-            <button class="table" style="left: 274px; top: 304px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
-            <button class="table" style="left: 162px; top: 304px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
+            <button class="table" style="left: 402px; top: 304px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
+            <button class="table" style="left: 274px; top: 304px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
+            <button class="table" style="left: 162px; top: 304px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
   
-            <button class="table small-vertical" style="left: 532px; top: 192px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 417px; top: 192px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 306px; top: 192px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 194px; top: 192px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 82px; top: 192px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
-            <button class="table large" style="left: -31px; top: 254px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 532px; top: 192px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 417px; top: 192px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 306px; top: 192px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 194px; top: 192px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 82px; top: 192px;" data-table="21"><span class="num">21</span><span class="cap"></span></button>
+            <button class="table large" style="left: -31px; top: 254px;" data-table="22"><span class="num">22</span><span class="cap"></span></button>
   
             <div class="bar-row">
               <div class="station-wrap">
@@ -1965,6 +1967,6 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       soonBookingHours: <?= json_encode($soonBookingHours, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260415_1500" defer></script>
+  <script src="/assets/js/Tr2.js?v=20260415_1530" defer></script>
 </body>
 </html>
