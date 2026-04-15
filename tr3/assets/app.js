@@ -697,11 +697,12 @@
       }
     });
 
-    const confirmCapacity = (maxCap, guests) => new Promise((resolve) => {
+    const confirmModal = (text) => new Promise((resolve) => {
       capConfirmResolve = resolve;
-      if (capModalText) capModalText.textContent = fmtVars(t('confirm_capacity'), { max: maxCap, guests });
+      if (capModalText) capModalText.textContent = String(text || '');
       setModal(capModal, true);
     });
+    const confirmCapacity = (maxCap, guests) => confirmModal(fmtVars(t('confirm_capacity'), { max: maxCap, guests }));
 
     if (capModalYes) {
       capModalYes.addEventListener('click', () => {
@@ -1347,35 +1348,48 @@
     };
 
     const applyMessengerVisibility = () => {
-      const msgrTgBtn = document.getElementById('msgrTgBtn');
       const msgrWaBtn = document.getElementById('msgrWaBtn');
-      const tgStack = msgrTgBtn && msgrTgBtn.closest ? msgrTgBtn.closest('.tg-stack') : null;
-      const waStack = msgrWaBtn && msgrWaBtn.closest ? msgrWaBtn.closest('.tg-stack') : null;
+      const msgrActions = document.getElementById('msgrActions');
+      const msgrTgIcon = document.getElementById('msgrTgIcon');
+      const msgrWaIcon = document.getElementById('msgrWaIcon');
 
       const tgLinked = !!(messengerLinked.telegram && linkedTg && linkedTg.user_id);
       const waLinked = !!(messengerLinked.whatsapp && linkedWaPhone);
 
-      if (tgLinked) {
-        if (tgStack) tgStack.hidden = false;
-        if (waStack) waStack.hidden = true;
-        return;
+      const state = waLinked ? 'wa' : (tgLinked ? 'tg' : 'none');
+      if (reqModal) {
+        reqModal.classList.remove('msgr-state-wa', 'msgr-state-tg', 'msgr-state-none');
+        reqModal.classList.add(state === 'wa' ? 'msgr-state-wa' : (state === 'tg' ? 'msgr-state-tg' : 'msgr-state-none'));
       }
-      if (waLinked) {
-        if (waStack) waStack.hidden = false;
-        if (tgStack) tgStack.hidden = true;
-        return;
+
+      if (reqPhone) {
+        if (state === 'wa') {
+          reqPhone.disabled = true;
+          if (linkedWaPhone) reqPhone.value = linkedWaPhone;
+        } else {
+          reqPhone.disabled = false;
+        }
       }
-      if (tgStack) tgStack.hidden = false;
-      if (waStack) waStack.hidden = false;
+
+      if (msgrActions) msgrActions.hidden = (state !== 'none');
+      if (msgrTgIcon) msgrTgIcon.hidden = (state !== 'tg');
+      if (msgrWaIcon) msgrWaIcon.hidden = (state !== 'wa');
+      if (msgrWaBtn) msgrWaBtn.disabled = (state !== 'none');
+      if (msgrTgBtn) msgrTgBtn.disabled = (state !== 'none');
     };
 
-    const unlinkWhatsApp = () => {
+    const unlinkAllMessengers = (hintMsg) => {
       messengerLinked.whatsapp = false;
+      messengerLinked.telegram = false;
+      messengerLinked.zalo = false;
       linkedWaPhone = null;
+      linkedTg = null;
       try { localStorage.removeItem('veranda_linked_wa'); } catch (_) {}
-      setMsgrHint(t('wa_unlinked'));
+      try { localStorage.removeItem('veranda_linked_tg'); } catch (_) {}
+      setMsgrHint(hintMsg ? String(hintMsg) : '');
       syncWaButtonState();
       syncSubmitState();
+      syncTgButtonState();
       applyMessengerVisibility();
     };
 
@@ -1392,8 +1406,8 @@
       }
 
       if (messengerLinked.whatsapp && linkedWaPhone) {
-        const ok = confirm(t('wa_unlink_confirm'));
-        if (ok) unlinkWhatsApp();
+        const ok = await confirmModal(t('wa_unlink_confirm'));
+        if (ok) unlinkAllMessengers(t('wa_unlinked'));
         return;
       }
 
@@ -1435,6 +1449,12 @@
 
     const msgrWaBtn = document.getElementById('msgrWaBtn');
     if (msgrWaBtn) msgrWaBtn.addEventListener('click', startWhatsAppFlow);
+    const msgrWaIcon = document.getElementById('msgrWaIcon');
+    if (msgrWaIcon) msgrWaIcon.addEventListener('click', async () => {
+      if (msgrBusy) return;
+      const ok = await confirmModal(t('wa_unlink_confirm'));
+      if (ok) unlinkAllMessengers(t('wa_unlinked'));
+    });
 
     const syncTgButtonState = () => {
       if (!msgrTgBtn) return;
@@ -1477,6 +1497,11 @@
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
       const phone = reqPhone ? ('+' + phoneDigits(reqPhone.value)) : '';
+      if (!isPhoneValid(phone)) {
+        if (reqPhone) reqPhone.focus();
+        showSubmitHint();
+        return;
+      }
       const comment = reqComment ? String(reqComment.value || '').trim() : '';
       const preorder = guests > 5 ? getPreorderText('ui') : '';
       const preorderRu = guests > 5 ? getPreorderText('ru') : '';
@@ -1510,23 +1535,18 @@
       }
     };
 
-    const unlinkTelegram = () => {
-      messengerLinked.telegram = false;
-      linkedTg = null;
-      try { localStorage.removeItem('veranda_linked_tg'); } catch (_) {}
-      setMsgrHint(t('tg_unlinked'));
-      syncTgButtonState();
-      syncSubmitState();
-      applyMessengerVisibility();
-    };
-
     if (msgrTgBtn) msgrTgBtn.addEventListener('click', () => {
       if (messengerLinked.telegram && linkedTg && linkedTg.user_id) {
-        const ok = confirm(t('tg_unlink_confirm'));
-        if (ok) unlinkTelegram();
+        confirmModal(t('tg_unlink_confirm')).then((ok) => { if (ok) unlinkAllMessengers(t('tg_unlinked')); });
         return;
       }
       startTelegramFlow().catch(() => null);
+    });
+    const msgrTgIcon = document.getElementById('msgrTgIcon');
+    if (msgrTgIcon) msgrTgIcon.addEventListener('click', async () => {
+      if (msgrBusy) return;
+      const ok = await confirmModal(t('tg_unlink_confirm'));
+      if (ok) unlinkAllMessengers(t('tg_unlinked'));
     });
 
     async function updateReqGuestsHint() {
