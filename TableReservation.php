@@ -1606,7 +1606,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260415_1730">
+  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260415_1745">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1658,9 +1658,9 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             <button class="table large" style="left: 712px; top: 528px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
             <button class="table small-vertical wide-1" style="left: 580px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 460px; top: 440px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 460px; top: 450px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
              <button class="table small-vertical wide-1" style="left: 340px; top: 528px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
-             <button class="table small-vertical wide-1" style="left: 220px; top: 440px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
+             <button class="table small-vertical wide-1" style="left: 220px; top: 450px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
             <button class="table small-vertical wide-1" style="left: 110px; top: 528px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
             <button class="table large" style="left: -30px; top: 512px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
   

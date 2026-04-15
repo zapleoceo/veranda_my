@@ -108,6 +108,10 @@
       background: rgba(255,255,255,0.03);
       flex: 0 0 auto;
       justify-self: end;
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 60;
     }
     @media (max-width: 640px) {
       .topbar {
@@ -117,7 +121,7 @@
           "controls controls";
       }
       .title-wrap { grid-area: title; }
-      .lang { grid-area: lang; align-self: start; }
+      .lang { grid-area: lang; align-self: start; top: 10px; right: 10px; }
       .controls { grid-area: controls; justify-self: stretch; justify-content: center; }
     }
     .lang a {
