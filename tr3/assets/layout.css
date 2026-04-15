@@ -1410,6 +1410,7 @@
       .modal { padding: 5px; align-items: center; justify-content: center; }
       .modal-card { padding: 10px 10px 8px; }
       .modal-grid { gap: 5px; margin-top: 5px; }
+      #reqModal .modal-grid { grid-template-columns: 0.42fr 0.58fr; }
       .modal-label { gap: 5px; }
       .modal-actions { gap: 5px; margin-top: 5px; }
       .req-layout { gap: 5px; }
@@ -1449,9 +1450,9 @@
       .phone-field input { order: 1; }
       .phone-field #msgrActions { order: 2; }
       .phone-field .msgr-hint { position: static; order: 3; flex: 1 0 100%; margin-top: 2px; text-align: right; pointer-events: none; }
-      .msgr-btn-inline { width: 35px; height: 35px; border-radius: 10px; }
-      .msgr-btn-inline svg { width: 18px; height: 18px; }
-      .msgr-cd { right: 3px; bottom: 2px; font-size: 9px; }
+      .msgr-btn-inline { width: 30px; height: 30px; border-radius: 9px; }
+      .msgr-btn-inline svg { width: 16px; height: 16px; }
+      .msgr-cd { right: 2px; bottom: 2px; font-size: 8px; }
       #reqModal.msgr-state-wa .phone-field input,
       #reqModal.msgr-state-tg .phone-field input { padding-right: 42px; }
       #reqModal.msgr-state-none .phone-field input { padding-right: 12px; }
@@ -1472,8 +1473,7 @@
       #reqModalTitle .framed-box { padding: 1px 4px; }
       #reqNameLabel > span { display: none; }
       #reqNameLabel { gap: 0; }
-      #reqPhoneLabel .label-row { gap: 0; }
-      #reqPhoneLabel [data-i18n="your_phone"] { display: none; }
+      #reqPhoneLabel .label-row { display: none; }
       #reqForm { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
       .req-layout { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding-right: 2px; min-height: 0; }
       .modal-actions { position: sticky; bottom: 0; background: transparent; padding-top: 5px; margin-top: 5px; z-index: 2; }
