@@ -86,8 +86,16 @@ $I18N = [
     'missing_phone' => 'телефон',
     'missing_preorder' => 'предзаказ',
     'missing_telegram' => 'Telegram (привязать)',
+    'missing_whatsapp' => 'WhatsApp (привязать)',
     'missing_zalo' => 'Zalo (привязать)',
     'phone_invalid' => 'неверный номер (международный формат, только цифры)',
+    'wa_linked' => 'WhatsApp привязан ✅',
+    'wa_unlinked' => 'WhatsApp отвязан',
+    'wa_unlink_confirm' => 'Отвязать WhatsApp? После этого можно привязать другой номер.',
+    'hint_opening_wa' => 'Отправляю ссылку в WhatsApp…',
+    'hint_wa_check_link' => 'Откройте ссылку из WhatsApp, чтобы привязать номер',
+    'err_wa_not_configured' => 'WhatsApp сервис не настроен',
+    'err_wa_send_failed' => 'Не удалось отправить ссылку в WhatsApp',
     'zalo_link_prompt' => 'Использовать этот номер для Zalo?',
     'zalo_linked' => 'Zalo привязан',
     'sending' => 'Отправляю…',
@@ -177,8 +185,16 @@ $I18N = [
     'missing_phone' => 'phone',
     'missing_preorder' => 'pre-order',
     'missing_telegram' => 'Telegram (link)',
+    'missing_whatsapp' => 'WhatsApp (link)',
     'missing_zalo' => 'Zalo (link)',
     'phone_invalid' => 'invalid number (intl format, digits only)',
+    'wa_linked' => 'WhatsApp linked ✅',
+    'wa_unlinked' => 'WhatsApp unlinked',
+    'wa_unlink_confirm' => 'Unlink WhatsApp? You can link another number later.',
+    'hint_opening_wa' => 'Sending a link to WhatsApp…',
+    'hint_wa_check_link' => 'Open the link from WhatsApp to link your number',
+    'err_wa_not_configured' => 'WhatsApp service is not configured',
+    'err_wa_send_failed' => 'Failed to send a link to WhatsApp',
     'zalo_link_prompt' => 'Use this number for Zalo?',
     'zalo_linked' => 'Zalo linked',
     'sending' => 'Sending…',
@@ -268,8 +284,16 @@ $I18N = [
     'missing_phone' => 'số điện thoại',
     'missing_preorder' => 'đặt trước',
     'missing_telegram' => 'Telegram (liên kết)',
+    'missing_whatsapp' => 'WhatsApp (liên kết)',
     'missing_zalo' => 'Zalo (liên kết)',
     'phone_invalid' => 'số điện thoại không hợp lệ (quốc tế, chỉ số)',
+    'wa_linked' => 'WhatsApp đã liên kết ✅',
+    'wa_unlinked' => 'WhatsApp đã hủy liên kết',
+    'wa_unlink_confirm' => 'Hủy liên kết WhatsApp? Bạn có thể liên kết số khác sau.',
+    'hint_opening_wa' => 'Đang gửi link qua WhatsApp…',
+    'hint_wa_check_link' => 'Mở link trong WhatsApp để liên kết số',
+    'err_wa_not_configured' => 'Chưa cấu hình dịch vụ WhatsApp',
+    'err_wa_send_failed' => 'Gửi link WhatsApp thất bại',
     'zalo_link_prompt' => 'Sử dụng số này cho Zalo?',
     'zalo_linked' => 'Đã liên kết Zalo',
     'sending' => 'Đang gửi…',
@@ -667,7 +691,7 @@ if (($_GET['ajax'] ?? '') === 'busy_ranges') {
       if ($n >= 1 && $n <= 500) $allowedNums[(string)$n] = true;
     }
   } else {
-    for ($i = 1; $i <= 20; $i++) $allowedNums[(string)$i] = true;
+    for ($i = 1; $i <= 22; $i++) $allowedNums[(string)$i] = true;
   }
 
   $allowedList = array_values(array_keys($allowedNums));
@@ -877,6 +901,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     exit;
   }
   $phoneNorm = '+' . $phoneNorm;
+  $waDigits = preg_replace('/\D+/', '', (string)$waPhone);
+  $waDigits = trim((string)$waDigits);
+  $waPhoneNorm = '';
+  if ($waDigits !== '' && preg_match('/^[1-9]\d{8,14}$/', $waDigits)) {
+    $waPhoneNorm = '+' . $waDigits;
+  }
   $comment = str_replace(["\r\n", "\r"], "\n", $comment);
   if (mb_strlen($comment) > 600) $comment = mb_substr($comment, 0, 600);
   $preorder = str_replace(["\r\n", "\r"], "\n", $preorder);
@@ -930,8 +960,8 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $text .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
   $text .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
   $text .= 'Номер телефона: <b>' . htmlspecialchars($phoneNorm) . '</b>';
-  if ($waPhone !== '') {
-    $waClean = preg_replace('/\D+/', '', $waPhone);
+  if ($waPhoneNorm !== '') {
+    $waClean = preg_replace('/\D+/', '', $waPhoneNorm);
     $text .= "\n" . 'WhatsApp: <a href="https://wa.me/' . htmlspecialchars($waClean) . '">+' . htmlspecialchars($waClean) . '</a>';
   }
   if ($comment !== '') {
@@ -947,6 +977,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $tgUid = isset($tg['user_id']) ? (int)$tg['user_id'] : 0;
   $tgUn = strtolower(trim((string)($tg['username'] ?? '')));
   $tgUn = ltrim($tgUn, '@');
+  if ($waPhoneNorm !== '') {
+    $tgUid = 0;
+    $tgUn = '';
+  }
 
   if (isset($db) && ($db instanceof \App\Classes\Database)) {
     $db->createReservationsTable();
@@ -972,14 +1006,14 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $preorderRu,
       $tgUid > 0 ? $tgUid : null,
       $tgUn !== '' ? $tgUn : null,
-      $waPhone !== '' ? $waPhone : null,
+      $waPhoneNorm !== '' ? $waPhoneNorm : null,
       $userLang,
       $qrUrl,
       $qrCode
     ]);
   }
 
-  if ($tgUn !== '' || $tgUid > 0) {
+  if ($waPhoneNorm === '' && ($tgUn !== '' || $tgUid > 0)) {
     $text .= "\n";
     $text .= 'Telegram: ';
     if ($tgUn !== '') {
@@ -996,29 +1030,6 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $text .= "\n\n@Ollushka90 @ce_akh1  свяжитесь с гостем";
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-  
-  // Send WhatsApp confirmation if linked
-  if ($waPhone !== '' && !empty($_ENV['WHATSAPP_TOKEN']) && !empty($_ENV['WHATSAPP_INSTANCE_ID'])) {
-      try {
-          require_once __DIR__ . '/src/classes/WhatsAppAPI.php';
-          $wa = new \App\Classes\WhatsAppAPI($_ENV['WHATSAPP_TOKEN'], $_ENV['WHATSAPP_INSTANCE_ID']);
-          
-          $waText = "*" . $trFor('tg_booking_title') . " #" . $qrCode . "*\n\n";
-          $waText .= $trFor('tg_date') . ": " . $startDt->format('Y-m-d') . "\n";
-          $waText .= $trFor('tg_time') . ": " . $startDt->format('H:i') . "\n";
-          $waText .= $trFor('tg_guests') . ": " . $guests . "\n";
-          $waText .= $trFor('tg_table') . ": " . $tableNum . "\n";
-          $waText .= $trFor('tg_name') . ": " . $name . "\n";
-          $waText .= $trFor('tg_phone') . ": " . $phoneNorm . "\n";
-          if ($comment !== '') $waText .= "\n" . $trFor('tg_comment') . ":\n" . $comment;
-          if ($preorder !== '') $waText .= "\n" . $trFor('tg_preorder') . ":\n" . $preorder;
-          $waText .= "\n\n" . $trFor('booking_note');
-          
-          $wa->sendMessage($waPhone, $waText);
-      } catch (\Throwable $e_wa) {
-          error_log("WhatsApp send error: " . $e_wa->getMessage());
-      }
-  }
 
   // Send Zalo confirmation if linked
   if ($zaloPhoneNorm !== '' && !empty($_ENV['ZALO_OA_TOKEN'])) {
@@ -1068,9 +1079,46 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     exit;
   }
 
-  if ($tgUid <= 0) {
+  if ($waPhoneNorm === '' && $tgUid <= 0) {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Telegram не привязан'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => false, 'error' => 'Мессенджер не привязан'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  if ($waPhoneNorm !== '') {
+    $waToken = trim((string)($_ENV['WHATSAPP_TOKEN'] ?? ''));
+    $waInstanceId = trim((string)($_ENV['WHATSAPP_INSTANCE_ID'] ?? ''));
+    if ($waToken === '' || $waInstanceId === '') {
+      http_response_code(500);
+      echo json_encode(['ok' => false, 'error' => $trFor('err_wa_not_configured')], JSON_UNESCAPED_UNICODE);
+      exit;
+    }
+    try {
+      require_once __DIR__ . '/src/classes/WhatsAppAPI.php';
+      $wa = new \App\Classes\WhatsAppAPI($waToken, $waInstanceId);
+      $waText = $trFor('tg_thanks_title') . ' ' . $trFor('tg_thanks_body') . "\n\n";
+      $waText .= $trFor('tg_booking_title') . ' #' . $qrCode . "\n";
+      $waText .= $trFor('tg_date') . ': ' . $startDt->format('Y-m-d') . "\n";
+      $waText .= $trFor('tg_time') . ': ' . $startDt->format('H:i') . "\n";
+      $waText .= $trFor('tg_guests') . ': ' . $guests . "\n";
+      $waText .= $trFor('tg_table') . ': ' . $tableNum . "\n";
+      $waText .= $trFor('tg_name') . ': ' . $name . "\n";
+      $waText .= $trFor('tg_phone') . ': ' . $phoneNorm;
+      if ($comment !== '') $waText .= "\n\n" . $trFor('tg_comment') . ":\n" . $comment;
+      if ($preorder !== '') $waText .= "\n\n" . $trFor('tg_preorder') . ":\n" . $preorder;
+      $waText .= "\n\n" . $trFor('booking_note');
+      $sent = $wa->sendMessage($waPhoneNorm, $waText);
+      if (!$sent) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $trFor('err_wa_send_failed')], JSON_UNESCAPED_UNICODE);
+        exit;
+      }
+    } catch (\Throwable $e_wa) {
+      http_response_code(500);
+      echo json_encode(['ok' => false, 'error' => $trFor('err_wa_send_failed')], JSON_UNESCAPED_UNICODE);
+      exit;
+    }
+    echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     exit;
   }
   $userText = '<b>' . htmlspecialchars($trFor('tg_thanks_title')) . '</b> ' . htmlspecialchars($trFor('tg_thanks_body')) . "\n\n";
@@ -1213,6 +1261,106 @@ if (($_GET['ajax'] ?? '') === 'tg_state_create') {
   exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'wa_state_create') {
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+  if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if (!isset($db) || !($db instanceof \App\Classes\Database)) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'DB не настроена'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $waToken = trim((string)($_ENV['WHATSAPP_TOKEN'] ?? ''));
+  $waInstanceId = trim((string)($_ENV['WHATSAPP_INSTANCE_ID'] ?? ''));
+  if ($waToken === '' || $waInstanceId === '') {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => tr('err_wa_not_configured')], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
+  if (!is_array($payload)) $payload = [];
+
+  $tableNum = trim((string)($payload['table_num'] ?? ''));
+  $guests = (int)($payload['guests'] ?? 0);
+  $start = trim((string)($payload['start'] ?? ''));
+  $phone = trim((string)($payload['phone'] ?? ''));
+  $sourcePage = trim((string)($payload['source_page'] ?? 'TableReservation.php'));
+
+  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректный номер стола'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if ($guests <= 0 || $guests > 99) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректное кол-во гостей'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if ($start === '' || mb_strlen($start) > 40) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Некорректное время'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $waDigits = preg_replace('/\D+/', '', $phone);
+  $waDigits = trim((string)$waDigits);
+  if ($waDigits === '' || !preg_match('/^[1-9]\d{8,14}$/', $waDigits)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => tr('phone_invalid')], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $phoneNorm = '+' . $waDigits;
+
+  $code = bin2hex(random_bytes(9));
+  $createdAt = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
+  $expiresAt = (new DateTimeImmutable('now'))->modify('+30 minutes')->format('Y-m-d H:i:s');
+
+  $t = $db->t('table_reservation_wa_states');
+  $pdo = $db->getPdo();
+  $pdo->exec("CREATE TABLE IF NOT EXISTS {$t} (
+    code VARCHAR(40) PRIMARY KEY,
+    phone VARCHAR(64) NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    KEY idx_expires_at (expires_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+  $payload['whatsapp_phone'] = $phoneNorm;
+  $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE);
+  if ($payloadJson === false) $payloadJson = '{}';
+  $db->query("INSERT INTO {$t} (code, phone, payload_json, created_at, expires_at) VALUES (?, ?, ?, ?, ?)", [$code, $phoneNorm, $payloadJson, $createdAt, $expiresAt]);
+
+  $host = (string)($_SERVER['HTTP_HOST'] ?? '');
+  $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+  $returnUrl = ($host !== '' ? ($scheme . '://' . $host) : '') . '/' . ltrim($sourcePage, '/') . '?wa_state=' . rawurlencode($code);
+
+  try {
+    require_once __DIR__ . '/src/classes/WhatsAppAPI.php';
+    $wa = new \App\Classes\WhatsAppAPI($waToken, $waInstanceId);
+    $msg = "Подтвердите WhatsApp номер:\n" . $returnUrl;
+    $sent = $wa->sendMessage($phoneNorm, $msg);
+    if (!$sent) {
+      http_response_code(500);
+      echo json_encode(['ok' => false, 'error' => tr('err_wa_send_failed')], JSON_UNESCAPED_UNICODE);
+      exit;
+    }
+  } catch (\Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => tr('err_wa_send_failed')], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  echo json_encode(['ok' => true, 'code' => $code, 'return_url' => $returnUrl], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'tg_state_get') {
   header('Content-Type: application/json; charset=utf-8');
   header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -1261,6 +1409,55 @@ if (($_GET['ajax'] ?? '') === 'tg_state_get') {
   $tgUsername = trim((string)($row['tg_username'] ?? ''));
   $tgName = trim((string)($row['tg_name'] ?? ''));
   echo json_encode(['ok' => true, 'payload' => $payload, 'tg' => ['user_id' => $tgUserId, 'username' => $tgUsername, 'name' => $tgName]], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'wa_state_get') {
+  header('Content-Type: application/json; charset=utf-8');
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+  if (!isset($db) || !($db instanceof \App\Classes\Database)) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'DB не настроена'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $code = trim((string)($_GET['code'] ?? ''));
+  if ($code === '' || !preg_match('/^[a-f0-9]{8,40}$/', $code)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $t = $db->t('table_reservation_wa_states');
+  try {
+    $row = $db->query("SELECT payload_json, phone, expires_at, used_at FROM {$t} WHERE code = ? LIMIT 1", [$code])->fetch();
+  } catch (\Throwable $e) {
+    $row = false;
+  }
+  if (!$row || !is_array($row)) {
+    http_response_code(404);
+    echo json_encode(['ok' => false, 'error' => 'Not found'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $usedAt = (string)($row['used_at'] ?? '');
+  if ($usedAt !== '') {
+    http_response_code(410);
+    echo json_encode(['ok' => false, 'error' => 'Expired'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $expiresAt = (string)($row['expires_at'] ?? '');
+  $expTs = $expiresAt !== '' ? strtotime($expiresAt) : false;
+  if ($expTs === false || $expTs < time()) {
+    $db->query("DELETE FROM {$t} WHERE code = ?", [$code]);
+    http_response_code(410);
+    echo json_encode(['ok' => false, 'error' => 'Expired'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $db->query("UPDATE {$t} SET used_at = ? WHERE code = ?", [(new DateTimeImmutable('now'))->format('Y-m-d H:i:s'), $code]);
+  $payloadJson = (string)($row['payload_json'] ?? '{}');
+  $payload = json_decode($payloadJson, true);
+  if (!is_array($payload)) $payload = [];
+  $phone = trim((string)($row['phone'] ?? ''));
+  echo json_encode(['ok' => true, 'payload' => $payload, 'phone' => $phone], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
@@ -1409,7 +1606,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260415_1610">
+  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260415_1730">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1718,7 +1915,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260415_1600"></script>
-  <script src="/links/table-reservation.js?v=20260415_1600"></script>
+  <script src="/assets/js/Tr2.js?v=20260415_1730"></script>
+  <script src="/links/table-reservation.js?v=20260415_1730"></script>
 </body>
 </html>

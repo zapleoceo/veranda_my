@@ -52,6 +52,11 @@ class WhatsAppAPI
         }
 
         $result = json_decode($response, true);
-        return isset($result['sent']) && $result['sent'] === 'true';
+        if (is_array($result)) {
+            if (isset($result['error']) && $result['error']) return false;
+            if (array_key_exists('sent', $result)) return $result['sent'] === true || $result['sent'] === 1 || $result['sent'] === 'true' || $result['sent'] === '1';
+            if (array_key_exists('success', $result)) return $result['success'] === true || $result['success'] === 1 || $result['success'] === 'true' || $result['success'] === '1';
+        }
+        return true;
     }
 }

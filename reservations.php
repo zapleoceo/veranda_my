@@ -175,8 +175,14 @@ if ($ajax === 'resend') {
         if (!$startDt) $startDt = new DateTimeImmutable('now', $spotTz);
     
     // Group Message
-    $tgUid = (int)$row['tg_user_id'];
-    $tgUn = (string)$row['tg_username'];
+    $tgUid = (int)($row['tg_user_id'] ?? 0);
+    $tgUn = strtolower(trim((string)($row['tg_username'] ?? '')));
+    $tgUn = ltrim($tgUn, '@');
+    $waPhone = trim((string)($row['whatsapp_phone'] ?? ''));
+    $waDigits = preg_replace('/\D+/', '', $waPhone);
+    $waDigits = trim((string)$waDigits);
+    $waPhoneNorm = ($waDigits !== '' && preg_match('/^[1-9]\d{8,14}$/', $waDigits)) ? ('+' . $waDigits) : '';
+    $guestChannel = $waPhoneNorm !== '' ? 'whatsapp' : ($tgUid > 0 ? 'telegram' : '');
 
     $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
     $okGroup = true;
@@ -197,7 +203,10 @@ if ($ajax === 'resend') {
         if ($preForGroup !== '') {
             $text .= "\n<b>Предзаказ:</b>\n" . htmlspecialchars($preForGroup);
         }
-        if ($tgUn !== '' || $tgUid > 0) {
+        if ($waPhoneNorm !== '') {
+            $waClean = preg_replace('/\D+/', '', $waPhoneNorm);
+            $text .= "\nWhatsApp: <a href=\"https://wa.me/" . htmlspecialchars($waClean) . "\">+" . htmlspecialchars($waClean) . "</a>";
+        } elseif ($tgUn !== '' || $tgUid > 0) {
             $text .= "\nTelegram: ";
             if ($tgUn !== '') {
                 $text .= '<a href="https://t.me/' . htmlspecialchars($tgUn) . '">@' . htmlspecialchars($tgUn) . '</a>';
@@ -215,7 +224,7 @@ if ($ajax === 'resend') {
 
     // Guest Message (localized to reservation language)
     $okGuest = true;
-    if (($target === 'both' || $target === 'guest') && $tgUid > 0) {
+    if (($target === 'both' || $target === 'guest') && $guestChannel !== '') {
         $langRow = strtolower(trim((string)($row['lang'] ?? 'ru')));
         if (!in_array($langRow, ['ru', 'en', 'vi'], true)) $langRow = 'ru';
         $T = [
@@ -270,8 +279,28 @@ if ($ajax === 'resend') {
         ];
         $tr = function (string $k) use ($T, $langRow): string { return $T[$langRow][$k] ?? $k; };
 
+        $qrUrl = (string)($row['qr_url'] ?? '');
+        $plainUserText = $tr('thanks_title') . ' ' . $tr('thanks_body') . "\n\n";
+        if ($qrUrl !== '') {
+            $plainUserText .= $tr('payment_title') . "\n";
+            $plainUserText .= $tr('payment_body') . "\n\n";
+            $plainUserText .= $tr('payment_link') . ': ' . $qrUrl . "\n\n";
+        }
+        $plainUserText .= $tr('booking_title') . ' #' . $code . "\n";
+        $plainUserText .= $tr('date') . ': ' . $startDt->format('Y-m-d') . "\n";
+        $plainUserText .= $tr('time') . ': ' . $startDt->format('H:i') . "\n";
+        $plainUserText .= $tr('guests') . ': ' . (string)($row['guests'] ?? '') . "\n";
+        $plainUserText .= $tr('table') . ': ' . (string)($row['table_num'] ?? '') . "\n";
+        $plainUserText .= $tr('name') . ': ' . (string)($row['name'] ?? '') . "\n";
+        $plainUserText .= $tr('phone') . ': ' . (string)($row['phone'] ?? '');
+        if ((string)($row['comment'] ?? '') !== '') {
+            $plainUserText .= "\n\n" . $tr('comment') . ":\n" . (string)$row['comment'];
+        }
+        if ((string)($row['preorder_text'] ?? '') !== '') {
+            $plainUserText .= "\n\n" . $tr('preorder') . ":\n" . (string)$row['preorder_text'];
+        }
+
         $userText = '<b>' . htmlspecialchars($tr('thanks_title')) . '</b> ' . htmlspecialchars($tr('thanks_body')) . "\n\n";
-        $qrUrl = (string)$row['qr_url'];
         if ($qrUrl !== '') {
             $userText .= '<b>' . htmlspecialchars($tr('payment_title')) . "</b>\n";
             $userText .= htmlspecialchars($tr('payment_body')) . "\n\n";
@@ -280,19 +309,34 @@ if ($ajax === 'resend') {
         $userText .= '<b>' . htmlspecialchars($tr('booking_title')) . ' #' . htmlspecialchars($code) . '</b>' . "\n";
         $userText .= htmlspecialchars($tr('date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
         $userText .= htmlspecialchars($tr('time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
-        $userText .= htmlspecialchars($tr('guests')) . ': <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
-        $userText .= htmlspecialchars($tr('table')) . ': <b>' . htmlspecialchars($row['table_num']) . '</b>' . "\n";
-        $userText .= htmlspecialchars($tr('name')) . ': <b>' . htmlspecialchars($row['name']) . '</b>' . "\n";
-        $userText .= htmlspecialchars($tr('phone')) . ': <b>' . htmlspecialchars($row['phone']) . '</b>';
-        if ($row['comment'] !== '') {
-            $userText .= "\n<b>" . htmlspecialchars($tr('comment')) . ":</b>\n" . htmlspecialchars($row['comment']);
+        $userText .= htmlspecialchars($tr('guests')) . ': <b>' . htmlspecialchars((string)($row['guests'] ?? '')) . '</b>' . "\n";
+        $userText .= htmlspecialchars($tr('table')) . ': <b>' . htmlspecialchars((string)($row['table_num'] ?? '')) . '</b>' . "\n";
+        $userText .= htmlspecialchars($tr('name')) . ': <b>' . htmlspecialchars((string)($row['name'] ?? '')) . '</b>' . "\n";
+        $userText .= htmlspecialchars($tr('phone')) . ': <b>' . htmlspecialchars((string)($row['phone'] ?? '')) . '</b>';
+        if ((string)($row['comment'] ?? '') !== '') {
+            $userText .= "\n<b>" . htmlspecialchars($tr('comment')) . ":</b>\n" . htmlspecialchars((string)$row['comment']);
         }
-        if ($row['preorder_text'] !== '') {
-            $userText .= "\n<b>" . htmlspecialchars($tr('preorder')) . ":</b>\n" . htmlspecialchars($row['preorder_text']);
+        if ((string)($row['preorder_text'] ?? '') !== '') {
+            $userText .= "\n<b>" . htmlspecialchars($tr('preorder')) . ":</b>\n" . htmlspecialchars((string)$row['preorder_text']);
         }
 
         $ch = curl_init();
-        if ($qrUrl !== '') {
+        if ($guestChannel === 'whatsapp') {
+            $waToken = trim((string)($_ENV['WHATSAPP_TOKEN'] ?? ''));
+            $waInstanceId = trim((string)($_ENV['WHATSAPP_INSTANCE_ID'] ?? ''));
+            if ($waToken === '' || $waInstanceId === '') {
+                $okGuest = false;
+            } else {
+                try {
+                    require_once __DIR__ . '/src/classes/WhatsAppAPI.php';
+                    $wa = new \App\Classes\WhatsAppAPI($waToken, $waInstanceId);
+                    $sent = $wa->sendMessage($waPhoneNorm, $plainUserText);
+                    if (!$sent) $okGuest = false;
+                } catch (\Throwable $e) {
+                    $okGuest = false;
+                }
+            }
+        } elseif ($qrUrl !== '') {
             $chImg = curl_init($qrUrl);
             curl_setopt($chImg, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($chImg, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
@@ -329,7 +373,7 @@ if ($ajax === 'resend') {
             $resp = curl_exec($ch);
             curl_close($ch);
         }
-        $data = $resp ? json_decode($resp, true) : null;
+        $data = $guestChannel === 'whatsapp' ? ['ok' => $okGuest] : ($resp ? json_decode($resp, true) : null);
         
         if ($qrUrl !== '' && (!is_array($data) || empty($data['ok']))) {
             $ch = curl_init();
@@ -389,7 +433,8 @@ if ($ajax === 'resend') {
         'ok' => true,
         'group_ok' => $respGroup,
         'guest_ok' => $respGuest,
-        'has_tg' => $tgUid > 0
+        'has_tg' => $tgUid > 0,
+        'guest_channel' => $guestChannel
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -555,7 +600,7 @@ $rows = $allRows;
     <title>Брони</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="/assets/app.css?v=20260415_1200">
-    <link rel="stylesheet" href="/assets/css/reservations.css?v=20260415_1200">
+    <link rel="stylesheet" href="/assets/css/reservations.css?v=20260415_1730">
 </head>
 <body>
     <div class="container res-page">
@@ -631,6 +676,10 @@ $rows = $allRows;
                                     if ($tgUsername !== '') {
                                         $tgUsername = ltrim($tgUsername, '@');
                                     }
+                                    $waPhone = trim((string)($r['whatsapp_phone'] ?? ''));
+                                    $waDigits = preg_replace('/\D+/', '', $waPhone);
+                                    $waDigits = trim((string)$waDigits);
+                                    $waPhoneNorm = ($waDigits !== '' && preg_match('/^[1-9]\d{8,14}$/', $waDigits)) ? ('+' . $waDigits) : '';
                                     $deletedAt = (string)($r['deleted_at'] ?? '');
                                     $deletedBy = (string)($r['deleted_by'] ?? '');
                                     $isDeleted = $deletedAt !== '' && $deletedAt !== null && $deletedAt !== '0000-00-00 00:00:00';
@@ -668,7 +717,10 @@ $rows = $allRows;
                                     <td data-label="Гость">
                                         <div style="font-weight:900;"><?= htmlspecialchars($r['name']) ?></div>
                                         <div class="res-muted"><?= htmlspecialchars($r['phone']) ?></div>
-                                        <?php if ($tgUsername !== ''): ?>
+                                        <?php if ($waPhoneNorm !== ''): ?>
+                                            <?php $waClean = preg_replace('/\D+/', '', $waPhoneNorm); ?>
+                                            <div class="res-muted"><a href="https://wa.me/<?= htmlspecialchars($waClean) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">WA: +<?= htmlspecialchars($waClean) ?></a></div>
+                                        <?php elseif ($tgUsername !== ''): ?>
                                             <div class="res-muted"><a href="https://t.me/<?= htmlspecialchars($tgUsername) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">TG: @<?= htmlspecialchars($tgUsername) ?></a></div>
                                         <?php endif; ?>
                                         <?php if (!empty($r['zalo_phone'])): ?>
@@ -699,7 +751,8 @@ $rows = $allRows;
                                     <td data-label="Действия">
                                         <?php if (!$isPoster): ?>
                                             <div class="res-actions">
-                                                <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="guest">ReGuest</button>
+                                                <?php $guestBtnClass = $waPhoneNorm !== '' ? 'contact-wa' : ($tgUsername !== '' || (int)($r['tg_user_id'] ?? 0) > 0 ? 'contact-tg' : ''); ?>
+                                                <button type="button" class="res-btn btn-resend <?= htmlspecialchars($guestBtnClass) ?>" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="guest">ReGuest</button>
                                                 <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="manager">ReManager</button>
                                                 <?php if ($hasPosterAccess && empty($r['is_poster_pushed'])): ?>
                                                     <button type="button" class="res-btn primary btn-vposter" data-id="<?= htmlspecialchars((string)$r['id']) ?>">вPoster</button>
@@ -739,7 +792,7 @@ $rows = $allRows;
         </div>
     </div>
 
-    <script src="/assets/user_menu.js?v=20260415_1200"></script>
-    <script src="/assets/js/reservations.js?v=20260415_1200"></script>
+    <script src="/assets/user_menu.js?v=20260415_1730"></script>
+    <script src="/assets/js/reservations.js?v=20260415_1730"></script>
 </body>
 </html>

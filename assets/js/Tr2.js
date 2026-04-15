@@ -1278,6 +1278,7 @@
       }
       syncTgButtonState();
       syncWaButtonState();
+      applyMessengerVisibility();
       checkModalAvailability();
       setModal(reqModal, true);
       if (reqName) reqName.focus();
@@ -1309,32 +1310,90 @@
       }
     };
 
-    const startWhatsAppFlow = () => {
-      const phone = String(reqPhone ? reqPhone.value : '').trim();
+    const applyMessengerVisibility = () => {
+      const msgrTgBtn = document.getElementById('msgrTgBtn');
+      const msgrWaBtn = document.getElementById('msgrWaBtn');
+      const tgStack = msgrTgBtn && msgrTgBtn.closest ? msgrTgBtn.closest('.tg-stack') : null;
+      const waStack = msgrWaBtn && msgrWaBtn.closest ? msgrWaBtn.closest('.tg-stack') : null;
+
+      const tgLinked = !!(messengerLinked.telegram && linkedTg && linkedTg.user_id);
+      const waLinked = !!(messengerLinked.whatsapp && linkedWaPhone);
+
+      if (tgLinked) {
+        if (tgStack) tgStack.hidden = false;
+        if (waStack) waStack.hidden = true;
+        return;
+      }
+      if (waLinked) {
+        if (waStack) waStack.hidden = false;
+        if (tgStack) tgStack.hidden = true;
+        return;
+      }
+      if (tgStack) tgStack.hidden = false;
+      if (waStack) waStack.hidden = false;
+    };
+
+    const unlinkWhatsApp = () => {
+      messengerLinked.whatsapp = false;
+      linkedWaPhone = null;
+      try { localStorage.removeItem('veranda_linked_wa'); } catch (_) {}
+      setMsgrHint(t('wa_unlinked'));
+      syncWaButtonState();
+      syncSubmitState();
+      applyMessengerVisibility();
+    };
+
+    const startWhatsAppFlow = async () => {
+      const msgrWaBtn = document.getElementById('msgrWaBtn');
+      if (!msgrWaBtn || msgrBusy) return;
+      if (!pendingBooking) { setMsgrHint(t('hint_pick_table_first')); return; }
+
+      const phone = reqPhone ? ('+' + phoneDigits(reqPhone.value)) : '';
       if (!isPhoneValid(phone)) {
         if (reqPhone) reqPhone.focus();
         showSubmitHint();
         return;
       }
 
-      if (messengerLinked.whatsapp) {
-        if (confirm(t('wa_unlink_confirm'))) {
-          messengerLinked.whatsapp = false;
-          linkedWaPhone = null;
-          localStorage.removeItem('veranda_linked_wa');
-          syncWaButtonState();
-          syncSubmitState();
-        }
+      if (messengerLinked.whatsapp && linkedWaPhone) {
+        const ok = confirm(t('wa_unlink_confirm'));
+        if (ok) unlinkWhatsApp();
         return;
       }
 
-      if (confirm(t('wa_link_prompt') + "\n" + phone)) {
-        messengerLinked.whatsapp = true;
-        linkedWaPhone = phone;
-        localStorage.setItem('veranda_linked_wa', phone);
-        syncWaButtonState();
-        syncSubmitState();
-        setMsgrHint(t('wa_linked'));
+      const tableNum = String(pendingBooking.tableNum || '');
+      const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
+      const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
+      const name = reqName ? String(reqName.value || '').trim() : '';
+      const comment = reqComment ? String(reqComment.value || '').trim() : '';
+      const preorder = guests > 5 ? getPreorderText('ui') : '';
+      const preorderRu = guests > 5 ? getPreorderText('ru') : '';
+      const totalAmount = (() => {
+        const counts = normalizePreorder(preorderCounts);
+        return Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
+      })();
+      const resDt = resDate ? String(resDate.value || '').trim() : '';
+
+      msgrBusy = true;
+      msgrWaBtn.disabled = true;
+      setMsgrHint(t('hint_opening_wa'));
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'wa_state_create');
+        const sourcePage = location.pathname.split('/').pop() || 'Tr2.php';
+        const res = await fetch(url.toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, source_page: sourcePage }),
+        });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
+        setMsgrHint(t('hint_wa_check_link'));
+      } catch (e) {
+        setMsgrHint(String(e && e.message ? e.message : e));
+      } finally {
+        msgrBusy = false;
+        msgrWaBtn.disabled = false;
       }
     };
 
@@ -1422,6 +1481,7 @@
       setMsgrHint(t('tg_unlinked'));
       syncTgButtonState();
       syncSubmitState();
+      applyMessengerVisibility();
     };
 
     if (msgrTgBtn) msgrTgBtn.addEventListener('click', () => {
@@ -2152,6 +2212,9 @@
         const tg = j.tg && typeof j.tg === 'object' ? j.tg : null;
         if (tableNum && guests > 0 && start) {
           selectedTableNum = tableNum;
+          messengerLinked.whatsapp = false;
+          linkedWaPhone = null;
+          try { localStorage.removeItem('veranda_linked_wa'); } catch (_) {}
           messengerLinked.telegram = true;
           linkedTg = tg ? { user_id: Number(tg.user_id || 0) || 0, username: String(tg.username || ''), name: String(tg.name || '') } : null;
           
@@ -2177,6 +2240,65 @@
         history.replaceState(null, '', next.toString());
       }
     };
+    const restoreFromWaState = async () => {
+      const params = new URLSearchParams(location.search);
+      const code = String(params.get('wa_state') || '').trim();
+      if (!code) return;
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('ajax', 'wa_state_get');
+        url.searchParams.set('code', code);
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok || !j.payload) throw new Error((j && j.error) ? j.error : t('err_generic'));
+        const p = j.payload || {};
+        const resDt = String(p.res_date || '').trim();
+        if (resDate && resDt && /^\d{4}-\d{2}-\d{2}/.test(resDt)) {
+          skipNextResDateAutoLoad = true;
+          resDate.value = resDt.slice(0, 10);
+          if (resDateBtn) resDateBtn.textContent = fmtCashDate(resDate.value);
+          setBusyLabel(String(resDate.value || '').slice(0, 10));
+          invalidateLast();
+          setTimeout(() => { loadFree(true).catch(() => null); }, 0);
+        }
+        const tableNum = String(p.table_num || '').trim();
+        const guests = Number(p.guests || 0) || 0;
+        const start = String(p.start || '').trim();
+        const name = String(p.name || '');
+        const phone = String(p.phone || '');
+        const comment = String(p.comment || '');
+        const preorder = String(p.preorder || '');
+        const preorderRu = String(p.preorder_ru || '');
+        const waPhone = String(j.phone || p.whatsapp_phone || phone || '').trim();
+        if (tableNum && guests > 0 && start) {
+          selectedTableNum = tableNum;
+          messengerLinked.telegram = false;
+          linkedTg = null;
+          try { localStorage.removeItem('veranda_linked_tg'); } catch (_) {}
+          messengerLinked.whatsapp = true;
+          linkedWaPhone = waPhone;
+          if (linkedWaPhone) {
+            try { localStorage.setItem('veranda_linked_wa', linkedWaPhone); } catch (_) {}
+          }
+
+          if (!last || !freeNums || !freeNums.size) {
+            await loadFree(true).catch(() => null);
+          }
+          openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
+          setMsgrHint('');
+          syncSubmitState();
+          updateReqGuestsHint().catch(() => null);
+        }
+        const scrollY = Math.max(0, Math.floor(Number(p.scroll_y || 0) || 0));
+        if (scrollY > 0) setTimeout(() => { window.scrollTo(0, scrollY); }, 60);
+      } catch (_) {
+      } finally {
+        const next = new URL(location.href);
+        next.searchParams.delete('wa_state');
+        history.replaceState(null, '', next.toString());
+      }
+    };
+    restoreFromWaState().catch(() => null);
     restoreFromTgState().catch(() => null);
     syncSteps();
     if (resDate) {

@@ -54,6 +54,10 @@
 .res-btn:hover { border-color: rgba(184,135,70,0.55); background: rgba(184,135,70,0.10); }
 .res-btn.primary { background: linear-gradient(180deg, rgba(184,135,70,0.95), rgba(154,108,52,0.95)); border-color: rgba(184,135,70,0.70); color: #0b0705; }
 .res-btn.primary:hover { background: linear-gradient(180deg, rgba(198,150,86,0.98), rgba(160,112,54,0.98)); }
+.res-btn.contact-tg { background: linear-gradient(180deg, rgba(42,171,238,0.95), rgba(31,120,200,0.95)); border-color: rgba(42,171,238,0.70); color: #061017; }
+.res-btn.contact-tg:hover { background: linear-gradient(180deg, rgba(70,190,248,0.98), rgba(34,132,215,0.98)); }
+.res-btn.contact-wa { background: linear-gradient(180deg, rgba(37,211,102,0.95), rgba(18,140,126,0.95)); border-color: rgba(37,211,102,0.70); color: #061017; }
+.res-btn.contact-wa:hover { background: linear-gradient(180deg, rgba(52,225,116,0.98), rgba(20,154,138,0.98)); }
 .res-btn.danger { background: rgba(229,115,115,0.12); border-color: rgba(229,115,115,0.40); color: rgba(255,205,210,0.95); }
 .res-btn:disabled { opacity: 0.5; cursor: default; }
 .res-status { font-size: 11px; margin-top: 6px; color: rgba(255,255,255,0.62); }

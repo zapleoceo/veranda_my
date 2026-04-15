@@ -112,15 +112,18 @@
           const { res, j } = await postForm('reservations.php?ajax=resend', { id, target });
           if (res.ok && j && j.ok) {
             const parts = [];
+            const guestChannel = String(j.guest_channel || (j.has_tg ? 'telegram' : '')).toLowerCase();
             if (target === 'manager') {
               parts.push(j.group_ok ? 'Менеджер: ОК' : 'Менеджер: Ошибка');
             } else if (target === 'guest') {
-              if (j.has_tg) parts.push(j.guest_ok ? 'Гость: ОК' : 'Гость: Ошибка');
-              else parts.push('Гость: нет TG');
+              if (guestChannel === 'telegram') parts.push(j.guest_ok ? 'Гость: ОК (TG)' : 'Гость: Ошибка (TG)');
+              else if (guestChannel === 'whatsapp') parts.push(j.guest_ok ? 'Гость: ОК (WA)' : 'Гость: Ошибка (WA)');
+              else parts.push('Гость: нет контакта');
             } else {
               parts.push(j.group_ok ? 'Менеджер: ОК' : 'Менеджер: Ошибка');
-              if (j.has_tg) parts.push(j.guest_ok ? 'Гость: ОК' : 'Гость: Ошибка');
-              else parts.push('Гость: нет TG');
+              if (guestChannel === 'telegram') parts.push(j.guest_ok ? 'Гость: ОК (TG)' : 'Гость: Ошибка (TG)');
+              else if (guestChannel === 'whatsapp') parts.push(j.guest_ok ? 'Гость: ОК (WA)' : 'Гость: Ошибка (WA)');
+              else parts.push('Гость: нет контакта');
             }
             if (statusEl) {
               statusEl.textContent = parts.join(' | ');
