@@ -1046,8 +1046,16 @@
     .tg-stack { display: grid; justify-items: center; gap: 4px; }
     .tg-nick { font-size: 10px; font-weight: 900; letter-spacing: -0.02em; color: rgba(245,238,228,0.82); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tg-nick[hidden] { display: none; }
-    .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; }
+    .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; position: relative; }
     .msgr-btn-inline svg { width: 22px; height: 22px; }
+    .msgr-btn-inline.active { background: #25d366; color: white; border-color: #25d366; }
+    .msgr-btn-inline.active .ico-wa { filter: brightness(0) invert(1); }
+    .ico-wa { color: #25d366; }
+    .tg-linked { background: #24A1DE; color: white; border-color: #24A1DE; }
+    .tg-linked .ico-tg { filter: brightness(0) invert(1); }
+    .ico-tg { color: #24A1DE; }
+    .msgr-btn-inline .ico-unlink { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; background: #ff5252; color: white; border-radius: 50%; padding: 2px; display: none; }
+    .tg-linked .ico-unlink, .msgr-btn-inline.active .ico-unlink { display: block; }
     .modal input[type="text"], .modal input[type="tel"], .modal input[type="number"], .modal input[type="time"], .modal select {
       width: 100%;
       min-width: 0;

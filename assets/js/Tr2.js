@@ -712,6 +712,7 @@
     let pendingBooking = null;
     let messengerLinked = { telegram: false, whatsapp: false, zalo: false };
     let linkedTg = null;
+    let linkedWaPhone = null;
 
     try {
       const savedTgStr = localStorage.getItem('veranda_linked_tg');
@@ -721,6 +722,11 @@
           linkedTg = parsed;
           messengerLinked.telegram = true;
         }
+      }
+      const savedWa = localStorage.getItem('veranda_linked_wa');
+      if (savedWa && isPhoneValid(savedWa)) {
+        linkedWaPhone = savedWa;
+        messengerLinked.whatsapp = true;
       }
     } catch(e) {}
 
@@ -1271,6 +1277,7 @@
         setMsgrHint('');
       }
       syncTgButtonState();
+      syncWaButtonState();
       checkModalAvailability();
       setModal(reqModal, true);
       if (reqName) reqName.focus();
@@ -1284,6 +1291,55 @@
       msgrHint.hidden = false;
       msgrHint.textContent = t;
     };
+
+    const syncWaButtonState = () => {
+      const msgrWaBtn = document.getElementById('msgrWaBtn');
+      const waNick = document.getElementById('waNick');
+      if (!msgrWaBtn) return;
+      const linked = !!(messengerLinked.whatsapp && linkedWaPhone);
+      msgrWaBtn.classList.toggle('active', linked);
+      if (waNick) {
+        if (linked) {
+          waNick.textContent = '✅ ' + linkedWaPhone;
+          waNick.hidden = false;
+        } else {
+          waNick.textContent = '';
+          waNick.hidden = true;
+        }
+      }
+    };
+
+    const startWhatsAppFlow = () => {
+      const phone = String(reqPhone ? reqPhone.value : '').trim();
+      if (!isPhoneValid(phone)) {
+        if (reqPhone) reqPhone.focus();
+        showSubmitHint();
+        return;
+      }
+
+      if (messengerLinked.whatsapp) {
+        if (confirm(t('wa_unlink_confirm'))) {
+          messengerLinked.whatsapp = false;
+          linkedWaPhone = null;
+          localStorage.removeItem('veranda_linked_wa');
+          syncWaButtonState();
+          syncSubmitState();
+        }
+        return;
+      }
+
+      if (confirm(t('wa_link_prompt') + "\n" + phone)) {
+        messengerLinked.whatsapp = true;
+        linkedWaPhone = phone;
+        localStorage.setItem('veranda_linked_wa', phone);
+        syncWaButtonState();
+        syncSubmitState();
+        setMsgrHint(t('wa_linked'));
+      }
+    };
+
+    const msgrWaBtn = document.getElementById('msgrWaBtn');
+    if (msgrWaBtn) msgrWaBtn.addEventListener('click', startWhatsAppFlow);
 
     const syncTgButtonState = () => {
       if (!msgrTgBtn) return;
@@ -1612,7 +1668,7 @@
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, duration_m, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
+            body: JSON.stringify({ table_num: tableNum, guests, start, duration_m, name, phone, whatsapp_phone: messengerLinked.whatsapp ? linkedWaPhone : null, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));

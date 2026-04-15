@@ -566,6 +566,7 @@ class Database {
             table_num VARCHAR(32) NOT NULL,
             name VARCHAR(128) NOT NULL,
             phone VARCHAR(64) NOT NULL,
+            whatsapp_phone VARCHAR(64) NULL,
             comment TEXT,
             preorder_text TEXT,
             preorder_ru TEXT,
@@ -600,6 +601,9 @@ class Database {
             }
             if (empty($cols['tg_message_id'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_message_id BIGINT NULL");
+            }
+            if (empty($cols['whatsapp_phone'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN whatsapp_phone VARCHAR(64) NULL AFTER phone");
             }
         } catch (\Throwable $e) {
         }
