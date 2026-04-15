@@ -215,80 +215,8 @@
     if (pcb) pcb.addEventListener('change', reload);
   };
 
-  const bindVPoster = () => {
-    const modal = q('#vposterModal');
-    const check = q('#vposterConfirmCheck');
-    const btnOk = q('#vposterOk');
-    const btnCancel = q('#vposterCancel');
-    if (!modal || !check || !btnOk || !btnCancel) return;
-
-    let activeId = null;
-    let activeBtn = null;
-
-    const closeModal = () => {
-      modal.hidden = true;
-      check.checked = false;
-      btnOk.disabled = true;
-      activeId = null;
-      activeBtn = null;
-    };
-
-    check.addEventListener('change', () => {
-      btnOk.disabled = !check.checked;
-    });
-
-    btnCancel.addEventListener('click', closeModal);
-
-    btnOk.addEventListener('click', async () => {
-      if (!activeId || !activeBtn) return;
-      const id = activeId;
-      const btn = activeBtn;
-      closeModal();
-
-      const statusEl = q(`#resend-status-${id}`);
-      btn.disabled = true;
-      if (statusEl) {
-        statusEl.textContent = 'Создание в Poster…';
-        statusEl.style.color = 'var(--muted)';
-      }
-      
-      try {
-        const { res, j } = await postForm('reservations.php?ajax=vposter', { id });
-        if (res.ok && j && j.ok) {
-          if (statusEl) {
-            statusEl.textContent = 'В Poster: Создано ✅';
-            statusEl.style.color = '#81c784';
-          }
-          btn.remove(); // Remove button after success
-        } else {
-          if (statusEl) {
-            statusEl.textContent = 'Ошибка Poster: ' + (j && j.error ? String(j.error) : 'Network error');
-            statusEl.style.color = '#e57373';
-          }
-          btn.disabled = false;
-        }
-      } catch (e) {
-        if (statusEl) {
-          statusEl.textContent = 'Ошибка запроса';
-          statusEl.style.color = '#e57373';
-        }
-        btn.disabled = false;
-      }
-    });
-
-    qa('.btn-vposter').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        activeId = String(btn.dataset.id || '');
-        activeBtn = btn;
-        if (!activeId) return;
-        modal.hidden = false;
-      });
-    });
-  };
-
   bindSort();
   bindResend();
-  bindVPoster();
   bindDelete();
   bindShowDeleted();
 })();

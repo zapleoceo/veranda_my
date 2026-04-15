@@ -2,7 +2,14 @@
 namespace App\Classes;
 
 class PosterReservationHelper {
-    public static function pushToPoster(Database $db, string $apiToken, int $reservationId, string $spotId = '1', string $commentSuffix = '') {
+    private static function normName(string $s): string {
+        $s = mb_strtolower(trim($s));
+        $s = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $s);
+        $s = preg_replace('/\s+/u', ' ', $s);
+        return trim($s);
+    }
+
+    public static function pushToPoster(Database $db, string $apiToken, int $reservationId, string $spotId = '1', string $commentSuffix = '', string $pushedBy = '') {
         if ($reservationId <= 0) {
             return ['ok' => false, 'error' => 'Invalid ID'];
         }
@@ -13,8 +20,17 @@ class PosterReservationHelper {
             return ['ok' => false, 'error' => 'Reservation not found'];
         }
 
-        if (!empty($row['is_poster_pushed'])) {
-            return ['ok' => false, 'error' => 'Бронь уже отправлена в Poster'];
+        $cols = [];
+        try {
+            foreach ($db->getPdo()->query("SHOW COLUMNS FROM {$resTable}") as $c) {
+                $f = strtolower((string)($c['Field'] ?? ''));
+                if ($f !== '') $cols[$f] = true;
+            }
+        } catch (\Throwable $e) {}
+
+        $existingPosterId = (int)($row['poster_id'] ?? 0);
+        if ($existingPosterId > 0) {
+            return ['ok' => true, 'poster_res' => ['incoming_order_id' => $existingPosterId], 'duplicate' => true, 'already' => true];
         }
 
         if (empty($apiToken)) {
@@ -76,8 +92,12 @@ class PosterReservationHelper {
                 'duration'         => '7200', // 2 hours default in seconds
                 'first_name'       => $firstName,
                 'last_name'        => $lastName,
-                'comment'          => trim(($row['comment'] ?? '') . ' ' . ($commentSuffix ?: '(Site #' . $row['id'] . ')'))
+                'comment'          => trim(($row['comment'] ?? '') . ' ' . ($commentSuffix !== '' ? $commentSuffix . ' ' : '') . '(Site #' . $row['id'] . ')')
             ];
+
+            $pushedAt = date('Y-m-d H:i:s');
+            $pushedBy = trim((string)$pushedBy);
+            if ($pushedBy === '') $pushedBy = 'system';
 
             // 1. Check for duplicates
             $existingRes = $api->request('incomingOrders.getReservations', [
@@ -87,8 +107,7 @@ class PosterReservationHelper {
             $foundDuplicateId = 0;
             if (is_array($existingRes)) {
                 $targetTs = strtotime($dateReservation);
-                $siteMarker1 = '(Site #' . $reservationId . ')';
-                $siteMarker2 = 'Сайт #' . $reservationId;
+                $targetName = self::normName((string)($row['name'] ?? ''));
 
                 foreach ($existingRes as $pr) {
                     $status = (int)($pr['status'] ?? 0);
@@ -96,39 +115,60 @@ class PosterReservationHelper {
                     if ((int)($pr['spot_id'] ?? 0) !== (int)$spotId) continue;
                     
                     $prTs = strtotime((string)($pr['date_reservation'] ?? ''));
-                    $prTableId = (int)($pr['table_id'] ?? 0);
-                    $prComment = (string)($pr['comment'] ?? '');
-                    
-                    $isSameMarker = (strpos($prComment, $siteMarker1) !== false || strpos($prComment, $siteMarker2) !== false);
-                    
-                    // Allow small time difference (e.g., 30 mins) if it's the exact same table and phone
-                    $isSameTableAndTime = ($prTableId === $tableId && abs($prTs - $targetTs) <= 1800);
-                    $prPhone = preg_replace('/\D+/', '', (string)($pr['phone'] ?? ''));
-                    $myPhone = preg_replace('/\D+/', '', $phone);
-                    $isSamePhone = ($prPhone !== '' && $myPhone !== '' && (strpos($prPhone, $myPhone) !== false || strpos($myPhone, $prPhone) !== false));
-                    
-                    if ($isSameMarker || ($isSameTableAndTime && $isSamePhone)) {
-                        $foundDuplicateId = (int)($pr['incoming_order_id'] ?? 0);
+                    if ($prTs <= 0 || $targetTs <= 0) continue;
+                    if (abs($prTs - $targetTs) > 120) continue;
+
+                    $prNameRaw = trim((string)($pr['client_name'] ?? ''));
+                    if ($prNameRaw === '') {
+                        $prNameRaw = trim((string)($pr['first_name'] ?? '') . ' ' . (string)($pr['last_name'] ?? ''));
+                    }
+                    if ($prNameRaw === '') {
+                        $prNameRaw = trim((string)($pr['name'] ?? ''));
+                    }
+                    $prName = self::normName($prNameRaw);
+                    if ($prName === '' || $targetName === '') continue;
+
+                    if ($prName === $targetName) {
+                        $foundDuplicateId = (int)($pr['incoming_order_id'] ?? $pr['id'] ?? 0);
                         break;
                     }
                 }
             }
 
             if ($foundDuplicateId > 0) {
-                // Already exists, just mark as pushed
                 $resp = ['incoming_order_id' => $foundDuplicateId];
-                $db->query("UPDATE {$resTable} SET is_poster_pushed = 1, poster_id = ? WHERE id = ?", [$foundDuplicateId, $reservationId]);
+                $set = [];
+                $params = [];
+                if (!empty($cols['poster_id'])) { $set[] = "poster_id = ?"; $params[] = $foundDuplicateId; }
+                if (!empty($cols['poster_pushed_at'])) { $set[] = "poster_pushed_at = COALESCE(poster_pushed_at, ?)"; $params[] = $pushedAt; }
+                if (!empty($cols['poster_pushed_by'])) { $set[] = "poster_pushed_by = COALESCE(poster_pushed_by, ?)"; $params[] = $pushedBy; }
+                if (!empty($cols['poster_duplicate'])) { $set[] = "poster_duplicate = 1"; }
+                if (!empty($set)) {
+                    $params[] = $reservationId;
+                    $db->query("UPDATE {$resTable} SET " . implode(', ', $set) . " WHERE id = ?", $params);
+                }
                 return ['ok' => true, 'poster_res' => $resp, 'duplicate' => true];
             }
 
             $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
 
             $posterId = (int)($resp['incoming_order_id'] ?? 0);
-            $db->query("UPDATE {$resTable} SET is_poster_pushed = 1, poster_id = ? WHERE id = ?", [$posterId, $reservationId]);
+            if ($posterId > 0) {
+                $set = [];
+                $params = [];
+                if (!empty($cols['poster_id'])) { $set[] = "poster_id = ?"; $params[] = $posterId; }
+                if (!empty($cols['poster_pushed_at'])) { $set[] = "poster_pushed_at = COALESCE(poster_pushed_at, ?)"; $params[] = $pushedAt; }
+                if (!empty($cols['poster_pushed_by'])) { $set[] = "poster_pushed_by = COALESCE(poster_pushed_by, ?)"; $params[] = $pushedBy; }
+                if (!empty($cols['poster_duplicate'])) { $set[] = "poster_duplicate = 0"; }
+                if (!empty($set)) {
+                    $params[] = $reservationId;
+                    $db->query("UPDATE {$resTable} SET " . implode(', ', $set) . " WHERE id = ?", $params);
+                }
+            }
 
             return ['ok' => true, 'poster_res' => $resp];
         } catch (\Throwable $e) {
-            return ['ok' => false, 'error' => 'Poster API error: ' . $e->getMessage()];
+            return ['ok' => false, 'error' => $e->getMessage()];
         }
     }
 }

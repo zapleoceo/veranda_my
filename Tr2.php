@@ -1168,6 +1168,26 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   ]);
   $resId = $db->getPdo()->lastInsertId();
 
+  $posterLine = '';
+  if ($posterToken !== '') {
+    try {
+      require_once __DIR__ . '/src/classes/PosterReservationHelper.php';
+      $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
+      $posterRes = \App\Classes\PosterReservationHelper::pushToPoster($db, $posterToken, (int)$resId, $spotId, '(Auto)', 'auto');
+      if (!empty($posterRes['ok'])) {
+        if (!empty($posterRes['duplicate'])) {
+          $posterLine = "\n\n🚀 <b>Poster:</b> бронь уже была создана ранее";
+        } else {
+          $posterLine = "\n\n🚀 <b>Poster:</b> бронь создана <b>auto</b> · <b>" . htmlspecialchars((new DateTimeImmutable('now', $displayTz))->format('d.m.Y H:i')) . "</b>";
+        }
+      } else {
+        $posterLine = "\n\n🚀 <b>Poster:</b> ошибка: " . htmlspecialchars((string)($posterRes['error'] ?? ''));
+      }
+    } catch (\Throwable $e) {
+      $posterLine = "\n\n🚀 <b>Poster:</b> ошибка: " . htmlspecialchars($e->getMessage());
+    }
+  }
+
   $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
   $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
   if ($tgChatId === '') $tgChatId = '3397075474';
@@ -1213,21 +1233,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
     }
   }
+  if ($posterLine !== '') $text .= $posterLine;
   $text .= "\n\n@Ollushka90 @ce_akh1  свяжитесь с гостем";
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-  
-  $keyboard = [];
-  $keyboard[] = [[
-      'text' => 'вPoster',
-      'callback_data' => 'vposter:' . $resId
-  ]];
-  
-  if (!empty($keyboard)) {
-      $ok = $bot->sendMessageGetIdWithKeyboard($text, $keyboard, $tgThreadNum > 0 ? $tgThreadNum : null);
-  } else {
-      $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
-  }
+
+  $ok = $bot->sendMessageGetId($text, $tgThreadNum > 0 ? $tgThreadNum : null);
   if ($ok > 1) { $db->query("UPDATE {$resTable} SET tg_message_id = ? WHERE id = ?", [$ok, $resId]); }
   if (!$ok) {
     http_response_code(500);

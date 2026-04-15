@@ -595,6 +595,21 @@ class Database {
             if (empty($cols['lang'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN lang VARCHAR(8) NULL");
             }
+            if (empty($cols['poster_id'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN poster_id INT NULL");
+            }
+            if (empty($cols['poster_pushed_at'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN poster_pushed_at DATETIME NULL");
+            }
+            if (empty($cols['poster_pushed_by'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN poster_pushed_by VARCHAR(255) NULL");
+            }
+            if (empty($cols['poster_duplicate'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN poster_duplicate TINYINT(1) NOT NULL DEFAULT 0");
+            }
+            if (empty($cols['tg_message_id'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_message_id BIGINT NULL");
+            }
         } catch (\Throwable $e) {
         }
     }

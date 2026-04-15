@@ -48,92 +48,10 @@ try {
     $db->pdo->exec("ALTER TABLE {$resTable} ADD COLUMN poster_id INT NULL");
 } catch (\Throwable $e) {}
 try {
-    $db->pdo->exec("ALTER TABLE {$resTable} ADD COLUMN is_poster_pushed TINYINT(1) DEFAULT 0");
-} catch (\Throwable $e) {}
-try {
     $db->pdo->exec("ALTER TABLE {$resTable} ADD COLUMN tg_message_id BIGINT NULL");
 } catch (\Throwable $e) {}
 
-// Check permissions for Poster button
-$userPermissions = veranda_get_user_permissions($db, $_SESSION['user_email'] ?? '');
-$hasPosterAccess = !empty($userPermissions['vposter_button']);
-
 $ajax = $_GET['ajax'] ?? '';
-if ($ajax === 'vposter') {
-    header('Content-Type: application/json; charset=utf-8');
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
-        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    if (!$hasPosterAccess) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'У вас нет прав для создания брони в Poster'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    $id = (int)($_POST['id'] ?? 0);
-    if ($id <= 0) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Invalid ID'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    $row = $db->query("SELECT * FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
-    if (!$row) {
-        http_response_code(404);
-        echo json_encode(['ok' => false, 'error' => 'Reservation not found'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    if (empty($_ENV['POSTER_API_TOKEN'])) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'Poster API not configured'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    require_once __DIR__ . '/src/classes/PosterReservationHelper.php';
-    $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
-    $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId);
-    if (!$res['ok']) {
-        http_response_code(500);
-    } else {
-        // Remove Telegram button
-        $rowMsg = $db->query("SELECT tg_message_id FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
-        if ($rowMsg && !empty($rowMsg['tg_message_id'])) {
-            require_once __DIR__ . '/src/classes/TelegramBot.php';
-            $tgToken = (string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? '');
-            $tgChatId = (string)($_ENV['TELEGRAM_GROUP_ID'] ?? $_ENV['TELEGRAM_CHAT_ID'] ?? '');
-            if ($tgToken !== '' && $tgChatId !== '') {
-                $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-                $startDt = $parseSpotDt($row['start_time']);
-                $datePart = $startDt ? $startDt->format('Y-m-d') : '';
-                $timePart = $startDt ? $startDt->format('H:i') : '';
-
-                $msgText = '<b>Бронь с сайта #' . htmlspecialchars((string)$id) . '</b>' . "\n";
-                if ($datePart !== '') $msgText .= 'Дата: <b>' . htmlspecialchars($datePart) . '</b>' . "\n";
-                if ($timePart !== '') $msgText .= 'Время: <b>' . htmlspecialchars($timePart) . '</b>' . "\n";
-                $msgText .= 'Кол-во человек: <b>' . htmlspecialchars((string)$row['guests']) . '</b>' . "\n";
-                $msgText .= 'Номер стола: <b>' . htmlspecialchars((string)$row['table_num']) . '</b>' . "\n";
-                $msgText .= 'Имя: <b>' . htmlspecialchars((string)$row['name']) . '</b>' . "\n";
-                $msgText .= 'Номер телефона: <b>' . htmlspecialchars((string)$row['phone']) . '</b>';
-                if (!empty($row['comment'])) {
-                    $msgText .= "\n<b>Комментарий:</b>\n" . htmlspecialchars((string)$row['comment']);
-                }
-
-                if (!empty($res['duplicate'])) {
-                    $msgText .= "\n\n🚀 <b>Уже была в Poster</b> (дубль предотвращен)";
-                } else {
-                    $msgText .= "\n\n🚀 <b>Отправлено в Poster</b> (через сайт)";
-                }
-
-                $bot->editMessageText((int)$rowMsg['tg_message_id'], $msgText, []);
-            }
-        }
-    }
-    echo json_encode($res, JSON_UNESCAPED_UNICODE);
-    exit;
-}
 
 if ($ajax === 'resend') {
     header('Content-Type: application/json; charset=utf-8');
@@ -204,6 +122,17 @@ if ($ajax === 'resend') {
                 if ($tgUid > 0) $text .= ' · <a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a>';
             } elseif ($tgUid > 0) {
                 $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
+            }
+        }
+        $posterId = (int)($row['poster_id'] ?? 0);
+        if ($posterId > 0) {
+            $posterBy = trim((string)($row['poster_pushed_by'] ?? ''));
+            $posterAt = trim((string)($row['poster_pushed_at'] ?? ''));
+            $posterAtHuman = $posterAt !== '' ? $fmtSpotDt($posterAt, 'd.m.Y H:i') : '';
+            if (!empty($row['poster_duplicate'])) {
+                $text .= "\n\n🚀 <b>Poster:</b> бронь уже была создана ранее";
+            } else {
+                $text .= "\n\n🚀 <b>Poster:</b> бронь создана" . ($posterBy !== '' ? ' <b>' . htmlspecialchars($posterBy) . '</b>' : '') . ($posterAtHuman !== '' ? ' · <b>' . htmlspecialchars($posterAtHuman) . '</b>' : '');
             }
         }
         $text .= "\n\n@Ollushka90 @ce_akh1 свяжитесь с гостем";
@@ -668,9 +597,6 @@ $rows = $allRows;
                                             <div class="res-actions">
                                                 <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="guest">ReGuest</button>
                                                 <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="manager">ReManager</button>
-                                                <?php if ($hasPosterAccess && empty($r['is_poster_pushed'])): ?>
-                                                    <button type="button" class="res-btn primary btn-vposter" data-id="<?= htmlspecialchars((string)$r['id']) ?>">вPoster</button>
-                                                <?php endif; ?>
                                                 <button type="button" class="res-btn danger btn-delete" data-id="<?= htmlspecialchars((string)$r['id']) ?>"><?= $isDeleted ? 'Восстановить' : 'Удалить' ?></button>
                                             </div>
                                             <div class="res-status" id="resend-status-<?= htmlspecialchars((string)$r['id']) ?>"></div>
@@ -683,25 +609,6 @@ $rows = $allRows;
                         <?php endif; ?>
                     </tbody>
                 </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- VPoster Confirmation Modal -->
-    <div id="vposterModal" class="res-modal" hidden>
-        <div class="res-modal-card">
-            <div class="res-modal-title">Создание брони в Poster</div>
-            <div class="res-modal-body">
-                Вы собираетесь отправить эту бронь в Poster POS.<br><br>
-                Это создаст официальную бронь на терминале официанта. Убедитесь, что все данные верны.
-            </div>
-            <label class="res-modal-check">
-                <input type="checkbox" id="vposterConfirmCheck">
-                <span>проверил</span>
-            </label>
-            <div class="res-modal-actions">
-                <button type="button" class="res-btn" id="vposterCancel">Отмена</button>
-                <button type="button" class="res-btn primary" id="vposterOk" disabled>ОК</button>
             </div>
         </div>
     </div>

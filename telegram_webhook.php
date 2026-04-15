@@ -230,6 +230,7 @@ $action = (string)($m[1] ?? '');
 
     try {
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+    $db->createReservationsTable();
     $usersTable = $db->t('users');
     $ks = $db->t('kitchen_stats');
     $resTable = $db->t('reservations');
@@ -283,7 +284,7 @@ $action = (string)($m[1] ?? '');
 
         require_once __DIR__ . '/src/classes/PosterReservationHelper.php';
         $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
-        $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId, '(TG ' . $ackBy . ')');
+        $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId, '(TG ' . $ackBy . ')', $ackBy);
         
         if (!$res['ok']) {
             $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Ошибка: ' . $res['error'], 'show_alert' => true]);
@@ -293,10 +294,10 @@ $action = (string)($m[1] ?? '');
         
         if (!empty($res['duplicate'])) {
             $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь уже была в Poster!']);
-            $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Уже была в Poster</b> (дубль предотвращен)";
+            $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Poster:</b> бронь уже была создана ранее";
         } else {
             $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь создана в Poster!']);
-            $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Отправлено в Poster</b> (" . htmlspecialchars($ackBy) . ")";
+            $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Poster:</b> бронь создана <b>" . htmlspecialchars($ackBy) . "</b> · <b>" . htmlspecialchars(date('d.m.Y H:i')) . "</b>";
         }
 
         $postJson('editMessageText', [

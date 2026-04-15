@@ -958,6 +958,27 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $qrUrl,
       $qrCode
     ]);
+    $resId = (int)$db->getPdo()->lastInsertId();
+  }
+
+  $posterLine = '';
+  if (isset($db) && ($db instanceof \App\Classes\Database) && $posterToken !== '' && !empty($resId)) {
+    try {
+      require_once __DIR__ . '/src/classes/PosterReservationHelper.php';
+      $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
+      $posterRes = \App\Classes\PosterReservationHelper::pushToPoster($db, $posterToken, (int)$resId, $spotId, '(Auto)', 'auto');
+      if (!empty($posterRes['ok'])) {
+        if (!empty($posterRes['duplicate'])) {
+          $posterLine = "\n\n🚀 <b>Poster:</b> бронь уже была создана ранее";
+        } else {
+          $posterLine = "\n\n🚀 <b>Poster:</b> бронь создана <b>auto</b> · <b>" . htmlspecialchars(date('d.m.Y H:i')) . "</b>";
+        }
+      } else {
+        $posterLine = "\n\n🚀 <b>Poster:</b> ошибка: " . htmlspecialchars((string)($posterRes['error'] ?? ''));
+      }
+    } catch (\Throwable $e) {
+      $posterLine = "\n\n🚀 <b>Poster:</b> ошибка: " . htmlspecialchars($e->getMessage());
+    }
   }
 
   if ($tgUn !== '' || $tgUid > 0) {
@@ -970,21 +991,12 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
     }
   }
+  if ($posterLine !== '') $text .= $posterLine;
   $text .= "\n\n@Ollushka90 @ce_akh1  свяжитесь с гостем";
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-  
-  $keyboard = [];
-  $keyboard[] = [[
-      'text' => 'вPoster',
-      'callback_data' => 'vposter:' . $resId
-  ]];
-  
-  if (!empty($keyboard)) {
-      $ok = $bot->sendMessageGetIdWithKeyboard($text, $keyboard, $tgThreadNum > 0 ? $tgThreadNum : null);
-  } else {
-      $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
-  }
+
+  $ok = $bot->sendMessageGetId($text, $tgThreadNum > 0 ? $tgThreadNum : null);
   if ($ok > 1) { $db->query("UPDATE {$resTable} SET tg_message_id = ? WHERE id = ?", [$ok, $resId]); }
   if (!$ok) {
     http_response_code(500);
