@@ -657,8 +657,9 @@
     }
 
     let pendingBooking = null;
-    let messengerLinked = { telegram: false, zalo: false };
+    let messengerLinked = { telegram: false, whatsapp: false, zalo: false };
     let linkedTg = null;
+    let linkedWaPhone = null;
     let linkedZaloPhone = null;
     let submitBusy = false;
     let submitPrevText = '';
@@ -1005,7 +1006,7 @@
     };
     const syncSubmitState = () => {
       if (!reqSubmit) return;
-      const linked = !!(messengerLinked.telegram || messengerLinked.zalo);
+      const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
       const nameOk = !!(reqName && String(reqName.value || '').trim());
       const phoneOk = !!(reqPhone && isPhoneValid(reqPhone.value));
       const startOk = !!(reqStart && String(reqStart.dataset.iso || reqStart.value || '').trim());
@@ -1026,7 +1027,7 @@
     let hintTimer = null;
     const showSubmitHint = () => {
       if (!reqSubmitHint) return;
-      const linked = !!(messengerLinked.telegram || messengerLinked.zalo);
+      const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
       const nameOk = !!(reqName && String(reqName.value || '').trim());
       const phoneOk = !!(reqPhone && isPhoneValid(reqPhone.value));
       const startOk = !!(reqStart && String(reqStart.dataset.iso || reqStart.value || '').trim());
@@ -1145,6 +1146,54 @@
       }
     };
 
+    const syncWaButtonState = () => {
+      const msgrWaBtn = document.getElementById('msgrWaBtn');
+      const waNick = document.getElementById('waNick');
+      if (!msgrWaBtn) return;
+      const linked = !!(messengerLinked.whatsapp && linkedWaPhone);
+      msgrWaBtn.classList.toggle('active', linked);
+      if (waNick) {
+        if (linked) {
+          waNick.textContent = '✅ ' + linkedWaPhone;
+          waNick.hidden = false;
+        } else {
+          waNick.textContent = '';
+          waNick.hidden = true;
+        }
+      }
+    };
+
+    const startWhatsAppFlow = () => {
+      const phone = String(reqPhone ? reqPhone.value : '').trim();
+      if (!isPhoneValid(phone)) {
+        if (reqPhone) reqPhone.focus();
+        showSubmitHint();
+        return;
+      }
+
+      if (messengerLinked.whatsapp) {
+        if (confirm(t('wa_unlink_confirm'))) {
+          messengerLinked.whatsapp = false;
+          linkedWaPhone = null;
+          localStorage.removeItem('veranda_linked_wa');
+          syncWaButtonState();
+          syncSubmitState();
+        }
+        return;
+      }
+
+      if (confirm(t('wa_link_prompt') + "\n" + phone)) {
+        messengerLinked.whatsapp = true;
+        linkedWaPhone = phone;
+        localStorage.setItem('veranda_linked_wa', phone);
+        syncWaButtonState();
+        syncSubmitState();
+        setMsgrHint(t('wa_linked'));
+      }
+    };
+
+    if (msgrWaBtn) msgrWaBtn.addEventListener('click', startWhatsAppFlow);
+
     const startZaloFlow = () => {
       const phone = String(reqPhone ? reqPhone.value : '').trim();
       if (!isPhoneValid(phone)) {
@@ -1176,6 +1225,15 @@
 
     if (msgrZaloBtn) msgrZaloBtn.addEventListener('click', startZaloFlow);
 
+    // Initial WhatsApp state from localStorage
+    try {
+      const savedWa = localStorage.getItem('veranda_linked_wa');
+      if (savedWa && isPhoneValid(savedWa)) {
+        linkedWaPhone = savedWa;
+        messengerLinked.whatsapp = true;
+      }
+    } catch (_) {}
+
     // Initial Zalo state from localStorage
     try {
       const savedZalo = localStorage.getItem('veranda_zalo_phone');
@@ -1184,6 +1242,9 @@
         messengerLinked.zalo = true;
       }
     } catch (_) {}
+
+    syncWaButtonState();
+    syncZaloButtonState();
 
     const startTelegramFlow = async () => {
       if (!msgrTgBtn || msgrBusy) return;
@@ -1366,6 +1427,7 @@
               start, 
               name, 
               phone, 
+              whatsapp_phone: messengerLinked.whatsapp ? linkedWaPhone : null,
               comment, 
               preorder, 
               preorder_ru: preorderRu, 

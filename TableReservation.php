@@ -846,6 +846,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $tableNum = trim((string)($payload['table_num'] ?? ''));
   $name = trim((string)($payload['name'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
+  $waPhone = trim((string)($payload['whatsapp_phone'] ?? ''));
   $comment = trim((string)($payload['comment'] ?? ''));
   $preorder = trim((string)($payload['preorder'] ?? ''));
   $preorderRu = trim((string)($payload['preorder_ru'] ?? ''));
@@ -929,6 +930,10 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
   $text .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
   $text .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
   $text .= 'Номер телефона: <b>' . htmlspecialchars($phoneNorm) . '</b>';
+  if ($waPhone !== '') {
+    $waClean = preg_replace('/\D+/', '', $waPhone);
+    $text .= "\n" . 'WhatsApp: <a href="https://wa.me/' . htmlspecialchars($waClean) . '">+' . htmlspecialchars($waClean) . '</a>';
+  }
   if ($comment !== '') {
     $text .= "\n";
     $text .= '<b>Комментарий:</b>' . "\n" . htmlspecialchars($comment);
@@ -954,7 +959,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
     $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount=0&des=" . urlencode("RES{$qrCode}");
 
     $db->query("INSERT INTO {$resTable} (
-      created_at, start_time, guests, table_num, name, phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, zalo_phone, lang, qr_url, qr_code
+      created_at, start_time, guests, table_num, name, phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, whatsapp_phone, lang, qr_url, qr_code
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
       (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
       $startDt->format('Y-m-d H:i:s'),
@@ -967,7 +972,7 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
       $preorderRu,
       $tgUid > 0 ? $tgUid : null,
       $tgUn !== '' ? $tgUn : null,
-      $zaloPhoneNorm !== '' ? $zaloPhoneNorm : null,
+      $waPhone !== '' ? $waPhone : null,
       $userLang,
       $qrUrl,
       $qrCode
@@ -992,6 +997,29 @@ if (($_GET['ajax'] ?? '') === 'submit_booking') {
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
   
+  // Send WhatsApp confirmation if linked
+  if ($waPhone !== '' && !empty($_ENV['WHATSAPP_TOKEN']) && !empty($_ENV['WHATSAPP_INSTANCE_ID'])) {
+      try {
+          require_once __DIR__ . '/src/classes/WhatsAppAPI.php';
+          $wa = new \App\Classes\WhatsAppAPI($_ENV['WHATSAPP_TOKEN'], $_ENV['WHATSAPP_INSTANCE_ID']);
+          
+          $waText = "*" . $trFor('tg_booking_title') . " #" . $qrCode . "*\n\n";
+          $waText .= $trFor('tg_date') . ": " . $startDt->format('Y-m-d') . "\n";
+          $waText .= $trFor('tg_time') . ": " . $startDt->format('H:i') . "\n";
+          $waText .= $trFor('tg_guests') . ": " . $guests . "\n";
+          $waText .= $trFor('tg_table') . ": " . $tableNum . "\n";
+          $waText .= $trFor('tg_name') . ": " . $name . "\n";
+          $waText .= $trFor('tg_phone') . ": " . $phoneNorm . "\n";
+          if ($comment !== '') $waText .= "\n" . $trFor('tg_comment') . ":\n" . $comment;
+          if ($preorder !== '') $waText .= "\n" . $trFor('tg_preorder') . ":\n" . $preorder;
+          $waText .= "\n\n" . $trFor('booking_note');
+          
+          $wa->sendMessage($waPhone, $waText);
+      } catch (\Throwable $e_wa) {
+          error_log("WhatsApp send error: " . $e_wa->getMessage());
+      }
+  }
+
   // Send Zalo confirmation if linked
   if ($zaloPhoneNorm !== '' && !empty($_ENV['ZALO_OA_TOKEN'])) {
       try {
@@ -1381,7 +1409,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260410_1135">
+  <link rel="stylesheet" href="/assets/css/Tr2.css?v=20260415_1530">
 
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
@@ -1432,14 +1460,16 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
             <button class="table large" style="left: 712px; top: 402px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
             <button class="table large" style="left: 712px; top: 528px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
   
-            <button class="table small-vertical wide-1" style="left: 534px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 370px; top: 528px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 222px; top: 528px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
-            <button class="table large" style="left: 12px; top: 512px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 580px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 450px; top: 528px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 320px; top: 528px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 215px; top: 528px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
+            <button class="table small-vertical wide-1" style="left: 110px; top: 528px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
+            <button class="table large" style="left: 12px; top: 512px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
   
-            <button class="table wide" style="left: 422px; top: 420px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
-            <button class="table wide" style="left: 300px; top: 420px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
-            <div class="fountain" style="left: 532px; top: 316px;" aria-hidden="true">
+            <button class="table wide" style="left: 422px; top: 420px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
+            <button class="table wide" style="left: 300px; top: 420px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
+            <div class="fountain" style="left: 532px; top: 316px;" aria-hidden="true" id="fountainEl">
               <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
                   <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
@@ -1463,19 +1493,19 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
               <div class="koi koi-1"></div>
               <div class="koi koi-2"></div>
             </div>
-            <button class="table wide" style="left: 102px; top: 420px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
-            <button class="table wide" style="left: -20px; top: 420px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
+            <button class="table wide" style="left: 102px; top: 420px;" data-table="12"><span class="num">12</span><span class="cap"></span></button>
+            <button class="table wide" style="left: -20px; top: 420px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
   
-            <button class="table" style="left: 402px; top: 304px;" data-table="12"><span class="num">12</span><span class="cap"></span></button>
-            <button class="table" style="left: 274px; top: 304px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
-            <button class="table" style="left: 162px; top: 304px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
+            <button class="table" style="left: 402px; top: 304px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
+            <button class="table" style="left: 274px; top: 304px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
+            <button class="table" style="left: 162px; top: 304px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
   
-            <button class="table small-vertical" style="left: 532px; top: 192px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 417px; top: 192px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 306px; top: 192px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 194px; top: 192px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 82px; top: 192px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
-            <button class="table large" style="left: -46px; top: 254px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 532px; top: 192px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 417px; top: 192px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 306px; top: 192px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 194px; top: 192px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
+            <button class="table small-vertical" style="left: 82px; top: 192px;" data-table="21"><span class="num">21</span><span class="cap"></span></button>
+            <button class="table large" style="left: -31px; top: 254px;" data-table="22"><span class="num">22</span><span class="cap"></span></button>
   
             <div class="bar-row">
               <div class="station-wrap">
@@ -1593,6 +1623,19 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
                       </svg>
                     </button>
                   </div>
+                  <div class="tg-stack">
+                    <div class="tg-nick" id="waNick" hidden></div>
+                    <button type="button" class="msgr-btn msgr-btn-inline" id="msgrWaBtn" aria-label="WhatsApp" title="WhatsApp">
+                      <svg class="ico-wa" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zM12.04 20.13c-1.55 0-3.07-.42-4.39-1.21l-.31-.19-3.11.82.83-3.04-.21-.33a8.103 8.103 0 0 1-1.24-4.27c0-4.47 3.64-8.11 8.11-8.11 2.17 0 4.2 0.84 5.73 2.38 1.53 1.53 2.38 3.56 2.38 5.73 0 4.47-3.64 8.12-8.11 8.12zM16.48 13.84c-.24-.12-1.44-.71-1.66-.79-.22-.08-.38-.12-.54.12-.16.24-.61.76-.75.91-.14.15-.28.17-.52.05-.24-.12-1.01-.37-1.92-1.18-.71-.63-1.19-1.41-1.33-1.65-.14-.24-.01-.37.11-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42s-.54-1.31-.74-1.79c-.2-.47-.4-.41-.54-.41-.14 0-.3 0-.46 0s-.42.06-.64.3c-.22.24-.84.82-.84 2s.86 2.33.98 2.49c.12.16 1.7 2.59 4.11 3.64.57.25 1.02.4 1.37.51.58.18 1.1.16 1.51.1.46-.07 1.44-.59 1.64-1.16.2-.57.2-1.06.14-1.16-.06-.1-.22-.16-.46-.28z" fill="currentColor"/>
+                      </svg>
+                      <svg class="ico-unlink" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M10.6 13.4a3 3 0 0 0 0-4.2l-.4-.4a3 3 0 0 0-4.2 0l-2.1 2.1a3 3 0 0 0 0 4.2l.4.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M13.4 10.6a3 3 0 0 0 0 4.2l.4.4a3 3 0 0 0 4.2 0l2.1-2.1a3 3 0 0 0 0-4.2l-.4-.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M8 16l8-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                    </button>
+                  </div>
                   <div class="zalo-stack">
                     <div class="zalo-nick" id="zaloNick" hidden></div>
                     <button type="button" class="msgr-btn msgr-btn-inline" id="msgrZaloBtn" aria-label="Zalo" title="Zalo">
@@ -1675,7 +1718,7 @@ if (($_GET['ajax'] ?? '') === 'menu_preorder') {
       tableCapsByNum: <?= json_encode($tableCapsByNum, JSON_UNESCAPED_UNICODE) ?>,
     };
   </script>
-  <script src="/assets/js/Tr2.js?v=20260410_1135"></script>
-  <script src="/links/table-reservation.js?v=20260410_1345"></script>
+  <script src="/assets/js/Tr2.js?v=20260415_1530"></script>
+  <script src="/links/table-reservation.js?v=20260415_1530"></script>
 </body>
 </html>
