@@ -1042,39 +1042,18 @@
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
     .modal-label { display: grid; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-top: 0; min-width: 0; }
     .modal-label.full { grid-column: 1 / -1; }
-    .guests-time-row { display: grid; grid-template-columns: max-content minmax(80px, 1fr) max-content max-content; gap: 10px; align-items: center; }
+    .guests-time-row { display: grid; grid-template-columns: max-content max-content max-content max-content; gap: 5px; align-items: start; }
     .guests-time-row.full { grid-column: 1 / -1; }
-    #reqLeft > div > div.guests-time-row.full > div:nth-child(1) { width: max-content; }
-    .guests-time-row.full > .modal-label,
-    .guests-time-row.full > div.modal-label {
-      display: inline-flex;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 8px;
-      min-width: 0;
-    }
-    .guests-time-row.full > .modal-label > span,
-    .guests-time-row.full > div.modal-label > span {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 100%;
-      line-height: 1.1;
-    }
-    .guests-time-row.full > .modal-label > select,
-    .guests-time-row.full > .modal-label > input,
-    .guests-time-row.full > .modal-label > .num-step,
-    .guests-time-row.full > div.modal-label > select,
-    .guests-time-row.full > div.modal-label > input,
-    .guests-time-row.full > div.modal-label > .num-step,
-    .guests-time-row.full > .end-time-label > .end-time-value {
-      flex: 1 1 auto;
-      min-width: 0;
-    }
+    .guests-time-row .modal-label { gap: 5px; }
+    .guests-time-row .modal-label span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .guests-time-row .modal-label select,
+    .guests-time-row .modal-label input { padding: 10px 10px; width: auto; max-width: 100%; }
+    .guests-time-row .modal-label select { width: auto; max-width: 100%; }
+    .guests-time-row .modal-label select { padding-right: 34px; }
+    .guests-time-row .end-time-value { padding: 0 8px; width: auto; }
     .phone-row, .name-row { display: flex; align-items: center; gap: 10px; }
     .phone-row input, .name-row input { flex: 1 1 auto; min-width: 0; }
-    .tg-stack { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-    .tg-nick { font-size: 11px; font-weight: 900; letter-spacing: -0.02em; color: rgba(245,238,228,0.86); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tg-nick { font-size: 11px; font-weight: 900; letter-spacing: -0.02em; color: rgba(129,199,132,0.95); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tg-nick[hidden] { display: none; }
     .msgr-btn-inline { width: 44px; height: 44px; border-radius: 12px; flex: 0 0 auto; position: relative; }
     .msgr-btn-inline svg { width: 22px; height: 22px; }
@@ -1099,6 +1078,52 @@
       transition: border-color .2s ease;
       appearance: none;
     }
+    .label-right { display: inline-flex; align-items: center; gap: 8px; }
+    .msgr-actions { display: inline-flex; align-items: center; gap: 6px; }
+    .phone-field { position: relative; display: flex; align-items: center; min-width: 0; }
+    .phone-field input { flex: 1 1 auto; min-width: 0; padding-right: 44px; }
+    .msgr-field-icon {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.20);
+      color: rgba(245,238,228,0.92);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+    }
+    .msgr-field-icon svg { width: 18px; height: 18px; }
+    .msgr-field-icon::after {
+      content: '✓';
+      position: absolute;
+      right: -2px;
+      bottom: -2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: rgba(129,199,132,0.95);
+      color: rgba(0,0,0,0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 900;
+      line-height: 1;
+    }
+    #reqModal.msgr-state-wa #msgrActions { display: none; }
+    #reqModal.msgr-state-tg #msgrActions { display: none; }
+    #reqModal.msgr-state-none #msgrTgIcon,
+    #reqModal.msgr-state-none #msgrWaIcon { display: none !important; }
+    #reqModal.msgr-state-tg #msgrWaIcon { display: none !important; }
+    #reqModal.msgr-state-wa #msgrTgIcon { display: none !important; }
+    #reqModal.msgr-state-wa #reqPhone { opacity: 0.8; }
     .modal { color-scheme: dark; }
     .modal select { background: rgba(0,0,0,0.22); }
     .modal select:invalid { color: rgba(255,255,255,0.62); }
@@ -1284,10 +1309,12 @@
       .req-layout { gap: 5px; }
       .phone-row, .name-row { gap: 5px; }
       .guests-time-row { gap: 5px; }
-      .guests-time-row.full > .modal-label,
-      .guests-time-row.full > div.modal-label { gap: 5px; }
       .guests-time-row .modal-label input { padding: 10px 6px; font-size: 14px; }
       .guests-time-row .modal-label select { padding: 10px 24px 10px 6px; font-size: 14px; background-position: right 6px center; background-size: 14px; }
+      .label-right { gap: 5px; }
+      .msgr-actions { gap: 5px; }
+      .phone-field input { padding-right: 42px; }
+      .msgr-field-icon { right: 5px; width: 32px; height: 32px; }
       .desktop-text { display: none; }
       .mobile-text { display: inline; }
       .modal-card {
@@ -1508,12 +1535,6 @@
       display: inline-flex;
       align-items: baseline;
       gap: 8px;
-      min-width: 0;
-    }
-    .msgr-badges {
-      display: inline-flex;
-      align-items: baseline;
-      gap: 6px;
       min-width: 0;
     }
     .msgr-hint {
