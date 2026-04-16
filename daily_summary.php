@@ -4,6 +4,11 @@ date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 require_once __DIR__ . '/src/classes/Database.php';
 
+$logPath = __DIR__ . '/daily_summary.log';
+$logLine = function (string $msg) use ($logPath): void {
+    @file_put_contents($logPath, '[' . date('Y-m-d H:i:s') . '] ' . $msg . "\n", FILE_APPEND);
+};
+
 $loadEnv = function (string $path): void {
     if (!is_file($path)) return;
     $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -20,6 +25,8 @@ $loadEnv(__DIR__ . '/.env');
 
 $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
 $tgUserId = '169510539';
+
+$logLine('START');
 
 $readLastTimestampFromLog = function (string $filePath): string {
     if (!is_file($filePath)) return '—';
@@ -236,11 +243,16 @@ $text = '<b>Сводка синков</b>' . "\n"
 $ok = $sendTelegram($tgToken, $tgUserId, $text);
 if (!$ok) {
     fwrite(STDERR, "Failed to send Telegram message\n");
+    $logLine('SEND_MESSAGE_FAIL');
+} else {
+    $logLine('SEND_MESSAGE_OK');
 }
 
 if (!empty($errLines)) {
     $tmp = '/tmp/veranda_sync_errors_' . preg_replace('/\D+/', '', $yesterday) . '.txt';
     file_put_contents($tmp, implode("\n", $errLines) . "\n");
-    $sendTelegramFile($tgToken, $tgUserId, $tmp, 'Ошибки синков за ' . $yesterday);
+    $okFile = $sendTelegramFile($tgToken, $tgUserId, $tmp, 'Ошибки синков за ' . $yesterday);
+    $logLine($okFile ? 'SEND_FILE_OK' : 'SEND_FILE_FAIL');
 }
 
+$logLine('DONE');
