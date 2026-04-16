@@ -1129,8 +1129,8 @@
       appearance: none;
     }
     .label-right { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-    .msgr-actions { display: inline-flex; align-items: center; gap: 6px; }
-    .phone-field { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .msgr-actions { display: inline-flex; align-items: flex-start; gap: 6px; }
+    .phone-field { position: relative; display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
     .phone-field input { flex: 1 1 auto; min-width: 0; padding-right: 14px; }
     #reqPhoneLabel .phone-field { align-items: flex-start; }
     .msgr-stack { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: 0 0 auto; }
@@ -1428,9 +1428,9 @@
       .guests-time-row { display: flex; flex-wrap: nowrap; gap: 5px; align-items: flex-end; }
       .guests-time-row.full { overflow: hidden; justify-content: center; }
       .guests-time-row .modal-label { flex: 0 0 auto; min-width: 0; }
-      .guests-time-row .modal-label > span { font-size: 10px; max-width: 64px; }
+      .guests-time-row .modal-label > span { font-size: 10px; max-width: 120px; }
       .guests-time-row.full .end-time-label > span { display: none; }
-      .guests-time-row.full > .modal-label:first-child > span { display: block; width: 100%; }
+      .guests-time-row.full > .modal-label:first-child > span { display: block; width: 100%; max-width: none; }
       .modal input[type="text"],
       .modal input[type="tel"],
       .modal input[type="number"],
@@ -1481,6 +1481,7 @@
       #reqNameLabel > span { display: none; }
       #reqNameLabel { gap: 0; }
       #reqPhoneLabel .label-row { display: none; }
+      #reqComment { margin-top: 5px; }
       #reqForm { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
       .req-layout { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding-right: 2px; min-height: 0; }
       .modal-actions { position: sticky; bottom: 0; background: transparent; padding-top: 5px; margin-top: 5px; z-index: 2; }
@@ -1709,11 +1710,12 @@
       line-height: 1.35;
       color: rgba(245, 238, 228, 0.78);
       text-align: right;
-      overflow: hidden;
-      text-overflow: ellipsis;
       white-space: nowrap;
-      max-width: 100%;
+      max-width: none;
+      overflow: visible;
+      text-overflow: clip;
     }
+    .msgr-stack .msgr-hint { width: max-content; }
     @keyframes msgrHintWarnFade {
       0% { color: rgba(229, 115, 115, 0.95); }
       100% { color: rgba(245, 238, 228, 0.78); }
