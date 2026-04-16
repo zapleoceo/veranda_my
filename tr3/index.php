@@ -63,7 +63,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0642">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0657">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -297,22 +297,25 @@ $mk = function (string $l) use ($self, $baseQs) {
                 </div>
                 <div class="phone-field">
                   <input type="tel" id="reqPhone" name="phone" autocomplete="tel" inputmode="numeric" pattern="\+[1-9][0-9]{8,14}" required placeholder="<?= htmlspecialchars(tr('your_phone')) ?>">
-                  <div class="msgr-actions" id="msgrActions">
-                    <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
-                      <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
-                        <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
-                      </svg>
-                      <span class="msgr-cd" data-msgr-cd="tg" aria-hidden="true"></span>
-                    </button>
-                    <button type="button" class="msgr-btn msgr-btn-inline" id="msgrWaBtn" aria-label="WhatsApp" title="WhatsApp">
-                      <svg class="ico-wa" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zM12.04 20.13c-1.55 0-3.07-.42-4.39-1.21l-.31-.19-3.11.82.83-3.04-.21-.33a8.103 8.103 0 0 1-1.24-4.27c0-4.47 3.64-8.11 8.11-8.11 2.17 0 4.2 0.84 5.73 2.38 1.53 1.53 2.38 3.56 2.38 5.73 0 4.47-3.64 8.12-8.11 8.12zM16.48 13.84c-.24-.12-1.44-.71-1.66-.79-.22-.08-.38-.12-.54.12-.16.24-.61.76-.75.91-.14.15-.28.17-.52.05-.24-.12-1.01-.37-1.92-1.18-.71-.63-1.19-1.41-1.33-1.65-.14-.24-.01-.37.11-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42s-.54-1.31-.74-1.79c-.2-.47-.4-.41-.54-.41-.14 0-.3 0-.46 0s-.42.06-.64.3c-.22.24-.84.82-.84 2s.86 2.33.98 2.49c.12.16 1.7 2.59 4.11 3.64.57.25 1.02.4 1.37.51.58.18 1.1.16 1.51.1.46-.07 1.44-.59 1.64-1.16.2-.57.2-1.06.14-1.16-.06-.1-.22-.16-.46-.28z" fill="currentColor"/>
-                      </svg>
-                      <span class="msgr-cd" data-msgr-cd="wa" aria-hidden="true"></span>
-                    </button>
+                  <div class="msgr-stack" id="msgrStack">
+                    <div class="msgr-actions" id="msgrActions">
+                      <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
+                        <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
+                          <path d="M9.1 14.9 18.3 8.9c.5-.3.9-.1.5.2l-7.6 6.9-.3 2.9c0 .4-.2.5-.4.1l-1.5-4.8Z" fill="currentColor"/>
+                        </svg>
+                        <span class="msgr-cd" data-msgr-cd="tg" aria-hidden="true"></span>
+                      </button>
+                      <button type="button" class="msgr-btn msgr-btn-inline" id="msgrWaBtn" aria-label="WhatsApp" title="WhatsApp">
+                        <svg class="ico-wa" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zM12.04 20.13c-1.55 0-3.07-.42-4.39-1.21l-.31-.19-3.11.82.83-3.04-.21-.33a8.103 8.103 0 0 1-1.24-4.27c0-4.47 3.64-8.11 8.11-8.11 2.17 0 4.2 0.84 5.73 2.38 1.53 1.53 2.38 3.56 2.38 5.73 0 4.47-3.64 8.12-8.11 8.12zM16.48 13.84c-.24-.12-1.44-.71-1.66-.79-.22-.08-.38-.12-.54.12-.16.24-.61.76-.75.91-.14.15-.28.17-.52.05-.24-.12-1.01-.37-1.92-1.18-.71-.63-1.19-1.41-1.33-1.65-.14-.24-.01-.37.11-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42s-.54-1.31-.74-1.79c-.2-.47-.4-.41-.54-.41-.14 0-.3 0-.46 0s-.42.06-.64.3c-.22.24-.84.82-.84 2s.86 2.33.98 2.49c.12.16 1.7 2.59 4.11 3.64.57.25 1.02.4 1.37.51.58.18 1.1.16 1.51.1.46-.07 1.44-.59 1.64-1.16.2-.57.2-1.06.14-1.16-.06-.1-.22-.16-.46-.28z" fill="currentColor"/>
+                        </svg>
+                        <span class="msgr-cd" data-msgr-cd="wa" aria-hidden="true"></span>
+                      </button>
+                    </div>
+                    <div class="msgr-hint" id="msgrHint" hidden></div>
+                    <div class="msgr-toast" id="msgrToast" hidden></div>
                   </div>
-                  <div class="msgr-toast" id="msgrToast" hidden></div>
                   <button type="button" class="msgr-field-icon" id="msgrTgIcon" aria-label="Telegram verified" title="Telegram" hidden>
                     <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path d="M20.6 5.3 4.2 11.7c-1.1.4-1.1 1-.2 1.3l4.2 1.3 1.6 4.8c.2.6.4.6.8.2l2.3-2.2 4.7 3.4c.9.5 1.5.2 1.7-.8l2.8-13.1c.3-1.2-.4-1.7-1.5-1.3Z" fill="currentColor" opacity=".9"/>
@@ -325,7 +328,6 @@ $mk = function (string $l) use ($self, $baseQs) {
                     </svg>
                   </button>
                 </div>
-                <div class="msgr-hint" id="msgrHint" hidden></div>
               </label>
               <label class="modal-label full" id="reqCommentLabel">
                 <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
@@ -385,7 +387,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260416_0642" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260416_0657" defer></script>
 </body>
 </html>
 
