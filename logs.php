@@ -3,6 +3,12 @@
 require_once __DIR__ . '/auth_check.php';
 veranda_require('admin');
 
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+    $spotTzName = 'Asia/Ho_Chi_Minh';
+}
+$spotTz = new DateTimeZone($spotTzName);
+
 $view = (string)($_REQUEST['view'] ?? 'kitchen');
 $lines = (int)($_GET['lines'] ?? 200);
 if ($lines < 50) $lines = 50;
@@ -21,6 +27,30 @@ if (!array_key_exists($view, $logMap)) {
 $path = $logMap[$view];
 $message = '';
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'run_sync') {
+    $key = (string)($_POST['key'] ?? '');
+    $jobs = [
+        'kitchen' => [
+            'cmd' => '/usr/bin/php /var/www/veranda_my_usr/data/www/veranda.my/scripts/kitchen/cron.php >> /var/www/veranda_my_usr/data/www/veranda.my/cron.log 2>&1',
+        ],
+        'telegram' => [
+            'cmd' => '/usr/bin/php /var/www/veranda_my_usr/data/www/veranda.my/scripts/kitchen/telegram_alerts.php >> /var/www/veranda_my_usr/data/www/veranda.my/telegram.log 2>&1',
+        ],
+        'menu' => [
+            'cmd' => '/usr/bin/php /var/www/veranda_my_usr/data/www/veranda.my/scripts/menu/cron.php >> /var/www/veranda_my_usr/data/www/veranda.my/menu_sync.log 2>&1',
+        ],
+    ];
+    if (isset($jobs[$key])) {
+        @set_time_limit(30);
+        @session_write_close();
+        @exec($jobs[$key]['cmd']);
+        header('Location: logs.php?view=' . urlencode($view) . '&lines=' . (int)$lines . '&ran=' . urlencode($key));
+        exit;
+    }
+    header('Location: logs.php?view=' . urlencode($view) . '&lines=' . (int)$lines . '&ran=0');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'clear_log') {
     if (array_key_exists($view, $logMap)) {
         $path = $logMap[$view];
@@ -31,6 +61,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
 }
 if (!empty($_GET['cleared'])) {
     $message = 'Лог очищен.';
+}
+if (!empty($_GET['ran'])) {
+    $ran = (string)$_GET['ran'];
+    $message = $ran !== '0' ? ('Запущен синк: ' . $ran) : 'Неизвестный синк.';
 }
 
 $tailFile = function (string $filePath, int $maxLines): string {
@@ -86,6 +120,17 @@ $fileInfo = function (string $filePath): array {
     return ['exists' => true, 'mtime' => $mt ? (int)$mt : null, 'size' => $sz !== false ? (int)$sz : null];
 };
 
+$fmtSpotMtime = function (?int $ts) use ($spotTz): string {
+    if (!$ts) return '—';
+    return (new DateTimeImmutable('@' . $ts))->setTimezone($spotTz)->format('d.m.Y H:i:s');
+};
+$syncStatus = function (array $fi): array {
+    if (empty($fi['exists']) || empty($fi['mtime'])) return ['kind' => 'bad', 'label' => 'ПРОБЛЕМА'];
+    $age = time() - (int)$fi['mtime'];
+    if ($age > 7200) return ['kind' => 'bad', 'label' => 'ПРОБЛЕМА'];
+    return ['kind' => 'ok', 'label' => 'есть'];
+};
+
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -127,23 +172,32 @@ $fileInfo = function (string $filePath): array {
                     <th>Cron</th>
                     <th>Лог</th>
                     <th>Статус</th>
+                    <th>Run</th>
                     <th>i</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($syncJobs as $job): ?>
                     <?php $fi = $fileInfo($logMap[$job['key']] ?? ''); ?>
+                    <?php $st = $syncStatus($fi); ?>
                     <tr>
                         <td style="font-weight:700;"><?= htmlspecialchars($job['label']) ?></td>
                         <td><span class="pill ok" title="<?= htmlspecialchars($cronHuman($job['cron']) . ' (' . $job['cron'] . ')', ENT_QUOTES) ?>"><?= htmlspecialchars($job['cron']) ?></span></td>
                         <td><a href="logs.php?view=<?= urlencode($job['key']) ?>&lines=<?= (int)$lines ?>" style="text-decoration:none; color:var(--accent); font-weight:600;"><?= htmlspecialchars($job['log']) ?></a></td>
                         <td>
                             <?php if (!empty($fi['exists'])): ?>
-                                <span class="pill ok">есть</span>
-                                <span class="muted">mtime: <?= htmlspecialchars($fi['mtime'] ? date('d.m.Y H:i:s', (int)$fi['mtime']) : '—') ?></span>
+                                <span class="pill <?= htmlspecialchars($st['kind']) ?>"><?= htmlspecialchars($st['label']) ?></span>
+                                <span class="muted">mtime: <?= htmlspecialchars($fmtSpotMtime($fi['mtime'] ?? null)) ?></span>
                             <?php else: ?>
-                                <span class="pill bad">нет</span>
+                                <span class="pill bad">ПРОБЛЕМА</span>
                             <?php endif; ?>
+                        </td>
+                        <td>
+                            <form method="post" style="margin:0;">
+                                <input type="hidden" name="action" value="run_sync">
+                                <input type="hidden" name="key" value="<?= htmlspecialchars($job['key'], ENT_QUOTES) ?>">
+                                <button class="btn" type="submit">Run</button>
+                            </form>
                         </td>
                         <td><span class="info-icon" data-tip="<?= htmlspecialchars($cronHuman($job['cron']) . ': ' . $job['desc'], ENT_QUOTES) ?>">i</span></td>
                     </tr>

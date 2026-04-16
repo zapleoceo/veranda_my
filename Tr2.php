@@ -1,5 +1,8 @@
 <?php
 
+header('Location: /tr3', true, 301);
+exit;
+
 if (file_exists(__DIR__ . '/.env')) {
   $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
   foreach ($lines as $line) {
