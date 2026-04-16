@@ -1194,6 +1194,12 @@
       syncSubmitState();
     };
 
+      const getPhoneE164 = () => {
+        if (!reqPhone) return '';
+        const digits = phoneDigits(reqPhone.value);
+        return digits ? ('+' + digits) : '';
+      };
+
       const syncSubmitState = () => {
         if (!reqSubmit) return;
         const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
@@ -1207,17 +1213,11 @@
         const preorderOk = guests <= 5 || hasPreorder;
         if (reqPreorderLabel) reqPreorderLabel.hidden = guests <= 5;
         if (reqPreorderBox) reqPreorderBox.classList.toggle('preorder-missing', guests > 5 && !preorderOk);
-        const canSubmit = linked && nameOk && phoneOk && startOk && guestsOk && preorderOk && !modalTableBusy && !submitBusy;
+        const canSubmit = linked && nameOk && phoneOk && startOk && guestsOk && preorderOk && !modalTableBusy;
         
-        if (canSubmit) {
-          reqSubmit.classList.remove('is-disabled');
-          reqSubmit.setAttribute('aria-disabled', 'false');
-          reqSubmit.disabled = false;
-        } else {
-          reqSubmit.classList.add('is-disabled');
-          reqSubmit.setAttribute('aria-disabled', 'true');
-          reqSubmit.disabled = true;
-        }
+        reqSubmit.classList.toggle('is-disabled', !canSubmit);
+        reqSubmit.setAttribute('aria-disabled', canSubmit ? 'false' : 'true');
+        reqSubmit.disabled = !!submitBusy;
       };
     const openRequestForm = ({ tableNum, guests, start, name, phone, comment, preorder, keepFields }) => {
       if (reqHint) {
@@ -1484,7 +1484,7 @@
       const rem = getCooldownRemaining('wa');
       if (rem > 0) { showMsgrToast(rem); return; }
 
-      const phone = reqPhone ? ('+' + phoneDigits(reqPhone.value)) : '';
+      const phone = getPhoneE164();
       if (!isPhoneValid(phone)) {
         if (reqPhone) reqPhone.focus();
         showSubmitHint();
@@ -1591,7 +1591,7 @@
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
-      const phone = reqPhone ? ('+' + phoneDigits(reqPhone.value)) : '';
+      const phone = getPhoneE164();
       if (!isPhoneValid(phone)) {
         if (reqPhone) reqPhone.focus();
         showSubmitHint();
@@ -1774,7 +1774,7 @@
 
         try {
           name = reqName ? String(reqName.value || '').trim() : '';
-          phone = reqPhone ? ('+' + phoneDigits(reqPhone.value)) : '';
+          phone = getPhoneE164();
           guests = reqGuests ? Number(reqGuests.value || 0) : 0;
           if (pendingBooking && pendingBooking.start && reqStart && reqStart.value) {
             const dPart = String(pendingBooking.start).slice(0, 10);

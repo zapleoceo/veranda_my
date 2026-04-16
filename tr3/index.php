@@ -63,7 +63,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0657">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0712">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -224,7 +224,7 @@ $mk = function (string $l) use ($self, $baseQs) {
         </div>
         <button class="btn-close-modal" type="button" data-modal-close="reqModal" aria-label="Close">×</button>
       </div>
-      <form id="reqForm" method="post" action="/tr3/api.php?ajax=submit_booking" accept-charset="utf-8">
+      <form id="reqForm" method="post" action="/tr3/api.php?ajax=submit_booking" accept-charset="utf-8" novalidate>
         <input type="hidden" id="reqTableNum" name="table_num" value="">
         <input type="hidden" id="reqStartIso" name="start" value="">
         <div class="req-layout">
@@ -387,7 +387,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260416_0657" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260416_0712" defer></script>
 </body>
 </html>
 
