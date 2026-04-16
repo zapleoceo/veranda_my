@@ -1481,7 +1481,7 @@
       #reqNameLabel > span { display: none; }
       #reqNameLabel { gap: 0; }
       #reqPhoneLabel .label-row { display: none; }
-      #reqComment { margin-top: 5px; }
+      #reqComment { margin-top: 12px; }
       #reqForm { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
       .req-layout { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding-right: 2px; min-height: 0; }
       .modal-actions { position: sticky; bottom: 0; background: transparent; padding-top: 5px; margin-top: 5px; z-index: 2; }

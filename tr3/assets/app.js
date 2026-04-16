@@ -1494,7 +1494,7 @@
 
       const phone = getPhoneE164();
       if (!isPhoneValid(phone)) {
-        if (reqPhone) reqPhone.focus();
+        if (reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
         showSubmitHint();
         return;
       }
