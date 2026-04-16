@@ -1771,7 +1771,6 @@
         let preorder = '';
         let preorderRu = '';
         let tableNum = '';
-        let totalAmount = 0;
 
         const getTotalPreorderAmount = () => {
           const counts = normalizePreorder(preorderCounts);
@@ -1784,31 +1783,18 @@
           guests = reqGuests ? Number(reqGuests.value || 0) : 0;
           const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
 
-          if (!name) {
-            showReqToast(t('missing_prefix') + t('missing_name'));
-            if (reqName) { warnPlaceholder(reqName); reqName.focus(); }
-            syncSubmitState();
-            return;
-          }
+          const invalidPhone = !!phone && !isPhoneValid(phone);
+          const missingName = !name;
+          const missingMsgr = !linked;
+          const missingPhone = !phone || invalidPhone;
 
-          if (!linked) {
-            setMsgrHint(t('msgr_required'));
-            warnMsgrHint();
-            showReqToast(t('msgr_required'));
-            syncSubmitState();
-            return;
-          }
+          if (missingName && reqName) warnPlaceholder(reqName);
+          if (missingPhone && reqPhone) warnPlaceholder(reqPhone);
+          if (missingMsgr) { setMsgrHint(t('msgr_required')); warnMsgrHint(); }
 
-          if (!phone) {
-            showReqToast(t('missing_prefix') + t('missing_phone'));
-            if (reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
-            syncSubmitState();
-            return;
-          }
-
-          if (!isPhoneValid(phone)) {
-            showReqToast(t('missing_prefix') + t('phone_invalid'));
-            if (reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
+          if (missingName || missingMsgr || missingPhone) {
+            if (missingName && reqName) reqName.focus();
+            else if (missingPhone && reqPhone) reqPhone.focus();
             syncSubmitState();
             return;
           }
@@ -1839,9 +1825,7 @@
           const hasPreorderNow = Object.keys(countsNow).some((k) => (Number(countsNow[k] || 0) || 0) > 0);
           if (guests > 5 && !hasPreorderNow) missing.push(t('missing_preorder'));
           if (missing.length) {
-            const msg = t('missing_prefix') + missing.join(', ');
             logJs('submit prevented: missing fields', { missing }).catch(() => null);
-            showReqToast(msg);
             if (!start && reqStart) reqStart.focus();
             else if (!isFinite(guests) || guests <= 0) { if (reqGuests) reqGuests.focus(); }
             syncSubmitState();
