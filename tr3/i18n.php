@@ -7,7 +7,7 @@ return [
       'page_title' => 'Схема бронирования',
       'data_on' => 'Данные на',
       'pick_date' => 'Выбрать дату',
-      'comment_placeholder' => 'Пожелания, особые условия…',
+      'comment_placeholder' => 'Комментарий. Особые пожелания',
       'booking_note' => 'Бронь держится 30 мин с момента старта. Если гость не пришел через 30 мин после начала — бронь аннулируется.',
 
       'zoom' => 'Масштаб',
@@ -124,7 +124,7 @@ return [
       'page_title' => 'Booking Map',
       'data_on' => 'Data for',
       'pick_date' => 'Pick date',
-      'comment_placeholder' => 'Wishes, special conditions…',
+      'comment_placeholder' => 'Comment. Special requests',
       'booking_note' => 'Your reservation is held for 30 min from the start time. If guests do not arrive within 30 min, the booking is cancelled.',
 
       'zoom' => 'Zoom',
@@ -241,7 +241,7 @@ return [
       'page_title' => 'Sơ đồ đặt bàn',
       'data_on' => 'Dữ liệu ngày',
       'pick_date' => 'Chọn ngày',
-      'comment_placeholder' => 'Yêu cầu, ghi chú…',
+      'comment_placeholder' => 'Ghi chú. Yêu cầu đặc biệt',
       'booking_note' => 'Bàn của bạn được giữ trong 30 phút kể từ thời gian bắt đầu. Nếu khách không đến trong vòng 30 phút, đặt bàn sẽ bị hủy.',
 
       'zoom' => 'Thu phóng',
@@ -360,6 +360,7 @@ return [
       'on_date' => '날짜',
       'start_time' => '시작 시간',
       'duration' => '소요 시간',
+      'comment_placeholder' => '메모. 요청 사항',
       'table_busy_warning' => '죄송합니다. 선택한 시간에는 이 테이블이 예약되어 있습니다. 다른 시간이나 테이블을 선택해주세요.',
       'busy_now' => '지금 사용 중',
       'preorder_amount' => '선주문 금액: {amount} ₫',

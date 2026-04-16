@@ -63,7 +63,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0712">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0731">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -289,15 +289,13 @@ $mk = function (string $l) use ($self, $baseQs) {
                 <input type="text" id="reqName" name="name" autocomplete="name" required maxlength="80" placeholder="<?= htmlspecialchars(tr('your_name')) ?>">
               </label>
               <label class="modal-label" id="reqPhoneLabel">
-                <div class="label-row">
-                  <div class="label-left">
-                    <span class="tg-nick" id="tgNick" hidden></span>
-                    <span class="tg-nick" id="waNick" hidden></span>
-                  </div>
-                </div>
                 <div class="phone-field">
                   <input type="tel" id="reqPhone" name="phone" autocomplete="tel" inputmode="numeric" pattern="\+[1-9][0-9]{8,14}" required placeholder="<?= htmlspecialchars(tr('your_phone')) ?>">
                   <div class="msgr-stack" id="msgrStack">
+                    <div class="msgr-nicks">
+                      <span class="tg-nick" id="tgNick" hidden></span>
+                      <span class="tg-nick" id="waNick" hidden></span>
+                    </div>
                     <div class="msgr-actions" id="msgrActions">
                       <button type="button" class="msgr-btn msgr-btn-inline" id="msgrTgBtn" aria-label="Telegram" title="Telegram">
                         <svg class="ico-tg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -330,7 +328,6 @@ $mk = function (string $l) use ($self, $baseQs) {
                 </div>
               </label>
               <label class="modal-label full" id="reqCommentLabel">
-                <span data-i18n="comment"><?= htmlspecialchars(tr('comment')) ?></span>
                 <textarea id="reqComment" name="comment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
               </label>
               <label class="modal-label full" id="reqPreorderLabel" hidden>
@@ -387,7 +384,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260416_0712" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260416_0731" defer></script>
 </body>
 </html>
 
