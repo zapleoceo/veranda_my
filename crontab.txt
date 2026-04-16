@@ -1,5 +1,0 @@
-*/5 * * * * /usr/bin/php /var/www/veranda_my_usr/data/www/veranda.my/scripts/kitchen/cron.php >> /var/www/veranda_my_usr/data/www/veranda.my/cron.log 2>&1
-*/1 * * * * /usr/bin/php /var/www/veranda_my_usr/data/www/veranda.my/scripts/kitchen/telegram_alerts.php >> /var/www/veranda_my_usr/data/www/veranda.my/telegram.log 2>&1
-0 * * * * /usr/bin/php /var/www/veranda_my_usr/data/www/veranda.my/scripts/menu/cron.php >> /var/www/veranda_my_usr/data/www/veranda.my/menu_sync.log 2>&1
-CRON_TZ=Asia/Ho_Chi_Minh
-0 10 * * * * /usr/bin/php /var/www/veranda_my_usr/data/www/veranda.my/scripts/kitchen/daily_summary.php >> /var/www/veranda_my_usr/data/www/veranda.my/daily_summary.log 2>&1
