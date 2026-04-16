@@ -859,7 +859,7 @@
         if (!keys.length) {
           const empty = document.createElement('div');
           empty.className = 'preorder-empty';
-          empty.textContent = targetBox.id === 'reqPreorderBox' ? t('preorder_required') : '—';
+          empty.textContent = t('preorder_required');
           targetBox.appendChild(empty);
           return;
         }
@@ -1732,12 +1732,20 @@
     if (reqPreorderBox) {
       reqPreorderBox.addEventListener('click', (e) => {
         const btn = e.target && e.target.closest ? e.target.closest('[data-preorder-minus]') : null;
-        if (!btn) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const title = String(btn.getAttribute('data-preorder-minus') || '').trim();
-        if (!title) return;
-        decPreorder(title);
+        if (btn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const title = String(btn.getAttribute('data-preorder-minus') || '').trim();
+          if (!title) return;
+          decPreorder(title);
+          return;
+        }
+
+        const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
+        const isMobile = !!(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
+        if (isMobile && guests > 5 && mobilePreorderModal) {
+          setModal(mobilePreorderModal, true);
+        }
       });
     }
 

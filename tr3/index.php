@@ -63,7 +63,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0840">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0854">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -327,11 +327,6 @@ $mk = function (string $l) use ($self, $baseQs) {
                 <textarea id="reqComment" name="comment" class="preorder-box" rows="4" placeholder="<?= htmlspecialchars(tr('comment_placeholder')) ?>"></textarea>
               </label>
               <label class="modal-label full" id="reqPreorderLabel" hidden>
-                <span class="desktop-text" data-i18n="preorder_title"><?= htmlspecialchars(tr('preorder_title')) ?></span>
-                <div class="mobile-text mobile-preorder-title-wrap">
-                  <span data-i18n="preorder_title_mobile"><?= htmlspecialchars(tr('preorder_title_mobile')) ?></span>
-                  <button type="button" class="btn-preorder-mobile-inline" id="btnOpenMobilePreorder" aria-label="Menu" data-i18n="menu_btn"><?= htmlspecialchars(tr('menu_btn')) ?></button>
-                </div>
                 <div id="reqPreorderBox" class="preorder-box" aria-readonly="true"></div>
                 <input type="hidden" id="reqPreorderHidden" name="preorder" value="">
                 <input type="hidden" id="reqPreorderRuHidden" name="preorder_ru" value="">
@@ -380,7 +375,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260416_0840" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260416_0854" defer></script>
 </body>
 </html>
 
