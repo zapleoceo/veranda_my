@@ -135,6 +135,10 @@
       .controls { justify-self: stretch; justify-content: center; }
       .map-invite { margin-top: 5px; }
     }
+    @media (max-width: 352px) {
+      #reqModal .req-layout { overflow-x: auto; overflow-y: auto; }
+      #reqModal .modal-grid { min-width: 352px; }
+    }
     .lang a {
       text-decoration: none;
       color: rgba(255,255,255,0.65);
@@ -1710,6 +1714,11 @@
       white-space: nowrap;
       max-width: 100%;
     }
+    @keyframes msgrHintWarnFade {
+      0% { color: rgba(229, 115, 115, 0.95); }
+      100% { color: rgba(245, 238, 228, 0.78); }
+    }
+    .msgr-hint.warn { color: rgba(229, 115, 115, 0.95); animation: msgrHintWarnFade 2s ease-out 1; }
     .modal-hint {
       margin-top: 10px;
       background: rgba(255, 255, 255, 0.04);

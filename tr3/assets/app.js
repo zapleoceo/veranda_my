@@ -1403,6 +1403,14 @@
       setTimeout(() => { el.classList.remove('ph-warn'); }, 2100);
     };
 
+    const warnMsgrHint = () => {
+      if (!msgrHint || !msgrHint.classList) return;
+      msgrHint.classList.remove('warn');
+      void msgrHint.offsetWidth;
+      msgrHint.classList.add('warn');
+      setTimeout(() => { msgrHint.classList.remove('warn'); }, 2100);
+    };
+
     const updateMsgrCountdownUi = () => {
       const nodes = document.querySelectorAll('[data-msgr-cd]');
       nodes.forEach((n) => {
@@ -1744,17 +1752,15 @@
       reqForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (Date.now() < reqToastCooldownUntil) return;
-        
-        await logJs('submit click', { submitBusy, modalTableBusy });
 
-        // Log explicitly for debugging if it prevents
+        logJs('submit click', { submitBusy, modalTableBusy }).catch(() => null);
         if (submitBusy) {
-            await logJs('submit prevented: submitBusy is true', {});
-            return;
+          logJs('submit prevented: submitBusy is true', {}).catch(() => null);
+          return;
         }
         if (modalTableBusy) {
-            await logJs('submit prevented: modalTableBusy is true', {});
-            return;
+          logJs('submit prevented: modalTableBusy is true', {}).catch(() => null);
+          return;
         }
         let name = '';
         let phone = '';
@@ -1776,6 +1782,37 @@
           name = reqName ? String(reqName.value || '').trim() : '';
           phone = getPhoneE164();
           guests = reqGuests ? Number(reqGuests.value || 0) : 0;
+          const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
+
+          if (!name) {
+            showReqToast(t('missing_prefix') + t('missing_name'));
+            if (reqName) { warnPlaceholder(reqName); reqName.focus(); }
+            syncSubmitState();
+            return;
+          }
+
+          if (!linked) {
+            setMsgrHint(t('msgr_required'));
+            warnMsgrHint();
+            showReqToast(t('msgr_required'));
+            syncSubmitState();
+            return;
+          }
+
+          if (!phone) {
+            showReqToast(t('missing_prefix') + t('missing_phone'));
+            if (reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
+            syncSubmitState();
+            return;
+          }
+
+          if (!isPhoneValid(phone)) {
+            showReqToast(t('missing_prefix') + t('phone_invalid'));
+            if (reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
+            syncSubmitState();
+            return;
+          }
+
           if (pendingBooking && pendingBooking.start && reqStart && reqStart.value) {
             const dPart = String(pendingBooking.start).slice(0, 10);
             const tPart = String(reqStart.value);
@@ -1785,35 +1822,27 @@
           duration_m = reqDuration ? parseInt(reqDuration.value, 10) : 120;
           if (!isFinite(duration_m) || duration_m <= 0) duration_m = 120;
           comment = reqComment ? String(reqComment.value || '').trim() : '';
-          
-          await logJs('submit trace 1', { name, phone, guests, start, duration_m });
+          logJs('submit trace 1', { name, phone, guests, start, duration_m }).catch(() => null);
           
           preorder = guests > 5 ? getPreorderText('ui') : '';
           preorderRu = guests > 5 ? getPreorderText('ru') : '';
           if (reqPreorderHidden) reqPreorderHidden.value = preorder;
           if (reqPreorderRuHidden) reqPreorderRuHidden.value = preorderRu;
-          
-          await logJs('submit trace 2', { preorder, preorderRu });
+          logJs('submit trace 2', { preorder, preorderRu }).catch(() => null);
           
           tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
           const missing = [];
           if (!tableNum) missing.push(t('missing_table'));
           if (!start) missing.push(t('missing_start'));
           if (!isFinite(guests) || guests <= 0) missing.push(t('missing_guests'));
-          if (!name) missing.push(t('missing_name'));
-          if (!phone) missing.push(t('missing_phone'));
-          else if (!isPhoneValid(phone)) missing.push(t('phone_invalid'));
           const countsNow = normalizePreorder(preorderCounts);
           const hasPreorderNow = Object.keys(countsNow).some((k) => (Number(countsNow[k] || 0) || 0) > 0);
           if (guests > 5 && !hasPreorderNow) missing.push(t('missing_preorder'));
-          if (!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo)) missing.push(t('missing_telegram'));
           if (missing.length) {
             const msg = t('missing_prefix') + missing.join(', ');
-            await logJs('submit prevented: missing fields', { missing });
+            logJs('submit prevented: missing fields', { missing }).catch(() => null);
             showReqToast(msg);
-            if (!name && reqName) { warnPlaceholder(reqName); reqName.focus(); }
-            else if ((!phone || !isPhoneValid(phone)) && reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
-            else if (!start && reqStart) reqStart.focus();
+            if (!start && reqStart) reqStart.focus();
             else if (!isFinite(guests) || guests <= 0) { if (reqGuests) reqGuests.focus(); }
             syncSubmitState();
             return;
@@ -1827,67 +1856,10 @@
             reqSubmit.disabled = true;
           }
         } catch (jsErr) {
-          await logJs('submit JS ERROR', { err: String(jsErr.message || jsErr) });
+          logJs('submit JS ERROR', { err: String(jsErr.message || jsErr) }).catch(() => null);
           return;
         }
         try {
-          // Double check availability before submit
-          const dPart = String(pendingBooking.start).slice(0, 10);
-          
-          const chkUrl = apiUrl();
-          chkUrl.searchParams.set('ajax', 'free_tables');
-          chkUrl.searchParams.set('date_reservation', dPart);
-          chkUrl.searchParams.set('duration', String(duration_m * 60));
-          chkUrl.searchParams.set('spot_id', '1');
-          
-          const rChk = await fetch(chkUrl.toString(), { headers: { 'Accept': 'application/json' } });
-          const jChk = await rChk.json().catch(() => null);
-          
-          if (rChk.ok && jChk && jChk.ok && Array.isArray(jChk.free_table_nums)) {
-            freeNums = new Set(jChk.free_table_nums.map(String));
-            occupiedNowNums = new Set(Array.isArray(jChk.occupied_now_nums) ? jChk.occupied_now_nums.map(String) : []);
-            
-            // Also fetch reservations for exact ranges
-            const rUrl = apiUrl();
-            rUrl.searchParams.set('ajax', 'reservations');
-            rUrl.searchParams.set('date_reservation', dPart);
-            rUrl.searchParams.set('duration', String(duration_m * 60));
-            rUrl.searchParams.set('spot_id', '1');
-            const rRes = await fetch(rUrl.toString(), { headers: { 'Accept': 'application/json' } });
-            const jRes = await rRes.json().catch(() => null);
-            if (rRes.ok && jRes && jRes.ok && Array.isArray(jRes.reservations_items)) {
-               applyReservationsItemsToTables(jRes.reservations_items, dPart, start);
-            }
-          }
-
-          const currentReq = getCurrentRequest();
-          const un = getUnavailableReason(tableNum, currentReq);
-          logJs('submit check un', { tableNum, currentReq, un });
-          if (un) {
-            throw new Error(un.reason + (un.detail ? ' · ' + un.detail : ''));
-          }
-
-          const fmtHm = (m) => {
-            const mm = Math.max(0, Math.round(Number(m) || 0));
-            const h = String(Math.floor(mm / 60)).padStart(2, '0');
-            const mi = String(mm % 60).padStart(2, '0');
-            return h + ':' + mi;
-          };
-          const tableRanges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
-          if (tableRanges.length) {
-            const sm = Number(String(start).slice(11, 13)) * 60 + Number(String(start).slice(14, 16));
-            const em = sm + Math.floor(duration_m);
-            const next = tableRanges.find(([s]) => Number(s) >= em);
-            if (next && Array.isArray(next)) {
-              const gap = Number(next[0]) - em;
-              if (isFinite(gap) && gap >= 0 && gap < 60) {
-                const rangeTxt = fmtHm(next[0]) + '-' + fmtHm(next[1]);
-                const msg = fmtVars(t('confirm_near_booking') || 'На этом столике будет бронь на {range}. Продолжить?', { range: rangeTxt });
-                if (!confirm(msg)) return;
-              }
-            }
-          }
-
           const url = apiUrl();
           url.searchParams.set('ajax', 'submit_booking');
           const res = await fetch(url.toString(), {
