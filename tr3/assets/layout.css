@@ -1410,7 +1410,7 @@
       .modal { padding: 5px; align-items: center; justify-content: center; }
       .modal-card { padding: 10px 10px 8px; }
       .modal-grid { gap: 5px; margin-top: 5px; }
-      #reqModal .modal-grid { grid-template-columns: 0.42fr 0.58fr; }
+      #reqModal .modal-grid { grid-template-columns: 1fr; }
       .modal-label { gap: 5px; }
       .modal-actions { gap: 5px; margin-top: 5px; }
       .req-layout { gap: 5px; }
