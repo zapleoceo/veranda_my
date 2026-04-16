@@ -1134,7 +1134,6 @@
     .phone-field input { flex: 1 1 auto; min-width: 0; padding-right: 14px; }
     #reqPhoneLabel .phone-field { align-items: flex-start; }
     .msgr-stack { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: 0 0 auto; }
-    .msgr-nicks { position: absolute; right: 0; bottom: calc(100% + 2px); display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; min-height: 0; pointer-events: none; }
     .msgr-stack .msgr-hint { position: absolute; right: 0; top: calc(100% + 2px); }
     .msgr-stack .msgr-toast { top: auto; bottom: calc(100% + 8px); }
     #reqPhoneLabel .msgr-hint { margin: 0; }

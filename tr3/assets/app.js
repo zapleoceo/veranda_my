@@ -376,8 +376,7 @@
     const msgrTgBtn = document.getElementById('msgrTgBtn');
     const msgrHint = document.getElementById('msgrHint');
     const msgrToast = document.getElementById('msgrToast');
-    const tgNick = document.getElementById('tgNick');
-    const waNick = document.getElementById('waNick');
+    const formatTgUsername = (raw) => String(raw || '').replace(/^@+/, '').trim();
     const reqPreorderHidden = document.getElementById('reqPreorderHidden');
     const reqPreorderRuHidden = document.getElementById('reqPreorderRuHidden');
     const toastEl = document.getElementById('tableToast');
@@ -408,12 +407,23 @@
 
     const phoneDigits = (raw) => String(raw || '').replace(/\D+/g, '').slice(0, 15);
     const isPhoneValid = (raw) => /^[1-9]\d{8,14}$/.test(phoneDigits(raw));
+    let applyPhoneMask = null;
     if (reqPhone) {
-      const applyPhoneMask = () => {
+      applyPhoneMask = () => {
         const digits = phoneDigits(reqPhone.value);
-        const next = digits ? ('+' + digits) : '';
+        const base = digits ? ('+' + digits) : '';
+        const un = (messengerLinked.telegram && linkedTg && linkedTg.user_id) ? formatTgUsername(linkedTg.username) : '';
+        const suffix = (base && un) ? (' | ' + un) : '';
+        const next = base + suffix;
         if (reqPhone.value !== next) reqPhone.value = next;
-        if (digits && reqPhone.selectionStart != null && reqPhone.selectionStart < 1) reqPhone.setSelectionRange(1, 1);
+        if (reqPhone.selectionStart != null && reqPhone.selectionEnd != null) {
+          const maxPos = base.length;
+          const minPos = base ? 1 : 0;
+          let pos = reqPhone.selectionStart;
+          if (pos < minPos) pos = minPos;
+          if (pos > maxPos) pos = maxPos;
+          reqPhone.setSelectionRange(pos, pos);
+        }
       };
       reqPhone.addEventListener('focus', () => {
         applyPhoneMask();
@@ -1427,15 +1437,6 @@
       if (!msgrWaBtn) return;
       const linked = !!(messengerLinked.whatsapp && linkedWaPhone);
       msgrWaBtn.classList.toggle('active', linked);
-      if (waNick) {
-        if (linked) {
-          waNick.textContent = '✅ ' + linkedWaPhone;
-          waNick.hidden = false;
-        } else {
-          waNick.textContent = '';
-          waNick.hidden = true;
-        }
-      }
     };
 
     const applyMessengerVisibility = () => {
@@ -1461,6 +1462,7 @@
           reqPhone.disabled = false;
         }
       }
+      if (applyPhoneMask) applyPhoneMask();
 
       if (msgrActions) msgrActions.hidden = (state !== 'none');
       if (msgrTgIcon) msgrTgIcon.hidden = (state !== 'tg');
@@ -1560,16 +1562,6 @@
       if (!msgrTgBtn) return;
       const linked = !!(messengerLinked.telegram && linkedTg && linkedTg.user_id);
       msgrTgBtn.classList.toggle('tg-linked', linked);
-      if (tgNick) {
-        if (linked) {
-          const un = String(linkedTg && linkedTg.username ? linkedTg.username : '').replace(/^@+/, '').trim();
-          tgNick.textContent = un ? ('✅ @' + un) : '✅';
-          tgNick.hidden = false;
-        } else {
-          tgNick.textContent = '';
-          tgNick.hidden = true;
-        }
-      }
       if (linked) {
         msgrTgBtn.title = t('tg_unlink_hover');
         msgrTgBtn.setAttribute('aria-label', t('tg_unlink_hover'));
@@ -1577,6 +1569,7 @@
         msgrTgBtn.title = t('tg_link_hover');
         msgrTgBtn.setAttribute('aria-label', t('tg_link_hover'));
       }
+      if (applyPhoneMask) applyPhoneMask();
     };
 
     const startTelegramFlow = async () => {
