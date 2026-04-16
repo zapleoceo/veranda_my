@@ -1396,6 +1396,14 @@
       }, 2000);
     };
 
+    const warnPlaceholder = (el) => {
+      if (!el || !el.classList) return;
+      el.classList.remove('ph-warn');
+      void el.offsetWidth;
+      el.classList.add('ph-warn');
+      setTimeout(() => { el.classList.remove('ph-warn'); }, 2100);
+    };
+
     const updateMsgrCountdownUi = () => {
       const nodes = document.querySelectorAll('[data-msgr-cd]');
       nodes.forEach((n) => {
@@ -1804,8 +1812,8 @@
             const msg = t('missing_prefix') + missing.join(', ');
             await logJs('submit prevented: missing fields', { missing });
             showReqToast(msg);
-            if (!name && reqName) reqName.focus();
-            else if ((!phone || !isPhoneValid(phone)) && reqPhone) reqPhone.focus();
+            if (!name && reqName) { warnPlaceholder(reqName); reqName.focus(); }
+            else if ((!phone || !isPhoneValid(phone)) && reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
             else if (!start && reqStart) reqStart.focus();
             else if (!isFinite(guests) || guests <= 0) { if (reqGuests) reqGuests.focus(); }
             syncSubmitState();

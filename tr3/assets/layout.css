@@ -1233,6 +1233,15 @@
     .modal { color-scheme: dark; }
     .modal select { background: rgba(0,0,0,0.22); }
     .modal select:invalid { color: rgba(255,255,255,0.62); }
+    .modal input::placeholder { color: rgba(245, 238, 228, 0.55); }
+    @keyframes placeholderWarnFade {
+      0% { color: rgba(229, 115, 115, 0.95); }
+      100% { color: rgba(245, 238, 228, 0.55); }
+    }
+    .modal input.ph-warn::placeholder {
+      color: rgba(229, 115, 115, 0.95);
+      animation: placeholderWarnFade 2s ease-out 1;
+    }
 
     .preorder-missing {
       border-color: rgba(229,115,115,0.75) !important;

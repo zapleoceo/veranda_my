@@ -63,7 +63,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0616">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260416_0624">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -286,13 +286,11 @@ $mk = function (string $l) use ($self, $baseQs) {
                 </div>
               </div>
               <label class="modal-label" id="reqNameLabel">
-                <span data-i18n="your_name"><?= htmlspecialchars(tr('your_name')) ?></span>
                 <input type="text" id="reqName" name="name" autocomplete="name" required maxlength="80" placeholder="<?= htmlspecialchars(tr('your_name')) ?>">
               </label>
               <label class="modal-label" id="reqPhoneLabel">
                 <div class="label-row">
                   <div class="label-left">
-                    <span data-i18n="your_phone"><?= htmlspecialchars(tr('your_phone')) ?></span>
                     <span class="tg-nick" id="tgNick" hidden></span>
                     <span class="tg-nick" id="waNick" hidden></span>
                   </div>
@@ -387,7 +385,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260416_0616" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260416_0624" defer></script>
 </body>
 </html>
 
