@@ -117,8 +117,10 @@
       background: rgba(255,255,255,0.03);
       flex: 0 0 auto;
       justify-self: end;
-      position: relative;
-      z-index: 60;
+      position: fixed;
+      top: 5px;
+      right: 5px;
+      z-index: 999;
     }
     @media (max-width: 640px) {
       .topbar {
@@ -129,7 +131,7 @@
       .title-wrap { justify-self: stretch; }
       .title-wrap h1 { text-align: left; }
       .date-wrap { justify-content: flex-start; }
-      .lang { position: absolute; top: 5px; right: 5px; padding: 5px; }
+      .lang { padding: 5px; }
       .controls { justify-self: stretch; justify-content: center; }
       .map-invite { margin-top: 5px; }
     }
@@ -1126,17 +1128,7 @@
     .msgr-actions { display: inline-flex; align-items: center; gap: 6px; }
     .phone-field { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; }
     .phone-field input { flex: 1 1 auto; min-width: 0; padding-right: 14px; }
-    .phone-field .msgr-hint {
-      position: absolute;
-      right: 0;
-      top: -16px;
-      max-width: 100%;
-      text-align: right;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      pointer-events: none;
-    }
+    #reqPhoneLabel .msgr-hint { margin-top: 4px; }
     #reqModal.msgr-state-none .phone-field input { flex: 1 1 auto; max-width: none; }
     #reqModal.msgr-state-none .phone-field .msgr-actions { margin-left: auto; flex: 0 0 auto; }
     #reqModal.msgr-state-wa .phone-field input,
@@ -1455,10 +1447,8 @@
 
       .label-right { gap: 5px; }
       .msgr-actions { gap: 5px; }
-      .phone-field { flex-wrap: wrap; }
-      .phone-field input { order: 1; }
-      .phone-field #msgrActions { order: 2; }
-      .phone-field .msgr-hint { position: static; order: 3; flex: 1 0 100%; margin-top: 2px; text-align: right; pointer-events: none; }
+      .phone-field { flex-wrap: nowrap; }
+      #reqPhoneLabel .msgr-hint { margin-top: 2px; }
       #reqModal #msgrActions .msgr-btn { width: 30px !important; height: 30px !important; border-radius: 9px; }
       #reqModal #msgrActions .msgr-btn svg { width: 16px !important; height: 16px !important; }
       .msgr-cd { right: 2px; bottom: 2px; font-size: 8px; }

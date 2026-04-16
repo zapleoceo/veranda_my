@@ -411,16 +411,15 @@
     if (reqPhone) {
       const applyPhoneMask = () => {
         const digits = phoneDigits(reqPhone.value);
-        const next = '+' + digits;
+        const next = digits ? ('+' + digits) : '';
         if (reqPhone.value !== next) reqPhone.value = next;
-        if (reqPhone.selectionStart != null && reqPhone.selectionStart < 1) reqPhone.setSelectionRange(1, 1);
+        if (digits && reqPhone.selectionStart != null && reqPhone.selectionStart < 1) reqPhone.setSelectionRange(1, 1);
       };
       reqPhone.addEventListener('focus', () => {
-        if (!String(reqPhone.value || '').trim()) reqPhone.value = '+';
         applyPhoneMask();
       });
       reqPhone.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && (reqPhone.selectionStart || 0) <= 1 && (reqPhone.selectionEnd || 0) <= 1) {
+        if (e.key === 'Backspace' && String(reqPhone.value || '').startsWith('+') && (reqPhone.selectionStart || 0) <= 1 && (reqPhone.selectionEnd || 0) <= 1) {
           e.preventDefault();
         }
       });
