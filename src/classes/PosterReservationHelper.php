@@ -176,10 +176,6 @@ class PosterReservationHelper {
                 return ['ok' => false, 'error' => 'Некорректное время брони'];
             }
             $dateReservation = $dt->format('Y-m-d H:i:s');
-            $nowSpot = new \DateTimeImmutable('now', $spotTz);
-            if ($dt < $nowSpot->modify('-1 minute')) {
-                return ['ok' => false, 'error' => 'Время брони уже прошло'];
-            }
 
             $rawCode = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string)($row['qr_code'] ?? '')));
             if ($rawCode === '') $rawCode = (string)$reservationId;
