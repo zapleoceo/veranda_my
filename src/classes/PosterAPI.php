@@ -66,6 +66,10 @@ class PosterAPI {
         if (isset($data['error'])) {
             $err = $data['error'];
             $msg = '';
+            $extra = '';
+            if (isset($data['message'])) $extra = (string)$data['message'];
+            elseif (isset($data['error_message'])) $extra = (string)$data['error_message'];
+            elseif (isset($data['errorMsg'])) $extra = (string)$data['errorMsg'];
             if (is_string($err)) {
                 $msg = $err;
             } elseif (is_int($err) || is_float($err)) {
@@ -79,6 +83,9 @@ class PosterAPI {
                 $msg = json_encode($err, JSON_UNESCAPED_UNICODE);
             }
             if (!is_string($msg) || $msg === '') $msg = 'Unknown error';
+            if ($extra !== '' && stripos($msg, $extra) === false) {
+                $msg .= ': ' . $extra;
+            }
             throw new \Exception("Poster API Error: " . $msg . " (http=" . (int)$httpCode . ", method=" . $method . ", params=" . json_encode($debugParams, JSON_UNESCAPED_UNICODE) . ")");
         }
 

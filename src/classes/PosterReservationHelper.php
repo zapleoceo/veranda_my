@@ -152,8 +152,17 @@ class PosterReservationHelper {
 
             if ($spotId === '0' || $spotId === '') $spotId = '1';
 
-            $phoneRaw = (string)($row['phone'] ?? '');
-            $phone = preg_replace('/\D+/', '', $phoneRaw);
+            $rawPhone = (string)($row['phone'] ?? '');
+            $digits = preg_replace('/\D+/', '', $rawPhone);
+            if ($digits === '') {
+                return ['ok' => false, 'error' => 'Телефон не указан'];
+            }
+            if (strpos($digits, '0') === 0 && strlen($digits) >= 10 && strlen($digits) <= 11) {
+                $digits = '84' . substr($digits, 1);
+            } elseif (strlen($digits) === 9 && preg_match('/^[35789]/', $digits)) {
+                $digits = '84' . $digits;
+            }
+            $phone = '+' . $digits;
 
             $dt = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string)$row['start_time']);
             if (!$dt) { try { $dt = new \DateTimeImmutable((string)$row['start_time']); } catch (\Throwable $e) {} }
