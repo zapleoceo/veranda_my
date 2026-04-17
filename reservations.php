@@ -997,7 +997,7 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
     <title>Брони</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="/assets/app.css?v=20260415_1200">
-    <link rel="stylesheet" href="/reservations/assets/css/reservations.css?v=20260417_1215">
+    <link rel="stylesheet" href="/reservations/assets/css/reservations.css?v=20260417_1236">
 </head>
 <body>
     <div class="container res-page">
@@ -1328,6 +1328,6 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
     <div class="res-hscroll" id="resHScroll" hidden><div class="res-hscroll-inner" id="resHScrollInner"></div></div>
 
     <script src="/assets/user_menu.js?v=20260417_1036"></script>
-    <script src="/reservations/assets/js/reservations.js?v=20260417_1215"></script>
+    <script src="/reservations/assets/js/reservations.js?v=20260417_1236"></script>
 </body>
 </html>
