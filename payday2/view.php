@@ -310,6 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
+$payday2AssetVersion = '20260417_1919';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,13 +325,13 @@ $fmtVnd = function (int $v): string {
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
   <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260414_0100">
-  <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=1776176619">
+  <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
 </head>
 <body>
 <div class="container">
     <div class="top-nav">
         <div class="nav-left">
-            <div class="nav-title">Payday</div>
+            <div class="nav-title" id="payday2BetaInfoBtn" style="cursor:pointer;">Payda2beta</div>
             <div class="tabs">
                 <button type="button" class="tab active" id="tabIn">IN</button>
                 <button type="button" class="tab" id="tabOut">OUT</button>
@@ -794,6 +795,7 @@ $fmtVnd = function (int $v): string {
                 <div style="display:flex; gap: 8px; align-items:center;">
                     <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
                     <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" style="padding: 4px 10px;">🔄</button>
+                    <button class="btn tiny" id="posterBalancesTelegramBtn" type="button" title="Отправить в Telegram" style="padding: 4px 10px;">✈</button>
                 </div>
             </div>
 
@@ -917,6 +919,21 @@ $fmtVnd = function (int $v): string {
                     </div>
                 </div>
             </div>
+            <div class="confirm-backdrop" id="payday2BetaModal">
+                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2BetaModalTitle">
+                    <h3 id="payday2BetaModalTitle">Payda2beta</h3>
+                    <div class="body">
+                        Это обновленная и оптимизированная версия payday.
+                        <br><br>
+                        Если что-то не работает, надо сообщить Диме.
+                        <br><br>
+                        <a href="/payday/" class="btn2 primary" style="display:inline-flex; text-decoration:none;">Payday</a>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn2" id="payday2BetaModalClose">Закрыть</button>
+                    </div>
+                </div>
+            </div>
             
 <script>
 window.PAYDAY_CONFIG = {
@@ -933,7 +950,7 @@ window.PAYDAY_CONFIG = {
     }, $links)), JSON_UNESCAPED_UNICODE) ?>
 };
 </script>
-<script src="/payday2/assets/js/payday2.js?v=<?= time() ?>"></script>
+<script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/assets/payday.js?v=20260414_0100" defer></script>
 </body>
 </html>
