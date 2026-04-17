@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_1919';
+$payday2AssetVersion = '20260417_1942';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -920,17 +920,16 @@ $payday2AssetVersion = '20260417_1919';
                 </div>
             </div>
             <div class="confirm-backdrop" id="payday2BetaModal">
-                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2BetaModalTitle">
+                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2BetaModalTitle" style="max-width: 440px;">
                     <h3 id="payday2BetaModalTitle">Payda2beta</h3>
-                    <div class="body">
+                    <div class="body" style="text-align:center; line-height:1.35;">
                         Это обновленная и оптимизированная версия payday.
                         <br><br>
                         Если что-то не работает, надо сообщить Диме.
-                        <br><br>
-                        <a href="/payday/" class="btn2 primary" style="display:inline-flex; text-decoration:none;">Payday</a>
                     </div>
-                    <div class="actions">
-                        <button type="button" class="btn2" id="payday2BetaModalClose">Закрыть</button>
+                    <div class="actions" style="justify-content:center;">
+                        <a href="/payday/" class="btn2 primary" style="display:inline-flex; text-decoration:none; min-width: 140px; justify-content:center;">Payday</a>
+                        <button type="button" class="btn2" id="payday2BetaModalClose" style="min-width: 140px;">Закрыть</button>
                     </div>
                 </div>
             </div>
