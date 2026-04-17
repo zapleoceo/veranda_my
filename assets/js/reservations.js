@@ -1,81 +1,86 @@
 (() => {
   const q = (sel, root = document) => root.querySelector(sel);
   const qa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+  const endpoint = (() => {
+    const p = String(location.pathname || '').replace(/\/+$/, '');
+    return p === '' ? '/reservations' : p;
+  })();
 
   const bindSort = () => {
-    const table = q('.res-table');
+    const table = q('#resTable') || q('.res-table');
     const tbody = table ? q('tbody', table) : null;
     if (!table || !tbody) return;
 
-    const parseDateTime = (s) => {
-      const m = String(s || '').match(/(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/);
-      if (!m) return 0;
-      const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), Number(m[4]), Number(m[5]), 0, 0);
-      return d.getTime() || 0;
-    };
-    const getCellText = (row, idx) => {
-      const td = row && row.children ? row.children[idx] : null;
-      return td ? String(td.textContent || '').trim() : '';
-    };
-    const toNum = (s) => {
-      const n = Number(String(s || '').replace(/[^\d.-]+/g, ''));
-      return isFinite(n) ? n : 0;
-    };
-
-    const headers = qa('th[data-sort]', table);
-    headers.forEach((th) => {
-      if (!th.dataset.baseLabel) th.dataset.baseLabel = String(th.textContent || '').replace(/[↑↓]/g, '').trim();
+    const headers = qa('thead .res-head-cols th[data-col]', table);
+    const sortable = headers.filter((th) => !!th.dataset.sort);
+    sortable.forEach((th) => {
+      if (!th.dataset.baseLabel) th.dataset.baseLabel = String(th.textContent || '').trim();
     });
 
-    const applyHeaderArrows = (sort, order) => {
-      headers.forEach((th) => {
-        const base = String(th.dataset.baseLabel || th.textContent || '').replace(/[↑↓]/g, '').trim();
-        const key = String(th.dataset.sort || '');
-        if (key === sort) th.textContent = base + (order === 'asc' ? ' ↑' : ' ↓');
+    const parseVal = (td, type) => {
+      const raw = td ? (td.dataset.sortValue != null ? String(td.dataset.sortValue) : String(td.textContent || '').trim()) : '';
+      if (type === 'num') {
+        const n = Number(String(raw).replace(/[^\d.-]+/g, ''));
+        return isFinite(n) ? n : 0;
+      }
+      if (type === 'date') {
+        const n = Number(raw);
+        return isFinite(n) ? n : 0;
+      }
+      return String(raw || '').toLowerCase();
+    };
+
+    const applyHeaderArrows = (col, order) => {
+      sortable.forEach((th) => {
+        const base = String(th.dataset.baseLabel || th.textContent || '').trim();
+        const k = String(th.dataset.col || '');
+        if (k === col) th.textContent = base + (order === 'asc' ? ' ↑' : ' ↓');
         else th.textContent = base;
       });
     };
 
-    const sortRows = (sort, order) => {
+    const sortRows = (col, type, order) => {
       const rows = qa('tr', tbody).filter((r) => r.querySelector('td'));
       const withKey = rows.map((r, i) => ({ r, i }));
-
-      const colIdx = (() => {
-        const map = { id: 0, qr_code: 1, created_at: 2, start_time: 3, table_num: 4, guests: 5, name: 6, total_amount: 7 };
-        return map[sort] != null ? map[sort] : 3;
-      })();
-
-      const cmp = (a, b) => {
-        const ta = getCellText(a.r, colIdx);
-        const tb = getCellText(b.r, colIdx);
-        let va = ta, vb = tb;
-        if (sort === 'created_at' || sort === 'start_time') { va = parseDateTime(ta); vb = parseDateTime(tb); }
-        if (sort === 'id' || sort === 'guests' || sort === 'total_amount' || sort === 'table_num') { va = toNum(ta); vb = toNum(tb); }
+      withKey.sort((a, b) => {
+        const ta = a.r.querySelector(`td[data-col="${CSS.escape(col)}"]`);
+        const tb = b.r.querySelector(`td[data-col="${CSS.escape(col)}"]`);
+        const va = parseVal(ta, type);
+        const vb = parseVal(tb, type);
         if (va < vb) return order === 'asc' ? -1 : 1;
         if (va > vb) return order === 'asc' ? 1 : -1;
         return a.i - b.i;
-      };
-
-      withKey.sort(cmp);
+      });
       withKey.forEach(({ r }) => tbody.appendChild(r));
     };
 
     const url = new URL(location.href);
-    let currentSort = url.searchParams.get('sort') || 'start_time';
+    let currentCol = url.searchParams.get('col') || 'start_time';
     let currentOrder = url.searchParams.get('order') || 'desc';
-    applyHeaderArrows(currentSort, currentOrder);
+    const initialTh = sortable.find((th) => String(th.dataset.col || '') === currentCol) || sortable.find((th) => String(th.dataset.sort || '') === currentCol);
+    if (initialTh) {
+      const col = String(initialTh.dataset.col || '');
+      const type = String(initialTh.dataset.type || 'text');
+      sortRows(col, type, currentOrder);
+      applyHeaderArrows(col, currentOrder);
+      currentCol = col;
+    } else if (sortable[0]) {
+      currentCol = String(sortable[0].dataset.col || '');
+      applyHeaderArrows(currentCol, currentOrder);
+    }
 
-    headers.forEach((th) => {
+    sortable.forEach((th) => {
       th.addEventListener('click', () => {
-        const sort = String(th.dataset.sort || '');
-        if (!sort) return;
-        if (currentSort === sort) currentOrder = currentOrder === 'asc' ? 'desc' : 'asc';
-        else { currentSort = sort; currentOrder = 'desc'; }
-        sortRows(currentSort, currentOrder);
-        applyHeaderArrows(currentSort, currentOrder);
+        const col = String(th.dataset.col || '');
+        const type = String(th.dataset.type || 'text');
+        if (!col) return;
+        if (currentCol === col) currentOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+        else { currentCol = col; currentOrder = 'desc'; }
+        sortRows(currentCol, type, currentOrder);
+        applyHeaderArrows(currentCol, currentOrder);
 
         const next = new URL(location.href);
-        next.searchParams.set('sort', currentSort);
+        next.searchParams.set('col', currentCol);
         next.searchParams.set('order', currentOrder);
         history.replaceState({}, '', next.toString());
       });
@@ -109,7 +114,7 @@
           statusEl.style.color = 'var(--muted)';
         }
         try {
-          const { res, j } = await postForm('reservations.php?ajax=resend', { id, target });
+          const { res, j } = await postForm(endpoint + '?ajax=resend', { id, target });
           if (res.ok && j && j.ok) {
             const parts = [];
             const guestChannel = String(j.guest_channel || (j.has_tg ? 'telegram' : '')).toLowerCase();
@@ -186,7 +191,7 @@
         if (!ok) return;
         btn.disabled = true;
         try {
-          const { res, j } = await postForm('reservations.php?ajax=toggle_deleted', { id, deleted: isDeleted ? '0' : '1' });
+          const { res, j } = await postForm(endpoint + '?ajax=toggle_deleted', { id, deleted: isDeleted ? '0' : '1' });
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
           setRowDeletedState(row, !!j.deleted, String(j.deleted_by || ''), String(j.deleted_at || ''));
         } catch (e) {
@@ -261,7 +266,7 @@
       }
       
       try {
-        const { res, j } = await postForm('reservations.php?ajax=vposter', { id });
+        const { res, j } = await postForm(endpoint + '?ajax=vposter', { id });
         if (res.ok && j && j.ok) {
           if (statusEl) {
             statusEl.textContent = j.duplicate ? 'В Poster: уже было ✅' : 'В Poster: создано ✅';
@@ -310,9 +315,162 @@
     });
   };
 
+  const bindColumns = () => {
+    const table = q('#resTable') || q('.res-table');
+    const wrap = q('#resTableWrap') || q('.table-wrap');
+    const groupRow = table ? q('thead .res-head-group', table) : null;
+    const colRow = table ? q('thead .res-head-cols', table) : null;
+    const btn = q('#resColBtn');
+    const panel = q('#resColPanel');
+    if (!table || !wrap || !groupRow || !colRow || !btn || !panel) return;
+
+    const ths = qa('th[data-col]', colRow);
+    const cols = ths.map((th) => ({
+      col: String(th.dataset.col || ''),
+      label: String(th.dataset.baseLabel || th.textContent || '').trim(),
+      side: String(th.dataset.side || 'site'),
+    })).filter((c) => c.col !== '');
+
+    const key = 'res_cols_hidden_v1';
+    const hidden = (() => {
+      try {
+        const v = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(v) ? v.map(String) : [];
+      } catch {
+        return [];
+      }
+    })();
+
+    const setVisible = (col, visible) => {
+      const list = qa(`[data-col="${CSS.escape(col)}"]`, table);
+      list.forEach((el) => {
+        el.style.display = visible ? '' : 'none';
+      });
+    };
+
+    const applyAll = () => {
+      cols.forEach((c) => setVisible(c.col, !hidden.includes(c.col)));
+
+      const visibleCols = cols.filter((c) => !hidden.includes(c.col));
+      const siteCount = visibleCols.filter((c) => c.side !== 'poster').length;
+      const posterCount = visibleCols.filter((c) => c.side === 'poster').length;
+      const siteTh = q('th[data-side="site"]', groupRow);
+      const posterTh = q('th[data-side="poster"]', groupRow);
+      if (siteTh) siteTh.colSpan = Math.max(1, siteCount);
+      if (posterTh) posterTh.colSpan = Math.max(1, posterCount);
+
+      const empty = q('tbody .res-empty td', table);
+      if (empty) empty.colSpan = Math.max(1, visibleCols.length);
+    };
+
+    panel.textContent = '';
+    cols.forEach((c) => {
+      const row = document.createElement('label');
+      row.className = 'res-colrow';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !hidden.includes(c.col);
+      cb.addEventListener('change', () => {
+        const idx = hidden.indexOf(c.col);
+        if (cb.checked) {
+          if (idx !== -1) hidden.splice(idx, 1);
+        } else {
+          if (idx === -1) hidden.push(c.col);
+        }
+        localStorage.setItem(key, JSON.stringify(hidden));
+        applyAll();
+        window.dispatchEvent(new Event('resize'));
+      });
+      const lbl = document.createElement('span');
+      lbl.className = 'lbl';
+      lbl.textContent = c.label;
+      const side = document.createElement('span');
+      side.className = 'side';
+      side.textContent = c.side === 'poster' ? 'Poster' : 'Сайт';
+      row.appendChild(cb);
+      row.appendChild(lbl);
+      row.appendChild(side);
+      panel.appendChild(row);
+    });
+
+    const close = () => { panel.hidden = true; };
+    const open = () => { panel.hidden = false; };
+    btn.addEventListener('click', () => {
+      panel.hidden ? open() : close();
+    });
+    document.addEventListener('click', (e) => {
+      const t = e.target;
+      if (!t) return;
+      if (panel.hidden) return;
+      if (panel.contains(t) || btn.contains(t)) return;
+      close();
+    });
+
+    applyAll();
+  };
+
+  const bindLayout = () => {
+    const wrap = q('#resTableWrap') || q('.table-wrap');
+    const table = q('#resTable') || q('.res-table');
+    const hscroll = q('#resHScroll');
+    const hinner = q('#resHScrollInner');
+    if (!wrap || !table || !hscroll || !hinner) return;
+
+    let syncing = false;
+    const updateHScroll = () => {
+      const sw = table.scrollWidth || 0;
+      const cw = wrap.clientWidth || 0;
+      const need = sw > cw + 2;
+      hscroll.hidden = !need;
+      document.body.classList.toggle('res-hscroll-on', need);
+      if (!need) return;
+      hinner.style.width = sw + 'px';
+      if (!syncing) hscroll.scrollLeft = wrap.scrollLeft;
+    };
+
+    const updateWrapHeight = () => {
+      const rect = wrap.getBoundingClientRect();
+      const barH = !hscroll.hidden ? hscroll.offsetHeight : 0;
+      const maxH = Math.floor(window.innerHeight - rect.top - barH - 12);
+      if (maxH > 240) wrap.style.maxHeight = maxH + 'px';
+    };
+
+    const updateStickyOffsets = () => {
+      const group = q('thead .res-head-group', table);
+      if (!group) return;
+      const h = Math.ceil(group.getBoundingClientRect().height || 0);
+      if (h > 0) document.documentElement.style.setProperty('--resHead1H', h + 'px');
+    };
+
+    hscroll.addEventListener('scroll', () => {
+      if (syncing) return;
+      syncing = true;
+      wrap.scrollLeft = hscroll.scrollLeft;
+      syncing = false;
+    });
+    wrap.addEventListener('scroll', () => {
+      if (syncing) return;
+      syncing = true;
+      hscroll.scrollLeft = wrap.scrollLeft;
+      syncing = false;
+    });
+
+    const onResize = () => {
+      updateStickyOffsets();
+      updateHScroll();
+      updateWrapHeight();
+    };
+
+    window.addEventListener('resize', onResize);
+    onResize();
+    setTimeout(onResize, 50);
+  };
+
   bindSort();
   bindResend();
   bindVPoster();
   bindDelete();
   bindShowDeleted();
+  bindColumns();
+  bindLayout();
 })();

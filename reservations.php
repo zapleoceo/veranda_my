@@ -716,7 +716,7 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                     <div class="title">Брони</div>
                     <div class="sub">Период и управление заявками</div>
                 </div>
-                <div class="res-controls" style="display: flex; gap: 15px; align-items: center;">
+                <div class="res-controls">
                     <label class="res-switch">
                         <input id="showPoster" type="checkbox" <?= $showPoster ? 'checked' : '' ?>>
                         <span>Брони Poster</span>
@@ -725,6 +725,10 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                         <input id="showDeleted" type="checkbox" <?= $showDeleted ? 'checked' : '' ?>>
                         <span>Удалённые</span>
                     </label>
+                    <div class="res-colmenu" id="resColMenu">
+                        <button type="button" class="res-btn res-colbtn" id="resColBtn">Колонки</button>
+                        <div class="res-colpanel" id="resColPanel" hidden></div>
+                    </div>
                 </div>
             </div>
 
@@ -746,40 +750,40 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                 <button type="submit" class="btn-primary">Показать</button>
             </form>
 
-            <div class="table-wrap">
-                <table class="res-table">
+            <div class="table-wrap" id="resTableWrap">
+                <table class="res-table" id="resTable">
                     <thead>
-                        <tr>
-                            <th colspan="10">Сайт</th>
+                        <tr class="res-head-group">
+                            <th colspan="10" data-side="site">Сайт</th>
                             <?php if ($showPoster): ?>
-                                <th colspan="7">Poster</th>
+                                <th colspan="7" data-side="poster">Poster</th>
                             <?php endif; ?>
                         </tr>
-                        <tr>
-                            <th data-sort="id">ID<?= $sort==='id'?($order==='asc'?' ↑':' ↓'):'' ?></th>
-                            <th data-sort="qr_code">Код<?= $sort==='qr_code'?($order==='asc'?' ↑':' ↓'):'' ?></th>
-                            <th data-sort="created_at">Создано<?= $sort==='created_at'?($order==='asc'?' ↑':' ↓'):'' ?></th>
-                            <th data-sort="start_time">Время брони<?= $sort==='start_time'?($order==='asc'?' ↑':' ↓'):'' ?></th>
-                            <th data-sort="table_num">Стол<?= $sort==='table_num'?($order==='asc'?' ↑':' ↓'):'' ?></th>
-                            <th data-sort="guests">Гостей<?= $sort==='guests'?($order==='asc'?' ↑':' ↓'):'' ?></th>
-                            <th data-sort="name">Гость<?= $sort==='name'?($order==='asc'?' ↑':' ↓'):'' ?></th>
-                            <th data-sort="total_amount">Сумма<?= $sort==='total_amount'?($order==='asc'?' ↑':' ↓'):'' ?></th>
-                            <th>QR</th>
-                            <th>Действия</th>
+                        <tr class="res-head-cols">
+                            <th data-col="id" data-side="site" data-sort="id" data-type="num">ID</th>
+                            <th data-col="qr_code" data-side="site" data-sort="qr_code" data-type="text">Код</th>
+                            <th data-col="created_at" data-side="site" data-sort="created_at" data-type="date">Создано</th>
+                            <th data-col="start_time" data-side="site" data-sort="start_time" data-type="date">Время брони</th>
+                            <th data-col="table_num" data-side="site" data-sort="table_num" data-type="num">Стол</th>
+                            <th data-col="guests" data-side="site" data-sort="guests" data-type="num">Гостей</th>
+                            <th data-col="name" data-side="site" data-sort="name" data-type="text">Гость</th>
+                            <th data-col="total_amount" data-side="site" data-sort="total_amount" data-type="num">Сумма</th>
+                            <th data-col="qr_url" data-side="site" data-sort="qr_url" data-type="text">QR</th>
+                            <th data-col="actions" data-side="site">Действия</th>
                             <?php if ($showPoster): ?>
-                                <th>Poster ID</th>
-                                <th>Создано</th>
-                                <th>Время</th>
-                                <th>Стол</th>
-                                <th>Гостей</th>
-                                <th>Гость</th>
-                                <th>Телефон</th>
+                                <th data-col="p_id" data-side="poster" data-sort="p_id" data-type="num">Poster ID</th>
+                                <th data-col="p_created_at" data-side="poster" data-sort="p_created_at" data-type="date">Создано</th>
+                                <th data-col="p_start_time" data-side="poster" data-sort="p_start_time" data-type="date">Время</th>
+                                <th data-col="p_table_num" data-side="poster" data-sort="p_table_num" data-type="num">Стол</th>
+                                <th data-col="p_guests" data-side="poster" data-sort="p_guests" data-type="num">Гостей</th>
+                                <th data-col="p_name" data-side="poster" data-sort="p_name" data-type="text">Гость</th>
+                                <th data-col="p_phone" data-side="poster" data-sort="p_phone" data-type="text">Телефон</th>
                             <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($viewRows)): ?>
-                            <tr><td colspan="<?= $showPoster ? 17 : 10 ?>" style="text-align:center; padding:20px; color:var(--muted);">Нет броней за выбранный период</td></tr>
+                            <tr class="res-empty"><td colspan="<?= $showPoster ? 17 : 10 ?>" class="res-empty-cell">Нет броней за выбранный период</td></tr>
                         <?php else: ?>
                             <?php foreach ($viewRows as $pair): ?>
                                 <?php
@@ -803,11 +807,19 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                                     [$startDate, $startTime] = is_array($r) ? $fmtSpotDateTimeParts($r['start_time'] ?? '') : ['', ''];
                                     [$pCreatedAtDate, $pCreatedAtTime] = is_array($p) ? $fmtSpotDateTimeParts($p['created_at'] ?? '') : ['', ''];
                                     [$pStartDate, $pStartTime] = is_array($p) ? $fmtSpotDateTimeParts($p['start_time'] ?? '') : ['', ''];
+                                    $createdAtTs = '';
+                                    if (is_array($r) && !empty($r['created_at'])) { $dtTmp = $parseSpotDt($r['created_at']); if ($dtTmp) $createdAtTs = (string)$dtTmp->getTimestamp(); }
+                                    $startTs = '';
+                                    if (is_array($r) && !empty($r['start_time'])) { $dtTmp = $parseSpotDt($r['start_time']); if ($dtTmp) $startTs = (string)$dtTmp->getTimestamp(); }
+                                    $pCreatedAtTs = '';
+                                    if (is_array($p) && !empty($p['created_at'])) { $dtTmp = $parseSpotDt($p['created_at']); if ($dtTmp) $pCreatedAtTs = (string)$dtTmp->getTimestamp(); }
+                                    $pStartTs = '';
+                                    if (is_array($p) && !empty($p['start_time'])) { $dtTmp = $parseSpotDt($p['start_time']); if ($dtTmp) $pStartTs = (string)$dtTmp->getTimestamp(); }
                                     $pIsDeleted = is_array($p) && (int)($p['status'] ?? 0) === 7;
                                     $isMerged = is_array($r) && is_array($p);
                                 ?>
                                 <tr<?= is_array($r) ? ' data-id="' . htmlspecialchars((string)($r['id'] ?? '')) . '"' : '' ?> class="<?= $isDeleted ? 'is-deleted' : '' ?> <?= $pIsDeleted ? 'is-poster is-deleted' : '' ?> <?= $isMerged ? 'is-merged' : '' ?>">
-                                    <td data-label="ID">
+                                    <td data-label="ID" data-col="id" data-sort-value="<?= is_array($r) ? (int)($r['id'] ?? 0) : '' ?>">
                                         <?= is_array($r) ? ('<div>#' . htmlspecialchars((string)($r['id'] ?? '')) . '</div>') : '<span class="res-muted">—</span>' ?>
                                         <?php if ($isDeleted): ?>
                                             <div class="tag deleted" id="deleted-tag-<?= htmlspecialchars((string)($r['id'] ?? '')) ?>">
@@ -818,12 +830,12 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                                             </div>
                                         <?php endif; ?>
                                     </td>
-                                    <td data-label="Код">
+                                    <td data-label="Код" data-col="qr_code" data-sort-value="<?= is_array($r) ? htmlspecialchars((string)($r['qr_code'] ?? ''), ENT_QUOTES) : '' ?>">
                                         <?php if (is_array($r) && !empty($r['qr_code'])): ?>
                                             <span class="tag"><?= htmlspecialchars((string)$r['qr_code']) ?></span>
                                         <?php else: ?><span class="res-muted">—</span><?php endif; ?>
                                     </td>
-                                    <td data-label="Создано">
+                                    <td data-label="Создано" data-col="created_at" data-sort-value="<?= htmlspecialchars((string)$createdAtTs, ENT_QUOTES) ?>">
                                         <?php if ($createdAtDate !== ''): ?>
                                             <div><?= htmlspecialchars($createdAtDate) ?></div>
                                             <div class="res-muted"><?= htmlspecialchars($createdAtTime) ?></div>
@@ -831,7 +843,7 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                                             —
                                         <?php endif; ?>
                                     </td>
-                                    <td data-label="Время" class="res-strong">
+                                    <td data-label="Время" class="res-strong" data-col="start_time" data-sort-value="<?= htmlspecialchars((string)$startTs, ENT_QUOTES) ?>">
                                         <?php if ($startDate !== ''): ?>
                                             <div><?= htmlspecialchars($startDate) ?></div>
                                             <div class="res-muted"><?= htmlspecialchars($startTime) ?></div>
@@ -839,23 +851,23 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                                             —
                                         <?php endif; ?>
                                     </td>
-                                    <td data-label="Стол"><?= is_array($r) ? htmlspecialchars((string)$r['table_num']) : '—' ?></td>
-                                    <td data-label="Гостей"><?= is_array($r) ? (int)$r['guests'] : '—' ?></td>
-                                    <td data-label="Гость">
+                                    <td data-label="Стол" data-col="table_num" data-sort-value="<?= is_array($r) ? (int)preg_replace('/\D+/', '', (string)($r['table_num'] ?? '')) : '' ?>"><?= is_array($r) ? htmlspecialchars((string)$r['table_num']) : '—' ?></td>
+                                    <td data-label="Гостей" data-col="guests" data-sort-value="<?= is_array($r) ? (int)($r['guests'] ?? 0) : '' ?>"><?= is_array($r) ? (int)$r['guests'] : '—' ?></td>
+                                    <td data-label="Гость" data-col="name" data-sort-value="<?= is_array($r) ? htmlspecialchars(mb_strtolower(trim((string)($r['name'] ?? ''))), ENT_QUOTES) : '' ?>">
                                         <?php if (is_array($r)): ?>
-                                            <div style="font-weight:900;"><?= htmlspecialchars((string)$r['name']) ?></div>
+                                            <div class="res-name"><?= htmlspecialchars((string)$r['name']) ?></div>
                                             <div class="res-muted"><?= htmlspecialchars((string)$r['phone']) ?></div>
                                         <?php else: ?>
                                             <span class="res-muted">—</span>
                                         <?php endif; ?>
                                         <?php if ($waPhoneNorm !== ''): ?>
                                             <?php $waClean = preg_replace('/\D+/', '', $waPhoneNorm); ?>
-                                            <div class="res-muted"><a href="https://wa.me/<?= htmlspecialchars($waClean) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">WA: +<?= htmlspecialchars($waClean) ?></a></div>
+                                            <div class="res-muted"><a class="res-link" href="https://wa.me/<?= htmlspecialchars($waClean) ?>" target="_blank">WA: +<?= htmlspecialchars($waClean) ?></a></div>
                                         <?php elseif ($tgUsername !== ''): ?>
-                                            <div class="res-muted"><a href="https://t.me/<?= htmlspecialchars($tgUsername) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">TG: @<?= htmlspecialchars($tgUsername) ?></a></div>
+                                            <div class="res-muted"><a class="res-link" href="https://t.me/<?= htmlspecialchars($tgUsername) ?>" target="_blank">TG: @<?= htmlspecialchars($tgUsername) ?></a></div>
                                         <?php endif; ?>
                                         <?php if (is_array($r) && !empty($r['zalo_phone'])): ?>
-                                            <div class="res-muted"><a href="https://zalo.me/<?= htmlspecialchars(ltrim((string)$r['zalo_phone'], '+')) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">Zalo: <?= htmlspecialchars((string)$r['zalo_phone']) ?></a></div>
+                                            <div class="res-muted"><a class="res-link" href="https://zalo.me/<?= htmlspecialchars(ltrim((string)$r['zalo_phone'], '+')) ?>" target="_blank">Zalo: <?= htmlspecialchars((string)$r['zalo_phone']) ?></a></div>
                                         <?php endif; ?>
                                         <?php if (is_array($r) && (!empty($r['comment']) || !empty($r['preorder_text']))): ?>
                                             <details class="res-more">
@@ -871,15 +883,15 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                                             </details>
                                         <?php endif; ?>
                                     </td>
-                                    <td data-label="Сумма"><?= (is_array($r) && (float)($r['total_amount'] ?? 0) > 0) ? number_format((float)$r['total_amount'], 0, '.', ' ') . ' ₫' : '—' ?></td>
-                                    <td data-label="QR">
+                                    <td data-label="Сумма" data-col="total_amount" data-sort-value="<?= is_array($r) ? (float)($r['total_amount'] ?? 0) : '' ?>"><?= (is_array($r) && (float)($r['total_amount'] ?? 0) > 0) ? number_format((float)$r['total_amount'], 0, '.', ' ') . ' ₫' : '—' ?></td>
+                                    <td data-label="QR" data-col="qr_url" data-sort-value="<?= is_array($r) ? htmlspecialchars((string)($r['qr_url'] ?? ''), ENT_QUOTES) : '' ?>">
                                         <?php if (is_array($r) && !empty($r['qr_url'])): ?>
-                                            <a href="<?= htmlspecialchars((string)$r['qr_url']) ?>" target="_blank" style="color:var(--accent); font-weight:900; text-decoration:none;">QR</a>
+                                            <a class="res-link res-link-strong" href="<?= htmlspecialchars((string)$r['qr_url']) ?>" target="_blank">QR</a>
                                         <?php else: ?>
                                             <span class="res-muted">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td data-label="Действия">
+                                    <td data-label="Действия" data-col="actions">
                                         <?php if (is_array($r)): ?>
                                             <div class="res-actions">
                                                 <?php $guestBtnClass = $waPhoneNorm !== '' ? 'contact-wa' : ($tgUsername !== '' || (int)($r['tg_user_id'] ?? 0) > 0 ? 'contact-tg' : ''); ?>
@@ -904,8 +916,8 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                                         <?php endif; ?>
                                     </td>
                                     <?php if ($showPoster): ?>
-                                        <td data-label="Poster ID"><?= is_array($p) && !empty($p['incoming_order_id']) ? htmlspecialchars((string)$p['incoming_order_id']) : '—' ?></td>
-                                        <td data-label="Создано">
+                                        <td data-label="Poster ID" data-col="p_id" data-sort-value="<?= is_array($p) ? (int)($p['incoming_order_id'] ?? 0) : '' ?>"><?= is_array($p) && !empty($p['incoming_order_id']) ? htmlspecialchars((string)$p['incoming_order_id']) : '—' ?></td>
+                                        <td data-label="Создано" data-col="p_created_at" data-sort-value="<?= htmlspecialchars((string)$pCreatedAtTs, ENT_QUOTES) ?>">
                                             <?php if ($pCreatedAtDate !== ''): ?>
                                                 <div><?= htmlspecialchars($pCreatedAtDate) ?></div>
                                                 <div class="res-muted"><?= htmlspecialchars($pCreatedAtTime) ?></div>
@@ -913,7 +925,7 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                                                 —
                                             <?php endif; ?>
                                         </td>
-                                        <td data-label="Время" class="res-strong">
+                                        <td data-label="Время" class="res-strong" data-col="p_start_time" data-sort-value="<?= htmlspecialchars((string)$pStartTs, ENT_QUOTES) ?>">
                                             <?php if ($pStartDate !== ''): ?>
                                                 <div><?= htmlspecialchars($pStartDate) ?></div>
                                                 <div class="res-muted"><?= htmlspecialchars($pStartTime) ?></div>
@@ -921,10 +933,10 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                                                 —
                                             <?php endif; ?>
                                         </td>
-                                        <td data-label="Стол"><?= is_array($p) ? htmlspecialchars((string)($p['table_num'] ?? '')) : '—' ?></td>
-                                        <td data-label="Гостей"><?= is_array($p) ? (int)($p['guests'] ?? 0) : '—' ?></td>
-                                        <td data-label="Гость"><?= is_array($p) ? htmlspecialchars((string)($p['name'] ?? '')) : '—' ?></td>
-                                        <td data-label="Телефон"><?= is_array($p) ? htmlspecialchars((string)($p['phone'] ?? '')) : '—' ?></td>
+                                        <td data-label="Стол" data-col="p_table_num" data-sort-value="<?= is_array($p) ? (int)preg_replace('/\D+/', '', (string)($p['table_num'] ?? '')) : '' ?>"><?= is_array($p) ? htmlspecialchars((string)($p['table_num'] ?? '')) : '—' ?></td>
+                                        <td data-label="Гостей" data-col="p_guests" data-sort-value="<?= is_array($p) ? (int)($p['guests'] ?? 0) : '' ?>"><?= is_array($p) ? (int)($p['guests'] ?? 0) : '—' ?></td>
+                                        <td data-label="Гость" data-col="p_name" data-sort-value="<?= is_array($p) ? htmlspecialchars(mb_strtolower(trim((string)($p['name'] ?? ''))), ENT_QUOTES) : '' ?>"><?= is_array($p) ? htmlspecialchars((string)($p['name'] ?? '')) : '—' ?></td>
+                                        <td data-label="Телефон" data-col="p_phone" data-sort-value="<?= is_array($p) ? htmlspecialchars((string)($p['phone'] ?? ''), ENT_QUOTES) : '' ?>"><?= is_array($p) ? htmlspecialchars((string)($p['phone'] ?? '')) : '—' ?></td>
                                     <?php endif; ?>
                                 </tr>
                             <?php endforeach; ?>
@@ -942,7 +954,7 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
             <div class="res-modal-body">
                 Вы собираетесь отправить эту бронь в Poster POS.<br><br>
                 Это создаст официальную бронь на терминале официанта. Убедитесь, что все данные верны.
-                <div id="vposterModalInfo" style="margin-top:12px; font-weight:900;"></div>
+                <div id="vposterModalInfo" class="res-modal-info"></div>
             </div>
             <label class="res-modal-check">
                 <input type="checkbox" id="vposterConfirmCheck">
@@ -955,7 +967,9 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
         </div>
     </div>
 
-    <script src="/assets/user_menu.js?v=20260415_2335"></script>
-    <script src="/assets/js/reservations.js?v=20260415_2335"></script>
+    <div class="res-hscroll" id="resHScroll" hidden><div class="res-hscroll-inner" id="resHScrollInner"></div></div>
+
+    <script src="/assets/user_menu.js?v=20260417_1030"></script>
+    <script src="/assets/js/reservations.js?v=20260417_1030"></script>
 </body>
 </html>
