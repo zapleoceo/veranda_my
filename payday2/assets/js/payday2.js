@@ -143,6 +143,9 @@ window.initPayday2 = function() {
         .replaceAll("'", '&#039;');
 
     const modeToggleEl = document.getElementById('modeToggle');
+    const payday2BetaInfoBtn = document.getElementById('payday2BetaInfoBtn');
+    const payday2BetaModal = document.getElementById('payday2BetaModal');
+    const payday2BetaModalClose = document.getElementById('payday2BetaModalClose');
     const applyMode = (mode) => {
         const m = (mode === 'lite') ? 'lite' : 'full';
         document.body.classList.toggle('mode-lite', m === 'lite');
@@ -259,6 +262,24 @@ window.initPayday2 = function() {
         if (search.get('tab') === 'out') initialTab = 'out';
     } catch (_) {}
     setTab(initialTab);
+    const openPayday2BetaModal = () => {
+        if (payday2BetaModal) payday2BetaModal.style.display = 'flex';
+    };
+    const closePayday2BetaModal = () => {
+        if (payday2BetaModal) payday2BetaModal.style.display = 'none';
+    };
+    if (payday2BetaInfoBtn) payday2BetaInfoBtn.addEventListener('click', openPayday2BetaModal);
+    if (payday2BetaModalClose) payday2BetaModalClose.addEventListener('click', closePayday2BetaModal);
+    if (payday2BetaModal) {
+        payday2BetaModal.addEventListener('click', (ev) => {
+            if (ev.target === payday2BetaModal) closePayday2BetaModal();
+        });
+    }
+    document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape' && payday2BetaModal && payday2BetaModal.style.display === 'flex') {
+            closePayday2BetaModal();
+        }
+    });
     const loadOutMail = (onProgress) => {
         const { dateFrom, dateTo } = getDateRange();
         const qs = new URLSearchParams({ dateFrom, dateTo, include_hidden: '1' });
@@ -997,6 +1018,7 @@ window.initPayday2 = function() {
     const balVietnamDiffEl = document.getElementById('balVietnamDiff');
     const balCashDiffEl = document.getElementById('balCashDiff');
     const balTotalDiffEl = document.getElementById('balTotalDiff');
+    const posterBalancesTelegramBtn = document.getElementById('posterBalancesTelegramBtn');
 
     const fmtIntSpaces = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
     const fmtVndCentsJs = (cents) => {
@@ -1124,6 +1146,75 @@ window.initPayday2 = function() {
                     posterAccountsBtn.classList.remove('loading');
                     posterAccountsBtn.disabled = false;
                 });
+        });
+    }
+    const collectPosterBalancePayload = () => {
+        const getText = (el) => el ? String(el.textContent || '').trim() : '—';
+        const getVal = (el) => el ? String(el.value || '').trim() : '';
+        const summaryRows = [
+            {
+                label: 'Счет Андрей',
+                poster: getText(balAndreyEl),
+                actual: getVal(balAndreyActualEl) || '—',
+                diff: getText(balAndreyDiffEl),
+            },
+            {
+                label: 'Вьет. счет',
+                poster: getText(balVietnamEl),
+                actual: getVal(balVietnamActualEl) || '—',
+                diff: getText(balVietnamDiffEl),
+            },
+            {
+                label: 'Касса',
+                poster: getText(balCashEl),
+                actual: getVal(balCashActualEl) || '—',
+                diff: getText(balCashDiffEl),
+            },
+            {
+                label: 'Total',
+                poster: getText(balTotalEl),
+                actual: getVal(balTotalActualEl) || '—',
+                diff: getText(balTotalDiffEl),
+            },
+        ];
+        const accountsRows = posterAccountsTbody
+            ? Array.from(posterAccountsTbody.querySelectorAll('tr')).map((tr) => {
+                const tds = tr.querySelectorAll('td');
+                return {
+                    id: tds[0] ? String(tds[0].textContent || '').trim() : '',
+                    name: tds[1] ? String(tds[1].textContent || '').trim() : '',
+                    balance: tds[2] ? String(tds[2].textContent || '').trim() : '',
+                };
+            }).filter((row) => row.id || row.name || row.balance)
+            : [];
+        return {
+            dateFrom: window.PAYDAY_CONFIG.dateFrom,
+            dateTo: window.PAYDAY_CONFIG.dateTo,
+            summaryRows,
+            accountsRows,
+        };
+    };
+    if (posterBalancesTelegramBtn) {
+        posterBalancesTelegramBtn.addEventListener('click', async () => {
+            const restore = setBtnBusy(posterBalancesTelegramBtn, { title: 'Telegram', pct: 0 });
+            try {
+                updateBtnBusy(posterBalancesTelegramBtn, { pct: 20, title: 'Telegram' });
+                const payload = collectPosterBalancePayload();
+                updateBtnBusy(posterBalancesTelegramBtn, { pct: 55, title: 'Telegram' });
+                const res = await fetch('?ajax=poster_balances_telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const j = await res.json();
+                if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка отправки в Telegram');
+                updateBtnBusy(posterBalancesTelegramBtn, { pct: 100, title: 'Отправлено' });
+                setTimeout(() => alert('Баланс отправлен в Telegram'), 120);
+            } catch (e) {
+                alert(e && e.message ? e.message : 'Ошибка отправки в Telegram');
+            } finally {
+                setTimeout(() => restore(), 200);
+            }
         });
     }
 

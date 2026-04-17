@@ -1471,6 +1471,109 @@ if (($_GET['ajax'] ?? '') === 'poster_accounts') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'poster_balances_telegram') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $raw = file_get_contents('php://input');
+        $j = json_decode($raw ?: '[]', true);
+        if (!is_array($j)) $j = [];
+
+        $dateFromPayload = trim((string)($j['dateFrom'] ?? $dateFrom ?? ''));
+        $dateToPayload = trim((string)($j['dateTo'] ?? $dateTo ?? ''));
+        $summaryRows = is_array($j['summaryRows'] ?? null) ? $j['summaryRows'] : [];
+        $accountsRows = is_array($j['accountsRows'] ?? null) ? $j['accountsRows'] : [];
+
+        $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+        $tgChatId = trim((string)($_ENV['PAYDAY_BALANCE_TELEGRAM_CHAT_ID'] ?? '3889942420'));
+        $tgThreadId = trim((string)($_ENV['PAYDAY_BALANCE_TELEGRAM_THREAD_ID'] ?? ''));
+        $tgReplyTo = trim((string)($_ENV['PAYDAY_BALANCE_TELEGRAM_REPLY_TO'] ?? '1561'));
+        $tgThreadNum = ($tgThreadId !== '' && ctype_digit($tgThreadId)) ? (int)$tgThreadId : null;
+        $tgReplyToNum = ($tgReplyTo !== '' && ctype_digit($tgReplyTo)) ? (int)$tgReplyTo : null;
+
+        if ($tgToken === '' || $tgChatId === '') {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'Telegram not configured'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $safe = function ($v): string {
+            return htmlspecialchars(trim((string)$v), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        };
+        $pad = function (string $s, int $width): string {
+            $txt = trim($s);
+            $len = function_exists('mb_strwidth') ? mb_strwidth($txt, 'UTF-8') : strlen($txt);
+            if ($len >= $width) return $txt;
+            return $txt . str_repeat(' ', $width - $len);
+        };
+        $truncate = function (string $s, int $max): string {
+            $txt = trim($s);
+            if (function_exists('mb_strwidth') && function_exists('mb_strimwidth')) {
+                return mb_strwidth($txt, 'UTF-8') > $max ? rtrim(mb_strimwidth($txt, 0, $max - 1, '', 'UTF-8')) . '…' : $txt;
+            }
+            return strlen($txt) > $max ? (substr($txt, 0, max(0, $max - 1)) . '…') : $txt;
+        };
+
+        $periodLabel = ($dateFromPayload !== '' && $dateToPayload !== '' && $dateFromPayload !== $dateToPayload)
+            ? ($dateFromPayload . ' — ' . $dateToPayload)
+            : ($dateToPayload !== '' ? $dateToPayload : $dateFromPayload);
+        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+
+        $summaryBlock = "Показатель           Poster      Факт.      Разница\n";
+        foreach ($summaryRows as $row) {
+            if (!is_array($row)) continue;
+            $label = $truncate((string)($row['label'] ?? ''), 20);
+            $poster = $truncate((string)($row['poster'] ?? '—'), 10);
+            $fact = $truncate((string)($row['actual'] ?? '—'), 10);
+            $diff = $truncate((string)($row['diff'] ?? '—'), 10);
+            $summaryBlock .= $pad($label, 20) . ' ' . $pad($poster, 10) . ' ' . $pad($fact, 10) . ' ' . $pad($diff, 10) . "\n";
+        }
+
+        $accountsBlock = "ID   Счёт                     Баланс\n";
+        $maxAccounts = 25;
+        $countAccounts = 0;
+        foreach ($accountsRows as $row) {
+            if (!is_array($row)) continue;
+            if ($countAccounts >= $maxAccounts) break;
+            $id = $truncate((string)($row['id'] ?? ''), 4);
+            $name = $truncate((string)($row['name'] ?? ''), 24);
+            $balance = $truncate((string)($row['balance'] ?? ''), 12);
+            $accountsBlock .= $pad($id, 4) . ' ' . $pad($name, 24) . ' ' . $pad($balance, 12) . "\n";
+            $countAccounts++;
+        }
+        if (count($accountsRows) > $countAccounts) {
+            $accountsBlock .= '... ещё ' . (count($accountsRows) - $countAccounts) . "\n";
+        }
+
+        $html = '<b>Обновляем Балансы Poster</b>';
+        if ($periodLabel !== '') $html .= "\nПериод: <b>" . $safe($periodLabel) . '</b>';
+        if ($by !== '') $html .= "\nОтправил: <b>" . $safe($by) . '</b>';
+        $html .= "\n\n<b>Сводка</b>\n<pre>" . $safe(rtrim($summaryBlock)) . "</pre>";
+        $html .= "\n<b>Счета Poster</b>\n<pre>" . $safe(rtrim($accountsBlock)) . "</pre>";
+
+        $sendResult = is_callable($sendTelegramHtmlMessage)
+            ? $sendTelegramHtmlMessage($tgToken, $tgChatId, $html, $tgThreadNum, $tgReplyToNum)
+            : ['ok' => false, 'error' => 'Telegram sender is unavailable'];
+        if (empty($sendResult['ok'])) {
+            throw new \Exception((string)($sendResult['error'] ?? 'Telegram send failed'));
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'message_id' => (int)($sendResult['message_id'] ?? 0),
+            'chat_id' => (string)($sendResult['chat_id'] ?? ''),
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'balance_sinc_plan') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

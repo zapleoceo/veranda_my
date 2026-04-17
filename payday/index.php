@@ -5889,6 +5889,37 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
 })();
 </script>
+<div class="confirm-backdrop" id="payday2PromoModal">
+    <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2PromoTitle">
+        <h3 id="payday2PromoTitle">Доступна новая версия</h3>
+        <div class="body">
+            Есть новая обновленная версия <b>Payda2beta</b>.
+            <br><br>
+            Можно перейти на нее сейчас или остаться на текущей странице Payday.
+        </div>
+        <div class="actions">
+            <button type="button" class="btn2" id="payday2PromoStay">Остаться в Payday</button>
+            <a href="/payday2/" class="btn2 primary" style="display:inline-flex; text-decoration:none;">Перейти в Payda2beta</a>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    const modal = document.getElementById('payday2PromoModal');
+    const stayBtn = document.getElementById('payday2PromoStay');
+    if (!modal) return;
+    const closeModal = () => { modal.style.display = 'none'; };
+    const openModal = () => { modal.style.display = 'flex'; };
+    if (stayBtn) stayBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.style.display === 'flex') closeModal();
+    });
+    openModal();
+})();
+</script>
 <script src="/assets/payday.js?v=20260414_0100" defer></script>
 </body>
 </html>

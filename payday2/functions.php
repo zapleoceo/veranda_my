@@ -141,6 +141,68 @@ $getAccountsById = function (\App\Classes\PosterAPI $api): array {
     return $out;
 };
 
+$sendTelegramHtmlMessage = function (
+    string $token,
+    string $chatId,
+    string $html,
+    ?int $messageThreadId = null,
+    ?int $replyToMessageId = null
+): array {
+    $token = trim($token);
+    $chatId = trim($chatId);
+    if ($token === '' || $chatId === '') {
+        return ['ok' => false, 'error' => 'Telegram not configured'];
+    }
+
+    $normalizedChatId = $chatId;
+    if ($normalizedChatId !== '' && $normalizedChatId[0] !== '@' && $normalizedChatId[0] !== '-') {
+        $digits = preg_replace('/\D+/', '', $normalizedChatId);
+        if ($digits !== '' && ctype_digit($digits)) {
+            $normalizedChatId = '-100' . $digits;
+        }
+    }
+
+    $params = [
+        'chat_id' => $normalizedChatId,
+        'text' => $html,
+        'parse_mode' => 'HTML',
+        'disable_web_page_preview' => 'true',
+    ];
+    if ($messageThreadId !== null && $messageThreadId > 0) {
+        $params['message_thread_id'] = $messageThreadId;
+    }
+    if ($replyToMessageId !== null && $replyToMessageId > 0) {
+        $params['reply_to_message_id'] = $replyToMessageId;
+    }
+
+    $ch = curl_init("https://api.telegram.org/bot{$token}/sendMessage");
+    if ($ch === false) {
+        return ['ok' => false, 'error' => 'curl_init failed'];
+    }
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    $response = curl_exec($ch);
+    $error = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false) {
+        return ['ok' => false, 'error' => ($error !== '' ? $error : 'Telegram request failed')];
+    }
+    $decoded = json_decode($response, true);
+    if (!is_array($decoded) || empty($decoded['ok'])) {
+        $desc = is_array($decoded) ? (string)($decoded['description'] ?? 'Telegram error') : 'Bad Telegram response';
+        return ['ok' => false, 'error' => $desc];
+    }
+
+    return [
+        'ok' => true,
+        'message_id' => (int)($decoded['result']['message_id'] ?? 0),
+        'chat_id' => (string)($decoded['result']['chat']['id'] ?? $normalizedChatId),
+    ];
+};
+
 $findFinanceTransfers = function (string $dateFrom, string $dateTo) use ($token, $getEmployeesById, $getAccountsById): array {
     $out = [
         'vietnam' => [],

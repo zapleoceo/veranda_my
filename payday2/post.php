@@ -518,6 +518,8 @@ try {
         $comment = $kind === 'vietnam'
             ? 'Перевод чеков вьетнаской компании'
             : 'Перевод типсов';
+        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+        if ($by !== '') $comment .= ' by ' . $by;
 
         $txs = [];
         try {
