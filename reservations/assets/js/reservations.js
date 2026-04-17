@@ -514,7 +514,6 @@
     const soonInput = q('#resSoonHours');
     const btnApply = q('#resHallApply');
     const btnRotate = q('#resHallRotate');
-    const zoom = q('#resHallZoom');
     const btnAll = q('#resHallAll');
     const btnNone = q('#resHallNone');
 
@@ -527,7 +526,6 @@
 
     const state = {
       rot: false,
-      zoom: 1,
       active: null,
       tables: Array.isArray(data.tables) ? data.tables.slice() : [],
       spotId: Number(data.spot_id || 1) || 1,
@@ -568,7 +566,6 @@
       board.style.width = W + 'px';
       board.style.height = H + 'px';
       board.classList.toggle('rot180', state.rot);
-      board.style.transform = 'scale(' + String(state.zoom) + ')';
       board.textContent = '';
 
       state.tables.forEach((t) => {
@@ -662,11 +659,6 @@
       state.rot = !state.rot;
       render();
     });
-    if (zoom) zoom.addEventListener('input', () => {
-      const v = Number(zoom.value || 100) || 100;
-      state.zoom = Math.max(0.5, Math.min(1.8, v / 100));
-      render();
-    });
 
     if (btnAll) btnAll.addEventListener('click', async () => {
       const todo = state.tables.filter((t) => t.scheme_num && !t.is_allowed);
@@ -744,4 +736,3 @@
   bindHall();
   bindDateFilters();
 })();
-

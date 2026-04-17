@@ -691,12 +691,12 @@ if ($ajax === 'res_hall_data') {
     exit;
 }
 
-$dateFrom = $_GET['date_from'] ?? date('Y-m-d', strtotime('-1 week'));
+$dateFrom = $_GET['date_from'] ?? date('Y-m-d');
 $dateTo = $_GET['date_to'] ?? date('Y-m-d', strtotime('+1 month'));
 $showDeleted = !empty($_GET['show_deleted']);
 $showPoster = isset($_GET['show_poster']) ? !empty($_GET['show_poster']) : true;
 
-if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-d', strtotime('-1 week'));
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) $dateFrom = date('Y-m-d');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) $dateTo = date('Y-m-d', strtotime('+1 month'));
 
 $sort = $_GET['sort'] ?? 'start_time';
@@ -1032,31 +1032,33 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
             </div>
 
             <?php if ($canManageTables): ?>
-                <div class="res-hall" id="resHallSection"
-                     data-hall-id="<?= (int)$resHallId ?>"
-                     data-spot-id="<?= (int)$resSpotId ?>">
-                    <div class="res-hall-head">
-                        <div>
-                            <div class="res-hall-title">Столы</div>
-                            <div class="res-hall-sub">spot_id=<?= (int)$resSpotId ?> · hall_id=<?= (int)$resHallId ?> · soon_hours=<?= (int)$resSoonHours ?></div>
+                <details class="res-hall-spoiler">
+                    <summary class="res-hall-spoiler-summary">Столы</summary>
+                    <div class="res-hall" id="resHallSection"
+                         data-hall-id="<?= (int)$resHallId ?>"
+                         data-spot-id="<?= (int)$resSpotId ?>">
+                        <div class="res-hall-head">
+                            <div>
+                                <div class="res-hall-title">Столы</div>
+                                <div class="res-hall-sub">spot_id=<?= (int)$resSpotId ?> · hall_id=<?= (int)$resHallId ?> · soon_hours=<?= (int)$resSoonHours ?></div>
+                            </div>
+                            <div class="res-hall-controls">
+                                <label class="res-hall-label">spot_id <input id="resSpotId" value="<?= (int)$resSpotId ?>" inputmode="numeric"></label>
+                                <label class="res-hall-label">hall_id <input id="resHallId" value="<?= (int)$resHallId ?>" inputmode="numeric"></label>
+                                <label class="res-hall-label">soon <input id="resSoonHours" value="<?= (int)$resSoonHours ?>" inputmode="numeric"></label>
+                                <button type="button" class="res-btn" id="resHallApply">Применить</button>
+                                <button type="button" class="res-btn" id="resHallRotate">180°</button>
+                            </div>
                         </div>
-                        <div class="res-hall-controls">
-                            <label class="res-hall-label">spot_id <input id="resSpotId" value="<?= (int)$resSpotId ?>" inputmode="numeric"></label>
-                            <label class="res-hall-label">hall_id <input id="resHallId" value="<?= (int)$resHallId ?>" inputmode="numeric"></label>
-                            <label class="res-hall-label">soon <input id="resSoonHours" value="<?= (int)$resSoonHours ?>" inputmode="numeric"></label>
-                            <button type="button" class="res-btn" id="resHallApply">Применить</button>
-                            <button type="button" class="res-btn" id="resHallRotate">180°</button>
-                            <label class="res-hall-label">zoom <input id="resHallZoom" type="range" min="50" max="180" value="100"></label>
+                        <div class="res-hall-board-wrap">
+                            <div class="res-hall-board" id="resHallBoard"></div>
+                        </div>
+                        <div class="res-hall-actions">
+                            <button type="button" class="res-btn" id="resHallAll">Все доступны</button>
+                            <button type="button" class="res-btn danger" id="resHallNone">Снять все</button>
                         </div>
                     </div>
-                    <div class="res-hall-board-wrap">
-                        <div class="res-hall-board" id="resHallBoard"></div>
-                    </div>
-                    <div class="res-hall-actions">
-                        <button type="button" class="res-btn" id="resHallAll">Все доступны</button>
-                        <button type="button" class="res-btn danger" id="resHallNone">Снять все</button>
-                    </div>
-                </div>
+                </details>
 
                 <div id="resHallModal" class="res-modal" hidden>
                     <div class="res-modal-card">
