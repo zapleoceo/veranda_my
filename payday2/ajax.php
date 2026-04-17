@@ -280,11 +280,12 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
             throw new \Exception('Bad date');
         }
 
-                $rows = [];
+        $rows = [];
         try {
             $rows = $api->request('finance.getTransactions', [
-                'dateFrom' => date('Ymd', $startTs),
-                'dateTo' => date('Ymd', $endTs),
+                // `dmY` is the format used by the stable payday implementation.
+                'dateFrom' => date('dmY', $startTs),
+                'dateTo' => date('dmY', $endTs),
                 'timezone' => 'client',
             ]);
         } catch (\Throwable $e) {
@@ -293,8 +294,8 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         if (!is_array($rows) || count($rows) === 0) {
             try {
                 $rows = $api->request('finance.getTransactions', [
-                    'dateFrom' => date('dmY', $startTs),
-                    'dateTo' => date('dmY', $endTs),
+                    'dateFrom' => date('Ymd', $startTs),
+                    'dateTo' => date('Ymd', $endTs),
                     'timezone' => 'client',
                 ]);
             } catch (\Throwable $e) {
@@ -330,6 +331,7 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         $out = [];
         foreach ($rows as $row) {
             if (!is_array($row)) continue;
+            if (((int)($row['status'] ?? 0)) === 3) continue;
             
             $tRaw = (string)($row['type'] ?? '');
             $isTransfer = ($tRaw === '2');

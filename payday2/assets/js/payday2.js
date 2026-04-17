@@ -253,7 +253,12 @@ window.initPayday2 = function() {
     };
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
     if (tabOut) tabOut.addEventListener('click', () => setTab('out'));
-    setTab('in');
+    let initialTab = 'in';
+    try {
+        const search = new URLSearchParams(window.location.search || '');
+        if (search.get('tab') === 'out') initialTab = 'out';
+    } catch (_) {}
+    setTab(initialTab);
     const loadOutMail = (onProgress) => {
         const { dateFrom, dateTo } = getDateRange();
         const qs = new URLSearchParams({ dateFrom, dateTo, include_hidden: '1' });
@@ -383,21 +388,33 @@ window.initPayday2 = function() {
     });
     const dateForm = document.getElementById('dateForm');
     if (dateForm) {
+        const dateFromInput = dateForm.querySelector('input[name="dateFrom"]');
+        const dateToInput = dateForm.querySelector('input[name="dateTo"]');
+        let syncingDateRange = false;
+        if (dateFromInput && dateToInput) {
+            dateFromInput.addEventListener('change', () => {
+                if (syncingDateRange) return;
+                syncingDateRange = true;
+                dateToInput.value = dateFromInput.value || '';
+                syncingDateRange = false;
+            });
+        }
         dateForm.addEventListener('submit', (ev) => {
-            if (activeTab === 'out') {
-                ev.preventDefault();
-                const restoreMail = outMailBtn ? setBtnBusy(outMailBtn, { title: 'OUT SePay', pct: 0 }) : null;
-                const restoreFin = outFinanceBtn ? setBtnBusy(outFinanceBtn, { title: 'OUT Poster', pct: 0 }) : null;
-                Promise.all([
-                    loadOutMail((pct) => updateBtnBusy(outMailBtn, { pct, title: 'OUT SePay' })),
-                    loadOutFinance((pct) => updateBtnBusy(outFinanceBtn, { pct, title: 'OUT Poster' })),
-                ])
-                    .catch((e) => alert(e && e.message ? e.message : 'Ошибка'))
-                    .finally(() => {
-                        if (restoreMail) restoreMail();
-                        if (restoreFin) restoreFin();
-                        outScheduleRelayout();
-                    });
+            ev.preventDefault();
+            const formData = new FormData(dateForm);
+            const baseUrl = new URL(dateForm.getAttribute('action') || window.location.href, window.location.href);
+            const nextUrl = new URL(baseUrl.href);
+            nextUrl.search = '';
+            for (const [k, v] of formData.entries()) {
+                nextUrl.searchParams.set(k, String(v));
+            }
+            if (activeTab === 'out') nextUrl.searchParams.set('tab', 'out');
+            else nextUrl.searchParams.delete('tab');
+
+            if (typeof window.doPjax === 'function') {
+                window.doPjax(nextUrl.href);
+            } else {
+                window.location.href = nextUrl.href;
             }
         });
     }

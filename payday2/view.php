@@ -252,6 +252,23 @@ try {
     $financeTipsCents = null;
 }
 
+$transferVietnamFoundList = [];
+$transferTipsFoundList = [];
+if (isset($findFinanceTransfers) && is_callable($findFinanceTransfers)) {
+    try {
+        $foundTransfers = $findFinanceTransfers($dateFrom, $dateTo);
+        if (is_array($foundTransfers['vietnam'] ?? null)) {
+            $transferVietnamFoundList = $foundTransfers['vietnam'];
+        }
+        if (is_array($foundTransfers['tips'] ?? null)) {
+            $transferTipsFoundList = $foundTransfers['tips'];
+        }
+    } catch (\Throwable $e) {
+    }
+}
+$transferVietnamExists = count($transferVietnamFoundList) > 0;
+$transferTipsExists = count($transferTipsFoundList) > 0;
+
 $posterAccounts = [];
 $posterAccountsById = [];
 try {
@@ -649,8 +666,8 @@ $fmtVnd = function (int $v): string {
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.';
 
-            $vietnamExists = false;
-            $tipsExists = false;
+            $vietnamExists = $transferVietnamExists;
+            $tipsExists = $transferTipsExists;
             $vietnamDisabled = $vietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
             $tipsDisabled = $tipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             ?>
@@ -672,9 +689,45 @@ $fmtVnd = function (int $v): string {
                     <div style="display:flex; align-items:center; gap: 10px;">
                         <div style="font-weight:900; white-space:nowrap;">Vietnam Company</div>
                         <div style="flex:1; text-align:center; font-weight:900;"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
-                        <button class="btn" type="submit" >Создать транзакцию</button>
+                        <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
                     </div>
-                    <div class="muted finance-status" style="margin-top: 6px;"><span style="color:var(--muted);">Загрузка...</span></div></form>
+                    <div class="muted finance-status" style="margin-top: 6px;">
+                        <?php if ($vietnamExists): ?>
+                            <div style="overflow-x:auto; max-width:100%;">
+                                <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
+                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
+                                    <tbody>
+                                    <?php foreach ($transferVietnamFoundList as $f): ?>
+                                        <?php
+                                            $ts = (int)($f['ts'] ?? 0);
+                                            $sumMinor = (int)($f['sum_minor'] ?? 0);
+                                            $sumVnd = (int)$posterCentsToVnd($sumMinor);
+                                            $tRaw = (string)($f['type'] ?? '');
+                                            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
+                                            $sumSignedVnd = $isOut ? -$sumVnd : $sumVnd;
+                                            $cmt = trim((string)($f['comment'] ?? ''));
+                                            $u = trim((string)($f['user'] ?? ''));
+                                            $acc = trim((string)($f['account'] ?? ''));
+                                            $dateStr = date('d.m.Y', $ts);
+                                            $timeStr = date('H:i:s', $ts);
+                                        ?>
+                                        <tr>
+                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
+                                            <td class="sum" style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
+                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($acc) ?></td>
+                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($u) ?></td>
+                                            <td style="padding:2px 4px; line-height:1.2;"><?= htmlspecialchars($cmt) ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php elseif ($vietnamDisabled): ?>
+                            <?= htmlspecialchars($vietnamDisabledReason) ?>
+                        <?php else: ?>
+                            <span style="color:var(--muted);">Транзакция не найдена</span>
+                        <?php endif; ?>
+                    </div></form>
             </div>
 
             <div class="finance-row">
@@ -694,9 +747,45 @@ $fmtVnd = function (int $v): string {
                     <div style="display:flex; align-items:center; gap: 10px;">
                         <div style="font-weight:900; white-space:nowrap;">Tips</div>
                         <div style="flex:1; text-align:center; font-weight:900;"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
-                        <button class="btn" type="submit" >Создать транзакцию</button>
+                        <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
                     </div>
-                    <div class="muted finance-status" style="margin-top: 6px;"><span style="color:var(--muted);">Загрузка...</span></div></form>
+                    <div class="muted finance-status" style="margin-top: 6px;">
+                        <?php if ($tipsExists): ?>
+                            <div style="overflow-x:auto; max-width:100%;">
+                                <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
+                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
+                                    <tbody>
+                                    <?php foreach ($transferTipsFoundList as $f): ?>
+                                        <?php
+                                            $ts = (int)($f['ts'] ?? 0);
+                                            $sumMinor = (int)($f['sum_minor'] ?? 0);
+                                            $sumVnd = (int)$posterCentsToVnd($sumMinor);
+                                            $tRaw = (string)($f['type'] ?? '');
+                                            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
+                                            $sumSignedVnd = $isOut ? -$sumVnd : $sumVnd;
+                                            $cmt = trim((string)($f['comment'] ?? ''));
+                                            $u = trim((string)($f['user'] ?? ''));
+                                            $acc = trim((string)($f['account'] ?? ''));
+                                            $dateStr = date('d.m.Y', $ts);
+                                            $timeStr = date('H:i:s', $ts);
+                                        ?>
+                                        <tr>
+                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
+                                            <td class="sum" style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
+                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($acc) ?></td>
+                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($u) ?></td>
+                                            <td style="padding:2px 4px; line-height:1.2;"><?= htmlspecialchars($cmt) ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php elseif ($tipsDisabled): ?>
+                            <?= htmlspecialchars($tipsDisabledReason) ?>
+                        <?php else: ?>
+                            <span style="color:var(--muted);">Транзакция не найдена</span>
+                        <?php endif; ?>
+                    </div></form>
             </div>
         </div>
         <div class="card card-balances">

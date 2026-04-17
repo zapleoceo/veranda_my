@@ -141,6 +141,166 @@ $getAccountsById = function (\App\Classes\PosterAPI $api): array {
     return $out;
 };
 
+$findFinanceTransfers = function (string $dateFrom, string $dateTo) use ($token, $getEmployeesById, $getAccountsById): array {
+    $out = [
+        'vietnam' => [],
+        'tips' => [],
+    ];
+
+    $startTs = strtotime($dateFrom . ' 00:00:00');
+    $endTs = strtotime($dateTo . ' 23:59:59');
+    if ($startTs === false || $endTs === false) {
+        return $out;
+    }
+
+    try {
+        $apiFinance = new \App\Classes\PosterAPI((string)$token);
+        $rows = [];
+        try {
+            // `dmY` is the working format used in the original payday implementation.
+            $rows = $apiFinance->request('finance.getTransactions', [
+                'dateFrom' => date('dmY', $startTs),
+                'dateTo' => date('dmY', $endTs),
+                'timezone' => 'client',
+            ]);
+        } catch (\Throwable $e) {
+            $rows = [];
+        }
+        if (!is_array($rows)) {
+            return $out;
+        }
+
+        $normMoney = function ($sumRaw): int {
+            $sumF = 0.0;
+            if (is_int($sumRaw) || is_float($sumRaw)) {
+                $sumF = (float)$sumRaw;
+            } elseif (is_string($sumRaw)) {
+                $sumF = (float)str_replace(',', '.', str_replace(' ', '', trim($sumRaw)));
+            }
+            $sumInt = (int)round($sumF);
+            return ($sumInt > 200000000 && $sumInt % 100 === 0) ? (int)round($sumInt / 100) : $sumInt;
+        };
+        $normText = function (string $s): string {
+            return mb_strtolower(trim($s), 'UTF-8');
+        };
+
+        $employeesMapFinance = [];
+        try {
+            $employeesMapFinance = $getEmployeesById($apiFinance);
+        } catch (\Throwable $e) {
+        }
+
+        $accountsMapFinance = [];
+        try {
+            $accountsMapFinance = $getAccountsById($apiFinance);
+        } catch (\Throwable $e) {
+        }
+
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            if (((int)($r['status'] ?? 0)) === 3) continue;
+
+            $tRaw = (string)($r['type'] ?? '');
+            $isTransfer = ($tRaw === '2');
+            $isIn = ($tRaw === '1' || strtoupper($tRaw) === 'I' || strtolower($tRaw) === 'in');
+            $isOut = ($tRaw === '0' || strtoupper($tRaw) === 'O' || strtolower($tRaw) === 'out');
+            if (!$isTransfer && !$isIn && !$isOut) continue;
+
+            $dRaw = $r['date'] ?? $r['created_at'] ?? $r['createdAt'] ?? $r['time'] ?? $r['datetime'] ?? $r['date_time'] ?? $r['created'] ?? null;
+            $ts = null;
+            if (is_numeric($dRaw)) {
+                $n = (int)$dRaw;
+                if ($n > 2000000000000) $n = (int)round($n / 1000);
+                if ($n > 0) $ts = $n;
+            } elseif (is_string($dRaw) && trim($dRaw) !== '') {
+                $t = strtotime($dRaw);
+                if ($t !== false && $t > 0) $ts = $t;
+            }
+            if ($ts === null) continue;
+            if ($ts < $startTs || $ts > $endTs) continue;
+
+            $accFromId = 0;
+            $accToId = 0;
+            if ($isTransfer) {
+                $fromRaw = $r['account_from'] ?? $r['account_from_id'] ?? $r['account_id'] ?? 0;
+                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+                $accFromId = (int)$fromRaw;
+
+                $toRaw = $r['account_to'] ?? $r['account_to_id'] ?? $r['recipient_id'] ?? 0;
+                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+                $accToId = (int)$toRaw;
+            } elseif ($isOut) {
+                $fromRaw = $r['account_id'] ?? $r['accountId'] ?? $r['account_from_id'] ?? $r['account_from'] ?? $r['accountFromId'] ?? $r['accountFrom'] ?? 0;
+                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+                $accFromId = (int)$fromRaw;
+
+                $toRaw = $r['recipient_id'] ?? $r['account_to_id'] ?? $r['account_to'] ?? 0;
+                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+                $accToId = (int)$toRaw;
+            } else {
+                $fromRaw = $r['account_from'] ?? $r['account_from_id'] ?? 0;
+                if (is_array($fromRaw)) $fromRaw = $fromRaw['account_id'] ?? $fromRaw['id'] ?? 0;
+                $accFromId = (int)$fromRaw;
+
+                $toRaw = $r['account_id'] ?? $r['account_to_id'] ?? $r['account_to'] ?? 0;
+                if (is_array($toRaw)) $toRaw = $toRaw['account_id'] ?? $toRaw['id'] ?? 0;
+                $accToId = (int)$toRaw;
+            }
+
+            if ($accToId !== 8 && $accToId !== 9 && $accFromId !== 8 && $accFromId !== 9) continue;
+            $accId = ($accToId === 8 || $accToId === 9) ? $accToId : $accFromId;
+
+            $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
+            $cmtNorm = $normText($cmt);
+            $isVietnam = $accId === 9 && mb_stripos($cmtNorm, 'вьетна', 0, 'UTF-8') !== false;
+            $isTips = $accId === 8 && (mb_stripos($cmtNorm, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmtNorm, 'tips', 0, 'UTF-8') !== false);
+            if (!$isVietnam && !$isTips) continue;
+
+            $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
+            if (is_array($uRaw)) $uRaw = $uRaw['user_id'] ?? $uRaw['id'] ?? $uRaw['userId'] ?? null;
+            $uId = (int)($uRaw ?? 0);
+            $userName = '';
+            if ($uId > 0 && isset($employeesMapFinance[$uId])) {
+                $userName = $employeesMapFinance[$uId];
+            } else {
+                $uObj = $r['user'] ?? $r['employee'] ?? null;
+                if (is_array($uObj)) {
+                    $userName = trim((string)($uObj['name'] ?? $uObj['user_name'] ?? $uObj['username'] ?? $uObj['title'] ?? ''));
+                }
+            }
+            if ($userName === '' && $uId > 0) $userName = '#' . $uId;
+
+            $amountMinor = abs($normMoney($r['amount'] ?? $r['amount_to'] ?? $r['amount_from'] ?? $r['sum'] ?? 0));
+            if ($amountMinor <= 0) continue;
+
+            $accName = isset($accountsMapFinance[$accId]) ? $accountsMapFinance[$accId] : ('#' . $accId);
+            $txId = (int)($r['transaction_id'] ?? $r['id'] ?? 0);
+            $rowOut = [
+                'transfer_id' => $txId,
+                'transaction_id' => $txId,
+                'ts' => (int)$ts,
+                'sum_minor' => $amountMinor,
+                'comment' => $cmt,
+                'user' => $userName,
+                'account' => $accName,
+                'type' => $tRaw,
+            ];
+            if ($isVietnam) $out['vietnam'][] = $rowOut;
+            if ($isTips) $out['tips'][] = $rowOut;
+        }
+
+        usort($out['vietnam'], function ($a, $b) {
+            return ((int)($b['ts'] ?? 0)) <=> ((int)($a['ts'] ?? 0));
+        });
+        usort($out['tips'], function ($a, $b) {
+            return ((int)($b['ts'] ?? 0)) <=> ((int)($a['ts'] ?? 0));
+        });
+    } catch (\Throwable $e) {
+    }
+
+    return $out;
+};
+
 global $db;
 $st = $db->t('sepay_transactions');
 $pc = $db->t('poster_checks');
@@ -213,4 +373,3 @@ try {
     );
 } catch (\Throwable $e) {
 }
-
