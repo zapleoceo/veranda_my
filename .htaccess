@@ -9,6 +9,7 @@ RewriteRule ^payday2/?$ payday2/index.php [L,QSA]
 RewriteRule ^tr3/?$ tr3/index.php [L,QSA]
 RewriteRule ^tr3/api/?$ tr3/api.php [L,QSA]
 RewriteRule ^TableReservation/?$ TableReservation.php [L,QSA]
+RewriteRule ^reservations/?$ /tr3 [R=301,L]
 
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.php -f
