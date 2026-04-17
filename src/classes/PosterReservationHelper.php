@@ -50,7 +50,7 @@ class PosterReservationHelper {
             $api = new PosterAPI($apiToken);
 
             $tableId = null;
-            $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2]);
+            $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2], 'POST');
             if (is_array($allTables)) {
                 foreach ($allTables as $t) {
                     $tTitle = trim((string)($t['table_title'] ?? ''));
@@ -63,7 +63,7 @@ class PosterReservationHelper {
             }
 
             if (!$tableId) {
-                $allTablesFallback = $api->request('spots.getTables', ['spot_id' => 1]);
+                $allTablesFallback = $api->request('spots.getTables', ['spot_id' => 1], 'POST');
                 if (is_array($allTablesFallback)) {
                     foreach ($allTablesFallback as $t) {
                         $tTitle = trim((string)($t['table_title'] ?? ''));
