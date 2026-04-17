@@ -198,7 +198,7 @@ class PosterReservationHelper {
             if (stripos($msg, 'CURL Error') !== false) {
                 return ['ok' => false, 'error' => 'Poster: ошибка сети/подключения'];
             }
-            return ['ok' => false, 'error' => 'Poster: ошибка создания брони'];
+            return ['ok' => false, 'error' => 'Poster Error: ' . $msg];
         }
     }
 }
