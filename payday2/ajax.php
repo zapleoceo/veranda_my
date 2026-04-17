@@ -1491,7 +1491,7 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram') {
         $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
         $tgChatId = trim((string)($_ENV['PAYDAY_BALANCE_TELEGRAM_CHAT_ID'] ?? '3889942420'));
         $tgThreadId = trim((string)($_ENV['PAYDAY_BALANCE_TELEGRAM_THREAD_ID'] ?? ''));
-        $tgReplyTo = trim((string)($_ENV['PAYDAY_BALANCE_TELEGRAM_REPLY_TO'] ?? '1561'));
+        $tgReplyTo = trim((string)($_ENV['PAYDAY_BALANCE_TELEGRAM_REPLY_TO'] ?? ''));
         $tgThreadNum = ($tgThreadId !== '' && ctype_digit($tgThreadId)) ? (int)$tgThreadId : null;
         $tgReplyToNum = ($tgReplyTo !== '' && ctype_digit($tgReplyTo)) ? (int)$tgReplyTo : null;
 

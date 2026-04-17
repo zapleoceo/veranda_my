@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_1942';
+$payday2AssetVersion = '20260417_2000';
 ?>
 <!DOCTYPE html>
 <html lang="ru">

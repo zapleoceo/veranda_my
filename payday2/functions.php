@@ -154,52 +154,88 @@ $sendTelegramHtmlMessage = function (
         return ['ok' => false, 'error' => 'Telegram not configured'];
     }
 
-    $normalizedChatId = $chatId;
-    if ($normalizedChatId !== '' && $normalizedChatId[0] !== '@' && $normalizedChatId[0] !== '-') {
-        $digits = preg_replace('/\D+/', '', $normalizedChatId);
-        if ($digits !== '' && ctype_digit($digits)) {
-            $normalizedChatId = '-100' . $digits;
-        }
-    }
-
-    $params = [
-        'chat_id' => $normalizedChatId,
+    $baseParams = [
         'text' => $html,
         'parse_mode' => 'HTML',
         'disable_web_page_preview' => 'true',
     ];
     if ($messageThreadId !== null && $messageThreadId > 0) {
-        $params['message_thread_id'] = $messageThreadId;
+        $baseParams['message_thread_id'] = $messageThreadId;
     }
     if ($replyToMessageId !== null && $replyToMessageId > 0) {
-        $params['reply_to_message_id'] = $replyToMessageId;
+        $baseParams['reply_to_message_id'] = $replyToMessageId;
     }
 
-    $ch = curl_init("https://api.telegram.org/bot{$token}/sendMessage");
-    if ($ch === false) {
-        return ['ok' => false, 'error' => 'curl_init failed'];
-    }
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-    $response = curl_exec($ch);
-    $error = curl_error($ch);
-    curl_close($ch);
+    $doSend = function (array $p) use ($token): array {
+        $ch = curl_init("https://api.telegram.org/bot{$token}/sendMessage");
+        if ($ch === false) {
+            return ['ok' => false, 'error' => 'curl_init failed'];
+        }
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($p));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        $response = curl_exec($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
 
-    if ($response === false) {
-        return ['ok' => false, 'error' => ($error !== '' ? $error : 'Telegram request failed')];
+        if ($response === false) {
+            return ['ok' => false, 'error' => ($error !== '' ? $error : 'Telegram request failed')];
+        }
+        $decoded = json_decode($response, true);
+        if (!is_array($decoded) || empty($decoded['ok'])) {
+            $desc = is_array($decoded) ? (string)($decoded['description'] ?? 'Telegram error') : 'Bad Telegram response';
+            return ['ok' => false, 'error' => $desc];
+        }
+        return ['ok' => true, 'decoded' => $decoded];
+    };
+
+    $chatCandidates = [];
+    $chatCandidates[] = $chatId;
+    if ($chatId !== '' && $chatId[0] !== '@' && $chatId[0] !== '-') {
+        $digits = preg_replace('/\D+/', '', $chatId);
+        if ($digits !== '' && ctype_digit($digits)) {
+            $chatCandidates[] = '-100' . $digits;
+        }
     }
-    $decoded = json_decode($response, true);
-    if (!is_array($decoded) || empty($decoded['ok'])) {
-        $desc = is_array($decoded) ? (string)($decoded['description'] ?? 'Telegram error') : 'Bad Telegram response';
-        return ['ok' => false, 'error' => $desc];
+    $chatCandidates = array_values(array_unique($chatCandidates));
+
+    $lastError = 'Telegram error';
+    foreach ($chatCandidates as $cid) {
+        $params = $baseParams + ['chat_id' => $cid];
+        $send1 = $doSend($params);
+        if (!empty($send1['ok'])) {
+            $decoded = (array)($send1['decoded'] ?? []);
+            return [
+                'ok' => true,
+                'message_id' => (int)($decoded['result']['message_id'] ?? 0),
+                'chat_id' => (string)($decoded['result']['chat']['id'] ?? $cid),
+            ];
+        }
+
+        $err = (string)($send1['error'] ?? 'Telegram error');
+        $lastError = $err;
+
+        if ($replyToMessageId !== null && $replyToMessageId > 0 && stripos($err, 'message to be replied not found') !== false) {
+            $params2 = $params;
+            unset($params2['reply_to_message_id']);
+            $send2 = $doSend($params2);
+            if (!empty($send2['ok'])) {
+                $decoded = (array)($send2['decoded'] ?? []);
+                return [
+                    'ok' => true,
+                    'message_id' => (int)($decoded['result']['message_id'] ?? 0),
+                    'chat_id' => (string)($decoded['result']['chat']['id'] ?? $cid),
+                ];
+            }
+            $lastError = (string)($send2['error'] ?? $err);
+            continue;
+        }
     }
 
     return [
-        'ok' => true,
-        'message_id' => (int)($decoded['result']['message_id'] ?? 0),
-        'chat_id' => (string)($decoded['result']['chat']['id'] ?? $normalizedChatId),
+        'ok' => false,
+        'error' => $lastError,
     ];
 };
 
