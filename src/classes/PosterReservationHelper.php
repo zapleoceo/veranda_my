@@ -27,6 +27,7 @@ class PosterReservationHelper {
             return ['ok' => false, 'error' => 'Poster API not configured'];
         }
 
+        $locked = false;
         try {
             $pdo = $db->getPdo();
             try {
@@ -43,6 +44,7 @@ class PosterReservationHelper {
                 }
                 $db->query("UPDATE {$resTable} SET is_poster_pushed = 2 WHERE id = ? LIMIT 1", [$reservationId]);
                 $pdo->commit();
+                $locked = true;
             } catch (\Throwable $e) {
                 try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (\Throwable $e2) {}
             }
@@ -187,6 +189,7 @@ class PosterReservationHelper {
 
             $reservationData = [
                 'spot_id'          => (string)$spotIdInt,
+                'timezone'         => 'client',
                 'phone'            => $phone,
                 'table_id'         => (string)$tableId,
                 'guests_count'     => (string)$row['guests'],
@@ -246,30 +249,35 @@ class PosterReservationHelper {
                     $verified = null;
                 }
                 $db->query("UPDATE {$resTable} SET is_poster_pushed = 1, poster_id = ? WHERE id = ?", [$foundDuplicateId, $reservationId]);
+                $locked = false;
                 return ['ok' => true, 'poster_res' => ['incoming_order_id' => $foundDuplicateId, 'verified' => $verified], 'duplicate' => true];
             }
 
-            try {
-                $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
-            } catch (\Throwable $eCreate) {
-                $m = (string)$eCreate->getMessage();
-                if (stripos($m, 'date_reservation') !== false) {
-                    try {
-                        $reservationData2 = $reservationData;
-                        $reservationData2['date_reservation'] = $dt->format('Y-m-d H:i');
-                        $resp = $api->request('incomingOrders.createReservation', $reservationData2, 'POST');
-                    } catch (\Throwable $eCreate2) {
-                        try {
-                            $reservationData3 = $reservationData;
-                            $reservationData3['date_reservation'] = (string)$dt->getTimestamp();
-                            $resp = $api->request('incomingOrders.createReservation', $reservationData3, 'POST');
-                        } catch (\Throwable $eCreate3) {
-                            throw $eCreate;
-                        }
+            $resp = null;
+            $errs = [];
+            $variants = [
+                ['k' => 'Y-m-d H:i:s', 'v' => $dt->format('Y-m-d H:i:s')],
+                ['k' => 'Y-m-d H:i', 'v' => $dt->format('Y-m-d H:i')],
+                ['k' => 'unix_s', 'v' => (string)$dt->getTimestamp()],
+                ['k' => 'unix_ms', 'v' => (string)($dt->getTimestamp() * 1000)],
+            ];
+            foreach ($variants as $variant) {
+                $reservationDataX = $reservationData;
+                $reservationDataX['date_reservation'] = $variant['v'];
+                try {
+                    $resp = $api->request('incomingOrders.createReservation', $reservationDataX, 'POST');
+                    break;
+                } catch (\Throwable $eCreate) {
+                    $m = (string)$eCreate->getMessage();
+                    if (stripos($m, 'date_reservation') === false) {
+                        throw $eCreate;
                     }
-                } else {
-                    throw $eCreate;
+                    $errs[] = $variant['k'] . ': ' . preg_replace('/\s+/', ' ', $m);
                 }
+            }
+            if ($resp === null) {
+                $tail = implode(' | ', array_slice($errs, 0, 3));
+                throw new \Exception($tail !== '' ? $tail : 'Poster: date_reservation error');
             }
 
             if (isset($resp['error']) || !isset($resp['incoming_order_id'])) {
@@ -280,6 +288,7 @@ class PosterReservationHelper {
 
             $posterId = (int)($resp['incoming_order_id'] ?? 0);
             $db->query("UPDATE {$resTable} SET is_poster_pushed = 1, poster_id = ? WHERE id = ?", [$posterId, $reservationId]);
+            $locked = false;
 
             return ['ok' => true, 'poster_res' => $resp];
         } catch (\Throwable $e) {
@@ -295,6 +304,10 @@ class PosterReservationHelper {
                 return ['ok' => false, 'error' => 'Poster: ошибка сети/подключения'];
             }
             return ['ok' => false, 'error' => 'Poster Error: ' . $msg];
+        } finally {
+            if ($locked) {
+                try { $db->query("UPDATE {$resTable} SET is_poster_pushed = 0 WHERE id = ? LIMIT 1", [$reservationId]); } catch (\Throwable $e3) {}
+            }
         }
     }
 }
