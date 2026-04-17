@@ -557,24 +557,26 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
                 
                 $tId = (int)($pr['table_id'] ?? 0);
                 $displayTable = isset($tableNameMap[$tId]) ? $tableNameMap[$tId] : ($tId > 0 ? $tId : '?');
+                $comment = (string)($pr['comment'] ?? '');
+                $marker = '';
+                if ($comment !== '' && preg_match('/\[VERANDA:([A-Z0-9]{6,16})\]/', $comment, $mm)) {
+                    $marker = strtoupper((string)($mm[1] ?? ''));
+                }
 
                 $posterRows[] = [
-                    'id' => 'P' . ($pr['incoming_order_id'] ?? 0),
-                    'qr_code' => 'POSTER',
-                    'created_at' => $pr['created_at'] ?? '',
+                    'incoming_order_id' => (int)($pr['incoming_order_id'] ?? 0),
+                    'created_at' => (string)($pr['created_at'] ?? ''),
+                    'updated_at' => (string)($pr['updated_at'] ?? ''),
                     'start_time' => $drDt->format('Y-m-d H:i:s'),
-                    'table_num' => $displayTable,
-                    'guests' => $pr['guests_count'] ?? 0,
-                    'name' => trim(($pr['first_name'] ?? '') . ' ' . ($pr['last_name'] ?? '')),
-                    'phone' => $pr['phone'] ?? '',
-                    'comment' => $pr['comment'] ?? '',
-                    'preorder_text' => '',
-                    'preorder_ru' => '',
-                    'total_amount' => 0,
-                    'qr_url' => '',
-                    'is_poster' => true,
+                    'table_id' => $tId,
+                    'table_num' => (string)$displayTable,
+                    'guests' => (int)($pr['guests_count'] ?? 0),
+                    'name' => trim(((string)($pr['first_name'] ?? '')) . ' ' . ((string)($pr['last_name'] ?? ''))),
+                    'phone' => (string)($pr['phone'] ?? ''),
+                    'comment' => $comment,
+                    'marker_code' => $marker,
+                    'status' => $status,
                     'status_text' => ($status === 7 ? 'Отменено' : ($status === 1 ? 'Принято' : 'Новый')),
-                    'deleted_at' => ($status === 7 ? ($pr['updated_at'] ?? '') : null),
                 ];
             }
         }
@@ -584,14 +586,104 @@ if ($showPoster && !empty($_ENV['POSTER_API_TOKEN'])) {
     }
 }
 
-$allRows = array_merge($rows, $posterRows);
-usort($allRows, function($a, $b) use ($sort, $order) {
-    $valA = $a[$sort] ?? '';
-    $valB = $b[$sort] ?? '';
-    if ($order === 'asc') return $valA <=> $valB;
-    return $valB <=> $valA;
+$posterById = [];
+$posterByMarker = [];
+$posterByDayTable = [];
+foreach ($posterRows as $pr) {
+    $pid = (int)($pr['incoming_order_id'] ?? 0);
+    if ($pid > 0) $posterById[$pid] = $pr;
+    $mc = (string)($pr['marker_code'] ?? '');
+    if ($mc !== '') $posterByMarker[$mc] = $pr;
+    $day = (string)substr((string)($pr['start_time'] ?? ''), 0, 10);
+    $tbl = (string)($pr['table_num'] ?? '');
+    if ($day !== '' && $tbl !== '') {
+        $k = $day . '|' . $tbl;
+        if (!isset($posterByDayTable[$k])) $posterByDayTable[$k] = [];
+        $posterByDayTable[$k][] = $pr;
+    }
+}
+
+$usedPoster = [];
+$viewRows = [];
+foreach ($rows as $r) {
+    $ourStart = (string)($r['start_time'] ?? '');
+    $ourDay = substr($ourStart, 0, 10);
+    $ourTable = trim((string)($r['table_num'] ?? ''));
+    $ourMarker = strtoupper(trim((string)($r['qr_code'] ?? '')));
+    $poster = null;
+
+    $posterId = (int)($r['poster_id'] ?? 0);
+    if ($posterId > 0 && isset($posterById[$posterId]) && empty($usedPoster[$posterId])) {
+        $poster = $posterById[$posterId];
+        $usedPoster[$posterId] = true;
+    }
+
+    if ($poster === null && $ourMarker !== '' && isset($posterByMarker[$ourMarker])) {
+        $cand = $posterByMarker[$ourMarker];
+        $candId = (int)($cand['incoming_order_id'] ?? 0);
+        if ($candId > 0 && empty($usedPoster[$candId])) {
+            $poster = $cand;
+            $usedPoster[$candId] = true;
+        }
+    }
+
+    if ($poster === null && $ourDay !== '' && $ourTable !== '') {
+        $k = $ourDay . '|' . $ourTable;
+        $list = $posterByDayTable[$k] ?? [];
+        if ($list) {
+            $best = null;
+            $bestDiff = null;
+            $ourTs = strtotime($ourStart);
+            foreach ($list as $cand) {
+                $candId = (int)($cand['incoming_order_id'] ?? 0);
+                if ($candId <= 0 || !empty($usedPoster[$candId])) continue;
+                $candTs = strtotime((string)($cand['start_time'] ?? ''));
+                if ($ourTs === false || $candTs === false) continue;
+                $diff = abs($candTs - $ourTs);
+                if ($diff > 1800) continue;
+                if ($bestDiff === null || $diff < $bestDiff) {
+                    $best = $cand;
+                    $bestDiff = $diff;
+                }
+            }
+            if ($best) {
+                $poster = $best;
+                $usedPoster[(int)$best['incoming_order_id']] = true;
+            }
+        }
+    }
+
+    $viewRows[] = ['our' => $r, 'poster' => $poster];
+}
+
+if ($showPoster) {
+    foreach ($posterRows as $pr) {
+        $pid = (int)($pr['incoming_order_id'] ?? 0);
+        if ($pid > 0 && !empty($usedPoster[$pid])) continue;
+        $viewRows[] = ['our' => null, 'poster' => $pr];
+    }
+}
+
+$getSortVal = function (array $row) use ($sort) {
+    $our = $row['our'] ?? null;
+    $poster = $row['poster'] ?? null;
+    $v = '';
+    if (is_array($our) && array_key_exists($sort, $our)) $v = $our[$sort];
+    elseif ($sort === 'start_time' && is_array($poster)) $v = $poster['start_time'] ?? '';
+    elseif ($sort === 'created_at' && is_array($poster)) $v = $poster['created_at'] ?? '';
+    elseif ($sort === 'table_num' && is_array($poster)) $v = $poster['table_num'] ?? '';
+    elseif ($sort === 'guests' && is_array($poster)) $v = $poster['guests'] ?? 0;
+    elseif ($sort === 'name' && is_array($poster)) $v = $poster['name'] ?? '';
+    elseif ($sort === 'phone' && is_array($poster)) $v = $poster['phone'] ?? '';
+    elseif ($sort === 'id' && is_array($poster)) $v = (int)($poster['incoming_order_id'] ?? 0);
+    return $v;
+};
+usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
+    $va = $getSortVal($a);
+    $vb = $getSortVal($b);
+    if ($order === 'asc') return $va <=> $vb;
+    return $vb <=> $va;
 });
-$rows = $allRows;
 
 ?>
 <!DOCTYPE html>
@@ -653,6 +745,12 @@ $rows = $allRows;
                 <table class="res-table">
                     <thead>
                         <tr>
+                            <th colspan="10">Сайт</th>
+                            <?php if ($showPoster): ?>
+                                <th colspan="8">Poster</th>
+                            <?php endif; ?>
+                        </tr>
+                        <tr>
                             <th data-sort="id">ID<?= $sort==='id'?($order==='asc'?' ↑':' ↓'):'' ?></th>
                             <th data-sort="qr_code">Код<?= $sort==='qr_code'?($order==='asc'?' ↑':' ↓'):'' ?></th>
                             <th data-sort="created_at">Создано<?= $sort==='created_at'?($order==='asc'?' ↑':' ↓'):'' ?></th>
@@ -663,94 +761,108 @@ $rows = $allRows;
                             <th data-sort="total_amount">Сумма<?= $sort==='total_amount'?($order==='asc'?' ↑':' ↓'):'' ?></th>
                             <th>QR</th>
                             <th>Действия</th>
+                            <?php if ($showPoster): ?>
+                                <th>Poster ID</th>
+                                <th>Создано</th>
+                                <th>Время</th>
+                                <th>Стол</th>
+                                <th>Гостей</th>
+                                <th>Гость</th>
+                                <th>Телефон</th>
+                                <th>Детали</th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($rows)): ?>
-                            <tr><td colspan="10" style="text-align:center; padding:20px; color:var(--muted);">Нет броней за выбранный период</td></tr>
+                        <?php if (empty($viewRows)): ?>
+                            <tr><td colspan="<?= $showPoster ? 18 : 10 ?>" style="text-align:center; padding:20px; color:var(--muted);">Нет броней за выбранный период</td></tr>
                         <?php else: ?>
-                            <?php foreach ($rows as $r): ?>
+                            <?php foreach ($viewRows as $pair): ?>
                                 <?php
-                                    // Parse TG username correctly if it exists
-                                    $tgUsername = (string)($r['tg_username'] ?? '');
+                                    $r = is_array($pair['our'] ?? null) ? $pair['our'] : null;
+                                    $p = is_array($pair['poster'] ?? null) ? $pair['poster'] : null;
+
+                                    $tgUsername = (string)(is_array($r) ? ($r['tg_username'] ?? '') : '');
                                     $tgUsername = trim($tgUsername);
                                     if ($tgUsername !== '') {
                                         $tgUsername = ltrim($tgUsername, '@');
                                     }
-                                    $waPhone = trim((string)($r['whatsapp_phone'] ?? ''));
+                                    $waPhone = trim((string)(is_array($r) ? ($r['whatsapp_phone'] ?? '') : ''));
                                     $waDigits = preg_replace('/\D+/', '', $waPhone);
                                     $waDigits = trim((string)$waDigits);
                                     $waPhoneNorm = ($waDigits !== '' && preg_match('/^[1-9]\d{8,14}$/', $waDigits)) ? ('+' . $waDigits) : '';
-                                    $deletedAt = (string)($r['deleted_at'] ?? '');
-                                    $deletedBy = (string)($r['deleted_by'] ?? '');
+                                    $deletedAt = (string)(is_array($r) ? ($r['deleted_at'] ?? '') : '');
+                                    $deletedBy = (string)(is_array($r) ? ($r['deleted_by'] ?? '') : '');
                                     $isDeleted = $deletedAt !== '' && $deletedAt !== null && $deletedAt !== '0000-00-00 00:00:00';
                                     $deletedAtHuman = $isDeleted ? ($fmtSpotDt($deletedAt) ?: '') : '';
-                                    $isPoster = !empty($r['is_poster']);
-                                    $createdAtHuman = !empty($r['created_at']) ? ($fmtSpotDt($r['created_at']) ?: '') : '';
-                                    $startHuman = !empty($r['start_time']) ? ($fmtSpotDt($r['start_time']) ?: '') : '';
+                                    $createdAtHuman = is_array($r) && !empty($r['created_at']) ? ($fmtSpotDt($r['created_at']) ?: '') : '';
+                                    $startHuman = is_array($r) && !empty($r['start_time']) ? ($fmtSpotDt($r['start_time']) ?: '') : '';
+
+                                    $pCreatedAtHuman = is_array($p) && !empty($p['created_at']) ? ($fmtSpotDt($p['created_at']) ?: '') : '';
+                                    $pStartHuman = is_array($p) && !empty($p['start_time']) ? ($fmtSpotDt($p['start_time']) ?: '') : '';
+                                    $pIsDeleted = is_array($p) && (int)($p['status'] ?? 0) === 7;
                                 ?>
-                                <tr data-id="<?= htmlspecialchars((string)$r['id']) ?>" class="<?= $isDeleted ? 'is-deleted' : '' ?> <?= $isPoster ? 'is-poster' : '' ?>">
+                                <tr<?= is_array($r) ? ' data-id="' . htmlspecialchars((string)($r['id'] ?? '')) . '"' : '' ?> class="<?= $isDeleted ? 'is-deleted' : '' ?> <?= $pIsDeleted ? 'is-poster is-deleted' : '' ?>">
                                     <td data-label="ID">
-                                        <div>#<?= htmlspecialchars((string)$r['id']) ?></div>
-                                        <?php if ($isPoster): ?>
-                                            <div class="tag poster">POSTER</div>
-                                        <?php endif; ?>
+                                        <?= is_array($r) ? ('<div>#' . htmlspecialchars((string)($r['id'] ?? '')) . '</div>') : '<span class="res-muted">—</span>' ?>
                                         <?php if ($isDeleted): ?>
-                                            <div class="tag deleted" id="deleted-tag-<?= htmlspecialchars((string)$r['id']) ?>">
-                                                <?= $isPoster ? ($r['status_text'] ?? 'Удалено') : 'Удалено' ?><?= $deletedBy !== '' ? ' · ' . htmlspecialchars($deletedBy) : '' ?>
+                                            <div class="tag deleted" id="deleted-tag-<?= htmlspecialchars((string)($r['id'] ?? '')) ?>">
+                                                Удалено<?= $deletedBy !== '' ? ' · ' . htmlspecialchars($deletedBy) : '' ?>
                                             </div>
-                                            <div class="res-muted" id="deleted-meta-<?= htmlspecialchars((string)$r['id']) ?>">
+                                            <div class="res-muted" id="deleted-meta-<?= htmlspecialchars((string)($r['id'] ?? '')) ?>">
                                                 <?= htmlspecialchars($deletedAtHuman) ?>
                                             </div>
                                         <?php endif; ?>
                                     </td>
                                     <td data-label="Код">
-                                        <?php if (!empty($r['qr_code'])): ?>
-                                            <span class="tag"><?= htmlspecialchars($r['qr_code']) ?></span>
-                                        <?php else: ?>
-                                            <span class="res-muted">—</span>
-                                        <?php endif; ?>
+                                        <?php if (is_array($r) && !empty($r['qr_code'])): ?>
+                                            <span class="tag"><?= htmlspecialchars((string)$r['qr_code']) ?></span>
+                                        <?php else: ?><span class="res-muted">—</span><?php endif; ?>
                                     </td>
                                     <td data-label="Создано"><?= $createdAtHuman !== '' ? htmlspecialchars($createdAtHuman) : '—' ?></td>
                                     <td data-label="Время" class="res-strong"><?= $startHuman !== '' ? htmlspecialchars($startHuman) : '—' ?></td>
-                                    <td data-label="Стол"><?= htmlspecialchars($r['table_num']) ?></td>
-                                    <td data-label="Гостей"><?= (int)$r['guests'] ?></td>
+                                    <td data-label="Стол"><?= is_array($r) ? htmlspecialchars((string)$r['table_num']) : '—' ?></td>
+                                    <td data-label="Гостей"><?= is_array($r) ? (int)$r['guests'] : '—' ?></td>
                                     <td data-label="Гость">
-                                        <div style="font-weight:900;"><?= htmlspecialchars($r['name']) ?></div>
-                                        <div class="res-muted"><?= htmlspecialchars($r['phone']) ?></div>
+                                        <?php if (is_array($r)): ?>
+                                            <div style="font-weight:900;"><?= htmlspecialchars((string)$r['name']) ?></div>
+                                            <div class="res-muted"><?= htmlspecialchars((string)$r['phone']) ?></div>
+                                        <?php else: ?>
+                                            <span class="res-muted">—</span>
+                                        <?php endif; ?>
                                         <?php if ($waPhoneNorm !== ''): ?>
                                             <?php $waClean = preg_replace('/\D+/', '', $waPhoneNorm); ?>
                                             <div class="res-muted"><a href="https://wa.me/<?= htmlspecialchars($waClean) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">WA: +<?= htmlspecialchars($waClean) ?></a></div>
                                         <?php elseif ($tgUsername !== ''): ?>
                                             <div class="res-muted"><a href="https://t.me/<?= htmlspecialchars($tgUsername) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">TG: @<?= htmlspecialchars($tgUsername) ?></a></div>
                                         <?php endif; ?>
-                                        <?php if (!empty($r['zalo_phone'])): ?>
-                                            <div class="res-muted"><a href="https://zalo.me/<?= htmlspecialchars(ltrim($r['zalo_phone'], '+')) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">Zalo: <?= htmlspecialchars($r['zalo_phone']) ?></a></div>
+                                        <?php if (is_array($r) && !empty($r['zalo_phone'])): ?>
+                                            <div class="res-muted"><a href="https://zalo.me/<?= htmlspecialchars(ltrim((string)$r['zalo_phone'], '+')) ?>" target="_blank" style="color:var(--accent); text-decoration:none;">Zalo: <?= htmlspecialchars((string)$r['zalo_phone']) ?></a></div>
                                         <?php endif; ?>
-                                        <?php if (!empty($r['comment']) || !empty($r['preorder_text'])): ?>
+                                        <?php if (is_array($r) && (!empty($r['comment']) || !empty($r['preorder_text']))): ?>
                                             <details class="res-more">
                                                 <summary>Комментарий / предзаказ</summary>
                                                 <div class="box">
                                                     <?php if (!empty($r['comment'])): ?>
-                                                        <div><b>Комментарий:</b> <?= htmlspecialchars($r['comment']) ?></div>
+                                                        <div><b>Комментарий:</b> <?= htmlspecialchars((string)$r['comment']) ?></div>
                                                     <?php endif; ?>
                                                     <?php if (!empty($r['preorder_text'])): ?>
-                                                        <div style="margin-top:6px;"><b>Предзаказ:</b><div class="pre"><?= htmlspecialchars($r['preorder_text']) ?></div></div>
+                                                        <div style="margin-top:6px;"><b>Предзаказ:</b><div class="pre"><?= htmlspecialchars((string)$r['preorder_text']) ?></div></div>
                                                     <?php endif; ?>
                                                 </div>
                                             </details>
                                         <?php endif; ?>
                                     </td>
-                                    <td data-label="Сумма"><?= $r['total_amount'] > 0 ? number_format($r['total_amount'], 0, '.', ' ') . ' ₫' : '—' ?></td>
+                                    <td data-label="Сумма"><?= (is_array($r) && (float)($r['total_amount'] ?? 0) > 0) ? number_format((float)$r['total_amount'], 0, '.', ' ') . ' ₫' : '—' ?></td>
                                     <td data-label="QR">
-                                        <?php if (!empty($r['qr_url'])): ?>
-                                            <a href="<?= htmlspecialchars($r['qr_url']) ?>" target="_blank" style="color:var(--accent); font-weight:900; text-decoration:none;">QR</a>
+                                        <?php if (is_array($r) && !empty($r['qr_url'])): ?>
+                                            <a href="<?= htmlspecialchars((string)$r['qr_url']) ?>" target="_blank" style="color:var(--accent); font-weight:900; text-decoration:none;">QR</a>
                                         <?php else: ?>
                                             <span class="res-muted">—</span>
                                         <?php endif; ?>
                                     </td>
                                     <td data-label="Действия">
-                                        <?php if (!$isPoster): ?>
+                                        <?php if (is_array($r)): ?>
                                             <div class="res-actions">
                                                 <?php $guestBtnClass = $waPhoneNorm !== '' ? 'contact-wa' : ($tgUsername !== '' || (int)($r['tg_user_id'] ?? 0) > 0 ? 'contact-tg' : ''); ?>
                                                 <button type="button" class="res-btn btn-resend <?= htmlspecialchars($guestBtnClass) ?>" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="guest">ReGuest</button>
@@ -771,10 +883,32 @@ $rows = $allRows;
                                                 <button type="button" class="res-btn danger btn-delete" data-id="<?= htmlspecialchars((string)$r['id']) ?>"><?= $isDeleted ? 'Восстановить' : 'Удалить' ?></button>
                                             </div>
                                             <div class="res-status" id="resend-status-<?= htmlspecialchars((string)$r['id']) ?>"></div>
-                                        <?php else: ?>
-                                            <span class="res-muted">Управление в Poster POS</span>
                                         <?php endif; ?>
                                     </td>
+                                    <?php if ($showPoster): ?>
+                                        <td data-label="Poster ID"><?= is_array($p) && !empty($p['incoming_order_id']) ? htmlspecialchars((string)$p['incoming_order_id']) : '—' ?></td>
+                                        <td data-label="Создано"><?= $pCreatedAtHuman !== '' ? htmlspecialchars($pCreatedAtHuman) : '—' ?></td>
+                                        <td data-label="Время" class="res-strong"><?= $pStartHuman !== '' ? htmlspecialchars($pStartHuman) : '—' ?></td>
+                                        <td data-label="Стол"><?= is_array($p) ? htmlspecialchars((string)($p['table_num'] ?? '')) : '—' ?></td>
+                                        <td data-label="Гостей"><?= is_array($p) ? (int)($p['guests'] ?? 0) : '—' ?></td>
+                                        <td data-label="Гость"><?= is_array($p) ? htmlspecialchars((string)($p['name'] ?? '')) : '—' ?></td>
+                                        <td data-label="Телефон"><?= is_array($p) ? htmlspecialchars((string)($p['phone'] ?? '')) : '—' ?></td>
+                                        <td data-label="Детали">
+                                            <?php if (is_array($p) && (!empty($p['comment']) || !empty($p['status_text']))): ?>
+                                                <details class="res-more">
+                                                    <summary>Открыть</summary>
+                                                    <div class="box">
+                                                        <div><b>Статус:</b> <?= htmlspecialchars((string)($p['status_text'] ?? '')) ?></div>
+                                                        <?php if (!empty($p['comment'])): ?>
+                                                            <div style="margin-top:6px;"><b>Комментарий:</b> <div class="pre"><?= htmlspecialchars((string)$p['comment']) ?></div></div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </details>
+                                            <?php else: ?>
+                                                <span class="res-muted">—</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    <?php endif; ?>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
