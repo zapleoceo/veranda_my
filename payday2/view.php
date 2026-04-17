@@ -318,7 +318,7 @@ $payday2AssetVersion = '20260417_2000';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
-    <title>Payday</title>
+    <title>Payday2</title>
     <link rel="stylesheet" href="/assets/app.css">
     <script src="/assets/app.js" defer></script>
     <script src="/assets/user_menu.js" defer></script>

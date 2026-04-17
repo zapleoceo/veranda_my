@@ -1504,12 +1504,6 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram') {
         $safe = function ($v): string {
             return htmlspecialchars(trim((string)$v), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         };
-        $pad = function (string $s, int $width): string {
-            $txt = trim($s);
-            $len = function_exists('mb_strwidth') ? mb_strwidth($txt, 'UTF-8') : strlen($txt);
-            if ($len >= $width) return $txt;
-            return $txt . str_repeat(' ', $width - $len);
-        };
         $truncate = function (string $s, int $max): string {
             $txt = trim($s);
             if (function_exists('mb_strwidth') && function_exists('mb_strimwidth')) {
@@ -1523,37 +1517,43 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram') {
             : ($dateToPayload !== '' ? $dateToPayload : $dateFromPayload);
         $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
 
-        $summaryBlock = "Показатель           Poster      Факт.      Разница\n";
+        $maxAccounts = 25;
+        $lines = [];
+        $lines[] = '<b>Payday2 • Балансы Poster</b>';
+        if ($periodLabel !== '') $lines[] = 'Период: <b>' . $safe($periodLabel) . '</b>';
+        if ($by !== '') $lines[] = 'Отправил: <b>' . $safe($by) . '</b>';
+
+        $lines[] = '';
+        $lines[] = '<b>Сводка</b>';
         foreach ($summaryRows as $row) {
             if (!is_array($row)) continue;
-            $label = $truncate((string)($row['label'] ?? ''), 20);
-            $poster = $truncate((string)($row['poster'] ?? '—'), 10);
-            $fact = $truncate((string)($row['actual'] ?? '—'), 10);
-            $diff = $truncate((string)($row['diff'] ?? '—'), 10);
-            $summaryBlock .= $pad($label, 20) . ' ' . $pad($poster, 10) . ' ' . $pad($fact, 10) . ' ' . $pad($diff, 10) . "\n";
+            $label = $truncate((string)($row['label'] ?? ''), 40);
+            $poster = $truncate((string)($row['poster'] ?? '—'), 24);
+            $fact = $truncate((string)($row['actual'] ?? '—'), 24);
+            $diff = $truncate((string)($row['diff'] ?? '—'), 24);
+            $lines[] = '• <b>' . $safe($label) . '</b>'
+                . '  Poster: <code>' . $safe($poster) . '</code>'
+                . '  Факт: <code>' . $safe($fact) . '</code>'
+                . '  Δ: <code>' . $safe($diff) . '</code>';
         }
 
-        $accountsBlock = "ID   Счёт                     Баланс\n";
-        $maxAccounts = 25;
+        $lines[] = '';
+        $lines[] = '<b>Счета Poster</b>';
         $countAccounts = 0;
         foreach ($accountsRows as $row) {
             if (!is_array($row)) continue;
             if ($countAccounts >= $maxAccounts) break;
-            $id = $truncate((string)($row['id'] ?? ''), 4);
-            $name = $truncate((string)($row['name'] ?? ''), 24);
-            $balance = $truncate((string)($row['balance'] ?? ''), 12);
-            $accountsBlock .= $pad($id, 4) . ' ' . $pad($name, 24) . ' ' . $pad($balance, 12) . "\n";
+            $id = $truncate((string)($row['id'] ?? ''), 8);
+            $name = $truncate((string)($row['name'] ?? ''), 80);
+            $balance = $truncate((string)($row['balance'] ?? ''), 24);
+            $lines[] = $safe($id) . '. <b>' . $safe($name) . '</b> — <code>' . $safe($balance) . '</code>';
             $countAccounts++;
         }
         if (count($accountsRows) > $countAccounts) {
-            $accountsBlock .= '... ещё ' . (count($accountsRows) - $countAccounts) . "\n";
+            $lines[] = '… ещё ' . (count($accountsRows) - $countAccounts);
         }
 
-        $html = '<b>Обновляем Балансы Poster</b>';
-        if ($periodLabel !== '') $html .= "\nПериод: <b>" . $safe($periodLabel) . '</b>';
-        if ($by !== '') $html .= "\nОтправил: <b>" . $safe($by) . '</b>';
-        $html .= "\n\n<b>Сводка</b>\n<pre>" . $safe(rtrim($summaryBlock)) . "</pre>";
-        $html .= "\n<b>Счета Poster</b>\n<pre>" . $safe(rtrim($accountsBlock)) . "</pre>";
+        $html = implode("\n", $lines);
 
         $sendResult = is_callable($sendTelegramHtmlMessage)
             ? $sendTelegramHtmlMessage($tgToken, $tgChatId, $html, $tgThreadNum, $tgReplyToNum)
