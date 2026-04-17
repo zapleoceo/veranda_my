@@ -6,6 +6,25 @@
     return p === '' ? '/reservations' : p;
   })();
 
+  const refreshTableFromUrl = async (url) => {
+    const wrap = q('#resTableWrap');
+    if (!wrap) return;
+    const res = await fetch(url, { credentials: 'same-origin' });
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const nextWrap = doc.querySelector('#resTableWrap');
+    if (!nextWrap) return;
+    wrap.innerHTML = nextWrap.innerHTML;
+    const panel = q('#resColPanel');
+    if (panel) panel.dataset.built = '0';
+    bindSort();
+    bindResend();
+    bindVPoster();
+    bindDelete();
+    bindColumns();
+    window.dispatchEvent(new Event('resize'));
+  };
+
   const bindSort = () => {
     const table = q('#resTable') || q('.res-table');
     const tbody = table ? q('tbody', table) : null;
@@ -97,6 +116,8 @@
 
   const bindResend = () => {
     qa('.btn-resend').forEach((btn) => {
+      if (btn.dataset.bound === '1') return;
+      btn.dataset.bound = '1';
       btn.addEventListener('click', async () => {
         const target = String(btn.dataset.target || 'both');
         const msg = target === 'guest'
@@ -182,6 +203,8 @@
 
   const bindDelete = () => {
     qa('.btn-delete').forEach((btn) => {
+      if (btn.dataset.bound === '1') return;
+      btn.dataset.bound = '1';
       btn.addEventListener('click', async () => {
         const id = String(btn.dataset.id || '');
         if (!id) return;
@@ -208,7 +231,7 @@
     const pcb = q('#showPoster');
     if (!cb && !pcb) return;
 
-    const reload = () => {
+    const reload = async () => {
       const url = new URL(location.href);
       if (cb && cb.checked) url.searchParams.set('show_deleted', '1');
       else url.searchParams.delete('show_deleted');
@@ -216,7 +239,8 @@
       if (pcb && !pcb.checked) url.searchParams.set('show_poster', '0');
       else url.searchParams.delete('show_poster');
 
-      location.href = url.toString();
+      history.replaceState({}, '', url.toString());
+      await refreshTableFromUrl(url.toString());
     };
 
     if (cb) cb.addEventListener('change', reload);
@@ -272,7 +296,7 @@
             statusEl.textContent = j.duplicate ? 'В Poster: уже было ✅' : 'В Poster: создано ✅';
             statusEl.style.color = '#81c784';
           }
-          btn.remove(); // Remove button after success
+          btn.remove();
         } else {
           if (statusEl) {
             statusEl.textContent = 'Ошибка Poster: ' + (j && j.error ? String(j.error) : 'Network error');
@@ -290,6 +314,8 @@
     });
 
     qa('.btn-vposter').forEach((btn) => {
+      if (btn.dataset.bound === '1') return;
+      btn.dataset.bound = '1';
       btn.addEventListener('click', () => {
         activeId = String(btn.dataset.id || '');
         activeBtn = btn;
@@ -363,61 +389,68 @@
       if (empty) empty.colSpan = Math.max(1, visibleCols.length);
     };
 
-    panel.textContent = '';
-    cols.forEach((c) => {
-      const row = document.createElement('label');
-      row.className = 'res-colrow';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = !hidden.includes(c.col);
-      cb.addEventListener('change', () => {
-        const idx = hidden.indexOf(c.col);
-        if (cb.checked) {
-          if (idx !== -1) hidden.splice(idx, 1);
-        } else {
-          if (idx === -1) hidden.push(c.col);
-        }
-        localStorage.setItem(key, JSON.stringify(hidden));
-        applyAll();
-        window.dispatchEvent(new Event('resize'));
+    if (panel.dataset.built !== '1') {
+      panel.dataset.built = '1';
+      panel.textContent = '';
+      cols.forEach((c) => {
+        const row = document.createElement('label');
+        row.className = 'res-colrow';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !hidden.includes(c.col);
+        cb.addEventListener('change', () => {
+          const idx = hidden.indexOf(c.col);
+          if (cb.checked) {
+            if (idx !== -1) hidden.splice(idx, 1);
+          } else {
+            if (idx === -1) hidden.push(c.col);
+          }
+          localStorage.setItem(key, JSON.stringify(hidden));
+          applyAll();
+          window.dispatchEvent(new Event('resize'));
+        });
+        const lbl = document.createElement('span');
+        lbl.className = 'lbl';
+        lbl.textContent = c.label;
+        const side = document.createElement('span');
+        side.className = 'side';
+        side.textContent = c.side === 'poster' ? 'Poster' : 'Сайт';
+        row.appendChild(cb);
+        row.appendChild(lbl);
+        row.appendChild(side);
+        panel.appendChild(row);
       });
-      const lbl = document.createElement('span');
-      lbl.className = 'lbl';
-      lbl.textContent = c.label;
-      const side = document.createElement('span');
-      side.className = 'side';
-      side.textContent = c.side === 'poster' ? 'Poster' : 'Сайт';
-      row.appendChild(cb);
-      row.appendChild(lbl);
-      row.appendChild(side);
-      panel.appendChild(row);
-    });
 
-    const close = () => { panel.hidden = true; };
-    const open = () => { panel.hidden = false; };
-    btn.addEventListener('click', () => {
-      panel.hidden ? open() : close();
-    });
-    document.addEventListener('click', (e) => {
-      const t = e.target;
-      if (!t) return;
-      if (panel.hidden) return;
-      if (panel.contains(t) || btn.contains(t)) return;
-      close();
-    });
+      const close = () => { panel.hidden = true; };
+      const open = () => { panel.hidden = false; };
+      btn.addEventListener('click', () => {
+        panel.hidden ? open() : close();
+      });
+      document.addEventListener('click', (e) => {
+        const t = e.target;
+        if (!t) return;
+        if (panel.hidden) return;
+        if (panel.contains(t) || btn.contains(t)) return;
+        close();
+      });
+    }
 
     applyAll();
   };
 
   const bindLayout = () => {
     const wrap = q('#resTableWrap') || q('.table-wrap');
-    const table = q('#resTable') || q('.res-table');
     const hscroll = q('#resHScroll');
     const hinner = q('#resHScrollInner');
-    if (!wrap || !table || !hscroll || !hinner) return;
+    if (!wrap || !hscroll || !hinner) return;
+    if (document.body.dataset.resLayoutBound === '1') return;
+    document.body.dataset.resLayoutBound = '1';
 
     let syncing = false;
+    const getTable = () => q('#resTable') || q('.res-table');
     const updateHScroll = () => {
+      const table = getTable();
+      if (!table) return;
       const sw = table.scrollWidth || 0;
       const cw = wrap.clientWidth || 0;
       const need = sw > cw + 2;
@@ -436,6 +469,8 @@
     };
 
     const updateStickyOffsets = () => {
+      const table = getTable();
+      if (!table) return;
       const group = q('thead .res-head-group', table);
       if (!group) return;
       const h = Math.ceil(group.getBoundingClientRect().height || 0);
@@ -466,6 +501,239 @@
     setTimeout(onResize, 50);
   };
 
+  const bindHall = () => {
+    const data = typeof window !== 'undefined' ? window.RES_HALL_DATA : null;
+    const section = q('#resHallSection');
+    const board = q('#resHallBoard');
+    if (!data || !section || !board) return;
+    if (section.dataset.bound === '1') return;
+    section.dataset.bound = '1';
+
+    const spotIdInput = q('#resSpotId');
+    const hallIdInput = q('#resHallId');
+    const soonInput = q('#resSoonHours');
+    const btnApply = q('#resHallApply');
+    const btnRotate = q('#resHallRotate');
+    const zoom = q('#resHallZoom');
+    const btnAll = q('#resHallAll');
+    const btnNone = q('#resHallNone');
+
+    const modal = q('#resHallModal');
+    const mNum = q('#resHallModalNum');
+    const mCap = q('#resHallModalCap');
+    const mAllowed = q('#resHallModalAllowed');
+    const mCancel = q('#resHallModalCancel');
+    const mSave = q('#resHallModalSave');
+
+    const state = {
+      rot: false,
+      zoom: 1,
+      active: null,
+      tables: Array.isArray(data.tables) ? data.tables.slice() : [],
+      spotId: Number(data.spot_id || 1) || 1,
+      hallId: Number(data.hall_id || 2) || 2,
+    };
+
+    const closeModal = () => {
+      if (modal) modal.hidden = true;
+      state.active = null;
+    };
+    if (mCancel) mCancel.addEventListener('click', closeModal);
+
+    const computeLayout = () => {
+      const W = 980, H = 620, pad = 20;
+      let minX = null, minY = null, maxX = null, maxY = null;
+      state.tables.forEach((t) => {
+        const x = Number(t.x || 0) || 0;
+        const y = Number(t.y || 0) || 0;
+        const w = Number(t.w || 0) || 6;
+        const h = Number(t.h || 0) || 6;
+        minX = minX == null ? x : Math.min(minX, x);
+        minY = minY == null ? y : Math.min(minY, y);
+        maxX = maxX == null ? (x + w) : Math.max(maxX, x + w);
+        maxY = maxY == null ? (y + h) : Math.max(maxY, y + h);
+      });
+      minX = minX == null ? 0 : minX;
+      minY = minY == null ? 0 : minY;
+      maxX = maxX == null ? 1 : maxX;
+      maxY = maxY == null ? 1 : maxY;
+      const worldW = Math.max(1, maxX - minX);
+      const worldH = Math.max(1, maxY - minY);
+      const scale = Math.min((W - pad * 2) / worldW, (H - pad * 2) / worldH);
+      return { W, H, pad, minX, minY, scale };
+    };
+
+    const render = () => {
+      const { W, H, pad, minX, minY, scale } = computeLayout();
+      board.style.width = W + 'px';
+      board.style.height = H + 'px';
+      board.classList.toggle('rot180', state.rot);
+      board.style.transform = 'scale(' + String(state.zoom) + ')';
+      board.textContent = '';
+
+      state.tables.forEach((t) => {
+        const x = Number(t.x || 0) || 0;
+        const y = Number(t.y || 0) || 0;
+        const w0 = Number(t.w || 0) || 6;
+        const h0 = Number(t.h || 0) || 6;
+        const left = pad + (x - minX) * scale;
+        const top = pad + (y - minY) * scale;
+        const w = w0 * scale;
+        const h = h0 * scale;
+
+        const el = document.createElement('div');
+        el.className = 'res-hall-tbl' + (String(t.shape || '') === 'circle' ? ' circle' : '') + (!t.scheme_num ? ' disabled' : '');
+        el.style.left = left + 'px';
+        el.style.top = top + 'px';
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+
+        const row = document.createElement('div');
+        row.className = 'row';
+        const num = document.createElement('div');
+        num.className = 'num';
+        num.textContent = t.scheme_num ? String(t.scheme_num) : (t.table_num ? String(t.table_num) : ('#' + String(t.table_id || '')));
+        const cap = document.createElement('div');
+        cap.className = 'cap';
+        cap.textContent = t.scheme_num ? ('👤' + String(t.cap || 0)) : '—';
+        const cb = document.createElement('input');
+        cb.className = 'chk';
+        cb.type = 'checkbox';
+        cb.checked = !!t.is_allowed;
+        cb.disabled = !t.scheme_num;
+        cb.addEventListener('click', (e) => e.stopPropagation());
+        cb.addEventListener('change', async () => {
+          if (!t.scheme_num) return;
+          t.is_allowed = cb.checked ? 1 : 0;
+          await postForm(endpoint + '?ajax=res_table_update', { hall_id: state.hallId, spot_id: state.spotId, scheme_num: t.scheme_num, allowed: cb.checked ? 1 : 0, cap: t.cap || 0 });
+        });
+
+        row.appendChild(num);
+        row.appendChild(cap);
+        row.appendChild(cb);
+        el.appendChild(row);
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = String(t.table_title || '').trim();
+        el.appendChild(title);
+
+        el.addEventListener('click', () => {
+          if (!t.scheme_num) return;
+          state.active = t;
+          if (mNum) mNum.textContent = String(t.scheme_num);
+          if (mCap) mCap.value = String(t.cap || 0);
+          if (mAllowed) mAllowed.checked = !!t.is_allowed;
+          if (modal) modal.hidden = false;
+        });
+
+        board.appendChild(el);
+      });
+    };
+
+    const loadHall = async (spotId, hallId) => {
+      const url = new URL(endpoint, location.origin);
+      url.searchParams.set('ajax', 'res_hall_data');
+      url.searchParams.set('spot_id', String(spotId));
+      url.searchParams.set('hall_id', String(hallId));
+      const res = await fetch(url.toString(), { credentials: 'same-origin' });
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j || !j.ok) throw new Error(j && j.error ? j.error : 'Ошибка загрузки');
+      state.tables = Array.isArray(j.tables) ? j.tables.slice() : [];
+      state.spotId = Number(j.spot_id || spotId) || spotId;
+      state.hallId = Number(j.hall_id || hallId) || hallId;
+      if (spotIdInput) spotIdInput.value = String(state.spotId);
+      if (hallIdInput) hallIdInput.value = String(state.hallId);
+      if (soonInput) soonInput.value = String(Number(j.soon_hours || 2) || 2);
+      const u = new URL(location.href);
+      u.searchParams.set('spot_id', String(state.spotId));
+      u.searchParams.set('hall_id', String(state.hallId));
+      history.replaceState({}, '', u.toString());
+      render();
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    if (btnApply) btnApply.addEventListener('click', async () => {
+      const s = spotIdInput ? (Number(spotIdInput.value || 1) || 1) : state.spotId;
+      const h = hallIdInput ? (Number(hallIdInput.value || 2) || 2) : state.hallId;
+      await loadHall(s, h);
+    });
+    if (btnRotate) btnRotate.addEventListener('click', () => {
+      state.rot = !state.rot;
+      render();
+    });
+    if (zoom) zoom.addEventListener('input', () => {
+      const v = Number(zoom.value || 100) || 100;
+      state.zoom = Math.max(0.5, Math.min(1.8, v / 100));
+      render();
+    });
+
+    if (btnAll) btnAll.addEventListener('click', async () => {
+      const todo = state.tables.filter((t) => t.scheme_num && !t.is_allowed);
+      for (const t of todo) {
+        t.is_allowed = 1;
+        await postForm(endpoint + '?ajax=res_table_update', { hall_id: state.hallId, spot_id: state.spotId, scheme_num: t.scheme_num, allowed: 1, cap: t.cap || 0 });
+      }
+      render();
+    });
+    if (btnNone) btnNone.addEventListener('click', async () => {
+      const todo = state.tables.filter((t) => t.scheme_num && t.is_allowed);
+      for (const t of todo) {
+        t.is_allowed = 0;
+        await postForm(endpoint + '?ajax=res_table_update', { hall_id: state.hallId, spot_id: state.spotId, scheme_num: t.scheme_num, allowed: 0, cap: t.cap || 0 });
+      }
+      render();
+    });
+
+    if (mSave) mSave.addEventListener('click', async () => {
+      if (!state.active) return;
+      const t = state.active;
+      const cap = mCap ? (Number(mCap.value || 0) || 0) : 0;
+      const allowed = mAllowed ? !!mAllowed.checked : false;
+      t.cap = cap;
+      t.is_allowed = allowed ? 1 : 0;
+      await postForm(endpoint + '?ajax=res_table_update', { hall_id: state.hallId, spot_id: state.spotId, scheme_num: t.scheme_num, allowed: allowed ? 1 : 0, cap });
+      closeModal();
+      render();
+    });
+
+    if (soonInput) soonInput.addEventListener('change', async () => {
+      const v = Number(soonInput.value || 2) || 2;
+      await postForm(endpoint + '?ajax=res_soon_hours', { soon_hours: v });
+    });
+
+    render();
+    window.addEventListener('resize', () => render());
+  };
+
+  const bindDateFilters = () => {
+    const df = q('input[name="date_from"]');
+    const dt = q('input[name="date_to"]');
+    const form = q('form.filters');
+    if (!df && !dt) return;
+
+    let t = null;
+    const apply = async () => {
+      const url = new URL(location.href);
+      if (df) url.searchParams.set('date_from', String(df.value || ''));
+      if (dt) url.searchParams.set('date_to', String(dt.value || ''));
+      history.replaceState({}, '', url.toString());
+      await refreshTableFromUrl(url.toString());
+    };
+
+    const onChange = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { apply(); t = null; }, 250);
+    };
+
+    if (df) df.addEventListener('change', onChange);
+    if (dt) dt.addEventListener('change', onChange);
+    if (form) form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      apply();
+    });
+  };
+
   bindSort();
   bindResend();
   bindVPoster();
@@ -473,4 +741,7 @@
   bindShowDeleted();
   bindColumns();
   bindLayout();
+  bindHall();
+  bindDateFilters();
 })();
+

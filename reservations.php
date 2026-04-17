@@ -62,6 +62,17 @@ try {
 // Check permissions for Poster button
 $userPermissions = veranda_get_user_permissions($db, $_SESSION['user_email'] ?? '');
 $hasPosterAccess = !empty($userPermissions['vposter_button']);
+$canManageTables = function_exists('veranda_can') && veranda_can('admin');
+
+$resHallId = max(1, (int)($_GET['hall_id'] ?? 2));
+$resSpotId = max(1, (int)($_GET['spot_id'] ?? ($_ENV['POSTER_SPOT_ID'] ?? 1)));
+$resMetaKey = 'reservations_allowed_scheme_nums_hall_' . $resHallId;
+$resCapsMetaKey = 'reservations_table_caps_hall_' . $resHallId;
+$resSoonKey = 'reservations_soon_booking_hours';
+$resSoonHours = 2;
+$resAllowedNums = [];
+$resCapsByNum = [];
+$resHallTables = [];
 
 $ajax = $_GET['ajax'] ?? '';
 if ($ajax === 'vposter') {
@@ -485,6 +496,201 @@ if ($ajax === 'toggle_deleted') {
     }
 }
 
+if ($ajax === 'res_table_update') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (!$canManageTables) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $hallId = max(1, (int)($_POST['hall_id'] ?? $resHallId));
+    $spotId = max(1, (int)($_POST['spot_id'] ?? $resSpotId));
+    $schemeNum = (int)($_POST['scheme_num'] ?? 0);
+    $allowed = (int)($_POST['allowed'] ?? 0) === 1;
+    $cap = (int)($_POST['cap'] ?? 0);
+    if ($schemeNum < 1 || $schemeNum > 500) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad scheme_num'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($cap < 0) $cap = 0;
+    if ($cap > 999) $cap = 999;
+
+    $metaRepo = new \App\Classes\MetaRepository($db);
+    $mk = 'reservations_allowed_scheme_nums_hall_' . $hallId;
+    $ck = 'reservations_table_caps_hall_' . $hallId;
+    $saved = $metaRepo->getMany([$mk, $ck]);
+
+    $nums = [];
+    $stored = array_key_exists($mk, $saved) ? trim((string)$saved[$mk]) : '';
+    if ($stored !== '') {
+        $decoded = json_decode($stored, true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $v) {
+                $n = (int)$v;
+                if ($n >= 1 && $n <= 500) $nums[(string)$n] = true;
+            }
+        } else {
+            foreach (explode(',', $stored) as $part) {
+                $part = trim($part);
+                if ($part === '' || !preg_match('/^\d+$/', $part)) continue;
+                $n = (int)$part;
+                if ($n >= 1 && $n <= 500) $nums[(string)$n] = true;
+            }
+        }
+    }
+    if ($allowed) $nums[(string)$schemeNum] = true;
+    else unset($nums[(string)$schemeNum]);
+    $numsList = array_values(array_map('intval', array_keys($nums)));
+    sort($numsList);
+
+    $caps = [];
+    $capsStored = array_key_exists($ck, $saved) ? trim((string)$saved[$ck]) : '';
+    $capsDecoded = $capsStored !== '' ? json_decode($capsStored, true) : null;
+    if (is_array($capsDecoded)) {
+        foreach ($capsDecoded as $k => $v) {
+            $k = trim((string)$k);
+            if (!preg_match('/^\d+$/', $k)) continue;
+            $n = (int)$k;
+            if ($n < 1 || $n > 500) continue;
+            $c = (int)$v;
+            if ($c < 0) $c = 0;
+            if ($c > 999) $c = 999;
+            $caps[(string)$n] = $c;
+        }
+    }
+    $caps[(string)$schemeNum] = $cap;
+    ksort($caps, SORT_NATURAL);
+
+    $metaTable = $db->t('system_meta');
+    $db->query(
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+        [$mk, json_encode($numsList, JSON_UNESCAPED_UNICODE)]
+    );
+    $db->query(
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+        [$ck, json_encode($caps, JSON_UNESCAPED_UNICODE)]
+    );
+
+    echo json_encode(['ok' => true, 'hall_id' => $hallId, 'spot_id' => $spotId], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($ajax === 'res_soon_hours') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (!$canManageTables) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $h = (int)($_POST['soon_hours'] ?? 2);
+    if ($h < 0) $h = 0;
+    if ($h > 24) $h = 24;
+    $metaTable = $db->t('system_meta');
+    $db->query(
+        "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+        [$resSoonKey, (string)$h]
+    );
+    echo json_encode(['ok' => true, 'soon_hours' => $h], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($ajax === 'res_hall_data') {
+    header('Content-Type: application/json; charset=utf-8');
+    if (!$canManageTables) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $hallId = max(1, (int)($_GET['hall_id'] ?? $resHallId));
+    $spotId = max(1, (int)($_GET['spot_id'] ?? $resSpotId));
+    $metaRepo = new \App\Classes\MetaRepository($db);
+    $mk = 'reservations_allowed_scheme_nums_hall_' . $hallId;
+    $ck = 'reservations_table_caps_hall_' . $hallId;
+    $saved = $metaRepo->getMany([$mk, $ck, $resSoonKey]);
+
+    $allowed = [];
+    $stored = array_key_exists($mk, $saved) ? trim((string)$saved[$mk]) : '';
+    if ($stored !== '') {
+        $decoded = json_decode($stored, true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $v) {
+                $n = (int)$v;
+                if ($n >= 1 && $n <= 500) $allowed[(string)$n] = true;
+            }
+        }
+    }
+    $caps = [];
+    $capsStored = array_key_exists($ck, $saved) ? trim((string)$saved[$ck]) : '';
+    $capsDecoded = $capsStored !== '' ? json_decode($capsStored, true) : null;
+    if (is_array($capsDecoded)) {
+        foreach ($capsDecoded as $k => $v) {
+            $k = trim((string)$k);
+            if (!preg_match('/^\d+$/', $k)) continue;
+            $n = (int)$k;
+            if ($n < 1 || $n > 500) continue;
+            $c = (int)$v;
+            if ($c < 0) $c = 0;
+            if ($c > 999) $c = 999;
+            $caps[(string)$n] = $c;
+        }
+    }
+    $soonStored = array_key_exists($resSoonKey, $saved) ? trim((string)$saved[$resSoonKey]) : '';
+    $soonHours = ($soonStored !== '' && is_numeric($soonStored)) ? max(0, min(24, (int)$soonStored)) : 2;
+
+    $tables = [];
+    if (!empty($_ENV['POSTER_API_TOKEN'])) {
+        try {
+            $apiTables = new \App\Classes\PosterAPI((string)$_ENV['POSTER_API_TOKEN']);
+            $rowsTables = $apiTables->request('spots.getTableHallTables', [
+                'spot_id' => $spotId,
+                'hall_id' => $hallId,
+                'without_deleted' => 1,
+            ], 'GET');
+            $rowsTables = is_array($rowsTables) ? $rowsTables : [];
+            foreach ($rowsTables as $t) {
+                if (!is_array($t)) continue;
+                $tableId = (int)($t['table_id'] ?? 0);
+                $tableNum = trim((string)($t['table_num'] ?? ''));
+                $tableTitle = trim((string)($t['table_title'] ?? ''));
+                $scheme = null;
+                if (preg_match('/^\d+$/', $tableTitle)) $scheme = (int)$tableTitle;
+                elseif (preg_match('/^\d+$/', $tableNum)) $scheme = (int)$tableNum;
+                $schemeStr = $scheme !== null ? (string)$scheme : '';
+                $tables[] = [
+                    'table_id' => $tableId,
+                    'table_num' => $tableNum,
+                    'table_title' => $tableTitle,
+                    'scheme_num' => $schemeStr,
+                    'shape' => (string)($t['table_shape'] ?? ''),
+                    'x' => (float)($t['table_x'] ?? 0),
+                    'y' => (float)($t['table_y'] ?? 0),
+                    'w' => (float)($t['table_width'] ?? 0),
+                    'h' => (float)($t['table_height'] ?? 0),
+                    'is_allowed' => ($schemeStr !== '' && isset($allowed[$schemeStr])) ? 1 : 0,
+                    'cap' => ($schemeStr !== '') ? (int)($caps[$schemeStr] ?? 0) : 0,
+                ];
+            }
+        } catch (\Throwable $e_tbl2) {
+        }
+    }
+    echo json_encode(['ok' => true, 'spot_id' => $spotId, 'hall_id' => $hallId, 'soon_hours' => $soonHours, 'tables' => $tables], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $dateFrom = $_GET['date_from'] ?? date('Y-m-d', strtotime('-1 week'));
 $dateTo = $_GET['date_to'] ?? date('Y-m-d', strtotime('+1 month'));
 $showDeleted = !empty($_GET['show_deleted']);
@@ -511,6 +717,99 @@ $rows = $db->query("
 ", $params)->fetchAll();
 if (!is_array($rows)) {
     $rows = [];
+}
+
+$defaultCaps = [
+    '1' => 8, '2' => 8, '3' => 8,
+    '4' => 5, '5' => 5, '6' => 5, '7' => 5, '8' => 5,
+    '9' => 8,
+    '10' => 2, '11' => 2, '12' => 2, '13' => 2,
+    '14' => 3, '15' => 3, '16' => 3,
+    '17' => 5, '18' => 5, '19' => 5, '20' => 5, '21' => 5,
+    '22' => 15,
+];
+
+try {
+    $metaRepo = new \App\Classes\MetaRepository($db);
+    $saved = $metaRepo->getMany([$resMetaKey, $resCapsMetaKey, $resSoonKey]);
+
+    $stored = array_key_exists($resMetaKey, $saved) ? trim((string)$saved[$resMetaKey]) : '';
+    if ($stored !== '') {
+        $decoded = json_decode($stored, true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $v) {
+                $n = (int)$v;
+                if ($n >= 1 && $n <= 500) $resAllowedNums[(string)$n] = true;
+            }
+        } else {
+            foreach (explode(',', $stored) as $part) {
+                $part = trim($part);
+                if ($part === '' || !preg_match('/^\d+$/', $part)) continue;
+                $n = (int)$part;
+                if ($n >= 1 && $n <= 500) $resAllowedNums[(string)$n] = true;
+            }
+        }
+    }
+
+    $capsStored = array_key_exists($resCapsMetaKey, $saved) ? trim((string)$saved[$resCapsMetaKey]) : '';
+    $capsDecoded = $capsStored !== '' ? json_decode($capsStored, true) : null;
+    if (is_array($capsDecoded)) {
+        foreach ($capsDecoded as $k => $v) {
+            $k = trim((string)$k);
+            if (!preg_match('/^\d+$/', $k)) continue;
+            $n = (int)$k;
+            if ($n < 1 || $n > 500) continue;
+            $c = (int)$v;
+            if ($c < 0) $c = 0;
+            if ($c > 999) $c = 999;
+            $resCapsByNum[(string)$n] = $c;
+        }
+    } else {
+        $resCapsByNum = $defaultCaps;
+    }
+
+    $soonStored = array_key_exists($resSoonKey, $saved) ? trim((string)$saved[$resSoonKey]) : '';
+    if ($soonStored !== '' && is_numeric($soonStored)) {
+        $resSoonHours = max(0, min(24, (int)$soonStored));
+    }
+} catch (\Throwable $e_meta) {
+}
+
+if (!empty($_ENV['POSTER_API_TOKEN'])) {
+    try {
+        $apiTables = new \App\Classes\PosterAPI((string)$_ENV['POSTER_API_TOKEN']);
+        $rowsTables = $apiTables->request('spots.getTableHallTables', [
+            'spot_id' => $resSpotId,
+            'hall_id' => $resHallId,
+            'without_deleted' => 1,
+        ], 'GET');
+        $rowsTables = is_array($rowsTables) ? $rowsTables : [];
+        foreach ($rowsTables as $t) {
+            if (!is_array($t)) continue;
+            $tableId = (int)($t['table_id'] ?? 0);
+            $tableNum = trim((string)($t['table_num'] ?? ''));
+            $tableTitle = trim((string)($t['table_title'] ?? ''));
+            $scheme = null;
+            if (preg_match('/^\d+$/', $tableTitle)) $scheme = (int)$tableTitle;
+            elseif (preg_match('/^\d+$/', $tableNum)) $scheme = (int)$tableNum;
+            $schemeStr = $scheme !== null ? (string)$scheme : '';
+
+            $resHallTables[] = [
+                'table_id' => $tableId,
+                'table_num' => $tableNum,
+                'table_title' => $tableTitle,
+                'scheme_num' => $schemeStr,
+                'shape' => (string)($t['table_shape'] ?? ''),
+                'x' => (float)($t['table_x'] ?? 0),
+                'y' => (float)($t['table_y'] ?? 0),
+                'w' => (float)($t['table_width'] ?? 0),
+                'h' => (float)($t['table_height'] ?? 0),
+                'is_allowed' => ($schemeStr !== '' && isset($resAllowedNums[$schemeStr])) ? 1 : 0,
+                'cap' => ($schemeStr !== '') ? (int)($resCapsByNum[$schemeStr] ?? ($defaultCaps[$schemeStr] ?? 0)) : 0,
+            ];
+        }
+    } catch (\Throwable $e_tbl) {
+    }
 }
 
 // FETCH FROM POSTER
@@ -698,7 +997,7 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
     <title>Брони</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="/assets/app.css?v=20260415_1200">
-    <link rel="stylesheet" href="/assets/css/reservations.css?v=20260417_1036">
+    <link rel="stylesheet" href="/reservations/assets/css/reservations.css?v=20260417_1215">
 </head>
 <body>
     <div class="container res-page">
@@ -731,6 +1030,63 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                     </div>
                 </div>
             </div>
+
+            <?php if ($canManageTables): ?>
+                <div class="res-hall" id="resHallSection"
+                     data-hall-id="<?= (int)$resHallId ?>"
+                     data-spot-id="<?= (int)$resSpotId ?>">
+                    <div class="res-hall-head">
+                        <div>
+                            <div class="res-hall-title">Столы</div>
+                            <div class="res-hall-sub">spot_id=<?= (int)$resSpotId ?> · hall_id=<?= (int)$resHallId ?> · soon_hours=<?= (int)$resSoonHours ?></div>
+                        </div>
+                        <div class="res-hall-controls">
+                            <label class="res-hall-label">spot_id <input id="resSpotId" value="<?= (int)$resSpotId ?>" inputmode="numeric"></label>
+                            <label class="res-hall-label">hall_id <input id="resHallId" value="<?= (int)$resHallId ?>" inputmode="numeric"></label>
+                            <label class="res-hall-label">soon <input id="resSoonHours" value="<?= (int)$resSoonHours ?>" inputmode="numeric"></label>
+                            <button type="button" class="res-btn" id="resHallApply">Применить</button>
+                            <button type="button" class="res-btn" id="resHallRotate">180°</button>
+                            <label class="res-hall-label">zoom <input id="resHallZoom" type="range" min="50" max="180" value="100"></label>
+                        </div>
+                    </div>
+                    <div class="res-hall-board-wrap">
+                        <div class="res-hall-board" id="resHallBoard"></div>
+                    </div>
+                    <div class="res-hall-actions">
+                        <button type="button" class="res-btn" id="resHallAll">Все доступны</button>
+                        <button type="button" class="res-btn danger" id="resHallNone">Снять все</button>
+                    </div>
+                </div>
+
+                <div id="resHallModal" class="res-modal" hidden>
+                    <div class="res-modal-card">
+                        <div class="res-modal-title">Стол</div>
+                        <div class="res-modal-body">
+                            <div class="res-modal-grid">
+                                <div class="res-modal-k">Номер</div>
+                                <div class="res-modal-v" id="resHallModalNum">—</div>
+                                <div class="res-modal-k">Вместимость</div>
+                                <div class="res-modal-v"><input id="resHallModalCap" type="number" min="0" max="999"></div>
+                                <div class="res-modal-k">Доступен</div>
+                                <div class="res-modal-v"><input id="resHallModalAllowed" type="checkbox"></div>
+                            </div>
+                        </div>
+                        <div class="res-modal-actions">
+                            <button type="button" class="res-btn" id="resHallModalCancel">Отмена</button>
+                            <button type="button" class="res-btn primary" id="resHallModalSave">Сохранить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    window.RES_HALL_DATA = <?= json_encode([
+                        'spot_id' => (int)$resSpotId,
+                        'hall_id' => (int)$resHallId,
+                        'soon_hours' => (int)$resSoonHours,
+                        'tables' => $resHallTables,
+                    ], JSON_UNESCAPED_UNICODE) ?>;
+                </script>
+            <?php endif; ?>
 
             <form method="GET" class="filters">
                 <div class="date-inputs">
@@ -970,6 +1326,6 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
     <div class="res-hscroll" id="resHScroll" hidden><div class="res-hscroll-inner" id="resHScrollInner"></div></div>
 
     <script src="/assets/user_menu.js?v=20260417_1036"></script>
-    <script src="/assets/js/reservations.js?v=20260417_1036"></script>
+    <script src="/reservations/assets/js/reservations.js?v=20260417_1215"></script>
 </body>
 </html>
