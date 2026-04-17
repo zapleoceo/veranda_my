@@ -164,9 +164,22 @@ class PosterReservationHelper {
             }
             $phone = '+' . $digits;
 
-            $dt = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string)$row['start_time']);
-            if (!$dt) { try { $dt = new \DateTimeImmutable((string)$row['start_time']); } catch (\Throwable $e) {} }
-            $dateReservation = $dt ? $dt->format('Y-m-d H:i:s') : (string)$row['start_time'];
+            $spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+            if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+                $spotTzName = 'Asia/Ho_Chi_Minh';
+            }
+            $spotTz = new \DateTimeZone($spotTzName);
+
+            $dt = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string)$row['start_time'], $spotTz);
+            if (!$dt) { try { $dt = new \DateTimeImmutable((string)$row['start_time'], $spotTz); } catch (\Throwable $e) { $dt = null; } }
+            if (!$dt) {
+                return ['ok' => false, 'error' => 'Некорректное время брони'];
+            }
+            $dateReservation = $dt->format('Y-m-d H:i:s');
+            $nowSpot = new \DateTimeImmutable('now', $spotTz);
+            if ($dt < $nowSpot->modify('-1 minute')) {
+                return ['ok' => false, 'error' => 'Время брони уже прошло'];
+            }
 
             $rawCode = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string)($row['qr_code'] ?? '')));
             if ($rawCode === '') $rawCode = (string)$reservationId;
@@ -186,7 +199,6 @@ class PosterReservationHelper {
                 'first_name'       => $firstName,
                 'last_name'        => $lastName,
                 'comment'          => $commentFinal,
-                'skip_phone_validation' => 'true'
             ];
 
             $dateFrom = date('Y-m-d 00:00:00');
