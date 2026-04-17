@@ -55,6 +55,9 @@ class PosterReservationHelper {
             }
 
             $tableId = null;
+            $rowNum = trim((string)($row['table_num'] ?? ''));
+
+            // Helper to fetch tables for a specific hall
             $getTables = function (array $params) use ($api) {
                 try {
                     return $api->request('spots.getTableHallTables', $params, 'GET');
@@ -66,12 +69,66 @@ class PosterReservationHelper {
                 }
             };
 
-            $allTables = $getTables(['spot_id' => $spotIdInt, 'hall_id' => 2, 'without_deleted' => 1]);
-            if (is_array($allTables)) {
-                foreach ($allTables as $t) {
-                    $tTitle = trim((string)($t['table_title'] ?? ''));
-                    $rowNum = trim((string)($row['table_num'] ?? ''));
-                    if ($tTitle === $rowNum) {
+            // Helper to fetch all halls
+            $getHalls = function (int $sId) use ($api) {
+                try {
+                    return $api->request('spots.getSpotTablesHalls', ['spot_id' => $sId], 'GET');
+                } catch (\Throwable $e) {
+                    if (stripos((string)$e->getMessage(), 'http=405') !== false) {
+                        return $api->request('spots.getSpotTablesHalls', ['spot_id' => $sId], 'POST');
+                    }
+                    throw $e;
+                }
+            };
+
+            // 1. Try to get all halls and search in every hall
+            $halls = [];
+            try {
+                $halls = $getHalls($spotIdInt);
+            } catch (\Throwable $e) {}
+
+            $allTablesFound = [];
+            if (is_array($halls)) {
+                foreach ($halls as $hall) {
+                    $hallId = (int)($hall['hall_id'] ?? 0);
+                    if ($hallId <= 0) continue;
+                    
+                    try {
+                        $hallTables = $getTables(['spot_id' => $spotIdInt, 'hall_id' => $hallId, 'without_deleted' => 1]);
+                        if (is_array($hallTables)) {
+                            $allTablesFound = array_merge($allTablesFound, $hallTables);
+                        }
+                    } catch (\Throwable $e) {}
+                }
+            }
+
+            // 2. If halls fetching failed or returned empty, try fallback without hall_id
+            if (empty($allTablesFound)) {
+                try {
+                    $fallback = $getTables(['spot_id' => $spotIdInt, 'without_deleted' => 1]);
+                    if (is_array($fallback)) {
+                        $allTablesFound = $fallback;
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            // 3. Search in gathered tables
+            foreach ($allTablesFound as $t) {
+                $tTitle = trim((string)($t['table_title'] ?? ''));
+                $tNum = trim((string)($t['table_num'] ?? ''));
+                
+                // User explicitly requested to match by table_title
+                if (strcasecmp($tTitle, $rowNum) === 0 || $tTitle === $rowNum) {
+                    $tableId = (int)$t['table_id'];
+                    break;
+                }
+            }
+
+            // Fallback: match by table_num if title didn't match
+            if (!$tableId) {
+                foreach ($allTablesFound as $t) {
+                    $tNum = trim((string)($t['table_num'] ?? ''));
+                    if (strcasecmp($tNum, $rowNum) === 0 || $tNum === $rowNum) {
                         $tableId = (int)$t['table_id'];
                         break;
                     }
@@ -79,21 +136,13 @@ class PosterReservationHelper {
             }
 
             if (!$tableId) {
-                $allTablesFallback = $getTables(['spot_id' => $spotIdInt, 'without_deleted' => 1]);
-                if (is_array($allTablesFallback)) {
-                    foreach ($allTablesFallback as $t) {
-                        $tTitle = trim((string)($t['table_title'] ?? ''));
-                        $rowNum = trim((string)($row['table_num'] ?? ''));
-                        if ($tTitle === $rowNum) {
-                            $tableId = (int)$t['table_id'];
-                            break;
-                        }
-                    }
+                // Return detailed error with the list of available table titles for debugging
+                $availableTitles = [];
+                foreach ($allTablesFound as $t) {
+                    $availableTitles[] = '"' . ($t['table_title'] ?? '') . '" (id:' . ($t['table_id'] ?? '') . ')';
                 }
-            }
-
-            if (!$tableId) {
-                return ['ok' => false, 'error' => 'Не удалось найти ID стола в Poster для номера ' . $row['table_num']];
+                $titlesStr = empty($availableTitles) ? 'столы не найдены' : implode(', ', array_slice($availableTitles, 0, 5));
+                return ['ok' => false, 'error' => 'Не удалось найти ID стола в Poster для номера ' . $rowNum . '. Доступные столы: ' . $titlesStr];
             }
 
             $fullName = trim((string)$row['name']);
