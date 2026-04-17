@@ -85,9 +85,17 @@ class PosterReservationHelper {
 
             if ($spotId === '0' || $spotId === '') $spotId = '1';
 
-            $phone = preg_replace('/\D+/', '', (string)$row['phone']);
-            if (strpos($phone, '380') === 0) {
-                $phone = '+' . $phone;
+            // Clean up phone number but preserve + if present
+            $phoneRaw = (string)$row['phone'];
+            $phone = preg_replace('/[^\d\+]/', '', $phoneRaw);
+            if (strpos($phone, '+') !== 0 && $phone !== '') {
+                // If it doesn't start with +, but it's a valid length, add it.
+                // Or if it's specifically Ukrainian 380:
+                if (strpos($phone, '380') === 0) {
+                    $phone = '+' . $phone;
+                } else {
+                    $phone = '+' . $phone; // Poster often requires + for international numbers
+                }
             }
 
             $dt = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string)$row['start_time']);
@@ -167,6 +175,12 @@ class PosterReservationHelper {
             }
 
             $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
+
+            if (isset($resp['error']) || !isset($resp['incoming_order_id'])) {
+                $err = $resp['error'] ?? 'Unknown Poster API Error';
+                $db->query("UPDATE {$resTable} SET is_poster_pushed = 0 WHERE id = ?", [$reservationId]);
+                return ['ok' => false, 'error' => "Poster API: " . json_encode($resp, JSON_UNESCAPED_UNICODE)];
+            }
 
             $posterId = (int)($resp['incoming_order_id'] ?? 0);
             $db->query("UPDATE {$resTable} SET is_poster_pushed = 1, poster_id = ? WHERE id = ?", [$posterId, $reservationId]);
