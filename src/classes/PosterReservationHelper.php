@@ -152,18 +152,8 @@ class PosterReservationHelper {
 
             if ($spotId === '0' || $spotId === '') $spotId = '1';
 
-            // Clean up phone number but preserve + if present
-            $phoneRaw = (string)$row['phone'];
-            $phone = preg_replace('/[^\d\+]/', '', $phoneRaw);
-            if (strpos($phone, '+') !== 0 && $phone !== '') {
-                // If it doesn't start with +, but it's a valid length, add it.
-                // Or if it's specifically Ukrainian 380:
-                if (strpos($phone, '380') === 0) {
-                    $phone = '+' . $phone;
-                } else {
-                    $phone = '+' . $phone; // Poster often requires + for international numbers
-                }
-            }
+            $phoneRaw = (string)($row['phone'] ?? '');
+            $phone = preg_replace('/\D+/', '', $phoneRaw);
 
             $dt = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string)$row['start_time']);
             if (!$dt) { try { $dt = new \DateTimeImmutable((string)$row['start_time']); } catch (\Throwable $e) {} }
@@ -186,7 +176,8 @@ class PosterReservationHelper {
                 'duration'         => '7200', // 2 hours default in seconds
                 'first_name'       => $firstName,
                 'last_name'        => $lastName,
-                'comment'          => $commentFinal
+                'comment'          => $commentFinal,
+                'skip_phone_validation' => 'true'
             ];
 
             $dateFrom = date('Y-m-d 00:00:00');
