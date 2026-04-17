@@ -565,7 +565,6 @@
       const { W, H, pad, minX, minY, scale } = computeLayout();
       board.style.width = W + 'px';
       board.style.height = H + 'px';
-      board.classList.toggle('rot180', state.rot);
       board.textContent = '';
 
       state.tables.forEach((t) => {
@@ -573,10 +572,14 @@
         const y = Number(t.y || 0) || 0;
         const w0 = Number(t.w || 0) || 6;
         const h0 = Number(t.h || 0) || 6;
-        const left = pad + (x - minX) * scale;
-        const top = pad + (y - minY) * scale;
         const w = w0 * scale;
         const h = h0 * scale;
+        let left = pad + (x - minX) * scale;
+        let top = pad + (y - minY) * scale;
+        if (state.rot) {
+          left = W - left - w;
+          top = H - top - h;
+        }
 
         const el = document.createElement('div');
         el.className = 'res-hall-tbl' + (String(t.shape || '') === 'circle' ? ' circle' : '') + (!t.scheme_num ? ' disabled' : '');
