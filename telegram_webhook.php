@@ -177,62 +177,54 @@ $message = $callback['message'] ?? [];
 $messageId = isset($message['message_id']) ? (int)$message['message_id'] : 0;
 $chatId = isset($message['chat']['id']) ? (string)$message['chat']['id'] : '';
 
-if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx|vposter):(\d+)$/', $data, $m)) {
+if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx|vposter(?:_confirmed)?):(\d+)$/', $data, $m)) {
     echo 'ok';
     exit;
 }
 
-$action = (string)($m[1] ?? '');
-    $id = (int)($m[2] ?? 0);
-    $from = $callback['from'] ?? [];
-    $ackBy = trim(($from['first_name'] ?? '') . ' ' . ($from['last_name'] ?? ''));
-    if ($ackBy === '') {
-        $ackBy = $from['username'] ?? 'unknown';
-    }
+$actionRaw = (string)($m[1] ?? '');
+$id = (int)($m[2] ?? 0);
+$from = $callback['from'] ?? [];
+$ackBy = trim(($from['first_name'] ?? '') . ' ' . ($from['last_name'] ?? ''));
+if ($ackBy === '') {
+    $ackBy = $from['username'] ?? 'unknown';
+}
 
-    // New logic: Check for confirmation
-    if ($action === 'vposter' && empty($callback['game_short_name'])) {
-        $isConfirmed = isset($update['callback_query']['data_confirmed']); // Custom flag for internal use or check if we need to show alert first
-        // Telegram doesn't have a built-in 'confirm' for buttons, so we use answerCallbackQuery with show_alert
-        // But the user wants a description of what will happen.
-        if (!strpos($data, '_confirmed')) {
-            $rawText = (string)($message['text'] ?? '');
-            $plain = trim(preg_replace('/<[^>]+>/', '', $rawText));
-            $plain = preg_replace("/\r\n|\r/", "\n", $plain);
-            $lines = array_values(array_filter(array_map('trim', explode("\n", $plain)), fn($x) => $x !== ''));
-            $preview = implode("\n", array_slice($lines, 0, 7));
-            if ($preview !== '') $preview = "\n\n" . $preview;
-            $postJson('answerCallbackQuery', [
-                'callback_query_id' => $callbackId,
-                'text' => "Вы собираетесь отправить эту бронь в Poster POS.\nЭто создаст официальную бронь на терминале официанта.\nНажмите еще раз для подтверждения." . $preview,
-                'show_alert' => true
-            ]);
-            // We update the data to include _confirmed for the next click
-            $newKeyboard = $message['reply_markup']['inline_keyboard'] ?? [];
-            foreach ($newKeyboard as &$row_kb) {
-                foreach ($row_kb as &$btn_kb) {
-                    if ($btn_kb['callback_data'] === $data) {
-                        $btn_kb['callback_data'] .= '_confirmed';
-                    }
-                }
+// New logic: Check for confirmation
+if ($actionRaw === 'vposter') {
+    // Telegram doesn't have a built-in 'confirm' for buttons, so we use answerCallbackQuery with show_alert
+    // But the user wants a description of what will happen.
+    $rawText = (string)($message['text'] ?? '');
+    $plain = trim(preg_replace('/<[^>]+>/', '', $rawText));
+    $plain = preg_replace("/\r\n|\r/", "\n", $plain);
+    $lines = array_values(array_filter(array_map('trim', explode("\n", $plain)), fn($x) => $x !== ''));
+    $preview = implode("\n", array_slice($lines, 0, 7));
+    if ($preview !== '') $preview = "\n\n" . $preview;
+    $postJson('answerCallbackQuery', [
+        'callback_query_id' => $callbackId,
+        'text' => "Вы собираетесь отправить эту бронь в Poster POS.\nЭто создаст официальную бронь на терминале официанта.\nНажмите еще раз для подтверждения." . $preview,
+        'show_alert' => true
+    ]);
+    // We update the data to include _confirmed for the next click
+    $newKeyboard = $message['reply_markup']['inline_keyboard'] ?? [];
+    foreach ($newKeyboard as &$row_kb) {
+        foreach ($row_kb as &$btn_kb) {
+            if ($btn_kb['callback_data'] === $data) {
+                $btn_kb['callback_data'] = 'vposter_confirmed:' . $id;
             }
-            $postJson('editMessageReplyMarkup', [
-                'chat_id' => $chatId,
-                'message_id' => $messageId,
-                'reply_markup' => ['inline_keyboard' => $newKeyboard]
-            ]);
-            echo 'ok';
-            exit;
         }
     }
+    $postJson('editMessageReplyMarkup', [
+        'chat_id' => $chatId,
+        'message_id' => $messageId,
+        'reply_markup' => ['inline_keyboard' => $newKeyboard]
+    ]);
+    echo 'ok';
+    exit;
+}
 
-    $data = str_replace('_confirmed', '', $data); // Clean up for actual processing
-    if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx|vposter):(\d+)$/', $data, $m)) {
-        echo 'ok';
-        exit;
-    }
-    $action = (string)($m[1] ?? '');
-    $id = (int)($m[2] ?? 0);
+$action = str_replace('_confirmed', '', $actionRaw);
+
 
     try {
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
@@ -304,11 +296,14 @@ $action = (string)($m[1] ?? '');
             $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь создана в Poster!']);
             $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Отправлено в Poster</b> (" . htmlspecialchars($ackBy) . ")";
         }
+        
+        // Remove the specific mention text from the end if it exists
+        $newText = preg_replace('/@Ollushka90 @ce_akh1\s+свяжитесь с гостем\s*$/u', '', $newText);
 
         $postJson('editMessageText', [
             'chat_id' => $chatId,
             'message_id' => $messageId,
-            'text' => $newText,
+            'text' => trim($newText),
             'parse_mode' => 'HTML',
             'reply_markup' => ['inline_keyboard' => []] // Remove buttons
         ]);
