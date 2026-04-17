@@ -274,32 +274,48 @@ $action = str_replace('_confirmed', '', $actionRaw);
             exit;
         }
 
+        $pushedState = (int)($row['is_poster_pushed'] ?? 0);
+        if ($pushedState === 2) {
+            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь уже отправляется в Poster', 'show_alert' => false]);
+            exit;
+        }
+        if ($pushedState === 1) {
+            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь уже отправлена в Poster', 'show_alert' => false]);
+            exit;
+        }
+
         if (empty($_ENV['POSTER_API_TOKEN'])) {
             $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Poster API не настроен', 'show_alert' => true]);
             exit;
         }
 
+        $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Отправляю в Poster…', 'show_alert' => false]);
+
         require_once __DIR__ . '/src/classes/PosterReservationHelper.php';
         $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
         $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId, $ackBy);
         
-        file_put_contents(__DIR__ . '/telegram.log', "[" . date('Y-m-d H:i:s') . "] pushToPoster result for ID $id: " . print_r($res, true) . "\n", FILE_APPEND);
-
         if (!$res['ok']) {
-            $errText = 'Ошибка: ' . $res['error'];
-            if (mb_strlen($errText) > 190) {
-                $errText = mb_substr($errText, 0, 190) . '...';
+            $rawText = (string)($message['text'] ?? '');
+            $newText = $rawText . "\n\n❌ <b>Poster</b>: " . htmlspecialchars((string)$res['error']);
+            $payload = [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'text' => trim($newText),
+                'parse_mode' => 'HTML',
+            ];
+            $rm = $message['reply_markup'] ?? null;
+            if (is_array($rm)) {
+                $payload['reply_markup'] = $rm;
             }
-            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => $errText, 'show_alert' => true]);
+            $postJson('editMessageText', $payload);
             exit;
         }
         
         
         if (!empty($res['duplicate'])) {
-            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь уже была в Poster!']);
             $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Уже была в Poster</b> (дубль предотвращен)";
         } else {
-            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь создана в Poster!']);
             $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Отправлено в Poster</b> (" . htmlspecialchars($ackBy) . ")";
         }
         
