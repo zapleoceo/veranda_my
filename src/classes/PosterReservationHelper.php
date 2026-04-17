@@ -51,10 +51,9 @@ class PosterReservationHelper {
             $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2]);
             if (is_array($allTables)) {
                 foreach ($allTables as $t) {
-                    $tNum = trim((string)($t['table_num'] ?? ''));
                     $tTitle = trim((string)($t['table_title'] ?? ''));
                     $rowNum = trim((string)($row['table_num'] ?? ''));
-                    if ($tNum === $rowNum || $tTitle === $rowNum) {
+                    if ($tTitle === $rowNum) {
                         $tableId = (int)$t['table_id'];
                         break;
                     }
@@ -65,10 +64,9 @@ class PosterReservationHelper {
                 $allTablesFallback = $api->request('spots.getTables', ['spot_id' => 1]);
                 if (is_array($allTablesFallback)) {
                     foreach ($allTablesFallback as $t) {
-                        $tNum = trim((string)($t['table_num'] ?? ''));
                         $tTitle = trim((string)($t['table_title'] ?? ''));
                         $rowNum = trim((string)($row['table_num'] ?? ''));
-                        if ($tNum === $rowNum || $tTitle === $rowNum) {
+                        if ($tTitle === $rowNum) {
                             $tableId = (int)$t['table_id'];
                             break;
                         }
