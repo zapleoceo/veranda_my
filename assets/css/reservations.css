@@ -25,7 +25,7 @@
 .filters .btn-primary:hover { opacity: 0.92; }
 .filters .btn-primary:disabled { opacity: 0.5; cursor: default; }
 .table-wrap { overflow: auto; border: 1px solid rgba(255,255,255,0.10); border-radius: 14px; background: rgba(0,0,0,0.18); }
-.res-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 980px; }
+.res-table { width: max-content; border-collapse: separate; border-spacing: 0; min-width: 0; table-layout: auto; }
 .res-table th, .res-table td { padding: 12px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; vertical-align: top; font-size: 13px; }
 .res-table th {
   position: sticky;
@@ -46,11 +46,14 @@
 .res-table tbody tr:nth-child(odd) td { background: rgba(255,255,255,0.02); }
 .res-table tbody tr:nth-child(even) td { background: rgba(255,255,255,0.04); }
 .res-table tbody tr:hover td { background: rgba(184,135,70,0.08); }
+.res-table tbody tr.is-merged td { background: rgba(37,211,102,0.06); }
+.res-table tbody tr.is-merged:hover td { background: rgba(37,211,102,0.10); }
 .res-table tr:last-child td { border-bottom: 0; }
 .res-strong { font-weight: 900; color: var(--accent); white-space: nowrap; }
 .res-muted { color: rgba(255,255,255,0.65); font-size: 12px; }
 .res-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.res-btn { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.20); color: rgba(255,255,255,0.92); border-radius: 12px; cursor: pointer; font-weight: 900; font-size: 13px; }
+.res-btn { padding: 6px 8px; border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.20); color: rgba(255,255,255,0.92); border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 12px; line-height: 1; }
+.res-btn.icon { min-width: 32px; padding: 6px 8px; }
 .res-btn:hover { border-color: rgba(184,135,70,0.55); background: rgba(184,135,70,0.10); }
 .res-btn.primary { background: linear-gradient(180deg, rgba(184,135,70,0.95), rgba(154,108,52,0.95)); border-color: rgba(184,135,70,0.70); color: #0b0705; }
 .res-btn.primary:hover { background: linear-gradient(180deg, rgba(198,150,86,0.98), rgba(160,112,54,0.98)); }
@@ -76,7 +79,7 @@
 .res-more .box b { color: var(--muted); }
 .res-more .pre { white-space: pre-wrap; }
 @media (max-width: 860px) {
-  .res-table { min-width: 860px; }
+  .res-table { min-width: 0; }
 }
 @media (max-width: 720px) {
   .filters { align-items: flex-end; }
