@@ -49,8 +49,24 @@ class PosterReservationHelper {
 
             $api = new PosterAPI($apiToken);
 
+            $spotIdInt = (int)$spotId;
+            if ($spotIdInt <= 0) {
+                $spotIdInt = 1;
+            }
+
             $tableId = null;
-            $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2], 'POST');
+            $getTables = function (array $params) use ($api) {
+                try {
+                    return $api->request('spots.getTableHallTables', $params, 'GET');
+                } catch (\Throwable $e) {
+                    if (stripos((string)$e->getMessage(), 'http=405') !== false) {
+                        return $api->request('spots.getTableHallTables', $params, 'POST');
+                    }
+                    throw $e;
+                }
+            };
+
+            $allTables = $getTables(['spot_id' => $spotIdInt, 'hall_id' => 2, 'without_deleted' => 1]);
             if (is_array($allTables)) {
                 foreach ($allTables as $t) {
                     $tTitle = trim((string)($t['table_title'] ?? ''));
@@ -63,7 +79,7 @@ class PosterReservationHelper {
             }
 
             if (!$tableId) {
-                $allTablesFallback = $api->request('spots.getTables', ['spot_id' => 1], 'POST');
+                $allTablesFallback = $getTables(['spot_id' => $spotIdInt, 'without_deleted' => 1]);
                 if (is_array($allTablesFallback)) {
                     foreach ($allTablesFallback as $t) {
                         $tTitle = trim((string)($t['table_title'] ?? ''));
@@ -113,7 +129,7 @@ class PosterReservationHelper {
             $commentFinal = $commentBase !== '' ? ($commentBase . "\n" . $metaLine) : $metaLine;
 
             $reservationData = [
-                'spot_id'          => $spotId,
+                'spot_id'          => (string)$spotIdInt,
                 'phone'            => $phone,
                 'table_id'         => (string)$tableId,
                 'guests_count'     => (string)$row['guests'],
@@ -124,8 +140,8 @@ class PosterReservationHelper {
                 'comment'          => $commentFinal
             ];
 
-            $dateFrom = date('Y-m-d');
-            $dateTo = date('Y-m-d', strtotime('+60 days'));
+            $dateFrom = date('Y-m-d 00:00:00');
+            $dateTo = date('Y-m-d 23:59:59', strtotime('+60 days'));
             $existingRes = $api->request('incomingOrders.getReservations', [
                 'timezone' => 'client',
                 'date_from' => $dateFrom,
