@@ -920,9 +920,12 @@
       const counts = normalizePreorder(preorderCounts);
       const keys = Object.keys(counts).sort((a, b) => a.localeCompare(b, UI_LOCALE, { sensitivity: 'base' }));
       const m = String(mode || 'ui');
+      const fmtMoney = (n) => new Intl.NumberFormat(UI_LOCALE).format(Math.round(Number(n) || 0)) + ' ₫';
       let text = keys.map((k) => {
         const title = (m === 'ru') ? k : getPreorderUiTitle(k);
-        return '- ' + title + (counts[k] > 1 ? (' x' + String(counts[k])) : '');
+        const qty = Number(counts[k] || 0) || 0;
+        const lineTotal = (getPreorderPrice(k) * qty);
+        return '- ' + title + (qty > 1 ? (' x' + String(qty)) : '') + ' — ' + fmtMoney(lineTotal);
       }).join('\n');
       
       const totalPrice = Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);

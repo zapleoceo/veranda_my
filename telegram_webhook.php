@@ -279,13 +279,14 @@ if ($ackBy === '') {
         
         
         if (!empty($res['duplicate'])) {
-            $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Уже была в Poster</b> (дубль предотвращен)";
+            $baseText = (string)($message['text'] ?? '');
+            $baseText = preg_replace('/\n?\s*@Ollushka90\s+@ce_akh1\s+свяжитесь\s+с\s+гостем\s*\n?/u', "\n", $baseText);
+            $newText = trim($baseText) . "\n\n🚀 <b>Уже была в Poster</b> (дубль предотвращен)";
         } else {
-            $newText = ($message['text'] ?? '') . "\n\n🚀 <b>Отправлено в Poster</b> (" . htmlspecialchars($ackBy) . ")";
+            $baseText = (string)($message['text'] ?? '');
+            $baseText = preg_replace('/\n?\s*@Ollushka90\s+@ce_akh1\s+свяжитесь\s+с\s+гостем\s*\n?/u', "\n", $baseText);
+            $newText = trim($baseText) . "\n\n🚀 <b>Отправлено в Poster</b> (" . htmlspecialchars($ackBy) . ")";
         }
-        
-        // Remove the specific mention text from the end if it exists
-        $newText = preg_replace('/@Ollushka90 @ce_akh1\s+свяжитесь с гостем\s*$/u', '', $newText);
 
         $postJson('editMessageText', [
             'chat_id' => $chatId,
