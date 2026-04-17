@@ -1,6 +1,8 @@
 <?php
 namespace App\Classes;
 
+require_once __DIR__ . '/PosterAPI.php';
+
 class PosterReservationHelper {
     public static function pushToPoster(Database $db, string $apiToken, int $reservationId, string $spotId = '1', string $actor = '') {
         if ($reservationId <= 0) {
