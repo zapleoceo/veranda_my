@@ -51,7 +51,10 @@ class PosterReservationHelper {
             $allTables = $api->request('spots.getTableHallTables', ['spot_id' => 1, 'hall_id' => 2]);
             if (is_array($allTables)) {
                 foreach ($allTables as $t) {
-                    if (trim((string)($t['table_num'] ?? '')) === trim((string)($row['table_num'] ?? ''))) {
+                    $tNum = trim((string)($t['table_num'] ?? ''));
+                    $tTitle = trim((string)($t['table_title'] ?? ''));
+                    $rowNum = trim((string)($row['table_num'] ?? ''));
+                    if ($tNum === $rowNum || $tTitle === $rowNum) {
                         $tableId = (int)$t['table_id'];
                         break;
                     }
@@ -62,7 +65,10 @@ class PosterReservationHelper {
                 $allTablesFallback = $api->request('spots.getTables', ['spot_id' => 1]);
                 if (is_array($allTablesFallback)) {
                     foreach ($allTablesFallback as $t) {
-                        if (trim((string)($t['table_num'] ?? '')) === trim((string)($row['table_num'] ?? ''))) {
+                        $tNum = trim((string)($t['table_num'] ?? ''));
+                        $tTitle = trim((string)($t['table_title'] ?? ''));
+                        $rowNum = trim((string)($row['table_num'] ?? ''));
+                        if ($tNum === $rowNum || $tTitle === $rowNum) {
                             $tableId = (int)$t['table_id'];
                             break;
                         }
@@ -110,18 +116,43 @@ class PosterReservationHelper {
                 'comment'          => $commentFinal
             ];
 
-            $existingRes = $api->request('incomingOrders.getReservations', ['timezone' => 'client'], 'GET');
+            $dateFrom = date('Y-m-d');
+            $dateTo = date('Y-m-d', strtotime('+60 days'));
+            $existingRes = $api->request('incomingOrders.getReservations', [
+                'timezone' => 'client',
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo
+            ], 'GET');
             $foundDuplicateId = 0;
+            $targetDtTs = $dt ? $dt->getTimestamp() : strtotime($dateReservation);
+
             if (is_array($existingRes)) {
                 foreach ($existingRes as $pr) {
                     if (!is_array($pr)) continue;
                     $status = (int)($pr['status'] ?? 0);
                     if ($status === 7) continue;
                     if ((int)($pr['spot_id'] ?? 0) !== (int)$spotId) continue;
+                    
+                    // Check by marker in comment
                     $prComment = (string)($pr['comment'] ?? '');
                     if ($prComment !== '' && strpos($prComment, $marker) !== false) {
                         $foundDuplicateId = (int)($pr['incoming_order_id'] ?? 0);
                         break;
+                    }
+
+                    // Check by table, time (+/- 30 mins) and guest name
+                    $prTableId = (int)($pr['table_id'] ?? 0);
+                    if ($prTableId === $tableId) {
+                        $prDateRaw = (string)($pr['date_reservation'] ?? '');
+                        $prDtTs = strtotime($prDateRaw);
+                        if ($prDtTs !== false && abs($prDtTs - $targetDtTs) <= 1800) { // 1800s = 30 mins
+                            $prFirstName = trim((string)($pr['first_name'] ?? ''));
+                            $prLastName = trim((string)($pr['last_name'] ?? ''));
+                            if (strcasecmp($prFirstName, $firstName) === 0 || strcasecmp($prLastName, $firstName) === 0 || strcasecmp($prFirstName, $fullName) === 0) {
+                                $foundDuplicateId = (int)($pr['incoming_order_id'] ?? 0);
+                                break;
+                            }
+                        }
                     }
                 }
             }
