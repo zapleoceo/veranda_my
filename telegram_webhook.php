@@ -283,8 +283,14 @@ $action = str_replace('_confirmed', '', $actionRaw);
         $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
         $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId, $ackBy);
         
+        file_put_contents(__DIR__ . '/telegram.log', "[" . date('Y-m-d H:i:s') . "] pushToPoster result for ID $id: " . print_r($res, true) . "\n", FILE_APPEND);
+
         if (!$res['ok']) {
-            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Ошибка: ' . $res['error'], 'show_alert' => true]);
+            $errText = 'Ошибка: ' . $res['error'];
+            if (mb_strlen($errText) > 190) {
+                $errText = mb_substr($errText, 0, 190) . '...';
+            }
+            $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => $errText, 'show_alert' => true]);
             exit;
         }
         
