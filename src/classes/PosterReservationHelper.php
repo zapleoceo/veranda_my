@@ -253,7 +253,28 @@ class PosterReservationHelper {
                 return ['ok' => true, 'poster_res' => ['incoming_order_id' => $foundDuplicateId, 'verified' => $verified], 'duplicate' => true];
             }
 
-            $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
+            try {
+                $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
+            } catch (\Throwable $eCreate) {
+                $m = (string)$eCreate->getMessage();
+                if (stripos($m, 'date_reservation') !== false) {
+                    try {
+                        $reservationData2 = $reservationData;
+                        $reservationData2['date_reservation'] = $dt->format('Y-m-d H:i');
+                        $resp = $api->request('incomingOrders.createReservation', $reservationData2, 'POST');
+                    } catch (\Throwable $eCreate2) {
+                        try {
+                            $reservationData3 = $reservationData;
+                            $reservationData3['date_reservation'] = (string)$dt->getTimestamp();
+                            $resp = $api->request('incomingOrders.createReservation', $reservationData3, 'POST');
+                        } catch (\Throwable $eCreate3) {
+                            throw $eCreate;
+                        }
+                    }
+                } else {
+                    throw $eCreate;
+                }
+            }
 
             if (isset($resp['error']) || !isset($resp['incoming_order_id'])) {
                 $err = $resp['error'] ?? 'Unknown Poster API Error';
