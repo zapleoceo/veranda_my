@@ -189,7 +189,7 @@ class PosterReservationHelper {
 
             $reservationData = [
                 'spot_id'          => (string)$spotIdInt,
-                'timezone'         => 'client',
+                'type'             => '2',
                 'phone'            => $phone,
                 'table_id'         => (string)$tableId,
                 'guests_count'     => (string)$row['guests'],
@@ -253,32 +253,7 @@ class PosterReservationHelper {
                 return ['ok' => true, 'poster_res' => ['incoming_order_id' => $foundDuplicateId, 'verified' => $verified], 'duplicate' => true];
             }
 
-            $resp = null;
-            $errs = [];
-            $variants = [
-                ['k' => 'Y-m-d H:i:s', 'v' => $dt->format('Y-m-d H:i:s')],
-                ['k' => 'Y-m-d H:i', 'v' => $dt->format('Y-m-d H:i')],
-                ['k' => 'unix_s', 'v' => (string)$dt->getTimestamp()],
-                ['k' => 'unix_ms', 'v' => (string)($dt->getTimestamp() * 1000)],
-            ];
-            foreach ($variants as $variant) {
-                $reservationDataX = $reservationData;
-                $reservationDataX['date_reservation'] = $variant['v'];
-                try {
-                    $resp = $api->request('incomingOrders.createReservation', $reservationDataX, 'POST');
-                    break;
-                } catch (\Throwable $eCreate) {
-                    $m = (string)$eCreate->getMessage();
-                    if (stripos($m, 'date_reservation') === false) {
-                        throw $eCreate;
-                    }
-                    $errs[] = $variant['k'] . ': ' . preg_replace('/\s+/', ' ', $m);
-                }
-            }
-            if ($resp === null) {
-                $tail = implode(' | ', array_slice($errs, 0, 3));
-                throw new \Exception($tail !== '' ? $tail : 'Poster: date_reservation error');
-            }
+            $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
 
             if (isset($resp['error']) || !isset($resp['incoming_order_id'])) {
                 $err = $resp['error'] ?? 'Unknown Poster API Error';
