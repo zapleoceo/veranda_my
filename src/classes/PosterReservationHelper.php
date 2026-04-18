@@ -189,6 +189,9 @@ class PosterReservationHelper {
 
             $duration = (int)($row['duration'] ?? 120);
             if ($duration <= 0) $duration = 120;
+            // Poster Incoming Orders API expects duration in SECONDS for reservations
+            // The error message "greater than 1800" confirms it expects seconds (1800s = 30m)
+            $durationSeconds = $duration * 60; 
 
             $reservationData = [
                 'spot_id'          => (string)$spotIdInt,
@@ -197,7 +200,7 @@ class PosterReservationHelper {
                 'table_id'         => (string)$tableId,
                 'guests_count'     => (string)$row['guests'],
                 'date_reservation' => $dateReservation,
-                'duration'         => (string)$duration,
+                'duration'         => (string)$durationSeconds,
                 'first_name'       => $firstName,
                 'last_name'        => $lastName,
                 'comment'          => $commentFinal,
