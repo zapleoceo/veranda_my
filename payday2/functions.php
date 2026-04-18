@@ -1,61 +1,17 @@
 <?php
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/FinanceHelper.php';
+
+use App\Payday2\FinanceHelper;
+
 $date = $dateTo;
 $periodFrom = $dateFrom . ' 00:00:00';
 $periodTo = $dateTo . ' 23:59:59';
 
-$moneyToInt = function ($v): int {
-    if (is_int($v)) return $v;
-    if (is_float($v)) return (int)round($v);
-    if (is_string($v)) {
-        $t = trim($v);
-        if ($t === '') return 0;
-        $t = str_replace(',', '.', $t);
-        if (is_numeric($t)) return (int)round((float)$t);
-        return 0;
-    }
-    if (is_numeric($v)) return (int)round((float)$v);
-    return 0;
-};
-
-$posterCentsToVnd = function (int $cents): int {
-    if ($cents === 0) return 0;
-    if ($cents % 100 === 0) return (int)($cents / 100);
-    return (int)round($cents / 100);
-};
-
-$fmtVndCents = function (int $cents): string {
-    $neg = $cents < 0;
-    $abs = $neg ? -$cents : $cents;
-    $int = (int)round($abs / 100);
-    $intFmt = number_format($int, 0, '.', "\u{202F}");
-    return ($neg && $int > 0 ? '-' : '') . $intFmt;
-};
-
-$parsePosterDateTime = function ($tx): ?string {
-    $ts = null;
-    if (is_array($tx)) {
-        if (!empty($tx['date_close']) && is_numeric($tx['date_close'])) {
-            $n = (int)$tx['date_close'];
-            if ($n > 20000000000) $n = (int)round($n / 1000);
-            if ($n > 0) $ts = $n;
-        }
-        if ($ts === null && !empty($tx['date_close']) && is_string($tx['date_close'])) {
-            $t = strtotime($tx['date_close']);
-            if ($t !== false && $t > 0) $ts = $t;
-        }
-        if ($ts === null && !empty($tx['date_close_date']) && is_string($tx['date_close_date'])) {
-            $t = strtotime($tx['date_close_date']);
-            if ($t !== false && $t > 0) $ts = $t;
-        }
-        if ($ts === null && !empty($tx['dateClose']) && is_string($tx['dateClose'])) {
-            $t = strtotime($tx['dateClose']);
-            if ($t !== false && $t > 0) $ts = $t;
-        }
-    }
-    if ($ts === null) return null;
-    if ((int)date('Y', $ts) < 2000) return null;
-    return date('Y-m-d H:i:s', $ts);
-};
+$moneyToInt = function ($v): int { return FinanceHelper::moneyToInt($v); };
+$posterCentsToVnd = function (int $cents): int { return FinanceHelper::posterCentsToVnd($cents); };
+$fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
+$parsePosterDateTime = function ($tx): ?string { return FinanceHelper::parsePosterDateTime($tx); };
 
 $sepayApiToken = trim((string)($_ENV['SEPAY_API_TOKEN'] ?? $_ENV['SEPAY_USER_API_TOKEN'] ?? ''));
 $sepayAccountNumber = trim((string)($_ENV['SEPAY_ACCOUNT_NUMBER'] ?? ''));
@@ -412,16 +368,16 @@ $ol = $db->t('out_links');
 
 try {
     $db->query("ALTER TABLE {$pc} ADD COLUMN was_deleted TINYINT(1) NOT NULL DEFAULT 0");
-} catch (\Throwable $e) {}
+} catch (\Throwable $e) { error_log('Payday2 Error: ' . $e->getMessage()); }
 try {
     $db->query("ALTER TABLE {$pc} ADD COLUMN deleted_at DATETIME NULL");
-} catch (\Throwable $e) {}
+} catch (\Throwable $e) { error_log('Payday2 Error: ' . $e->getMessage()); }
 try {
     $db->query("ALTER TABLE {$st} ADD COLUMN was_deleted TINYINT(1) NOT NULL DEFAULT 0");
-} catch (\Throwable $e) {}
+} catch (\Throwable $e) { error_log('Payday2 Error: ' . $e->getMessage()); }
 try {
     $db->query("ALTER TABLE {$st} ADD COLUMN deleted_at DATETIME NULL");
-} catch (\Throwable $e) {}
+} catch (\Throwable $e) { error_log('Payday2 Error: ' . $e->getMessage()); }
 try {
     $db->query(
         "CREATE TABLE IF NOT EXISTS {$sh} (

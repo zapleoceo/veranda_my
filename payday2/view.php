@@ -1,4 +1,8 @@
 <?php
+require_once __DIR__ . '/config.php';
+use App\Payday2\Config;
+use App\Payday2\FinanceHelper;
+
 $sepayRows = $db->query(
     "SELECT s.sepay_id, s.transaction_date, s.transfer_amount, s.payment_method, s.content, s.reference_code
      FROM {$st} s
@@ -81,7 +85,7 @@ try {
            AND COALESCE(was_deleted, 0) = 0
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
-           AND poster_payment_method_id = 12",
+           AND poster_payment_method_id = " . Config::METHOD_BYBIT,
         [$dateFrom, $dateTo]
     )->fetchColumn();
     $posterBybitVnd = $posterCentsToVnd($bybitCents);
@@ -97,7 +101,7 @@ try {
            AND COALESCE(was_deleted, 0) = 0
            AND pay_type IN (2,3)
            AND (payed_card + payed_third_party) > 0
-           AND poster_payment_method_id = 11",
+           AND poster_payment_method_id = " . Config::METHOD_VIETNAM,
         [$dateFrom, $dateTo]
     )->fetchColumn();
     $posterVietVnd = $posterCentsToVnd($vietCents);
@@ -245,7 +249,7 @@ try {
            AND p.pay_type IN (2,3)
            AND (p.payed_card + p.payed_third_party) > 0
            AND p.tip_sum > 0
-           AND COALESCE(p.poster_payment_method_id, 0) <> 11",
+           AND COALESCE(p.poster_payment_method_id, 0) <> " . Config::METHOD_VIETNAM,
         [$dateFrom, $dateTo, $dateFrom, $dateTo]
     )->fetchColumn();
 } catch (\Throwable $e) {
@@ -290,11 +294,11 @@ $posterBalanceAndrey = null;
 $posterBalanceVietnam = null;
 $posterBalanceCash = null;
 $posterBalanceTotal = null;
-if (isset($posterAccountsById[1]) || isset($posterAccountsById[8])) {
-    $posterBalanceAndrey = (int)($posterAccountsById[1]['balance'] ?? 0) + (int)($posterAccountsById[8]['balance'] ?? 0);
+if (isset($posterAccountsById[Config::ACCOUNT_ANDREY]) || isset($posterAccountsById[Config::ACCOUNT_TIPS])) {
+    $posterBalanceAndrey = (int)($posterAccountsById[Config::ACCOUNT_ANDREY]['balance'] ?? 0) + (int)($posterAccountsById[Config::ACCOUNT_TIPS]['balance'] ?? 0);
 }
-if (isset($posterAccountsById[9])) {
-    $posterBalanceVietnam = (int)($posterAccountsById[9]['balance'] ?? 0);
+if (isset($posterAccountsById[Config::ACCOUNT_VIETNAM])) {
+    $posterBalanceVietnam = (int)($posterAccountsById[Config::ACCOUNT_VIETNAM]['balance'] ?? 0);
 }
 if (isset($posterAccountsById[2])) {
     $posterBalanceCash = (int)($posterAccountsById[2]['balance'] ?? 0);
@@ -307,10 +311,9 @@ if (count($posterAccountsById) > 0) {
     $posterBalanceTotal = $sum;
 }
 
-$fmtVnd = function (int $v): string {
-    return number_format($v, 0, '.', "\u{202F}");
-};
-$payday2AssetVersion = '20260417_7100';
+$fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
+$fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
+$payday2AssetVersion = '20260418_0001';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -713,7 +716,7 @@ $payday2AssetVersion = '20260417_7100';
             $tipsVnd = $tipsCents !== null ? $posterCentsToVnd((int)$tipsCents) : null;
             $vietnamDisabledReason = $vietnamCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
-                : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за выбранный период.';
+                : 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=' . Config::METHOD_VIETNAM . ') за выбранный период.';
             $tipsDisabledReason = $tipsCents === null
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.';
@@ -748,8 +751,10 @@ $payday2AssetVersion = '20260417_7100';
                       data-date-to="<?= htmlspecialchars($dateTo) ?>"
                       data-account-from-id="1"
                       data-account-to-id="9"
+                      data-account-from-id="1"
+                      data-account-to-id="<?= Config::ACCOUNT_VIETNAM ?>"
                       data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
-                      data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[9]['name'] ?? '#9')) ?>"
+                      data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[Config::ACCOUNT_VIETNAM]['name'] ?? '#' . Config::ACCOUNT_VIETNAM)) ?>"
                       data-sum-vnd="<?= htmlspecialchars((string)($vietnamVnd !== null ? (int)$vietnamVnd : 0)) ?>">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="vietnam">
@@ -806,8 +811,10 @@ $payday2AssetVersion = '20260417_7100';
                       data-date-to="<?= htmlspecialchars($dateTo) ?>"
                       data-account-from-id="1"
                       data-account-to-id="8"
+                      data-account-from-id="1"
+                      data-account-to-id="<?= Config::ACCOUNT_TIPS ?>"
                       data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
-                      data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[8]['name'] ?? '#8')) ?>"
+                      data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[Config::ACCOUNT_TIPS]['name'] ?? '#' . Config::ACCOUNT_TIPS)) ?>"
                       data-sum-vnd="<?= htmlspecialchars((string)($tipsVnd !== null ? (int)$tipsVnd : 0)) ?>">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="tips">

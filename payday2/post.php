@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/config.php';
 $action = (string)($_POST['action'] ?? '');
 
 try {
@@ -96,10 +97,17 @@ try {
         }
         if (!is_array($txs)) $txs = [];
 
-        try { $db->query("DELETE FROM {$pt} WHERE day_date BETWEEN ? AND ?", [$dateFrom, $dateTo]); } catch (\Throwable $e) {}
+        try { $db->query("DELETE FROM {$pt} WHERE day_date BETWEEN ? AND ?", [$dateFrom, $dateTo]); } catch (\Throwable $e) { error_log('Payday2 Error: ' . $e->getMessage()); }
 
         $totalTxs = count($txs);
         $sendProgress(40, 'Обработка ' . $totalTxs . ' чеков...');
+        
+        $batchPtParams = [];
+        $batchPtPlaceholders = [];
+        $batchPcUpdates = [];
+        $batchPcInsertsParams = [];
+        $batchPcInsertsPlaceholders = [];
+        
         foreach ($txs as $i => $tx) {
             if ($totalTxs > 0 && $i % max(1, (int)($totalTxs / 20)) === 0) {
                 $sendProgress(40 + (int)(60 * $i / $totalTxs), "Чеки: {$i} из {$totalTxs}");
@@ -158,31 +166,13 @@ try {
             $receiptNumber = (int)($tx['receipt_number'] ?? $tx['receiptNumber'] ?? $tx['receipt'] ?? $tx['check_number'] ?? $tx['checkNumber'] ?? 0);
             if ($receiptNumber <= 0) $receiptNumber = $txId;
 
-            try {
-                $db->query(
-                    "INSERT INTO {$pt}
-                        (transaction_id, day_date, date_close, pay_type, sum, payed_card, payed_third_party, tip_sum, spot_id, table_id, waiter_name)
-                     VALUES
-                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                     ON DUPLICATE KEY UPDATE
-                        day_date = VALUES(day_date),
-                        date_close = VALUES(date_close),
-                        pay_type = VALUES(pay_type),
-                        sum = VALUES(sum),
-                        payed_card = VALUES(payed_card),
-                        payed_third_party = VALUES(payed_third_party),
-                        tip_sum = VALUES(tip_sum),
-                        spot_id = VALUES(spot_id),
-                        table_id = VALUES(table_id),
-                        waiter_name = VALUES(waiter_name)",
-                    [
-                        $txId, $dayDate, $closeAt, $payType, $sum, $payedCard, $payedThirdParty, $tipSum, $spotId, $tableId,
-                        $waiterName !== '' ? $waiterName : null,
-                    ]
-                );
-            } catch (\Throwable $e) {
-            }
+            $batchPtPlaceholders[] = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            array_push($batchPtParams, 
+                $txId, $dayDate, $closeAt, $payType, $sum, $payedCard, $payedThirdParty, $tipSum, $spotId, $tableId,
+                $waiterName !== '' ? $waiterName : null
+            );
 
+            // Fetch detail conditionally (can be slow, but it's part of existing logic)
             $detail = null;
             try {
                 $detail = $normalizePosterTx($api->request('dash.getTransaction', [
@@ -192,6 +182,7 @@ try {
                     'include_delivery' => 0,
                 ]));
             } catch (\Throwable $e) {
+                error_log('Payday2 Error in ' . __FILE__ . ':' . __LINE__ . ' - ' . $e->getMessage());
                 $detail = null;
             }
 
@@ -203,47 +194,71 @@ try {
                 $pmId = (int)($tx['payment_method_id'] ?? $tx['paymentMethodId'] ?? 0);
             }
 
-            if ($pmId > 0) {
-                try {
-                    $db->query("UPDATE {$pt} SET payment_method_id = ? WHERE transaction_id = ? LIMIT 1", [$pmId, $txId]);
-                } catch (\Throwable $e) {
-                }
-            }
             $exists = (int)$db->query("SELECT 1 FROM {$pc} WHERE transaction_id = ? LIMIT 1", [$txId])->fetchColumn();
             if ($exists === 1) {
-                $db->query(
-                    "UPDATE {$pc}
-                     SET receipt_number = ?, table_id = ?, spot_id = ?, sum = ?, payed_sum = ?, payed_cash = ?, payed_card = ?, payed_cert = ?, payed_bonus = ?, payed_third_party = ?,
-                         pay_type = ?, reason = ?, tip_sum = ?, discount = ?, date_close = ?, poster_payment_method_id = ?, waiter_name = ?, day_date = ?
-                         , was_deleted = 0, deleted_at = NULL
-                     WHERE transaction_id = ?
-                     LIMIT 1",
-                    [
-                        $receiptNumber > 0 ? $receiptNumber : null,
-                        $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus, $payedThirdParty,
-                        $payType, $reason, $tipSum, $discount, $closeAt,
-                        $pmId > 0 ? $pmId : null,
-                        $waiterName !== '' ? $waiterName : null, $dayDate,
-                        $txId
-                    ]
-                );
+                $batchPcUpdates[] = [
+                    $receiptNumber > 0 ? $receiptNumber : null,
+                    $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus, $payedThirdParty,
+                    $payType, $reason, $tipSum, $discount, $closeAt,
+                    $pmId > 0 ? $pmId : null,
+                    $waiterName !== '' ? $waiterName : null, $dayDate,
+                    $txId
+                ];
                 $updated++;
             } else {
-                $db->query(
-                    "INSERT INTO {$pc}
-                        (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, payed_third_party, pay_type, reason, tip_sum, discount, date_close, poster_payment_method_id, waiter_name, day_date)
-                     VALUES
-                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    [
-                        $txId,
-                        $receiptNumber > 0 ? $receiptNumber : null,
-                        $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus, $payedThirdParty,
-                        $payType, $reason, $tipSum, $discount, $closeAt,
-                        $pmId > 0 ? $pmId : null,
-                        $waiterName !== '' ? $waiterName : null, $dayDate
-                    ]
+                $batchPcInsertsPlaceholders[] = '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+                array_push($batchPcInsertsParams,
+                    $txId,
+                    $receiptNumber > 0 ? $receiptNumber : null,
+                    $tableId, $spotId, $sum, $payedSum, $payedCash, $payedCard, $payedCert, $payedBonus, $payedThirdParty,
+                    $payType, $reason, $tipSum, $discount, $closeAt,
+                    $pmId > 0 ? $pmId : null,
+                    $waiterName !== '' ? $waiterName : null, $dayDate
                 );
                 $inserted++;
+            }
+            
+            // Execute batches if they get too large
+            if (count($batchPtPlaceholders) >= 100) {
+                try {
+                    $ptSql = "INSERT INTO {$pt} (transaction_id, day_date, date_close, pay_type, sum, payed_card, payed_third_party, tip_sum, spot_id, table_id, waiter_name) VALUES " . implode(', ', $batchPtPlaceholders) . " ON DUPLICATE KEY UPDATE day_date = VALUES(day_date), date_close = VALUES(date_close), pay_type = VALUES(pay_type), sum = VALUES(sum), payed_card = VALUES(payed_card), payed_third_party = VALUES(payed_third_party), tip_sum = VALUES(tip_sum), spot_id = VALUES(spot_id), table_id = VALUES(table_id), waiter_name = VALUES(waiter_name)";
+                    $db->query($ptSql, $batchPtParams);
+                } catch (\Throwable $e) { error_log('Payday2 Error in ' . __FILE__ . ':' . __LINE__ . ' - ' . $e->getMessage()); }
+                $batchPtPlaceholders = []; $batchPtParams = [];
+            }
+            if (count($batchPcInsertsPlaceholders) >= 100) {
+                try {
+                    $pcSql = "INSERT INTO {$pc} (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, payed_third_party, pay_type, reason, tip_sum, discount, date_close, poster_payment_method_id, waiter_name, day_date) VALUES " . implode(', ', $batchPcInsertsPlaceholders);
+                    $db->query($pcSql, $batchPcInsertsParams);
+                } catch (\Throwable $e) { error_log('Payday2 Error in ' . __FILE__ . ':' . __LINE__ . ' - ' . $e->getMessage()); }
+                $batchPcInsertsPlaceholders = []; $batchPcInsertsParams = [];
+            }
+            if (count($batchPcUpdates) >= 100) {
+                $stmt = $db->getPdo()->prepare("UPDATE {$pc} SET receipt_number = ?, table_id = ?, spot_id = ?, sum = ?, payed_sum = ?, payed_cash = ?, payed_card = ?, payed_cert = ?, payed_bonus = ?, payed_third_party = ?, pay_type = ?, reason = ?, tip_sum = ?, discount = ?, date_close = ?, poster_payment_method_id = ?, waiter_name = ?, day_date = ?, was_deleted = 0, deleted_at = NULL WHERE transaction_id = ?");
+                foreach ($batchPcUpdates as $upd) {
+                    try { $stmt->execute($upd); } catch (\Throwable $e) { error_log('Payday2 Error in ' . __FILE__ . ':' . __LINE__ . ' - ' . $e->getMessage()); }
+                }
+                $batchPcUpdates = [];
+            }
+        }
+        
+        // Finalize remaining batches
+        if (count($batchPtPlaceholders) > 0) {
+            try {
+                $ptSql = "INSERT INTO {$pt} (transaction_id, day_date, date_close, pay_type, sum, payed_card, payed_third_party, tip_sum, spot_id, table_id, waiter_name) VALUES " . implode(', ', $batchPtPlaceholders) . " ON DUPLICATE KEY UPDATE day_date = VALUES(day_date), date_close = VALUES(date_close), pay_type = VALUES(pay_type), sum = VALUES(sum), payed_card = VALUES(payed_card), payed_third_party = VALUES(payed_third_party), tip_sum = VALUES(tip_sum), spot_id = VALUES(spot_id), table_id = VALUES(table_id), waiter_name = VALUES(waiter_name)";
+                $db->query($ptSql, $batchPtParams);
+            } catch (\Throwable $e) { error_log('Payday2 Error in ' . __FILE__ . ':' . __LINE__ . ' - ' . $e->getMessage()); }
+        }
+        if (count($batchPcInsertsPlaceholders) > 0) {
+            try {
+                $pcSql = "INSERT INTO {$pc} (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, payed_third_party, pay_type, reason, tip_sum, discount, date_close, poster_payment_method_id, waiter_name, day_date) VALUES " . implode(', ', $batchPcInsertsPlaceholders);
+                $db->query($pcSql, $batchPcInsertsParams);
+            } catch (\Throwable $e) { error_log('Payday2 Error in ' . __FILE__ . ':' . __LINE__ . ' - ' . $e->getMessage()); }
+        }
+        if (count($batchPcUpdates) > 0) {
+            $stmt = $db->getPdo()->prepare("UPDATE {$pc} SET receipt_number = ?, table_id = ?, spot_id = ?, sum = ?, payed_sum = ?, payed_cash = ?, payed_card = ?, payed_cert = ?, payed_bonus = ?, payed_third_party = ?, pay_type = ?, reason = ?, tip_sum = ?, discount = ?, date_close = ?, poster_payment_method_id = ?, waiter_name = ?, day_date = ?, was_deleted = 0, deleted_at = NULL WHERE transaction_id = ?");
+            foreach ($batchPcUpdates as $upd) {
+                try { $stmt->execute($upd); } catch (\Throwable $e) { error_log('Payday2 Error in ' . __FILE__ . ':' . __LINE__ . ' - ' . $e->getMessage()); }
             }
         }
 
@@ -478,7 +493,7 @@ try {
                  WHERE day_date BETWEEN ? AND ?
                    AND pay_type IN (2,3)
                    AND (payed_card + payed_third_party) > 0
-                   AND poster_payment_method_id = 11",
+                   AND poster_payment_method_id = " . \App\Payday2\Config::METHOD_VIETNAM,
                 [$dateFrom, $dateTo]
             )->fetchColumn();
         } else {
@@ -497,7 +512,7 @@ try {
                    AND p.pay_type IN (2,3)
                    AND (p.payed_card + p.payed_third_party) > 0
                    AND p.tip_sum > 0
-                   AND COALESCE(p.poster_payment_method_id, 0) <> 11",
+                   AND COALESCE(p.poster_payment_method_id, 0) <> " . \App\Payday2\Config::METHOD_VIETNAM,
                 [$dateFrom, $dateTo, $dateFrom, $dateTo]
             )->fetchColumn();
         }
@@ -514,7 +529,7 @@ try {
         $startTs = strtotime($dateTo . ' 00:00:00');
         $endTs = strtotime($dateTo . ' 23:59:59');
 
-        $accountTo = $kind === 'vietnam' ? 9 : 8;
+        $accountTo = $kind === 'vietnam' ? \App\Payday2\Config::ACCOUNT_VIETNAM : \App\Payday2\Config::ACCOUNT_TIPS;
         $comment = $kind === 'vietnam'
             ? 'Перевод чеков вьетнаской компании'
             : 'Перевод типсов';

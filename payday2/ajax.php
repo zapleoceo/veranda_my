@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../auth_check.php';
 
+require_once __DIR__ . '/config.php';
+
 if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -1016,7 +1018,7 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
             $uid = (int)($hr['mail_uid'] ?? 0);
             if ($uid > 0) $hidden[$uid] = (string)($hr['comment'] ?? '');
         }
-    } catch (\Throwable $e) {}
+    } catch (\Throwable $e) { error_log('Payday2 Error: ' . $e->getMessage()); }
     $rows = [];
     foreach ($emails as $num) {
         $h = @imap_headerinfo($inbox, $num);
@@ -1497,7 +1499,7 @@ if (($_GET['ajax'] ?? '') === 'poster_accounts') {
         $rows = $api2->request('finance.getAccounts', []);
         if (!is_array($rows)) $rows = [];
 
-        try { $db->query("DELETE FROM {$pa}"); } catch (\Throwable $e) {}
+        try { $db->query("DELETE FROM {$pa}"); } catch (\Throwable $e) { error_log('Payday2 Error: ' . $e->getMessage()); }
 
         $accounts = [];
         $byId = [];

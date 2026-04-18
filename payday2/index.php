@@ -37,8 +37,6 @@ $apiTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? 'Asia/Ho_Chi_Minh'))
 if ($apiTzName === '') $apiTzName = 'Asia/Ho_Chi_Minh';
 date_default_timezone_set($apiTzName);
 
-$db->createPaydayTables();
-
 $message = '';
 $error = '';
 
