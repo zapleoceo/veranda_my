@@ -26,12 +26,14 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
         exit;
     }
     
-    $tmpFile = tempnam(sys_get_temp_dir(), 'bal_') . '.png';
+    $tmpFile = tempnam(sys_get_temp_dir(), 'bal_');
     file_put_contents($tmpFile, $imgData);
-    
+
     $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
     $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
     $threadId = trim((string)($_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? ''));
+
+    file_put_contents(__DIR__ . '/telegram_debug.log', "Token length: " . strlen($tgToken) . " Chat ID: $tgChatId Thread: $threadId\n", FILE_APPEND);
 
     if ($tgToken === '' || $tgChatId === '') {
         @unlink($tmpFile);
@@ -39,11 +41,11 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
         echo json_encode(['ok' => false, 'error' => 'Telegram config is missing (Token or Chat ID empty)'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    
+
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
     curl_setopt($ch, CURLOPT_POST, true);
-    
+
     $postFields = [
         'chat_id' => $tgChatId,
         'photo' => new CURLFile($tmpFile, 'image/png', 'balance.png'),
@@ -52,13 +54,16 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     if ($threadId !== '') {
         $postFields['message_thread_id'] = $threadId;
     }
-    
+
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     $resp = curl_exec($ch);
+    $curlErr = curl_error($ch);
     curl_close($ch);
     @unlink($tmpFile);
+
+    file_put_contents(__DIR__ . '/telegram_debug.log', "cURL Error: $curlErr\nResp: $resp\n", FILE_APPEND);
     
     if ($resp === false) {
         http_response_code(500);
