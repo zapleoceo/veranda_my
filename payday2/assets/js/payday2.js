@@ -1101,6 +1101,12 @@ window.initPayday2 = function() {
     };
 
     const refreshPosterAccounts = () => {
+        if (balAndreyEl) { balAndreyEl.textContent = '...'; balAndreyEl.setAttribute('data-cents', ''); }
+        if (balVietnamEl) { balVietnamEl.textContent = '...'; balVietnamEl.setAttribute('data-cents', ''); }
+        if (balCashEl) { balCashEl.textContent = '...'; balCashEl.setAttribute('data-cents', ''); }
+        if (balTotalEl) { balTotalEl.textContent = '...'; balTotalEl.setAttribute('data-cents', ''); }
+        if (posterAccountsTbody) posterAccountsTbody.innerHTML = '<tr><td colspan="3" style="padding: 10px; color:var(--muted); font-weight:900;">Обновление...</td></tr>';
+        
         const url = `?dateFrom=${encodeURIComponent(window.PAYDAY_CONFIG.dateFrom)}&dateTo=${encodeURIComponent(window.PAYDAY_CONFIG.dateTo)}&ajax=poster_accounts`;
         return fetch(url, {
             method: 'POST',
@@ -2191,7 +2197,11 @@ window.initPayday2 = function() {
             try {
                 const forms = document.querySelectorAll('form.finance-transfer');
                 for (const form of forms) {
-                    await window.refreshFinanceForm(form, { showLoading: true });
+                    const statusEl = form.querySelector('.finance-status');
+                    if (statusEl) statusEl.innerHTML = '<span style="color:var(--muted);">Обновление...</span>';
+                }
+                for (const form of forms) {
+                    await window.refreshFinanceForm(form, { showLoading: false });
                 }
             } finally {
                 btn.disabled = false;

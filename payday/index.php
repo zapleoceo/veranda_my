@@ -2945,7 +2945,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_5000">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_5100">
 </head>
 <body>
 <div class="container">
@@ -4533,6 +4533,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     };
 
     const refreshPosterAccounts = () => {
+        if (balAndreyEl) { balAndreyEl.textContent = '...'; balAndreyEl.setAttribute('data-cents', ''); }
+        if (balVietnamEl) { balVietnamEl.textContent = '...'; balVietnamEl.setAttribute('data-cents', ''); }
+        if (balCashEl) { balCashEl.textContent = '...'; balCashEl.setAttribute('data-cents', ''); }
+        if (balTotalEl) { balTotalEl.textContent = '...'; balTotalEl.setAttribute('data-cents', ''); }
+        if (posterAccountsTbody) posterAccountsTbody.innerHTML = '<tr><td colspan="3" style="padding: 10px; color:var(--muted); font-weight:900;">Обновление...</td></tr>';
+        
         const url = <?= json_encode('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'ajax' => 'poster_accounts'])) ?>;
         return fetch(url, {
             method: 'POST',
@@ -5557,7 +5563,11 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
             try {
                 const forms = document.querySelectorAll('form.finance-transfer');
                 for (const form of forms) {
-                    await window.refreshFinanceForm(form, { showLoading: true });
+                    const statusEl = form.querySelector('.finance-status');
+                    if (statusEl) statusEl.innerHTML = '<span style="color:var(--muted);">Обновление...</span>';
+                }
+                for (const form of forms) {
+                    await window.refreshFinanceForm(form, { showLoading: false });
                 }
             } finally {
                 btn.disabled = false;
