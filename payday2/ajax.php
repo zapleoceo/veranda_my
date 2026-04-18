@@ -30,8 +30,8 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     file_put_contents($tmpFile, $imgData);
 
     $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
-    $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
-    $threadId = trim((string)($_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? ''));
+    $tgChatId = '-1003889942420'; // From https://t.me/c/3889942420/1736
+    $threadId = '1736'; // From https://t.me/c/3889942420/1736
 
     file_put_contents(__DIR__ . '/telegram_debug.log', "Token length: " . strlen($tgToken) . " Chat ID: $tgChatId Thread: $threadId\n", FILE_APPEND);
 
