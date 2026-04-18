@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_2600';
+$payday2AssetVersion = '20260417_2700';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,7 +324,7 @@ $payday2AssetVersion = '20260417_2600';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2600">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2700">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
 </head>
 <body>
@@ -340,8 +340,8 @@ $payday2AssetVersion = '20260417_2600';
             </div>
             <div id="topFormsWrap" style="display: flex; gap: 10px; margin-left: 10px; align-items: center;">
                 <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin: 0; align-items: center;">
-                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
-                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
+                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 117px;">
+                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 117px;">
                     <button class="btn" type="submit">Открыть</button>
                 </form>
                 <form method="POST" id="clearDayForm" style="margin: 0;">
@@ -386,7 +386,7 @@ $payday2AssetVersion = '20260417_2600';
                     </div>
                 </div>
                 <div class="mid-col" id="outMidCol">
-                    <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px; transform: scale(0.9); transform-origin: center;">
+                    <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px !important; transform: scale(0.9); transform-origin: center;">
                         <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                         <label class="switch">
                             <input id="modeToggleOut" type="checkbox">
@@ -515,7 +515,7 @@ $payday2AssetVersion = '20260417_2600';
             </div>
 
             <div class="mid-col" id="midCol">
-                <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px; transform: scale(0.9); transform-origin: center;">
+                <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px !important; transform: scale(0.9); transform-origin: center;">
                     <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                     <label class="switch">
                         <input id="modeToggle" type="checkbox">
@@ -831,7 +831,7 @@ $payday2AssetVersion = '20260417_2600';
                 <div style="display:flex; gap: 8px; align-items:center;">
                     <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
                     <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" style="padding: 4px 10px;">🔄</button>
-                    <button class="btn tiny" id="posterBalancesTelegramBtn" type="button" title="Отправить в Telegram" style="padding: 4px 10px;">✈</button>
+                    <button class="btn tiny" id="posterBalancesTelegramBtn" type="button" title="Отправить в Telegram" style="padding: 4px 10px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="#0088cc" style="vertical-align: middle; margin-top: -2px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.42.91-4.01 2.66-.38.26-.72.39-1.03.38-.34-.01-1-.19-1.48-.35-.59-.19-1.05-.29-1.01-.61.02-.17.29-.35.81-.54 3.17-1.38 5.28-2.29 6.33-2.73 3.01-1.26 3.63-1.48 4.04-1.48.09 0 .29.02.4.11.09.07.12.16.13.25.01.12.02.26.01.37z"/></svg></button>
                 </div>
             </div>
 

@@ -2945,7 +2945,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2600">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2700">
 </head>
 <body>
 <div class="container">
@@ -2960,8 +2960,8 @@ $fmtVnd = function (int $v): string {
             </div>
             <div id="topFormsWrap" style="display: flex; gap: 10px; margin-left: 10px; align-items: center;">
                 <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin: 0; align-items: center;">
-                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
-                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
+                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 117px;">
+                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 117px;">
                     <button class="btn" type="submit">Открыть</button>
                 </form>
                 <form method="POST" id="clearDayForm" style="margin: 0;">
@@ -3006,7 +3006,7 @@ $fmtVnd = function (int $v): string {
                     </div>
                 </div>
                 <div class="mid-col" id="outMidCol">
-                    <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px; transform: scale(0.9); transform-origin: center;">
+                    <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px !important; transform: scale(0.9); transform-origin: center;">
                         <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                         <label class="switch">
                             <input id="modeToggleOut" type="checkbox">
@@ -3175,7 +3175,7 @@ $fmtVnd = function (int $v): string {
             </div>
 
             <div class="mid-col" id="midCol">
-                <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px; transform: scale(0.9); transform-origin: center;">
+                <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px !important; transform: scale(0.9); transform-origin: center;">
                     <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                     <label class="switch">
                         <input id="modeToggle" type="checkbox">
