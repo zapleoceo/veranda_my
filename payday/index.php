@@ -2999,11 +2999,16 @@ $fmtVnd = function (int $v): string {
                             <button type="button" class="vc-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
                         </div>
                     </div>
-                    <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
+                    <div id="outSepayScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
                         <table id="outSepayTable">
                             <thead><tr><th class="col-out-hide"></th><th class="col-out-content">Content</th><th class="nowrap col-out-time">Время</th><th class="nowrap col-out-sum">Сумма</th><th class="col-out-select"></th><th class="col-out-anchor"></th></tr></thead>
                             <tbody></tbody>
                         </table>
+                    </div>
+                    <div class="muted table-footer-stats">
+                        <span>Итого: <span id="outSepayTotal">...</span></span>
+                        <span>• связанные: <span id="outSepayLinked">—</span></span>
+                        <span>• несвязанные: <span id="outSepayUnlinked">—</span></span>
                     </div>
                 </div>
                 <div class="mid-col" id="outMidCol">
@@ -3039,7 +3044,7 @@ $fmtVnd = function (int $v): string {
                             <button class="btn primary" id="outFinanceBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
                         </div>
                     </div>
-                    <div id="outPosterScroll" style="max-height: 56vh; overflow:auto;">
+                    <div id="outPosterScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
                         <table id="outPosterTable">
                             <thead>
                                 <tr>
@@ -3048,6 +3053,11 @@ $fmtVnd = function (int $v): string {
                             </thead>
                             <tbody></tbody>
                         </table>
+                    </div>
+                    <div class="muted table-footer-stats">
+                        <span>Итого: <span id="outPosterTotal">...</span></span>
+                        <span>• в таблице связи: <span id="outPosterLinked">—</span></span>
+                        <span>• несвязи: <span id="outPosterUnlinked">—</span></span>
                     </div>
                 </div>
             </div>
