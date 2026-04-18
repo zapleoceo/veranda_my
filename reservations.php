@@ -75,6 +75,58 @@ $resCapsByNum = [];
 $resHallTables = [];
 
 $ajax = $_GET['ajax'] ?? '';
+
+if ($ajax === 'get_res') {
+    header('Content-Type: application/json; charset=utf-8');
+    $id = (int)($_GET['id'] ?? 0);
+    $row = $db->query("SELECT * FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
+    if (!$row) {
+        echo json_encode(['ok' => false, 'error' => 'Not found']);
+        exit;
+    }
+    echo json_encode(['ok' => true, 'data' => $row], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($ajax === 'save_res') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed']);
+        exit;
+    }
+    $id = (int)($_POST['id'] ?? 0);
+    if ($id <= 0) {
+        echo json_encode(['ok' => false, 'error' => 'Invalid ID']);
+        exit;
+    }
+    $fields = [
+        'start_time', 'guests', 'table_num', 'name', 'phone', 
+        'whatsapp_phone', 'comment', 'preorder_text', 'preorder_ru',
+        'tg_user_id', 'tg_username', 'zalo_user_id', 'zalo_phone',
+        'lang', 'total_amount', 'qr_url', 'qr_code'
+    ];
+    $sets = [];
+    $params = [];
+    foreach ($fields as $f) {
+        if (isset($_POST[$f])) {
+            $sets[] = "{$f} = ?";
+            $params[] = $_POST[$f] === '' ? null : $_POST[$f];
+        }
+    }
+    if (empty($sets)) {
+        echo json_encode(['ok' => false, 'error' => 'No fields to update']);
+        exit;
+    }
+    $params[] = $id;
+    try {
+        $db->query("UPDATE {$resTable} SET " . implode(', ', $sets) . " WHERE id = ? LIMIT 1", $params);
+        echo json_encode(['ok' => true]);
+    } catch (\Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 if ($ajax === 'vposter') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -1255,6 +1307,7 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                                                 <?php $guestBtnClass = $waPhoneNorm !== '' ? 'contact-wa' : ($tgUsername !== '' || (int)($r['tg_user_id'] ?? 0) > 0 ? 'contact-tg' : ''); ?>
                                                 <button type="button" class="res-btn btn-resend <?= htmlspecialchars($guestBtnClass) ?>" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="guest">reG</button>
                                                 <button type="button" class="res-btn primary btn-resend" data-id="<?= htmlspecialchars((string)$r['id']) ?>" data-target="manager">reM</button>
+                                                <button type="button" class="res-btn btn-edit" data-id="<?= htmlspecialchars((string)$r['id']) ?>" title="Редактировать">&#9998;</button>
                                                 <?php if ($hasPosterAccess && empty($r['is_poster_pushed'])): ?>
                                                     <button
                                                         type="button"
@@ -1321,6 +1374,91 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
             <div class="res-modal-actions">
                 <button type="button" class="res-btn" id="vposterCancel">Отмена</button>
                 <button type="button" class="res-btn primary" id="vposterOk" disabled>ОК</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Reservation Modal -->
+    <div id="editResModal" class="res-modal" hidden>
+        <div class="res-modal-card" style="max-width: 800px;">
+            <div class="res-modal-title">Редактировать бронь #<span id="editResIdTitle"></span></div>
+            <div class="res-modal-body">
+                <form id="editResForm" class="res-modal-grid" style="grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <input type="hidden" name="id" id="editResId">
+                    
+                    <div class="form-group">
+                        <label class="res-modal-k">Время начала (Y-m-d H:i:s)</label>
+                        <input type="text" name="start_time" id="editResStartTime" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">Гостей</label>
+                        <input type="number" name="guests" id="editResGuests" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">Стол</label>
+                        <input type="text" name="table_num" id="editResTableNum" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">Имя гостя</label>
+                        <input type="text" name="name" id="editResName" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">Телефон</label>
+                        <input type="text" name="phone" id="editResPhone" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">WhatsApp</label>
+                        <input type="text" name="whatsapp_phone" id="editResWA" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">Telegram Username</label>
+                        <input type="text" name="tg_username" id="editResTGUser" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">Telegram ID</label>
+                        <input type="text" name="tg_user_id" id="editResTGId" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">Zalo Телефон</label>
+                        <input type="text" name="zalo_phone" id="editResZaloPhone" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">Zalo ID</label>
+                        <input type="text" name="zalo_user_id" id="editResZaloId" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">Сумма (VND)</label>
+                        <input type="number" name="total_amount" id="editResAmount" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">Язык</label>
+                        <input type="text" name="lang" id="editResLang" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">QR Code</label>
+                        <input type="text" name="qr_code" id="editResQRCode" class="res-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="res-modal-k">QR URL</label>
+                        <input type="text" name="qr_url" id="editResQRUrl" class="res-input">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label class="res-modal-k">Комментарий</label>
+                        <textarea name="comment" id="editResComment" class="res-input" rows="2"></textarea>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label class="res-modal-k">Предзаказ (текст)</label>
+                        <textarea name="preorder_text" id="editResPreorder" class="res-input" rows="3"></textarea>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label class="res-modal-k">Предзаказ (RU)</label>
+                        <textarea name="preorder_ru" id="editResPreorderRu" class="res-input" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="res-modal-actions">
+                <button type="button" class="res-btn" id="editResCancel">Отмена</button>
+                <button type="button" class="res-btn primary" id="editResSave">Сохранить</button>
             </div>
         </div>
     </div>

@@ -729,6 +729,76 @@
     });
   };
 
+  const bindEdit = () => {
+    const modal = q('#editResModal');
+    const form = q('#editResForm');
+    const btnCancel = q('#editResCancel');
+    const btnSave = q('#editResSave');
+    if (!modal || !form || !btnCancel || !btnSave) return;
+
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.btn-edit');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      if (!id) return;
+
+      btn.disabled = true;
+      try {
+        const res = await fetch(`?ajax=get_res&id=${id}`);
+        const j = await res.json();
+        if (!j.ok) throw new Error(j.error || 'Fetch failed');
+        
+        const d = j.data;
+        q('#editResIdTitle').textContent = d.id;
+        q('#editResId').value = d.id;
+        q('#editResStartTime').value = d.start_time || '';
+        q('#editResGuests').value = d.guests || '';
+        q('#editResTableNum').value = d.table_num || '';
+        q('#editResName').value = d.name || '';
+        q('#editResPhone').value = d.phone || '';
+        q('#editResWA').value = d.whatsapp_phone || '';
+        q('#editResTGUser').value = d.tg_username || '';
+        q('#editResTGId').value = d.tg_user_id || '';
+        q('#editResZaloPhone').value = d.zalo_phone || '';
+        q('#editResZaloId').value = d.zalo_user_id || '';
+        q('#editResAmount').value = d.total_amount || '';
+        q('#editResLang').value = d.lang || '';
+        q('#editResQRCode').value = d.qr_code || '';
+        q('#editResQRUrl').value = d.qr_url || '';
+        q('#editResComment').value = d.comment || '';
+        q('#editResPreorder').value = d.preorder_text || '';
+        q('#editResPreorderRu').value = d.preorder_ru || '';
+
+        modal.hidden = false;
+      } catch (err) {
+        alert('Ошибка: ' + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    const close = () => { modal.hidden = true; };
+    btnCancel.addEventListener('click', close);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+    btnSave.addEventListener('click', async () => {
+      btnSave.disabled = true;
+      const fd = new FormData(form);
+      try {
+        const res = await fetch('?ajax=save_res', {
+          method: 'POST',
+          body: fd
+        });
+        const j = await res.json();
+        if (!j.ok) throw new Error(j.error || 'Save failed');
+        location.reload();
+      } catch (err) {
+        alert('Ошибка: ' + err.message);
+        btnSave.disabled = false;
+      }
+    });
+  };
+
   bindSort();
   bindResend();
   bindVPoster();
@@ -738,4 +808,5 @@
   bindLayout();
   bindHall();
   bindDateFilters();
+  bindEdit();
 })();
