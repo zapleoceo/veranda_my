@@ -1387,72 +1387,32 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                     <input type="hidden" name="id" id="editResId">
                     
                     <div class="form-group">
-                        <label class="res-modal-k">Время начала (Y-m-d H:i:s)</label>
-                        <input type="text" name="start_time" id="editResStartTime" class="res-input">
-                    </div>
-                    <div class="form-group">
-                        <label class="res-modal-k">Гостей</label>
-                        <input type="number" name="guests" id="editResGuests" class="res-input">
-                    </div>
-                    <div class="form-group">
-                        <label class="res-modal-k">Стол</label>
-                        <input type="text" name="table_num" id="editResTableNum" class="res-input">
-                    </div>
-                    <div class="form-group">
-                        <label class="res-modal-k">Имя гостя</label>
+                        <label class="res-modal-k">Имя гостя (First Name + Last Name)</label>
                         <input type="text" name="name" id="editResName" class="res-input">
                     </div>
                     <div class="form-group">
-                        <label class="res-modal-k">Телефон</label>
+                        <label class="res-modal-k">Телефон (Poster Phone)</label>
                         <input type="text" name="phone" id="editResPhone" class="res-input">
                     </div>
                     <div class="form-group">
-                        <label class="res-modal-k">WhatsApp</label>
-                        <input type="text" name="whatsapp_phone" id="editResWA" class="res-input">
+                        <label class="res-modal-k">Дата и время (Y-m-d H:i:s)</label>
+                        <input type="text" name="start_time" id="editResStartTime" class="res-input">
                     </div>
                     <div class="form-group">
-                        <label class="res-modal-k">Telegram Username</label>
-                        <input type="text" name="tg_username" id="editResTGUser" class="res-input">
+                        <label class="res-modal-k">Кол-во гостей</label>
+                        <input type="number" name="guests" id="editResGuests" class="res-input">
                     </div>
                     <div class="form-group">
-                        <label class="res-modal-k">Telegram ID</label>
-                        <input type="text" name="tg_user_id" id="editResTGId" class="res-input">
+                        <label class="res-modal-k">Номер стола (как в Poster)</label>
+                        <input type="text" name="table_num" id="editResTableNum" class="res-input">
                     </div>
                     <div class="form-group">
-                        <label class="res-modal-k">Zalo Телефон</label>
-                        <input type="text" name="zalo_phone" id="editResZaloPhone" class="res-input">
-                    </div>
-                    <div class="form-group">
-                        <label class="res-modal-k">Zalo ID</label>
-                        <input type="text" name="zalo_user_id" id="editResZaloId" class="res-input">
-                    </div>
-                    <div class="form-group">
-                        <label class="res-modal-k">Сумма (VND)</label>
-                        <input type="number" name="total_amount" id="editResAmount" class="res-input">
-                    </div>
-                    <div class="form-group">
-                        <label class="res-modal-k">Язык</label>
-                        <input type="text" name="lang" id="editResLang" class="res-input">
-                    </div>
-                    <div class="form-group">
-                        <label class="res-modal-k">QR Code</label>
+                        <label class="res-modal-k">Код брони (QR Code / Marker)</label>
                         <input type="text" name="qr_code" id="editResQRCode" class="res-input">
                     </div>
-                    <div class="form-group">
-                        <label class="res-modal-k">QR URL</label>
-                        <input type="text" name="qr_url" id="editResQRUrl" class="res-input">
-                    </div>
                     <div class="form-group" style="grid-column: span 2;">
-                        <label class="res-modal-k">Комментарий</label>
-                        <textarea name="comment" id="editResComment" class="res-input" rows="2"></textarea>
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label class="res-modal-k">Предзаказ (текст)</label>
-                        <textarea name="preorder_text" id="editResPreorder" class="res-input" rows="3"></textarea>
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label class="res-modal-k">Предзаказ (RU)</label>
-                        <textarea name="preorder_ru" id="editResPreorderRu" class="res-input" rows="3"></textarea>
+                        <label class="res-modal-k">Комментарий (Comment)</label>
+                        <textarea name="comment" id="editResComment" class="res-input" rows="3"></textarea>
                     </div>
                 </form>
             </div>
@@ -1466,6 +1426,6 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
     <div class="res-hscroll" id="resHScroll" hidden><div class="res-hscroll-inner" id="resHScrollInner"></div></div>
 
     <script src="/assets/user_menu.js?v=20260417_1036"></script>
-    <script src="/reservations/assets/js/reservations.js?v=20260418_0001"></script>
+    <script src="/reservations/assets/js/reservations.js?v=20260418_0002"></script>
 </body>
 </html>

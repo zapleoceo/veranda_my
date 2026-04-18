@@ -756,18 +756,8 @@
         q('#editResTableNum').value = d.table_num || '';
         q('#editResName').value = d.name || '';
         q('#editResPhone').value = d.phone || '';
-        q('#editResWA').value = d.whatsapp_phone || '';
-        q('#editResTGUser').value = d.tg_username || '';
-        q('#editResTGId').value = d.tg_user_id || '';
-        q('#editResZaloPhone').value = d.zalo_phone || '';
-        q('#editResZaloId').value = d.zalo_user_id || '';
-        q('#editResAmount').value = d.total_amount || '';
-        q('#editResLang').value = d.lang || '';
         q('#editResQRCode').value = d.qr_code || '';
-        q('#editResQRUrl').value = d.qr_url || '';
         q('#editResComment').value = d.comment || '';
-        q('#editResPreorder').value = d.preorder_text || '';
-        q('#editResPreorderRu').value = d.preorder_ru || '';
 
         modal.hidden = false;
       } catch (err) {
