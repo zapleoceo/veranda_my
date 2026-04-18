@@ -30,7 +30,7 @@
         .confirm-modal .btn2:disabled { opacity: 0.6; cursor: default; }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .table-card-header { position: relative; padding: 12px 12px 6px; }
-        .table-card-header > div:first-child { font-weight: 900; }
+        .table-card-header > div:first-child > div:first-child { font-weight: 900; }
         .table-card-header .vc-toggle { position: absolute; top: 12px; right: 12px; }
         .grid { display:grid; grid-template-columns: minmax(max-content, 1fr) 104px minmax(max-content, 1fr); gap: 12px; align-items:start; width: 100%; overflow-x: auto; }
         
@@ -176,9 +176,11 @@
             .user-menu { grid-column: 2; grid-row: 1; margin-left: 0 !important; }
             .tabs { grid-column: 1 / -1; grid-row: 2; margin-left: 0; flex-wrap: wrap; }
             .toolbar { grid-column: 1 / -1; grid-row: 3; display: flex; flex-direction: column; gap: 10px; }
-            #dateForm { flex-direction: row !important; width: 100%; justify-content: center; align-items: center; gap: 6px !important; }
-            #dateForm input[type="date"] { width: auto !important; flex: 0 1 auto; padding: 6px 4px !important; font-size: 11px; }
-            #dateForm button { flex: 0 0 auto; padding: 6px 10px !important; }
+            #topFormsWrap { flex-wrap: wrap; margin-left: 0 !important; width: 100%; gap: 6px !important; }
+            #dateForm { flex-direction: row !important; justify-content: flex-start; align-items: center; gap: 6px !important; flex: 1 1 auto; }
+            #clearDayForm { flex: 0 0 auto; }
+            #dateForm input[type="date"] { width: auto !important; flex: 1 1 auto; min-width: 0; padding: 6px 4px !important; font-size: 11px; }
+            #dateForm button, #clearDayBtn { flex: 0 0 auto; padding: 6px 10px !important; }
             .toolbar-line { gap: 4px !important; justify-content: space-between; }
             .toolbar-line .btn { font-size: 10px !important; padding: 6px 6px !important; white-space: nowrap; letter-spacing: -0.2px; }
             .toggle-wrap { margin-left: 0; gap: 4px; transform: scale(0.85); transform-origin: right center; }

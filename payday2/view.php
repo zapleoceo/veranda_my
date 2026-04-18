@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_2400';
+$payday2AssetVersion = '20260417_2500';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,7 +324,7 @@ $payday2AssetVersion = '20260417_2400';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2400">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2500">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
 </head>
 <body>
@@ -338,11 +338,19 @@ $payday2AssetVersion = '20260417_2400';
                 <button type="button" class="tab" id="btnKashShift" style="margin-left: 15px; background: rgba(184,135,70,0.15); color: #B88746;">KashShift</button>
                 <button type="button" class="tab" id="btnSupplies" style="margin-left: 5px; background: rgba(184,135,70,0.15); color: #B88746;">Supplies</button>
             </div>
-            <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin-left: 10px;">
-                <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
-                <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
-                <button class="btn" type="submit">Открыть</button>
-            </form>
+            <div id="topFormsWrap" style="display: flex; gap: 10px; margin-left: 10px; align-items: center;">
+                <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin: 0; align-items: center;">
+                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
+                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
+                    <button class="btn" type="submit">Открыть</button>
+                </form>
+                <form method="POST" id="clearDayForm" style="margin: 0;">
+                    <input type="hidden" name="action" value="clear_day">
+                    <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                    <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
+                    <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Очистить день</button>
+                </form>
+            </div>
         </div>
         <?php require __DIR__ . '/../partials/user_menu.php'; ?>
     </div>
@@ -350,38 +358,9 @@ $payday2AssetVersion = '20260417_2400';
     <?php if ($error !== ''): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
     <div class="card">
-        <div class="toolbar toolbar-line" style="margin-bottom: 10px;">
-            <form method="POST" id="posterSyncForm">
-                <input type="hidden" name="action" value="load_poster_checks">
-                <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
-                <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                <button class="btn primary" id="posterSyncBtn" type="submit">Загрузить чеки</button>
-            </form>
-
-            <form method="POST" id="sepaySyncForm">
-                <input type="hidden" name="action" value="reload_sepay_api">
-                <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
-                <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                <button class="btn primary" id="sepaySyncBtn" type="submit">Обновить платежи</button>
-            </form>
+        <div class="toolbar toolbar-line" style="margin-bottom: 10px; display:none;">
             <button class="btn" id="outMailBtn" type="button" style="display:none;">Обновить Платежи Out</button>
             <button class="btn" id="outFinanceBtn" type="button" style="display:none;">Обновить транзакции</button>
-
-            <form method="POST" id="clearDayForm">
-                <input type="hidden" name="action" value="clear_day">
-                <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
-                <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Очистить день</button>
-            </form>
-
-            <div class="toggle-wrap" title="Lite/Full">
-                <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
-                <label class="switch">
-                    <input id="modeToggle" type="checkbox">
-                    <span class="slider"></span>
-                </label>
-                <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
-            </div>
         </div>
 
         <div class="divider"></div>
@@ -436,8 +415,16 @@ $payday2AssetVersion = '20260417_2400';
         <div class="grid" id="tablesRoot">
             <div id="lineLayer"></div>
             <div class="card" style="padding: 0; position: relative;">
-                <div class="table-card-header">
-                    <div>Деньги</div>
+                <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div>Деньги</div>
+                        <form method="POST" id="sepaySyncForm" style="margin: 0;">
+                            <input type="hidden" name="action" value="reload_sepay_api">
+                            <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                            <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
+                            <button class="btn primary" id="sepaySyncBtn" type="submit" style="padding: 4px 8px; font-size: 11px;">Загрузить платежи</button>
+                        </form>
+                    </div>
                     <div class="muted vc-subtitle">
                         <button type="button" class="vc-toggle hidden-toggle" id="toggleSepayHiddenBtn" title="Показать/скрыть скрытые транзакции">👁</button>
                     </div>
@@ -510,6 +497,14 @@ $payday2AssetVersion = '20260417_2400';
             </div>
 
             <div class="mid-col" id="midCol">
+                <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px; transform: scale(0.9); transform-origin: center;">
+                    <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
+                    <label class="switch">
+                        <input id="modeToggle" type="checkbox">
+                        <span class="slider"></span>
+                    </label>
+                    <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
+                </div>
                 <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">🎯</button>
                 <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                 <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
@@ -535,8 +530,16 @@ $payday2AssetVersion = '20260417_2400';
             </div>
 
             <div class="card" style="padding: 0; position: relative;">
-                <div class="table-card-header">
-                    <div>Poster чеки</div>
+                <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div>Poster чеки</div>
+                        <form method="POST" id="posterSyncForm" style="margin: 0;">
+                            <input type="hidden" name="action" value="load_poster_checks">
+                            <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                            <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
+                            <button class="btn primary" id="posterSyncBtn" type="submit" style="padding: 4px 8px; font-size: 11px;">Загрузить чеки</button>
+                        </form>
+                    </div>
                     <div class="muted vc-subtitle">
                         <button type="button" class="vc-toggle" id="toggleVietnamBtn" title="Показать/скрыть Vietnam Company">👁</button>
                     </div>
