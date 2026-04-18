@@ -1192,27 +1192,9 @@ window.initPayday2 = function() {
         };
     };
     if (posterBalancesTelegramBtn) {
-        posterBalancesTelegramBtn.addEventListener('click', async () => {
-            const restore = setBtnBusy(posterBalancesTelegramBtn, { title: 'Telegram', pct: 0 });
-            try {
-                updateBtnBusy(posterBalancesTelegramBtn, { pct: 20, title: 'Telegram' });
-                const payload = collectPosterBalancePayload();
-                updateBtnBusy(posterBalancesTelegramBtn, { pct: 55, title: 'Telegram' });
-                const res = await fetch('?ajax=poster_balances_telegram', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-                const j = await res.json();
-                if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка отправки в Telegram');
-                updateBtnBusy(posterBalancesTelegramBtn, { pct: 100, title: 'Отправлено' });
-                setTimeout(() => alert('Баланс отправлен в Telegram'), 120);
-            } catch (e) {
-                alert(e && e.message ? e.message : 'Ошибка отправки в Telegram');
-            } finally {
-                setTimeout(() => restore(), 200);
-            }
-        });
+        if (typeof window.initPaydayTelegramScreenshot === 'function') {
+            window.initPaydayTelegramScreenshot();
+        }
     }
 
     try {

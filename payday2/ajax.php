@@ -1,4 +1,80 @@
 <?php
+if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    $imgData = $payload['image'] ?? '';
+    
+    if (!$imgData || !preg_match('/^data:image\/(\w+);base64,/', $imgData, $type)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid image format'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $imgData = substr($imgData, strpos($imgData, ',') + 1);
+    $imgData = base64_decode($imgData);
+    if ($imgData === false) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'base64_decode failed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $tmpFile = tempnam(sys_get_temp_dir(), 'bal_') . '.png';
+    file_put_contents($tmpFile, $imgData);
+    
+    $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+    $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
+    $threadId = trim((string)($_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? ''));
+    
+    if ($tgToken === '' || $tgChatId === '') {
+        @unlink($tmpFile);
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Telegram config is missing'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
+    curl_setopt($ch, CURLOPT_POST, true);
+    
+    $postFields = [
+        'chat_id' => $tgChatId,
+        'photo' => new CURLFile($tmpFile, 'image/png', 'balance.png'),
+        'caption' => "Итоговый баланс",
+    ];
+    if ($threadId !== '') {
+        $postFields['message_thread_id'] = $threadId;
+    }
+    
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    $resp = curl_exec($ch);
+    curl_close($ch);
+    @unlink($tmpFile);
+    
+    if ($resp === false) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Telegram request failed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $tgData = json_decode($resp, true);
+    if (!isset($tgData['ok']) || !$tgData['ok']) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Telegram API error: ' . ($tgData['description'] ?? 'Unknown')], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'create_transfer') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_3700';
+$payday2AssetVersion = '20260417_3800';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -326,7 +326,8 @@ $payday2AssetVersion = '20260417_3700';
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
   <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3700">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
-</head>
+   <script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>" defer></script>
+ </head>
 <body>
 <div class="container">
     <div class="top-nav">
