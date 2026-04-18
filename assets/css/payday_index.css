@@ -182,8 +182,8 @@
         
         @media (max-width: 800px) {
             .card { padding: 5px !important; }
-            .table-card-header { padding: 5px !important; }
-            .table-card-header .vc-toggle { top: 5px; right: 5px; }
+            .table-card-header { padding: 5px 34px 5px 5px !important; }
+            .table-card-header .vc-toggle { top: 50%; transform: translateY(-50%); right: 6px; }
             .top-nav { display: grid !important; grid-template-columns: 1fr auto !important; gap: 10px; align-items: center; }
             .nav-left { display: contents !important; }
             .nav-title { grid-column: 1; grid-row: 1; margin-bottom: 0; }
@@ -193,7 +193,7 @@
             .toolbar { grid-column: 1 / -1; grid-row: 4; display: flex; flex-direction: column; gap: 10px; }
             #dateForm { flex-direction: row !important; justify-content: flex-start; align-items: center; gap: 6px !important; flex: 1 1 auto; }
             #clearDayForm { flex: 0 0 auto; }
-            #dateForm input[type="date"] { width: 97px !important; flex: 0 1 auto; min-width: 0; padding: 6px 4px !important; font-size: 11px; }
+            #dateForm input[type="date"] { width: 102px !important; flex: 0 1 auto; min-width: 0; padding: 6px 4px !important; font-size: 11px; }
             #dateForm button, #clearDayBtn { flex: 0 0 auto; padding: 6px 10px !important; }
             .toolbar-line { gap: 4px !important; justify-content: space-between; }
             .toolbar-line .btn { font-size: 10px !important; padding: 6px 6px !important; white-space: nowrap; letter-spacing: -0.2px; }
