@@ -1466,6 +1466,6 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
     <div class="res-hscroll" id="resHScroll" hidden><div class="res-hscroll-inner" id="resHScrollInner"></div></div>
 
     <script src="/assets/user_menu.js?v=20260417_1036"></script>
-    <script src="/reservations/assets/js/reservations.js?v=20260417_1236"></script>
+    <script src="/reservations/assets/js/reservations.js?v=20260418_0001"></script>
 </body>
 </html>

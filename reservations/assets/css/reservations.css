@@ -187,6 +187,41 @@ body.res-hscroll-on { padding-bottom: 18px; }
 .res-modal-actions { display: flex; gap: 12px; }
 .res-modal-actions .res-btn { flex: 1; padding: 12px; }
 
+/* Edit Modal styles */
+.res-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(0,0,0,0.22);
+  color: rgba(255,255,255,0.92);
+  font-size: 14px;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.res-input:focus {
+  border-color: var(--accent);
+  outline: none;
+  background: rgba(0,0,0,0.3);
+}
+.res-modal-grid .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#editResModal .res-modal-card {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+@media (max-width: 600px) {
+  #editResForm {
+    grid-template-columns: 1fr !important;
+  }
+  #editResForm .form-group {
+    grid-column: span 1 !important;
+  }
+}
+
 
 @media (max-width: 720px) {
   .res-page { padding: 12px; overflow-x: hidden; }
