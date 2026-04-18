@@ -2987,7 +2987,7 @@ $fmtVnd = function (int $v): string {
 
     <div class="card">
         <div id="outSection" style="display:none;">
-            <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; position: relative;">
+            <div class="grid" id="outGrid" style="position: relative;">
                 <div id="outLineLayer"></div>
                 <div class="card" style="padding:0; position:relative;">
                     <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
