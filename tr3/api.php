@@ -150,8 +150,15 @@ try {
     $key = 'reservations_allowed_scheme_nums_hall_' . $hallIdForSettings;
     $capsKey = 'reservations_table_caps_hall_' . $hallIdForSettings;
     $soonKey = 'reservations_soon_booking_hours';
-    $vals = $metaRepo->getMany([$key, $soonKey]);
+    $workdayKey = 'reservations_latest_workday';
+    $weekendKey = 'reservations_latest_weekend';
+    $vals = $metaRepo->getMany([$key, $soonKey, $workdayKey, $weekendKey]);
     $stored = array_key_exists($key, $vals) ? trim((string)$vals[$key]) : '';
+    
+    $latestWorkday = array_key_exists($workdayKey, $vals) ? trim((string)$vals[$workdayKey]) : '21:00';
+    $latestWeekend = array_key_exists($weekendKey, $vals) ? trim((string)$vals[$weekendKey]) : '22:00';
+    if ($latestWorkday === '') $latestWorkday = '21:00';
+    if ($latestWeekend === '') $latestWeekend = '22:00';
     if ($stored !== '') {
       $decoded = json_decode($stored, true);
       $tmp = [];
@@ -213,6 +220,8 @@ if ($ajax === 'bootstrap') {
     'allowedTableNums' => $allowedSchemeNums,
     'tableCapsByNum' => $tableCapsByNum,
     'soonBookingHours' => $soonBookingHours,
+    'latestWorkday' => $latestWorkday,
+    'latestWeekend' => $latestWeekend,
     'apiBase' => '/tr3/api.php',
   ], JSON_UNESCAPED_UNICODE);
   exit;
@@ -732,6 +741,29 @@ if ($ajax === 'submit_booking') {
   }
   if (!$startDt) {
     $respondError(400, 'Некорректное время');
+  }
+
+  // Enforce latest booking limits
+  $metaRepo = new \App\Classes\MetaRepository($db);
+  $workdayKey = 'reservations_latest_workday';
+  $weekendKey = 'reservations_latest_weekend';
+  $vals = $metaRepo->getMany([$workdayKey, $weekendKey]);
+  $latestWorkday = array_key_exists($workdayKey, $vals) ? trim((string)$vals[$workdayKey]) : '21:00';
+  $latestWeekend = array_key_exists($weekendKey, $vals) ? trim((string)$vals[$weekendKey]) : '22:00';
+  if ($latestWorkday === '') $latestWorkday = '21:00';
+  if ($latestWeekend === '') $latestWeekend = '22:00';
+
+  $reqDay = (int)$startDt->format('N'); // 1 (Mon) to 7 (Sun)
+  $limitStr = ($reqDay >= 1 && $reqDay <= 4) ? $latestWorkday : $latestWeekend;
+  $limitParts = explode(':', $limitStr);
+  $limitH = (int)($limitParts[0] ?? 21);
+  $limitM = (int)($limitParts[1] ?? 0);
+  
+  $reqH = (int)$startDt->format('H');
+  $reqM = (int)$startDt->format('i');
+  
+  if ($reqH > $limitH || ($reqH === $limitH && $reqM > $limitM)) {
+      $respondError(400, 'Извините, мы скоро закрываемся, забронировать столик на это время уже нельзя.');
   }
 
   $tg = is_array($payload['tg'] ?? null) ? $payload['tg'] : [];

@@ -465,20 +465,31 @@
       return (Number(m[1]) * 60) + Number(m[2]);
     };
 
+    const getLatestTimeLimit = (dateObj) => {
+      const day = dateObj.getDay();
+      const limitStr = (day >= 1 && day <= 4) 
+        ? (window.__TR_CONFIG__.latestWorkday || '21:00') 
+        : (window.__TR_CONFIG__.latestWeekend || '22:00');
+      const [h, m] = limitStr.split(':').map(Number);
+      return { h, m, min: h * 60 + m };
+    };
+
     const getMinSelectableSlot = () => {
       const now = new Date();
       let base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0);
       const m = base.getMinutes();
       const add = (30 - (m % 30)) % 30;
       base.setMinutes(m + add, 0, 0);
-      
+
+      const limit = getLatestTimeLimit(base);
+
       if (base.getHours() < 10) {
         base.setHours(10, 0, 0, 0);
-      } else if (base.getHours() === 21 && base.getMinutes() > 0 || base.getHours() > 21) {
+      } else if (base.getHours() > limit.h || (base.getHours() === limit.h && base.getMinutes() > limit.m)) {
         base.setDate(base.getDate() + 1);
         base.setHours(10, 0, 0, 0);
       }
-      
+
       return { dateVal: isoDate(base), timeVal: pad2(base.getHours()) + ':' + pad2(base.getMinutes()) };
     };
 
@@ -1282,14 +1293,21 @@
         const isToday = datePart === now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
         const nowMin = now.getHours() * 60 + now.getMinutes();
 
+        const mMatch = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        const selDateObj = mMatch ? new Date(Number(mMatch[1]), Number(mMatch[2]) - 1, Number(mMatch[3])) : new Date();
+        const limit = getLatestTimeLimit(selDateObj);
+        const maxH = limit.h;
+        const maxM = limit.m;
+
         let hasSelected = false;
-        for (let h = 10; h <= 21; h++) {
+        for (let h = 10; h <= 23; h++) {
+          if (h > maxH) break;
           for (let m = 0; m < 60; m += 30) {
-            if (h === 21 && m > 0) continue;
-            
+            if (h === maxH && m > maxM) continue;
+
             const slotMin = h * 60 + m;
             if (isToday && slotMin < nowMin) continue;
-            
+
             const val = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
             const opt = document.createElement('option');
             opt.value = val;
@@ -2145,6 +2163,16 @@
       table.addEventListener('click', async () => {
         const id = String(table.dataset.table || '');
         const current = getCurrentRequest();
+
+        // New limit check:
+        const now = new Date();
+        const todayLimit = getLatestTimeLimit(now);
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        if (current && current.dt === isoDate(now) && nowMin > todayLimit.min) {
+            alert('Извините, мы скоро закрываемся, забронировать столик на сегодня уже нельзя, выберите другой день');
+            return;
+        }
+
         if (!current) {
           if (!resDate || !String(resDate.value || '').trim()) {
             setStatus(id);

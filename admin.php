@@ -219,6 +219,8 @@ $resSpotId = max(1, (int)($_GET['spot_id'] ?? 1));
 $resMetaKey = 'reservations_allowed_scheme_nums_hall_' . $resHallId;
 $resCapsMetaKey = 'reservations_table_caps_hall_' . $resHallId;
 $resSoonKey = 'reservations_soon_booking_hours';
+$resWorkdayKey = 'reservations_latest_workday';
+$resWeekendKey = 'reservations_latest_weekend';
 $resAllowedNums = [];
 $resCapsByNum = [];
 $resTables = [];
@@ -226,17 +228,38 @@ $resTables = [];
 if ($tab === 'reservations') {
     $metaRepo = new \App\Classes\MetaRepository($db);
     $resSoonHours = 2;
+    $resLatestWorkday = '21:00';
+    $resLatestWeekend = '22:00';
+    
     if (isset($_POST['save_reservation_soon_hours'])) {
         $h = (int)($_POST['soon_hours'] ?? 2);
         if ($h < 0) $h = 0;
         if ($h > 24) $h = 24;
+        
+        $wDay = trim((string)($_POST['latest_workday'] ?? '21:00'));
+        $wEnd = trim((string)($_POST['latest_weekend'] ?? '22:00'));
+        if (!preg_match('/^\d{1,2}:\d{2}$/', $wDay)) $wDay = '21:00';
+        if (!preg_match('/^\d{1,2}:\d{2}$/', $wEnd)) $wEnd = '22:00';
+
         $db->query(
             "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
              ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
             [$resSoonKey, (string)$h]
         );
-        $message = 'Запас часов сохранён.';
+        $db->query(
+            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+            [$resWorkdayKey, $wDay]
+        );
+        $db->query(
+            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+            [$resWeekendKey, $wEnd]
+        );
+        $message = 'Настройки времени и запаса часов сохранены.';
         $resSoonHours = $h;
+        $resLatestWorkday = $wDay;
+        $resLatestWeekend = $wEnd;
     }
     $defaultCaps = [
         '1' => 8, '2' => 8, '3' => 8,
@@ -303,7 +326,7 @@ if ($tab === 'reservations') {
         $resCapsMetaKey = $resCapsMetaKeyPost;
     }
 
-    $saved = $metaRepo->getMany([$resMetaKey, $resCapsMetaKey, $resSoonKey]);
+    $saved = $metaRepo->getMany([$resMetaKey, $resCapsMetaKey, $resSoonKey, $resWorkdayKey, $resWeekendKey]);
     $stored = array_key_exists($resMetaKey, $saved) ? trim((string)$saved[$resMetaKey]) : '';
     if ($stored !== '') {
         $decoded = json_decode($stored, true);
@@ -342,6 +365,13 @@ if ($tab === 'reservations') {
     $soonStored = array_key_exists($resSoonKey, $saved) ? trim((string)$saved[$resSoonKey]) : '';
     if ($soonStored !== '' && is_numeric($soonStored)) {
         $resSoonHours = max(0, min(24, (int)$soonStored));
+    }
+    
+    if (!isset($_POST['save_reservation_soon_hours'])) {
+        $resLatestWorkday = array_key_exists($resWorkdayKey, $saved) ? trim((string)$saved[$resWorkdayKey]) : '21:00';
+        $resLatestWeekend = array_key_exists($resWeekendKey, $saved) ? trim((string)$saved[$resWeekendKey]) : '22:00';
+        if ($resLatestWorkday === '') $resLatestWorkday = '21:00';
+        if ($resLatestWeekend === '') $resLatestWeekend = '22:00';
     }
 
     if ($posterToken === '') {
@@ -1492,11 +1522,19 @@ if ($tab === 'menu' || $tab === 'categories') {
                     Здесь выбираются номера столов, которые доступны для бронирования в публичной форме.
                 </div>
 
-                <form method="post" action="admin.php?tab=reservations&hall_id=<?= (int)$resHallId ?>&spot_id=<?= (int)$resSpotId ?>" style="display:flex; gap: 12px; align-items:flex-end; margin-bottom: 12px;">
+                <form method="post" action="admin.php?tab=reservations&hall_id=<?= (int)$resHallId ?>&spot_id=<?= (int)$resSpotId ?>" style="display:flex; gap: 12px; align-items:flex-end; margin-bottom: 12px; flex-wrap: wrap;">
                     <input type="hidden" name="save_reservation_soon_hours" value="1">
                     <label style="display:grid; gap:6px;">
                         <div class="small-muted">Запас часов</div>
                         <input type="number" name="soon_hours" value="<?= (int)$resSoonHours ?>" min="0" max="24" step="1" style="width: 120px; padding: 8px 10px; border-radius: 10px; border: 1px solid #e5e7eb;">
+                    </label>
+                    <label style="display:grid; gap:6px;">
+                        <div class="small-muted">Поздняя бронь (Пн-Чт)</div>
+                        <input type="time" name="latest_workday" value="<?= htmlspecialchars($resLatestWorkday) ?>" style="width: 150px; padding: 8px 10px; border-radius: 10px; border: 1px solid #e5e7eb;">
+                    </label>
+                    <label style="display:grid; gap:6px;">
+                        <div class="small-muted">Поздняя бронь (Пт-Вс)</div>
+                        <input type="time" name="latest_weekend" value="<?= htmlspecialchars($resLatestWeekend) ?>" style="width: 150px; padding: 8px 10px; border-radius: 10px; border: 1px solid #e5e7eb;">
                     </label>
                     <button type="submit" class="pill ok" style="border:0; cursor:pointer;">Сохранить</button>
                 </form>
