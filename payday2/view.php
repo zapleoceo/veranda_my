@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_3100';
+$payday2AssetVersion = '20260417_3200';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,7 +324,7 @@ $payday2AssetVersion = '20260417_3100';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3100">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3200">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
 </head>
 <body>
@@ -840,10 +840,17 @@ $payday2AssetVersion = '20260417_3100';
         </div>
         <div class="card card-balances">
             <div style="display:flex; justify-content:flex-start; align-items:center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
-                <div style="font-weight: 900;">Обновляем Балансы Poster</div>
+                <div style="font-weight: 900;">Итоговый баланс</div>
                 <div style="display:flex; gap: 8px; align-items:center;">
                     <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
-                    <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" style="padding: 4px 10px;">🔄</button>
+                    <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" style="padding: 4px 10px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                            <path d="M21 2v6h-6"></path>
+                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                            <path d="M3 22v-6h6"></path>
+                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                        </svg>
+                    </button>
                     <button class="btn tiny" id="posterBalancesTelegramBtn" type="button" title="Отправить в Telegram" style="padding: 4px 10px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="#0088cc" style="vertical-align: middle; margin-top: -2px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.42.91-4.01 2.66-.38.26-.72.39-1.03.38-.34-.01-1-.19-1.48-.35-.59-.19-1.05-.29-1.01-.61.02-.17.29-.35.81-.54 3.17-1.38 5.28-2.29 6.33-2.73 3.01-1.26 3.63-1.48 4.04-1.48.09 0 .29.02.4.11.09.07.12.16.13.25.01.12.02.26.01.37z"/></svg></button>
                 </div>
             </div>
