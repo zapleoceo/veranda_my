@@ -157,7 +157,7 @@
         .bal-grid table { width:100%; border-collapse: collapse; white-space: nowrap; }
         .bal-grid th, .bal-grid td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 12px; }
         .bal-grid th { background: transparent; text-transform:none; letter-spacing: 0; }
-        .bal-grid input { width: 90px; min-width: 90px; max-width: 100%; padding: 4px; border: 1px solid var(--border); border-radius: 10px; font-weight: 900; font-size: 12px; background: transparent; color: var(--text); }
+        .bal-grid input, .bal-grid .fake-input { display: inline-flex; align-items: center; justify-content: flex-start; height: 24px; line-height: 1; width: 90px; min-width: 90px; max-width: 100%; padding: 0 4px; border: 1px solid var(--border); border-radius: 10px; font-weight: 900; font-size: 12px; background: transparent; color: var(--text); box-sizing: border-box; margin: 0; }
         .bal-diff-pos { color: #81c784; font-weight: 900; }
         .bal-diff-neg { color: #ef5350; font-weight: 900; }
         body.mode-lite .col-sepay-content { display: none; }
@@ -206,13 +206,13 @@
             
             .bal-grid table { width: auto !important; margin: 0 auto; }
             .bal-grid th, .bal-grid td { padding: 4px 6px !important; font-size: 11px !important; }
-            .bal-grid input { width: 85px !important; min-width: 85px !important; padding: 4px !important; font-size: 11px !important; box-sizing: border-box; }
+            .bal-grid input, .bal-grid .fake-input { width: 85px !important; min-width: 85px !important; height: 20px !important; padding: 0 4px !important; font-size: 11px !important; }
         }
 
         .telegram-capture.card { padding: 5px !important; }
         .telegram-capture .bal-grid table { width: auto !important; margin: 0 auto; }
         .telegram-capture .bal-grid th, .telegram-capture .bal-grid td { padding: 4px 6px !important; font-size: 11px !important; }
-        .telegram-capture .bal-grid input { width: 85px !important; min-width: 85px !important; padding: 4px !important; font-size: 11px !important; box-sizing: border-box; }
+        .telegram-capture .bal-grid input, .telegram-capture .bal-grid .fake-input { width: 85px !important; min-width: 85px !important; height: 20px !important; padding: 0 4px !important; font-size: 11px !important; }
 
         body.mode-lite #outSepayTable .col-out-content { display: none; }
         body.mode-lite #outPosterTable .col-out-user,

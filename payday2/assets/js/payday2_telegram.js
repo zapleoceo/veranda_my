@@ -47,6 +47,17 @@ window.initPaydayTelegramScreenshot = function() {
 
             if (typeof updateBtnBusy === 'function') updateBtnBusy(btn, { pct: 40, title: 'Скриншот...' });
 
+            // Replace inputs with visually identical divs to avoid html2canvas input text shifting bugs
+            const inputs = Array.from(container.querySelectorAll('input'));
+            const replacements = inputs.map(inp => {
+                const fake = document.createElement('div');
+                fake.className = inp.className + ' fake-input';
+                fake.textContent = inp.value;
+                inp.parentNode.insertBefore(fake, inp);
+                inp.style.display = 'none';
+                return { inp, fake };
+            });
+
             // Wait a tick for layout recalculation
             await new Promise(r => setTimeout(r, 100));
 
@@ -54,6 +65,12 @@ window.initPaydayTelegramScreenshot = function() {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: getComputedStyle(document.body).backgroundColor || '#1f2937'
+            });
+
+            // Revert fake inputs back to real inputs
+            replacements.forEach(r => {
+                r.fake.remove();
+                r.inp.style.display = '';
             });
 
             // Restore original styles immediately after snapshot
