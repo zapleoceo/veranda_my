@@ -121,6 +121,17 @@
         .bottom-two > .card.card-finance { flex: 0.7 1 360px; min-width: 0; }
         .bottom-two > .card.card-balances { flex: 1 1 560px; min-width: 0; }
         .btn.tiny { padding: 6px 10px; border-radius: 10px; font-weight: 900; font-size: 11px; }
+        .btn.btn-sm-orange {
+            padding: 4px 8px;
+            font-size: 10px;
+            white-space: nowrap;
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fffaf4;
+            border-radius: 8px;
+            line-height: 1.2;
+            height: auto;
+        }
         .bal-grid { width: 100%; border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; overflow-y: hidden; background: var(--card); }
         .bal-grid table { width:100%; border-collapse: collapse; white-space: nowrap; }
         .bal-grid th, .bal-grid td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 12px; }

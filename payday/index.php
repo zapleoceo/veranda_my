@@ -2945,7 +2945,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_0200">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2200">
 </head>
 <body>
 <div class="container">
@@ -3372,7 +3372,7 @@ $fmtVnd = function (int $v): string {
                     <div style="display:flex; align-items:center; gap: 10px;">
                         <div style="font-weight:900; white-space:nowrap;">Vietnam Company</div>
                         <div style="flex:1; text-align:center; font-weight:900;"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
-                        <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
+                        <button class="btn btn-sm-orange" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
                     </div>
                     <div class="muted finance-status" style="margin-top: 6px;">
                         <?php if ($vietnamExists): ?>
@@ -3431,7 +3431,7 @@ $fmtVnd = function (int $v): string {
                     <div style="display:flex; align-items:center; gap: 10px;">
                         <div style="font-weight:900; white-space:nowrap;">Tips</div>
                         <div style="flex:1; text-align:center; font-weight:900;"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
-                        <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
+                        <button class="btn btn-sm-orange" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
                     </div>
                     <div class="muted finance-status" style="margin-top: 6px;">
                         <?php if ($tipsExists): ?>
