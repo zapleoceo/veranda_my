@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_5100';
+$payday2AssetVersion = '20260417_5200';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,7 +324,7 @@ $payday2AssetVersion = '20260417_5100';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_5100">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_5200">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
  </head>
 <body>
@@ -504,10 +504,10 @@ $payday2AssetVersion = '20260417_5100';
                         </tbody>
                     </table>
                 </div>
-                <div class="muted" style="padding: 10px 12px; font-weight: 900;">
-                    Итого: <span id="sepayTotal"><?= htmlspecialchars($fmtVnd((int)$sepayTotalVnd)) ?></span>
-                    • связанные: <span id="sepayLinked">—</span>
-                    • несвязанные: <span id="sepayUnlinked">—</span>
+                <div class="muted table-footer-stats">
+                    <span>Итого: <span id="sepayTotal"><?= htmlspecialchars($fmtVnd((int)$sepayTotalVnd)) ?></span></span>
+                    <span>• связанные: <span id="sepayLinked">—</span></span>
+                    <span>• несвязанные: <span id="sepayUnlinked">—</span></span>
                 </div>
             </div>
 
@@ -653,13 +653,13 @@ $payday2AssetVersion = '20260417_5100';
                         </tbody>
                     </table>
                 </div>
-                <div class="muted" style="padding: 10px 12px; font-weight: 900;">
-                    Итого: <span id="posterTotal"><?= htmlspecialchars($fmtVnd((int)$posterTotalVnd)) ?></span>
-                    • Tips: <span id="posterTipsLinked">—</span>
-                    • в таблице связи: <span id="posterLinked">—</span>
-                    • несвязи: <span id="posterUnlinked">—</span>
-                    • BB: <span><?= htmlspecialchars($fmtVnd((int)$posterBybitVnd)) ?></span>
-                    • VC: <span><?= htmlspecialchars($fmtVnd((int)$posterVietVnd)) ?></span>
+                <div class="muted table-footer-stats">
+                    <span>Итого: <span id="posterTotal"><?= htmlspecialchars($fmtVnd((int)$posterTotalVnd)) ?></span></span>
+                    <span>• Tips: <span id="posterTipsLinked">—</span></span>
+                    <span>• в таблице связи: <span id="posterLinked">—</span></span>
+                    <span>• несвязи: <span id="posterUnlinked">—</span></span>
+                    <span>• BB: <span><?= htmlspecialchars($fmtVnd((int)$posterBybitVnd)) ?></span></span>
+                    <span>• VC: <span><?= htmlspecialchars($fmtVnd((int)$posterVietVnd)) ?></span></span>
                 </div>
             </div>
         </div>

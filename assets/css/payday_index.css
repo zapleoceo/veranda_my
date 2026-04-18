@@ -84,6 +84,7 @@
         tr.row-hidden .col-sepay-content { font-weight: 900; }
         tr.row-selected { outline: 2px solid #1a73e8; outline-offset: -2px; }
         .muted { color: var(--muted); font-size: 12px; }
+        .table-footer-stats { padding: 10px 12px; font-weight: 900; display: flex; flex-wrap: wrap; gap: 4px 8px; }
         .sum,
         .col-sepay-sum,
         .col-poster-card,
@@ -146,8 +147,8 @@
         }
         .bottom-two { display:flex; gap: 12px; align-items:flex-start; flex-wrap: wrap; }
         .bottom-two > .card { flex: 1 1 420px; min-width: 0; }
-        .bottom-two > .card.card-finance { flex: 0.7 1 360px; min-width: 0; }
-        .bottom-two > .card.card-balances { flex: 1 1 560px; min-width: 0; }
+        .bottom-two > .card.card-finance { flex: 1 1 360px; min-width: 0; }
+        .bottom-two > .card.card-balances { flex: 1.4 1 560px; min-width: 0; }
         .btn.tiny { padding: 6px 10px; border-radius: 10px; font-weight: 900; font-size: 11px; }
         .btn.btn-sm-orange {
             padding: 4px 8px;
