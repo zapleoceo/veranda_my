@@ -1,0 +1,12 @@
+.res-modal-card-wide {
+    max-width: 800px !important;
+}
+
+.res-modal-grid-2col {
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.form-group-span-2 {
+    grid-column: span 2;
+}

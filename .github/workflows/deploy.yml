@@ -59,4 +59,4 @@ jobs:
         run: |
           ssh -p "${{ secrets.SSH_PORT }}" -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "cd '${{ secrets.DEPLOY_PATH }}' && php -l index.php && php -l login.php && php -l logout.php && php -l auth_callback.php && php -l dashboard.php && php -l rawdata.php && php -l rawdata_receipts_chunk.php && php -l kitchen_online.php && php -l admin.php && php -l logs.php && php -l cron.php && php -l telegram_alerts.php && php -l march.php && php -l roma.php && php -l banya.php && php -l employees.php"
+            "cd '${{ secrets.DEPLOY_PATH }}' && php -l index.php && php -l login.php && php -l logout.php && php -l auth_callback.php && php -l dashboard.php && php -l rawdata.php && php -l rawdata_receipts_chunk.php && php -l kitchen_online.php && php -l admin.php && php -l logs.php && php -l cron.php && php -l telegram_alerts.php && php -l march.php && php -l roma/index.php && php -l banya/index.php && php -l employees/index.php && php -l reservations/index.php"

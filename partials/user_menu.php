@@ -41,10 +41,10 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
                 </details>
             <?php endif; ?>
 
-            <?php if ($canBanya): ?><a class="ud-link ud-l1" href="/banya.php">Баня</a><?php endif; ?>
-            <?php if ($canRoma): ?><a class="ud-link ud-l1" href="/roma.php">Кальяны</a><?php endif; ?>
+            <?php if ($canBanya): ?><a class="ud-link ud-l1" href="/banya">Баня</a><?php endif; ?>
+            <?php if ($canRoma): ?><a class="ud-link ud-l1" href="/roma">Кальяны</a><?php endif; ?>
             <?php if ($canReservations): ?><a class="ud-link ud-l1" href="/reservations">Брони</a><?php endif; ?>
-            <?php if ($canEmployees): ?><a class="ud-link ud-l1" href="/employees.php">ЗП сотрудников</a><?php endif; ?>
+            <?php if ($canEmployees): ?><a class="ud-link ud-l1" href="/employees">ЗП сотрудников</a><?php endif; ?>
 
             <div class="ud-sep"></div>
         <?php endif; ?>

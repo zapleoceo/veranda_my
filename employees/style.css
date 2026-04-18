@@ -1,0 +1,15 @@
+.emp-style-0 { width: 20px; height: 20px; }
+.emp-style-1 { display:none; }
+.emp-style-2 { text-align:right; cursor:pointer; }
+.emp-style-3 { margin-top: 5px; font-size: 12px; font-weight: 800; }
+.emp-style-4 { margin-bottom: 10px; }
+.emp-style-5 { margin: 14px 0 8px; font-weight: 900; }
+.emp-style-6 { margin-bottom: 8px; }
+.emp-style-7 { display:flex; gap: 5px; align-items:center; flex-wrap: wrap; margin-top: 5px; }
+.emp-style-8 { display:flex; gap: 5px; align-items:center; flex-wrap: wrap; }
+.emp-style-9 { margin-top: 5px; }
+.emp-style-10 { align-self: flex-end; width: 0; min-width: 100%; text-align: right; margin-top: 5px; font-weight: 900; line-height: 1.4; white-space: normal; word-break: break-word; }
+.emp-style-11 { text-align:right; }
+.emp-style-12 { cursor:pointer; }
+.emp-style-13 { display: inline-flex; flex-direction: column; }
+.emp-style-14 { display:flex; align-items:center; gap: 5px; margin: 0; }

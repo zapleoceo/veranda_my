@@ -9,7 +9,19 @@ RewriteRule ^payday2/?$ payday2/index.php [L,QSA]
 RewriteRule ^tr3/?$ tr3/index.php [L,QSA]
 RewriteRule ^tr3/api/?$ tr3/api.php [L,QSA]
 RewriteRule ^TableReservation/?$ TableReservation.php [L,QSA]
+
+# Redirects from old .php paths to new folders
+RewriteRule ^banya\.php$ /banya [R=301,L]
+RewriteRule ^roma\.php$ /roma [R=301,L]
+RewriteRule ^employees\.php$ /employees [R=301,L]
+RewriteRule ^reservations\.php$ /reservations [R=301,L]
+
+# Routes for new folders
+RewriteRule ^banya/?$ banya/index.php [L,QSA]
+RewriteRule ^roma/?$ roma/index.php [L,QSA]
+RewriteRule ^employees/?$ employees/index.php [L,QSA]
 RewriteRule ^reservations/?$ reservations/index.php [L,QSA]
+
 RewriteRule ^neworder/?$ neworder/index.php [L,QSA]
 RewriteRule ^neworder/api/?$ neworder/api.php [L,QSA]
 
