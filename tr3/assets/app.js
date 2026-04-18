@@ -1515,6 +1515,7 @@
       if (!isPhoneValid(phone)) {
         if (reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
         showSubmitHint();
+        if (phone) showReqToast(t('phone_invalid') || 'Некорректный номер телефона');
         return;
       }
 
@@ -1611,8 +1612,9 @@
       const name = reqName ? String(reqName.value || '').trim() : '';
       const phone = getPhoneE164();
       if (!isPhoneValid(phone)) {
-        if (reqPhone) reqPhone.focus();
+        if (reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
         showSubmitHint();
+        if (phone) showReqToast(t('phone_invalid') || 'Некорректный номер телефона');
         return;
       }
       const comment = reqComment ? String(reqComment.value || '').trim() : '';
@@ -1802,20 +1804,25 @@
           const linked = !!(messengerLinked.telegram || messengerLinked.whatsapp || messengerLinked.zalo);
 
           const invalidPhone = !!phone && !isPhoneValid(phone);
-          const missingName = !name;
-          const missingMsgr = !linked;
-          const missingPhone = !phone || invalidPhone;
+        const missingName = !name;
+        const missingMsgr = !linked;
+        const missingPhone = !phone || invalidPhone;
 
-          if (missingName && reqName) warnPlaceholder(reqName);
-          if (missingPhone && reqPhone) warnPlaceholder(reqPhone);
-          if (missingMsgr) { setMsgrHint(t('msgr_required')); warnMsgrHint(); }
-
-          if (missingName || missingMsgr || missingPhone) {
-            if (missingName && reqName) reqName.focus();
-            else if (missingPhone && reqPhone) reqPhone.focus();
-            syncSubmitState();
-            return;
+        if (missingName && reqName) warnPlaceholder(reqName);
+        if (missingPhone && reqPhone) {
+          warnPlaceholder(reqPhone);
+          if (invalidPhone) {
+            showReqToast(t('phone_invalid') || 'Некорректный номер телефона');
           }
+        }
+        if (missingMsgr) { setMsgrHint(t('msgr_required')); warnMsgrHint(); }
+
+        if (missingName || missingMsgr || missingPhone) {
+          if (missingName && reqName) reqName.focus();
+          else if (missingPhone && reqPhone) reqPhone.focus();
+          syncSubmitState();
+          return;
+        }
 
           if (pendingBooking && pendingBooking.start && reqStart && reqStart.value) {
             const dPart = String(pendingBooking.start).slice(0, 10);

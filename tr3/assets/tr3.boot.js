@@ -28,7 +28,7 @@
         soonBookingHours: j.soonBookingHours,
         apiBase: j.apiBase,
       };
-      return loadScript('/tr3/assets/app.js?v=20260417_1000');
+      return loadScript('/tr3/assets/app.js?v=20260417_1005');
     })
     .catch((e) => {
       const msg = document.createElement('div');
