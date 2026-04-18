@@ -96,7 +96,7 @@ window.initPaydayTelegramScreenshot = function() {
             if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка отправки в Telegram');
 
             if (typeof updateBtnBusy === 'function') updateBtnBusy(btn, { pct: 100, title: 'Отправлено' });
-            setTimeout(() => alert('Скриншот итогового баланса успешно отправлен в Telegram!'), 100);
+            setTimeout(() => alert('Скриншот итогового баланса успешно отправлен в Telegram группу "Старшие и отчёты"!'), 100);
         } catch (e) {
             alert(e && e.message ? e.message : 'Ошибка отправки в Telegram');
         } finally {
