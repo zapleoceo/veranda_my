@@ -157,7 +157,7 @@
         .bal-grid table { width:100%; border-collapse: collapse; white-space: nowrap; }
         .bal-grid th, .bal-grid td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 12px; }
         .bal-grid th { background: transparent; text-transform:none; letter-spacing: 0; }
-        .bal-grid input { width: 90px; min-width: 90px; max-width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 10px; font-weight: 900; font-size: 12px; background: transparent; color: var(--text); }
+        .bal-grid input { width: 90px; min-width: 90px; max-width: 100%; padding: 4px; border: 1px solid var(--border); border-radius: 10px; font-weight: 900; font-size: 12px; background: transparent; color: var(--text); }
         .bal-diff-pos { color: #81c784; font-weight: 900; }
         .bal-diff-neg { color: #ef5350; font-weight: 900; }
         body.mode-lite .col-sepay-content { display: none; }
