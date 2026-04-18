@@ -1984,10 +1984,6 @@
       const now = new Date();
       const nowMin = now.getHours() * 60 + now.getMinutes();
 
-      if (isToday && ps && ps.selMin < nowMin) {
-         return { reason: t('time_passed') || 'Время уже прошло', detail: '' };
-      }
-
       if (isToday && soonBookingNums && soonBookingNums.has(String(tableNum))) {
         const nextStart = soonBookingNextByTable ? Number(soonBookingNextByTable[String(tableNum)]) : NaN;
         if (isFinite(nextStart) && (nextStart - nowMin) <= SOON_BOOK_MIN && ps && ps.selMin < nextStart) {
