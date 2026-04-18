@@ -1,4 +1,87 @@
 <?php
+require_once __DIR__ . '/../auth_check.php';
+
+if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    $imgData = $payload['image'] ?? '';
+    
+    if (!$imgData || !preg_match('/^data:image\/(\w+);base64,/', $imgData, $type)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid image format'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $imgData = substr($imgData, strpos($imgData, ',') + 1);
+    $imgData = base64_decode($imgData);
+    if ($imgData === false) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'base64_decode failed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $tmpFile = tempnam(sys_get_temp_dir(), 'bal_');
+    file_put_contents($tmpFile, $imgData);
+
+    $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+    $tgChatId = '-1003889942420'; // From https://t.me/c/3889942420/1736
+    $threadId = '1736'; // From https://t.me/c/3889942420/1736
+
+    file_put_contents(__DIR__ . '/telegram_debug.log', "Token length: " . strlen($tgToken) . " Chat ID: $tgChatId Thread: $threadId\n", FILE_APPEND);
+
+    if ($tgToken === '' || $tgChatId === '') {
+        @unlink($tmpFile);
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Telegram config is missing (Token or Chat ID empty)'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendPhoto");
+    curl_setopt($ch, CURLOPT_POST, true);
+
+    $postFields = [
+        'chat_id' => $tgChatId,
+        'photo' => new CURLFile($tmpFile, 'image/png', 'balance.png'),
+        'caption' => "Итоговый баланс",
+    ];
+    if ($threadId !== '') {
+        $postFields['message_thread_id'] = $threadId;
+    }
+
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    $resp = curl_exec($ch);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+    @unlink($tmpFile);
+
+    file_put_contents(__DIR__ . '/telegram_debug.log', "cURL Error: $curlErr\nResp: $resp\n", FILE_APPEND);
+    
+    if ($resp === false) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Telegram request failed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $tgData = json_decode($resp, true);
+    if (!isset($tgData['ok']) || !$tgData['ok']) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Telegram API error: ' . ($tgData['description'] ?? 'Unknown')], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'create_transfer') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -89,11 +172,25 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             $txs = $api->request('finance.getTransactions', [
                 'dateFrom' => date('Ymd', $startTs),
                 'dateTo' => date('Ymd', $endTs),
-            
+                'account_id' => $accountTo,
+                'type' => 1,
                 'timezone' => 'client',
             ]);
         } catch (\Throwable $e) {
             $txs = [];
+        }
+        if (!is_array($txs) || count($txs) === 0) {
+            try {
+                $txs = $api->request('finance.getTransactions', [
+                    'dateFrom' => date('dmY', $startTs),
+                    'dateTo' => date('dmY', $endTs),
+                    'account_id' => $accountTo,
+                    'type' => 1,
+                    'timezone' => 'client',
+                ]);
+            } catch (\Throwable $e) {
+                $txs = [];
+            }
         }
         if (!is_array($txs)) $txs = [];
 
@@ -171,12 +268,8 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
 
             $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
             $cmtNorm = $normText($cmt);
-            if ($cmtNorm === '' || mb_stripos($cmtNorm, $normText($commentBase), 0, 'UTF-8') === false) continue;
-
-            $isMatch = false;
-            if ($isTransfer && $accFromId === 1 && $accToId === $accountTo) $isMatch = true;
-            if ($isOut && $accFromId === 1 && $accToId === $accountTo) $isMatch = true;
-            if ($isIn && $accToId === $accountTo) $isMatch = true;
+            // Any type=1 transaction on the target account with the exact amount is a match
+            $isMatch = true;
             if (!$isMatch) continue;
 
             $uRaw = $row['user_id'] ?? $row['userId'] ?? $row['user'] ?? $row['employee_id'] ?? null;
@@ -217,16 +310,12 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         }
 
         $api->request('finance.createTransactions', [
-            'type' => 2,
+            'type' => 1,
             'user_id' => $expectedUserId,
-            'account_from' => 1,
-            'account_to' => $accountTo,
-            'amount_from' => $amountVnd,
-            'amount_to' => $amountVnd,
+            'account_id' => $accountTo,
+            'amount' => $amountVnd,
             'date' => $targetDate,
             'comment' => $comment,
-            'account_id' => 1,
-            'account_to_id' => $accountTo,
             'sum' => $amountVnd,
         ], 'POST');
 
@@ -280,12 +369,15 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
             throw new \Exception('Bad date');
         }
 
-        $rows = [];
+                $rows = [];
+        $accTarget = $kind === 'vietnam' ? 9 : 8;
+
         try {
             $rows = $api->request('finance.getTransactions', [
-                // `dmY` is the format used by the stable payday implementation.
-                'dateFrom' => date('dmY', $startTs),
-                'dateTo' => date('dmY', $endTs),
+                'dateFrom' => date('Ymd', $startTs),
+                'dateTo' => date('Ymd', $endTs),
+                'account_id' => $accTarget,
+                'type' => 1,
                 'timezone' => 'client',
             ]);
         } catch (\Throwable $e) {
@@ -294,8 +386,10 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         if (!is_array($rows) || count($rows) === 0) {
             try {
                 $rows = $api->request('finance.getTransactions', [
-                    'dateFrom' => date('Ymd', $startTs),
-                    'dateTo' => date('Ymd', $endTs),
+                    'dateFrom' => date('dmY', $startTs),
+                    'dateTo' => date('dmY', $endTs),
+                    'account_id' => $accTarget,
+                    'type' => 1,
                     'timezone' => 'client',
                 ]);
             } catch (\Throwable $e) {
@@ -331,7 +425,6 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         $out = [];
         foreach ($rows as $row) {
             if (!is_array($row)) continue;
-            if (((int)($row['status'] ?? 0)) === 3) continue;
             
             $tRaw = (string)($row['type'] ?? '');
             $isTransfer = ($tRaw === '2');
@@ -385,8 +478,11 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
 
             $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
             $cmtNorm = $normText($cmt);
-            $isVietnam = $accId === 9 && mb_stripos($cmtNorm, 'вьетна', 0, 'UTF-8') !== false;
-            $isTips = $accId === 8 && (mb_stripos($cmtNorm, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmtNorm, 'tips', 0, 'UTF-8') !== false);
+            
+            // We explicitly requested type=1 for the target account, so any returned transaction matches the kind
+            $isVietnam = ($kind === 'vietnam' && $accId === 9);
+            $isTips = ($kind === 'tips' && $accId === 8);
+            
             if ($kind === 'vietnam' && !$isVietnam) continue;
             if ($kind === 'tips' && !$isTips) continue;
             $sumRaw = $row['amount'] ?? $row['amount_to'] ?? $row['amount_from'] ?? $row['sum'] ?? 0;
@@ -1463,109 +1559,6 @@ if (($_GET['ajax'] ?? '') === 'poster_accounts') {
             'balance_cash_cents' => $cash,
             'balance_total' => $fmtVndCents($total),
             'balance_total_cents' => $total,
-        ], JSON_UNESCAPED_UNICODE);
-    } catch (\Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-    }
-    exit;
-}
-
-if (($_GET['ajax'] ?? '') === 'poster_balances_telegram') {
-    header('Content-Type: application/json; charset=utf-8');
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
-        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    try {
-        $raw = file_get_contents('php://input');
-        $j = json_decode($raw ?: '[]', true);
-        if (!is_array($j)) $j = [];
-
-        $dateFromPayload = trim((string)($j['dateFrom'] ?? $dateFrom ?? ''));
-        $dateToPayload = trim((string)($j['dateTo'] ?? $dateTo ?? ''));
-        $summaryRows = is_array($j['summaryRows'] ?? null) ? $j['summaryRows'] : [];
-        $accountsRows = is_array($j['accountsRows'] ?? null) ? $j['accountsRows'] : [];
-
-        $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
-        $tgChatId = trim((string)($_ENV['PAYDAY_BALANCE_TELEGRAM_CHAT_ID'] ?? '3889942420'));
-        $tgThreadId = trim((string)($_ENV['PAYDAY_BALANCE_TELEGRAM_THREAD_ID'] ?? ''));
-        $tgReplyTo = trim((string)($_ENV['PAYDAY_BALANCE_TELEGRAM_REPLY_TO'] ?? ''));
-        $tgThreadNum = ($tgThreadId !== '' && ctype_digit($tgThreadId)) ? (int)$tgThreadId : null;
-        $tgReplyToNum = ($tgReplyTo !== '' && ctype_digit($tgReplyTo)) ? (int)$tgReplyTo : null;
-
-        if ($tgToken === '' || $tgChatId === '') {
-            http_response_code(500);
-            echo json_encode(['ok' => false, 'error' => 'Telegram not configured'], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-
-        $safe = function ($v): string {
-            return htmlspecialchars(trim((string)$v), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        };
-        $truncate = function (string $s, int $max): string {
-            $txt = trim($s);
-            if (function_exists('mb_strwidth') && function_exists('mb_strimwidth')) {
-                return mb_strwidth($txt, 'UTF-8') > $max ? rtrim(mb_strimwidth($txt, 0, $max - 1, '', 'UTF-8')) . '…' : $txt;
-            }
-            return strlen($txt) > $max ? (substr($txt, 0, max(0, $max - 1)) . '…') : $txt;
-        };
-
-        $periodLabel = ($dateFromPayload !== '' && $dateToPayload !== '' && $dateFromPayload !== $dateToPayload)
-            ? ($dateFromPayload . ' — ' . $dateToPayload)
-            : ($dateToPayload !== '' ? $dateToPayload : $dateFromPayload);
-        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
-
-        $maxAccounts = 25;
-        $lines = [];
-        $lines[] = '<b>Payday2 • Балансы Poster</b>';
-        if ($periodLabel !== '') $lines[] = 'Период: <b>' . $safe($periodLabel) . '</b>';
-        if ($by !== '') $lines[] = 'Отправил: <b>' . $safe($by) . '</b>';
-
-        $lines[] = '';
-        $lines[] = '<b>Сводка</b>';
-        foreach ($summaryRows as $row) {
-            if (!is_array($row)) continue;
-            $label = $truncate((string)($row['label'] ?? ''), 40);
-            $poster = $truncate((string)($row['poster'] ?? '—'), 24);
-            $fact = $truncate((string)($row['actual'] ?? '—'), 24);
-            $diff = $truncate((string)($row['diff'] ?? '—'), 24);
-            $lines[] = '• <b>' . $safe($label) . '</b>'
-                . '  Poster: <code>' . $safe($poster) . '</code>'
-                . '  Факт: <code>' . $safe($fact) . '</code>'
-                . '  Δ: <code>' . $safe($diff) . '</code>';
-        }
-
-        $lines[] = '';
-        $lines[] = '<b>Счета Poster</b>';
-        $countAccounts = 0;
-        foreach ($accountsRows as $row) {
-            if (!is_array($row)) continue;
-            if ($countAccounts >= $maxAccounts) break;
-            $id = $truncate((string)($row['id'] ?? ''), 8);
-            $name = $truncate((string)($row['name'] ?? ''), 80);
-            $balance = $truncate((string)($row['balance'] ?? ''), 24);
-            $lines[] = $safe($id) . '. <b>' . $safe($name) . '</b> — <code>' . $safe($balance) . '</code>';
-            $countAccounts++;
-        }
-        if (count($accountsRows) > $countAccounts) {
-            $lines[] = '… ещё ' . (count($accountsRows) - $countAccounts);
-        }
-
-        $html = implode("\n", $lines);
-
-        $sendResult = is_callable($sendTelegramHtmlMessage)
-            ? $sendTelegramHtmlMessage($tgToken, $tgChatId, $html, $tgThreadNum, $tgReplyToNum)
-            : ['ok' => false, 'error' => 'Telegram sender is unavailable'];
-        if (empty($sendResult['ok'])) {
-            throw new \Exception((string)($sendResult['error'] ?? 'Telegram send failed'));
-        }
-
-        echo json_encode([
-            'ok' => true,
-            'message_id' => (int)($sendResult['message_id'] ?? 0),
-            'chat_id' => (string)($sendResult['chat_id'] ?? ''),
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);

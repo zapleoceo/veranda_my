@@ -143,6 +143,7 @@ window.initPayday2 = function() {
         .replaceAll("'", '&#039;');
 
     const modeToggleEl = document.getElementById('modeToggle');
+    const modeToggleOutEl = document.getElementById('modeToggleOut');
     const payday2BetaInfoBtn = document.getElementById('payday2BetaInfoBtn');
     const payday2BetaModal = document.getElementById('payday2BetaModal');
     const payday2BetaModalClose = document.getElementById('payday2BetaModalClose');
@@ -150,6 +151,7 @@ window.initPayday2 = function() {
         const m = (mode === 'lite') ? 'lite' : 'full';
         document.body.classList.toggle('mode-lite', m === 'lite');
         if (modeToggleEl) modeToggleEl.checked = (m === 'full');
+        if (modeToggleOutEl) modeToggleOutEl.checked = (m === 'full');
         try { localStorage.setItem('payday_mode', m); } catch (_) {}
     };
     const tabIn = document.getElementById('tabIn');
@@ -204,34 +206,29 @@ window.initPayday2 = function() {
         if (!btn) return () => {};
         const origHtml = btn.innerHTML;
         btn.dataset.origHtml = origHtml;
-        const title = String(state && state.title ? state.title : btn.textContent || '').trim() || 'Загрузка';
-        const pct = Number(state && state.pct != null ? state.pct : 0);
-        const pctClamped = Math.max(0, Math.min(100, Math.round(pct)));
-        btn.innerHTML = `<span class="btn-label">${escapeHtml(title)} <span class="btn-pct">${pctClamped}%</span></span><span class="btn-busy-line"><span class="btn-busy-fill" style="width:${pctClamped}%"></span></span>`;
-        btn.classList.add('loading');
+        
+        btn.innerHTML = `Загрузка...`;
+        btn.classList.add('loading-fill');
         btn.disabled = true;
+        
+        const pct = Number(state && state.pct != null ? state.pct : 10);
+        const pctClamped = Math.max(10, Math.min(100, Math.round(pct)));
+        btn.style.setProperty('--btn-progress', String(pctClamped) + '%');
+        
         return () => {
-            btn.classList.remove('loading');
+            btn.classList.remove('loading-fill');
             btn.disabled = false;
+            btn.style.removeProperty('--btn-progress');
             btn.innerHTML = btn.dataset.origHtml || origHtml;
             delete btn.dataset.origHtml;
         };
     };
     const updateBtnBusy = (btn, state) => {
-        if (!btn) return;
-        const pctEl = btn.querySelector('.btn-pct');
-        const fillEl = btn.querySelector('.btn-busy-fill');
-        if (state && state.title != null) {
-            const labelEl = btn.querySelector('.btn-label');
-            if (labelEl && pctEl) {
-                labelEl.innerHTML = escapeHtml(String(state.title)) + ' <span class="btn-pct">' + pctEl.textContent + '</span>';
-            }
-        }
+        if (!btn || !btn.classList.contains('loading-fill')) return;
         const pct = Number(state && state.pct != null ? state.pct : NaN);
-        if (Number.isFinite(pct) && pctEl && fillEl) {
-            const pctClamped = Math.max(0, Math.min(100, Math.round(pct)));
-            pctEl.textContent = String(pctClamped) + '%';
-            fillEl.style.width = String(pctClamped) + '%';
+        if (Number.isFinite(pct)) {
+            const pctClamped = Math.max(10, Math.min(100, Math.round(pct)));
+            btn.style.setProperty('--btn-progress', String(pctClamped) + '%');
         }
     };
     let activeTab = 'in';
@@ -538,6 +535,7 @@ window.initPayday2 = function() {
         svg.setAttribute('width', '100%');
         svg.setAttribute('height', '100%');
         svg.style.display = 'block';
+        svg.style.pointerEvents = 'none';
         const defs = document.createElementNS(ns, 'defs');
         const g = document.createElementNS(ns, 'g');
         svg.appendChild(defs);
@@ -569,7 +567,9 @@ window.initPayday2 = function() {
         const h = Math.max(1, Math.round(rootRect.height));
         const scrollW = outGrid.scrollWidth || w;
         outSvgState.svg.setAttribute('viewBox', `0 0 ${scrollW} ${h}`);
+        outSvgState.svg.setAttribute('preserveAspectRatio', 'none');
         outSvgState.svg.style.width = scrollW + 'px';
+        outSvgState.svg.style.height = h + 'px';
 
         outLinks.forEach((l) => {
             const s = document.getElementById('out-sepay-' + l.mail_uid);
@@ -1101,6 +1101,12 @@ window.initPayday2 = function() {
     };
 
     const refreshPosterAccounts = () => {
+        if (balAndreyEl) { balAndreyEl.textContent = '...'; balAndreyEl.setAttribute('data-cents', ''); }
+        if (balVietnamEl) { balVietnamEl.textContent = '...'; balVietnamEl.setAttribute('data-cents', ''); }
+        if (balCashEl) { balCashEl.textContent = '...'; balCashEl.setAttribute('data-cents', ''); }
+        if (balTotalEl) { balTotalEl.textContent = '...'; balTotalEl.setAttribute('data-cents', ''); }
+        if (posterAccountsTbody) posterAccountsTbody.innerHTML = '<tr><td colspan="3" style="padding: 10px; color:var(--muted); font-weight:900;">Обновление...</td></tr>';
+        
         const url = `?dateFrom=${encodeURIComponent(window.PAYDAY_CONFIG.dateFrom)}&dateTo=${encodeURIComponent(window.PAYDAY_CONFIG.dateTo)}&ajax=poster_accounts`;
         return fetch(url, {
             method: 'POST',
@@ -1195,27 +1201,9 @@ window.initPayday2 = function() {
         };
     };
     if (posterBalancesTelegramBtn) {
-        posterBalancesTelegramBtn.addEventListener('click', async () => {
-            const restore = setBtnBusy(posterBalancesTelegramBtn, { title: 'Telegram', pct: 0 });
-            try {
-                updateBtnBusy(posterBalancesTelegramBtn, { pct: 20, title: 'Telegram' });
-                const payload = collectPosterBalancePayload();
-                updateBtnBusy(posterBalancesTelegramBtn, { pct: 55, title: 'Telegram' });
-                const res = await fetch('?ajax=poster_balances_telegram', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-                const j = await res.json();
-                if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка отправки в Telegram');
-                updateBtnBusy(posterBalancesTelegramBtn, { pct: 100, title: 'Отправлено' });
-                setTimeout(() => alert('Баланс отправлен в Telegram'), 120);
-            } catch (e) {
-                alert(e && e.message ? e.message : 'Ошибка отправки в Telegram');
-            } finally {
-                setTimeout(() => restore(), 200);
-            }
-        });
+        if (typeof window.initPaydayTelegramScreenshot === 'function') {
+            window.initPaydayTelegramScreenshot();
+        }
     }
 
     try {
@@ -1309,6 +1297,14 @@ window.initPayday2 = function() {
             setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 200);
         });
     }
+    if (modeToggleOutEl) {
+        modeToggleOutEl.addEventListener('change', () => {
+            const next = modeToggleOutEl.checked ? 'full' : 'lite';
+            applyMode(next);
+            try { window.dispatchEvent(new Event('resize')); } catch (_) {}
+            setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 200);
+        });
+    }
 
     const widgets = new Map();
     const svgState = { svg: null, defs: null, group: null, markers: new Map() };
@@ -1339,6 +1335,7 @@ window.initPayday2 = function() {
         svg.setAttribute('width', '100%');
         svg.setAttribute('height', '100%');
         svg.style.display = 'block';
+        svg.style.pointerEvents = 'none';
         const defs = document.createElementNS(ns, 'defs');
         const g = document.createElementNS(ns, 'g');
         svg.appendChild(defs);
@@ -1622,8 +1619,10 @@ window.initPayday2 = function() {
         
         const scrollW = tablesRoot.scrollWidth || w;
         svgState.svg.setAttribute('viewBox', `0 0 ${scrollW} ${h}`);
+        svgState.svg.setAttribute('preserveAspectRatio', 'none');
         svgState.svg.style.width = scrollW + 'px';
-        
+        svgState.svg.style.height = h + 'px';
+
         widgets.forEach((btn) => { btn.style.display = 'none'; });
 
         const isVisibleInScrollY = (el, scrollEl) => {
@@ -1785,21 +1784,6 @@ window.initPayday2 = function() {
         applyHideLinked();
         scheduleRelayoutBurst();
     });
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            drawLines();
-            applyRowClasses();
-            updateStats();
-            applyHideLinked();
-            scheduleRelayoutBurst();
-        });
-    } else {
-        drawLines();
-        applyRowClasses();
-        updateStats();
-        applyHideLinked();
-        scheduleRelayoutBurst();
-    }
 
     const sepayTable = document.getElementById('sepayTable');
     const posterTable = document.getElementById('posterTable');
@@ -2133,15 +2117,17 @@ window.initPayday2 = function() {
         const fmtSum = (v) => Math.round(Number(v || 0)).toLocaleString('en-US').replace(/,/g, '\u202F');
 
         console.log('renderFinanceTable rows:', rows, 'expectedSum:', expectedSum);
-        // Compare with a tiny tolerance to account for floating point issues, or just convert to Int
-        const match = rows;
-                const btnSubmit = form.querySelector('button[type="submit"]');
-        if (match.length > 0) {
+        // Check if there is an exact amount match
+        const exactMatchExists = rows.some(r => Math.abs(Number(r.sum || 0)) === expectedSum);
+
+        const btnSubmit = form.querySelector('button[type="submit"]');
+        if (exactMatchExists) {
             if (btnSubmit) btnSubmit.style.display = 'none';
         } else {
             if (btnSubmit) btnSubmit.style.display = '';
         }
-        if (!match.length) {
+        
+        if (!rows.length) {
             statusEl.innerHTML = '<span style="color:var(--muted);">Транзакция не найдена</span>';
             return;
         }
@@ -2149,7 +2135,7 @@ window.initPayday2 = function() {
         let html = '<div style="overflow-x:auto; max-width:100%;">';
         html += '<table class="table" style="margin-top:5px; font-size:12px; width:100%;">';
         html += '<thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead><tbody>';
-        match.forEach((x) => {
+        rows.forEach((x) => {
             const ts = Number(x.ts || 0);
             const d = ts ? new Date(ts * 1000) : null;
             const dateStr = d ? `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}` : '';
@@ -2211,7 +2197,11 @@ window.initPayday2 = function() {
             try {
                 const forms = document.querySelectorAll('form.finance-transfer');
                 for (const form of forms) {
-                    await window.refreshFinanceForm(form, { showLoading: true });
+                    const statusEl = form.querySelector('.finance-status');
+                    if (statusEl) statusEl.innerHTML = '<span style="color:var(--muted);">Обновление...</span>';
+                }
+                for (const form of forms) {
+                    await window.refreshFinanceForm(form, { showLoading: false });
                 }
             } finally {
                 btn.disabled = false;
@@ -2373,7 +2363,16 @@ window.initPayday2 = function() {
                 
                 html += '</tbody></table></div>';
                 kashshiftBody.innerHTML = html;
-                if (firstShiftId) window.toggleShiftDetail(null, firstShiftId);
+                if (res.data && res.data.length > 0) {
+                    const firstRow = res.data[0];
+                    const sId = String(firstRow.cash_shift_id || firstRow.shift_id || '');
+                    if (sId) {
+                        const firstTr = kashshiftBody.querySelector('tbody tr');
+                        if (firstTr) {
+                            window.toggleShiftDetail(firstTr, sId);
+                        }
+                    }
+                }
             }).catch(e => {
                 kashshiftBody.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>';
             });
@@ -2564,5 +2563,21 @@ window.initPayday2 = function() {
     document.querySelectorAll('form.finance-transfer').forEach((form) => {
         if (window.refreshFinanceForm) window.refreshFinanceForm(form, { showLoading: false });
     });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            drawLines();
+            applyRowClasses();
+            updateStats();
+            applyHideLinked();
+            scheduleRelayoutBurst();
+        });
+    } else {
+        drawLines();
+        applyRowClasses();
+        updateStats();
+        applyHideLinked();
+        scheduleRelayoutBurst();
+    }
 };
 window.initPayday2();

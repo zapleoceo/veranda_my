@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_2030';
+$payday2AssetVersion = '20260417_5400';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,9 +324,9 @@ $payday2AssetVersion = '20260417_2030';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260414_0100">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_5400">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
-</head>
+ </head>
 <body>
 <div class="container">
     <div class="top-nav">
@@ -335,14 +335,24 @@ $payday2AssetVersion = '20260417_2030';
             <div class="tabs">
                 <button type="button" class="tab active" id="tabIn">IN</button>
                 <button type="button" class="tab" id="tabOut">OUT</button>
-                <button type="button" class="tab" id="btnKashShift" style="margin-left: 15px; background: rgba(184,135,70,0.15); color: #B88746;">KashShift</button>
-                <button type="button" class="tab" id="btnSupplies" style="margin-left: 5px; background: rgba(184,135,70,0.15); color: #B88746;">Supplies</button>
+                <div style="margin-left: auto; display: flex;">
+                    <button type="button" class="tab" id="btnKashShift" style="background: rgba(184,135,70,0.15); color: #B88746;">KashShift</button>
+                    <button type="button" class="tab" id="btnSupplies" style="margin-left: 5px; background: rgba(184,135,70,0.15); color: #B88746;">Supplies</button>
+                </div>
             </div>
-            <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin-left: 10px;">
-                <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
-                <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 180px;">
-                <button class="btn" type="submit">Открыть</button>
-            </form>
+            <div id="topFormsWrap" style="display: flex; gap: 10px; margin-left: 10px; align-items: center;">
+                <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin: 0; align-items: center;">
+                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 102px;">
+                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 102px;">
+                    <button class="btn" type="submit">Открыть</button>
+                </form>
+                <form method="POST" id="clearDayForm" style="margin: 0;">
+                    <input type="hidden" name="action" value="clear_day">
+                    <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                    <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
+                    <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Обнулить</button>
+                </form>
+            </div>
         </div>
         <?php require __DIR__ . '/../partials/user_menu.php'; ?>
     </div>
@@ -350,49 +360,18 @@ $payday2AssetVersion = '20260417_2030';
     <?php if ($error !== ''): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
     <div class="card">
-        <div class="toolbar toolbar-line" style="margin-bottom: 10px;">
-            <form method="POST" id="posterSyncForm">
-                <input type="hidden" name="action" value="load_poster_checks">
-                <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
-                <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                <button class="btn primary" id="posterSyncBtn" type="submit">Загрузить чеки</button>
-            </form>
-
-            <form method="POST" id="sepaySyncForm">
-                <input type="hidden" name="action" value="reload_sepay_api">
-                <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
-                <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                <button class="btn primary" id="sepaySyncBtn" type="submit">Обновить платежи</button>
-            </form>
-            <button class="btn" id="outMailBtn" type="button" style="display:none;">Обновить Платежи Out</button>
-            <button class="btn" id="outFinanceBtn" type="button" style="display:none;">Обновить транзакции</button>
-
-            <form method="POST" id="clearDayForm">
-                <input type="hidden" name="action" value="clear_day">
-                <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
-                <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Очистить день</button>
-            </form>
-
-            <div class="toggle-wrap" title="Lite/Full">
-                <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
-                <label class="switch">
-                    <input id="modeToggle" type="checkbox">
-                    <span class="slider"></span>
-                </label>
-                <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
-            </div>
-        </div>
-
-        <div class="divider"></div>
-
         <div id="outSection" style="display:none;">
             <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; position: relative;">
                 <div id="outLineLayer"></div>
-                <div class="card" style="padding:0;">
-                    <div style="padding:8px 12px; font-weight:900;" class="vc-subtitle">
-                        <span>Sepay (Mail)</span>
-                        <button type="button" class="vc-toggle hidden-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
+                <div class="card" style="padding:0; position:relative;">
+                    <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div>Деньги 📧</div>
+                            <button class="btn primary" id="outMailBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
+                        </div>
+                        <div class="muted vc-subtitle">
+                            <button type="button" class="vc-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
+                        </div>
                     </div>
                     <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
                         <table id="outSepayTable">
@@ -402,23 +381,38 @@ $payday2AssetVersion = '20260417_2030';
                     </div>
                 </div>
                 <div class="mid-col" id="outMidCol">
-                    <button class="mid-btn primary" id="outLinkMakeBtn" type="button" title="Связать выбранные" disabled>🎯</button>
-                    <button class="mid-btn" id="outHideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
-                    <button class="mid-btn" id="outLinkAutoBtn" type="button" title="Автосвязи">🧩</button>
-                    <button class="mid-btn" id="outLinkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
-                    <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
-                        <div>←</div>
-                        <div id="outSelSepaySum">0</div>
-                        <div style="height: 10px;"></div>
-                        <div>→</div>
-                        <div id="outSelPosterSum">0</div>
-                        <div style="height: 10px;"></div>
-                        <div id="outSelMatch" style="font-size: 16px; color: #34d399;">✅</div>
-                        <div id="outSelDiff" style="font-weight: 900;">0</div>
+                    <div class="toggle-wrap" title="Lite/Full" style="margin: 0; transform: scale(0.9); transform-origin: center;">
+                        <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
+                        <label class="switch">
+                            <input id="modeToggleOut" type="checkbox">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
+                    </div>
+                    <div class="mid-col-glass">
+                        <button class="mid-btn primary" id="outLinkMakeBtn" type="button" title="Связать выбранные" disabled>🎯</button>
+                        <button class="mid-btn eye-toggle" id="outHideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
+                        <button class="mid-btn" id="outLinkAutoBtn" type="button" title="Автосвязи">🧩</button>
+                        <button class="mid-btn" id="outLinkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
+                        <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
+                            <div>←</div>
+                            <div id="outSelSepaySum">0</div>
+                            <div style="height: 10px;"></div>
+                            <div>→</div>
+                            <div id="outSelPosterSum">0</div>
+                            <div style="height: 10px;"></div>
+                            <div id="outSelMatch" style="font-size: 16px; color: #34d399;">✅</div>
+                            <div id="outSelDiff" style="font-weight: 900;">0</div>
+                        </div>
                     </div>
                 </div>
-                <div class="card" style="padding:0;">
-                    <div style="padding:8px 12px; font-weight:900;">Poster Finance</div>
+                <div class="card" style="padding:0; position:relative;">
+                    <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div>Poster тр-ии</div>
+                            <button class="btn primary" id="outFinanceBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
+                        </div>
+                    </div>
                     <div id="outPosterScroll" style="max-height: 56vh; overflow:auto;">
                         <table id="outPosterTable">
                             <thead>
@@ -435,12 +429,19 @@ $payday2AssetVersion = '20260417_2030';
 
         <div class="grid" id="tablesRoot">
             <div id="lineLayer"></div>
-            <div class="card" style="padding: 0;">
-                <div style="padding: 12px 12px 6px;">
-                    <div style="font-weight:900;">SePay</div>
+            <div class="card" style="padding: 0; position: relative;">
+                <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div>Деньги</div>
+                        <form method="POST" id="sepaySyncForm" style="margin: 0;">
+                            <input type="hidden" name="action" value="reload_sepay_api">
+                            <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                            <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
+                            <button class="btn primary" id="sepaySyncBtn" type="submit" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
+                        </form>
+                    </div>
                     <div class="muted vc-subtitle">
-                        <span>Приходы за день</span>
-                        <button type="button" class="vc-toggle hidden-toggle" id="toggleSepayHiddenBtn" title="Показать/скрыть скрытые транзакции">👁</button>
+                        <button type="button" class="vc-toggle" id="toggleSepayHiddenBtn" title="Показать/скрыть скрытые транзакции">👁</button>
                     </div>
                 </div>
                 <div id="sepayScroll" style="max-height: 56vh; overflow:auto;">
@@ -503,43 +504,60 @@ $payday2AssetVersion = '20260417_2030';
                         </tbody>
                     </table>
                 </div>
-                <div class="muted" style="padding: 10px 12px; font-weight: 900;">
-                    Итого: <span id="sepayTotal"><?= htmlspecialchars($fmtVnd((int)$sepayTotalVnd)) ?></span>
-                    • связанные: <span id="sepayLinked">—</span>
-                    • несвязанные: <span id="sepayUnlinked">—</span>
+                <div class="muted table-footer-stats">
+                    <span>Итого: <span id="sepayTotal"><?= htmlspecialchars($fmtVnd((int)$sepayTotalVnd)) ?></span></span>
+                    <span>• связанные: <span id="sepayLinked">—</span></span>
+                    <span>• несвязанные: <span id="sepayUnlinked">—</span></span>
                 </div>
             </div>
 
-            <div class="mid-col">
-                <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">🎯</button>
-                <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
-                <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
-                <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
-                <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
-                    <div>←</div>
-                    <div id="selSepaySum">0</div>
-                    <div style="height: 10px;"></div>
-                    <div>→</div>
-                    <div id="selPosterSum">0</div>
-                    <div style="height: 10px;"></div>
-                    <div id="selMatch" style="font-size: 16px;">❗</div>
-                    <div id="selDiff" style="font-weight: 900;">0</div>
+            <div class="mid-col" id="midCol">
+                <div class="toggle-wrap" title="Lite/Full" style="margin: 0; transform: scale(0.9); transform-origin: center;">
+                    <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
+                    <label class="switch">
+                        <input id="modeToggle" type="checkbox">
+                        <span class="slider"></span>
+                    </label>
+                    <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
                 </div>
-                <div class="muted mid-legend" style="text-align:center; font-weight:900; line-height: 1.35;">
-                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>Авто 1</div>
-                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>Авто 2</div>
-                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>Ручная связь</div>
-                </div>
-                <div class="muted" style="text-align:center; font-weight:900; margin-top: 6px;">
-                    <span id="totalsDiff">—</span>
+                <div class="mid-col-glass">
+                    <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">🎯</button>
+                    <button class="mid-btn eye-toggle" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
+                    <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
+                    <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
+                    <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
+                        <div>←</div>
+                        <div id="selSepaySum">0</div>
+                        <div style="height: 10px;"></div>
+                        <div>→</div>
+                        <div id="selPosterSum">0</div>
+                        <div style="height: 10px;"></div>
+                        <div id="selMatch" style="font-size: 16px;">❗</div>
+                        <div id="selDiff" style="font-weight: 900;">0</div>
+                    </div>
+                    <div class="muted mid-legend" style="text-align:center; font-weight:900; line-height: 1.35;">
+                        <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>Авто 1</div>
+                        <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>Авто 2</div>
+                        <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>Ручная связь</div>
+                    </div>
+                    <div class="muted" style="text-align:center; font-weight:900; margin-top: 6px;">
+                        <span id="totalsDiff">—</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="card" style="padding: 0;">
-                <div style="padding: 12px 12px 6px;">
-                    <div style="font-weight:900;">Poster</div>
+            <div class="card" style="padding: 0; position: relative;">
+                <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div>Poster чеки</div>
+                        <form method="POST" id="posterSyncForm" style="margin: 0;">
+                            <input type="hidden" name="action" value="load_poster_checks">
+                            <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                            <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
+                            <button class="btn primary" id="posterSyncBtn" type="submit" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
+                        </form>
+                    </div>
                     <div class="muted vc-subtitle">
-                        <span>Безнал / смешанная (за выбранный день)</span>
                         <button type="button" class="vc-toggle" id="toggleVietnamBtn" title="Показать/скрыть Vietnam Company">👁</button>
                     </div>
                 </div>
@@ -635,13 +653,13 @@ $payday2AssetVersion = '20260417_2030';
                         </tbody>
                     </table>
                 </div>
-                <div class="muted" style="padding: 10px 12px; font-weight: 900;">
-                    Итого: <span id="posterTotal"><?= htmlspecialchars($fmtVnd((int)$posterTotalVnd)) ?></span>
-                    • Tips: <span id="posterTipsLinked">—</span>
-                    • в таблице связи: <span id="posterLinked">—</span>
-                    • несвязи: <span id="posterUnlinked">—</span>
-                    • BB: <span><?= htmlspecialchars($fmtVnd((int)$posterBybitVnd)) ?></span>
-                    • VC: <span><?= htmlspecialchars($fmtVnd((int)$posterVietVnd)) ?></span>
+                <div class="muted table-footer-stats">
+                    <span>Итого: <span id="posterTotal"><?= htmlspecialchars($fmtVnd((int)$posterTotalVnd)) ?></span></span>
+                    <span>• Tips: <span id="posterTipsLinked">—</span></span>
+                    <span>• в таблице связи: <span id="posterLinked">—</span></span>
+                    <span>• несвязи: <span id="posterUnlinked">—</span></span>
+                    <span>• BB: <span><?= htmlspecialchars($fmtVnd((int)$posterBybitVnd)) ?></span></span>
+                    <span>• VC: <span><?= htmlspecialchars($fmtVnd((int)$posterVietVnd)) ?></span></span>
                 </div>
             </div>
         </div>
@@ -652,7 +670,14 @@ $payday2AssetVersion = '20260417_2030';
         <div class="card card-finance">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
                 <div style="font-weight: 900;">Финансовые транзакции</div>
-                <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить">🔄</button>
+                <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                        <path d="M21 2v6h-6"></path>
+                        <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                        <path d="M3 22v-6h6"></path>
+                        <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                    </svg>
+                </button>
             </div>
 
             <?php
@@ -667,8 +692,25 @@ $payday2AssetVersion = '20260417_2030';
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.';
 
-            $vietnamExists = $transferVietnamExists;
-            $tipsExists = $transferTipsExists;
+            $vietnamExists = false;
+            if (is_array($transferVietnamFoundList) && $vietnamVnd !== null) {
+                foreach ($transferVietnamFoundList as $f) {
+                    if ((int)$posterCentsToVnd((int)($f['sum_minor'] ?? 0)) === (int)$vietnamVnd) {
+                        $vietnamExists = true;
+                        break;
+                    }
+                }
+            }
+            
+            $tipsExists = false;
+            if (is_array($transferTipsFoundList) && $tipsVnd !== null) {
+                foreach ($transferTipsFoundList as $f) {
+                    if ((int)$posterCentsToVnd((int)($f['sum_minor'] ?? 0)) === (int)$tipsVnd) {
+                        $tipsExists = true;
+                        break;
+                    }
+                }
+            }
             $vietnamDisabled = $vietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
             $tipsDisabled = $tipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             ?>
@@ -690,10 +732,10 @@ $payday2AssetVersion = '20260417_2030';
                     <div style="display:flex; align-items:center; gap: 10px;">
                         <div style="font-weight:900; white-space:nowrap;">Vietnam Company</div>
                         <div style="flex:1; text-align:center; font-weight:900;"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
-                        <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
+                        <button class="btn btn-sm-orange" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
                     </div>
                     <div class="muted finance-status" style="margin-top: 6px;">
-                        <?php if ($vietnamExists): ?>
+                        <?php if (count($transferVietnamFoundList) > 0): ?>
                             <div style="overflow-x:auto; max-width:100%;">
                                 <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
                                     <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
@@ -748,10 +790,10 @@ $payday2AssetVersion = '20260417_2030';
                     <div style="display:flex; align-items:center; gap: 10px;">
                         <div style="font-weight:900; white-space:nowrap;">Tips</div>
                         <div style="flex:1; text-align:center; font-weight:900;"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
-                        <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
+                        <button class="btn btn-sm-orange" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
                     </div>
                     <div class="muted finance-status" style="margin-top: 6px;">
-                        <?php if ($tipsExists): ?>
+                        <?php if (count($transferTipsFoundList) > 0): ?>
                             <div style="overflow-x:auto; max-width:100%;">
                                 <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
                                     <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
@@ -790,12 +832,19 @@ $payday2AssetVersion = '20260417_2030';
             </div>
         </div>
         <div class="card card-balances">
-            <div style="display:flex; justify-content:flex-start; align-items:center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
-                <div style="font-weight: 900;">Обновляем Балансы Poster</div>
-                <div style="display:flex; gap: 8px; align-items:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                <div style="font-weight: 900;">Итоговый баланс</div>
+                <div style="display:flex; gap: 8px; align-items:center; margin-left: auto;">
                     <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
-                    <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" style="padding: 4px 10px;">🔄</button>
-                    <button class="btn tiny" id="posterBalancesTelegramBtn" type="button" title="Отправить в Telegram" style="padding: 4px 10px;">✈</button>
+                    <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" style="padding: 4px 10px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                            <path d="M21 2v6h-6"></path>
+                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                            <path d="M3 22v-6h6"></path>
+                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                        </svg>
+                    </button>
+                    <button class="btn tiny" id="posterBalancesTelegramBtn" type="button" title="Отправить в Telegram" style="padding: 4px 10px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="#0088cc" style="vertical-align: middle; margin-top: -2px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.42.91-4.01 2.66-.38.26-.72.39-1.03.38-.34-.01-1-.19-1.48-.35-.59-.19-1.05-.29-1.01-.61.02-.17.29-.35.81-.54 3.17-1.38 5.28-2.29 6.33-2.73 3.01-1.26 3.63-1.48 4.04-1.48.09 0 .29.02.4.11.09.07.12.16.13.25.01.12.02.26.01.37z"/></svg></button>
                 </div>
             </div>
 
@@ -949,6 +998,7 @@ window.PAYDAY_CONFIG = {
     }, $links)), JSON_UNESCAPED_UNICODE) ?>
 };
 </script>
+<script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/assets/payday.js?v=20260414_0100" defer></script>
 </body>
