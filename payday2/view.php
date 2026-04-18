@@ -323,8 +323,6 @@ $payday2AssetVersion = '20260417_7000';
     <script src="/assets/app.js" defer></script>
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/payday2/assets/css/payday_index.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
  </head>
 <body>
@@ -381,7 +379,7 @@ $payday2AssetVersion = '20260417_7000';
                         </div>
                     </div>
                     <div id="outSepayScroll" class="pd2-scroll-container">
-                        <table id="outSepayTable">
+                        <table id="outSepayTable" class="pd2-data-table">
                             <thead><tr><th class="col-out-hide"></th><th class="col-out-content">Content</th><th class="nowrap col-out-time">Время</th><th class="nowrap col-out-sum">Сумма</th><th class="col-out-select"></th><th class="col-out-anchor"></th></tr></thead>
                             <tbody></tbody>
                         </table>
@@ -428,7 +426,7 @@ $payday2AssetVersion = '20260417_7000';
                         </div>
                     </div>
                     <div id="outPosterScroll" class="pd2-scroll-container">
-                        <table id="outPosterTable">
+                        <table id="outPosterTable" class="pd2-data-table">
                             <thead>
                                 <tr>
                                     <th></th><th class="nowrap col-out-date">Дата</th><th class="col-out-user">User</th><th class="col-out-category">Category</th><th class="col-out-type">Type</th><th class="col-out-amount">Amount</th><th class="col-out-balance">Balance</th><th class="col-out-comment">Comment</th>
@@ -466,7 +464,7 @@ $payday2AssetVersion = '20260417_7000';
                     </div>
                 </div>
                 <div id="sepayScroll" class="pd2-scroll-container">
-                    <table id="sepayTable">
+                    <table id="sepayTable" class="pd2-data-table">
                         <thead>
                             <tr>
                                 <th></th>
@@ -590,7 +588,7 @@ $payday2AssetVersion = '20260417_7000';
                     </div>
                 </div>
                 <div id="posterScroll" class="pd2-scroll-container">
-                    <table id="posterTable">
+                    <table id="posterTable" class="pd2-data-table">
                         <thead>
                             <tr>
                                 <th></th>

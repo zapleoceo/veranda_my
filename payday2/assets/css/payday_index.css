@@ -51,25 +51,15 @@
         #outLineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
         #sepayScroll, #posterScroll, #outSepayScroll, #outPosterScroll { width: 100%; }
         table { width: 100%; border-collapse: collapse; }
-        #sepayTable, #posterTable, #outSepayTable, #outPosterTable { width: 100%; min-width: 250px; }
+        .pd2-data-table { width: 100%; min-width: 250px; }
         .grid > .card { min-width: 0; }
         th, td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
         th { background: var(--card); color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; }
-        #sepayScroll thead th,
-        #posterScroll thead th,
-        #outSepayScroll thead th,
-        #outPosterScroll thead th { position: sticky; top: 0; z-index: 5; background: var(--card); }
-        #sepayScroll thead th::after,
-        #posterScroll thead th::after,
-        #outSepayScroll thead th::after,
-        #outPosterScroll thead th::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--border); z-index: 6; }
-        #sepayTable th, #sepayTable td,
-        #posterTable th, #posterTable td,
-        #outSepayTable th, #outSepayTable td,
-        #outPosterTable th, #outPosterTable td { padding: 6px 8px; vertical-align: middle; }
-        #sepayTable th, #posterTable th,
-        #outSepayTable th, #outPosterTable th { white-space: nowrap; }
-        #sepayTable td, #posterTable td, #outSepayTable td, #outPosterTable td { font-size: 13px; line-height: 1.2; }
+        .pd2-scroll-container thead th { position: sticky; top: 0; z-index: 5; background: var(--card); }
+        .pd2-scroll-container thead th::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--border); z-index: 6; }
+        .pd2-data-table th, .pd2-data-table td { padding: 6px 8px; vertical-align: middle; }
+        .pd2-data-table th { white-space: nowrap; }
+        .pd2-data-table td { font-size: 13px; line-height: 1.2; }
         #sepayTable .col-sepay-cb, #sepayTable .col-sepay-hide, #sepayTable .col-sepay-dot,
         #outSepayTable .col-out-select, #outSepayTable .col-out-hide, #outSepayTable .col-out-anchor { width: 1%; padding-left: 6px; padding-right: 6px; text-align: center; }
         #sepayTable .col-sepay-hide, #sepayTable .col-sepay-dot,
@@ -86,8 +76,8 @@
         #outPosterTable .col-out-comment { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
         .tt-short { display: none; }
         @media (max-width: 1050px) {
-            #sepayTable td, #posterTable td, #outSepayTable td, #outPosterTable td { font-size: 12px; }
-            #sepayTable th, #posterTable th, #outSepayTable th, #outPosterTable th { font-size: 11px; }
+            .pd2-data-table td { font-size: 12px; }
+            .pd2-data-table th { font-size: 11px; }
             #sepayTable .col-sepay-content, #outSepayTable .col-out-content { max-width: none; text-overflow: clip; overflow: visible; }
             #posterTable .col-poster-method,
             #posterTable .col-poster-waiter,
