@@ -2133,15 +2133,17 @@ window.initPayday2 = function() {
         const fmtSum = (v) => Math.round(Number(v || 0)).toLocaleString('en-US').replace(/,/g, '\u202F');
 
         console.log('renderFinanceTable rows:', rows, 'expectedSum:', expectedSum);
-        // Compare with a tiny tolerance to account for floating point issues, or just convert to Int
-        const match = rows;
-                const btnSubmit = form.querySelector('button[type="submit"]');
-        if (match.length > 0) {
+        // Check if there is an exact amount match
+        const exactMatchExists = rows.some(r => Math.abs(Number(r.sum || 0)) === expectedSum);
+
+        const btnSubmit = form.querySelector('button[type="submit"]');
+        if (exactMatchExists) {
             if (btnSubmit) btnSubmit.style.display = 'none';
         } else {
             if (btnSubmit) btnSubmit.style.display = '';
         }
-        if (!match.length) {
+        
+        if (!rows.length) {
             statusEl.innerHTML = '<span style="color:var(--muted);">Транзакция не найдена</span>';
             return;
         }
@@ -2149,7 +2151,7 @@ window.initPayday2 = function() {
         let html = '<div style="overflow-x:auto; max-width:100%;">';
         html += '<table class="table" style="margin-top:5px; font-size:12px; width:100%;">';
         html += '<thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead><tbody>';
-        match.forEach((x) => {
+        rows.forEach((x) => {
             const ts = Number(x.ts || 0);
             const d = ts ? new Date(ts * 1000) : null;
             const dateStr = d ? `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}` : '';

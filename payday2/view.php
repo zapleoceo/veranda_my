@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_2000';
+$payday2AssetVersion = '20260417_2100';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -667,8 +667,25 @@ $payday2AssetVersion = '20260417_2000';
                 ? 'Нет данных за период: нажми «Загрузить чеки из Poster».'
                 : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.';
 
-            $vietnamExists = $transferVietnamExists;
-            $tipsExists = $transferTipsExists;
+            $vietnamExists = false;
+            if (is_array($transferVietnamFoundList) && $vietnamVnd !== null) {
+                foreach ($transferVietnamFoundList as $f) {
+                    if ((int)$posterCentsToVnd((int)($f['sum_minor'] ?? 0)) === (int)$vietnamVnd) {
+                        $vietnamExists = true;
+                        break;
+                    }
+                }
+            }
+            
+            $tipsExists = false;
+            if (is_array($transferTipsFoundList) && $tipsVnd !== null) {
+                foreach ($transferTipsFoundList as $f) {
+                    if ((int)$posterCentsToVnd((int)($f['sum_minor'] ?? 0)) === (int)$tipsVnd) {
+                        $tipsExists = true;
+                        break;
+                    }
+                }
+            }
             $vietnamDisabled = $vietnamExists || $vietnamCents === null || (int)$vietnamCents <= 0;
             $tipsDisabled = $tipsExists || $tipsCents === null || (int)$tipsCents <= 0;
             ?>
@@ -693,7 +710,7 @@ $payday2AssetVersion = '20260417_2000';
                         <button class="btn" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
                     </div>
                     <div class="muted finance-status" style="margin-top: 6px;">
-                        <?php if ($vietnamExists): ?>
+                        <?php if (count($transferVietnamFoundList) > 0): ?>
                             <div style="overflow-x:auto; max-width:100%;">
                                 <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
                                     <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
@@ -751,7 +768,7 @@ $payday2AssetVersion = '20260417_2000';
                         <button class="btn" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
                     </div>
                     <div class="muted finance-status" style="margin-top: 6px;">
-                        <?php if ($tipsExists): ?>
+                        <?php if (count($transferTipsFoundList) > 0): ?>
                             <div style="overflow-x:auto; max-width:100%;">
                                 <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
                                     <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
