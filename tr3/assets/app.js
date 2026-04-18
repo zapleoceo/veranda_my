@@ -1515,7 +1515,7 @@
       if (!isPhoneValid(phone)) {
         if (reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
         showSubmitHint();
-        if (phone) showReqToast(t('phone_invalid') || 'Некорректный номер телефона');
+        if (phone) showReqToast(t('phone_invalid') || 'Проверьте корректность номера телефона');
         return;
       }
 
@@ -1614,7 +1614,7 @@
       if (!isPhoneValid(phone)) {
         if (reqPhone) { warnPlaceholder(reqPhone); reqPhone.focus(); }
         showSubmitHint();
-        if (phone) showReqToast(t('phone_invalid') || 'Некорректный номер телефона');
+        if (phone) showReqToast(t('phone_invalid') || 'Проверьте корректность номера телефона');
         return;
       }
       const comment = reqComment ? String(reqComment.value || '').trim() : '';
@@ -1812,7 +1812,7 @@
         if (missingPhone && reqPhone) {
           warnPlaceholder(reqPhone);
           if (invalidPhone) {
-            showReqToast(t('phone_invalid') || 'Некорректный номер телефона');
+            showReqToast(t('phone_invalid') || 'Проверьте корректность номера телефона');
           }
         }
         if (missingMsgr) { setMsgrHint(t('msgr_required')); warnMsgrHint(); }

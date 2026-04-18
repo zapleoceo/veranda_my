@@ -375,7 +375,7 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
-  <script src="/tr3/assets/tr3.boot.js?v=20260417_1005" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260417_1010" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>
