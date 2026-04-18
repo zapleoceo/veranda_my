@@ -53,6 +53,43 @@ if (!empty($update['message'])) {
     $chatType = (string)($chat['type'] ?? '');
     $text = trim((string)($msg['text'] ?? ''));
     $cmd = strtolower(preg_replace('/\s+.*/', '', $text));
+    
+    try {
+        $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+        $pdo = $db->getPdo();
+        $tgMsgTable = $db->t('tg_messages');
+        $pdo->exec("CREATE TABLE IF NOT EXISTS {$tgMsgTable} (
+            id BIGINT AUTO_INCREMENT PRIMARY KEY,
+            message_id BIGINT NOT NULL,
+            chat_id VARCHAR(64) NOT NULL,
+            user_id BIGINT NULL,
+            username VARCHAR(64) NULL,
+            text TEXT NULL,
+            date_ts INT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_date_ts (date_ts),
+            KEY idx_username (username)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+        
+        $from = is_array($msg['from'] ?? null) ? $msg['from'] : [];
+        $tgUserId = isset($from['id']) ? (int)$from['id'] : 0;
+        $tgUsername = strtolower(trim((string)($from['username'] ?? '')));
+        
+        if ($text !== '') {
+            $stmt = $pdo->prepare("INSERT INTO {$tgMsgTable} (message_id, chat_id, user_id, username, text, date_ts) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $msg['message_id'] ?? 0,
+                $chatId,
+                $tgUserId,
+                $tgUsername,
+                $text,
+                $msg['date'] ?? time()
+            ]);
+        }
+    } catch (\Throwable $e) {
+        error_log('telegram_webhook db save error: ' . $e->getMessage());
+    }
+
     $startCode = '';
     if (preg_match('/^\/start(?:@\w+)?\s+([a-f0-9]{8,40})$/i', $text, $m)) {
         $startCode = strtolower((string)($m[1] ?? ''));

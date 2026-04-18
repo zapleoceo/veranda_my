@@ -106,64 +106,40 @@ if (($_GET['ajax'] ?? '') === 'telegram_search_fact') {
         exit;
     }
     
-    // Внимание: Telegram Bot API не поддерживает метод для поиска сообщений в истории чата.
-    // getUpdates вернет ошибку (409 Conflict), если установлен Webhook, 
-    // и не позволяет получить историю старше 24 часов или уже обработанные сообщения.
-    // Для реального поиска необходимо либо сохранять сообщения в базу данных через Webhook, 
-    // либо использовать Userbot (Telethon / MadelineProto).
-    
-    // Заглушка: пытаемся сделать getUpdates, если webhook не установлен, 
-    // но в реальности это не сработает для старых сообщений.
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/getUpdates?allowed_updates=[\"message\"]");
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    $resp = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 409) {
-        echo json_encode([
-            'ok' => false, 
-            'error' => 'Ошибка: установлен Webhook. Telegram Bot API не позволяет искать сообщения. Настройте сохранение сообщений в БД или используйте Userbot.'
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    
-    $data = json_decode((string)$resp, true);
-    if (!is_array($data) || empty($data['ok'])) {
-        echo json_encode([
-            'ok' => false, 
-            'error' => 'Не удалось получить обновления от Telegram: ' . ($data['description'] ?? 'Unknown error')
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    
-    $foundMsg = null;
-    $targetStart = strtotime($dateTo . ' 22:00:00');
-    $targetEnd = strtotime($dateTo . ' 03:00:00') + 86400; // 03:00 следующего дня
-    
-    foreach ($data['result'] ?? [] as $update) {
-        if (!isset($update['message'])) continue;
-        $msg = $update['message'];
-        $text = mb_strtolower($msg['text'] ?? '', 'UTF-8');
-        $username = mb_strtolower($msg['from']['username'] ?? '', 'UTF-8');
-        $date = $msg['date'] ?? 0;
+    // Ищем в БД, куда теперь сохраняет вебхук
+    try {
+        require_once __DIR__ . '/../src/classes/Database.php';
+        $db = new \App\Classes\Database(
+            $_ENV['DB_HOST'] ?? 'localhost',
+            $_ENV['DB_NAME'] ?? 'veranda_my',
+            $_ENV['DB_USER'] ?? 'veranda_my',
+            $_ENV['DB_PASS'] ?? '',
+            $_ENV['DB_TABLE_SUFFIX'] ?? ''
+        );
+        $pdo = $db->getPdo();
+        $tgMsgTable = $db->t('tg_messages');
         
-        if (strpos($text, 'факт кассы') !== false) {
-            if ($username === 'ollushka90' || $username === 'ce_akh1') {
-                if ($date >= $targetStart && $date <= $targetEnd) {
-                    $foundMsg = $msg['text'];
-                    break;
-                }
-            }
+        $targetStart = strtotime($dateTo . ' 22:00:00');
+        $targetEnd = strtotime($dateTo . ' 03:00:00') + 86400; // 03:00 следующего дня
+        
+        $stmt = $pdo->prepare("SELECT text FROM {$tgMsgTable} 
+            WHERE (username = 'ollushka90' OR username = 'ce_akh1') 
+            AND LOWER(text) LIKE '%факт кассы%' 
+            AND date_ts >= ? 
+            AND date_ts <= ? 
+            ORDER BY date_ts DESC 
+            LIMIT 1");
+        $stmt->execute([$targetStart, $targetEnd]);
+        $row = $stmt->fetch();
+        
+        if ($row && !empty($row['text'])) {
+            echo json_encode(['ok' => true, 'message_text' => $row['text']], JSON_UNESCAPED_UNICODE);
+        } else {
+            echo json_encode(['ok' => true, 'message_text' => 'Сообщение не найдено. (Возможно, оно было отправлено до настройки сохранения сообщений в БД)'], JSON_UNESCAPED_UNICODE);
         }
-    }
-    
-    if ($foundMsg !== null) {
-        echo json_encode(['ok' => true, 'message_text' => $foundMsg], JSON_UNESCAPED_UNICODE);
-    } else {
-        echo json_encode(['ok' => true, 'message_text' => 'Сообщение не найдено. (Помните, что Bot API не видит старую историю чата)'], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Database error: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
     exit;
 }
