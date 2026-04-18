@@ -331,22 +331,22 @@ $payday2AssetVersion = '20260417_7000';
 <div class="container">
     <div class="top-nav">
         <div class="nav-left">
-            <div class="nav-title" id="payday2BetaInfoBtn" style="cursor:pointer;">Payda2beta</div>
+            <div class="nav-title pd2-pointer" id="payday2BetaInfoBtn">Payda2beta</div>
             <div class="tabs">
                 <button type="button" class="tab active" id="tabIn">IN</button>
                 <button type="button" class="tab" id="tabOut">OUT</button>
-                <div style="margin-left: auto; display: flex;">
-                    <button type="button" class="tab" id="btnKashShift" style="background: rgba(184,135,70,0.15); color: #B88746;">KashShift</button>
-                    <button type="button" class="tab" id="btnSupplies" style="margin-left: 5px; background: rgba(184,135,70,0.15); color: #B88746;">Supplies</button>
+                <div class="pd2-ml-auto pd2-d-flex">
+                    <button type="button" class="tab pd2-tab-gold" id="btnKashShift">KashShift</button>
+                    <button type="button" class="tab pd2-tab-gold pd2-ml-5" id="btnSupplies">Supplies</button>
                 </div>
             </div>
-            <div id="topFormsWrap" style="display: flex; gap: 10px; margin-left: 10px; align-items: center;">
-                <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin: 0; align-items: center;">
-                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 102px;">
-                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 102px;">
+            <div id="topFormsWrap" class="pd2-top-forms-wrap">
+                <form method="GET" id="dateForm" class="pd2-date-form">
+                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn pd2-date-input">
+                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn pd2-date-input">
                     <button class="btn" type="submit">Открыть</button>
                 </form>
-                <form method="POST" id="clearDayForm" style="margin: 0;">
+                <form method="POST" id="clearDayForm" class="pd2-m-0">
                     <input type="hidden" name="action" value="clear_day">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
@@ -361,14 +361,14 @@ $payday2AssetVersion = '20260417_7000';
 
     <div class="card">
         <div id="outSection" style="display:none;">
-            <div class="grid" id="outGrid" style="position: relative;">
+            <div class="grid pd2-pos-relative" id="outGrid">
                 <div id="outLineLayer"></div>
-                <div class="card" style="padding:0; position:relative;">
-                    <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px; min-width: 0;">
-                        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: nowrap;">
-                            <div style="white-space: nowrap;">Деньги 📧</div>
-                            <button class="btn tiny" id="outMailBtn" type="button" title="Загрузить">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                <div class="card pd2-p-0 pd2-pos-relative">
+                    <div class="table-card-header pd2-card-header">
+                        <div class="pd2-card-header-title">
+                            <div class="pd2-ws-nowrap">Деньги 📧</div>
+                            <button class="btn tiny" id="outMailBtn" type="button" title="Загрузить из почты">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                                     <path d="M21 2v6h-6"></path>
                                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
                                     <path d="M3 22v-6h6"></path>
@@ -380,7 +380,7 @@ $payday2AssetVersion = '20260417_7000';
                             <button type="button" class="vc-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
                         </div>
                     </div>
-                    <div id="outSepayScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
+                    <div id="outSepayScroll" class="pd2-scroll-container">
                         <table id="outSepayTable">
                             <thead><tr><th class="col-out-hide"></th><th class="col-out-content">Content</th><th class="nowrap col-out-time">Время</th><th class="nowrap col-out-sum">Сумма</th><th class="col-out-select"></th><th class="col-out-anchor"></th></tr></thead>
                             <tbody></tbody>
@@ -388,7 +388,7 @@ $payday2AssetVersion = '20260417_7000';
                     </div>
                 </div>
                 <div class="mid-col" id="outMidCol">
-                    <div class="toggle-wrap" title="Lite/Full" style="margin: 0; transform: scale(0.9); transform-origin: center;">
+                    <div class="toggle-wrap pd2-toggle-wrap" title="Lite/Full">
                         <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                         <label class="switch">
                             <input id="modeToggleOut" type="checkbox">
@@ -401,24 +401,24 @@ $payday2AssetVersion = '20260417_7000';
                         <button class="mid-btn eye-toggle" id="outHideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                         <button class="mid-btn" id="outLinkAutoBtn" type="button" title="Автосвязи">🧩</button>
                         <button class="mid-btn" id="outLinkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
-                        <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
+                        <div class="muted pd2-text-center pd2-fw-900 pd2-lh-135">
                             <div>←</div>
                             <div id="outSelSepaySum">0</div>
-                            <div style="height: 10px;"></div>
+                            <div class="pd2-h-10"></div>
                             <div>→</div>
                             <div id="outSelPosterSum">0</div>
-                            <div style="height: 10px;"></div>
-                            <div id="outSelMatch" style="font-size: 16px; color: #34d399;">✅</div>
-                            <div id="outSelDiff" style="font-weight: 900;">0</div>
+                            <div class="pd2-h-10"></div>
+                            <div id="outSelMatch" class="pd2-fs-16 pd2-color-green">✅</div>
+                            <div id="outSelDiff" class="pd2-fw-900">0</div>
                         </div>
                     </div>
                 </div>
-                <div class="card" style="padding:0; position:relative;">
-                    <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px; min-width: 0;">
-                        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: nowrap;">
-                            <div style="white-space: nowrap;">Poster тр-ии</div>
+                <div class="card pd2-p-0 pd2-pos-relative">
+                    <div class="table-card-header pd2-card-header">
+                        <div class="pd2-card-header-title">
+                            <div class="pd2-ws-nowrap">Poster тр-ии</div>
                             <button class="btn tiny" id="outFinanceBtn" type="button" title="Загрузить">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                                     <path d="M21 2v6h-6"></path>
                                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
                                     <path d="M3 22v-6h6"></path>
@@ -427,7 +427,7 @@ $payday2AssetVersion = '20260417_7000';
                             </button>
                         </div>
                     </div>
-                    <div id="outPosterScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
+                    <div id="outPosterScroll" class="pd2-scroll-container">
                         <table id="outPosterTable">
                             <thead>
                                 <tr>
@@ -441,18 +441,18 @@ $payday2AssetVersion = '20260417_7000';
             </div>
         </div>
 
-        <div class="grid" id="tablesRoot">
+        <div class="grid pd2-pos-relative" id="tablesRoot">
             <div id="lineLayer"></div>
-            <div class="card" style="padding: 0; position: relative;">
-                <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px; min-width: 0;">
-                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: nowrap;">
-                        <div style="white-space: nowrap;">Деньги</div>
-                        <form method="POST" id="sepaySyncForm" style="margin: 0; white-space: nowrap;">
+            <div class="card pd2-p-0 pd2-pos-relative">
+                <div class="table-card-header pd2-card-header">
+                    <div class="pd2-card-header-title">
+                        <div class="pd2-ws-nowrap">Деньги</div>
+                        <form method="POST" id="sepaySyncForm" class="pd2-m-0 pd2-ws-nowrap">
                             <input type="hidden" name="action" value="reload_sepay_api">
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                             <button class="btn tiny" id="sepaySyncBtn" type="submit" title="Загрузить">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                                     <path d="M21 2v6h-6"></path>
                                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
                                     <path d="M3 22v-6h6"></path>
@@ -465,7 +465,7 @@ $payday2AssetVersion = '20260417_7000';
                         <button type="button" class="vc-toggle" id="toggleSepayHiddenBtn" title="Показать/скрыть скрытые транзакции">👁</button>
                     </div>
                 </div>
-                <div id="sepayScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
+                <div id="sepayScroll" class="pd2-scroll-container">
                     <table id="sepayTable">
                         <thead>
                             <tr>
@@ -533,7 +533,7 @@ $payday2AssetVersion = '20260417_7000';
             </div>
 
             <div class="mid-col" id="midCol">
-                <div class="toggle-wrap" title="Lite/Full" style="margin: 0; transform: scale(0.9); transform-origin: center;">
+                <div class="toggle-wrap pd2-toggle-wrap" title="Lite/Full">
                     <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                     <label class="switch">
                         <input id="modeToggle" type="checkbox">
@@ -546,37 +546,37 @@ $payday2AssetVersion = '20260417_7000';
                     <button class="mid-btn eye-toggle" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                     <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
                     <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
-                    <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
+                    <div class="muted pd2-text-center pd2-fw-900 pd2-lh-135">
                         <div>←</div>
                         <div id="selSepaySum">0</div>
-                        <div style="height: 10px;"></div>
+                        <div class="pd2-h-10"></div>
                         <div>→</div>
                         <div id="selPosterSum">0</div>
-                        <div style="height: 10px;"></div>
-                        <div id="selMatch" style="font-size: 16px;">❗</div>
-                        <div id="selDiff" style="font-weight: 900;">0</div>
+                        <div class="pd2-h-10"></div>
+                        <div id="selMatch" class="pd2-fs-16">❗</div>
+                        <div id="selDiff" class="pd2-fw-900">0</div>
                     </div>
-                    <div class="muted mid-legend" style="text-align:center; font-weight:900; line-height: 1.35;">
+                    <div class="muted mid-legend pd2-text-center pd2-fw-900 pd2-lh-135">
                         <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>Авто 1</div>
                         <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>Авто 2</div>
                         <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>Ручная связь</div>
                     </div>
-                    <div class="muted" style="text-align:center; font-weight:900; margin-top: 6px;">
+                    <div class="muted pd2-text-center pd2-fw-900 pd2-mt-6">
                         <span id="totalsDiff">—</span>
                     </div>
                 </div>
             </div>
 
-            <div class="card" style="padding: 0; position: relative;">
-                <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px; min-width: 0;">
-                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: nowrap;">
-                        <div style="white-space: nowrap;">Poster чеки</div>
-                        <form method="POST" id="posterSyncForm" style="margin: 0; white-space: nowrap;">
+            <div class="card pd2-p-0 pd2-pos-relative">
+                <div class="table-card-header pd2-card-header">
+                    <div class="pd2-card-header-title">
+                        <div class="pd2-ws-nowrap">Poster чеки</div>
+                        <form method="POST" id="posterSyncForm" class="pd2-m-0 pd2-ws-nowrap">
                             <input type="hidden" name="action" value="load_poster_checks">
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                             <button class="btn tiny" id="posterSyncBtn" type="submit" title="Загрузить">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                                     <path d="M21 2v6h-6"></path>
                                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
                                     <path d="M3 22v-6h6"></path>
@@ -589,7 +589,7 @@ $payday2AssetVersion = '20260417_7000';
                         <button type="button" class="vc-toggle" id="toggleVietnamBtn" title="Показать/скрыть Vietnam Company">👁</button>
                     </div>
                 </div>
-                <div id="posterScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
+                <div id="posterScroll" class="pd2-scroll-container">
                     <table id="posterTable">
                         <thead>
                             <tr>
@@ -695,11 +695,11 @@ $payday2AssetVersion = '20260417_7000';
         <div class="divider"></div>
 
         <div class="bottom-two">
-        <div class="card card-finance">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
-                <div style="font-weight: 900;">Финансовые транзакции</div>
-                <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+            <div class="card card-finance">
+                <div class="pd2-justify-between pd2-align-center pd2-d-flex pd2-mb-10">
+                    <div class="pd2-fw-900">Финансовые транзакции</div>
+                    <button class="btn tiny" id="posterFinanceBtn" type="button" title="Загрузить фин. транзакции">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                         <path d="M21 2v6h-6"></path>
                         <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
                         <path d="M3 22v-6h6"></path>
@@ -860,71 +860,72 @@ $payday2AssetVersion = '20260417_7000';
             </div>
         </div>
         <div class="card card-balances">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
-                <div style="font-weight: 900;">Итоговый баланс</div>
-                <div style="display:flex; gap: 8px; align-items:center; margin-left: auto;">
-                    <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
-                    <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" style="padding: 4px 10px;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+            <div class="card card-balances">
+                <div class="pd2-justify-between pd2-align-center pd2-d-flex pd2-gap-10 pd2-mb-10 pd2-flex-wrap">
+                    <div class="pd2-fw-900">Итоговый баланс</div>
+                    <div class="pd2-d-flex pd2-gap-8 pd2-align-center pd2-ml-auto">
+                        <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" class="pd2-p-4-10">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                             <path d="M21 2v6h-6"></path>
                             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
                             <path d="M3 22v-6h6"></path>
                             <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
                         </svg>
                     </button>
-                    <button class="btn tiny" id="posterBalancesTelegramBtn" type="button" title="Отправить в Telegram" style="padding: 4px 10px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="#0088cc" style="vertical-align: middle; margin-top: -2px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.42.91-4.01 2.66-.38.26-.72.39-1.03.38-.34-.01-1-.19-1.48-.35-.59-.19-1.05-.29-1.01-.61.02-.17.29-.35.81-.54 3.17-1.38 5.28-2.29 6.33-2.73 3.01-1.26 3.63-1.48 4.04-1.48.09 0 .29.02.4.11.09.07.12.16.13.25.01.12.02.26.01.37z"/></svg></button>
+                    <button class="btn tiny pd2-p-4-10" id="posterBalancesTelegramBtn" type="button" title="Отправить в Telegram">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="#0088cc" class="pd2-v-align-mid pd2-mt-n2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.42.91-4.01 2.66-.38.26-.72.39-1.03.38-.34-.01-1-.19-1.48-.35-.59-.19-1.05-.29-1.01-.61.02-.17.29-.35.81-.54 3.17-1.38 5.28-2.29 6.33-2.73 3.01-1.26 3.63-1.48 4.04-1.48.09 0 .29.02.4.11.09.07.12.16.13.25.01.12.02.26.01.37z"/></svg></button>
                 </div>
             </div>
 
-            <div class="bal-grid" style="margin-bottom: 10px;">
-                <table>
+            <div class="bal-grid pd2-mb-10">
+                <table class="pd2-w-100 pd2-collapse">
                     <thead>
                     <tr>
-                        <th style="text-align:left;">Показатель</th>
-                        <th style="text-align:right;">Poster</th>
-                        <th style="text-align:right;">Факт.</th>
-                        <th style="text-align:right;">Разница</th>
+                        <th class="pd2-text-left">Показатель</th>
+                        <th class="pd2-text-right">Poster</th>
+                        <th class="pd2-text-right">Факт.</th>
+                        <th class="pd2-text-right">Разница</th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr data-key="andrey">
-                        <td style="font-weight:900;">Счет Андрей</td>
-                        <td style="text-align:right;">
+                        <td class="pd2-fw-900">Счет Андрей</td>
+                        <td class="pd2-text-right">
                             <span id="balAndrey" data-cents="<?= $posterBalanceAndrey !== null ? (int)$posterBalanceAndrey : '' ?>"><?= $posterBalanceAndrey !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceAndrey)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balAndreyActual" type="text" inputmode="numeric" placeholder="0" style="text-align:right;"></td>
-                        <td style="text-align:right;"><span id="balAndreyDiff">—</span></td>
+                        <td class="pd2-text-right"><input id="balAndreyActual" type="text" inputmode="numeric" placeholder="0" class="pd2-text-right"></td>
+                        <td class="pd2-text-right"><span id="balAndreyDiff">—</span></td>
                     </tr>
                     <tr data-key="vietnam">
-                        <td style="font-weight:900;">Вьет. счет</td>
-                        <td style="text-align:right;">
+                        <td class="pd2-fw-900">Вьет. счет</td>
+                        <td class="pd2-text-right">
                             <span id="balVietnam" data-cents="<?= $posterBalanceVietnam !== null ? (int)$posterBalanceVietnam : '' ?>"><?= $posterBalanceVietnam !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceVietnam)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balVietnamActual" type="text" inputmode="numeric" placeholder="0" style="text-align:right;"></td>
-                        <td style="text-align:right;"><span id="balVietnamDiff">—</span></td>
+                        <td class="pd2-text-right"><input id="balVietnamActual" type="text" inputmode="numeric" placeholder="0" class="pd2-text-right"></td>
+                        <td class="pd2-text-right"><span id="balVietnamDiff">—</span></td>
                     </tr>
                     <tr data-key="cash">
-                        <td style="font-weight:900;">Касса</td>
-                        <td style="text-align:right;">
+                        <td class="pd2-fw-900">Касса</td>
+                        <td class="pd2-text-right">
                             <span id="balCash" data-cents="<?= $posterBalanceCash !== null ? (int)$posterBalanceCash : '' ?>"><?= $posterBalanceCash !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceCash)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balCashActual" type="text" inputmode="numeric" placeholder="0" style="text-align:right;"></td>
-                        <td style="text-align:right;"><span id="balCashDiff">—</span></td>
+                        <td class="pd2-text-right"><input id="balCashActual" type="text" inputmode="numeric" placeholder="0" class="pd2-text-right"></td>
+                        <td class="pd2-text-right"><span id="balCashDiff">—</span></td>
                     </tr>
                     <tr data-key="total">
-                        <td style="font-weight:900;">Total</td>
-                        <td style="text-align:right;">
+                        <td class="pd2-fw-900">Total</td>
+                        <td class="pd2-text-right">
                             <span id="balTotal" data-cents="<?= $posterBalanceTotal !== null ? (int)$posterBalanceTotal : '' ?>"><?= $posterBalanceTotal !== null ? htmlspecialchars($fmtVndCents((int)$posterBalanceTotal)) : '—' ?></span>
                         </td>
-                        <td style="text-align:right;"><input id="balTotalActual" type="text" inputmode="numeric" placeholder="0" style="text-align:right;" readonly></td>
-                        <td style="text-align:right;"><span id="balTotalDiff">—</span></td>
+                        <td class="pd2-text-right"><input id="balTotalActual" type="text" inputmode="numeric" placeholder="0" class="pd2-text-right" readonly></td>
+                        <td class="pd2-text-right"><span id="balTotalDiff">—</span></td>
                     </tr>
                     </tbody>
                 </table>
             </div>
 
-            <div class="bal-grid" style="max-height: 260px; overflow:auto;">
-                <table style="width:100%; border-collapse: collapse;">
+            <div class="bal-grid pd2-max-h-260">
+                <table class="pd2-w-100 pd2-collapse">
                     <thead>
                     <tr>
                         <th style="text-align:left; padding: 8px 10px; font-weight: 900;">ID</th>
@@ -956,29 +957,29 @@ $payday2AssetVersion = '20260417_7000';
     </div>
 </div>
 
-<div class="confirm-backdrop" id="kashshiftModal" style="display:none; z-index: 9999; align-items: flex-start; padding-top: 5vh;">
-                <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-                        <h3 style="margin:0;">KashShift</h3>
-                        <button type="button" class="btn2" id="kashshiftClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
-                    </div>
-                    <div class="body" id="kashshiftBody" style="max-height: 85vh; overflow: auto;">
-                        <div style="text-align:center;">Загрузка...</div>
-                    </div>
-                </div>
-            </div>
+<div class="confirm-backdrop pd2-modal-backdrop" id="kashshiftModal">
+    <div class="confirm-modal pd2-modal-content" role="dialog">
+        <div class="pd2-modal-header">
+            <h3 class="pd2-m-0">KashShift</h3>
+            <button type="button" class="btn2 pd2-modal-close" id="kashshiftClose">✕</button>
+        </div>
+        <div class="body pd2-modal-body" id="kashshiftBody">
+            <div class="pd2-text-center">Загрузка...</div>
+        </div>
+    </div>
+</div>
 
-            <div class="confirm-backdrop" id="suppliesModal" style="display:none; z-index: 9999; align-items: flex-start; padding-top: 5vh;">
-                <div class="confirm-modal" role="dialog" style="max-width: 900px; width: 90%;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-                        <h3 style="margin:0;">Supplies</h3>
-                        <button type="button" class="btn2" id="suppliesClose" style="min-width: 40px; font-weight: bold; font-size: 16px;">✕</button>
-                    </div>
-                    <div class="body" id="suppliesBody" style="max-height: 85vh; overflow: auto;">
-                        <div style="text-align:center;">Загрузка...</div>
-                    </div>
-                </div>
-            </div>
+<div class="confirm-backdrop pd2-modal-backdrop" id="suppliesModal">
+    <div class="confirm-modal pd2-modal-content" role="dialog">
+        <div class="pd2-modal-header">
+            <h3 class="pd2-m-0">Supplies</h3>
+            <button type="button" class="btn2 pd2-modal-close" id="suppliesClose">✕</button>
+        </div>
+        <div class="body pd2-modal-body" id="suppliesBody">
+            <div class="pd2-text-center">Загрузка...</div>
+        </div>
+    </div>
+</div>
 
             <div class="confirm-backdrop" id="financeConfirm">
                 <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="financeConfirmTitle">
@@ -998,15 +999,15 @@ $payday2AssetVersion = '20260417_7000';
             </div>
             <div class="confirm-backdrop" id="payday2BetaModal">
                 <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2BetaModalTitle" style="max-width: 440px;">
-                    <h3 id="payday2BetaModalTitle">Payda2beta</h3>
-                    <div class="body" style="text-align:center; line-height:1.35;">
+                    <h3 id="payday2BetaModalTitle" class="pd2-m-0">Payda2beta</h3>
+                    <div class="body pd2-text-center pd2-lh-135">
                         Это обновленная и оптимизированная версия payday.
                         <br><br>
                         Если что-то не работает, надо сообщить Диме.
                     </div>
-                    <div class="actions" style="justify-content:center;">
-                        <a href="/payday/" class="btn2 primary" style="display:inline-flex; text-decoration:none; min-width: 140px; justify-content:center;">Payday</a>
-                        <button type="button" class="btn2" id="payday2BetaModalClose" style="min-width: 140px;">Закрыть</button>
+                    <div class="actions pd2-justify-center">
+                        <a href="/payday/" class="btn2 primary pd2-inline-flex pd2-text-dec-none pd2-min-w-140 pd2-justify-center">Payday</a>
+                        <button type="button" class="btn2 pd2-min-w-140" id="payday2BetaModalClose">Закрыть</button>
                     </div>
                 </div>
             </div>
