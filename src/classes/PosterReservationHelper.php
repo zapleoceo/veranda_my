@@ -195,7 +195,7 @@ class PosterReservationHelper {
 
             $reservationData = [
                 'spot_id'          => (string)$spotIdInt,
-                'type'             => '3',
+                'type'             => '2', // 2 - бронирование (как в документации)
                 'phone'            => $phone,
                 'table_id'         => (string)$tableId,
                 'guests_count'     => (string)$row['guests'],
@@ -204,6 +204,7 @@ class PosterReservationHelper {
                 'first_name'       => $firstName,
                 'last_name'        => $lastName,
                 'comment'          => $commentFinal,
+                'skip_phone_validation' => 'true'
             ];
 
             $dateFrom = date('Y-m-d 00:00:00');
@@ -260,23 +261,22 @@ class PosterReservationHelper {
             }
 
             try {
-                // Using Poster v3 API as per documentation:
-                // https://dev.joinposter.com/docs/v3/web/incomingOrders/createReservation
-                $resp = $api->request('incomingOrders/createReservation', $reservationData, 'POST', true);
+                // Используем метод с точкой, как в официальной документации
+                // POST https://joinposter.com/api/incomingOrders.createReservation
+                $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
             } catch (\Throwable $e) {
                 $msg = $e->getMessage();
                 // If Poster error 37 (invalid phone), retry with fallback phone
                 if (strpos($msg, '37') !== false || stripos($msg, 'phone number') !== false) {
                     $reservationData['phone'] = '+94742688058';
-                    $resp = $api->request('incomingOrders/createReservation', $reservationData, 'POST', true);
+                    $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
                 } else {
                     throw $e;
                 }
             }
 
-            // In v3, the response structure might be different, but usually it's ['id' => ...] 
-            // or ['reservation_id' => ...]
-            $posterId = (int)($resp['id'] ?? $resp['reservation_id'] ?? $resp['incoming_order_id'] ?? 0);
+            // Согласно документации, ответ содержит incoming_order_id
+            $posterId = (int)($resp['incoming_order_id'] ?? $resp['reservation_id'] ?? $resp['id'] ?? 0);
 
             if (isset($resp['error']) || $posterId <= 0) {
                 $err = $resp['error'] ?? 'Unknown Poster API Error (no ID returned)';
