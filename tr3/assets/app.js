@@ -2144,6 +2144,11 @@
           showBusyToast(table);
           return;
         }
+        if (preUn) {
+          selectedTableNum = '';
+          showToast(table, preUn.reason, preUn.detail || '');
+          return;
+        }
 
         const key = current.dt + '|' + String(current.guests);
         if ((!last || lastKey !== key) && !isLoading) {
@@ -2159,6 +2164,11 @@
         if (un && String(un.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят')) {
           selectedTableNum = '';
           showBusyToast(table);
+          return;
+        }
+        if (un) {
+          selectedTableNum = '';
+          showToast(table, un.reason, un.detail || '');
           return;
         }
 
