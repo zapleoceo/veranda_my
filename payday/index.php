@@ -2945,7 +2945,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2900">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3000">
 </head>
 <body>
 <div class="container">
@@ -2962,8 +2962,8 @@ $fmtVnd = function (int $v): string {
             </div>
             <div id="topFormsWrap" style="display: flex; gap: 10px; margin-left: 10px; align-items: center;">
                 <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin: 0; align-items: center;">
-                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 76px;">
-                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 76px;">
+                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 84px;">
+                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 84px;">
                     <button class="btn" type="submit">Открыть</button>
                 </form>
                 <form method="POST" id="clearDayForm" style="margin: 0;">
@@ -3008,7 +3008,7 @@ $fmtVnd = function (int $v): string {
                     </div>
                 </div>
                 <div class="mid-col" id="outMidCol">
-                    <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px !important; transform: scale(0.9); transform-origin: center;">
+                    <div class="toggle-wrap" title="Lite/Full" style="margin: 0; transform: scale(0.9); transform-origin: center;">
                         <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                         <label class="switch">
                             <input id="modeToggleOut" type="checkbox">
@@ -3016,19 +3016,21 @@ $fmtVnd = function (int $v): string {
                         </label>
                         <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
                     </div>
-                    <button class="mid-btn primary" id="outLinkMakeBtn" type="button" title="Связать выбранные" disabled>🎯</button>
-                    <button class="mid-btn" id="outHideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
-                    <button class="mid-btn" id="outLinkAutoBtn" type="button" title="Автосвязи">🧩</button>
-                    <button class="mid-btn" id="outLinkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
-                    <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
-                        <div>←</div>
-                        <div id="outSelSepaySum">0</div>
-                        <div style="height: 10px;"></div>
-                        <div>→</div>
-                        <div id="outSelPosterSum">0</div>
-                        <div style="height: 10px;"></div>
-                        <div id="outSelMatch" style="font-size: 16px; color: #34d399;">✅</div>
-                        <div id="outSelDiff" style="font-weight: 900;">0</div>
+                    <div class="mid-col-glass">
+                        <button class="mid-btn primary" id="outLinkMakeBtn" type="button" title="Связать выбранные" disabled>🎯</button>
+                        <button class="mid-btn" id="outHideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
+                        <button class="mid-btn" id="outLinkAutoBtn" type="button" title="Автосвязи">🧩</button>
+                        <button class="mid-btn" id="outLinkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
+                        <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
+                            <div>←</div>
+                            <div id="outSelSepaySum">0</div>
+                            <div style="height: 10px;"></div>
+                            <div>→</div>
+                            <div id="outSelPosterSum">0</div>
+                            <div style="height: 10px;"></div>
+                            <div id="outSelMatch" style="font-size: 16px; color: #34d399;">✅</div>
+                            <div id="outSelDiff" style="font-weight: 900;">0</div>
+                        </div>
                     </div>
                 </div>
                 <div class="card" style="padding:0; position:relative;">
@@ -3177,7 +3179,7 @@ $fmtVnd = function (int $v): string {
             </div>
 
             <div class="mid-col" id="midCol">
-                <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px !important; transform: scale(0.9); transform-origin: center;">
+                <div class="toggle-wrap" title="Lite/Full" style="margin: 0; transform: scale(0.9); transform-origin: center;">
                     <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                     <label class="switch">
                         <input id="modeToggle" type="checkbox">
@@ -3185,27 +3187,29 @@ $fmtVnd = function (int $v): string {
                     </label>
                     <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
                 </div>
-                <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">🎯</button>
-                <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
-                <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
-                <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
-                <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
-                    <div>←</div>
-                    <div id="selSepaySum">0</div>
-                    <div style="height: 10px;"></div>
-                    <div>→</div>
-                    <div id="selPosterSum">0</div>
-                    <div style="height: 10px;"></div>
-                    <div id="selMatch" style="font-size: 16px;">❗</div>
-                    <div id="selDiff" style="font-weight: 900;">0</div>
-                </div>
-                <div class="muted mid-legend" style="text-align:center; font-weight:900; line-height: 1.35;">
-                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>Авто 1</div>
-                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>Авто 2</div>
-                    <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>Ручная связь</div>
-                </div>
-                <div class="muted" style="text-align:center; font-weight:900; margin-top: 6px;">
-                    <span id="totalsDiff">—</span>
+                <div class="mid-col-glass">
+                    <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">🎯</button>
+                    <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
+                    <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
+                    <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
+                    <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
+                        <div>←</div>
+                        <div id="selSepaySum">0</div>
+                        <div style="height: 10px;"></div>
+                        <div>→</div>
+                        <div id="selPosterSum">0</div>
+                        <div style="height: 10px;"></div>
+                        <div id="selMatch" style="font-size: 16px;">❗</div>
+                        <div id="selDiff" style="font-weight: 900;">0</div>
+                    </div>
+                    <div class="muted mid-legend" style="text-align:center; font-weight:900; line-height: 1.35;">
+                        <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>Авто 1</div>
+                        <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>Авто 2</div>
+                        <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>Ручная связь</div>
+                    </div>
+                    <div class="muted" style="text-align:center; font-weight:900; margin-top: 6px;">
+                        <span id="totalsDiff">—</span>
+                    </div>
                 </div>
             </div>
 

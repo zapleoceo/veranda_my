@@ -112,7 +112,8 @@
         .finance-del:hover { background: rgba(220, 38, 38, 0.08); }
         .cell-anchor { display:flex; align-items:center; gap: 8px; }
         .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
-        .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding: 10px 8px 12px; margin-top: 6px; border-radius: 14px; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 1px solid var(--border); position: relative; z-index: 3; }
+        .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 12px; margin-top: 6px; position: relative; z-index: 3; flex: 0 0 104px; }
+        .mid-col-glass { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding: 10px 8px 12px; border-radius: 14px; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 1px solid var(--border); width: 100%; box-sizing: border-box; }
         .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; position: relative; overflow: hidden; color: var(--text); }
         .mid-btn.primary { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
         .mid-btn.active { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
@@ -129,7 +130,8 @@
         .hidden-toggle.on { border-color: var(--muted); background: var(--muted); color: #111; }
         @media (max-width: 1050px) {
             .grid { grid-template-columns: 1fr 70px 1fr; }
-            .mid-col { padding-top: 10px; gap: 6px; }
+            .mid-col { gap: 8px; flex: 0 0 70px; }
+            .mid-col-glass { padding-top: 10px; gap: 6px; }
             .mid-btn { width: 22px; height: 22px; border-radius: 8px; font-size: 14px; }
             .mid-legend { display: none; }
             #sepayTable th.col-sepay-sum, #sepayTable td.col-sepay-sum { width: 80px; max-width: 80px; }
@@ -190,7 +192,7 @@
             .toolbar { grid-column: 1 / -1; grid-row: 4; display: flex; flex-direction: column; gap: 10px; }
             #dateForm { flex-direction: row !important; justify-content: flex-start; align-items: center; gap: 6px !important; flex: 1 1 auto; }
             #clearDayForm { flex: 0 0 auto; }
-            #dateForm input[type="date"] { width: 76px !important; flex: 0 1 auto; min-width: 0; padding: 6px 4px !important; font-size: 11px; }
+            #dateForm input[type="date"] { width: 84px !important; flex: 0 1 auto; min-width: 0; padding: 6px 4px !important; font-size: 11px; }
             #dateForm button, #clearDayBtn { flex: 0 0 auto; padding: 6px 10px !important; }
             .toolbar-line { gap: 4px !important; justify-content: space-between; }
             .toolbar-line .btn { font-size: 10px !important; padding: 6px 6px !important; white-space: nowrap; letter-spacing: -0.2px; }
