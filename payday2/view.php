@@ -673,7 +673,7 @@ $payday2AssetVersion = '20260417_2900';
         <div class="card card-finance">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
                 <div style="font-weight: 900;">Финансовые транзакции</div>
-                <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить"><img src="https://image.pngaaa.com/816/3994816-middle.png" alt="refresh" style="width: 14px; height: 14px; vertical-align: middle;"></button>
+                <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить"><img src="/assets/img/refresh_icon.png" alt="refresh" style="width: 14px; height: 14px; vertical-align: middle;"></button>
             </div>
 
             <?php
