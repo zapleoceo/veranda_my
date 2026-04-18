@@ -103,7 +103,7 @@ if ($ajax === 'save_res') {
         'start_time', 'guests', 'table_num', 'name', 'phone', 
         'whatsapp_phone', 'comment', 'preorder_text', 'preorder_ru',
         'tg_user_id', 'tg_username', 'zalo_user_id', 'zalo_phone',
-        'lang', 'total_amount', 'qr_url', 'qr_code'
+        'lang', 'total_amount', 'qr_url', 'qr_code', 'duration'
     ];
     $sets = [];
     $params = [];
@@ -1403,6 +1403,10 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
                         <input type="number" name="guests" id="editResGuests" class="res-input">
                     </div>
                     <div class="form-group">
+                        <label class="res-modal-k">Длительность (мин, Poster Duration)</label>
+                        <input type="number" name="duration" id="editResDuration" class="res-input">
+                    </div>
+                    <div class="form-group">
                         <label class="res-modal-k">Номер стола (как в Poster)</label>
                         <input type="text" name="table_num" id="editResTableNum" class="res-input">
                     </div>
@@ -1426,6 +1430,6 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
     <div class="res-hscroll" id="resHScroll" hidden><div class="res-hscroll-inner" id="resHScrollInner"></div></div>
 
     <script src="/assets/user_menu.js?v=20260417_1036"></script>
-    <script src="/reservations/assets/js/reservations.js?v=20260418_0002"></script>
+    <script src="/reservations/assets/js/reservations.js?v=20260418_0003"></script>
 </body>
 </html>

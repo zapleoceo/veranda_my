@@ -187,6 +187,9 @@ class PosterReservationHelper {
             $commentBase = trim((string)($row['comment'] ?? ''));
             $commentFinal = $commentBase !== '' ? ($commentBase . "\n" . $metaLine) : $metaLine;
 
+            $duration = (int)($row['duration'] ?? 120);
+            if ($duration <= 0) $duration = 120;
+
             $reservationData = [
                 'spot_id'          => (string)$spotIdInt,
                 'type'             => '3',
@@ -194,7 +197,7 @@ class PosterReservationHelper {
                 'table_id'         => (string)$tableId,
                 'guests_count'     => (string)$row['guests'],
                 'date_reservation' => $dateReservation,
-                'duration'         => '120', // 2 hours default in minutes
+                'duration'         => (string)$duration,
                 'first_name'       => $firstName,
                 'last_name'        => $lastName,
                 'comment'          => $commentFinal,

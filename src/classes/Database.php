@@ -620,6 +620,9 @@ class Database {
             if (empty($cols['qr_code'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN qr_code VARCHAR(64) NULL");
             }
+            if (empty($cols['duration'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN duration INT DEFAULT 120");
+            }
         } catch (\Throwable $e) {
         }
     }

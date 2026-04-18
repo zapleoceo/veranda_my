@@ -753,6 +753,7 @@
         q('#editResId').value = d.id;
         q('#editResStartTime').value = d.start_time || '';
         q('#editResGuests').value = d.guests || '';
+        q('#editResDuration').value = d.duration || 120;
         q('#editResTableNum').value = d.table_num || '';
         q('#editResName').value = d.name || '';
         q('#editResPhone').value = d.phone || '';
