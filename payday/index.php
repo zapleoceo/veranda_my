@@ -2945,7 +2945,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3000">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3100">
 </head>
 <body>
 <div class="container">
@@ -2962,15 +2962,15 @@ $fmtVnd = function (int $v): string {
             </div>
             <div id="topFormsWrap" style="display: flex; gap: 10px; margin-left: 10px; align-items: center;">
                 <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin: 0; align-items: center;">
-                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 84px;">
-                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 84px;">
+                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 92px;">
+                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 92px;">
                     <button class="btn" type="submit">Открыть</button>
                 </form>
                 <form method="POST" id="clearDayForm" style="margin: 0;">
                     <input type="hidden" name="action" value="clear_day">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Очистить день</button>
+                    <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Обнулить</button>
                 </form>
             </div>
         </div>
@@ -3337,7 +3337,14 @@ $fmtVnd = function (int $v): string {
         <div class="card card-finance">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
                 <div style="font-weight: 900;">Финансовые транзакции</div>
-                <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить"><img src="/assets/img/refresh_icon.png" alt="refresh" style="width: 14px; height: 14px; vertical-align: middle;"></button>
+                <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                        <path d="M21 2v6h-6"></path>
+                        <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                        <path d="M3 22v-6h6"></path>
+                        <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                    </svg>
+                </button>
             </div>
 
             <?php
