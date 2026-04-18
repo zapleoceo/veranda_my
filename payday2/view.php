@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_2200';
+$payday2AssetVersion = '20260417_2300';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,7 +324,7 @@ $payday2AssetVersion = '20260417_2200';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2200">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2300">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
 </head>
 <body>
@@ -389,10 +389,10 @@ $payday2AssetVersion = '20260417_2200';
         <div id="outSection" style="display:none;">
             <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; position: relative;">
                 <div id="outLineLayer"></div>
-                <div class="card" style="padding:0;">
+                <div class="card" style="padding:0; position:relative;">
                     <div style="padding:8px 12px; font-weight:900;" class="vc-subtitle">
-                        <span>Sepay (Mail)</span>
-                        <button type="button" class="vc-toggle hidden-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
+                        <span>Деньги (Mail)</span>
+                        <button type="button" class="vc-toggle hidden-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые" style="position:absolute; top:8px; right:12px;">👁</button>
                     </div>
                     <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
                         <table id="outSepayTable">
@@ -435,12 +435,11 @@ $payday2AssetVersion = '20260417_2200';
 
         <div class="grid" id="tablesRoot">
             <div id="lineLayer"></div>
-            <div class="card" style="padding: 0;">
+            <div class="card" style="padding: 0; position: relative;">
                 <div style="padding: 12px 12px 6px;">
-                    <div style="font-weight:900;">SePay</div>
+                    <div style="font-weight:900;">Деньги</div>
                     <div class="muted vc-subtitle">
-                        <span>Приходы за день</span>
-                        <button type="button" class="vc-toggle hidden-toggle" id="toggleSepayHiddenBtn" title="Показать/скрыть скрытые транзакции">👁</button>
+                        <button type="button" class="vc-toggle hidden-toggle" id="toggleSepayHiddenBtn" title="Показать/скрыть скрытые транзакции" style="position:absolute; top:12px; right:12px;">👁</button>
                     </div>
                 </div>
                 <div id="sepayScroll" style="max-height: 56vh; overflow:auto;">
@@ -510,7 +509,7 @@ $payday2AssetVersion = '20260417_2200';
                 </div>
             </div>
 
-            <div class="mid-col">
+            <div class="mid-col" id="midCol">
                 <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">🎯</button>
                 <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                 <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
@@ -535,12 +534,11 @@ $payday2AssetVersion = '20260417_2200';
                 </div>
             </div>
 
-            <div class="card" style="padding: 0;">
+            <div class="card" style="padding: 0; position: relative;">
                 <div style="padding: 12px 12px 6px;">
-                    <div style="font-weight:900;">Poster</div>
+                    <div style="font-weight:900;">Poster чеки</div>
                     <div class="muted vc-subtitle">
-                        <span>Безнал / смешанная (за выбранный день)</span>
-                        <button type="button" class="vc-toggle" id="toggleVietnamBtn" title="Показать/скрыть Vietnam Company">👁</button>
+                        <button type="button" class="vc-toggle" id="toggleVietnamBtn" title="Показать/скрыть Vietnam Company" style="position:absolute; top:12px; right:12px;">👁</button>
                     </div>
                 </div>
                 <div id="posterScroll" style="max-height: 56vh; overflow:auto;">
