@@ -238,6 +238,10 @@ body {
   justify-content: flex-end;
 }
 
+.modal-overlay[hidden] {
+  display: none !important;
+}
+
 .modal-content {
   width: 400px;
   max-width: 100%;
