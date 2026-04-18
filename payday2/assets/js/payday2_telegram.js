@@ -39,6 +39,7 @@ window.initPaydayTelegramScreenshot = function() {
             const origMargin = container.style.margin;
 
             // Force width to 400px for screenshot
+            container.classList.add('telegram-capture');
             container.style.width = '400px';
             container.style.maxWidth = '400px';
             container.style.overflowX = 'hidden';
@@ -56,6 +57,7 @@ window.initPaydayTelegramScreenshot = function() {
             });
 
             // Restore original styles immediately after snapshot
+            container.classList.remove('telegram-capture');
             container.style.width = origWidth;
             container.style.maxWidth = origMaxWidth;
             container.style.overflowX = origOverflow;

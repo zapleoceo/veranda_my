@@ -209,6 +209,11 @@
             .bal-grid input { width: 85px !important; min-width: 85px !important; padding: 4px !important; font-size: 11px !important; box-sizing: border-box; }
         }
 
+        .telegram-capture.card { padding: 5px !important; }
+        .telegram-capture .bal-grid table { width: auto !important; margin: 0 auto; }
+        .telegram-capture .bal-grid th, .telegram-capture .bal-grid td { padding: 4px 6px !important; font-size: 11px !important; }
+        .telegram-capture .bal-grid input { width: 85px !important; min-width: 85px !important; padding: 4px !important; font-size: 11px !important; box-sizing: border-box; }
+
         body.mode-lite #outSepayTable .col-out-content { display: none; }
         body.mode-lite #outPosterTable .col-out-user,
         body.mode-lite #outPosterTable .col-out-category,
