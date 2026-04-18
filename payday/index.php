@@ -2945,7 +2945,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3200">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3400">
 </head>
 <body>
 <div class="container">
@@ -5739,6 +5739,17 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 
                 html += '</tbody></table></div>';
                 kashshiftBody.innerHTML = html;
+                
+                if (res.data && res.data.length > 0) {
+                    const firstRow = res.data[0];
+                    const sId = String(firstRow.cash_shift_id || firstRow.shift_id || '');
+                    if (sId) {
+                        const firstTr = kashshiftBody.querySelector('tbody tr');
+                        if (firstTr) {
+                            window.toggleShiftDetail(firstTr, sId);
+                        }
+                    }
+                }
             }).catch(e => {
                 kashshiftBody.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>';
             });

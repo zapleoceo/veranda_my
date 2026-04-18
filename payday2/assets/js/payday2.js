@@ -2378,6 +2378,17 @@ window.initPayday2 = function() {
                 
                 html += '</tbody></table></div>';
                 kashshiftBody.innerHTML = html;
+
+                if (res.data && res.data.length > 0) {
+                    const firstRow = res.data[0];
+                    const sId = String(firstRow.cash_shift_id || firstRow.shift_id || '');
+                    if (sId) {
+                        const firstTr = kashshiftBody.querySelector('tbody tr');
+                        if (firstTr) {
+                            window.toggleShiftDetail(firstTr, sId);
+                        }
+                    }
+                }
             }).catch(e => {
                 kashshiftBody.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>';
             });
