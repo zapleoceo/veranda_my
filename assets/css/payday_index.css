@@ -43,15 +43,15 @@
         .table-card-header { position: relative; padding: 12px 12px 6px; display: flex; flex-wrap: nowrap; align-items: center; white-space: nowrap; }
         .table-card-header > div:first-child > div:first-child { font-weight: 900; white-space: nowrap; }
         .table-card-header .vc-toggle { position: absolute; top: 12px; right: 12px; }
-        .grid { display:grid; grid-template-columns: minmax(0, 1fr) 104px minmax(0, 1fr); gap: 12px; align-items:start; width: 100%; overflow-x: auto; }
+        .grid { display:grid; grid-template-columns: minmax(min-content, 1fr) 104px minmax(min-content, 1fr); gap: 12px; align-items:start; width: 100%; overflow-x: auto; }
         
         #tablesRoot { position: relative; }
         #outGrid { position: relative; }
         #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
         #outLineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
-        #sepayScroll, #posterScroll, #outSepayScroll, #outPosterScroll { width: 100%; overflow-x: auto; }
+        #sepayScroll, #posterScroll, #outSepayScroll, #outPosterScroll { width: 100%; }
         table { width: 100%; border-collapse: collapse; }
-        #sepayTable, #posterTable, #outSepayTable, #outPosterTable { width: 100%; }
+        #sepayTable, #posterTable, #outSepayTable, #outPosterTable { width: 100%; min-width: 250px; }
         .grid > .card { min-width: 0; }
         th, td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
         th { background: var(--card); color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; }
@@ -151,7 +151,7 @@
         .hidden-toggle { border-color: var(--border); background: rgba(107, 114, 128, 0.10); color: var(--muted); }
         .hidden-toggle.on { border-color: var(--border); background: var(--muted); color: #111; }
         @media (max-width: 1050px) {
-            .grid { grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr); }
+            .grid { grid-template-columns: minmax(min-content, 1fr) 70px minmax(min-content, 1fr); }
             .mid-col { gap: 8px; flex: 0 0 70px; }
             .mid-col-glass { padding-top: 10px; gap: 6px; }
             .mid-btn { width: 22px; height: 22px; border-radius: 8px; font-size: 14px; }
