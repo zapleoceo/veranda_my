@@ -2945,7 +2945,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_4800">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_4900">
 </head>
 <body>
 <div class="container">
@@ -2980,13 +2980,6 @@ $fmtVnd = function (int $v): string {
     <?php if ($error !== ''): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
     <div class="card">
-        <div class="toolbar toolbar-line" style="margin-bottom: 10px; display:none;">
-            <button class="btn" id="outMailBtn" type="button" style="display:none;">Обновить Платежи Out</button>
-            <button class="btn" id="outFinanceBtn" type="button" style="display:none;">Обновить транзакции</button>
-        </div>
-
-        <div class="divider"></div>
-
         <div id="outSection" style="display:none;">
             <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; position: relative;">
                 <div id="outLineLayer"></div>
