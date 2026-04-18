@@ -85,16 +85,13 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         $expectedUserId = 4;
 
         $txs = [];
-        $tzParam = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? 'client'));
-        if ($tzParam === '') $tzParam = 'client';
-        
         try {
             $txs = $api->request('finance.getTransactions', [
                 'dateFrom' => date('Ymd', $startTs),
                 'dateTo' => date('Ymd', $endTs),
                 'account_id' => $accountTo,
                 'type' => 1,
-                'timezone' => $tzParam,
+                'timezone' => 'client',
             ]);
         } catch (\Throwable $e) {
             $txs = [];
@@ -106,7 +103,7 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
                     'dateTo' => date('dmY', $endTs),
                     'account_id' => $accountTo,
                     'type' => 1,
-                    'timezone' => $tzParam,
+                    'timezone' => 'client',
                 ]);
             } catch (\Throwable $e) {
                 $txs = [];
@@ -291,8 +288,6 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
 
                 $rows = [];
         $accTarget = $kind === 'vietnam' ? 9 : 8;
-        $tzParam = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? 'client'));
-        if ($tzParam === '') $tzParam = 'client';
 
         try {
             $rows = $api->request('finance.getTransactions', [
@@ -300,7 +295,7 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
                 'dateTo' => date('Ymd', $endTs),
                 'account_id' => $accTarget,
                 'type' => 1,
-                'timezone' => $tzParam,
+                'timezone' => 'client',
             ]);
         } catch (\Throwable $e) {
             $rows = [];
@@ -312,7 +307,7 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
                     'dateTo' => date('dmY', $endTs),
                     'account_id' => $accTarget,
                     'type' => 1,
-                    'timezone' => $tzParam,
+                    'timezone' => 'client',
                 ]);
             } catch (\Throwable $e) {
                 $rows = [];
