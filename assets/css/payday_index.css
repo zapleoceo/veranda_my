@@ -56,6 +56,7 @@
         #posterScroll thead th { position: sticky; top: 0; z-index: 5; }
         #sepayTable th, #sepayTable td,
         #posterTable th, #posterTable td { padding: 6px 8px; vertical-align: middle; }
+        #sepayTable th, #posterTable th { white-space: nowrap; }
         #sepayTable td, #posterTable td { font-size: 13px; line-height: 1.2; }
         #sepayTable .col-sepay-cb, #sepayTable .col-sepay-hide, #sepayTable .col-sepay-dot { width: 1%; padding-left: 6px; padding-right: 6px; text-align: center; }
         #sepayTable .col-sepay-hide, #sepayTable .col-sepay-dot { padding-left: 4px; padding-right: 4px; }
