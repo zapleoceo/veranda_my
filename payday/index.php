@@ -2945,7 +2945,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2500">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2600">
 </head>
 <body>
 <div class="container">
@@ -2989,9 +2989,14 @@ $fmtVnd = function (int $v): string {
             <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; position: relative;">
                 <div id="outLineLayer"></div>
                 <div class="card" style="padding:0; position:relative;">
-                    <div class="table-card-header vc-subtitle">
-                        <div>Деньги (Mail)</div>
-                        <button type="button" class="vc-toggle hidden-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
+                    <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div>Деньги 📧</div>
+                            <button class="btn primary" id="outMailBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Обновить платежи</button>
+                        </div>
+                        <div class="muted vc-subtitle">
+                            <button type="button" class="vc-toggle hidden-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
+                        </div>
                     </div>
                     <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
                         <table id="outSepayTable">
@@ -3001,6 +3006,14 @@ $fmtVnd = function (int $v): string {
                     </div>
                 </div>
                 <div class="mid-col" id="outMidCol">
+                    <div class="toggle-wrap" title="Lite/Full" style="margin: 0 auto 12px; transform: scale(0.9); transform-origin: center;">
+                        <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
+                        <label class="switch">
+                            <input id="modeToggleOut" type="checkbox">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
+                    </div>
                     <button class="mid-btn primary" id="outLinkMakeBtn" type="button" title="Связать выбранные" disabled>🎯</button>
                     <button class="mid-btn" id="outHideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                     <button class="mid-btn" id="outLinkAutoBtn" type="button" title="Автосвязи">🧩</button>
@@ -3016,8 +3029,13 @@ $fmtVnd = function (int $v): string {
                         <div id="outSelDiff" style="font-weight: 900;">0</div>
                     </div>
                 </div>
-                <div class="card" style="padding:0;">
-                    <div style="padding:8px 12px; font-weight:900;">Poster Finance</div>
+                <div class="card" style="padding:0; position:relative;">
+                    <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div>Poster тр-ии</div>
+                            <button class="btn primary" id="outFinanceBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Обновить транзакции</button>
+                        </div>
+                    </div>
                     <div id="outPosterScroll" style="max-height: 56vh; overflow:auto;">
                         <table id="outPosterTable">
                             <thead>
