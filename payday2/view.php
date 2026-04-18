@@ -368,7 +368,7 @@ $payday2AssetVersion = '20260417_6100';
                         <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: nowrap;">
                             <div style="white-space: nowrap;">Деньги 📧</div>
                             <button class="btn tiny" id="outMailBtn" type="button" title="Загрузить">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
                                     <path d="M21 2v6h-6"></path>
                                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
                                     <path d="M3 22v-6h6"></path>
@@ -452,7 +452,7 @@ $payday2AssetVersion = '20260417_6100';
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                             <button class="btn tiny" id="sepaySyncBtn" type="submit" title="Загрузить">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
                                     <path d="M21 2v6h-6"></path>
                                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
                                     <path d="M3 22v-6h6"></path>
