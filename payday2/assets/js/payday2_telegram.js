@@ -38,9 +38,9 @@ window.initPaydayTelegramScreenshot = function() {
             const origOverflow = container.style.overflowX;
             const origMargin = container.style.margin;
 
-            // Force width to 380px for screenshot
-            container.style.width = '380px';
-            container.style.maxWidth = '380px';
+            // Force width to 400px for screenshot
+            container.style.width = '400px';
+            container.style.maxWidth = '400px';
             container.style.overflowX = 'hidden';
             container.style.margin = '0';
 
