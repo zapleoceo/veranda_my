@@ -696,24 +696,14 @@ $payday2AssetVersion = '20260417_7100';
             <div class="card card-finance">
                 <div class="pd2-justify-between pd2-align-center pd2-d-flex pd2-mb-10">
                     <div class="pd2-fw-900">Финансовые транзакции</div>
-                    <div class="pd2-d-flex pd2-gap-8">
-                        <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
-                                <path d="M21 2v6h-6"></path>
-                                <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
-                                <path d="M3 22v-6h6"></path>
-                                <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
-                            </svg>
-                        </button>
-                        <button class="btn tiny" id="posterFinanceBtn" type="button" title="Загрузить фин. транзакции">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
+                    <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                             <path d="M21 2v6h-6"></path>
                             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
                             <path d="M3 22v-6h6"></path>
                             <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
                         </svg>
                     </button>
-                    </div>
                 </div>
 
             <?php
