@@ -29,6 +29,9 @@
         .confirm-modal .btn2.primary { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
         .confirm-modal .btn2:disabled { opacity: 0.6; cursor: default; }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .table-card-header { position: relative; padding: 12px 12px 6px; }
+        .table-card-header > div:first-child { font-weight: 900; }
+        .table-card-header .vc-toggle { position: absolute; top: 12px; right: 12px; }
         .grid { display:grid; grid-template-columns: minmax(max-content, 1fr) 104px minmax(max-content, 1fr); gap: 12px; align-items:start; width: 100%; overflow-x: auto; }
         
         #tablesRoot { position: relative; }
@@ -105,6 +108,10 @@
         .mid-btn:disabled { opacity: 0.5; cursor: default; }
         .mid-check { display:flex; gap: 8px; align-items:center; font-weight: 800; font-size: 12px; color: var(--text); user-select: none; }
         .vc-subtitle { display:flex; align-items:center; gap: 8px; }
+        .table-card-header.vc-subtitle { padding: 8px 12px; }
+        @media (max-width: 800px) {
+            .table-card-header.vc-subtitle { padding: 5px !important; }
+        }
         .vc-toggle { display:inline-flex; align-items:center; justify-content:center; width: 22px; height: 22px; border-radius: 8px; border: 1px solid rgba(26, 115, 232, 0.35); background: rgba(26, 115, 232, 0.08); color: var(--accent); cursor: pointer; font-weight: 900; line-height: 1; padding: 0; }
         .vc-toggle.on { border-color: var(--accent); background: var(--accent); color: #fffaf4; }
         .hidden-toggle { border-color: rgba(107, 114, 128, 0.45); background: rgba(107, 114, 128, 0.10); color: var(--muted); }
@@ -161,6 +168,8 @@
         
         @media (max-width: 800px) {
             .card { padding: 5px !important; }
+            .table-card-header { padding: 5px !important; }
+            .table-card-header .vc-toggle { top: 5px; right: 5px; }
             .top-nav { display: grid !important; grid-template-columns: 1fr auto !important; gap: 10px; align-items: center; }
             .nav-left { display: contents !important; }
             .nav-title { grid-column: 1; grid-row: 1; margin-bottom: 0; }
