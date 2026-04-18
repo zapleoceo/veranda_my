@@ -697,14 +697,14 @@ if ($ajax === 'submit_booking') {
   }
   $phoneNorm = preg_replace('/\D+/', '', (string)$phone);
   $phoneNorm = trim((string)$phoneNorm);
-  if ($phoneNorm === '' || !preg_match('/^[1-9]\d{8,14}$/', $phoneNorm)) {
+  if ($phoneNorm === '' || !preg_match('/^[1-9]\d{6,15}$/', $phoneNorm)) {
     $respondError(400, $trFor('phone_invalid'));
   }
   $phoneNorm = '+' . $phoneNorm;
   $waDigits = preg_replace('/\D+/', '', (string)$waPhone);
   $waDigits = trim((string)$waDigits);
   $waPhoneNorm = '';
-  if ($waDigits !== '' && preg_match('/^[1-9]\d{8,14}$/', $waDigits)) {
+  if ($waDigits !== '' && preg_match('/^[1-9]\d{6,15}$/', $waDigits)) {
     $waPhoneNorm = '+' . $waDigits;
   }
   $comment = str_replace(["\r\n", "\r"], "\n", $comment);
@@ -1127,7 +1127,7 @@ if ($ajax === 'wa_state_create') {
   }
   $waDigits = preg_replace('/\D+/', '', $phone);
   $waDigits = trim((string)$waDigits);
-  if ($waDigits === '' || !preg_match('/^[1-9]\d{8,14}$/', $waDigits)) {
+  if ($waDigits === '' || !preg_match('/^[1-9]\d{6,15}$/', $waDigits)) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => tr('phone_invalid')], JSON_UNESCAPED_UNICODE);
     exit;

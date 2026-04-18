@@ -265,14 +265,7 @@ class PosterReservationHelper {
                 // POST https://joinposter.com/api/incomingOrders.createReservation
                 $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
             } catch (\Throwable $e) {
-                $msg = $e->getMessage();
-                // If Poster error 37 (invalid phone), retry with fallback phone
-                if (strpos($msg, '37') !== false || stripos($msg, 'phone number') !== false) {
-                    $reservationData['phone'] = '+94742688058';
-                    $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
-                } else {
-                    throw $e;
-                }
+                throw $e;
             }
 
             // Согласно документации, ответ содержит incoming_order_id

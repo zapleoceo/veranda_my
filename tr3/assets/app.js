@@ -406,7 +406,15 @@
     let skipNextResDateAutoLoad = false;
 
     const phoneDigits = (raw) => String(raw || '').replace(/\D+/g, '').slice(0, 15);
-    const isPhoneValid = (raw) => /^[1-9]\d{8,14}$/.test(phoneDigits(raw));
+    const isPhoneValid = (raw) => {
+      try {
+        if (typeof libphonenumber === 'undefined') return /^[1-9]\d{8,14}$/.test(phoneDigits(raw));
+        const parsed = libphonenumber.parsePhoneNumber(String(raw).split('|')[0].trim());
+        return parsed && parsed.isValid();
+      } catch (e) {
+        return false;
+      }
+    };
     let applyPhoneMask = null;
     if (reqPhone) {
       applyPhoneMask = () => {
@@ -1209,6 +1217,12 @@
 
       const getPhoneE164 = () => {
         if (!reqPhone) return '';
+        try {
+          if (typeof libphonenumber !== 'undefined') {
+            const parsed = libphonenumber.parsePhoneNumber(String(reqPhone.value || '').split('|')[0].trim());
+            if (parsed && parsed.isValid()) return parsed.format('E.164');
+          }
+        } catch (e) {}
         const digits = phoneDigits(reqPhone.value);
         return digits ? ('+' + digits) : '';
       };
