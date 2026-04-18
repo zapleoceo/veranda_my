@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_3500';
+$payday2AssetVersion = '20260417_3600';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,7 +324,7 @@ $payday2AssetVersion = '20260417_3500';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3500">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3600">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
 </head>
 <body>
@@ -342,8 +342,8 @@ $payday2AssetVersion = '20260417_3500';
             </div>
             <div id="topFormsWrap" style="display: flex; gap: 10px; margin-left: 10px; align-items: center;">
                 <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin: 0; align-items: center;">
-                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 92px;">
-                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 92px;">
+                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn" style="padding: 8px 10px; width: 97px;">
+                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn" style="padding: 8px 10px; width: 97px;">
                     <button class="btn" type="submit">Открыть</button>
                 </form>
                 <form method="POST" id="clearDayForm" style="margin: 0;">
@@ -377,7 +377,7 @@ $payday2AssetVersion = '20260417_3500';
                             <button class="btn primary" id="outMailBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
                         </div>
                         <div class="muted vc-subtitle">
-                            <button type="button" class="vc-toggle hidden-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
+                            <button type="button" class="vc-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
                         </div>
                     </div>
                     <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
@@ -398,7 +398,7 @@ $payday2AssetVersion = '20260417_3500';
                     </div>
                     <div class="mid-col-glass">
                         <button class="mid-btn primary" id="outLinkMakeBtn" type="button" title="Связать выбранные" disabled>🎯</button>
-                        <button class="mid-btn" id="outHideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
+                        <button class="mid-btn eye-toggle" id="outHideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                         <button class="mid-btn" id="outLinkAutoBtn" type="button" title="Автосвязи">🧩</button>
                         <button class="mid-btn" id="outLinkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
                         <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
@@ -448,7 +448,7 @@ $payday2AssetVersion = '20260417_3500';
                         </form>
                     </div>
                     <div class="muted vc-subtitle">
-                        <button type="button" class="vc-toggle hidden-toggle" id="toggleSepayHiddenBtn" title="Показать/скрыть скрытые транзакции">👁</button>
+                        <button type="button" class="vc-toggle" id="toggleSepayHiddenBtn" title="Показать/скрыть скрытые транзакции">👁</button>
                     </div>
                 </div>
                 <div id="sepayScroll" style="max-height: 56vh; overflow:auto;">
@@ -529,7 +529,7 @@ $payday2AssetVersion = '20260417_3500';
                 </div>
                 <div class="mid-col-glass">
                     <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">🎯</button>
-                    <button class="mid-btn" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
+                    <button class="mid-btn eye-toggle" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                     <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
                     <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
                     <div class="muted" style="text-align:center; font-weight:900; line-height: 1.35;">
