@@ -260,28 +260,29 @@ class PosterReservationHelper {
             }
 
             try {
-                // Try incomingOrders.createIncomingOrder instead of createReservation
-                // as error 42 "incoming_order_id is undefined" often means createReservation 
-                // is behaving like an update method or is deprecated in some Poster versions.
-                $resp = $api->request('incomingOrders.createIncomingOrder', $reservationData, 'POST');
+                // Reverting to createReservation because createIncomingOrder requires products
+                // Error 42 was likely due to checking for 'incoming_order_id' instead of 'reservation_id'
+                $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
             } catch (\Throwable $e) {
                 $msg = $e->getMessage();
                 // If Poster error 37 (invalid phone), retry with fallback phone
                 if (strpos($msg, '37') !== false || stripos($msg, 'phone number') !== false) {
                     $reservationData['phone'] = '+94742688058';
-                    $resp = $api->request('incomingOrders.createIncomingOrder', $reservationData, 'POST');
+                    $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
                 } else {
                     throw $e;
                 }
             }
 
-            if (isset($resp['error']) || !isset($resp['incoming_order_id'])) {
-                $err = $resp['error'] ?? 'Unknown Poster API Error';
+            // Poster createReservation returns 'reservation_id', not 'incoming_order_id'
+            $posterId = (int)($resp['reservation_id'] ?? $resp['incoming_order_id'] ?? 0);
+
+            if (isset($resp['error']) || $posterId <= 0) {
+                $err = $resp['error'] ?? 'Unknown Poster API Error (no reservation_id returned)';
                 $db->query("UPDATE {$resTable} SET is_poster_pushed = 0 WHERE id = ?", [$reservationId]);
                 return ['ok' => false, 'error' => "Poster API: " . json_encode($resp, JSON_UNESCAPED_UNICODE)];
             }
 
-            $posterId = (int)($resp['incoming_order_id'] ?? 0);
             $db->query("UPDATE {$resTable} SET is_poster_pushed = 1, poster_id = ? WHERE id = ?", [$posterId, $reservationId]);
             $locked = false;
 

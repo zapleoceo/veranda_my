@@ -262,9 +262,9 @@ if ($ackBy === '') {
         
         if (!$res['ok']) {
             $rawText = (string)($message['text'] ?? '');
-            // Remove previous error messages before adding a new one
-            $rawText = preg_replace('/\n\n❌ <b>Poster<\/b>:.*$/s', '', $rawText);
-            $newText = $rawText . "\n\n❌ <b>Poster</b>: " . htmlspecialchars((string)$res['error']);
+            // Remove previous error messages before adding a new one (looking for raw text from Telegram)
+            $rawText = preg_replace('/\n\n❌ Poster:.*$/s', '', $rawText);
+            $newText = $rawText . "\n\n❌ Poster: " . htmlspecialchars((string)$res['error']);
             $payload = [
                 'chat_id' => $chatId,
                 'message_id' => $messageId,
@@ -283,13 +283,13 @@ if ($ackBy === '') {
         if (!empty($res['duplicate'])) {
             $baseText = (string)($message['text'] ?? '');
             // Remove error messages and specific mentions
-            $baseText = preg_replace('/\n\n❌ <b>Poster<\/b>:.*$/s', '', $baseText);
+            $baseText = preg_replace('/\n\n❌ Poster:.*$/s', '', $baseText);
             $baseText = preg_replace('/\n?\s*@Ollushka90\s+@ce_akh1\s+свяжитесь\s+с\s+гостем\s*\n?/u', "\n", $baseText);
             $newText = trim($baseText) . "\n\n🚀 <b>Уже была в Poster</b> (дубль предотвращен)";
         } else {
             $baseText = (string)($message['text'] ?? '');
             // Remove error messages and specific mentions
-            $baseText = preg_replace('/\n\n❌ <b>Poster<\/b>:.*$/s', '', $baseText);
+            $baseText = preg_replace('/\n\n❌ Poster:.*$/s', '', $baseText);
             $baseText = preg_replace('/\n?\s*@Ollushka90\s+@ce_akh1\s+свяжитесь\s+с\s+гостем\s*\n?/u', "\n", $baseText);
             $newText = trim($baseText) . "\n\n🚀 <b>Отправлено в Poster</b> (" . htmlspecialchars($ackBy) . ")";
         }
