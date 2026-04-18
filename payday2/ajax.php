@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../auth_check.php';
+
 if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -30,11 +32,11 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
     $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
     $threadId = trim((string)($_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? ''));
-    
+
     if ($tgToken === '' || $tgChatId === '') {
         @unlink($tmpFile);
         http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'Telegram config is missing'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => false, 'error' => 'Telegram config is missing (Token or Chat ID empty)'], JSON_UNESCAPED_UNICODE);
         exit;
     }
     
@@ -53,7 +55,7 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     $resp = curl_exec($ch);
     curl_close($ch);
     @unlink($tmpFile);
