@@ -15,12 +15,15 @@ RewriteRule ^banya\.php$ /banya [R=301,L]
 RewriteRule ^roma\.php$ /roma [R=301,L]
 RewriteRule ^employees\.php$ /employees [R=301,L]
 RewriteRule ^reservations\.php$ /reservations [R=301,L]
+RewriteRule ^admin\.php$ /admin/ [R=301,L,QSA]
+RewriteRule ^logs\.php$ /admin/?tab=logs [R=301,L,QSA]
 
 # Routes for new folders
 RewriteRule ^banya/?$ banya/index.php [L,QSA]
 RewriteRule ^roma/?$ roma/index.php [L,QSA]
 RewriteRule ^employees/?$ employees/index.php [L,QSA]
 RewriteRule ^reservations/?$ reservations/index.php [L,QSA]
+RewriteRule ^admin/?$ admin/index.php [L,QSA]
 
 RewriteRule ^neworder/?$ neworder/index.php [L,QSA]
 RewriteRule ^neworder/api/?$ neworder/api.php [L,QSA]
