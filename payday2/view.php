@@ -863,6 +863,7 @@ $payday2AssetVersion = '20260417_7000';
             <div style="display:flex; justify-content:space-between; align-items:center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
                 <div style="font-weight: 900;">Итоговый баланс</div>
                 <div style="display:flex; gap: 8px; align-items:center; margin-left: auto;">
+                    <button class="btn tiny" id="lbptBtn" type="button" title="Искать факт кассы">lbpt</button>
                     <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
                     <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" style="padding: 4px 10px;">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
@@ -1027,6 +1028,7 @@ $payday2AssetVersion = '20260417_7000';
     };
 </script>
 <script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
+<script src="/payday2/assets/js/payday2_lbpt.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 </body>
 </html>

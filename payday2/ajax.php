@@ -82,6 +82,92 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'telegram_search_fact') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    $dateTo = $payload['dateTo'] ?? '';
+    
+    if (!$dateTo || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid date format'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+    if ($tgToken === '') {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Telegram token is missing'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    // Внимание: Telegram Bot API не поддерживает метод для поиска сообщений в истории чата.
+    // getUpdates вернет ошибку (409 Conflict), если установлен Webhook, 
+    // и не позволяет получить историю старше 24 часов или уже обработанные сообщения.
+    // Для реального поиска необходимо либо сохранять сообщения в базу данных через Webhook, 
+    // либо использовать Userbot (Telethon / MadelineProto).
+    
+    // Заглушка: пытаемся сделать getUpdates, если webhook не установлен, 
+    // но в реальности это не сработает для старых сообщений.
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/getUpdates?allowed_updates=[\"message\"]");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 409) {
+        echo json_encode([
+            'ok' => false, 
+            'error' => 'Ошибка: установлен Webhook. Telegram Bot API не позволяет искать сообщения. Настройте сохранение сообщений в БД или используйте Userbot.'
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $data = json_decode((string)$resp, true);
+    if (!is_array($data) || empty($data['ok'])) {
+        echo json_encode([
+            'ok' => false, 
+            'error' => 'Не удалось получить обновления от Telegram: ' . ($data['description'] ?? 'Unknown error')
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $foundMsg = null;
+    $targetStart = strtotime($dateTo . ' 22:00:00');
+    $targetEnd = strtotime($dateTo . ' 03:00:00') + 86400; // 03:00 следующего дня
+    
+    foreach ($data['result'] ?? [] as $update) {
+        if (!isset($update['message'])) continue;
+        $msg = $update['message'];
+        $text = mb_strtolower($msg['text'] ?? '', 'UTF-8');
+        $username = mb_strtolower($msg['from']['username'] ?? '', 'UTF-8');
+        $date = $msg['date'] ?? 0;
+        
+        if (strpos($text, 'факт кассы') !== false) {
+            if ($username === 'ollushka90' || $username === 'ce_akh1') {
+                if ($date >= $targetStart && $date <= $targetEnd) {
+                    $foundMsg = $msg['text'];
+                    break;
+                }
+            }
+        }
+    }
+    
+    if ($foundMsg !== null) {
+        echo json_encode(['ok' => true, 'message_text' => $foundMsg], JSON_UNESCAPED_UNICODE);
+    } else {
+        echo json_encode(['ok' => true, 'message_text' => 'Сообщение не найдено. (Помните, что Bot API не видит старую историю чата)'], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'create_transfer') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
