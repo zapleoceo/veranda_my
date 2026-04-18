@@ -12,33 +12,51 @@ class PosterAPI {
     }
 
     /**
-     * Выполнение запроса к Poster API
+     * Выполнение запроса к Poster API (v2 по умолчанию, или v3 если указано)
      */
-    public function request(string $method, array $params = [], string $httpMethod = 'GET') {
+    public function request(string $method, array $params = [], string $httpMethod = 'GET', bool $isV3 = false) {
         $httpMethod = strtoupper($httpMethod);
         $params['token'] = $this->token;
-        $url = $this->baseUrl . '/' . $method;
+        
+        if ($isV3) {
+            $url = 'https://api.joinposter.com/v3/' . $method;
+        } else {
+            $url = $this->baseUrl . '/' . $method;
+        }
+        
         $debugParams = $params;
         unset($debugParams['token']);
 
         if ($httpMethod === 'GET') {
             if (!empty($params)) {
-                $url .= '?' . http_build_query($params);
+                $url .= (strpos($url, '?') === false ? '?' : '&') . http_build_query($params);
             }
         } else {
-            $url .= '?' . http_build_query(['token' => $this->token]);
+            $url .= (strpos($url, '?') === false ? '?' : '&') . http_build_query(['token' => $this->token]);
         }
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        
+        if ($isV3) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Authorization: Bearer ' . $this->token,
+                'Content-Type: application/json'
+            ]);
+        }
         
         if ($httpMethod === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
             $postParams = $params;
             unset($postParams['token']);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postParams));
+            
+            if ($isV3) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postParams));
+            } else {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postParams));
+            }
         }
 
         $response = curl_exec($ch);
