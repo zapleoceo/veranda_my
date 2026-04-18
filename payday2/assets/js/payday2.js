@@ -535,6 +535,7 @@ window.initPayday2 = function() {
         svg.setAttribute('width', '100%');
         svg.setAttribute('height', '100%');
         svg.style.display = 'block';
+        svg.style.pointerEvents = 'none';
         const defs = document.createElementNS(ns, 'defs');
         const g = document.createElementNS(ns, 'g');
         svg.appendChild(defs);
@@ -566,7 +567,9 @@ window.initPayday2 = function() {
         const h = Math.max(1, Math.round(rootRect.height));
         const scrollW = outGrid.scrollWidth || w;
         outSvgState.svg.setAttribute('viewBox', `0 0 ${scrollW} ${h}`);
+        outSvgState.svg.setAttribute('preserveAspectRatio', 'none');
         outSvgState.svg.style.width = scrollW + 'px';
+        outSvgState.svg.style.height = h + 'px';
 
         outLinks.forEach((l) => {
             const s = document.getElementById('out-sepay-' + l.mail_uid);
@@ -1326,6 +1329,7 @@ window.initPayday2 = function() {
         svg.setAttribute('width', '100%');
         svg.setAttribute('height', '100%');
         svg.style.display = 'block';
+        svg.style.pointerEvents = 'none';
         const defs = document.createElementNS(ns, 'defs');
         const g = document.createElementNS(ns, 'g');
         svg.appendChild(defs);
@@ -1609,8 +1613,10 @@ window.initPayday2 = function() {
         
         const scrollW = tablesRoot.scrollWidth || w;
         svgState.svg.setAttribute('viewBox', `0 0 ${scrollW} ${h}`);
+        svgState.svg.setAttribute('preserveAspectRatio', 'none');
         svgState.svg.style.width = scrollW + 'px';
-        
+        svgState.svg.style.height = h + 'px';
+
         widgets.forEach((btn) => { btn.style.display = 'none'; });
 
         const isVisibleInScrollY = (el, scrollEl) => {
