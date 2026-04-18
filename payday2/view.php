@@ -324,7 +324,7 @@ $payday2AssetVersion = '20260417_6100';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_6100">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_6200">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
  </head>
 <body>
@@ -380,7 +380,7 @@ $payday2AssetVersion = '20260417_6100';
                             <button type="button" class="vc-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
                         </div>
                     </div>
-                    <div id="outSepayScroll" style="max-height: 56vh; overflow:auto;">
+                    <div id="outSepayScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
                         <table id="outSepayTable">
                             <thead><tr><th class="col-out-hide"></th><th class="col-out-content">Content</th><th class="nowrap col-out-time">Время</th><th class="nowrap col-out-sum">Сумма</th><th class="col-out-select"></th><th class="col-out-anchor"></th></tr></thead>
                             <tbody></tbody>
@@ -427,7 +427,7 @@ $payday2AssetVersion = '20260417_6100';
                             </button>
                         </div>
                     </div>
-                    <div id="outPosterScroll" style="max-height: 56vh; overflow:auto;">
+                    <div id="outPosterScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
                         <table id="outPosterTable">
                             <thead>
                                 <tr>
@@ -465,7 +465,7 @@ $payday2AssetVersion = '20260417_6100';
                         <button type="button" class="vc-toggle" id="toggleSepayHiddenBtn" title="Показать/скрыть скрытые транзакции">👁</button>
                     </div>
                 </div>
-                <div id="sepayScroll" style="max-height: 56vh; overflow:auto;">
+                <div id="sepayScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
                     <table id="sepayTable">
                         <thead>
                             <tr>
@@ -589,7 +589,7 @@ $payday2AssetVersion = '20260417_6100';
                         <button type="button" class="vc-toggle" id="toggleVietnamBtn" title="Показать/скрыть Vietnam Company">👁</button>
                     </div>
                 </div>
-                <div id="posterScroll" style="max-height: 56vh; overflow:auto;">
+                <div id="posterScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
                     <table id="posterTable">
                         <thead>
                             <tr>
