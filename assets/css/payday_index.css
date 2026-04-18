@@ -75,6 +75,7 @@
         #sepayTable .col-sepay-hide, #sepayTable .col-sepay-dot,
         #outSepayTable .col-out-hide, #outSepayTable .col-out-anchor { padding-left: 4px; padding-right: 4px; }
         #sepayTable .col-sepay-content, #outSepayTable .col-out-content { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+        #outSepayTable .col-out-content { width: 100%; }
         #posterTable td:first-child, #posterTable th:first-child,
         #outPosterTable td:first-child, #outPosterTable th:first-child { width: 1%; padding-left: 6px; padding-right: 6px; }
         #posterTable .cell-anchor, #outPosterTable .cell-anchor { gap: 6px; }
