@@ -1,6 +1,6 @@
 .container { width: 100%; max-width: 1800px; margin: 0 auto; padding: 12px; box-sizing: border-box; }
         .top-nav { display:flex; justify-content: space-between; align-items:center; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
-        .nav-left { display:flex; gap: 14px; align-items:center; flex-wrap: wrap; }
+        .nav-left { display:flex; gap: 14px; align-items:center; flex-wrap: wrap; flex: 1; }
         .nav-title { font-weight: 800; color: var(--text); }
         .toolbar { display:flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .toolbar-line { flex-wrap: nowrap; overflow-x: auto; }
@@ -29,8 +29,8 @@
         .confirm-modal .btn2.primary { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
         .confirm-modal .btn2:disabled { opacity: 0.6; cursor: default; }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .table-card-header { position: relative; padding: 12px 12px 6px; }
-        .table-card-header > div:first-child > div:first-child { font-weight: 900; }
+        .table-card-header { position: relative; padding: 12px 12px 6px; display: flex; flex-wrap: nowrap; align-items: center; white-space: nowrap; }
+        .table-card-header > div:first-child > div:first-child { font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .table-card-header .vc-toggle { position: absolute; top: 12px; right: 12px; }
         .grid { display:grid; grid-template-columns: minmax(max-content, 1fr) 104px minmax(max-content, 1fr); gap: 12px; align-items:start; width: 100%; overflow-x: auto; }
         
@@ -155,7 +155,7 @@
         .pm-lite { display: none; }
         body.mode-lite .pm-full { display: none; }
         body.mode-lite .pm-lite { display: inline; }
-        .tabs { display:flex; gap:6px; align-items:center; margin-left: 12px; }
+        .tabs { display:flex; gap:6px; align-items:center; margin-left: 12px; flex: 1; }
         .tabs .tab { padding: 6px 12px; border: 1px solid var(--border); border-radius:10px; cursor:pointer; font-weight:900; color: var(--muted); background: var(--card); }
         .tabs .tab.active { background: rgba(255,255,255,0.15); color: var(--text); border-color: rgba(255,255,255,0.3); }
         .btn { position: relative; overflow: hidden; }

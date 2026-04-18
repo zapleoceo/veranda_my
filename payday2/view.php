@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_2700';
+$payday2AssetVersion = '20260417_2800';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,7 +324,7 @@ $payday2AssetVersion = '20260417_2700';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2700">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_2800">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
 </head>
 <body>
@@ -335,8 +335,10 @@ $payday2AssetVersion = '20260417_2700';
             <div class="tabs">
                 <button type="button" class="tab active" id="tabIn">IN</button>
                 <button type="button" class="tab" id="tabOut">OUT</button>
-                <button type="button" class="tab" id="btnKashShift" style="margin-left: 15px; background: rgba(184,135,70,0.15); color: #B88746;">KashShift</button>
-                <button type="button" class="tab" id="btnSupplies" style="margin-left: 5px; background: rgba(184,135,70,0.15); color: #B88746;">Supplies</button>
+                <div style="margin-left: auto; display: flex;">
+                    <button type="button" class="tab" id="btnKashShift" style="background: rgba(184,135,70,0.15); color: #B88746;">KashShift</button>
+                    <button type="button" class="tab" id="btnSupplies" style="margin-left: 5px; background: rgba(184,135,70,0.15); color: #B88746;">Supplies</button>
+                </div>
             </div>
             <div id="topFormsWrap" style="display: flex; gap: 10px; margin-left: 10px; align-items: center;">
                 <form method="GET" id="dateForm" style="display: flex; gap: 10px; margin: 0; align-items: center;">
@@ -372,7 +374,7 @@ $payday2AssetVersion = '20260417_2700';
                     <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <div>Деньги 📧</div>
-                            <button class="btn primary" id="outMailBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Обновить платежи</button>
+                            <button class="btn primary" id="outMailBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
                         </div>
                         <div class="muted vc-subtitle">
                             <button type="button" class="vc-toggle hidden-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
@@ -413,7 +415,7 @@ $payday2AssetVersion = '20260417_2700';
                     <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <div>Poster тр-ии</div>
-                            <button class="btn primary" id="outFinanceBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Обновить транзакции</button>
+                            <button class="btn primary" id="outFinanceBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
                         </div>
                     </div>
                     <div id="outPosterScroll" style="max-height: 56vh; overflow:auto;">
@@ -440,7 +442,7 @@ $payday2AssetVersion = '20260417_2700';
                             <input type="hidden" name="action" value="reload_sepay_api">
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                            <button class="btn primary" id="sepaySyncBtn" type="submit" style="padding: 4px 8px; font-size: 11px;">Загрузить платежи</button>
+                            <button class="btn primary" id="sepaySyncBtn" type="submit" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
                         </form>
                     </div>
                     <div class="muted vc-subtitle">
@@ -555,7 +557,7 @@ $payday2AssetVersion = '20260417_2700';
                             <input type="hidden" name="action" value="load_poster_checks">
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                            <button class="btn primary" id="posterSyncBtn" type="submit" style="padding: 4px 8px; font-size: 11px;">Загрузить чеки</button>
+                            <button class="btn primary" id="posterSyncBtn" type="submit" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
                         </form>
                     </div>
                     <div class="muted vc-subtitle">
