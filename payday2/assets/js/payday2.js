@@ -206,34 +206,29 @@ window.initPayday2 = function() {
         if (!btn) return () => {};
         const origHtml = btn.innerHTML;
         btn.dataset.origHtml = origHtml;
-        const title = String(state && state.title ? state.title : btn.textContent || '').trim() || 'Загрузка';
-        const pct = Number(state && state.pct != null ? state.pct : 0);
-        const pctClamped = Math.max(0, Math.min(100, Math.round(pct)));
-        btn.innerHTML = `<span class="btn-label">${escapeHtml(title)} <span class="btn-pct">${pctClamped}%</span></span><span class="btn-busy-line"><span class="btn-busy-fill" style="width:${pctClamped}%"></span></span>`;
-        btn.classList.add('loading');
+        
+        btn.innerHTML = `Загрузка...`;
+        btn.classList.add('loading-fill');
         btn.disabled = true;
+        
+        const pct = Number(state && state.pct != null ? state.pct : 10);
+        const pctClamped = Math.max(10, Math.min(100, Math.round(pct)));
+        btn.style.setProperty('--btn-progress', String(pctClamped) + '%');
+        
         return () => {
-            btn.classList.remove('loading');
+            btn.classList.remove('loading-fill');
             btn.disabled = false;
+            btn.style.removeProperty('--btn-progress');
             btn.innerHTML = btn.dataset.origHtml || origHtml;
             delete btn.dataset.origHtml;
         };
     };
     const updateBtnBusy = (btn, state) => {
-        if (!btn) return;
-        const pctEl = btn.querySelector('.btn-pct');
-        const fillEl = btn.querySelector('.btn-busy-fill');
-        if (state && state.title != null) {
-            const labelEl = btn.querySelector('.btn-label');
-            if (labelEl && pctEl) {
-                labelEl.innerHTML = escapeHtml(String(state.title)) + ' <span class="btn-pct">' + pctEl.textContent + '</span>';
-            }
-        }
+        if (!btn || !btn.classList.contains('loading-fill')) return;
         const pct = Number(state && state.pct != null ? state.pct : NaN);
-        if (Number.isFinite(pct) && pctEl && fillEl) {
-            const pctClamped = Math.max(0, Math.min(100, Math.round(pct)));
-            pctEl.textContent = String(pctClamped) + '%';
-            fillEl.style.width = String(pctClamped) + '%';
+        if (Number.isFinite(pct)) {
+            const pctClamped = Math.max(10, Math.min(100, Math.round(pct)));
+            btn.style.setProperty('--btn-progress', String(pctClamped) + '%');
         }
     };
     let activeTab = 'in';

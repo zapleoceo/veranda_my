@@ -5,10 +5,21 @@
         .toolbar { display:flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .toolbar-line { flex-wrap: nowrap; overflow-x: auto; }
         .toolbar-line form { margin: 0; }
-        .btn { position: relative; overflow: hidden; }
-        .btn.loading::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 6px; height: 3px; border-radius: 999px; background: rgba(17, 24, 39, 0.12); }
-        .btn.loading::before { content: ''; position: absolute; left: 10px; bottom: 6px; height: 3px; width: 22px; border-radius: 999px; background: currentColor; opacity: 0.75; animation: btnbar 900ms ease-in-out infinite alternate; }
-        @keyframes btnbar { from { transform: translateX(0); } to { transform: translateX(22px); } }
+        .btn { position: relative; overflow: hidden; z-index: 1; }
+        .btn.loading-fill {
+            background: transparent !important;
+            color: var(--text) !important;
+            border-color: var(--accent) !important;
+        }
+        .btn.loading-fill::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: var(--btn-progress, 10%);
+            background: var(--accent);
+            z-index: -1;
+            transition: width 0.2s linear;
+        }
         .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-weight: 800; cursor: pointer; color: var(--text); }
         .btn.primary { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
         .btn:disabled { opacity: 0.6; cursor: default; }
@@ -179,7 +190,7 @@
             .toolbar { grid-column: 1 / -1; grid-row: 4; display: flex; flex-direction: column; gap: 10px; }
             #dateForm { flex-direction: row !important; justify-content: flex-start; align-items: center; gap: 6px !important; flex: 1 1 auto; }
             #clearDayForm { flex: 0 0 auto; }
-            #dateForm input[type="date"] { width: 117px !important; flex: 0 1 auto; min-width: 0; padding: 6px 4px !important; font-size: 11px; }
+            #dateForm input[type="date"] { width: 76px !important; flex: 0 1 auto; min-width: 0; padding: 6px 4px !important; font-size: 11px; }
             #dateForm button, #clearDayBtn { flex: 0 0 auto; padding: 6px 10px !important; }
             .toolbar-line { gap: 4px !important; justify-content: space-between; }
             .toolbar-line .btn { font-size: 10px !important; padding: 6px 6px !important; white-space: nowrap; letter-spacing: -0.2px; }
