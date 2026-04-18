@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_3800';
+$payday2AssetVersion = '20260417_3900';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,9 +324,8 @@ $payday2AssetVersion = '20260417_3800';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3700">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3900">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
-   <script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>" defer></script>
  </head>
 <body>
 <div class="container">
@@ -1006,6 +1005,7 @@ window.PAYDAY_CONFIG = {
     }, $links)), JSON_UNESCAPED_UNICODE) ?>
 };
 </script>
+<script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/assets/payday.js?v=20260414_0100" defer></script>
 </body>
