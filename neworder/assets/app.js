@@ -4,8 +4,7 @@ let cart = {}; // product_id -> { item, count }
 
 const elCategories = d.getElementById('categoriesSidebar');
 const elMenu = d.getElementById('menuMain');
-const elCartModal = d.getElementById('cartModal');
-const elCheckoutModal = d.getElementById('checkoutModal');
+const elCartSidebar = d.getElementById('cartSidebar');
 const elCartBadge = d.getElementById('cartBadge');
 const elCartItems = d.getElementById('cartItems');
 const elCartTotal = d.getElementById('cartTotalSum');
@@ -190,18 +189,30 @@ function renderCart() {
 }
 
 function toggleCartModal() {
-  elCartModal.hidden = !elCartModal.hidden;
-  if (!elCartModal.hidden) renderCart();
+  if (window.innerWidth <= 800) {
+    if (elCartSidebar.classList.contains('open')) {
+      elCartSidebar.classList.remove('open');
+      d.body.style.overflow = '';
+    } else {
+      elCartSidebar.classList.add('open');
+      d.body.style.overflow = 'hidden';
+      renderCart();
+    }
+  } else {
+    // On desktop, cart is always visible in the grid, but we can jump to it
+    elCartSidebar.scrollIntoView({ behavior: 'smooth' });
+  }
 }
 
 function openCheckoutModal() {
-  toggleCartModal();
-  elCheckoutModal.hidden = false;
-  d.getElementById('checkoutError').hidden = true;
+  // Not used anymore as checkout is inline
 }
 
 function closeCheckoutModal() {
-  elCheckoutModal.hidden = true;
+  if (window.innerWidth <= 800) {
+    elCartSidebar.classList.remove('open');
+    d.body.style.overflow = '';
+  }
 }
 
 function showToast(msg, isError = false) {
@@ -288,13 +299,11 @@ async function submitOrder(e) {
   }
 }
 
-// Intercept clicks on overlay to close modal
-d.querySelectorAll('.modal-overlay').forEach(el => {
-  el.addEventListener('click', (e) => {
-    if (e.target === el) {
-      el.hidden = true;
-    }
-  });
+// Intercept clicks on overlay to close modal (if using mobile slide-up cart)
+elCartSidebar.addEventListener('click', (e) => {
+  if (e.target === elCartSidebar && window.innerWidth <= 800) {
+    closeCheckoutModal();
+  }
 });
 
 loadMenu();
