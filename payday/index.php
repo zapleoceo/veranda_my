@@ -2990,10 +2990,10 @@ $fmtVnd = function (int $v): string {
             <div class="grid" id="outGrid" style="position: relative;">
                 <div id="outLineLayer"></div>
                 <div class="card" style="padding:0; position:relative;">
-                    <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <div>Деньги 📧</div>
-                            <button class="btn primary" id="outMailBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
+                    <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px; min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap;">
+                            <div style="white-space: nowrap;">Деньги 📧</div>
+                            <button class="btn primary" id="outMailBtn" type="button" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;">Загрузить</button>
                         </div>
                         <div class="muted vc-subtitle">
                             <button type="button" class="vc-toggle" id="toggleOutMailHiddenBtn" title="Показать/скрыть скрытые">👁</button>
@@ -3038,10 +3038,10 @@ $fmtVnd = function (int $v): string {
                     </div>
                 </div>
                 <div class="card" style="padding:0; position:relative;">
-                    <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <div>Poster тр-ии</div>
-                            <button class="btn primary" id="outFinanceBtn" type="button" style="padding: 4px 8px; font-size: 11px;">Загрузить</button>
+                    <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px; min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap;">
+                            <div style="white-space: nowrap;">Poster тр-ии</div>
+                            <button class="btn primary" id="outFinanceBtn" type="button" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;">Загрузить</button>
                         </div>
                     </div>
                     <div id="outPosterScroll" style="max-height: 56vh; overflow-y:auto; overflow-x:hidden;">
@@ -3106,10 +3106,10 @@ $fmtVnd = function (int $v): string {
             </div>
             <div id="lineLayer"></div>
             <div class="card" style="padding: 0; position: relative;">
-                <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div>Деньги</div>
-                        <form method="POST" id="sepaySyncForm" style="margin: 0;">
+                <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap;">
+                        <div style="white-space: nowrap;">Деньги</div>
+                        <form method="POST" id="sepaySyncForm" style="margin: 0; white-space: nowrap;">
                             <input type="hidden" name="action" value="reload_sepay_api">
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
@@ -3223,10 +3223,10 @@ $fmtVnd = function (int $v): string {
             </div>
 
             <div class="card" style="padding: 0; position: relative;">
-                <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div>Poster чеки</div>
-                        <form method="POST" id="posterSyncForm" style="margin: 0;">
+                <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap;">
+                        <div style="white-space: nowrap;">Poster чеки</div>
+                        <form method="POST" id="posterSyncForm" style="margin: 0; white-space: nowrap;">
                             <input type="hidden" name="action" value="load_poster_checks">
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
