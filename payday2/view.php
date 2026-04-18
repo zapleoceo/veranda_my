@@ -310,7 +310,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $v): string {
     return number_format($v, 0, '.', "\u{202F}");
 };
-$payday2AssetVersion = '20260417_6800';
+$payday2AssetVersion = '20260417_7000';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -324,7 +324,7 @@ $payday2AssetVersion = '20260417_6800';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_6800">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_7000">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
  </head>
 <body>
@@ -361,7 +361,7 @@ $payday2AssetVersion = '20260417_6800';
 
     <div class="card">
         <div id="outSection" style="display:none;">
-            <div class="grid" id="outGrid" style="grid-template-columns: 1fr 70px 1fr; gap:12px; position: relative;">
+            <div class="grid" id="outGrid" style="position: relative;">
                 <div id="outLineLayer"></div>
                 <div class="card" style="padding:0; position:relative;">
                     <div class="table-card-header" style="display: flex; align-items: center; justify-content: space-between; padding-right: 40px; min-width: 0;">

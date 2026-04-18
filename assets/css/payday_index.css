@@ -88,6 +88,12 @@
         @media (max-width: 1050px) {
             #sepayTable td, #posterTable td, #outSepayTable td, #outPosterTable td { font-size: 12px; }
             #sepayTable th, #posterTable th, #outSepayTable th, #outPosterTable th { font-size: 11px; }
+            #sepayTable .col-sepay-content, #outSepayTable .col-out-content { max-width: none; text-overflow: clip; overflow: visible; }
+            #posterTable .col-poster-method,
+            #posterTable .col-poster-waiter,
+            #outPosterTable .col-out-user,
+            #outPosterTable .col-out-category,
+            #outPosterTable .col-out-comment { max-width: none; text-overflow: clip; overflow: visible; }
         }
         tr.row-green { background: rgba(46, 125, 50, 0.08); }
         tr.row-yellow { background: rgba(255, 193, 7, 0.16); }
