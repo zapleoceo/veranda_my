@@ -261,70 +261,6 @@ if ($tab === 'reservations') {
         $resLatestWorkday = $wDay;
         $resLatestWeekend = $wEnd;
     }
-    $defaultCaps = [
-        '1' => 8, '2' => 8, '3' => 8,
-        '4' => 5, '5' => 5, '6' => 5, '7' => 5, '8' => 5,
-        '9' => 8,
-        '10' => 2, '11' => 2, '12' => 2, '13' => 2,
-        '14' => 3, '15' => 3, '16' => 3,
-        '17' => 5, '18' => 5, '19' => 5, '20' => 5, '21' => 5,
-        '22' => 15,
-    ];
-
-    if (isset($_POST['save_reservation_tables'])) {
-        $resHallIdPost = max(1, (int)($_POST['hall_id'] ?? $resHallId));
-        $resSpotIdPost = max(1, (int)($_POST['spot_id'] ?? $resSpotId));
-        $resMetaKeyPost = 'reservations_allowed_scheme_nums_hall_' . $resHallIdPost;
-        $resCapsMetaKeyPost = 'reservations_table_caps_hall_' . $resHallIdPost;
-
-        $raw = $_POST['allowed_nums'] ?? [];
-        $nums = [];
-        if (is_array($raw)) {
-            foreach ($raw as $v) {
-                $s = trim((string)$v);
-                if (!preg_match('/^\d+$/', $s)) continue;
-                $n = (int)$s;
-                if ($n < 1 || $n > 500) continue;
-                $nums[$n] = true;
-            }
-        }
-        $nums = array_values(array_keys($nums));
-        sort($nums);
-
-        $db->query(
-            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-            [$resMetaKeyPost, json_encode($nums, JSON_UNESCAPED_UNICODE)]
-        );
-
-        $capsRaw = $_POST['caps'] ?? [];
-        $caps = [];
-        if (is_array($capsRaw)) {
-            foreach ($capsRaw as $k => $v) {
-                $k = trim((string)$k);
-                if (!preg_match('/^\d+$/', $k)) continue;
-                $n = (int)$k;
-                if ($n < 1 || $n > 500) continue;
-                $c = (int)$v;
-                if ($c < 0) $c = 0;
-                if ($c > 999) $c = 999;
-                $caps[(string)$n] = $c;
-            }
-        }
-        if (!$caps) $caps = $defaultCaps;
-        ksort($caps, SORT_NATURAL);
-        $db->query(
-            "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
-            [$resCapsMetaKeyPost, json_encode($caps, JSON_UNESCAPED_UNICODE)]
-        );
-
-        $message = 'Список доступных столов сохранён.';
-        $resHallId = $resHallIdPost;
-        $resSpotId = $resSpotIdPost;
-        $resMetaKey = $resMetaKeyPost;
-        $resCapsMetaKey = $resCapsMetaKeyPost;
-    }
 
     $saved = $metaRepo->getMany([$resMetaKey, $resCapsMetaKey, $resSoonKey, $resWorkdayKey, $resWeekendKey]);
     $stored = array_key_exists($resMetaKey, $saved) ? trim((string)$saved[$resMetaKey]) : '';
@@ -374,38 +310,6 @@ if ($tab === 'reservations') {
         if ($resLatestWeekend === '') $resLatestWeekend = '22:00';
     }
 
-    if ($posterToken === '') {
-        $error = $error ?: 'POSTER_API_TOKEN не задан.';
-    } else {
-        try {
-            $api = new \App\Classes\PosterAPI($posterToken);
-            $rows = $api->request('spots.getTableHallTables', [
-                'spot_id' => $resSpotId,
-                'hall_id' => $resHallId,
-                'without_deleted' => 1,
-            ], 'GET');
-            $rows = is_array($rows) ? $rows : [];
-            foreach ($rows as $r) {
-                if (!is_array($r)) continue;
-                $tableId = trim((string)($r['table_id'] ?? ''));
-                $tableNum = trim((string)($r['table_num'] ?? ''));
-                $tableTitle = trim((string)($r['table_title'] ?? ''));
-                $scheme = null;
-                if (preg_match('/^\d+$/', $tableTitle)) $scheme = (int)$tableTitle;
-                elseif (preg_match('/^\d+$/', $tableNum)) $scheme = (int)$tableNum;
-                $resTables[] = [
-                    'table_id' => $tableId,
-                    'table_num' => $tableNum,
-                    'table_title' => $tableTitle,
-                    'scheme_num' => $scheme !== null ? (string)$scheme : '',
-                    'is_allowed' => $scheme !== null && isset($resAllowedNums[(string)$scheme]) ? 1 : 0,
-                    'cap' => $scheme !== null ? (int)($resCapsByNum[(string)$scheme] ?? ($defaultCaps[(string)$scheme] ?? 0)) : 0,
-                ];
-            }
-        } catch (\Throwable $e) {
-            $error = $error ?: ('Ошибка Poster API: ' . $e->getMessage());
-        }
-    }
 }
 
 $isMenuAjax = ($_GET['ajax'] ?? '') === 'menu_publish';
