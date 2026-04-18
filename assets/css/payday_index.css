@@ -53,9 +53,15 @@
         #sepayTable, #posterTable, #outSepayTable, #outPosterTable { width: max-content; }
         .grid > .card { min-width: 250px; }
         th, td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-        th { background: transparent; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+        th { background: var(--card); color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; }
         #sepayScroll thead th,
-        #posterScroll thead th { position: sticky; top: 0; z-index: 5; }
+        #posterScroll thead th,
+        #outSepayScroll thead th,
+        #outPosterScroll thead th { position: sticky; top: 0; z-index: 5; background: var(--card); }
+        #sepayScroll thead th::after,
+        #posterScroll thead th::after,
+        #outSepayScroll thead th::after,
+        #outPosterScroll thead th::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--border); z-index: 6; }
         #sepayTable th, #sepayTable td,
         #posterTable th, #posterTable td { padding: 6px 8px; vertical-align: middle; }
         #sepayTable th, #posterTable th,
@@ -164,7 +170,7 @@
         .bal-grid { width: 100%; border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; overflow-y: hidden; background: var(--card); }
         .bal-grid table { width:100%; border-collapse: collapse; white-space: nowrap; }
         .bal-grid th, .bal-grid td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 12px; }
-        .bal-grid th { background: transparent; text-transform:none; letter-spacing: 0; }
+        .bal-grid th { background: var(--card); text-transform:none; letter-spacing: 0; }
         .bal-grid input, .bal-grid .fake-input { display: inline-flex; align-items: center; justify-content: flex-end; text-align: right; height: 24px; line-height: 1; width: 90px; min-width: 90px; max-width: 100%; padding: 0 4px; border: 1px solid var(--border); border-radius: 10px; font-weight: 900; font-size: 12px; background: transparent; color: var(--text); box-sizing: border-box; margin: 0; }
         .bal-diff-pos { color: #81c784; font-weight: 900; }
         .bal-diff-neg { color: #ef5350; font-weight: 900; }
