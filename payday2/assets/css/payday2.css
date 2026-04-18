@@ -1,5 +1,5 @@
 @import url('/assets/css/common.css?v=20260412_0171');
-@import url('./payday_index.css');
+@import url('./payday_index.css?v=7100');
 
 /* Utility Classes for payday2/view.php */
 .pd2-pointer { cursor: pointer; }
