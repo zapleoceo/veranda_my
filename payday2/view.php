@@ -324,7 +324,7 @@ $payday2AssetVersion = '20260417_7000';
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_7000">
+  <link rel="stylesheet" href="/payday2/assets/css/payday_index.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
  </head>
 <body>
@@ -1012,22 +1012,21 @@ $payday2AssetVersion = '20260417_7000';
             </div>
             
 <script>
-window.PAYDAY_CONFIG = {
-    userEmail: <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>,
-    dateFrom: <?= json_encode($dateFrom, JSON_UNESCAPED_UNICODE) ?>,
-    dateTo: <?= json_encode($dateTo, JSON_UNESCAPED_UNICODE) ?>,
-    links: <?= json_encode(array_values(array_map(function ($l) {
-        return [
-            'poster_transaction_id' => (int)$l['poster_transaction_id'],
-            'sepay_id' => (int)$l['sepay_id'],
-            'link_type' => (string)$l['link_type'],
-            'is_manual' => !empty($l['is_manual']),
-        ];
-    }, $links)), JSON_UNESCAPED_UNICODE) ?>
-};
+    window.PAYDAY_CONFIG = {
+        userEmail: <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>,
+        dateFrom: <?= json_encode($dateFrom, JSON_UNESCAPED_UNICODE) ?>,
+        dateTo: <?= json_encode($dateTo, JSON_UNESCAPED_UNICODE) ?>,
+        links: <?= json_encode(array_values(array_map(function ($l) {
+                return [
+                    'poster_transaction_id' => (int)$l['poster_transaction_id'],
+                    'sepay_id' => (int)$l['sepay_id'],
+                    'link_type' => (string)$l['link_type'],
+                    'is_manual' => (int)$l['is_manual']
+                ];
+        }, $links)), JSON_UNESCAPED_UNICODE) ?>
+    };
 </script>
 <script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
-<script src="/assets/payday.js?v=20260414_0100" defer></script>
 </body>
 </html>
