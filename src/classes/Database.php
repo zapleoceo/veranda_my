@@ -605,6 +605,21 @@ class Database {
             if (empty($cols['whatsapp_phone'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN whatsapp_phone VARCHAR(64) NULL AFTER phone");
             }
+            if (empty($cols['zalo_user_id'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN zalo_user_id VARCHAR(64) NULL");
+            }
+            if (empty($cols['zalo_phone'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN zalo_phone VARCHAR(64) NULL");
+            }
+            if (empty($cols['total_amount'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN total_amount INT DEFAULT 0");
+            }
+            if (empty($cols['qr_url'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN qr_url VARCHAR(255) NULL");
+            }
+            if (empty($cols['qr_code'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN qr_code VARCHAR(64) NULL");
+            }
         } catch (\Throwable $e) {
         }
     }
