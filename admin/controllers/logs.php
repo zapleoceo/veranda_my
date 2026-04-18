@@ -1,9 +1,4 @@
 <?php
-
-
-
-
-
 $spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
 if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
     $spotTzName = 'Asia/Ho_Chi_Minh';
@@ -26,7 +21,6 @@ if (!array_key_exists($view, $logMap)) {
     $view = 'kitchen';
 }
 $path = $logMap[$view];
-$message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'run_sync') {
     $key = (string)($_POST['key'] ?? '');
@@ -45,10 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
         @set_time_limit(30);
         @session_write_close();
         @exec($jobs[$key]['cmd']);
-        header('Location: logs.php?view=' . urlencode($view) . '&lines=' . (int)$lines . '&ran=' . urlencode($key));
+        header('Location: ?tab=logs&view=' . urlencode($view) . '&lines=' . (int)$lines . '&ran=' . urlencode($key));
         exit;
     }
-    header('Location: logs.php?view=' . urlencode($view) . '&lines=' . (int)$lines . '&ran=0');
+    header('Location: ?tab=logs&view=' . urlencode($view) . '&lines=' . (int)$lines . '&ran=0');
     exit;
 }
 
@@ -56,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
     if (array_key_exists($view, $logMap)) {
         $path = $logMap[$view];
         @file_put_contents($path, '');
-        header('Location: logs.php?view=' . urlencode($view) . '&lines=' . (int)$lines . '&cleared=1');
+        header('Location: ?tab=logs&view=' . urlencode($view) . '&lines=' . (int)$lines . '&cleared=1');
         exit;
     }
 }
@@ -131,5 +125,3 @@ $syncStatus = function (array $fi): array {
     if ($age > 7200) return ['kind' => 'bad', 'label' => 'ПРОБЛЕМА'];
     return ['kind' => 'ok', 'label' => 'есть'];
 };
-
-?>

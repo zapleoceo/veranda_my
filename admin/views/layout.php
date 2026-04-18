@@ -10,11 +10,14 @@
 </head>
 <body>
 
-<?php require_once __DIR__ . '/../../partials/user_menu.php'; ?>
-
 <div class="container">
     <div class="top-nav" style="justify-content: space-between; flex-wrap: wrap;">
-        <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: var(--text);">Админ-панель</h1>
+        <div class="nav-left">
+            <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: var(--text);">Админ-панель</h1>
+        </div>
+        <div class="nav-right">
+            <?php require_once __DIR__ . '/../../partials/user_menu.php'; ?>
+        </div>
     </div>
 
     <!-- Stylish Navigation Menu -->

@@ -1,6 +1,16 @@
 <?php
 $usersTable = $db->t('users');
 $metaTable = $db->t('system_meta');
+
+$menuItems = [];
+$menuTotal = 0;
+$menuPerPage = 50;
+$menuPage = max(1, (int)($_GET['page'] ?? 1));
+$menuEdit = null;
+$menuWorkshops = [];
+$menuCategories = [];
+$menuSyncMeta = ['last_sync_at' => null, 'last_sync_result' => null, 'last_sync_error' => null];
+$menuSyncAtIso = '';
 $menuView = $_GET['view'] ?? 'list';
 if (!in_array($menuView, ['list', 'edit', 'categories'], true)) {
     $menuView = 'list';
