@@ -189,12 +189,12 @@ class PosterReservationHelper {
 
             $reservationData = [
                 'spot_id'          => (string)$spotIdInt,
-                'type'             => '2',
+                'type'             => '3',
                 'phone'            => $phone,
                 'table_id'         => (string)$tableId,
                 'guests_count'     => (string)$row['guests'],
                 'date_reservation' => $dateReservation,
-                'duration'         => '7200', // 2 hours default in seconds
+                'duration'         => '120', // 2 hours default in minutes
                 'first_name'       => $firstName,
                 'last_name'        => $lastName,
                 'comment'          => $commentFinal,
@@ -253,7 +253,18 @@ class PosterReservationHelper {
                 return ['ok' => true, 'poster_res' => ['incoming_order_id' => $foundDuplicateId, 'verified' => $verified], 'duplicate' => true];
             }
 
-            $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
+            try {
+                $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
+            } catch (\Throwable $e) {
+                $msg = $e->getMessage();
+                // If Poster error 37 (invalid phone), retry with fallback phone
+                if (strpos($msg, '37') !== false || stripos($msg, 'phone number') !== false) {
+                    $reservationData['phone'] = '+94742688058';
+                    $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
+                } else {
+                    throw $e;
+                }
+            }
 
             if (isset($resp['error']) || !isset($resp['incoming_order_id'])) {
                 $err = $resp['error'] ?? 'Unknown Poster API Error';

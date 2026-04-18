@@ -1803,7 +1803,7 @@ window.initPayday2 = function() {
 
     const sepayTable = document.getElementById('sepayTable');
     const posterTable = document.getElementById('posterTable');
-    if (!sepayTable || !posterTable) return;
+    // if (!sepayTable || !posterTable) return; // REMOVED early return
 
     const selectedSepay = new Set();
     const selectedPoster = new Set();
@@ -1915,8 +1915,8 @@ window.initPayday2 = function() {
         });
     };
 
-    setupSort(sepayTable);
-    setupSort(posterTable);
+    if (sepayTable) setupSort(sepayTable);
+    if (posterTable) setupSort(posterTable);
 
     const sendManualLinks = (sepayIds, posterIds) => {
         const url = `?dateFrom=${encodeURIComponent(window.PAYDAY_CONFIG.dateFrom)}&dateTo=${encodeURIComponent(window.PAYDAY_CONFIG.dateTo)}&ajax=manual_link`;
@@ -2327,9 +2327,12 @@ window.initPayday2 = function() {
                     html += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; background:var(--card);">' + escapeHtml(k) + '</th>';
                 });
                 html += '</tr></thead><tbody>';
-                
+                let firstShiftId = '';
                 res.data.forEach(row => {
-                    html += '<tr style="cursor:pointer;" onclick="toggleShiftDetail(this, \'' + escapeHtml(row.cash_shift_id || row.shift_id || '') + '\')">';
+                    const rawShiftId = String(row.cash_shift_id || row.shift_id || '');
+                    const escShiftId = escapeHtml(rawShiftId);
+                    if (!firstShiftId && rawShiftId) firstShiftId = rawShiftId;
+                    html += '<tr style="cursor:pointer;" onclick="toggleShiftDetail(this, \'' + escShiftId + '\')">';
                     keys.forEach(k => {
                         let val = row[k];
                         if (val === null || val === undefined) val = '';
@@ -2361,9 +2364,8 @@ window.initPayday2 = function() {
                         html += '<td style="border-bottom:1px solid var(--border); padding:6px;">' + escapeHtml(val) + '</td>';
                     });
                     html += '</tr>';
-                    const sId = escapeHtml(row.cash_shift_id || row.shift_id || '');
-                    if (sId) {
-                        html += '<tr id="shift_detail_' + sId + '" style="display:none; background:var(--card2);">';
+                    if (escShiftId) {
+                        html += '<tr id="shift_detail_' + escShiftId + '" style="display:none; background:var(--card2);">';
                         html += '<td colspan="' + keys.length + '" style="border-bottom:1px solid var(--border); padding:15px; white-space:normal;" class="shift-detail-content">Загрузка...</td>';
                         html += '</tr>';
                     }
@@ -2371,6 +2373,7 @@ window.initPayday2 = function() {
                 
                 html += '</tbody></table></div>';
                 kashshiftBody.innerHTML = html;
+                if (firstShiftId) window.toggleShiftDetail(null, firstShiftId);
             }).catch(e => {
                 kashshiftBody.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>';
             });

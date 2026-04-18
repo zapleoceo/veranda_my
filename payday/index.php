@@ -15,6 +15,12 @@ $error = '';
 if (!isset($_SESSION)) {
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
 }
+if (!isset($_SESSION['payday2_promo_shown_v2'])) {
+    $_SESSION['payday2_promo_shown_v2'] = true;
+    $showPayday2Promo = true;
+} else {
+    $showPayday2Promo = false;
+}
 if (!empty($_SESSION['payday_flash']) && is_array($_SESSION['payday_flash'])) {
     $message = (string)($_SESSION['payday_flash']['message'] ?? '');
     $error = (string)($_SESSION['payday_flash']['error'] ?? '');
@@ -2945,7 +2951,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260414_0100">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_0104">
 </head>
 <body>
 <div class="container">
@@ -5889,6 +5895,7 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
 
 })();
 </script>
+<?php if ($showPayday2Promo): ?>
 <div class="confirm-backdrop" id="payday2PromoModal">
     <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2PromoTitle">
         <h3 id="payday2PromoTitle">Доступна новая версия</h3>
@@ -5909,17 +5916,32 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     const stayBtn = document.getElementById('payday2PromoStay');
     if (!modal) return;
     const closeModal = () => { modal.style.display = 'none'; };
-    const openModal = () => { modal.style.display = 'flex'; };
-    if (stayBtn) stayBtn.addEventListener('click', closeModal);
+    const openModal = () => {
+        if (localStorage.getItem('payday2_promo_shown_v2')) return;
+        modal.style.display = 'flex';
+    };
+    if (stayBtn) {
+        stayBtn.addEventListener('click', () => {
+            closeModal();
+            localStorage.setItem('payday2_promo_shown_v2', '1');
+        });
+    }
     modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
+        if (e.target === modal) {
+            closeModal();
+            localStorage.setItem('payday2_promo_shown_v2', '1');
+        }
     });
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modal.style.display === 'flex') closeModal();
+        if (e.key === 'Escape' && modal.style.display === 'flex') {
+            closeModal();
+            localStorage.setItem('payday2_promo_shown_v2', '1');
+        }
     });
     openModal();
 })();
 </script>
-<script src="/assets/payday.js?v=20260414_0100" defer></script>
+<?php endif; ?>
+<script src="/assets/payday.js?v=20260417_0104" defer></script>
 </body>
 </html>
