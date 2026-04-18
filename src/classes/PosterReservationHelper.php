@@ -260,13 +260,16 @@ class PosterReservationHelper {
             }
 
             try {
-                $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
+                // Try incomingOrders.createIncomingOrder instead of createReservation
+                // as error 42 "incoming_order_id is undefined" often means createReservation 
+                // is behaving like an update method or is deprecated in some Poster versions.
+                $resp = $api->request('incomingOrders.createIncomingOrder', $reservationData, 'POST');
             } catch (\Throwable $e) {
                 $msg = $e->getMessage();
                 // If Poster error 37 (invalid phone), retry with fallback phone
                 if (strpos($msg, '37') !== false || stripos($msg, 'phone number') !== false) {
                     $reservationData['phone'] = '+94742688058';
-                    $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
+                    $resp = $api->request('incomingOrders.createIncomingOrder', $reservationData, 'POST');
                 } else {
                     throw $e;
                 }
