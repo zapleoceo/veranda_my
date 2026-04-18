@@ -50,8 +50,8 @@
         #lineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
         #outLineLayer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index: 2; grid-column: 1 / -1; grid-row: 1 / -1; }
         #sepayScroll, #posterScroll, #outSepayScroll, #outPosterScroll { width: 100%; }
-        table { width: 100%; border-collapse: collapse; }
-        #sepayTable, #posterTable, #outSepayTable, #outPosterTable { width: 100%; min-width: 250px; }
+        table { width: auto; border-collapse: collapse; }
+        #sepayTable, #posterTable, #outSepayTable, #outPosterTable { width: auto; min-width: 250px; }
         .grid > .card { min-width: 0; }
         th, td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
         th { background: var(--card); color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; }
@@ -74,7 +74,7 @@
         #outSepayTable .col-out-select, #outSepayTable .col-out-hide, #outSepayTable .col-out-anchor { width: 1%; padding-left: 6px; padding-right: 6px; text-align: center; }
         #sepayTable .col-sepay-hide, #sepayTable .col-sepay-dot,
         #outSepayTable .col-out-hide, #outSepayTable .col-out-anchor { padding-left: 4px; padding-right: 4px; }
-        #sepayTable .col-sepay-content, #outSepayTable .col-out-content { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; width: 100%; }
+        #sepayTable .col-sepay-content, #outSepayTable .col-out-content { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
         #posterTable td:first-child, #posterTable th:first-child,
         #outPosterTable td:first-child, #outPosterTable th:first-child { width: 1%; padding-left: 6px; padding-right: 6px; }
         #posterTable .cell-anchor, #outPosterTable .cell-anchor { gap: 6px; }
