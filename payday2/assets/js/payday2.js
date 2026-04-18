@@ -1790,21 +1790,6 @@ window.initPayday2 = function() {
         applyHideLinked();
         scheduleRelayoutBurst();
     });
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            drawLines();
-            applyRowClasses();
-            updateStats();
-            applyHideLinked();
-            scheduleRelayoutBurst();
-        });
-    } else {
-        drawLines();
-        applyRowClasses();
-        updateStats();
-        applyHideLinked();
-        scheduleRelayoutBurst();
-    }
 
     const sepayTable = document.getElementById('sepayTable');
     const posterTable = document.getElementById('posterTable');
@@ -2579,5 +2564,21 @@ window.initPayday2 = function() {
     document.querySelectorAll('form.finance-transfer').forEach((form) => {
         if (window.refreshFinanceForm) window.refreshFinanceForm(form, { showLoading: false });
     });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            drawLines();
+            applyRowClasses();
+            updateStats();
+            applyHideLinked();
+            scheduleRelayoutBurst();
+        });
+    } else {
+        drawLines();
+        applyRowClasses();
+        updateStats();
+        applyHideLinked();
+        scheduleRelayoutBurst();
+    }
 };
 window.initPayday2();

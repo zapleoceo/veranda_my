@@ -2945,7 +2945,7 @@ $fmtVnd = function (int $v): string {
     <script src="/assets/user_menu.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260412_0171">
-  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3400">
+  <link rel="stylesheet" href="/assets/css/payday_index.css?v=20260417_3500">
 </head>
 <body>
 <div class="container">
@@ -5155,21 +5155,6 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         applyHideLinked();
         scheduleRelayoutBurst();
     });
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            drawLines();
-            applyRowClasses();
-            updateStats();
-            applyHideLinked();
-            scheduleRelayoutBurst();
-        });
-    } else {
-        drawLines();
-        applyRowClasses();
-        updateStats();
-        applyHideLinked();
-        scheduleRelayoutBurst();
-    }
 
     const sepayTable = document.getElementById('sepayTable');
     const posterTable = document.getElementById('posterTable');
@@ -5935,6 +5920,22 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
                 suppliesModal.style.display = 'none';
             }
         });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            drawLines();
+            applyRowClasses();
+            updateStats();
+            applyHideLinked();
+            scheduleRelayoutBurst();
+        });
+    } else {
+        drawLines();
+        applyRowClasses();
+        updateStats();
+        applyHideLinked();
+        scheduleRelayoutBurst();
     }
 
 })();
