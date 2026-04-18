@@ -3630,10 +3630,12 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
         .replaceAll("'", '&#039;');
 
     const modeToggleEl = document.getElementById('modeToggle');
+    const modeToggleOutEl = document.getElementById('modeToggleOut');
     const applyMode = (mode) => {
         const m = (mode === 'lite') ? 'lite' : 'full';
         document.body.classList.toggle('mode-lite', m === 'lite');
         if (modeToggleEl) modeToggleEl.checked = (m === 'full');
+        if (modeToggleOutEl) modeToggleOutEl.checked = (m === 'full');
         try { localStorage.setItem('payday_mode', m); } catch (_) {}
     };
     const tabIn = document.getElementById('tabIn');
@@ -4689,6 +4691,14 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     if (modeToggleEl) {
         modeToggleEl.addEventListener('change', () => {
             const next = modeToggleEl.checked ? 'full' : 'lite';
+            applyMode(next);
+            try { window.dispatchEvent(new Event('resize')); } catch (_) {}
+            setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 200);
+        });
+    }
+    if (modeToggleOutEl) {
+        modeToggleOutEl.addEventListener('change', () => {
+            const next = modeToggleOutEl.checked ? 'full' : 'lite';
             applyMode(next);
             try { window.dispatchEvent(new Event('resize')); } catch (_) {}
             setTimeout(() => { try { window.dispatchEvent(new Event('resize')); } catch (_) {} }, 200);
