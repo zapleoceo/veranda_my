@@ -20,9 +20,11 @@
             z-index: -1;
             transition: width 0.2s linear;
         }
-        .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-weight: 800; cursor: pointer; color: var(--text); }
+        .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-weight: 800; cursor: pointer; color: var(--text); transition: background-color 0.2s ease, filter 0.2s ease; }
+        .btn:hover { filter: brightness(0.95); }
         .btn.primary { background: var(--accent); border-color: var(--border); color: #fffaf4; }
-        .btn:disabled { opacity: 0.6; cursor: default; }
+        .btn.primary:hover { filter: brightness(1.1); }
+        .btn:disabled { opacity: 0.6; cursor: default; filter: none !important; }
         .toggle-wrap { display:flex; align-items:center; gap: 8px; font-weight: 900; font-size: 12px; color: var(--text); }
         .toggle-wrap .toggle-text { user-select:none; }
         .switch { position: relative; display:inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
@@ -36,9 +38,11 @@
         .confirm-modal h3 { margin: 0 0 10px; font-size: 16px; color: var(--text); }
         .confirm-modal .sub { margin-top: 10px; color: var(--muted); font-weight: 800; font-size: 12px; }
         .confirm-modal .actions { display:flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
-        .confirm-modal .btn2 { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; color: var(--text); }
+        .confirm-modal .btn2 { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; color: var(--text); transition: background-color 0.2s ease, filter 0.2s ease; }
+        .confirm-modal .btn2:hover { filter: brightness(0.95); }
         .confirm-modal .btn2.primary { background: var(--accent); border-color: var(--border); color: #fffaf4; }
-        .confirm-modal .btn2:disabled { opacity: 0.6; cursor: default; }
+        .confirm-modal .btn2.primary:hover { filter: brightness(1.1); }
+        .confirm-modal .btn2:disabled { opacity: 0.6; cursor: default; filter: none !important; }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .table-card-header { position: relative; padding: 12px 12px 6px; display: flex; flex-wrap: nowrap; align-items: center; white-space: nowrap; }
         .table-card-header > div:first-child > div:first-child { font-weight: 900; white-space: nowrap; }
@@ -122,17 +126,17 @@
         .finance-left { display:flex; flex-direction: column; gap: 4px; }
         .badge { display:inline-flex; align-items:center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 800; font-size: 12px; border: 1px solid var(--border); background: var(--card); }
         .link-x { position: absolute; z-index: 20; width: 16px; height: 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); display:flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; }
-        .link-x:hover { background: var(--border); }
-        .sepay-hide { width: 14px; height: 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); display:inline-flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; margin-right: 6px; }
-        .sepay-hide:hover { background: var(--border); }
-        .finance-del { width: 14px; height: 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: #ef5350; display:inline-flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; margin-right: 6px; }
-        .finance-del:hover { background: rgba(220, 38, 38, 0.08); }
+        .link-x:hover { background: var(--border); filter: brightness(0.95); }
+        .sepay-hide { width: 14px; height: 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); display:inline-flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; margin-right: 6px; transition: background-color 0.2s ease, filter 0.2s ease; }
+        .sepay-hide:hover { background: var(--border); filter: brightness(0.95); }
+        .finance-del { width: 14px; height: 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: #ef5350; display:inline-flex; align-items:center; justify-content:center; font-weight: 900; font-size: 12px; line-height: 1; cursor: pointer; padding: 0; margin-right: 6px; transition: background-color 0.2s ease, filter 0.2s ease; }
+        .finance-del:hover { background: rgba(220, 38, 38, 0.08); filter: brightness(0.95); }
         .cell-anchor { display:flex; align-items:center; gap: 8px; }
         .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
         .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 12px; margin-top: 6px; position: relative; z-index: 3; flex: 0 0 104px; }
         .mid-col-glass { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding: 10px 8px 12px; border-radius: 14px; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 1px solid var(--border); width: 100%; box-sizing: border-box; }
-        .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; position: relative; overflow: hidden; color: var(--text); transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out, transform 0.1s; }
-        .mid-btn:not(:disabled):hover { background: var(--accent); border-color: var(--accent); color: #fffaf4; transform: scale(1.05); }
+        .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; position: relative; overflow: hidden; color: var(--text); transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out, transform 0.1s, filter 0.2s ease; }
+        .mid-btn:not(:disabled):hover { background: var(--accent); border-color: var(--accent); color: #fffaf4; transform: scale(1.05); filter: brightness(1.1); }
         .mid-btn:not(:disabled):active { transform: scale(0.95); }
         .mid-btn.loading-fill {
             background: transparent !important;

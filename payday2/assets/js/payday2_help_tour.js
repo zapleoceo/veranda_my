@@ -164,11 +164,39 @@
             text: 'Создание/контроль сводных транзакций в Poster по итогам дня (например, переводы между счетами).',
         },
         {
+            key: 'financeRefreshAll',
+            tab: 'in',
+            selector: '#finance-refresh-all',
+            title: 'Обновить транзакции',
+            text: 'Обновить статусы созданных финансовых транзакций (проверить, создались ли они в Poster).',
+        },
+        {
             key: 'balancesBlock',
             tab: 'in',
             selector: '.card-balances',
             title: 'Итоговый баланс',
-            text: 'Сводка балансов счетов Poster и отправка отчета в Telegram.',
+            text: 'Сводка текущих балансов по счетам в Poster. Позволяет контролировать расхождения между расчетным и фактическим балансом.',
+        },
+        {
+            key: 'balanceSync',
+            tab: 'in',
+            selector: '#balanceSyncBtn',
+            title: 'UPLD',
+            text: 'Сохранить или загрузить фактические балансы для сверки с расчетными (если предусмотрено API).',
+        },
+        {
+            key: 'posterAccounts',
+            tab: 'in',
+            selector: '#posterAccountsBtn',
+            title: 'Обновить балансы',
+            text: 'Сделать запрос в Poster и получить актуальные текущие балансы по всем привязанным счетам.',
+        },
+        {
+            key: 'balancesTelegram',
+            tab: 'in',
+            selector: '#posterBalancesTelegramBtn',
+            title: 'Отправить в Telegram',
+            text: 'Сформировать итоговый отчет по балансам и отправить его в привязанный Telegram-чат (указывается в Настройках).',
         },
     ];
 
@@ -231,10 +259,10 @@
     const setTab = (tab) => {
         if (tab === 'out') {
             const t = document.getElementById('tabOut');
-            if (t) t.click();
+            if (t && !t.classList.contains('active')) t.click();
         } else if (tab === 'in') {
             const t = document.getElementById('tabIn');
-            if (t) t.click();
+            if (t && !t.classList.contains('active')) t.click();
         }
     };
 

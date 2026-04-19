@@ -37,14 +37,17 @@
     align-items: center;
     margin: 0;
 }
-#payday2SettingsBtn {
+#payday2HelpToggleBtn, #payday2SettingsBtn {
     height: 34px;
+    width: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    padding: 0 12px;
+    padding: 0;
     border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
 }
 
 @media (max-width: 800px) {

@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0056';
+$payday2AssetVersion = '20260419_0057';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1151,7 +1151,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <details class="pd2-settings-spoiler pd2-mb-10">
                             <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Постер</summary>
                             <div class="pd2-settings-grid-5 pd2-mt-10">
-                                <label class="pd2-settings-label pd2-m-0"><span>service user_id</span>
+                                <label class="pd2-settings-label pd2-m-0"><span>user_id</span>
                                     <input type="number" class="btn pd2-w-100" id="pd2sett_svc_user" min="1" step="1">
                                 </label>
                                 <label class="pd2-settings-label pd2-m-0"><span>Andrey (ID)</span>
