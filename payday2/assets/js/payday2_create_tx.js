@@ -248,15 +248,19 @@ window.initPaydayCreateTx = function() {
             
             let details = '';
             const tText = typeSelect.options[typeSelect.selectedIndex].text;
-            details += `<div><strong>Тип:</strong> ${escapeHtml(tText)}</div>`;
-            details += `<div><strong>Сумма:</strong> ${Math.round(amount).toLocaleString('en-US').replace(/,/g, '\u202F')} VND</div>`;
-            if (t === '1') details += `<div><strong>На счет:</strong> ${escapeHtml(accToSelect.options[accToSelect.selectedIndex].text)}</div>`;
-            if (t === '2') details += `<div><strong>Со счета:</strong> ${escapeHtml(accFromSelect.options[accFromSelect.selectedIndex].text)}</div>`;
-            if (t === '3') {
-                details += `<div><strong>Со счета:</strong> ${escapeHtml(accFromSelect.options[accFromSelect.selectedIndex].text)}</div>`;
-                details += `<div><strong>На счет:</strong> ${escapeHtml(accToSelect.options[accToSelect.selectedIndex].text)}</div>`;
+            details += `<div class="pd2-mb-4"><strong>Тип:</strong> ${escapeHtml(tText)}</div>`;
+            details += `<div class="pd2-mb-4"><strong>Сумма:</strong> ${Math.round(amount).toLocaleString('en-US').replace(/,/g, '\u202F')} VND</div>`;
+            if (t === '1') {
+                details += `<div class="pd2-mb-4"><strong>На счет:</strong> ${escapeHtml(accToSelect.options[accToSelect.selectedIndex].text)}</div>`;
+            } else if (t === '2') {
+                details += `<div class="pd2-mb-4"><strong>Со счета:</strong> ${escapeHtml(accFromSelect.options[accFromSelect.selectedIndex].text)}</div>`;
+            } else if (t === '3') {
+                details += `<div class="pd2-mb-4"><strong>Со счета:</strong> ${escapeHtml(accFromSelect.options[accFromSelect.selectedIndex].text)}</div>`;
+                details += `<div class="pd2-mb-4"><strong>На счет:</strong> ${escapeHtml(accToSelect.options[accToSelect.selectedIndex].text)}</div>`;
             }
-            if (categoryId) details += `<div><strong>Категория:</strong> ${escapeHtml(categorySelect.options[categorySelect.selectedIndex].text)}</div>`;
+            if (categoryId) {
+                details += `<div class="pd2-mb-4"><strong>Категория:</strong> ${escapeHtml(categorySelect.options[categorySelect.selectedIndex].text.replace(/— /g, ''))}</div>`;
+            }
             
             openSuccessModal(details);
             
