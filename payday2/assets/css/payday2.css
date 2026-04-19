@@ -13,6 +13,15 @@
 .pd2-date-input { padding: 0 2px !important; width: 108px !important; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; }
 .pd2-date-input::-webkit-calendar-picker-indicator { margin-left: 2px; padding: 0; }
 
+@keyframes pd2-spin {
+    100% { transform: rotate(360deg); }
+}
+.pd2-loader-spin {
+    animation: pd2-spin 1s linear infinite;
+    color: var(--muted);
+    display: inline-block;
+}
+
 /* Match height for nav elements and tabs */
 .tabs .tab {
     height: 34px;

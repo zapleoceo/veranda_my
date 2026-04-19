@@ -496,6 +496,7 @@ window.initPayday2 = function() {
     if (dateForm) {
         const dateFromInput = dateForm.querySelector('input[name="dateFrom"]');
         const dateToInput = dateForm.querySelector('input[name="dateTo"]');
+        const dateFormLoader = document.getElementById('dateFormLoader');
         let syncingDateRange = false;
         if (dateFromInput && dateToInput) {
             dateFromInput.addEventListener('change', () => {
@@ -508,6 +509,10 @@ window.initPayday2 = function() {
         }
         dateForm.addEventListener('submit', (ev) => {
             ev.preventDefault();
+            if (dateFormLoader) {
+                dateFormLoader.classList.remove('pd2-d-none');
+                dateFormLoader.classList.add('pd2-d-flex');
+            }
             const formData = new FormData(dateForm);
             const baseUrl = new URL(dateForm.getAttribute('action') || window.location.href, window.location.href);
             const nextUrl = new URL(baseUrl.href);
