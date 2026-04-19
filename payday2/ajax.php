@@ -5,6 +5,22 @@ require_once __DIR__ . '/config.php';
 
 veranda_require('payday');
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!function_exists('payday2_ensure_csrf')) {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Payday2 bootstrap error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    payday2_ensure_csrf();
+    if (!payday2_csrf_valid()) {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Сессия устарела. Обновите страницу (CSRF).'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

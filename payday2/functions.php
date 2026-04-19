@@ -427,3 +427,30 @@ try {
     );
 } catch (\Throwable $e) {
 }
+
+if (!function_exists('payday2_ensure_csrf')) {
+    function payday2_ensure_csrf(): string {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['payday2_csrf']) || !is_string($_SESSION['payday2_csrf'])) {
+            $_SESSION['payday2_csrf'] = bin2hex(random_bytes(16));
+        }
+        return $_SESSION['payday2_csrf'];
+    }
+}
+
+if (!function_exists('payday2_csrf_valid')) {
+    function payday2_csrf_valid(): bool {
+        $expected = (string)(($_SESSION['payday2_csrf'] ?? '') ?: '');
+        if ($expected === '') {
+            return false;
+        }
+        $hdr = trim((string)($_SERVER['HTTP_X_PAYDAY2_CSRF'] ?? ''));
+        if ($hdr !== '' && hash_equals($expected, $hdr)) {
+            return true;
+        }
+        $post = trim((string)($_POST['payday2_csrf'] ?? ''));
+        return $post !== '' && hash_equals($expected, $post);
+    }
+}

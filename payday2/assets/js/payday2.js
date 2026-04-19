@@ -1,3 +1,29 @@
+(function () {
+    if (typeof window.fetch !== 'function' || window.__payday2FetchPatched) return;
+    window.__payday2FetchPatched = true;
+    const origFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+        init = init == null ? {} : Object.assign({}, init);
+        const method = String(init.method || 'GET').toUpperCase();
+        const cfg = window.PAYDAY_CONFIG;
+        if (method === 'POST' && cfg && cfg.csrfToken) {
+            let urlStr = '';
+            if (typeof input === 'string') urlStr = input;
+            else if (input && typeof input.url === 'string') urlStr = input.url;
+            const samePayday =
+                urlStr.indexOf('ajax=') !== -1 ||
+                urlStr.indexOf('/payday2') !== -1 ||
+                (urlStr.charAt(0) === '?' && urlStr.length > 1);
+            if (samePayday) {
+                const h = new Headers(init.headers || undefined);
+                if (!h.has('X-Payday2-Csrf')) h.set('X-Payday2-Csrf', cfg.csrfToken);
+                init.headers = h;
+            }
+        }
+        return origFetch(input, init);
+    };
+})();
+
 if (!window._paydayPjaxLoaded) {
     window._paydayPjaxLoaded = true;
 

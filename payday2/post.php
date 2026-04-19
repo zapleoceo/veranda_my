@@ -5,6 +5,13 @@ require_once __DIR__ . '/config.php';
 veranda_require('payday');
 
 $action = (string)($_POST['action'] ?? '');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== '') {
+    payday2_ensure_csrf();
+    if (!payday2_csrf_valid()) {
+        $error = 'Сессия устарела. Обновите страницу (CSRF).';
+        $action = '';
+    }
+}
 
 try {
     $api = new \App\Classes\PosterAPI((string)$token);

@@ -313,7 +313,8 @@ if (count($posterAccountsById) > 0) {
 
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
-$payday2AssetVersion = '20260419_0003';
+$payday2CsrfToken = payday2_ensure_csrf();
+$payday2AssetVersion = '20260419_0004';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -348,6 +349,7 @@ $payday2AssetVersion = '20260419_0003';
                     <button class="btn" type="submit">Открыть</button>
                 </form>
                 <form method="POST" id="clearDayForm" class="pd2-m-0">
+                    <input type="hidden" name="payday2_csrf" value="<?= htmlspecialchars($payday2CsrfToken) ?>">
                     <input type="hidden" name="action" value="clear_day">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
@@ -449,6 +451,7 @@ $payday2AssetVersion = '20260419_0003';
                     <div class="pd2-card-header-title">
                         <div class="pd2-ws-nowrap">Деньги</div>
                         <form method="POST" id="sepaySyncForm" class="pd2-m-0 pd2-ws-nowrap">
+                            <input type="hidden" name="payday2_csrf" value="<?= htmlspecialchars($payday2CsrfToken) ?>">
                             <input type="hidden" name="action" value="reload_sepay_api">
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
@@ -573,6 +576,7 @@ $payday2AssetVersion = '20260419_0003';
                     <div class="pd2-card-header-title">
                         <div class="pd2-ws-nowrap">Poster чеки</div>
                         <form method="POST" id="posterSyncForm" class="pd2-m-0 pd2-ws-nowrap">
+                            <input type="hidden" name="payday2_csrf" value="<?= htmlspecialchars($payday2CsrfToken) ?>">
                             <input type="hidden" name="action" value="load_poster_checks">
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
@@ -756,6 +760,7 @@ $payday2AssetVersion = '20260419_0003';
                       data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
                       data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[Config::ACCOUNT_VIETNAM]['name'] ?? '#' . Config::ACCOUNT_VIETNAM)) ?>"
                       data-sum-vnd="<?= htmlspecialchars((string)($vietnamVnd !== null ? (int)$vietnamVnd : 0)) ?>">
+                    <input type="hidden" name="payday2_csrf" value="<?= htmlspecialchars($payday2CsrfToken) ?>">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="vietnam">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
@@ -816,6 +821,7 @@ $payday2AssetVersion = '20260419_0003';
                       data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
                       data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[Config::ACCOUNT_TIPS]['name'] ?? '#' . Config::ACCOUNT_TIPS)) ?>"
                       data-sum-vnd="<?= htmlspecialchars((string)($tipsVnd !== null ? (int)$tipsVnd : 0)) ?>">
+                    <input type="hidden" name="payday2_csrf" value="<?= htmlspecialchars($payday2CsrfToken) ?>">
                     <input type="hidden" name="action" value="create_transfer">
                     <input type="hidden" name="kind" value="tips">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
@@ -1020,6 +1026,7 @@ $payday2AssetVersion = '20260419_0003';
 <script>
     window.PAYDAY_CONFIG = {
         userEmail: <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>,
+        csrfToken: <?= json_encode($payday2CsrfToken, JSON_UNESCAPED_UNICODE) ?>,
         dateFrom: <?= json_encode($dateFrom, JSON_UNESCAPED_UNICODE) ?>,
         dateTo: <?= json_encode($dateTo, JSON_UNESCAPED_UNICODE) ?>,
         links: <?= json_encode(array_values(array_map(function ($l) {
