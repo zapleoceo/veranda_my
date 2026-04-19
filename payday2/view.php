@@ -403,19 +403,21 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     <button type="button" class="tab pd2-tab-gold pd2-ml-5" id="btnSupplies">Supplies</button>
                 </div>
             </div>
-            <div id="topFormsWrap" class="pd2-top-forms-wrap">
-                <form method="GET" id="dateForm" class="pd2-date-form">
-                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn pd2-date-input">
-                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn pd2-date-input">
-                    <button class="btn" type="submit">Открыть</button>
+            <div id="topFormsWrap" class="pd2-top-forms-wrap" style="flex-wrap: wrap;">
+                <form method="GET" id="dateForm" class="pd2-m-0 pd2-d-flex pd2-align-center pd2-gap-10">
+                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn pd2-date-input pd2-ws-nowrap">
+                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn pd2-date-input pd2-d-none">
                 </form>
-                <form method="POST" id="clearDayForm" class="pd2-m-0">
+                <form method="POST" id="clearDayForm" class="pd2-m-0 pd2-d-none">
                     <input type="hidden" name="payday2_csrf" value="<?= htmlspecialchars($payday2CsrfToken) ?>">
                     <input type="hidden" name="action" value="clear_day">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <button class="btn" id="clearDayBtn" type="submit" title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстанавливаются.">SoftReset</button>
                 </form>
+                <div class="pd2-d-flex pd2-align-center pd2-gap-10 pd2-ws-nowrap">
+                    <button class="btn pd2-ws-nowrap" type="submit" form="dateForm">Открыть</button>
+                    <button class="btn pd2-ws-nowrap" id="clearDayBtn" type="submit" form="clearDayForm" title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстанавливаются.">SoftReset</button>
+                </div>
             </div>
         </div>
         <?php require __DIR__ . '/../partials/user_menu.php'; ?>

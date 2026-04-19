@@ -37,7 +37,6 @@ if (!window._paydayPjaxLoaded) {
     window._paydayPjaxLoaded = true;
 
     window.doPjax = async function(url, options = {}) {
-        document.body.style.opacity = '0.5';
         try {
             const res = await fetch(url, options);
             if (res.redirected) {
@@ -82,8 +81,6 @@ if (!window._paydayPjaxLoaded) {
             if (options.method !== 'POST') {
                 window.location.href = url;
             }
-        } finally {
-            document.body.style.opacity = '1';
         }
     };
 
