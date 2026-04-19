@@ -50,6 +50,22 @@
             placement: 'bottom-right',
         },
         {
+            key: 'btnKashShift',
+            tab: 'in',
+            selector: '#btnKashShift',
+            title: 'KashShift',
+            text: 'Просмотр кассовых смен из Poster. Помогает сверить кассу на конец дня.',
+            placement: 'bottom-right',
+        },
+        {
+            key: 'btnSupplies',
+            tab: 'in',
+            selector: '#btnSupplies',
+            title: 'Поставки',
+            text: 'Просмотр списка поставок из Poster.',
+            placement: 'bottom-right',
+        },
+        {
             key: 'tabs',
             tab: 'in',
             selector: '.tabs',
