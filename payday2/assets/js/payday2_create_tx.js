@@ -68,14 +68,43 @@ window.initPaydayCreateTx = function() {
                 
                 const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
                 const allowed = ls && ls.allowed_categories ? ls.allowed_categories : [];
+                const customNames = ls && ls.custom_category_names ? ls.custom_category_names : {};
 
-                categorySelect.innerHTML = '<option value="">Без категории</option>';
-                for (const [id, name] of Object.entries(j.categories || {})) {
-                    // Show only if allowed list is empty (fallback) or if category is explicitly allowed
-                    if (allowed.length === 0 || allowed.includes(Number(id))) {
-                        categorySelect.insertAdjacentHTML('beforeend', `<option value="${id}">${escapeHtml(name)}</option>`);
+                const cats = j.categories || {};
+                const roots = [];
+                const byId = {};
+                
+                for (const [idStr, data] of Object.entries(cats)) {
+                    const id = Number(idStr);
+                    byId[id] = { id, name: data.name, parent_id: Number(data.parent_id || 0), children: [] };
+                }
+                
+                for (const id in byId) {
+                    const node = byId[id];
+                    if (node.parent_id && byId[node.parent_id]) {
+                        byId[node.parent_id].children.push(node);
+                    } else {
+                        roots.push(node);
                     }
                 }
+
+                categorySelect.innerHTML = '<option value="">Без категории</option>';
+                
+                const renderOptions = (node, depth) => {
+                    if (allowed.length === 0 || allowed.includes(node.id)) {
+                        const customName = customNames[node.id] || node.name;
+                        const prefix = '— '.repeat(depth);
+                        categorySelect.insertAdjacentHTML('beforeend', `<option value="${node.id}">${escapeHtml(prefix + customName)}</option>`);
+                    }
+                    for (const child of node.children) {
+                        renderOptions(child, depth + 1);
+                    }
+                };
+
+                for (const root of roots) {
+                    renderOptions(root, 0);
+                }
+
                 categoriesLoaded = true;
             }
         } catch (e) {

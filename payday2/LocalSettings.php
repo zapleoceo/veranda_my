@@ -23,6 +23,7 @@ final class LocalSettings
             'account_vietnam_id' => Config::ACCOUNT_VIETNAM,
             'balance_sinc_account_id' => Config::ACCOUNT_TIPS,
             'allowed_categories' => [],
+            'custom_category_names' => [],
         ];
         $path = __DIR__ . DIRECTORY_SEPARATOR . 'local_config.json';
         $file = @file_get_contents($path);
@@ -45,6 +46,7 @@ final class LocalSettings
                 ? (int)$j['balance_sinc_account_id']
                 : $defaults['balance_sinc_account_id'],
             'allowed_categories' => isset($j['allowed_categories']) && is_array($j['allowed_categories']) ? array_map('intval', $j['allowed_categories']) : $defaults['allowed_categories'],
+            'custom_category_names' => isset($j['custom_category_names']) && is_array($j['custom_category_names']) ? $j['custom_category_names'] : $defaults['custom_category_names'],
         ];
         foreach (['service_user_id', 'account_andrey_id', 'account_tips_id', 'account_vietnam_id', 'balance_sinc_account_id'] as $k) {
             if ((int)$row[$k] <= 0) {
@@ -108,6 +110,7 @@ final class LocalSettings
             ],
             'balance_sinc_account_id' => (int)$m['balance_sinc_account_id'],
             'allowed_categories' => (array)($m['allowed_categories'] ?? []),
+            'custom_category_names' => (array)($m['custom_category_names'] ?? []),
         ];
     }
 
@@ -148,6 +151,14 @@ final class LocalSettings
             return ['ok' => false, 'error' => 'Неверный balance_sinc_account_id.'];
         }
         $allowedCats = isset($in['allowed_categories']) && is_array($in['allowed_categories']) ? array_values(array_map('intval', $in['allowed_categories'])) : [];
+        $customNamesIn = isset($in['custom_category_names']) && is_array($in['custom_category_names']) ? $in['custom_category_names'] : [];
+        $customNames = [];
+        foreach ($customNamesIn as $k => $v) {
+            $id = (int)$k;
+            if ($id > 0 && is_string($v) && trim($v) !== '') {
+                $customNames[$id] = trim($v);
+            }
+        }
 
         $out = [
             'telegram_chat_id' => $tgChat,
@@ -160,6 +171,7 @@ final class LocalSettings
             ],
             'balance_sinc_account_id' => $bs,
             'allowed_categories' => $allowedCats,
+            'custom_category_names' => $customNames,
         ];
 
         $path = __DIR__ . DIRECTORY_SEPARATOR . 'local_config.json';

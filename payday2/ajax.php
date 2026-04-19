@@ -1361,7 +1361,13 @@ if (($_GET['ajax'] ?? '') === 'finance_categories') {
             if (!is_array($r)) continue;
             $cid = (int)($r['category_id'] ?? 0);
             $name = (string)($r['name'] ?? '');
-            if ($cid > 0 && $name !== '') $out[$cid] = $name;
+            $pid = (int)($r['parent_id'] ?? 0);
+            if ($cid > 0 && $name !== '') {
+                $out[$cid] = [
+                    'name' => $name,
+                    'parent_id' => $pid
+                ];
+            }
         }
         echo json_encode(['ok' => true, 'categories' => $out], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {

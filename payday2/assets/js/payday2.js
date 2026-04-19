@@ -299,17 +299,55 @@ window.initPayday2 = function() {
             listEl.innerHTML = '';
             const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
             const allowed = ls && ls.allowed_categories ? ls.allowed_categories : [];
+            const customNames = ls && ls.custom_category_names ? ls.custom_category_names : {};
             
-            for (const [id, name] of Object.entries(j.categories || {})) {
-                const checked = allowed.includes(Number(id)) ? 'checked' : '';
-                const idNum = Number(id);
-                listEl.insertAdjacentHTML('beforeend', `
-                    <label class="pd2-d-flex pd2-align-center pd2-gap-8 pd2-pointer">
-                        <input type="checkbox" class="pd2-sett-cat-cb" value="${idNum}" ${checked}>
-                        <span>${escapeHtml(name)}</span>
-                    </label>
-                `);
+            const cats = j.categories || {};
+            
+            // Build tree
+            const roots = [];
+            const byId = {};
+            
+            for (const [idStr, data] of Object.entries(cats)) {
+                const id = Number(idStr);
+                byId[id] = { id, name: data.name, parent_id: Number(data.parent_id || 0), children: [] };
             }
+            
+            for (const id in byId) {
+                const node = byId[id];
+                if (node.parent_id && byId[node.parent_id]) {
+                    byId[node.parent_id].children.push(node);
+                } else {
+                    roots.push(node);
+                }
+            }
+            
+            const renderNode = (node, depth) => {
+                const checked = allowed.includes(node.id) ? 'checked' : '';
+                const customName = customNames[node.id] || node.name;
+                const margin = depth * 20;
+                
+                let html = `
+                    <div class="pd2-d-flex pd2-align-center pd2-gap-8 pd2-mb-6" style="margin-left: ${margin}px;">
+                        <label class="pd2-d-flex pd2-align-center pd2-gap-8 pd2-pointer pd2-m-0">
+                            <input type="checkbox" class="pd2-sett-cat-cb" value="${node.id}" ${checked}>
+                            <span class="pd2-ws-nowrap">${escapeHtml(node.name)}</span>
+                        </label>
+                        <input type="text" class="btn pd2-sett-cat-name pd2-flex-1" data-id="${node.id}" value="${escapeHtml(customName)}" placeholder="${escapeHtml(node.name)}">
+                    </div>
+                `;
+                
+                for (const child of node.children) {
+                    html += renderNode(child, depth + 1);
+                }
+                return html;
+            };
+            
+            let html = '';
+            for (const root of roots) {
+                html += renderNode(root, 0);
+            }
+            
+            listEl.innerHTML = html;
             payday2CategoriesLoaded = true;
         }).catch(e => {
             listEl.innerHTML = '<div class="error pd2-text-center">Ошибка загрузки категорий</div>';
@@ -328,8 +366,17 @@ window.initPayday2 = function() {
         };
         
         const allowedCats = [];
+        const customNames = {};
         document.querySelectorAll('.pd2-sett-cat-cb:checked').forEach(cb => {
-            allowedCats.push(Number(cb.value));
+            const id = Number(cb.value);
+            allowedCats.push(id);
+            const input = document.querySelector(`.pd2-sett-cat-name[data-id="${id}"]`);
+            if (input) {
+                const val = input.value.trim();
+                if (val) {
+                    customNames[id] = val;
+                }
+            }
         });
 
         return {
@@ -343,6 +390,7 @@ window.initPayday2 = function() {
             },
             balance_sinc_account_id: num('pd2sett_balance_sinc'),
             allowed_categories: allowedCats,
+            custom_category_names: customNames,
         };
     };
     const openPayday2SettingsModal = () => {
@@ -506,7 +554,15 @@ window.initPayday2 = function() {
                 const amountInt = Math.round(amountVnd);
                 const balanceInt = Math.round(balanceVnd);
                 const userName = String(emps && emps[Number(row.user_id || 0)] ? emps[Number(row.user_id || 0)] : row.user_id || '');
-                let catName = String(cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : row.category_id || '');
+                let catName = '';
+                const catObj = cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : null;
+                if (catObj && typeof catObj === 'object' && catObj.name) {
+                    catName = String(catObj.name);
+                } else if (typeof catObj === 'string') {
+                    catName = String(catObj);
+                } else {
+                    catName = String(row.category_id || '');
+                }
                 if (catName === 'book_category_action_supplies') catName = 'поставки';
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
