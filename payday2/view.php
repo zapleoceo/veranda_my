@@ -313,7 +313,7 @@ if (count($posterAccountsById) > 0) {
 
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
-$payday2AssetVersion = '20260419_0002';
+$payday2AssetVersion = '20260419_0003';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
