@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>Админ-панель</title>
     <link rel="stylesheet" href="/assets/app.css?v=11">
     <link rel="stylesheet" href="/assets/css/common.css?v=1">
@@ -11,11 +12,11 @@
 <body>
 
 <div class="container">
-    <div class="top-nav" style="justify-content: space-between; flex-wrap: wrap;">
-        <div class="nav-left">
-            <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: var(--text);">Админ-панель</h1>
+    <div class="top-nav" style="justify-content: space-between; flex-wrap: nowrap; align-items: center; gap: 10px;">
+        <div class="nav-left" style="flex: 1; min-width: 0;">
+            <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Админ-панель</h1>
         </div>
-        <div class="nav-right">
+        <div class="nav-right" style="flex-shrink: 0;">
             <?php require_once __DIR__ . '/../../partials/user_menu.php'; ?>
         </div>
     </div>
