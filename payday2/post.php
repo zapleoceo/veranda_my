@@ -1,5 +1,9 @@
 <?php
+require_once __DIR__ . '/../auth_check.php';
 require_once __DIR__ . '/config.php';
+
+veranda_require('payday');
+
 $action = (string)($_POST['action'] ?? '');
 
 try {
