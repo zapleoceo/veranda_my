@@ -186,7 +186,7 @@
     border-radius: 50%;
     transition: transform 0.2s ease, opacity 0.2s, box-shadow 0.2s ease;
 }
-.pd2-soft-reset-btn:hover {
+.pd2-soft-reset-btn:not(:disabled):hover {
     transform: scale(1.05);
     box-shadow: 0 0 7px 2px rgba(239, 68, 68, 0.4);
 }
@@ -237,29 +237,29 @@
     transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out, fill 0.2s ease-in-out, stroke 0.2s ease-in-out;
 }
 
-.tabs .tab:hover,
-.pd2-icon-btn:hover,
-#tablesRoot .btn:hover,
-#outSection .btn:hover,
-.bottom-two .btn:hover {
+.tabs .tab:not(:disabled):hover,
+.pd2-icon-btn:not(:disabled):hover,
+#tablesRoot .btn:not(:disabled):hover,
+#outSection .btn:not(:disabled):hover,
+.bottom-two .btn:not(:disabled):hover {
     background-color: #b88746 !important;
     border-color: #b88746 !important;
     color: #fff !important;
 }
-#tablesRoot .btn:hover svg,
-#outSection .btn:hover svg,
-.bottom-two .btn:hover svg {
+#tablesRoot .btn:not(:disabled):hover svg,
+#outSection .btn:not(:disabled):hover svg,
+.bottom-two .btn:not(:disabled):hover svg {
     stroke: #fff !important;
 }
 /* For SVGs that have fill instead of stroke (like Telegram icon) */
-.bottom-two .btn:hover svg[fill]:not([fill="none"]) {
+.bottom-two .btn:not(:disabled):hover svg[fill]:not([fill="none"]) {
     fill: #fff !important;
 }
-.bottom-two .btn:hover svg path[fill]:not([fill="none"]) {
+.bottom-two .btn:not(:disabled):hover svg path[fill]:not([fill="none"]) {
     fill: #fff !important;
 }
 
-#payday2SettingsBtn:hover {
+#payday2SettingsBtn:not(:disabled):hover {
     background-color: #ef4444 !important;
     border-color: #ef4444 !important;
     color: #fff !important;
