@@ -40,7 +40,7 @@
 
 | Пункт | Суть |
 |-------|------|
-| **4.1** | **`eval` убран**: конфиг в `#payday2-config-json` + `JSON.parse` при первой загрузке и в **`doPjax`**. **Нет подмены** `document.addEventListener` / `window.addEventListener`. Повторные **`initPayday2`**: `AbortController` + хелпер **`pd2on`** для слушателей на **`document`**, **`window`**, **`visualViewport`**; при abort — **`ResizeObserver.disconnect`**. PJAX по-прежнему подменяет **`innerHTML`** у **`.container`** (не `eval`, не глобальный перехват). **Правка:** `setTab(initialTab)` перенесён **после** объявления `outScheduleRelayout`, иначе при `?tab=out` TDZ и падение всего `initPayday2`. |
+| **4.1** | **`eval` убран**: `#payday2-config-json` + **`JSON.parse`** (страница и **`doPjax`**). Подмены глобальных **`addEventListener`** нет; между PJAX — **`AbortController`** + **`pd2on`** на **`document` / `window` / `visualViewport`**, на **`abort`** — **`ResizeObserver.disconnect`**. PJAX: **`innerHTML`** у **`.container`** (точечный swap таблиц в плане оставлен на потом). **Фикс TDZ:** первый **`setTab(initialTab)`** только **после** **`outScheduleRelayout`**, иначе при **`?tab=out`** ломались кнопки OUT, синк дат и остальной **`initPayday2`**. Ассеты **`20260419_0015`**. |
 
 ---
 
@@ -48,7 +48,7 @@
 
 1. Ctrl+F5 на `/payday2/`, версия **`?v=20260419_0015`**.
 2. **SoftReset** + confirm + flash + **Poster sync** после сброса.
-3. **PJAX**: переход по внутренним ссылкам `/payday2`, смена даты GET-формой, POST-редиректы — без дублей обработчиков (Escape, клики OUT, resize).
+3. **PJAX** + вкладка **OUT** (`?tab=out`): смена даты кнопкой **Открыть** — второй датапикер синхронизируется с первым; кнопки обновления таблиц OUT реагируют; без ошибки `outScheduleRelayout` до инициализации.
 4. Таблица **Poster чеки**: колонка **Стол** совпадает с прежним поведением при нескольких `spot_id`.
 5. Блок **финансовых транзакций** (списки Vietnam/Tips из Poster) — без регрессий.
 6. **OUT** — почта (IMAP) после правок `.env`.
