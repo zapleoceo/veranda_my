@@ -37,7 +37,7 @@ if (!window._paydayPjaxLoaded) {
             const html = await res.text();
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            
+
             const newContainer = doc.querySelector('.container');
             const oldContainer = document.querySelector('.container');
             if (newContainer && oldContainer) {
@@ -46,25 +46,25 @@ if (!window._paydayPjaxLoaded) {
                 document.body.innerHTML = doc.body.innerHTML;
             }
 
-            const configScript = Array.from(doc.querySelectorAll('script')).find(s => s.textContent.includes('window.PAYDAY_CONFIG ='));
-            if (configScript) {
+            const jsonCfg = doc.getElementById('payday2-config-json');
+            if (jsonCfg) {
                 try {
-                    eval(configScript.textContent);
-                } catch(err) {
-                    console.error('Eval config error:', err);
+                    window.PAYDAY_CONFIG = JSON.parse(jsonCfg.textContent || '{}');
+                } catch (err) {
+                    console.error('Payday2 config parse error:', err);
                 }
             }
 
             if (options.method !== 'POST' || res.redirected) {
                 try {
                     window.history.pushState({}, '', url);
-                } catch(err) {}
+                } catch (err) {}
             }
 
             if (typeof window.initPayday2 === 'function') {
                 try {
                     window.initPayday2();
-                } catch(err) {
+                } catch (err) {
                     console.error('initPayday2 error:', err);
                 }
             }
@@ -78,40 +78,6 @@ if (!window._paydayPjaxLoaded) {
         }
     };
 
-    const _realAddEventListenerDoc = document.addEventListener;
-    document.addEventListener = function(type, listener, options) {
-        if (!window._paydayPjaxListeners) window._paydayPjaxListeners = [];
-        // Only track listeners that are NOT from this pjax script
-        if (listener.name !== 'pjaxListener') {
-            window._paydayPjaxListeners.push({type, listener, options});
-        }
-        return _realAddEventListenerDoc.call(document, type, listener, options);
-    };
-
-    const _realAddEventListenerWin = window.addEventListener;
-    window.addEventListener = function(type, listener, options) {
-        if (!window._paydayPjaxWinListeners) window._paydayPjaxWinListeners = [];
-        if (listener.name !== 'pjaxListener') {
-            window._paydayPjaxWinListeners.push({type, listener, options});
-        }
-        return _realAddEventListenerWin.call(window, type, listener, options);
-    };
-
-    window.clearPaydayListeners = function() {
-        if (window._paydayPjaxListeners) {
-            window._paydayPjaxListeners.forEach(l => {
-                document.removeEventListener(l.type, l.listener, l.options);
-            });
-            window._paydayPjaxListeners = [];
-        }
-        if (window._paydayPjaxWinListeners) {
-            window._paydayPjaxWinListeners.forEach(l => {
-                window.removeEventListener(l.type, l.listener, l.options);
-            });
-            window._paydayPjaxWinListeners = [];
-        }
-    };
-
     const clickHandler = function pjaxListener(e) {
         const a = e.target.closest('a');
         if (a && a.href && a.href.includes('/payday2') && !a.hasAttribute('download') && !a.target && !e.ctrlKey && !e.metaKey) {
@@ -119,26 +85,25 @@ if (!window._paydayPjaxLoaded) {
             window.doPjax(a.href);
         }
     };
-    _realAddEventListenerDoc.call(document, 'click', clickHandler);
+    document.addEventListener('click', clickHandler);
 
     const popstateHandler = function pjaxListener() {
         window.doPjax(window.location.href);
     };
-    _realAddEventListenerWin.call(window, 'popstate', popstateHandler);
+    window.addEventListener('popstate', popstateHandler);
 
     const submitHandler = function pjaxListener(e) {
         const form = e.target;
         if (e.defaultPrevented) return;
-        
+
         const action = form.getAttribute('action') || window.location.href;
         const method = (form.getAttribute('method') || 'GET').toUpperCase();
-        
+
         if (action.includes('/payday2') || action.startsWith('?') || !action.includes('//')) {
             e.preventDefault();
-            
+
             const formData = new FormData(form);
             if (method === 'GET') {
-                // Fix: if action is just "?..." or empty, use window.location.href to preserve the path!
                 const baseUrl = action.startsWith('http') ? action : new URL(action, window.location.href).href;
                 const url = new URL(baseUrl);
                 for (const [k, v] of formData.entries()) {
@@ -153,11 +118,22 @@ if (!window._paydayPjaxLoaded) {
             }
         }
     };
-    _realAddEventListenerDoc.call(document, 'submit', submitHandler);
+    document.addEventListener('submit', submitHandler);
 }
 
 window.initPayday2 = function() {
-    if (window.clearPaydayListeners) window.clearPaydayListeners();
+    if (window.__payday2InitAbort) {
+        try { window.__payday2InitAbort.abort(); } catch (_) {}
+    }
+    window.__payday2InitAbort = new AbortController();
+    const pd2Signal = window.__payday2InitAbort.signal;
+    const pd2on = (target, type, listener, options) => {
+        if (!target || typeof target.addEventListener !== 'function') return;
+        const o = typeof options === 'boolean' ? { capture: options } : (options && typeof options === 'object' ? Object.assign({}, options) : {});
+        o.signal = pd2Signal;
+        target.addEventListener(type, listener, o);
+    };
+
     window.__USER_EMAIL__ = window.PAYDAY_CONFIG.userEmail;
     let links = window.PAYDAY_CONFIG.links || [];
 
@@ -379,7 +355,7 @@ window.initPayday2 = function() {
             if (ev.target === payday2BetaModal) closePayday2BetaModal();
         });
     }
-    document.addEventListener('keydown', (ev) => {
+    pd2on(document, 'keydown', (ev) => {
         if (ev.key !== 'Escape') return;
         if (payday2SettingsModal && payday2SettingsModal.style.display === 'flex') {
             closePayday2SettingsModal();
@@ -771,7 +747,7 @@ window.initPayday2 = function() {
     if (outPosterScroll) {
         outPosterScroll.addEventListener('scroll', () => outScheduleRelayout(), { passive: true });
     }
-    window.addEventListener('resize', () => outScheduleRelayout(), { passive: true });
+    pd2on(window, 'resize', () => outScheduleRelayout(), { passive: true });
 
     let outHideLinkedOn = false;
     let showOutMailHidden = false;
@@ -860,7 +836,7 @@ window.initPayday2 = function() {
         });
     };
 
-    document.addEventListener('change', (ev) => {
+    pd2on(document, 'change', (ev) => {
         const t = ev.target;
         if (!(t instanceof HTMLInputElement)) return;
         if (t.classList.contains('out-sepay-cb')) {
@@ -1030,7 +1006,7 @@ window.initPayday2 = function() {
         .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
     });
 
-    document.addEventListener('click', (ev) => {
+    pd2on(document, 'click', (ev) => {
         const t = ev.target;
         if (!(t instanceof HTMLElement)) return;
         if (t.classList.contains('out-hide')) {
@@ -1871,12 +1847,12 @@ window.initPayday2 = function() {
     if (posterScroll) {
         posterScroll.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
     }
-    window.addEventListener('resize', () => scheduleRelayoutBurst(), { passive: true });
-    window.addEventListener('pageshow', () => scheduleRelayoutBurst(), { passive: true });
+    pd2on(window, 'resize', () => scheduleRelayoutBurst(), { passive: true });
+    pd2on(window, 'pageshow', () => scheduleRelayoutBurst(), { passive: true });
     try {
         if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', () => scheduleRelayoutBurst(), { passive: true });
-            window.visualViewport.addEventListener('scroll', () => scheduleRelayout(), { passive: true });
+            pd2on(window.visualViewport, 'resize', () => scheduleRelayoutBurst(), { passive: true });
+            pd2on(window.visualViewport, 'scroll', () => scheduleRelayout(), { passive: true });
         }
     } catch (_) {}
 
@@ -1886,10 +1862,13 @@ window.initPayday2 = function() {
             if (tablesRoot) ro.observe(tablesRoot);
             if (sepayScroll) ro.observe(sepayScroll);
             if (posterScroll) ro.observe(posterScroll);
+            pd2Signal.addEventListener('abort', () => {
+                try { ro.disconnect(); } catch (_) {}
+            });
         }
     } catch (_) {}
 
-    window.addEventListener('load', () => {
+    pd2on(window, 'load', () => {
         drawLines();
         applyRowClasses();
         updateStats();
@@ -2183,7 +2162,7 @@ window.initPayday2 = function() {
                 cancel.addEventListener('click', onCancel);
                 ok.addEventListener('click', onOk);
                 backdrop.addEventListener('click', onBg);
-                document.addEventListener('keydown', onEsc, true);
+                pd2on(document, 'keydown', onEsc, { capture: true });
                 cancel.focus();
             });
 
@@ -2393,7 +2372,7 @@ window.initPayday2 = function() {
     }
     updateLinkButtonState();
 
-    document.addEventListener('keydown', (e) => {
+    pd2on(document, 'keydown', (e) => {
         if (e.key === 'Escape') clearCheckboxes();
     });
 
@@ -2676,7 +2655,7 @@ window.initPayday2 = function() {
     });
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
+        pd2on(document, 'DOMContentLoaded', () => {
             drawLines();
             applyRowClasses();
             updateStats();

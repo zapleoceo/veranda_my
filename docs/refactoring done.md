@@ -1,6 +1,6 @@
 # Payday2 — что уже сделано (по [PAYDAY2_REFACTORING_PLAN.md](PAYDAY2_REFACTORING_PLAN.md))
 
-Актуальная версия ассетов в `payday2/view.php`: **`20260419_0013`** (после деплоя — Ctrl+F5 на `/payday2/`).
+Актуальная версия ассетов в `payday2/view.php`: **`20260419_0014`** (после деплоя — Ctrl+F5 на `/payday2/`).
 
 ---
 
@@ -32,14 +32,23 @@
 |-------|------|
 | **3.1** | `mail_out`: `$_ENV` + IMAP **`SINCE` + `BEFORE`**; ошибка `imap_open` с текстом от сервера. |
 | **3.2** | **`spots.getTableHallTables`** вызывается **до** цикла вывода Poster-чеков: для каждого уникального `spot_id` из `$posterRows` один запрос, карта `$posterTableNumsBySpot`; в шаблоне только lookup. В **`findFinanceTransfers`** (`functions.php`) счета 8/9 заменены на **`LocalSettings::accountTipsId()` / `accountVietnamId()`**. Отдельного N+1 по БД для «финансовых строк» во `view.php` не было — мета по webhook уже пакетом через **`IN (...)`**. |
-| **3.3** | Кнопка и `confirm` — **«Сбросить день (Soft Reset)»** (пояснение про `was_deleted`, без физического удаления). Flash после POST — **`clear_day.php`**. **`load_poster_checks.php`**: батч-`INSERT` в `poster_checks` с **`ON DUPLICATE KEY UPDATE`** + `was_deleted = 0`, `deleted_at = NULL` (дубль ключа / гонка). SePay уже был в **`reload_sepay_api.php`**. В **`payday2.js`** текст загрузки формы: «Сброс дня». |
+| **3.3** | Кнопка **SoftReset** (`title` с пояснением), `confirm` без изменений по смыслу. Flash — **`clear_day.php`**. **`load_poster_checks.php`**: `ON DUPLICATE` для `poster_checks`. SePay — **`reload_sepay_api.php`**. Загрузка формы в JS: «Сброс дня». |
+
+---
+
+## Этап 4 — фронтенд
+
+| Пункт | Суть |
+|-------|------|
+| **4.1** | **`eval` убран**: конфиг в `#payday2-config-json` + `JSON.parse` при первой загрузке и в **`doPjax`**. **Нет подмены** `document.addEventListener` / `window.addEventListener`. Повторные **`initPayday2`**: `AbortController` + хелпер **`pd2on`** для слушателей на **`document`**, **`window`**, **`visualViewport`**; при abort — **`ResizeObserver.disconnect`**. PJAX по-прежнему подменяет **`innerHTML`** у **`.container`** (не `eval`, не глобальный перехват). |
 
 ---
 
 ## Чеклист для проверки после релиза
 
-1. Ctrl+F5 на `/payday2/`, версия **`?v=20260419_0013`**.
-2. **Сброс дня (Soft Reset)**: текст кнопки и confirm; flash после POST; затем **Poster sync** — строки снова видны (`was_deleted` снят).
-3. Таблица **Poster чеки**: колонка **Стол** совпадает с прежним поведением при нескольких `spot_id`.
-4. Блок **финансовых транзакций** (списки Vietnam/Tips из Poster) — без регрессий.
-5. **OUT** — почта (IMAP) после правок `.env`.
+1. Ctrl+F5 на `/payday2/`, версия **`?v=20260419_0014`**.
+2. **SoftReset** + confirm + flash + **Poster sync** после сброса.
+3. **PJAX**: переход по внутренним ссылкам `/payday2`, смена даты GET-формой, POST-редиректы — без дублей обработчиков (Escape, клики OUT, resize).
+4. Таблица **Poster чеки**: колонка **Стол** совпадает с прежним поведением при нескольких `spot_id`.
+5. Блок **финансовых транзакций** (списки Vietnam/Tips из Poster) — без регрессий.
+6. **OUT** — почта (IMAP) после правок `.env`.

@@ -356,7 +356,23 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0013';
+$payday2AssetVersion = '20260419_0014';
+$payday2ClientConfig = [
+    'userEmail' => (string)($_SESSION['user_email'] ?? ''),
+    'csrfToken' => $payday2CsrfToken,
+    'dateFrom' => $dateFrom,
+    'dateTo' => $dateTo,
+    'localSettings' => LocalSettings::toClientPayload(),
+    'links' => array_values(array_map(static function ($l) {
+        return [
+            'poster_transaction_id' => (int)$l['poster_transaction_id'],
+            'sepay_id' => (int)$l['sepay_id'],
+            'link_type' => (string)$l['link_type'],
+            'is_manual' => (int)$l['is_manual'],
+        ];
+    }, $links)),
+];
+$payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -398,7 +414,7 @@ $payday2AssetVersion = '20260419_0013';
                     <input type="hidden" name="action" value="clear_day">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Сбросить день (Soft Reset)? Записи Poster и SePay за выбранную дату будут помечены скрытыми (was_deleted); строки и связи в БД не удаляются физически. После повторной синхронизации данные снова появятся.')">Сбросить день (Soft Reset)</button>
+                    <button class="btn" id="clearDayBtn" type="submit" title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстанавливаются." onclick="return confirm('Сбросить день (Soft Reset)? Записи Poster и SePay за выбранную дату будут помечены скрытыми (was_deleted); строки и связи в БД не удаляются физически. После повторной синхронизации данные снова появятся.')">SoftReset</button>
                 </form>
             </div>
         </div>
@@ -1085,22 +1101,16 @@ $payday2AssetVersion = '20260419_0013';
                 </div>
             </div>
             
+<script type="application/json" id="payday2-config-json"><?= json_encode($payday2ClientConfig, $payday2ConfigJsonFlags) ?></script>
 <script>
-    window.PAYDAY_CONFIG = {
-        userEmail: <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>,
-        csrfToken: <?= json_encode($payday2CsrfToken, JSON_UNESCAPED_UNICODE) ?>,
-        dateFrom: <?= json_encode($dateFrom, JSON_UNESCAPED_UNICODE) ?>,
-        dateTo: <?= json_encode($dateTo, JSON_UNESCAPED_UNICODE) ?>,
-        localSettings: <?= json_encode(LocalSettings::toClientPayload(), JSON_UNESCAPED_UNICODE) ?>,
-        links: <?= json_encode(array_values(array_map(function ($l) {
-                return [
-                    'poster_transaction_id' => (int)$l['poster_transaction_id'],
-                    'sepay_id' => (int)$l['sepay_id'],
-                    'link_type' => (string)$l['link_type'],
-                    'is_manual' => (int)$l['is_manual']
-                ];
-        }, $links)), JSON_UNESCAPED_UNICODE) ?>
-    };
+(function () {
+    var el = document.getElementById('payday2-config-json');
+    try {
+        window.PAYDAY_CONFIG = el ? JSON.parse(el.textContent || '{}') : {};
+    } catch (e) {
+        window.PAYDAY_CONFIG = {};
+    }
+})();
 </script>
 <script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
