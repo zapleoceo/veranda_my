@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0027';
+$payday2AssetVersion = '20260419_0028';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -395,11 +395,11 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 <div class="nav-title pd2-pointer" id="payday2BetaInfoBtn">Payda2beta</div>
                 <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2SettingsBtn" title="Настройки Payday2">⚙</button>
                 <div class="pd2-d-flex">
-                    <button type="button" class="tab pd2-tab-gold pd2-d-flex pd2-align-center pd2-justify-center" id="btnKashShift" style="padding: 4px 10px; background: #f97316; border: none;" title="KashShift">
-                        <img src="/payday2/img/Cash.png" alt="KashShift" style="width: 35px; height: 35px; object-fit: contain;">
+                    <button type="button" class="tab pd2-tab-gold pd2-d-flex pd2-align-center pd2-justify-center" id="btnKashShift" style="width: 40px; height: 40px; padding: 0; background: #f97316; border: none; overflow: hidden; border-radius: 8px;" title="KashShift">
+                        <img src="/payday2/img/Cash.png" alt="KashShift" style="width: 100%; height: 100%; object-fit: contain; filter: invert(1);">
                     </button>
-                    <button type="button" class="tab pd2-tab-gold pd2-ml-5 pd2-d-flex pd2-align-center pd2-justify-center" id="btnSupplies" style="padding: 4px 10px; background: #f97316; border: none;" title="Supplies">
-                        <img src="/payday2/img/Supply.png" alt="Supplies" style="width: 35px; height: 35px; object-fit: contain;">
+                    <button type="button" class="tab pd2-tab-gold pd2-ml-5 pd2-d-flex pd2-align-center pd2-justify-center" id="btnSupplies" style="width: 40px; height: 40px; padding: 0; background: #f97316; border: none; overflow: hidden; border-radius: 8px;" title="Supplies">
+                        <img src="/payday2/img/Supply.png" alt="Supplies" style="width: 100%; height: 100%; object-fit: contain; filter: invert(1);">
                     </button>
                 </div>
             </div>
