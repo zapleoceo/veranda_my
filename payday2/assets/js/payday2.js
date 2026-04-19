@@ -872,7 +872,7 @@ window.initPayday2 = function() {
         }
     });
 
-    if (outLinkMakeBtn) outLinkMakeBtn.addEventListener('click', () => {
+    if (outLinkMakeBtn) outLinkMakeBtn.addEventListener('click', async () => {
         const mails = Array.from(outSelectedMail);
         const fins = Array.from(outSelectedFin);
         const pairs = [];
@@ -897,18 +897,20 @@ window.initPayday2 = function() {
             }
         }
         const { dateTo } = getDateRange();
-        fetch(location.pathname + '?ajax=out_manual_link', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dateTo, links: pairs }),
-        })
-        .then((r) => r.json())
-        .then((j) => {
+        
+        const restore = setBtnBusy(outLinkMakeBtn, { title: '🎯', pct: 0 });
+        try {
+            const r = await fetch(location.pathname + '?ajax=out_manual_link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dateTo, links: pairs }),
+            });
+            const j = await r.json();
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_manual_link');
-            return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
-        })
-        .then((j2) => {
+            
+            const j2 = await fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
             if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
+            
             outLinks.length = 0;
             outLinkByMail.clear();
             outLinkByFin.clear();
@@ -925,28 +927,35 @@ window.initPayday2 = function() {
             applyOutHideLinked();
             updateOutSelection();
             outScheduleRelayout();
-        })
-        .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+        } catch (e) {
+            alert(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            restore();
+        }
     });
 
-    if (outLinkClearBtn) outLinkClearBtn.addEventListener('click', () => {
+    if (outLinkClearBtn) outLinkClearBtn.addEventListener('click', async () => {
         const { dateTo } = getDateRange();
-        fetch(location.pathname + '?ajax=out_clear_links', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dateTo }),
-        })
-        .then((r) => r.json())
-        .then((j) => {
+        const restore = setBtnBusy(outLinkClearBtn, { title: '⛓️‍💥', pct: 0 });
+        try {
+            const r = await fetch(location.pathname + '?ajax=out_clear_links', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dateTo }),
+            });
+            const j = await r.json();
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_clear_links');
             outSelectedMail.clear();
             outSelectedFin.clear();
             Array.from(outSepayTable.querySelectorAll('input.out-sepay-cb')).forEach((cb) => { cb.checked = false; });
             Array.from(outPosterTable.querySelectorAll('input.out-poster-cb')).forEach((cb) => { cb.checked = false; });
             outHideLinkedOn = false;
-            return outReloadLinks(dateTo);
-        })
-        .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+            await outReloadLinks(dateTo);
+        } catch (e) {
+            alert(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            restore();
+        }
     });
 
     if (outHideLinkedBtn) outHideLinkedBtn.addEventListener('click', () => {
@@ -966,7 +975,7 @@ window.initPayday2 = function() {
         });
     }
 
-    if (outLinkAutoBtn) outLinkAutoBtn.addEventListener('click', () => {
+    if (outLinkAutoBtn) outLinkAutoBtn.addEventListener('click', async () => {
         const mailRows = Array.from(outSepayTable.tBodies[0]?.rows || []);
         const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
         const finBySum = new Map();
@@ -993,18 +1002,20 @@ window.initPayday2 = function() {
             return;
         }
         const { dateTo } = getDateRange();
-        fetch(location.pathname + '?ajax=out_auto_link', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dateTo, links: pairs }),
-        })
-        .then((r) => r.json())
-        .then((j) => {
+        
+        const restore = setBtnBusy(outLinkAutoBtn, { title: '🧩', pct: 0 });
+        try {
+            const r = await fetch(location.pathname + '?ajax=out_auto_link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dateTo, links: pairs }),
+            });
+            const j = await r.json();
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_auto_link');
-            return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
-        })
-        .then((j2) => {
+            
+            const j2 = await fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
             if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
+            
             outLinks.length = 0;
             outLinkByMail.clear();
             outLinkByFin.clear();
@@ -1021,8 +1032,11 @@ window.initPayday2 = function() {
             applyOutHideLinked();
             updateOutSelection();
             outScheduleRelayout();
-        })
-        .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+        } catch (e) {
+            alert(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            restore();
+        }
     });
 
     pd2on(document, 'click', (ev) => {
@@ -2330,7 +2344,7 @@ window.initPayday2 = function() {
     });
 
     if (linkMakeBtn) {
-        linkMakeBtn.addEventListener('click', () => {
+        linkMakeBtn.addEventListener('click', async () => {
             const sepayIds = Array.from(selectedSepay.values()).map((v) => Number(v)).filter((v) => v > 0);
             const posterIds = Array.from(selectedPoster.values()).map((v) => Number(v)).filter((v) => v > 0);
             if (!sepayIds.length || !posterIds.length) return;
@@ -2338,9 +2352,15 @@ window.initPayday2 = function() {
                 alert('Нельзя: выбери 1 платеж и много чеков или 1 чек и много платежей.');
                 return;
             }
-            sendManualLinks(sepayIds, posterIds)
-                .then(() => clearCheckboxes())
-                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+            const restore = setBtnBusy(linkMakeBtn, { title: '🎯', pct: 0 });
+            try {
+                await sendManualLinks(sepayIds, posterIds);
+                clearCheckboxes();
+            } catch (e) {
+                alert(e && e.message ? e.message : 'Ошибка');
+            } finally {
+                restore();
+            }
         });
     }
     if (hideLinkedBtn) {
@@ -2376,18 +2396,30 @@ window.initPayday2 = function() {
         updateSepayHiddenButtonState();
     }
     if (linkAutoBtn) {
-        linkAutoBtn.addEventListener('click', () => {
-            sendAutoLinks()
-                .then(() => clearCheckboxes())
-                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+        linkAutoBtn.addEventListener('click', async () => {
+            const restore = setBtnBusy(linkAutoBtn, { title: '🧩', pct: 0 });
+            try {
+                await sendAutoLinks();
+                clearCheckboxes();
+            } catch (e) {
+                alert(e && e.message ? e.message : 'Ошибка');
+            } finally {
+                restore();
+            }
         });
     }
     if (linkClearBtn) {
-        linkClearBtn.addEventListener('click', () => {
+        linkClearBtn.addEventListener('click', async () => {
             if (!confirm('Удалить все связи за день?')) return;
-            sendClearLinks()
-                .then(() => clearCheckboxes())
-                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
+            const restore = setBtnBusy(linkClearBtn, { title: '⛓️‍💥', pct: 0 });
+            try {
+                await sendClearLinks();
+                clearCheckboxes();
+            } catch (e) {
+                alert(e && e.message ? e.message : 'Ошибка');
+            } finally {
+                restore();
+            }
         });
     }
     updateLinkButtonState();

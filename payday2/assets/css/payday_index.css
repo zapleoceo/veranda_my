@@ -131,7 +131,23 @@
         .cell-anchor input[type="checkbox"] { width: 16px; height: 16px; }
         .mid-col { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 12px; margin-top: 6px; position: relative; z-index: 3; flex: 0 0 104px; }
         .mid-col-glass { display:flex; flex-direction: column; align-items:center; justify-content:flex-start; gap: 10px; padding: 10px 8px 12px; border-radius: 14px; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: 1px solid var(--border); width: 100%; box-sizing: border-box; }
-        .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; position: relative; overflow: hidden; color: var(--text); }
+        .mid-btn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; display:flex; align-items:center; justify-content:center; position: relative; overflow: hidden; color: var(--text); transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out, transform 0.1s; }
+        .mid-btn:not(:disabled):hover { background: var(--accent); border-color: var(--accent); color: #fffaf4; transform: scale(1.05); }
+        .mid-btn:not(:disabled):active { transform: scale(0.95); }
+        .mid-btn.loading-fill {
+            background: transparent !important;
+            color: var(--text) !important;
+            border-color: var(--accent) !important;
+        }
+        .mid-btn.loading-fill::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: var(--btn-progress, 10%);
+            background: var(--accent);
+            z-index: -1;
+            transition: width 0.2s linear;
+        }
         .mid-btn.primary { background: var(--accent); border-color: var(--border); color: #fffaf4; }
         .mid-btn.active { background: var(--accent); border-color: var(--border); color: #fffaf4; }
         .mid-btn.eye-toggle { background: rgba(26, 115, 232, 0.08); border-color: var(--border); color: var(--accent); }
