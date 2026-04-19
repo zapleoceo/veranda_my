@@ -191,12 +191,27 @@
 .tabs .tab:hover,
 .pd2-icon-btn:hover,
 #tablesRoot .btn:hover,
-#outSection .btn:hover {
+#outSection .btn:hover,
+.bottom-two .btn:hover {
     background-color: #b88746 !important;
     border-color: #b88746 !important;
     color: #fff !important;
 }
 #tablesRoot .btn:hover svg,
-#outSection .btn:hover svg {
+#outSection .btn:hover svg,
+.bottom-two .btn:hover svg {
     stroke: #fff !important;
+}
+/* For SVGs that have fill instead of stroke (like Telegram icon) */
+.bottom-two .btn:hover svg[fill]:not([fill="none"]) {
+    fill: #fff !important;
+}
+.bottom-two .btn:hover svg path[fill]:not([fill="none"]) {
+    fill: #fff !important;
+}
+
+#payday2SettingsBtn:hover {
+    background-color: #ef4444 !important;
+    border-color: #ef4444 !important;
+    color: #fff !important;
 }
