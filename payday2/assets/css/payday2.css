@@ -59,8 +59,13 @@
 .pd2-justify-center { justify-content: center; }
 
 .pd2-settings-gear { line-height: 1; min-width: 36px; opacity: 0.9; }
+.pd2-settings-warn { color: #ef4444; font-size: 12px; font-weight: 700; margin: 0 0 12px; line-height: 1.35; }
 .pd2-settings-modal .pd2-settings-fields { text-align: left; }
 .pd2-settings-modal .pd2-settings-label { display: block; margin-bottom: 8px; font-size: 12px; }
+.pd2-settings-modal .pd2-settings-label.pd2-mb-0 { margin-bottom: 0; }
+.pd2-settings-modal .pd2-settings-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; align-items: end; }
 .pd2-settings-modal .pd2-settings-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-.pd2-settings-modal .pd2-settings-grid label { display: block; font-size: 11px; margin: 0; }
+.pd2-settings-modal .pd2-settings-grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.pd2-settings-modal .pd2-settings-grid label,
+.pd2-settings-modal .pd2-settings-grid-4 label { display: block; font-size: 11px; margin: 0; }
 

@@ -315,7 +315,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0008';
+$payday2AssetVersion = '20260419_0009';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -1009,9 +1009,10 @@ $payday2AssetVersion = '20260419_0008';
                 </div>
             </div>
             <div class="confirm-backdrop" id="payday2SettingsModal" style="display:none;">
-                <div class="confirm-modal pd2-settings-modal" role="dialog" aria-modal="true" aria-labelledby="payday2SettingsTitle" style="max-width: 420px;">
+                <div class="confirm-modal pd2-settings-modal" role="dialog" aria-modal="true" aria-labelledby="payday2SettingsTitle" style="max-width: 520px;">
                     <h3 id="payday2SettingsTitle" class="pd2-m-0">Настройки Payday2</h3>
                     <p class="muted pd2-fs-12 pd2-mb-10">Сохраняется в <code>payday2/local_config.json</code> на сервере.</p>
+                    <p class="pd2-settings-warn">НЕ МЕНЯЙ, ЕСЛИ НЕ ЗНАЕШЬ ЧТО ЭТО</p>
                     <div class="pd2-settings-fields">
                         <label class="pd2-settings-label">Telegram chat_id
                             <input type="text" class="btn pd2-w-100" id="pd2sett_tg_chat" autocomplete="off">
@@ -1021,24 +1022,24 @@ $payday2AssetVersion = '20260419_0008';
                             <code>t.me/c/3889942420/…</code> (часть после <code>/c/</code>) добавляют префикс <code>-100</code>, получается например <code>-1003889942420</code>.
                             Число без минуса или с другим префиксом — это другой тип чата; бот должен быть <strong>участником</strong> этой группы.
                         </p>
-                        <label class="pd2-settings-label">Telegram message_thread_id
-                            <input type="text" class="btn pd2-w-100" id="pd2sett_tg_thread" autocomplete="off" placeholder="пусто = без темы">
-                        </label>
                         <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left" style="line-height:1.35;">
-                            Для форумов: это ID <strong>темы</strong> (topic), не номер сообщения в ссылке. Ошибка «chat not found» чаще из‑за неверного <code>chat_id</code>.
+                            Для форумов: <code>message_thread_id</code> — это ID <strong>темы</strong> (topic), не номер сообщения в ссылке. Ошибка «chat not found» чаще из‑за неверного <code>chat_id</code>.
                         </p>
-                        <label class="pd2-settings-label">Poster service user_id
-                            <input type="number" class="btn pd2-w-100" id="pd2sett_svc_user" min="1" step="1">
-                        </label>
-                        <div class="pd2-settings-label pd2-text-left">Счета Poster</div>
-                        <div class="pd2-settings-grid">
+                        <div class="pd2-settings-row-2">
+                            <label class="pd2-settings-label pd2-mb-0">Telegram message_thread_id
+                                <input type="text" class="btn pd2-w-100" id="pd2sett_tg_thread" autocomplete="off" placeholder="пусто = без темы">
+                            </label>
+                            <label class="pd2-settings-label pd2-mb-0">Poster service user_id
+                                <input type="number" class="btn pd2-w-100" id="pd2sett_svc_user" min="1" step="1">
+                            </label>
+                        </div>
+                        <div class="pd2-settings-label pd2-text-left pd2-mt-6">Счета в Poster (ID)</div>
+                        <div class="pd2-settings-grid-4">
                             <label>Andrey <input type="number" class="btn pd2-w-100" id="pd2sett_acc_andrey" min="1" step="1"></label>
                             <label>Tips <input type="number" class="btn pd2-w-100" id="pd2sett_acc_tips" min="1" step="1"></label>
                             <label>Vietnam <input type="number" class="btn pd2-w-100" id="pd2sett_acc_vietnam" min="1" step="1"></label>
+                            <label>Чай <input type="number" class="btn pd2-w-100" id="pd2sett_balance_sinc" min="1" step="1"></label>
                         </div>
-                        <label class="pd2-settings-label">Коррекция «чай» (account_id)
-                            <input type="number" class="btn pd2-w-100" id="pd2sett_balance_sinc" min="1" step="1">
-                        </label>
                     </div>
                     <div id="payday2SettingsErr" class="error" style="display:none; margin-top:10px;"></div>
                     <div class="actions pd2-justify-center pd2-mt-6">
