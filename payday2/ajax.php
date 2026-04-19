@@ -364,14 +364,17 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         }
 
         $api->request('finance.createTransactions', [
-            'type' => 3, // Transfer
+            'type' => 2,
             'user_id' => $expectedUserId,
             'account_from' => $accAndrey,
             'account_to' => $accountTo,
-            'amount' => $amountVnd,
-            'sum' => $amountVnd,
+            'amount_from' => $amountVnd,
+            'amount_to' => $amountVnd,
             'date' => $targetDate,
             'comment' => $comment,
+            'account_id' => $accAndrey,
+            'account_to_id' => $accountTo,
+            'sum' => $amountVnd,
         ], 'POST');
 
         echo json_encode([
