@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0034';
+$payday2AssetVersion = '20260419_0035';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -636,7 +636,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     </div>
                 </div>
                 <button class="pd2-soft-reset-btn" id="clearDayBtn" type="submit" form="clearDayForm" title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстанавливаются.">
-                    <img src="https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=Round%203D%20red%20button%20with%20dark%20grey%20metallic%20border%20and%20the%20word%20RESET%20written%20in%20white%20text%20on%20it%2C%20isolated%20on%20white%20background&image_size=square" alt="SoftReset">
+                    <img src="/payday2/img/reset.png" alt="SoftReset">
                 </button>
             </div>
 
