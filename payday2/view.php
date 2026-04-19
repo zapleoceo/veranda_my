@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0015';
+$payday2AssetVersion = '20260419_0016';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -414,7 +414,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     <input type="hidden" name="action" value="clear_day">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <button class="btn" id="clearDayBtn" type="submit" title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстанавливаются." onclick="return confirm('Сбросить день (Soft Reset)? Записи Poster и SePay за выбранную дату будут помечены скрытыми (was_deleted); строки и связи в БД не удаляются физически. После повторной синхронизации данные снова появятся.')">SoftReset</button>
+                    <button class="btn" id="clearDayBtn" type="submit" title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстанавливаются.">SoftReset</button>
                 </form>
             </div>
         </div>
@@ -424,7 +424,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
     <?php if ($error !== ''): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
     <div class="card">
-        <div id="outSection" style="display:none;">
+        <div id="outSection" class="pd2-d-none">
             <div class="grid pd2-pos-relative" id="outGrid">
                 <div id="outLineLayer"></div>
                 <div class="card pd2-p-0 pd2-pos-relative">
@@ -622,9 +622,9 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <div id="selDiff" class="pd2-fw-900">0</div>
                     </div>
                     <div class="muted mid-legend pd2-text-center pd2-fw-900 pd2-lh-135">
-                        <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#2e7d32; vertical-align:middle; margin-right:6px;"></span>Авто 1</div>
-                        <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#f6c026; vertical-align:middle; margin-right:6px;"></span>Авто 2</div>
-                        <div><span style="display:inline-block; width:18px; height:3px; border-radius:999px; background:#6b7280; vertical-align:middle; margin-right:6px;"></span>Ручная связь</div>
+                        <div><span class="pd2-legend-line pd2-legend-line--green" aria-hidden="true"></span>Авто 1</div>
+                        <div><span class="pd2-legend-line pd2-legend-line--yellow" aria-hidden="true"></span>Авто 2</div>
+                        <div><span class="pd2-legend-line pd2-legend-line--gray" aria-hidden="true"></span>Ручная связь</div>
                     </div>
                     <div class="muted pd2-text-center pd2-fw-900 pd2-mt-6">
                         <span id="totalsDiff">—</span>
@@ -791,7 +791,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
             ?>
 
             <div class="finance-row">
-                <form method="POST" class="finance-transfer" style="width:100%;"
+                <form method="POST" class="finance-transfer pd2-finance-transfer-full"
                       data-kind="vietnam"
                       data-date-from="<?= htmlspecialchars($dateFrom) ?>"
                       data-date-to="<?= htmlspecialchars($dateTo) ?>"
@@ -805,16 +805,16 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     <input type="hidden" name="kind" value="vietnam">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <div style="display:flex; align-items:center; gap: 10px;">
-                        <div style="font-weight:900; white-space:nowrap;">Vietnam Company</div>
-                        <div style="flex:1; text-align:center; font-weight:900;"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
+                    <div class="pd2-finance-head">
+                        <div class="pd2-finance-head-title">Vietnam Company</div>
+                        <div class="pd2-finance-head-total"><?= $vietnamVnd !== null ? htmlspecialchars($fmtVnd((int)$vietnamVnd)) : '—' ?></div>
                         <button class="btn btn-sm-orange" type="submit" <?= $vietnamDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
                     </div>
-                    <div class="muted finance-status" style="margin-top: 6px;">
+                    <div class="muted finance-status pd2-finance-status-mt">
                         <?php if (count($transferVietnamFoundList) > 0): ?>
-                            <div style="overflow-x:auto; max-width:100%;">
-                                <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
-                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
+                            <div class="pd2-finance-scroll-x">
+                                <table class="table pd2-finance-mini-table">
+                                    <thead><tr><th class="pd2-finance-th">Дата<br><span class="pd2-fw-normal">Время</span></th><th class="pd2-finance-th">Сумма</th><th class="pd2-finance-th">Счет</th><th class="pd2-finance-th">Кто</th><th class="pd2-finance-th">Комментарий</th></tr></thead>
                                     <tbody>
                                     <?php foreach ($transferVietnamFoundList as $f): ?>
                                         <?php
@@ -831,11 +831,11 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                                             $timeStr = date('H:i:s', $ts);
                                         ?>
                                         <tr>
-                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
-                                            <td class="sum" style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
-                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($acc) ?></td>
-                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($u) ?></td>
-                                            <td style="padding:2px 4px; line-height:1.2;"><?= htmlspecialchars($cmt) ?></td>
+                                            <td class="pd2-finance-td"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
+                                            <td class="sum pd2-finance-td"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
+                                            <td class="pd2-finance-td"><?= htmlspecialchars($acc) ?></td>
+                                            <td class="pd2-finance-td"><?= htmlspecialchars($u) ?></td>
+                                            <td class="pd2-finance-td-comment"><?= htmlspecialchars($cmt) ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                     </tbody>
@@ -844,13 +844,13 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <?php elseif ($vietnamDisabled): ?>
                             <?= htmlspecialchars($vietnamDisabledReason) ?>
                         <?php else: ?>
-                            <span style="color:var(--muted);">Транзакция не найдена</span>
+                            <span class="pd2-finance-empty">Транзакция не найдена</span>
                         <?php endif; ?>
                     </div></form>
             </div>
 
             <div class="finance-row">
-                <form method="POST" class="finance-transfer" style="width:100%;"
+                <form method="POST" class="finance-transfer pd2-finance-transfer-full"
                       data-kind="tips"
                       data-date-from="<?= htmlspecialchars($dateFrom) ?>"
                       data-date-to="<?= htmlspecialchars($dateTo) ?>"
@@ -864,16 +864,16 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     <input type="hidden" name="kind" value="tips">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <div style="display:flex; align-items:center; gap: 10px;">
-                        <div style="font-weight:900; white-space:nowrap;">Tips</div>
-                        <div style="flex:1; text-align:center; font-weight:900;"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
+                    <div class="pd2-finance-head">
+                        <div class="pd2-finance-head-title">Tips</div>
+                        <div class="pd2-finance-head-total"><?= $tipsVnd !== null ? htmlspecialchars($fmtVnd((int)$tipsVnd)) : '—' ?></div>
                         <button class="btn btn-sm-orange" type="submit" <?= $tipsDisabled ? 'disabled' : '' ?>>Создать транзакцию</button>
                     </div>
-                    <div class="muted finance-status" style="margin-top: 6px;">
+                    <div class="muted finance-status pd2-finance-status-mt">
                         <?php if (count($transferTipsFoundList) > 0): ?>
-                            <div style="overflow-x:auto; max-width:100%;">
-                                <table class="table" style="margin-top:5px; font-size:12px; width:100%;">
-                                    <thead><tr><th style="padding:2px 4px;">Дата<br><span style="font-weight:normal;">Время</span></th><th style="padding:2px 4px;">Сумма</th><th style="padding:2px 4px;">Счет</th><th style="padding:2px 4px;">Кто</th><th style="padding:2px 4px;">Комментарий</th></tr></thead>
+                            <div class="pd2-finance-scroll-x">
+                                <table class="table pd2-finance-mini-table">
+                                    <thead><tr><th class="pd2-finance-th">Дата<br><span class="pd2-fw-normal">Время</span></th><th class="pd2-finance-th">Сумма</th><th class="pd2-finance-th">Счет</th><th class="pd2-finance-th">Кто</th><th class="pd2-finance-th">Комментарий</th></tr></thead>
                                     <tbody>
                                     <?php foreach ($transferTipsFoundList as $f): ?>
                                         <?php
@@ -890,11 +890,11 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                                             $timeStr = date('H:i:s', $ts);
                                         ?>
                                         <tr>
-                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
-                                            <td class="sum" style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
-                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($acc) ?></td>
-                                            <td style="padding:2px 4px; white-space:nowrap;"><?= htmlspecialchars($u) ?></td>
-                                            <td style="padding:2px 4px; line-height:1.2;"><?= htmlspecialchars($cmt) ?></td>
+                                            <td class="pd2-finance-td"><?= htmlspecialchars($dateStr) ?><br><span class="muted"><?= htmlspecialchars($timeStr) ?></span></td>
+                                            <td class="sum pd2-finance-td"><?= htmlspecialchars($fmtVnd((int)$sumSignedVnd)) ?></td>
+                                            <td class="pd2-finance-td"><?= htmlspecialchars($acc) ?></td>
+                                            <td class="pd2-finance-td"><?= htmlspecialchars($u) ?></td>
+                                            <td class="pd2-finance-td-comment"><?= htmlspecialchars($cmt) ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                     </tbody>
@@ -903,7 +903,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <?php elseif ($tipsDisabled): ?>
                             <?= htmlspecialchars($tipsDisabledReason) ?>
                         <?php else: ?>
-                            <span style="color:var(--muted);">Транзакция не найдена</span>
+                            <span class="pd2-finance-empty">Транзакция не найдена</span>
                         <?php endif; ?>
                     </div></form>
             </div>
@@ -913,7 +913,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 <div class="pd2-fw-900">Итоговый баланс</div>
                 <div class="pd2-d-flex pd2-gap-8 pd2-align-center pd2-ml-auto">
                     <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
-                    <button class="btn tiny" id="posterAccountsBtn" type="button" title="Обновить балансы" class="pd2-p-4-10">
+                    <button class="btn tiny pd2-p-4-10" id="posterAccountsBtn" type="button" title="Обновить балансы">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                             <path d="M21 2v6h-6"></path>
                             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
@@ -977,9 +977,9 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 <table class="pd2-w-100 pd2-collapse">
                     <thead>
                     <tr>
-                        <th style="text-align:left; padding: 8px 10px; font-weight: 900;">ID</th>
-                        <th style="text-align:left; padding: 8px 10px; font-weight: 900;">Счёт</th>
-                        <th style="text-align:right; padding: 8px 10px; font-weight: 900;">Баланс</th>
+                        <th class="pd2-acct-th">ID</th>
+                        <th class="pd2-acct-th">Счёт</th>
+                        <th class="pd2-acct-th-num">Баланс</th>
                     </tr>
                     </thead>
                     <tbody id="posterAccountsTbody">
@@ -990,13 +990,13 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         $bal = (int)($a['balance'] ?? 0);
                         ?>
                         <tr>
-                            <td style="padding: 8px 10px;"><?= htmlspecialchars((string)$aid) ?></td>
-                            <td style="padding: 8px 10px;"><?= htmlspecialchars($an) ?></td>
-                            <td style="padding: 8px 10px; text-align:right;"><?= htmlspecialchars($fmtVndCents($bal)) ?></td>
+                            <td class="pd2-acct-td"><?= htmlspecialchars((string)$aid) ?></td>
+                            <td class="pd2-acct-td"><?= htmlspecialchars($an) ?></td>
+                            <td class="pd2-acct-td-num"><?= htmlspecialchars($fmtVndCents($bal)) ?></td>
                         </tr>
                     <?php endforeach; ?>
                     <?php if (count($posterAccounts) === 0): ?>
-                        <tr><td colspan="3" style="padding: 10px; color:var(--muted); font-weight:900;">Нет данных: нажми 🔄</td></tr>
+                        <tr class="pd2-acct-empty-row"><td colspan="3">Нет данных: нажми 🔄</td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>
@@ -1035,7 +1035,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     <h3 id="financeConfirmTitle">Подтверждение</h3>
                     <div class="body" id="financeConfirmText"></div>
                     <div class="sub">
-                        <label style="display:flex; align-items:center; gap: 8px; margin: 0;">
+                        <label class="pd2-finance-confirm-label">
                             <input type="checkbox" id="financeConfirmChecked">
                             проверил
                         </label>
@@ -1046,8 +1046,8 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     </div>
                 </div>
             </div>
-            <div class="confirm-backdrop" id="payday2SettingsModal" style="display:none;">
-                <div class="confirm-modal pd2-settings-modal" role="dialog" aria-modal="true" aria-labelledby="payday2SettingsTitle" style="max-width: 520px;">
+            <div class="confirm-backdrop" id="payday2SettingsModal">
+                <div class="confirm-modal pd2-settings-modal" role="dialog" aria-modal="true" aria-labelledby="payday2SettingsTitle">
                     <h3 id="payday2SettingsTitle" class="pd2-m-0">Настройки Payday2</h3>
                     <p class="muted pd2-fs-12 pd2-mb-10">Сохраняется в <code>payday2/local_config.json</code> на сервере.</p>
                     <p class="pd2-settings-warn">НЕ МЕНЯЙ, ЕСЛИ НЕ ЗНАЕШЬ ЧТО ЭТО</p>
@@ -1055,12 +1055,12 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <label class="pd2-settings-label">Telegram chat_id
                             <input type="text" class="btn pd2-w-100" id="pd2sett_tg_chat" autocomplete="off">
                         </label>
-                        <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left" style="line-height:1.35;">
+                        <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left pd2-lh-135">
                             Для супергрупп и каналов в Bot API используется формат <strong>-100…</strong>: к числу из ссылки
                             <code>t.me/c/3889942420/…</code> (часть после <code>/c/</code>) добавляют префикс <code>-100</code>, получается например <code>-1003889942420</code>.
                             Число без минуса или с другим префиксом — это другой тип чата; бот должен быть <strong>участником</strong> этой группы.
                         </p>
-                        <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left" style="line-height:1.35;">
+                        <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left pd2-lh-135">
                             Для форумов: <code>message_thread_id</code> — это ID <strong>темы</strong> (topic), не номер сообщения в ссылке. Ошибка «chat not found» чаще из‑за неверного <code>chat_id</code>.
                         </p>
                         <div class="pd2-settings-row-2">
@@ -1079,7 +1079,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                             <label>Чай <input type="number" class="btn pd2-w-100" id="pd2sett_balance_sinc" min="1" step="1"></label>
                         </div>
                     </div>
-                    <div id="payday2SettingsErr" class="error" style="display:none; margin-top:10px;"></div>
+                    <div id="payday2SettingsErr" class="error pd2-settings-err pd2-d-none"></div>
                     <div class="actions pd2-justify-center pd2-mt-6">
                         <button type="button" class="btn2" id="payday2SettingsCancel">Отмена</button>
                         <button type="button" class="btn2 primary" id="payday2SettingsSave">Сохранить</button>
@@ -1087,7 +1087,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 </div>
             </div>
             <div class="confirm-backdrop" id="payday2BetaModal">
-                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2BetaModalTitle" style="max-width: 440px;">
+                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2BetaModalTitle">
                     <h3 id="payday2BetaModalTitle" class="pd2-m-0">Payda2beta</h3>
                     <div class="body pd2-text-center pd2-lh-135">
                         Это обновленная и оптимизированная версия payday.
@@ -1102,16 +1102,6 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
             </div>
             
 <script type="application/json" id="payday2-config-json"><?= json_encode($payday2ClientConfig, $payday2ConfigJsonFlags) ?></script>
-<script>
-(function () {
-    var el = document.getElementById('payday2-config-json');
-    try {
-        window.PAYDAY_CONFIG = el ? JSON.parse(el.textContent || '{}') : {};
-    } catch (e) {
-        window.PAYDAY_CONFIG = {};
-    }
-})();
-</script>
 <script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 </body>

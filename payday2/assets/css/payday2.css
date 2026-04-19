@@ -69,3 +69,48 @@
 .pd2-settings-modal .pd2-settings-grid label,
 .pd2-settings-modal .pd2-settings-grid-4 label { display: block; font-size: 11px; margin: 0; }
 
+/* --- Этап 4.2: вынесено из view.php --- */
+.pd2-d-none { display: none !important; }
+
+#outSection:not(.pd2-d-none) { display: block; }
+
+.pd2-legend-line {
+    display: inline-block;
+    width: 18px;
+    height: 3px;
+    border-radius: 999px;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+.pd2-legend-line--green { background: #2e7d32; }
+.pd2-legend-line--yellow { background: #f6c026; }
+.pd2-legend-line--gray { background: #6b7280; }
+
+.finance-transfer.pd2-finance-transfer-full { width: 100%; }
+.pd2-finance-head { display: flex; align-items: center; gap: 10px; }
+.pd2-finance-head-title { font-weight: 900; white-space: nowrap; }
+.pd2-finance-head-total { flex: 1; text-align: center; font-weight: 900; }
+.pd2-finance-status-mt { margin-top: 6px; }
+.pd2-finance-scroll-x { overflow-x: auto; max-width: 100%; }
+.pd2-finance-mini-table { margin-top: 5px; font-size: 12px; width: 100%; }
+.pd2-finance-th { padding: 2px 4px; }
+.pd2-finance-td { padding: 2px 4px; white-space: nowrap; }
+.pd2-finance-td-comment { padding: 2px 4px; line-height: 1.2; }
+.pd2-finance-empty { color: var(--muted); }
+
+.pd2-acct-th { text-align: left; padding: 8px 10px; font-weight: 900; }
+.pd2-acct-th-num { text-align: right; padding: 8px 10px; font-weight: 900; }
+.pd2-acct-td { padding: 8px 10px; }
+.pd2-acct-td-num { padding: 8px 10px; text-align: right; }
+.pd2-acct-empty-row td { padding: 10px; color: var(--muted); font-weight: 900; }
+
+.pd2-finance-confirm-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.pd2-settings-modal.confirm-modal { max-width: 520px; }
+#payday2BetaModal .confirm-modal { max-width: 440px; }
+.pd2-settings-err { margin-top: 10px; }

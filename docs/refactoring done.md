@@ -1,6 +1,6 @@
 # Payday2 — что уже сделано (по [PAYDAY2_REFACTORING_PLAN.md](PAYDAY2_REFACTORING_PLAN.md))
 
-Актуальная версия ассетов в `payday2/view.php`: **`20260419_0015`** (после деплоя — Ctrl+F5 на `/payday2/`).
+Актуальная версия ассетов в `payday2/view.php`: **`20260419_0016`** (после деплоя — Ctrl+F5 на `/payday2/`).
 
 ---
 
@@ -40,15 +40,17 @@
 
 | Пункт | Суть |
 |-------|------|
-| **4.1** | **`eval` убран**: `#payday2-config-json` + **`JSON.parse`** (страница и **`doPjax`**). Подмены глобальных **`addEventListener`** нет; между PJAX — **`AbortController`** + **`pd2on`** на **`document` / `window` / `visualViewport`**, на **`abort`** — **`ResizeObserver.disconnect`**. PJAX: **`innerHTML`** у **`.container`** (точечный swap таблиц в плане оставлен на потом). **Фикс TDZ:** первый **`setTab(initialTab)`** только **после** **`outScheduleRelayout`**, иначе при **`?tab=out`** ломались кнопки OUT, синк дат и остальной **`initPayday2`**. Ассеты **`20260419_0015`**. |
+| **4.1** | **`eval` убран**: `#payday2-config-json` + **`JSON.parse`** (страница и **`doPjax`**). Подмены глобальных **`addEventListener`** нет; между PJAX — **`AbortController`** + **`pd2on`** на **`document` / `window` / `visualViewport`**, на **`abort`** — **`ResizeObserver.disconnect`**. PJAX: **`innerHTML`** у **`.container`** (точечный swap таблиц в плане оставлен на потом). **Фикс TDZ:** первый **`setTab(initialTab)`** только **после** **`outScheduleRelayout`**, иначе при **`?tab=out`** ломались кнопки OUT, синк дат и остальной **`initPayday2`**. |
+| **4.2** | В **`view.php`** нет **`style=`** и **`onclick`**: стили в **`payday2.css`** (`pd2-d-none`, finance, legend, poster accounts, confirm-label, модалки). **`PAYDAY_CONFIG`**: парсинг JSON в начале **`payday2.js`**. **SoftReset**: **`pd2on(clearDayForm, 'submit', confirm)`**. **`setTab`**: класс **`pd2-d-none`** вместо **`style.display`**. Динамические строки счетов Poster в **`payday2.js`** переведены на те же классы. |
 
 ---
 
 ## Чеклист для проверки после релиза
 
-1. Ctrl+F5 на `/payday2/`, версия **`?v=20260419_0015`**.
+1. Ctrl+F5 на `/payday2/`, версия **`?v=20260419_0016`**.
 2. **SoftReset** + confirm + flash + **Poster sync** после сброса.
 3. **PJAX** + вкладка **OUT** (`?tab=out`): смена даты кнопкой **Открыть** — второй датапикер синхронизируется с первым; кнопки обновления таблиц OUT реагируют; без ошибки `outScheduleRelayout` до инициализации.
 4. Таблица **Poster чеки**: колонка **Стол** совпадает с прежним поведением при нескольких `spot_id`.
 5. Блок **финансовых транзакций** (списки Vietnam/Tips из Poster) — без регрессий.
 6. **OUT** — почта (IMAP) после правок `.env`.
+7. **4.2**: блоки Vietnam/Tips, легенда цветов, модалки настроек/бета, **SoftReset** (confirm), переключение **IN/OUT** и PJAX.

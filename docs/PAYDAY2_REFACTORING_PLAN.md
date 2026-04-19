@@ -52,6 +52,6 @@
   - Отказаться от глобальной перезаписи `document.addEventListener` и `window.addEventListener` (вместо этого `AbortController` / `pd2on` для слушателей, живущих между PJAX-перерисовками).
   - Полная замена `innerHTML` у **`.container`** сохранена; **точечное** обновление таблиц без перерисовки контейнера — по желанию отдельным шагом (не блокер текущего этапа).
   - Исправление после внедрения 4.1: **`setTab(initialTab)` вызывается только после** объявления `outScheduleRelayout`, иначе при `?tab=out` падение `initPayday2` (TDZ) и поломка OUT / формы дат после PJAX.
-- [ ] **4.2. Разделение слоев (Очистка View)**
-  - Вынести все inline-стили (`<style>`, `style="..."`) из `view.php` в `payday2.css`.
-  - Вынести все inline-скрипты (`onclick="..."`, `<script>`) в `payday2.js`, используя делегирование событий.
+- [x] **4.2. Разделение слоев (Очистка View)**
+  - Inline `style` из `view.php` вынесены в `payday2.css` (классы `pd2-*`).
+  - `PAYDAY_CONFIG` из JSON и confirm SoftReset в `payday2.js`; `setTab` через класс `pd2-d-none`.

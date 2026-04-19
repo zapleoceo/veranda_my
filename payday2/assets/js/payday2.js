@@ -24,6 +24,15 @@
     };
 })();
 
+(function () {
+    const el = document.getElementById('payday2-config-json');
+    try {
+        window.PAYDAY_CONFIG = el ? JSON.parse(el.textContent || '{}') : {};
+    } catch (e) {
+        window.PAYDAY_CONFIG = {};
+    }
+})();
+
 if (!window._paydayPjaxLoaded) {
     window._paydayPjaxLoaded = true;
 
@@ -243,18 +252,18 @@ window.initPayday2 = function() {
         const inOn = m === 'in';
         const tablesRoot = document.getElementById('tablesRoot');
         const lineLayer = document.getElementById('lineLayer');
-        if (tablesRoot) tablesRoot.style.display = inOn ? '' : 'none';
-        if (lineLayer) lineLayer.style.display = inOn ? '' : 'none';
+        if (tablesRoot) tablesRoot.classList.toggle('pd2-d-none', !inOn);
+        if (lineLayer) lineLayer.classList.toggle('pd2-d-none', !inOn);
         if (tabIn && tabOut) { tabIn.classList.toggle('active', inOn); tabOut.classList.toggle('active', !inOn); }
-        if (outSection) outSection.style.display = inOn ? 'none' : '';
-        if (outMailBtn) outMailBtn.style.display = inOn ? 'none' : '';
-        if (outFinanceBtn) outFinanceBtn.style.display = inOn ? 'none' : '';
+        if (outSection) outSection.classList.toggle('pd2-d-none', inOn);
+        if (outMailBtn) outMailBtn.classList.toggle('pd2-d-none', inOn);
+        if (outFinanceBtn) outFinanceBtn.classList.toggle('pd2-d-none', inOn);
         const posterSyncForm = document.getElementById('posterSyncForm');
         const sepaySyncForm = document.getElementById('sepaySyncForm');
         const clearDayForm = document.getElementById('clearDayForm');
-        if (posterSyncForm) posterSyncForm.style.display = inOn ? '' : 'none';
-        if (sepaySyncForm) sepaySyncForm.style.display = inOn ? '' : 'none';
-        if (clearDayForm) clearDayForm.style.display = inOn ? '' : 'none';
+        if (posterSyncForm) posterSyncForm.classList.toggle('pd2-d-none', !inOn);
+        if (sepaySyncForm) sepaySyncForm.classList.toggle('pd2-d-none', !inOn);
+        if (clearDayForm) clearDayForm.classList.toggle('pd2-d-none', !inOn);
         activeTab = inOn ? 'in' : 'out';
         if (!inOn) outScheduleRelayout();
     };
@@ -303,7 +312,7 @@ window.initPayday2 = function() {
         };
     };
     const openPayday2SettingsModal = () => {
-        if (payday2SettingsErr) { payday2SettingsErr.style.display = 'none'; payday2SettingsErr.textContent = ''; }
+        if (payday2SettingsErr) { payday2SettingsErr.textContent = ''; payday2SettingsErr.classList.add('pd2-d-none'); }
         fillPayday2SettingsForm();
         if (payday2SettingsModal) payday2SettingsModal.style.display = 'flex';
     };
@@ -315,7 +324,7 @@ window.initPayday2 = function() {
     if (payday2SettingsSave) {
         payday2SettingsSave.addEventListener('click', () => {
             const payload = readPayday2SettingsPayload();
-            if (payday2SettingsErr) { payday2SettingsErr.style.display = 'none'; payday2SettingsErr.textContent = ''; }
+            if (payday2SettingsErr) { payday2SettingsErr.textContent = ''; payday2SettingsErr.classList.add('pd2-d-none'); }
             payday2SettingsSave.disabled = true;
             fetch('?ajax=save_local_config', {
                 method: 'POST',
@@ -331,7 +340,7 @@ window.initPayday2 = function() {
                 .catch((e) => {
                     if (payday2SettingsErr) {
                         payday2SettingsErr.textContent = e && e.message ? e.message : 'Ошибка';
-                        payday2SettingsErr.style.display = 'block';
+                        payday2SettingsErr.classList.remove('pd2-d-none');
                     }
                 })
                 .finally(() => { payday2SettingsSave.disabled = false; });
@@ -516,6 +525,14 @@ window.initPayday2 = function() {
             } else {
                 window.location.href = nextUrl.href;
             }
+        });
+    }
+
+    const clearDayFormEl = document.getElementById('clearDayForm');
+    if (clearDayFormEl) {
+        pd2on(clearDayFormEl, 'submit', (ev) => {
+            const msg = 'Сбросить день (Soft Reset)? Записи Poster и SePay за выбранную дату будут помечены скрытыми (was_deleted); строки и связи в БД не удаляются физически. После повторной синхронизации данные снова появятся.';
+            if (!confirm(msg)) ev.preventDefault();
         });
     }
 
@@ -1194,7 +1211,7 @@ window.initPayday2 = function() {
         if (balVietnamEl) { balVietnamEl.textContent = '...'; balVietnamEl.setAttribute('data-cents', ''); }
         if (balCashEl) { balCashEl.textContent = '...'; balCashEl.setAttribute('data-cents', ''); }
         if (balTotalEl) { balTotalEl.textContent = '...'; balTotalEl.setAttribute('data-cents', ''); }
-        if (posterAccountsTbody) posterAccountsTbody.innerHTML = '<tr><td colspan="3" style="padding: 10px; color:var(--muted); font-weight:900;">Обновление...</td></tr>';
+        if (posterAccountsTbody) posterAccountsTbody.innerHTML = '<tr class="pd2-acct-empty-row"><td colspan="3">Обновление...</td></tr>';
         
         const url = `?dateFrom=${encodeURIComponent(window.PAYDAY_CONFIG.dateFrom)}&dateTo=${encodeURIComponent(window.PAYDAY_CONFIG.dateTo)}&ajax=poster_accounts`;
         return fetch(url, {
@@ -1213,16 +1230,16 @@ window.initPayday2 = function() {
             if (posterAccountsTbody) {
                 const rows = Array.isArray(j.accounts) ? j.accounts : [];
                 if (rows.length === 0) {
-                    posterAccountsTbody.innerHTML = '<tr><td colspan="3" style="padding: 10px; color:var(--muted); font-weight:900;">Нет данных</td></tr>';
+                    posterAccountsTbody.innerHTML = '<tr class="pd2-acct-empty-row"><td colspan="3">Нет данных</td></tr>';
                 } else {
                     posterAccountsTbody.innerHTML = rows.map((a) => {
                         const id = Number(a.account_id || 0);
                         const name = String(a.name || '');
                         const bal = String(a.balance || '0');
                         return `<tr>
-                            <td style="padding: 8px 10px;">${String(id)}</td>
-                            <td style="padding: 8px 10px;">${escapeHtml(name)}</td>
-                            <td style="padding: 8px 10px; text-align:right;">${escapeHtml(bal)}</td>
+                            <td class="pd2-acct-td">${String(id)}</td>
+                            <td class="pd2-acct-td">${escapeHtml(name)}</td>
+                            <td class="pd2-acct-td-num">${escapeHtml(bal)}</td>
                         </tr>`;
                     }).join('');
                 }
