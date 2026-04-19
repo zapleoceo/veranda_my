@@ -43,6 +43,47 @@ $posterRows = $db->query(
     [$dateFrom, $dateTo]
 )->fetchAll();
 
+/** @var array<int, array<int, int>> spot_id => [ table_id => table_num ] */
+$posterTableNumsBySpot = [];
+$spotIdsForHall = [];
+foreach ($posterRows as $pr) {
+    $sid = (int)($pr['spot_id'] ?? 0);
+    if ($sid > 0) {
+        $spotIdsForHall[$sid] = true;
+    }
+}
+if ($spotIdsForHall !== []) {
+    try {
+        $apiHallTables = new \App\Classes\PosterAPI((string)$token);
+        foreach (array_keys($spotIdsForHall) as $spotId) {
+            try {
+                $hallRows = $apiHallTables->request('spots.getTableHallTables', [
+                    'spot_id' => $spotId,
+                    'without_deleted' => 0,
+                ], 'GET');
+                if (!is_array($hallRows)) {
+                    $hallRows = [];
+                }
+                $tidMap = [];
+                foreach ($hallRows as $t) {
+                    if (!is_array($t)) {
+                        continue;
+                    }
+                    $tid = (int)($t['table_id'] ?? 0);
+                    $tnum = (int)($t['table_num'] ?? 0);
+                    if ($tid > 0 && $tnum > 0) {
+                        $tidMap[$tid] = $tnum;
+                    }
+                }
+                $posterTableNumsBySpot[$spotId] = $tidMap;
+            } catch (\Throwable $e) {
+                $posterTableNumsBySpot[$spotId] = [];
+            }
+        }
+    } catch (\Throwable $e) {
+    }
+}
+
 $sepayTotalVnd = 0;
 $posterTotalVnd = 0;
 $posterBybitVnd = 0;
@@ -315,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0011';
+$payday2AssetVersion = '20260419_0012';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -621,32 +662,13 @@ $payday2AssetVersion = '20260419_0011';
                                 if ($receiptNumber <= 0) $receiptNumber = $pid;
                                 $spotIdRow = (int)($r['spot_id'] ?? 0);
                                 $tableIdRow = (int)($r['table_id'] ?? 0);
-                                $tableNumCache = $tableNumCache ?? [];
-                                $getTableNum = $getTableNum ?? function (int $spotId, int $tableId) use (&$tableNumCache, $token): ?int {
-                                    if ($spotId <= 0 || $tableId <= 0) return null;
-                                    if (!isset($tableNumCache[$spotId])) {
-                                        try {
-                                            $apiTables = new \App\Classes\PosterAPI((string)$token);
-                                            $rows = $apiTables->request('spots.getTableHallTables', [
-                                                'spot_id' => $spotId,
-                                                'without_deleted' => 0,
-                                            ], 'GET');
-                                            if (!is_array($rows)) $rows = [];
-                                            $m = [];
-                                            foreach ($rows as $t) {
-                                                if (!is_array($t)) continue;
-                                                $tid = (int)($t['table_id'] ?? 0);
-                                                $tn = (int)($t['table_num'] ?? 0);
-                                                if ($tid > 0 && $tn > 0) $m[$tid] = $tn;
-                                            }
-                                            $tableNumCache[$spotId] = $m;
-                                        } catch (\Throwable $e) {
-                                            $tableNumCache[$spotId] = [];
-                                        }
+                                $tableNum = null;
+                                if ($spotIdRow > 0 && $tableIdRow > 0) {
+                                    $hallMap = $posterTableNumsBySpot[$spotIdRow] ?? [];
+                                    if (isset($hallMap[$tableIdRow])) {
+                                        $tableNum = (int)$hallMap[$tableIdRow];
                                     }
-                                    return isset($tableNumCache[$spotId][$tableId]) ? (int)$tableNumCache[$spotId][$tableId] : null;
-                                };
-                                $tableNum = $getTableNum($spotIdRow, $tableIdRow);
+                                }
                                 $tableDisplay = $tableNum !== null ? (string)$tableNum : (string)$tableIdRow;
                                 $linkList = $linkByPoster[$pid] ?? [];
                                 $cls = 'row-red';

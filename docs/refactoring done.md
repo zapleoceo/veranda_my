@@ -1,6 +1,6 @@
 # Payday2 — что уже сделано (по [PAYDAY2_REFACTORING_PLAN.md](PAYDAY2_REFACTORING_PLAN.md))
 
-Актуальная версия ассетов в `payday2/view.php`: **`20260419_0010`** (после деплоя — Ctrl+F5 на `/payday2/`).
+Актуальная версия ассетов в `payday2/view.php`: **`20260419_0012`** (после деплоя — Ctrl+F5 на `/payday2/`).
 
 ---
 
@@ -10,7 +10,7 @@
 |-------|------|
 | **1.1** | `payday2/post/create_transfer.php` — убрана синтаксическая ошибка; fallback без JS даёт понятное сообщение; основной сценарий — `?ajax=create_transfer` в `ajax.php`. |
 | **1.2** | `veranda_require('payday')` + `auth_check` в `post.php`; `veranda_require('payday')` в `ajax.php`. |
-| **1.3** | CSRF: `payday2_ensure_csrf` / `payday2_csrf_valid` в `functions.php`, токен в `PAYDAY_CONFIG` и скрытые поля в POST-формах `view.php`, заголовок `X-Payday2-Csrf` через обёртку `fetch` в `payday2.js`, проверка POST в `ajax.php` и `post.php`. |
+| **1.3** | CSRF: `payday2_ensure_csrf` / `payday2_csrf_valid` в `functions.php`, токен в `PAYDAY_CONFIG` и скрытые поля в POST-формах `view.php`, заголовок `X-Payday2-Csrf` в `payday2.js`, проверка POST в `ajax.php` и `post.php`. |
 
 ---
 
@@ -18,11 +18,11 @@
 
 | Пункт | Суть |
 |-------|------|
-| **2.1** | `payday2/local_config.json`, `local_config.example.json`, класс `payday2/LocalSettings.php`, подключение из `config.php`; значения Telegram, `service_user_id`, счета Poster, `balance_sinc_account_id` читаются из конфига в `ajax.php` / `view.php`. |
-| **2.2** | Кнопка ⚙ в шапке, модалка настроек в `view.php`, стили в `payday2.css`. |
-| **2.3** | `?ajax=save_local_config` (POST JSON, CSRF), `LocalSettings::persistPayload()` — атомарная запись JSON. |
+| **2.1** | `local_config.json`, `LocalSettings.php`, чтение в `ajax.php` / `view.php`. |
+| **2.2** | Кнопка ⚙, модалка настроек, стили. |
+| **2.3** | `?ajax=save_local_config`, атомарная запись JSON. |
 
-Дополнительно (не в исходном списке пунктов): подсказки про `-100…` и `chat_id`, ответы Telegram API как **400** с текстом ошибки; правки текста/вёрстки модалки (предупреждение красным, сетка полей).
+Дополнительно: подсказки Telegram `-100…`, ответы API **400**, правки модалки; **парсинг `.env` в `auth_check.php`** (trim ключей, снятие кавычек у значений) — починка IMAP после отказа от двойного чтения `.env` в `mail_out`.
 
 ---
 
@@ -30,15 +30,15 @@
 
 | Пункт | Суть |
 |-------|------|
-| **3.1** | `mail_out` в `ajax.php`: не перечитываем `.env` (используется `$_ENV` после `auth_check`); в `imap_search` добавлен **`BEFORE`** (день после `dateTo`), вместе с **`SINCE`** задаёт узкий диапазон дат на стороне почты. |
-| **3.2** | По плану: Poster API / пакетный SQL во `view.php` — ещё не делалось. |
-| **3.3** | По плану: текст «Сбросить день (Soft Reset)» и логика восстановления записей — ещё не делалось. |
+| **3.1** | `mail_out`: `$_ENV` + IMAP **`SINCE` + `BEFORE`**; ошибка `imap_open` с текстом от сервера. |
+| **3.2** | **`spots.getTableHallTables`** вызывается **до** цикла вывода Poster-чеков: для каждого уникального `spot_id` из `$posterRows` один запрос, карта `$posterTableNumsBySpot`; в шаблоне только lookup. В **`findFinanceTransfers`** (`functions.php`) счета 8/9 заменены на **`LocalSettings::accountTipsId()` / `accountVietnamId()`**. Отдельного N+1 по БД для «финансовых строк» во `view.php` не было — мета по webhook уже пакетом через **`IN (...)`**. |
+| **3.3** | По плану: текст «Сбросить день (Soft Reset)» и `INSERT … ON DUPLICATE` / снятие `was_deleted` — **ещё не делалось**. |
 
 ---
 
 ## Чеклист для проверки после релиза
 
-1. Жёсткое обновление `/payday2/` (новый `?v=` у JS/CSS).
-2. Пользователь **с** правом `payday`: даты, IN/OUT, синки, связи, finance, Telegram-скрин, ⚙ сохранение настроек.
-3. Пользователь **без** права: 403 на защищённые обработчики.
-4. При устаревшей сессии CSRF — полное обновление страницы.
+1. Ctrl+F5 на `/payday2/`, версия **`?v=20260419_0012`**.
+2. Таблица **Poster чеки**: колонка **Стол** совпадает с прежним поведением при нескольких `spot_id`.
+3. Блок **финансовых транзакций** (списки Vietnam/Tips из Poster) — без регрессий.
+4. **OUT** — почта (IMAP) после правок `.env`.

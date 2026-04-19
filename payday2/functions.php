@@ -3,6 +3,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/FinanceHelper.php';
 
 use App\Payday2\FinanceHelper;
+use App\Payday2\LocalSettings;
 
 $date = $dateTo;
 $periodFrom = $dateFrom . ' 00:00:00';
@@ -250,6 +251,9 @@ $findFinanceTransfers = function (string $dateFrom, string $dateTo) use ($token,
         } catch (\Throwable $e) {
         }
 
+        $idTips = LocalSettings::accountTipsId();
+        $idVietnam = LocalSettings::accountVietnamId();
+
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
             if (((int)($r['status'] ?? 0)) === 3) continue;
@@ -301,13 +305,13 @@ $findFinanceTransfers = function (string $dateFrom, string $dateTo) use ($token,
                 $accToId = (int)$toRaw;
             }
 
-            if ($accToId !== 8 && $accToId !== 9 && $accFromId !== 8 && $accFromId !== 9) continue;
-            $accId = ($accToId === 8 || $accToId === 9) ? $accToId : $accFromId;
+            if ($accToId !== $idTips && $accToId !== $idVietnam && $accFromId !== $idTips && $accFromId !== $idVietnam) continue;
+            $accId = ($accToId === $idTips || $accToId === $idVietnam) ? $accToId : $accFromId;
 
             $cmt = (string)($r['comment'] ?? $r['description'] ?? $r['comment_text'] ?? '');
             $cmtNorm = $normText($cmt);
-            $isVietnam = $accId === 9 && mb_stripos($cmtNorm, 'вьетна', 0, 'UTF-8') !== false;
-            $isTips = $accId === 8 && (mb_stripos($cmtNorm, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmtNorm, 'tips', 0, 'UTF-8') !== false);
+            $isVietnam = $accId === $idVietnam && mb_stripos($cmtNorm, 'вьетна', 0, 'UTF-8') !== false;
+            $isTips = $accId === $idTips && (mb_stripos($cmtNorm, 'типс', 0, 'UTF-8') !== false || mb_stripos($cmtNorm, 'tips', 0, 'UTF-8') !== false);
             if (!$isVietnam && !$isTips) continue;
 
             $uRaw = $r['user_id'] ?? $r['userId'] ?? $r['user'] ?? $r['employee_id'] ?? null;
