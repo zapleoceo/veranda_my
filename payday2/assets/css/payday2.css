@@ -5,6 +5,7 @@
 .pd2-pointer { cursor: pointer; }
 .pd2-ml-auto { margin-left: auto; }
 .pd2-d-flex { display: flex; }
+.pd2-flex-column { flex-direction: column; }
 .pd2-tab-gold { background: rgba(184,135,70,0.15); color: #B88746; }
 .pd2-ml-5 { margin-left: 5px; }
 .pd2-top-forms-wrap { display: flex; gap: 10px; margin-left: 10px; align-items: center; flex-wrap: wrap; }
@@ -119,7 +120,28 @@
 .pd2-modal-backdrop { display: none; z-index: 9999; align-items: flex-start; padding-top: 5vh; }
 .pd2-modal-content { max-width: 900px; width: 90%; }
 .pd2-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-.pd2-modal-close { min-width: 40px; font-weight: bold; font-size: 16px; }
+.pd2-modal-close {
+    min-width: unset;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.pd2-modal-close:hover {
+    background: var(--border);
+    color: var(--text);
+}
 .pd2-modal-body { max-height: 85vh; overflow: auto; }
 .pd2-inline-flex { display: inline-flex; }
 .pd2-text-dec-none { text-decoration: none; }

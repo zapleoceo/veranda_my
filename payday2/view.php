@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0051';
+$payday2AssetVersion = '20260419_0052';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1023,7 +1023,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
     <div class="confirm-modal pd2-modal-content" role="dialog">
         <div class="pd2-modal-header">
             <h3 class="pd2-m-0">KashShift</h3>
-            <button type="button" class="btn2 pd2-modal-close" id="kashshiftClose">✕</button>
+            <button type="button" class="pd2-modal-close" id="kashshiftClose">✕</button>
         </div>
         <div class="body pd2-modal-body" id="kashshiftBody">
             <div class="pd2-text-center">Загрузка...</div>
@@ -1035,7 +1035,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
     <div class="confirm-modal pd2-modal-content" role="dialog">
         <div class="pd2-modal-header">
             <h3 class="pd2-m-0">Supplies</h3>
-            <button type="button" class="btn2 pd2-modal-close" id="suppliesClose">✕</button>
+            <button type="button" class="pd2-modal-close" id="suppliesClose">✕</button>
         </div>
         <div class="body pd2-modal-body" id="suppliesBody">
             <div class="pd2-text-center">Загрузка...</div>
@@ -1048,7 +1048,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 <div class="confirm-modal pd2-modal-content" role="dialog" style="max-width: 400px;">
                     <div class="pd2-modal-header">
                         <h3 class="pd2-m-0">Новая транзакция</h3>
-                        <button type="button" class="btn2 pd2-modal-close" id="createTxClose">✕</button>
+                        <button type="button" class="pd2-modal-close" id="createTxClose">✕</button>
                     </div>
                     <div class="body pd2-modal-body pd2-p-15">
                         <form id="createTxForm">
@@ -1099,7 +1099,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 <div class="confirm-modal pd2-modal-content" role="dialog" style="max-width: 400px;">
                     <div class="pd2-modal-header">
                         <h3 class="pd2-m-0">Успешно</h3>
-                        <button type="button" class="btn2 pd2-modal-close" id="createTxSuccessClose">✕</button>
+                        <button type="button" class="pd2-modal-close" id="createTxSuccessClose">✕</button>
                     </div>
                     <div class="body pd2-modal-body pd2-p-15 pd2-text-center">
                         <div class="pd2-mb-15 pd2-fs-16">
@@ -1130,7 +1130,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 <div class="confirm-modal pd2-settings-modal" role="dialog" aria-modal="true" aria-labelledby="payday2SettingsTitle">
                     <div class="pd2-modal-header">
                         <h3 id="payday2SettingsTitle" class="pd2-m-0">Настройки Payday2</h3>
-                        <button type="button" class="btn2 pd2-modal-close" id="payday2SettingsClose">✕</button>
+                        <button type="button" class="pd2-modal-close" id="payday2SettingsClose">✕</button>
                     </div>
                     <p class="muted pd2-fs-12 pd2-mb-10">Сохраняется в <code>payday2/local_config.json</code> на сервере.</p>
                     <div class="pd2-settings-fields">
