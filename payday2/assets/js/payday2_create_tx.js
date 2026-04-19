@@ -126,10 +126,10 @@ window.initPaydayCreateTx = function() {
 
     const closeSuccessModal = () => {
         if (successModal) successModal.style.display = 'none';
-        // Reload the table
-        if (typeof window.loadOutMail === 'function') {
-            const df = document.getElementById('dateForm');
-            if (df) df.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        // Click the refresh button of out table instead of reloading the whole page via form submit
+        const outMailBtn = document.getElementById('outMailBtn');
+        if (outMailBtn) {
+            outMailBtn.click();
         }
     };
 

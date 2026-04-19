@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0049';
+$payday2AssetVersion = '20260419_0050';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1128,18 +1128,15 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
             </div>
             <div class="confirm-backdrop" id="payday2SettingsModal">
                 <div class="confirm-modal pd2-settings-modal" role="dialog" aria-modal="true" aria-labelledby="payday2SettingsTitle">
-                    <h3 id="payday2SettingsTitle" class="pd2-m-0">Настройки Payday2</h3>
+                    <div class="pd2-modal-header">
+                        <h3 id="payday2SettingsTitle" class="pd2-m-0">Настройки Payday2</h3>
+                        <button type="button" class="btn2 pd2-modal-close" id="payday2SettingsClose">✕</button>
+                    </div>
                     <p class="muted pd2-fs-12 pd2-mb-10">Сохраняется в <code>payday2/local_config.json</code> на сервере.</p>
-                    <p class="pd2-settings-warn">НЕ МЕНЯЙ, ЕСЛИ НЕ ЗНАЕШЬ ЧТО ЭТО</p>
                     <div class="pd2-settings-fields">
                         <label class="pd2-settings-label">Telegram chat_id
                             <input type="text" class="btn pd2-w-100" id="pd2sett_tg_chat" autocomplete="off">
                         </label>
-                        <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left pd2-lh-135">
-                            Для супергрупп и каналов в Bot API используется формат <strong>-100…</strong>: к числу из ссылки
-                            <code>t.me/c/3889942420/…</code> (часть после <code>/c/</code>) добавляют префикс <code>-100</code>, получается например <code>-1003889942420</code>.
-                            Число без минуса или с другим префиксом — это другой тип чата; бот должен быть <strong>участником</strong> этой группы.
-                        </p>
                         <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left pd2-lh-135">
                             Для форумов: <code>message_thread_id</code> — это ID <strong>темы</strong> (topic), не номер сообщения в ссылке. Ошибка «chat not found» чаще из‑за неверного <code>chat_id</code>.
                         </p>
@@ -1160,8 +1157,8 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         </div>
                     </div>
                     <div id="payday2SettingsErr" class="error pd2-settings-err pd2-d-none"></div>
-                    <div class="actions pd2-justify-center pd2-mt-6">
-                        <button type="button" class="btn2" id="payday2SettingsCancel">Отмена</button>
+                    <div class="actions pd2-justify-between pd2-align-center pd2-mt-6">
+                        <p class="pd2-settings-warn pd2-m-0">НЕ МЕНЯЙ, ЕСЛИ НЕ ЗНАЕШЬ ЧТО ЭТО</p>
                         <button type="button" class="btn2 primary" id="payday2SettingsSave">Сохранить</button>
                     </div>
                 </div>

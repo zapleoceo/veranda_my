@@ -157,7 +157,7 @@ window.initPayday2 = function() {
     const payday2InfoModalClose = document.getElementById('payday2InfoModalClose');
     const payday2SettingsBtn = document.getElementById('payday2SettingsBtn');
     const payday2SettingsModal = document.getElementById('payday2SettingsModal');
-    const payday2SettingsCancel = document.getElementById('payday2SettingsCancel');
+    const payday2SettingsClose = document.getElementById('payday2SettingsClose');
     const payday2SettingsSave = document.getElementById('payday2SettingsSave');
     const payday2SettingsErr = document.getElementById('payday2SettingsErr');
     const applyMode = (mode) => {
@@ -317,7 +317,7 @@ window.initPayday2 = function() {
         if (payday2SettingsModal) payday2SettingsModal.style.display = 'none';
     };
     if (payday2SettingsBtn) payday2SettingsBtn.addEventListener('click', openPayday2SettingsModal);
-    if (payday2SettingsCancel) payday2SettingsCancel.addEventListener('click', closePayday2SettingsModal);
+    if (payday2SettingsClose) payday2SettingsClose.addEventListener('click', closePayday2SettingsModal);
     if (payday2SettingsSave) {
         payday2SettingsSave.addEventListener('click', () => {
             const payload = readPayday2SettingsPayload();
