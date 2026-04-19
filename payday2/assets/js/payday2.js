@@ -530,7 +530,10 @@ window.initPayday2 = function() {
     if (clearDayFormEl) {
         pd2on(clearDayFormEl, 'submit', (ev) => {
             const msg = 'Сбросить день (Soft Reset)? Записи Poster и SePay за выбранную дату будут помечены скрытыми (was_deleted); строки и связи в БД не удаляются физически. После повторной синхронизации данные снова появятся.';
-            if (!confirm(msg)) ev.preventDefault();
+            if (!confirm(msg)) {
+                ev.preventDefault();
+                ev.stopImmediatePropagation();
+            }
         });
     }
 
@@ -1065,6 +1068,7 @@ window.initPayday2 = function() {
         const btn = document.getElementById(btnId);
         if (!form || !btn) return;
         form.addEventListener('submit', async (ev) => {
+            if (ev.defaultPrevented) return;
             ev.preventDefault();
             const restore = setBtnBusy(btn, { title: defaultStep || 'Загрузка…', pct: 0 });
             try {
