@@ -7,11 +7,33 @@
 .pd2-d-flex { display: flex; }
 .pd2-tab-gold { background: rgba(184,135,70,0.15); color: #B88746; }
 .pd2-ml-5 { margin-left: 5px; }
-.pd2-top-forms-wrap { display: flex; gap: 10px; margin-left: 10px; align-items: center; }
+.pd2-top-forms-wrap { display: flex; gap: 10px; margin-left: 10px; align-items: center; flex-wrap: wrap; }
 .pd2-date-form { display: flex; gap: 10px; margin: 0; align-items: center; }
-.pd2-date-input { padding: 8px 10px; width: 120px; }
+.pd2-date-input { padding: 0 10px; width: 120px; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; }
 @media (max-width: 800px) {
-    .pd2-date-input { width: 102px; }
+    .pd2-date-input { width: 102px !important; height: 34px !important; padding: 0 10px !important; border-radius: 10px !important; }
+    
+    #topFormsWrap {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+        width: auto !important;
+        margin: 0 !important;
+        flex-wrap: nowrap !important;
+    }
+    .tabs {
+        grid-column: 2 !important;
+        grid-row: 2 !important;
+        margin: 0 !important;
+        justify-content: flex-end;
+        flex-wrap: nowrap !important;
+    }
+    .tabs .tab {
+        height: 34px;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        box-sizing: border-box;
+    }
 }
 .pd2-m-0 { margin: 0; }
 .pd2-pos-relative { position: relative; }
