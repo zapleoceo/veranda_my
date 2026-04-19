@@ -503,6 +503,7 @@ window.initPayday2 = function() {
                 syncingDateRange = true;
                 dateToInput.value = dateFromInput.value || '';
                 syncingDateRange = false;
+                dateForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
             });
         }
         dateForm.addEventListener('submit', (ev) => {

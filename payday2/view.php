@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0023';
+$payday2AssetVersion = '20260419_0024';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -394,11 +394,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
             <div class="pd2-nav-title-row pd2-d-flex pd2-align-center pd2-gap-8">
                 <div class="nav-title pd2-pointer" id="payday2BetaInfoBtn">Payda2beta</div>
                 <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2SettingsBtn" title="Настройки Payday2">⚙</button>
-            </div>
-            <div class="tabs">
-                <button type="button" class="tab active" id="tabIn">IN</button>
-                <button type="button" class="tab" id="tabOut">OUT</button>
-                <div class="pd2-ml-auto pd2-d-flex">
+                <div class="pd2-d-flex">
                     <button type="button" class="tab pd2-tab-gold pd2-d-flex pd2-align-center pd2-justify-center" id="btnKashShift" style="padding: 4px 10px; background: #f97316;" title="KashShift">
                         <img src="/payday2/img/Cash.png" alt="KashShift" style="width: 20px; height: 20px; object-fit: contain;">
                     </button>
@@ -406,6 +402,10 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <img src="/payday2/img/Supply.png" alt="Supplies" style="width: 20px; height: 20px; object-fit: contain;">
                     </button>
                 </div>
+            </div>
+            <div class="tabs">
+                <button type="button" class="tab active" id="tabIn">IN</button>
+                <button type="button" class="tab" id="tabOut">OUT</button>
             </div>
             <div id="topFormsWrap" class="pd2-top-forms-wrap" style="flex-wrap: wrap;">
                 <form method="GET" id="dateForm" class="pd2-m-0 pd2-d-flex pd2-align-center pd2-gap-10">
@@ -418,7 +418,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
                 </form>
-                <div class="pd2-d-flex pd2-align-center pd2-gap-10 pd2-ws-nowrap">
+                <div class="pd2-d-flex pd2-align-center pd2-gap-10 pd2-ws-nowrap pd2-d-none">
                     <button class="btn pd2-ws-nowrap" type="submit" form="dateForm">Открыть</button>
                 </div>
             </div>
