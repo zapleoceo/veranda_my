@@ -159,13 +159,6 @@ window.initPayday2 = function() {
     const payday2SettingsModal = document.getElementById('payday2SettingsModal');
     const payday2SettingsClose = document.getElementById('payday2SettingsClose');
     const payday2SettingsSave = document.getElementById('payday2SettingsSave');
-    
-    const payday2HelpToggleBtn = document.getElementById('payday2HelpToggleBtn');
-    if (payday2HelpToggleBtn) {
-        payday2HelpToggleBtn.addEventListener('click', () => {
-            document.body.classList.toggle('pd2-help-mode');
-        });
-    }
     const payday2SettingsErr = document.getElementById('payday2SettingsErr');
     const applyMode = (mode) => {
         const m = (mode === 'lite') ? 'lite' : 'full';
