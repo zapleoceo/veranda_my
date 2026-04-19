@@ -178,6 +178,9 @@
     background: none;
     border: none;
     padding: 0;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -189,7 +192,7 @@
 .pd2-soft-reset-btn:not(:disabled):hover {
     transform: scale(1.05);
     background-color: rgba(239, 68, 68, 0.4);
-    box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 6px 3px rgba(239, 68, 68, 0.4);
 }
 .pd2-soft-reset-btn:active {
     transform: scale(0.95);
