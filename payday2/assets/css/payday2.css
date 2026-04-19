@@ -9,9 +9,10 @@
 .pd2-ml-5 { margin-left: 5px; }
 .pd2-top-forms-wrap { display: flex; gap: 10px; margin-left: 10px; align-items: center; flex-wrap: wrap; }
 .pd2-date-form { display: flex; gap: 10px; margin: 0; align-items: center; }
-.pd2-date-input { padding: 0 10px; width: 120px; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; }
+.pd2-date-input { padding: 0 6px; width: 108px; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; }
+.pd2-date-input::-webkit-calendar-picker-indicator { margin-left: 2px; padding: 0; }
 @media (max-width: 800px) {
-    .pd2-date-input { width: 102px !important; height: 34px !important; padding: 0 10px !important; border-radius: 10px !important; }
+    .pd2-date-input { width: 92px !important; height: 34px !important; padding: 0 4px !important; border-radius: 10px !important; }
     
     #topFormsWrap {
         grid-column: 1 !important;
