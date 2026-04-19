@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0048';
+$payday2AssetVersion = '20260419_0049';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1090,6 +1090,22 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                             <div id="createTxError" class="error pd2-d-none pd2-mb-10"></div>
                             <button type="submit" class="btn primary pd2-w-100 pd2-fw-900" id="createTxSubmitBtn">Создать</button>
                         </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Модалка успешного создания транзакции -->
+            <div class="confirm-backdrop pd2-modal-backdrop" id="createTxSuccessModal">
+                <div class="confirm-modal pd2-modal-content" role="dialog" style="max-width: 400px;">
+                    <div class="pd2-modal-header">
+                        <h3 class="pd2-m-0">Успешно</h3>
+                        <button type="button" class="btn2 pd2-modal-close" id="createTxSuccessClose">✕</button>
+                    </div>
+                    <div class="body pd2-modal-body pd2-p-15 pd2-text-center">
+                        <div class="pd2-mb-15 pd2-fs-16">
+                            Транзакция успешно создана в Poster!
+                        </div>
+                        <div id="createTxSuccessDetails" class="muted pd2-mb-15"></div>
                     </div>
                 </div>
             </div>

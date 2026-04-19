@@ -18,8 +18,21 @@ window.initPaydayCreateTx = function() {
     const errorDiv = document.getElementById('createTxError');
     const submitBtn = document.getElementById('createTxSubmitBtn');
 
+    const successModal = document.getElementById('createTxSuccessModal');
+    const successCloseBtn = document.getElementById('createTxSuccessClose');
+    const successDetails = document.getElementById('createTxSuccessDetails');
+
     let accountsLoaded = false;
     let categoriesLoaded = false;
+
+    const escapeHtml = (str) => {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    };
 
     const showError = (msg) => {
         if (!msg) {
@@ -105,10 +118,32 @@ window.initPaydayCreateTx = function() {
         showError('');
     };
 
+    const openSuccessModal = (detailsHtml) => {
+        if (!successModal || !successDetails) return;
+        successDetails.innerHTML = detailsHtml;
+        successModal.style.display = 'flex';
+    };
+
+    const closeSuccessModal = () => {
+        if (successModal) successModal.style.display = 'none';
+        // Reload the table
+        if (typeof window.loadOutMail === 'function') {
+            const df = document.getElementById('dateForm');
+            if (df) df.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+    };
+
     closeBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
     });
+
+    if (successCloseBtn) successCloseBtn.addEventListener('click', closeSuccessModal);
+    if (successModal) {
+        successModal.addEventListener('click', (e) => {
+            if (e.target === successModal) closeSuccessModal();
+        });
+    }
 
     typeSelect.addEventListener('change', () => {
         const t = typeSelect.value;
@@ -176,13 +211,20 @@ window.initPaydayCreateTx = function() {
             
             closeModal();
             
-            // Reload the table
-            if (typeof window.loadOutMail === 'function') {
-                // If we have a global load function, we might need to trigger a full refresh
-                // Assuming we can just submit the dateForm to reload
-                const df = document.getElementById('dateForm');
-                if (df) df.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            let details = '';
+            const tText = typeSelect.options[typeSelect.selectedIndex].text;
+            details += `<div><strong>Тип:</strong> ${escapeHtml(tText)}</div>`;
+            details += `<div><strong>Сумма:</strong> ${Math.round(amount).toLocaleString('en-US').replace(/,/g, '\u202F')} VND</div>`;
+            if (t === '1') details += `<div><strong>На счет:</strong> ${escapeHtml(accToSelect.options[accToSelect.selectedIndex].text)}</div>`;
+            if (t === '2') details += `<div><strong>Со счета:</strong> ${escapeHtml(accFromSelect.options[accFromSelect.selectedIndex].text)}</div>`;
+            if (t === '3') {
+                details += `<div><strong>Со счета:</strong> ${escapeHtml(accFromSelect.options[accFromSelect.selectedIndex].text)}</div>`;
+                details += `<div><strong>На счет:</strong> ${escapeHtml(accToSelect.options[accToSelect.selectedIndex].text)}</div>`;
             }
+            if (categoryId) details += `<div><strong>Категория:</strong> ${escapeHtml(categorySelect.options[categorySelect.selectedIndex].text)}</div>`;
+            
+            openSuccessModal(details);
+            
         } catch (err) {
             showError(err.message);
         } finally {
