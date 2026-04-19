@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0054';
+$payday2AssetVersion = '20260419_0055';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1150,20 +1150,20 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
 
                         <details class="pd2-settings-spoiler pd2-mb-10">
                             <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Постер</summary>
-                            <div class="pd2-d-flex pd2-gap-10 pd2-mt-10 pd2-align-center pd2-flex-wrap">
-                                <label class="pd2-settings-label pd2-m-0 pd2-flex-1">service user_id
+                            <div class="pd2-settings-grid-5 pd2-mt-10">
+                                <label class="pd2-settings-label pd2-m-0"><span>service user_id</span>
                                     <input type="number" class="btn pd2-w-100" id="pd2sett_svc_user" min="1" step="1">
                                 </label>
-                                <label class="pd2-settings-label pd2-m-0 pd2-flex-1">Andrey (ID)
+                                <label class="pd2-settings-label pd2-m-0"><span>Andrey (ID)</span>
                                     <input type="number" class="btn pd2-w-100" id="pd2sett_acc_andrey" min="1" step="1">
                                 </label>
-                                <label class="pd2-settings-label pd2-m-0 pd2-flex-1">Tips (ID)
+                                <label class="pd2-settings-label pd2-m-0"><span>Tips (ID)</span>
                                     <input type="number" class="btn pd2-w-100" id="pd2sett_acc_tips" min="1" step="1">
                                 </label>
-                                <label class="pd2-settings-label pd2-m-0 pd2-flex-1">Vietnam (ID)
+                                <label class="pd2-settings-label pd2-m-0"><span>Vietnam (ID)</span>
                                     <input type="number" class="btn pd2-w-100" id="pd2sett_acc_vietnam" min="1" step="1">
                                 </label>
-                                <label class="pd2-settings-label pd2-m-0 pd2-flex-1">Чай (ID)
+                                <label class="pd2-settings-label pd2-m-0"><span>Чай (ID)</span>
                                     <input type="number" class="btn pd2-w-100" id="pd2sett_balance_sinc" min="1" step="1">
                                 </label>
                             </div>
