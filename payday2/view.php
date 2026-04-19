@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0050';
+$payday2AssetVersion = '20260419_0051';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1134,27 +1134,47 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     </div>
                     <p class="muted pd2-fs-12 pd2-mb-10">Сохраняется в <code>payday2/local_config.json</code> на сервере.</p>
                     <div class="pd2-settings-fields">
-                        <label class="pd2-settings-label">Telegram chat_id
-                            <input type="text" class="btn pd2-w-100" id="pd2sett_tg_chat" autocomplete="off">
-                        </label>
-                        <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left pd2-lh-135">
-                            Для форумов: <code>message_thread_id</code> — это ID <strong>темы</strong> (topic), не номер сообщения в ссылке. Ошибка «chat not found» чаще из‑за неверного <code>chat_id</code>.
-                        </p>
-                        <div class="pd2-settings-row-2">
-                            <label class="pd2-settings-label pd2-mb-0">Telegram message_thread_id
-                                <input type="text" class="btn pd2-w-100" id="pd2sett_tg_thread" autocomplete="off" placeholder="пусто = без темы">
-                            </label>
-                            <label class="pd2-settings-label pd2-mb-0">Poster service user_id
-                                <input type="number" class="btn pd2-w-100" id="pd2sett_svc_user" min="1" step="1">
-                            </label>
-                        </div>
-                        <div class="pd2-settings-label pd2-text-left pd2-mt-6">Счета в Poster (ID)</div>
-                        <div class="pd2-settings-grid-4">
-                            <label>Andrey <input type="number" class="btn pd2-w-100" id="pd2sett_acc_andrey" min="1" step="1"></label>
-                            <label>Tips <input type="number" class="btn pd2-w-100" id="pd2sett_acc_tips" min="1" step="1"></label>
-                            <label>Vietnam <input type="number" class="btn pd2-w-100" id="pd2sett_acc_vietnam" min="1" step="1"></label>
-                            <label>Чай <input type="number" class="btn pd2-w-100" id="pd2sett_balance_sinc" min="1" step="1"></label>
-                        </div>
+                        
+                        <details class="pd2-settings-spoiler pd2-mb-10">
+                            <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Телеграм</summary>
+                            <div class="pd2-d-flex pd2-gap-10 pd2-mt-10 pd2-align-center">
+                                <label class="pd2-settings-label pd2-m-0 pd2-w-100">chat_id
+                                    <input type="text" class="btn pd2-w-100" id="pd2sett_tg_chat" autocomplete="off">
+                                </label>
+                                <label class="pd2-settings-label pd2-m-0 pd2-w-100">message_thread_id
+                                    <input type="text" class="btn pd2-w-100" id="pd2sett_tg_thread" autocomplete="off" placeholder="пусто = без темы">
+                                </label>
+                            </div>
+                        </details>
+
+                        <details class="pd2-settings-spoiler pd2-mb-10">
+                            <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Постер</summary>
+                            <div class="pd2-d-flex pd2-gap-10 pd2-mt-10 pd2-align-center pd2-flex-wrap">
+                                <label class="pd2-settings-label pd2-m-0 pd2-flex-1">service user_id
+                                    <input type="number" class="btn pd2-w-100" id="pd2sett_svc_user" min="1" step="1">
+                                </label>
+                                <label class="pd2-settings-label pd2-m-0 pd2-flex-1">Andrey (ID)
+                                    <input type="number" class="btn pd2-w-100" id="pd2sett_acc_andrey" min="1" step="1">
+                                </label>
+                                <label class="pd2-settings-label pd2-m-0 pd2-flex-1">Tips (ID)
+                                    <input type="number" class="btn pd2-w-100" id="pd2sett_acc_tips" min="1" step="1">
+                                </label>
+                                <label class="pd2-settings-label pd2-m-0 pd2-flex-1">Vietnam (ID)
+                                    <input type="number" class="btn pd2-w-100" id="pd2sett_acc_vietnam" min="1" step="1">
+                                </label>
+                                <label class="pd2-settings-label pd2-m-0 pd2-flex-1">Чай (ID)
+                                    <input type="number" class="btn pd2-w-100" id="pd2sett_balance_sinc" min="1" step="1">
+                                </label>
+                            </div>
+                        </details>
+
+                        <details class="pd2-settings-spoiler pd2-mb-10" id="pd2sett_categories_spoiler">
+                            <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Категории</summary>
+                            <div id="pd2sett_categories_list" class="pd2-mt-10 pd2-d-flex pd2-flex-column pd2-gap-6" style="max-height: 200px; overflow-y: auto;">
+                                <div class="pd2-text-center muted">Загрузка категорий...</div>
+                            </div>
+                        </details>
+
                     </div>
                     <div id="payday2SettingsErr" class="error pd2-settings-err pd2-d-none"></div>
                     <div class="actions pd2-justify-between pd2-align-center pd2-mt-6">

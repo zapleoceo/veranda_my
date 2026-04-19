@@ -285,7 +285,37 @@ window.initPayday2 = function() {
             set('pd2sett_acc_vietnam', ls.accounts.vietnam);
         }
         set('pd2sett_balance_sinc', ls.balance_sinc_account_id);
+        
+        // Allowed categories will be set after categories are loaded
     };
+    
+    let payday2CategoriesLoaded = false;
+    const loadPayday2Categories = () => {
+        const listEl = document.getElementById('pd2sett_categories_list');
+        if (!listEl || payday2CategoriesLoaded) return;
+        
+        fetchJsonSafe(location.pathname + '?ajax=finance_categories').then(j => {
+            if (!j || !j.ok) throw new Error(j.error || 'Ошибка');
+            listEl.innerHTML = '';
+            const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
+            const allowed = ls && ls.allowed_categories ? ls.allowed_categories : [];
+            
+            for (const [id, name] of Object.entries(j.categories || {})) {
+                const checked = allowed.includes(Number(id)) ? 'checked' : '';
+                const idNum = Number(id);
+                listEl.insertAdjacentHTML('beforeend', `
+                    <label class="pd2-d-flex pd2-align-center pd2-gap-8 pd2-pointer">
+                        <input type="checkbox" class="pd2-sett-cat-cb" value="${idNum}" ${checked}>
+                        <span>${escapeHtml(name)}</span>
+                    </label>
+                `);
+            }
+            payday2CategoriesLoaded = true;
+        }).catch(e => {
+            listEl.innerHTML = '<div class="error pd2-text-center">Ошибка загрузки категорий</div>';
+        });
+    };
+
     const readPayday2SettingsPayload = () => {
         const num = (id) => {
             const el = document.getElementById(id);
@@ -296,6 +326,12 @@ window.initPayday2 = function() {
             const el = document.getElementById(id);
             return el ? String(el.value || '').trim() : '';
         };
+        
+        const allowedCats = [];
+        document.querySelectorAll('.pd2-sett-cat-cb:checked').forEach(cb => {
+            allowedCats.push(Number(cb.value));
+        });
+
         return {
             telegram_chat_id: str('pd2sett_tg_chat'),
             telegram_message_thread_id: str('pd2sett_tg_thread'),
@@ -306,12 +342,20 @@ window.initPayday2 = function() {
                 vietnam: num('pd2sett_acc_vietnam'),
             },
             balance_sinc_account_id: num('pd2sett_balance_sinc'),
+            allowed_categories: allowedCats,
         };
     };
     const openPayday2SettingsModal = () => {
         if (payday2SettingsErr) { payday2SettingsErr.textContent = ''; payday2SettingsErr.classList.add('pd2-d-none'); }
         fillPayday2SettingsForm();
         if (payday2SettingsModal) payday2SettingsModal.style.display = 'flex';
+        
+        const catSpoiler = document.getElementById('pd2sett_categories_spoiler');
+        if (catSpoiler) {
+            catSpoiler.addEventListener('toggle', () => {
+                if (catSpoiler.open) loadPayday2Categories();
+            });
+        }
     };
     const closePayday2SettingsModal = () => {
         if (payday2SettingsModal) payday2SettingsModal.style.display = 'none';

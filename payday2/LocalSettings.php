@@ -22,6 +22,7 @@ final class LocalSettings
             'account_tips_id' => Config::ACCOUNT_TIPS,
             'account_vietnam_id' => Config::ACCOUNT_VIETNAM,
             'balance_sinc_account_id' => Config::ACCOUNT_TIPS,
+            'allowed_categories' => [],
         ];
         $path = __DIR__ . DIRECTORY_SEPARATOR . 'local_config.json';
         $file = @file_get_contents($path);
@@ -43,6 +44,7 @@ final class LocalSettings
             'balance_sinc_account_id' => isset($j['balance_sinc_account_id'])
                 ? (int)$j['balance_sinc_account_id']
                 : $defaults['balance_sinc_account_id'],
+            'allowed_categories' => isset($j['allowed_categories']) && is_array($j['allowed_categories']) ? array_map('intval', $j['allowed_categories']) : $defaults['allowed_categories'],
         ];
         foreach (['service_user_id', 'account_andrey_id', 'account_tips_id', 'account_vietnam_id', 'balance_sinc_account_id'] as $k) {
             if ((int)$row[$k] <= 0) {
@@ -105,6 +107,7 @@ final class LocalSettings
                 'vietnam' => (int)$m['account_vietnam_id'],
             ],
             'balance_sinc_account_id' => (int)$m['balance_sinc_account_id'],
+            'allowed_categories' => (array)($m['allowed_categories'] ?? []),
         ];
     }
 
@@ -144,6 +147,7 @@ final class LocalSettings
         if ($bs <= 0 || $bs > 999999999) {
             return ['ok' => false, 'error' => 'Неверный balance_sinc_account_id.'];
         }
+        $allowedCats = isset($in['allowed_categories']) && is_array($in['allowed_categories']) ? array_values(array_map('intval', $in['allowed_categories'])) : [];
 
         $out = [
             'telegram_chat_id' => $tgChat,
@@ -155,6 +159,7 @@ final class LocalSettings
                 'vietnam' => $v,
             ],
             'balance_sinc_account_id' => $bs,
+            'allowed_categories' => $allowedCats,
         ];
 
         $path = __DIR__ . DIRECTORY_SEPARATOR . 'local_config.json';

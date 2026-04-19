@@ -66,9 +66,15 @@ window.initPaydayCreateTx = function() {
                 const j = await r.json();
                 if (!j || !j.ok) throw new Error(j?.error || 'Ошибка загрузки категорий');
                 
+                const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
+                const allowed = ls && ls.allowed_categories ? ls.allowed_categories : [];
+
                 categorySelect.innerHTML = '<option value="">Без категории</option>';
                 for (const [id, name] of Object.entries(j.categories || {})) {
-                    categorySelect.insertAdjacentHTML('beforeend', `<option value="${id}">${name}</option>`);
+                    // Show only if allowed list is empty (fallback) or if category is explicitly allowed
+                    if (allowed.length === 0 || allowed.includes(Number(id))) {
+                        categorySelect.insertAdjacentHTML('beforeend', `<option value="${id}">${escapeHtml(name)}</option>`);
+                    }
                 }
                 categoriesLoaded = true;
             }
