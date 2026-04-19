@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0019';
+$payday2AssetVersion = '20260419_0020';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -400,8 +400,8 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 <button type="button" class="tab" id="tabOut">OUT</button>
                 <div class="pd2-ml-auto pd2-d-flex">
                     <button type="button" class="tab pd2-tab-gold" id="btnKashShift">KashShift</button>
-                    <button type="button" class="tab pd2-tab-gold pd2-ml-5 pd2-d-flex pd2-align-center pd2-justify-center" id="btnSupplies" style="padding: 4px 10px;" title="Supplies">
-                        <img src="https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=solid%20black%20silhouette%20square%20cardboard%20box%20package%20icon%20with%20tape%20cross%20on%20top%20and%20a%20small%20tag%20label%2C%20minimalist%20flat%20vector%2C%20white%20background&image_size=square" alt="Supplies" style="width: 20px; height: 20px; object-fit: contain; filter: invert(1); mix-blend-mode: screen; opacity: 0.8;">
+                    <button type="button" class="tab pd2-tab-gold pd2-ml-5 pd2-d-flex pd2-align-center pd2-justify-center" id="btnSupplies" style="padding: 4px 10px; background: #f97316;" title="Supplies">
+                        <img src="https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt=solid%20black%20silhouette%20square%20cardboard%20box%20package%20icon%20with%20tape%20cross%20on%20top%20and%20a%20small%20tag%20label%2C%20minimalist%20flat%20vector%2C%20white%20background&image_size=square" alt="Supplies" style="width: 20px; height: 20px; object-fit: contain; filter: invert(1); mix-blend-mode: screen; opacity: 0.9;">
                     </button>
                 </div>
             </div>
