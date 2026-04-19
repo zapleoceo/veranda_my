@@ -159,6 +159,13 @@ window.initPayday2 = function() {
     const payday2SettingsModal = document.getElementById('payday2SettingsModal');
     const payday2SettingsClose = document.getElementById('payday2SettingsClose');
     const payday2SettingsSave = document.getElementById('payday2SettingsSave');
+    
+    const payday2HelpToggleBtn = document.getElementById('payday2HelpToggleBtn');
+    if (payday2HelpToggleBtn) {
+        payday2HelpToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('pd2-help-mode');
+        });
+    }
     const payday2SettingsErr = document.getElementById('payday2SettingsErr');
     const applyMode = (mode) => {
         const m = (mode === 'lite') ? 'lite' : 'full';
@@ -478,12 +485,12 @@ window.initPayday2 = function() {
                 const dt = formatOutDT(row.tx_time, row.date);
                 const contentShow = (isHidden && hiddenComment) ? hiddenComment : String(row.content || '');
                 tr.innerHTML = `
-                    <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
+                    <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)" data-help-abs="Скрыть транзакцию, если она не относится к расходам Poster.">−</button></td>
                     <td class="col-out-content">${escapeHtml(contentShow)}</td>
                     <td class="nowrap col-out-time"><div class="col-out-date-part">${escapeHtml(dt.date)}</div><div class="col-out-time-part">${escapeHtml(dt.time)}</div></td>
                     <td class="sum col-out-sum">
                         <div class="pd2-d-flex pd2-align-center pd2-justify-end">
-                            <button type="button" class="out-create-poster-tx-btn" title="Создать транзакцию в Poster" data-amount="${Number(row.amount || 0)}" data-date="${dt.date}" data-time="${dt.time}">+</button>
+                            <button type="button" class="out-create-poster-tx-btn" title="Создать транзакцию в Poster" data-help-abs="Создать новую транзакцию расхода в Poster." data-amount="${Number(row.amount || 0)}" data-date="${dt.date}" data-time="${dt.time}">+</button>
                             ${Math.round(Number(row.amount || 0)).toLocaleString('en-US').replace(/,/g, '\u202F')}
                         </div>
                     </td>
