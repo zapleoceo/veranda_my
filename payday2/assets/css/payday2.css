@@ -9,7 +9,10 @@
 .pd2-ml-5 { margin-left: 5px; }
 .pd2-top-forms-wrap { display: flex; gap: 10px; margin-left: 10px; align-items: center; }
 .pd2-date-form { display: flex; gap: 10px; margin: 0; align-items: center; }
-.pd2-date-input { padding: 8px 10px; width: 102px; }
+.pd2-date-input { padding: 8px 10px; width: 120px; }
+@media (max-width: 800px) {
+    .pd2-date-input { width: 102px; }
+}
 .pd2-m-0 { margin: 0; }
 .pd2-pos-relative { position: relative; }
 .pd2-p-0 { padding: 0; }
