@@ -260,12 +260,6 @@ window.initPayday2 = function() {
     };
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
     if (tabOut) tabOut.addEventListener('click', () => setTab('out'));
-    let initialTab = 'in';
-    try {
-        const search = new URLSearchParams(window.location.search || '');
-        if (search.get('tab') === 'out') initialTab = 'out';
-    } catch (_) {}
-    setTab(initialTab);
     const openPayday2BetaModal = () => {
         if (payday2BetaModal) payday2BetaModal.style.display = 'flex';
     };
@@ -748,6 +742,13 @@ window.initPayday2 = function() {
         outPosterScroll.addEventListener('scroll', () => outScheduleRelayout(), { passive: true });
     }
     pd2on(window, 'resize', () => outScheduleRelayout(), { passive: true });
+
+    let initialTab = 'in';
+    try {
+        const search = new URLSearchParams(window.location.search || '');
+        if (search.get('tab') === 'out') initialTab = 'out';
+    } catch (_) {}
+    setTab(initialTab);
 
     let outHideLinkedOn = false;
     let showOutMailHidden = false;

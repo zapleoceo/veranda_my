@@ -1,6 +1,6 @@
 # Payday2 — что уже сделано (по [PAYDAY2_REFACTORING_PLAN.md](PAYDAY2_REFACTORING_PLAN.md))
 
-Актуальная версия ассетов в `payday2/view.php`: **`20260419_0014`** (после деплоя — Ctrl+F5 на `/payday2/`).
+Актуальная версия ассетов в `payday2/view.php`: **`20260419_0015`** (после деплоя — Ctrl+F5 на `/payday2/`).
 
 ---
 
@@ -40,13 +40,13 @@
 
 | Пункт | Суть |
 |-------|------|
-| **4.1** | **`eval` убран**: конфиг в `#payday2-config-json` + `JSON.parse` при первой загрузке и в **`doPjax`**. **Нет подмены** `document.addEventListener` / `window.addEventListener`. Повторные **`initPayday2`**: `AbortController` + хелпер **`pd2on`** для слушателей на **`document`**, **`window`**, **`visualViewport`**; при abort — **`ResizeObserver.disconnect`**. PJAX по-прежнему подменяет **`innerHTML`** у **`.container`** (не `eval`, не глобальный перехват). |
+| **4.1** | **`eval` убран**: конфиг в `#payday2-config-json` + `JSON.parse` при первой загрузке и в **`doPjax`**. **Нет подмены** `document.addEventListener` / `window.addEventListener`. Повторные **`initPayday2`**: `AbortController` + хелпер **`pd2on`** для слушателей на **`document`**, **`window`**, **`visualViewport`**; при abort — **`ResizeObserver.disconnect`**. PJAX по-прежнему подменяет **`innerHTML`** у **`.container`** (не `eval`, не глобальный перехват). **Правка:** `setTab(initialTab)` перенесён **после** объявления `outScheduleRelayout`, иначе при `?tab=out` TDZ и падение всего `initPayday2`. |
 
 ---
 
 ## Чеклист для проверки после релиза
 
-1. Ctrl+F5 на `/payday2/`, версия **`?v=20260419_0014`**.
+1. Ctrl+F5 на `/payday2/`, версия **`?v=20260419_0015`**.
 2. **SoftReset** + confirm + flash + **Poster sync** после сброса.
 3. **PJAX**: переход по внутренним ссылкам `/payday2`, смена даты GET-формой, POST-редиректы — без дублей обработчиков (Escape, клики OUT, resize).
 4. Таблица **Poster чеки**: колонка **Стол** совпадает с прежним поведением при нескольких `spot_id`.
