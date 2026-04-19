@@ -403,6 +403,12 @@
     border-radius: 10px;
     box-shadow: 0 0 0 9999px rgba(0,0,0,0.15);
 }
+.pd2-tour-target-wrap {
+    position: relative;
+    z-index: 10055;
+    border-radius: 20px;
+    box-shadow: 0 0 0 4px #1a73e8, 0 0 0 9999px rgba(0,0,0,0.15);
+}
 
 /* For SVGs that have fill instead of stroke (like Telegram icon) */
 .bottom-two .btn:not(:disabled):not(#posterBalancesTelegramBtn):hover svg[fill]:not([fill="none"]) {

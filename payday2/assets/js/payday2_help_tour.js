@@ -85,6 +85,7 @@
             selector: '#sepayTable',
             title: 'Деньги (факт)',
             text: 'Банк/почта: реальные поступления. Тут выбираются строки для связывания с чеками Poster.',
+            placement: 'top',
         },
         {
             key: 'sepayReload',
@@ -116,6 +117,7 @@
             text: 'Lite — компактный вид таблиц (скрыты некоторые столбцы для удобства на малых экранах). Full — полная информация по каждой транзакции.',
             placement: 'bottom',
             offsetTarget: '#midCol',
+            extraClass: 'pd2-tour-target-wrap',
         },
         {
             key: 'inLinkControls',
@@ -147,6 +149,7 @@
             selector: '#posterTable',
             title: 'Poster чеки (учет)',
             text: 'Чеки из Poster (безнал/чаевые) за период. Их связываем с фактическими поступлениями из банка.',
+            placement: 'top',
         },
         {
             key: 'posterReload',
@@ -176,6 +179,7 @@
             selector: '#outSepayTable',
             title: 'Деньги 📧 (факт расходов)',
             text: 'Фактические списания. Тут выбираются строки для связывания с транзакциями расходов Poster.',
+            placement: 'top',
         },
         {
             key: 'outReloadMail',
@@ -204,6 +208,7 @@
             selector: '#outPosterTable',
             title: 'Poster тр-ии',
             text: 'Транзакции расходов/переводов в Poster, которые нужно сопоставить с фактическими списаниями.',
+            placement: 'top',
         },
         {
             key: 'outReloadPoster',
@@ -332,6 +337,7 @@
     const clearHighlight = () => {
         if (state.currentTarget) {
             state.currentTarget.classList.remove('pd2-tour-target');
+            state.currentTarget.classList.remove('pd2-tour-target-wrap');
             state.currentTarget = null;
         }
     };
@@ -370,7 +376,11 @@
         }
 
         clearHighlight();
-        target.classList.add('pd2-tour-target');
+        if (step.extraClass) {
+            target.classList.add(step.extraClass);
+        } else {
+            target.classList.add('pd2-tour-target');
+        }
         state.currentTarget = target;
 
         state.titleEl.textContent = step.title || '';
