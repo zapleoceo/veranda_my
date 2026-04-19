@@ -2142,7 +2142,6 @@ window.initPayday2 = function() {
         const pad = (n) => String(n).padStart(2, '0');
         const fmtSum = (v) => Math.round(Number(v || 0)).toLocaleString('en-US').replace(/,/g, '\u202F');
 
-        console.log('renderFinanceTable rows:', rows, 'expectedSum:', expectedSum);
         // Check if there is an exact amount match
         const exactMatchExists = rows.some(r => Math.abs(Number(r.sum || 0)) === expectedSum);
 
