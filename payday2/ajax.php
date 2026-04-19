@@ -355,14 +355,23 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             exit;
         }
 
+        $accAndrey = \App\Payday2\LocalSettings::accountAndreyId();
+
+        if ($accountTo <= 0 || $accAndrey <= 0) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Счета не настроены. Проверьте настройки (шестеренка).'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         $api->request('finance.createTransactions', [
-            'type' => 1,
+            'type' => 3, // Transfer
             'user_id' => $expectedUserId,
-            'account_id' => $accountTo,
+            'account_from' => $accAndrey,
+            'account_to' => $accountTo,
             'amount' => $amountVnd,
+            'sum' => $amountVnd,
             'date' => $targetDate,
             'comment' => $comment,
-            'sum' => $amountVnd,
         ], 'POST');
 
         echo json_encode([
