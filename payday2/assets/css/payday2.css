@@ -145,3 +145,36 @@
     object-fit: contain;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
 }
+
+.pd2-icon-btn {
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #e5e7eb;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    width: 34px;
+    overflow: hidden;
+    transition: background 0.2s, border-color 0.2s;
+}
+.pd2-icon-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.tabs .tab:hover,
+.pd2-icon-btn:hover,
+#tablesRoot .btn:hover,
+#outSection .btn:hover {
+    background-color: #b88746 !important;
+    border-color: #b88746 !important;
+    color: #fff !important;
+}
+#tablesRoot .btn:hover svg,
+#outSection .btn:hover svg {
+    stroke: #fff !important;
+}
