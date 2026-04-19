@@ -1113,7 +1113,7 @@ window.initPayday2 = function() {
     };
     setFormLoading('posterSyncForm', 'posterSyncBtn', 'IN', 'Poster: загрузка чеков');
     setFormLoading('sepaySyncForm', 'sepaySyncBtn', 'IN', 'SePay: загрузка платежей');
-    setFormLoading('clearDayForm', 'clearDayBtn', 'IN', 'Очистка дня');
+    setFormLoading('clearDayForm', 'clearDayBtn', 'IN', 'Сброс дня');
 
     const posterAccountsBtn = document.getElementById('posterAccountsBtn');
     const posterAccountsTbody = document.getElementById('posterAccountsTbody');

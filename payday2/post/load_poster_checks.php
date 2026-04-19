@@ -216,7 +216,7 @@ $isAjax = isset($_GET['ajax']) || (isset($_POST['ajax']) && $_POST['ajax'] === '
             }
             if (count($batchPcInsertsPlaceholders) >= 100) {
                 try {
-                    $pcSql = "INSERT INTO {$pc} (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, payed_third_party, pay_type, reason, tip_sum, discount, date_close, poster_payment_method_id, waiter_name, day_date) VALUES " . implode(', ', $batchPcInsertsPlaceholders);
+                    $pcSql = "INSERT INTO {$pc} (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, payed_third_party, pay_type, reason, tip_sum, discount, date_close, poster_payment_method_id, waiter_name, day_date) VALUES " . implode(', ', $batchPcInsertsPlaceholders) . " ON DUPLICATE KEY UPDATE receipt_number = VALUES(receipt_number), table_id = VALUES(table_id), spot_id = VALUES(spot_id), sum = VALUES(sum), payed_sum = VALUES(payed_sum), payed_cash = VALUES(payed_cash), payed_card = VALUES(payed_card), payed_cert = VALUES(payed_cert), payed_bonus = VALUES(payed_bonus), payed_third_party = VALUES(payed_third_party), pay_type = VALUES(pay_type), reason = VALUES(reason), tip_sum = VALUES(tip_sum), discount = VALUES(discount), date_close = VALUES(date_close), poster_payment_method_id = VALUES(poster_payment_method_id), waiter_name = VALUES(waiter_name), day_date = VALUES(day_date), was_deleted = 0, deleted_at = NULL";
                     $db->query($pcSql, $batchPcInsertsParams);
                 } catch (\Throwable $e) { error_log('Payday2 Error in ' . __FILE__ . ':' . __LINE__ . ' - ' . $e->getMessage()); }
                 $batchPcInsertsPlaceholders = []; $batchPcInsertsParams = [];
@@ -239,7 +239,7 @@ $isAjax = isset($_GET['ajax']) || (isset($_POST['ajax']) && $_POST['ajax'] === '
         }
         if (count($batchPcInsertsPlaceholders) > 0) {
             try {
-                $pcSql = "INSERT INTO {$pc} (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, payed_third_party, pay_type, reason, tip_sum, discount, date_close, poster_payment_method_id, waiter_name, day_date) VALUES " . implode(', ', $batchPcInsertsPlaceholders);
+                $pcSql = "INSERT INTO {$pc} (transaction_id, receipt_number, table_id, spot_id, sum, payed_sum, payed_cash, payed_card, payed_cert, payed_bonus, payed_third_party, pay_type, reason, tip_sum, discount, date_close, poster_payment_method_id, waiter_name, day_date) VALUES " . implode(', ', $batchPcInsertsPlaceholders) . " ON DUPLICATE KEY UPDATE receipt_number = VALUES(receipt_number), table_id = VALUES(table_id), spot_id = VALUES(spot_id), sum = VALUES(sum), payed_sum = VALUES(payed_sum), payed_cash = VALUES(payed_cash), payed_card = VALUES(payed_card), payed_cert = VALUES(payed_cert), payed_bonus = VALUES(payed_bonus), payed_third_party = VALUES(payed_third_party), pay_type = VALUES(pay_type), reason = VALUES(reason), tip_sum = VALUES(tip_sum), discount = VALUES(discount), date_close = VALUES(date_close), poster_payment_method_id = VALUES(poster_payment_method_id), waiter_name = VALUES(waiter_name), day_date = VALUES(day_date), was_deleted = 0, deleted_at = NULL";
                 $db->query($pcSql, $batchPcInsertsParams);
             } catch (\Throwable $e) { error_log('Payday2 Error in ' . __FILE__ . ':' . __LINE__ . ' - ' . $e->getMessage()); }
         }

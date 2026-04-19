@@ -1,6 +1,6 @@
 # Payday2 — что уже сделано (по [PAYDAY2_REFACTORING_PLAN.md](PAYDAY2_REFACTORING_PLAN.md))
 
-Актуальная версия ассетов в `payday2/view.php`: **`20260419_0012`** (после деплоя — Ctrl+F5 на `/payday2/`).
+Актуальная версия ассетов в `payday2/view.php`: **`20260419_0013`** (после деплоя — Ctrl+F5 на `/payday2/`).
 
 ---
 
@@ -32,13 +32,14 @@
 |-------|------|
 | **3.1** | `mail_out`: `$_ENV` + IMAP **`SINCE` + `BEFORE`**; ошибка `imap_open` с текстом от сервера. |
 | **3.2** | **`spots.getTableHallTables`** вызывается **до** цикла вывода Poster-чеков: для каждого уникального `spot_id` из `$posterRows` один запрос, карта `$posterTableNumsBySpot`; в шаблоне только lookup. В **`findFinanceTransfers`** (`functions.php`) счета 8/9 заменены на **`LocalSettings::accountTipsId()` / `accountVietnamId()`**. Отдельного N+1 по БД для «финансовых строк» во `view.php` не было — мета по webhook уже пакетом через **`IN (...)`**. |
-| **3.3** | По плану: текст «Сбросить день (Soft Reset)» и `INSERT … ON DUPLICATE` / снятие `was_deleted` — **ещё не делалось**. |
+| **3.3** | Кнопка и `confirm` — **«Сбросить день (Soft Reset)»** (пояснение про `was_deleted`, без физического удаления). Flash после POST — **`clear_day.php`**. **`load_poster_checks.php`**: батч-`INSERT` в `poster_checks` с **`ON DUPLICATE KEY UPDATE`** + `was_deleted = 0`, `deleted_at = NULL` (дубль ключа / гонка). SePay уже был в **`reload_sepay_api.php`**. В **`payday2.js`** текст загрузки формы: «Сброс дня». |
 
 ---
 
 ## Чеклист для проверки после релиза
 
-1. Ctrl+F5 на `/payday2/`, версия **`?v=20260419_0012`**.
-2. Таблица **Poster чеки**: колонка **Стол** совпадает с прежним поведением при нескольких `spot_id`.
-3. Блок **финансовых транзакций** (списки Vietnam/Tips из Poster) — без регрессий.
-4. **OUT** — почта (IMAP) после правок `.env`.
+1. Ctrl+F5 на `/payday2/`, версия **`?v=20260419_0013`**.
+2. **Сброс дня (Soft Reset)**: текст кнопки и confirm; flash после POST; затем **Poster sync** — строки снова видны (`was_deleted` снят).
+3. Таблица **Poster чеки**: колонка **Стол** совпадает с прежним поведением при нескольких `spot_id`.
+4. Блок **финансовых транзакций** (списки Vietnam/Tips из Poster) — без регрессий.
+5. **OUT** — почта (IMAP) после правок `.env`.

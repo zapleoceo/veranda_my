@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0012';
+$payday2AssetVersion = '20260419_0013';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -398,7 +398,7 @@ $payday2AssetVersion = '20260419_0012';
                     <input type="hidden" name="action" value="clear_day">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                    <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Очистить все данные за выбранный день (Poster, SePay, связи)?')">Обнулить</button>
+                    <button class="btn" id="clearDayBtn" type="submit" onclick="return confirm('Сбросить день (Soft Reset)? Записи Poster и SePay за выбранную дату будут помечены скрытыми (was_deleted); строки и связи в БД не удаляются физически. После повторной синхронизации данные снова появятся.')">Сбросить день (Soft Reset)</button>
                 </form>
             </div>
         </div>
