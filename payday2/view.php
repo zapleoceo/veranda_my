@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0017';
+$payday2AssetVersion = '20260419_0018';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -416,7 +416,6 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 </form>
                 <div class="pd2-d-flex pd2-align-center pd2-gap-10 pd2-ws-nowrap">
                     <button class="btn pd2-ws-nowrap" type="submit" form="dateForm">Открыть</button>
-                    <button class="btn pd2-ws-nowrap" id="clearDayBtn" type="submit" form="clearDayForm" title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстанавливаются.">SoftReset</button>
                 </div>
             </div>
         </div>
@@ -632,6 +631,9 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <span id="totalsDiff">—</span>
                     </div>
                 </div>
+                <button class="pd2-soft-reset-btn" id="clearDayBtn" type="submit" form="clearDayForm" title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстанавливаются.">
+                    <img src="https://png.klev.club/uploads/posts/2024-04/png-klev-club-h0qc-p-knopka-restart-png-30.png" alt="SoftReset">
+                </button>
             </div>
 
             <div class="card pd2-p-0 pd2-pos-relative">

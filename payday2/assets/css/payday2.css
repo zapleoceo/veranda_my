@@ -114,3 +114,31 @@
 .pd2-settings-modal.confirm-modal { max-width: 520px; }
 #payday2BetaModal .confirm-modal { max-width: 440px; }
 .pd2-settings-err { margin-top: 10px; }
+
+.pd2-soft-reset-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: auto;
+    transition: transform 0.2s ease, opacity 0.2s;
+}
+.pd2-soft-reset-btn:hover {
+    transform: scale(1.05);
+}
+.pd2-soft-reset-btn:active {
+    transform: scale(0.95);
+}
+.pd2-soft-reset-btn.loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+.pd2-soft-reset-btn img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+}
