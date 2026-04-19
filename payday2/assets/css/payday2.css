@@ -272,6 +272,32 @@
     fill: #fff !important;
 }
 
+.out-create-poster-tx-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background-color: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1;
+    padding: 0;
+    margin-right: 6px;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+.out-create-poster-tx-btn:hover {
+    background-color: #1557b0;
+    transform: scale(1.1);
+}
+tr.row-red .out-create-poster-tx-btn {
+    display: inline-flex;
+}
+
 #payday2SettingsBtn:not(:disabled):hover {
     background-color: #ef4444 !important;
     border-color: #ef4444 !important;

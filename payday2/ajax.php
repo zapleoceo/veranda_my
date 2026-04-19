@@ -1264,6 +1264,92 @@ if (($_GET['ajax'] ?? '') === 'poster_employees') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'finance_accounts') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $apiAcc = new \App\Classes\PosterAPI((string)$token);
+        $rows = $apiAcc->request('finance.getAccounts', []);
+        if (!is_array($rows)) $rows = [];
+        $out = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $aid = (int)($r['account_id'] ?? $r['accountId'] ?? 0);
+            $name = trim((string)($r['name'] ?? ''));
+            if ($aid > 0 && $name !== '') $out[$aid] = $name;
+        }
+        echo json_encode(['ok' => true, 'accounts' => $out], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'create_poster_transaction') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        if (!payday2_csrf_valid()) {
+            throw new \Exception('CSRF token mismatch or missing');
+        }
+
+        $input = file_get_contents('php://input');
+        $data = json_decode($input, true);
+        if (!is_array($data)) throw new \Exception('Invalid JSON');
+
+        $type = (int)($data['type'] ?? 0);
+        $amount = (int)($data['amount'] ?? 0);
+        $date = trim((string)($data['date'] ?? ''));
+        $comment = trim((string)($data['comment'] ?? ''));
+        $categoryId = (int)($data['category_id'] ?? 0);
+        $accountFrom = (int)($data['account_from'] ?? 0);
+        $accountTo = (int)($data['account_to'] ?? 0);
+
+        if ($type < 1 || $type > 3) throw new \Exception('Invalid type');
+        if ($amount <= 0) throw new \Exception('Invalid amount');
+        if ($date === '') throw new \Exception('Invalid date');
+
+        $payload = [
+            'type' => $type,
+            'date' => $date,
+            'comment' => $comment,
+        ];
+        if ($categoryId > 0) {
+            $payload['category_id'] = $categoryId;
+        }
+
+        if ($type === 1) { // income
+            if ($accountTo <= 0) throw new \Exception('Missing account');
+            $payload['account_to'] = $accountTo;
+            $payload['amount_to'] = $amount;
+        } elseif ($type === 2) { // expense
+            if ($accountFrom <= 0) throw new \Exception('Missing account');
+            $payload['account_from'] = $accountFrom;
+            $payload['amount_from'] = $amount;
+        } elseif ($type === 3) { // transfer
+            if ($accountFrom <= 0 || $accountTo <= 0) throw new \Exception('Missing accounts');
+            if ($accountFrom === $accountTo) throw new \Exception('Accounts must be different');
+            $payload['account_from'] = $accountFrom;
+            $payload['amount_from'] = $amount;
+            $payload['account_to'] = $accountTo;
+            $payload['amount_to'] = $amount;
+        }
+
+        $apiCreate = new \App\Classes\PosterAPI((string)$token);
+        $res = $apiCreate->request('finance.createTransactions', $payload, 'POST');
+
+        echo json_encode(['ok' => true, 'response' => $res], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'finance_categories') {
     header('Content-Type: application/json; charset=utf-8');
     try {

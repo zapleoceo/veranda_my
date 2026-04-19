@@ -389,7 +389,12 @@ window.initPayday2 = function() {
                     <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
                     <td class="col-out-content">${escapeHtml(contentShow)}</td>
                     <td class="nowrap col-out-time"><div class="col-out-date-part">${escapeHtml(dt.date)}</div><div class="col-out-time-part">${escapeHtml(dt.time)}</div></td>
-                    <td class="sum col-out-sum">${Math.round(Number(row.amount || 0)).toLocaleString('en-US').replace(/,/g, '\u202F')}</td>
+                    <td class="sum col-out-sum">
+                        <div class="pd2-d-flex pd2-align-center pd2-justify-end">
+                            <button type="button" class="out-create-poster-tx-btn" title="Создать транзакцию в Poster" data-amount="${Number(row.amount || 0)}" data-date="${dt.date}" data-time="${dt.time}">+</button>
+                            ${Math.round(Number(row.amount || 0)).toLocaleString('en-US').replace(/,/g, '\u202F')}
+                        </div>
+                    </td>
                     <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
                     <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
                 `;

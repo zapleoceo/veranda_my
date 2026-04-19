@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0046';
+$payday2AssetVersion = '20260419_0047';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1043,6 +1043,57 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
     </div>
 </div>
 
+            <!-- Модалка создания транзакции -->
+            <div class="confirm-backdrop pd2-modal-backdrop" id="createTxModal">
+                <div class="confirm-modal pd2-modal-content" role="dialog" style="max-width: 400px;">
+                    <div class="pd2-modal-header">
+                        <h3 class="pd2-m-0">Новая транзакция</h3>
+                        <button type="button" class="btn2 pd2-modal-close" id="createTxClose">✕</button>
+                    </div>
+                    <div class="body pd2-modal-body pd2-p-15">
+                        <form id="createTxForm">
+                            <div class="pd2-mb-10">
+                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Дата и время</label>
+                                <div class="pd2-d-flex pd2-gap-10">
+                                    <input type="date" id="createTxDate" class="btn pd2-w-100" required>
+                                    <input type="time" id="createTxTime" class="btn pd2-w-100" required>
+                                </div>
+                            </div>
+                            <div class="pd2-mb-10">
+                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Тип</label>
+                                <select id="createTxType" class="btn pd2-w-100">
+                                    <option value="2">Расход</option>
+                                    <option value="1">Приход</option>
+                                    <option value="3">Перевод</option>
+                                </select>
+                            </div>
+                            <div class="pd2-mb-10" id="createTxAccountFromWrap">
+                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Счет списания</label>
+                                <select id="createTxAccountFrom" class="btn pd2-w-100"></select>
+                            </div>
+                            <div class="pd2-mb-10 pd2-d-none" id="createTxAccountToWrap">
+                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Счет пополнения</label>
+                                <select id="createTxAccountTo" class="btn pd2-w-100"></select>
+                            </div>
+                            <div class="pd2-mb-10">
+                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Сумма (VND)</label>
+                                <input type="number" id="createTxAmount" class="btn pd2-w-100" step="1" min="1" required>
+                            </div>
+                            <div class="pd2-mb-10">
+                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Категория</label>
+                                <select id="createTxCategory" class="btn pd2-w-100"></select>
+                            </div>
+                            <div class="pd2-mb-10">
+                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Комментарий</label>
+                                <input type="text" id="createTxComment" class="btn pd2-w-100">
+                            </div>
+                            <div id="createTxError" class="error pd2-d-none pd2-mb-10"></div>
+                            <button type="submit" class="btn primary pd2-w-100 pd2-fw-900" id="createTxSubmitBtn">Создать</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             <div class="confirm-backdrop" id="financeConfirm">
                 <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="financeConfirmTitle">
                     <h3 id="financeConfirmTitle">Подтверждение</h3>
@@ -1116,6 +1167,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
             
 <script type="application/json" id="payday2-config-json"><?= json_encode($payday2ClientConfig, $payday2ConfigJsonFlags) ?></script>
 <script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
+<script src="/payday2/assets/js/payday2_create_tx.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 </body>
 </html>
