@@ -1285,6 +1285,110 @@ if (($_GET['ajax'] ?? '') === 'finance_categories') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'finance_accounts') {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $apiAcc = new \App\Classes\PosterAPI((string)$token);
+        $rows = $apiAcc->request('finance.getAccounts', []);
+        if (!is_array($rows)) $rows = [];
+        $out = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $accountId = (int)($r['account_id'] ?? $r['accountId'] ?? 0);
+            $name = trim((string)($r['account_name'] ?? $r['name'] ?? ''));
+            if ($accountId > 0 && $name !== '') $out[$accountId] = $name;
+        }
+        echo json_encode(['ok' => true, 'accounts' => $out], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'create_transaction') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $json = file_get_contents('php://input');
+        $data = json_decode($json, true);
+        if (!is_array($data)) throw new \Exception('Invalid JSON payload');
+        
+        $type = (int)($data['type'] ?? 0);
+        if (!in_array($type, [0, 1, 2], true)) throw new \Exception('Invalid transaction type');
+        
+        $date = trim((string)($data['date'] ?? ''));
+        if ($date === '') throw new \Exception('Date is required');
+        
+        $payload = [
+            'id' => 1,
+            'type' => $type,
+            'date' => $date,
+        ];
+        
+        $categoryId = (int)($data['category'] ?? 0);
+        if ($categoryId > 0 && in_array($type, [0, 1], true)) {
+            $payload['category'] = $categoryId;
+        }
+        
+        $userId = (int)($data['user_id'] ?? 0);
+        if ($userId > 0) {
+            $payload['user_id'] = $userId;
+        }
+        
+        $comment = trim((string)($data['comment'] ?? ''));
+        if ($comment !== '') {
+            $payload['comment'] = $comment;
+        }
+
+        if ($type === 0) { // Expense
+            $accFrom = (int)($data['account_from'] ?? 0);
+            $amtFrom = (float)($data['amount_from'] ?? 0);
+            if ($accFrom <= 0) throw new \Exception('Account from is required for expense');
+            if ($amtFrom <= 0) throw new \Exception('Amount from must be greater than 0');
+            $payload['account_from'] = $accFrom;
+            $payload['amount_from'] = $amtFrom;
+        } elseif ($type === 1) { // Income
+            $accTo = (int)($data['account_to'] ?? 0);
+            $amtTo = (float)($data['amount_to'] ?? 0);
+            if ($accTo <= 0) throw new \Exception('Account to is required for income');
+            if ($amtTo <= 0) throw new \Exception('Amount to must be greater than 0');
+            $payload['account_to'] = $accTo;
+            $payload['amount_to'] = $amtTo;
+        } elseif ($type === 2) { // Transfer
+            $accFrom = (int)($data['account_from'] ?? 0);
+            $accTo = (int)($data['account_to'] ?? 0);
+            $amtFrom = (float)($data['amount_from'] ?? 0);
+            $amtTo = (float)($data['amount_to'] ?? 0);
+            if ($accFrom <= 0) throw new \Exception('Account from is required for transfer');
+            if ($accTo <= 0) throw new \Exception('Account to is required for transfer');
+            if ($accFrom === $accTo) throw new \Exception('Cannot transfer to the same account');
+            if ($amtFrom <= 0 || $amtTo <= 0) throw new \Exception('Transfer amounts must be greater than 0');
+            $payload['account_from'] = $accFrom;
+            $payload['account_to'] = $accTo;
+            $payload['amount_from'] = $amtFrom;
+            $payload['amount_to'] = $amtTo;
+        }
+
+        $apiCreate = new \App\Classes\PosterAPI((string)$token);
+        $res = $apiCreate->request('finance.createTransactions', $payload, 'POST');
+        if (!isset($res['response']) || empty($res['response'])) {
+            $err = isset($res['error']) ? print_r($res['error'], true) : 'Unknown error from API';
+            throw new \Exception('Poster API Error: ' . $err);
+        }
+        
+        echo json_encode(['ok' => true, 'response' => $res['response']], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'kashshift') {
     header('Content-Type: application/json; charset=utf-8');
     try {

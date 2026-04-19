@@ -1115,7 +1115,65 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
             </div>
             
 <script type="application/json" id="payday2-config-json"><?= json_encode($payday2ClientConfig, $payday2ConfigJsonFlags) ?></script>
-<script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
+<div class="confirm-backdrop" id="createTxModal" style="display:none;">
+        <div class="confirm-modal pd2-create-tx-modal" role="dialog" aria-modal="true" aria-labelledby="createTxModalTitle">
+            <h3 id="createTxModalTitle" class="pd2-m-0">Создать транзакцию</h3>
+            <div id="createTxErr" class="pd2-settings-err pd2-text-red pd2-fw-900 pd2-d-none"></div>
+            <form id="createTxForm" class="pd2-mt-10">
+                <div class="pd2-d-flex pd2-gap-10 pd2-mb-10">
+                    <div style="flex:1;">
+                        <label class="pd2-d-block pd2-mb-4 pd2-fw-900">Дата</label>
+                        <input type="date" id="createTxDate" class="pd2-w-100 pd2-p-8 pd2-border-radius-8 pd2-border-gray" required>
+                    </div>
+                    <div style="flex:1;">
+                        <label class="pd2-d-block pd2-mb-4 pd2-fw-900">Время</label>
+                        <input type="time" id="createTxTime" class="pd2-w-100 pd2-p-8 pd2-border-radius-8 pd2-border-gray" required step="1">
+                    </div>
+                </div>
+                
+                <div class="pd2-mb-10">
+                    <label class="pd2-d-block pd2-mb-4 pd2-fw-900">Тип</label>
+                    <select id="createTxType" class="pd2-w-100 pd2-p-8 pd2-border-radius-8 pd2-border-gray">
+                        <option value="0" selected>Расход</option>
+                        <option value="1">Доход</option>
+                        <option value="2">Перевод</option>
+                    </select>
+                </div>
+                
+                <div id="createTxAccountFromWrap" class="pd2-mb-10">
+                    <label class="pd2-d-block pd2-mb-4 pd2-fw-900" id="createTxAccountFromLabel">Счет (списание)</label>
+                    <select id="createTxAccountFrom" class="pd2-w-100 pd2-p-8 pd2-border-radius-8 pd2-border-gray"></select>
+                </div>
+                
+                <div id="createTxAccountToWrap" class="pd2-mb-10 pd2-d-none">
+                    <label class="pd2-d-block pd2-mb-4 pd2-fw-900">Счет (зачисление)</label>
+                    <select id="createTxAccountTo" class="pd2-w-100 pd2-p-8 pd2-border-radius-8 pd2-border-gray"></select>
+                </div>
+                
+                <div class="pd2-mb-10">
+                    <label class="pd2-d-block pd2-mb-4 pd2-fw-900">Сумма</label>
+                    <input type="number" id="createTxAmount" class="pd2-w-100 pd2-p-8 pd2-border-radius-8 pd2-border-gray" step="0.01" min="0.01" required>
+                </div>
+                
+                <div id="createTxCategoryWrap" class="pd2-mb-10">
+                    <label class="pd2-d-block pd2-mb-4 pd2-fw-900">Категория</label>
+                    <select id="createTxCategory" class="pd2-w-100 pd2-p-8 pd2-border-radius-8 pd2-border-gray"></select>
+                </div>
+                
+                <div class="pd2-d-flex pd2-justify-between pd2-mt-20 pd2-gap-10">
+                    <button type="button" class="btn2 pd2-min-w-140" id="createTxCancelBtn">Отмена</button>
+                    <button type="submit" class="btn2 primary pd2-min-w-140" id="createTxSaveBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pd2-mr-4 pd2-v-align-mid">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Создать
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 </body>
 </html>
