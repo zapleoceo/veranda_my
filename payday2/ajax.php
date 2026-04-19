@@ -1040,7 +1040,15 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
     }
     $inbox = @imap_open('{imap.gmail.com:993/imap/ssl}INBOX', $mailUser, $mailPass);
     if (!$inbox) {
-        echo json_encode(['ok' => false, 'error' => 'IMAP open failed'], JSON_UNESCAPED_UNICODE);
+        $imapErr = function_exists('imap_last_error') ? (string)imap_last_error() : '';
+        if ($imapErr !== '') {
+            @imap_errors();
+            @imap_alerts();
+        }
+        echo json_encode([
+            'ok' => false,
+            'error' => 'IMAP open failed' . ($imapErr !== '' ? (': ' . $imapErr) : ''),
+        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
     $fromTs = strtotime($dFrom !== '' ? ($dFrom . ' 00:00:00') : ($dTo . ' 00:00:00'));

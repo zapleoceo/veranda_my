@@ -3,13 +3,22 @@ require_once __DIR__ . '/src/classes/Database.php';
 require_once __DIR__ . '/src/classes/Auth.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 
-// Load .env
+// Load .env (trim keys; strip surrounding quotes on values — как в типичных .env)
 if (file_exists(__DIR__ . '/.env')) {
     $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
-        if (strpos(trim($line), '#') === 0) continue;
-        list($name, $value) = explode('=', $line, 2);
-        $_ENV[$name] = trim($value);
+        if (strpos(trim($line), '#') === 0) {
+            continue;
+        }
+        if (strpos($line, '=') === false) {
+            continue;
+        }
+        [$name, $value] = explode('=', $line, 2);
+        $name = trim($name);
+        if ($name === '') {
+            continue;
+        }
+        $_ENV[$name] = trim(trim((string)$value), '"\'');
     }
 }
 
