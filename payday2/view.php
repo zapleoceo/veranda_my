@@ -315,7 +315,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0007';
+$payday2AssetVersion = '20260419_0008';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -1016,9 +1016,17 @@ $payday2AssetVersion = '20260419_0007';
                         <label class="pd2-settings-label">Telegram chat_id
                             <input type="text" class="btn pd2-w-100" id="pd2sett_tg_chat" autocomplete="off">
                         </label>
+                        <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left" style="line-height:1.35;">
+                            Для супергрупп и каналов в Bot API используется формат <strong>-100…</strong>: к числу из ссылки
+                            <code>t.me/c/3889942420/…</code> (часть после <code>/c/</code>) добавляют префикс <code>-100</code>, получается например <code>-1003889942420</code>.
+                            Число без минуса или с другим префиксом — это другой тип чата; бот должен быть <strong>участником</strong> этой группы.
+                        </p>
                         <label class="pd2-settings-label">Telegram message_thread_id
                             <input type="text" class="btn pd2-w-100" id="pd2sett_tg_thread" autocomplete="off" placeholder="пусто = без темы">
                         </label>
+                        <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left" style="line-height:1.35;">
+                            Для форумов: это ID <strong>темы</strong> (topic), не номер сообщения в ссылке. Ошибка «chat not found» чаще из‑за неверного <code>chat_id</code>.
+                        </p>
                         <label class="pd2-settings-label">Poster service user_id
                             <input type="number" class="btn pd2-w-100" id="pd2sett_svc_user" min="1" step="1">
                         </label>

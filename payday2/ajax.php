@@ -115,8 +115,9 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     
     $tgData = json_decode($resp, true);
     if (!isset($tgData['ok']) || !$tgData['ok']) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => 'Telegram API error: ' . ($tgData['description'] ?? 'Unknown')], JSON_UNESCAPED_UNICODE);
+        $desc = is_array($tgData) ? (string)($tgData['description'] ?? 'Unknown') : 'Invalid Telegram response';
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Telegram: ' . $desc], JSON_UNESCAPED_UNICODE);
         exit;
     }
     
