@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0057';
+$payday2AssetVersion = '20260419_0058';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -393,7 +393,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
         <div class="nav-left">
             <div class="pd2-nav-title-row pd2-d-flex pd2-align-center pd2-gap-8">
                 <div class="nav-title pd2-pointer" id="payday2InfoBtn">Payday2</div>
-                <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2HelpToggleBtn" title="Справка">i</button>
+                <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2HelpToggleBtn" title="Справка">❓</button>
                 <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2SettingsBtn" title="Настройки Payday2" data-help-abs="Настройки интеграции с Telegram и счетами Poster.">⚙</button>
                 <div class="pd2-d-flex">
                     <button type="button" class="pd2-icon-btn" id="btnKashShift" title="KashShift" data-help-abs="Просмотр кассовых смен из Poster.">
