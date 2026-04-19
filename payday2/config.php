@@ -11,3 +11,5 @@ class Config {
     public const METHOD_VIETNAM = 11;
     public const METHOD_BYBIT = 12;
 }
+
+require_once __DIR__ . '/LocalSettings.php';

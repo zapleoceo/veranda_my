@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 use App\Payday2\Config;
 use App\Payday2\FinanceHelper;
+use App\Payday2\LocalSettings;
 
 $sepayRows = $db->query(
     "SELECT s.sepay_id, s.transaction_date, s.transfer_amount, s.payment_method, s.content, s.reference_code
@@ -294,11 +295,11 @@ $posterBalanceAndrey = null;
 $posterBalanceVietnam = null;
 $posterBalanceCash = null;
 $posterBalanceTotal = null;
-if (isset($posterAccountsById[Config::ACCOUNT_ANDREY]) || isset($posterAccountsById[Config::ACCOUNT_TIPS])) {
-    $posterBalanceAndrey = (int)($posterAccountsById[Config::ACCOUNT_ANDREY]['balance'] ?? 0) + (int)($posterAccountsById[Config::ACCOUNT_TIPS]['balance'] ?? 0);
+if (isset($posterAccountsById[LocalSettings::accountAndreyId()]) || isset($posterAccountsById[LocalSettings::accountTipsId()])) {
+    $posterBalanceAndrey = (int)($posterAccountsById[LocalSettings::accountAndreyId()]['balance'] ?? 0) + (int)($posterAccountsById[LocalSettings::accountTipsId()]['balance'] ?? 0);
 }
-if (isset($posterAccountsById[Config::ACCOUNT_VIETNAM])) {
-    $posterBalanceVietnam = (int)($posterAccountsById[Config::ACCOUNT_VIETNAM]['balance'] ?? 0);
+if (isset($posterAccountsById[LocalSettings::accountVietnamId()])) {
+    $posterBalanceVietnam = (int)($posterAccountsById[LocalSettings::accountVietnamId()]['balance'] ?? 0);
 }
 if (isset($posterAccountsById[2])) {
     $posterBalanceCash = (int)($posterAccountsById[2]['balance'] ?? 0);
@@ -314,7 +315,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0005';
+$payday2AssetVersion = '20260419_0006';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -753,12 +754,10 @@ $payday2AssetVersion = '20260419_0005';
                       data-kind="vietnam"
                       data-date-from="<?= htmlspecialchars($dateFrom) ?>"
                       data-date-to="<?= htmlspecialchars($dateTo) ?>"
-                      data-account-from-id="1"
-                      data-account-to-id="9"
-                      data-account-from-id="1"
-                      data-account-to-id="<?= Config::ACCOUNT_VIETNAM ?>"
-                      data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
-                      data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[Config::ACCOUNT_VIETNAM]['name'] ?? '#' . Config::ACCOUNT_VIETNAM)) ?>"
+                      data-account-from-id="<?= (int)LocalSettings::accountAndreyId() ?>"
+                      data-account-to-id="<?= (int)LocalSettings::accountVietnamId() ?>"
+                      data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[LocalSettings::accountAndreyId()]['name'] ?? '#' . LocalSettings::accountAndreyId())) ?>"
+                      data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[LocalSettings::accountVietnamId()]['name'] ?? '#' . LocalSettings::accountVietnamId())) ?>"
                       data-sum-vnd="<?= htmlspecialchars((string)($vietnamVnd !== null ? (int)$vietnamVnd : 0)) ?>">
                     <input type="hidden" name="payday2_csrf" value="<?= htmlspecialchars($payday2CsrfToken) ?>">
                     <input type="hidden" name="action" value="create_transfer">
@@ -814,12 +813,10 @@ $payday2AssetVersion = '20260419_0005';
                       data-kind="tips"
                       data-date-from="<?= htmlspecialchars($dateFrom) ?>"
                       data-date-to="<?= htmlspecialchars($dateTo) ?>"
-                      data-account-from-id="1"
-                      data-account-to-id="8"
-                      data-account-from-id="1"
-                      data-account-to-id="<?= Config::ACCOUNT_TIPS ?>"
-                      data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[1]['name'] ?? '#1')) ?>"
-                      data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[Config::ACCOUNT_TIPS]['name'] ?? '#' . Config::ACCOUNT_TIPS)) ?>"
+                      data-account-from-id="<?= (int)LocalSettings::accountAndreyId() ?>"
+                      data-account-to-id="<?= (int)LocalSettings::accountTipsId() ?>"
+                      data-account-from-name="<?= htmlspecialchars((string)($posterAccountsById[LocalSettings::accountAndreyId()]['name'] ?? '#' . LocalSettings::accountAndreyId())) ?>"
+                      data-account-to-name="<?= htmlspecialchars((string)($posterAccountsById[LocalSettings::accountTipsId()]['name'] ?? '#' . LocalSettings::accountTipsId())) ?>"
                       data-sum-vnd="<?= htmlspecialchars((string)($tipsVnd !== null ? (int)$tipsVnd : 0)) ?>">
                     <input type="hidden" name="payday2_csrf" value="<?= htmlspecialchars($payday2CsrfToken) ?>">
                     <input type="hidden" name="action" value="create_transfer">

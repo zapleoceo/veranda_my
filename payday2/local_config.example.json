@@ -1,0 +1,11 @@
+{
+  "telegram_chat_id": "-100xxxxxxxx",
+  "telegram_message_thread_id": "1234",
+  "service_user_id": 4,
+  "accounts": {
+    "andrey": 1,
+    "tips": 8,
+    "vietnam": 9
+  },
+  "balance_sinc_account_id": 8
+}

@@ -50,8 +50,8 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     file_put_contents($tmpFile, $imgData);
 
     $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
-    $tgChatId = '-1003889942420'; // From https://t.me/c/3889942420/1736
-    $threadId = '1736'; // From https://t.me/c/3889942420/1736
+    $tgChatId = \App\Payday2\LocalSettings::telegramChatId();
+    $threadId = \App\Payday2\LocalSettings::telegramMessageThreadId();
 
     file_put_contents(__DIR__ . '/telegram_debug.log', "Token length: " . strlen($tgToken) . " Chat ID: $tgChatId Thread: $threadId\n", FILE_APPEND);
 
@@ -128,6 +128,9 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
         exit;
     }
     try {
+        $methodVietnam = (int)\App\Payday2\Config::METHOD_VIETNAM;
+        $accTips = \App\Payday2\LocalSettings::accountTipsId();
+        $accVietnam = \App\Payday2\LocalSettings::accountVietnamId();
         $amountCents = 0;
         if ($kind === 'vietnam') {
             $amountCents = (int)$db->query(
@@ -136,7 +139,7 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
                  WHERE day_date BETWEEN ? AND ?
                    AND pay_type IN (2,3)
                    AND (payed_card + payed_third_party) > 0
-                   AND poster_payment_method_id = 11",
+                   AND poster_payment_method_id = " . $methodVietnam,
                 [$dFrom, $dTo]
             )->fetchColumn();
         } else {
@@ -155,13 +158,13 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
                    AND p.pay_type IN (2,3)
                    AND (p.payed_card + p.payed_third_party) > 0
                    AND p.tip_sum > 0
-                   AND COALESCE(p.poster_payment_method_id, 0) <> 11",
+                   AND COALESCE(p.poster_payment_method_id, 0) <> " . $methodVietnam,
                 [$dFrom, $dTo, $dFrom, $dTo]
             )->fetchColumn();
         }
         if ($amountCents <= 0) {
             throw new \Exception($kind === 'vietnam'
-                ? 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=11) за выбранный период.'
+                ? 'Сумма = 0: нет чеков Vietnam Company (payment_method_id=' . $methodVietnam . ') за выбранный период.'
                 : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.'
             );
         }
@@ -178,14 +181,14 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             throw new \Exception('Bad date');
         }
 
-        $accountTo = $kind === 'vietnam' ? 9 : 8;
+        $accountTo = $kind === 'vietnam' ? $accVietnam : $accTips;
         $commentBase = $kind === 'vietnam'
             ? 'Перевод чеков вьетнаской компании'
             : 'Перевод типсов';
         $comment = $commentBase;
         $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
         if ($by !== '') $comment .= ' by ' . $by;
-        $expectedUserId = 4;
+        $expectedUserId = \App\Payday2\LocalSettings::serviceUserId();
 
         $txs = [];
         try {
@@ -390,7 +393,9 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
         }
 
                 $rows = [];
-        $accTarget = $kind === 'vietnam' ? 9 : 8;
+        $accTips = \App\Payday2\LocalSettings::accountTipsId();
+        $accVietnam = \App\Payday2\LocalSettings::accountVietnamId();
+        $accTarget = $kind === 'vietnam' ? $accVietnam : $accTips;
 
         try {
             $rows = $api->request('finance.getTransactions', [
@@ -493,15 +498,15 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
                 $accToId = (int)$toRaw;
             }
 
-            if ($accToId !== 8 && $accToId !== 9 && $accFromId !== 8 && $accFromId !== 9) continue;
-            $accId = ($accToId === 8 || $accToId === 9) ? $accToId : $accFromId;
+            if ($accToId !== $accTips && $accToId !== $accVietnam && $accFromId !== $accTips && $accFromId !== $accVietnam) continue;
+            $accId = ($accToId === $accTips || $accToId === $accVietnam) ? $accToId : $accFromId;
 
             $cmt = (string)($row['comment'] ?? $row['description'] ?? $row['comment_text'] ?? '');
             $cmtNorm = $normText($cmt);
             
             // We explicitly requested type=1 for the target account, so any returned transaction matches the kind
-            $isVietnam = ($kind === 'vietnam' && $accId === 9);
-            $isTips = ($kind === 'tips' && $accId === 8);
+            $isVietnam = ($kind === 'vietnam' && $accId === $accVietnam);
+            $isTips = ($kind === 'tips' && $accId === $accTips);
             
             if ($kind === 'vietnam' && !$isVietnam) continue;
             if ($kind === 'tips' && !$isTips) continue;
@@ -720,6 +725,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
         exit;
     }
     try {
+        $methodVietnamId = (int)\App\Payday2\Config::METHOD_VIETNAM;
         $checks = $db->query(
             "SELECT transaction_id, date_close, payed_card, payed_third_party, tip_sum, poster_payment_method_id
              FROM {$pc}
@@ -775,7 +781,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             if ($pid <= 0) continue;
             if (!empty($linkedPoster[$pid])) continue;
             $pmId = (int)($c['poster_payment_method_id'] ?? 0);
-            if ($pmId === 11) continue;
+            if ($pmId === $methodVietnamId) continue;
 
             $payedCardVnd = $posterCentsToVnd((int)(($c['payed_card'] ?? 0) + ($c['payed_third_party'] ?? 0)));
             $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
@@ -831,7 +837,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             if ($pid <= 0) continue;
             if (!empty($linkedPoster[$pid])) continue;
             $pmId = (int)($checks[$i]['poster_payment_method_id'] ?? 0);
-            if ($pmId === 11) continue;
+            if ($pmId === $methodVietnamId) continue;
 
             $prevPid = (int)($checks[$i - 1]['transaction_id'] ?? 0);
             $nextPid = (int)($checks[$i + 1]['transaction_id'] ?? 0);
@@ -879,7 +885,7 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
             if ($pid <= 0) continue;
             if (!empty($linkedPoster[$pid])) continue;
             $pmId = (int)($c['poster_payment_method_id'] ?? 0);
-            if ($pmId === 11) continue;
+            if ($pmId === $methodVietnamId) continue;
 
             $payedCardVnd = $posterCentsToVnd((int)(($c['payed_card'] ?? 0) + ($c['payed_third_party'] ?? 0)));
             $tipVnd = $posterCentsToVnd((int)($c['tip_sum'] ?? 0));
@@ -1167,7 +1173,7 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
 
         $apiOut = new \App\Classes\PosterAPI((string)$token);
         $rows = [];
-        foreach ([1, 8] as $accType) {
+        foreach ([\App\Payday2\LocalSettings::accountAndreyId(), \App\Payday2\LocalSettings::accountTipsId()] as $accType) {
             try {
                 $r2 = $apiOut->request('finance.getTransactions', [
                     'dateFrom' => date('Ymd', strtotime($fromDate)),
@@ -1562,8 +1568,11 @@ if (($_GET['ajax'] ?? '') === 'poster_accounts') {
             $byId[$accountId] = $balance;
         }
 
-        $andrey = (int)($byId[1] ?? 0) + (int)($byId[8] ?? 0);
-        $vietnam = (int)($byId[9] ?? 0);
+        $idA = \App\Payday2\LocalSettings::accountAndreyId();
+        $idT = \App\Payday2\LocalSettings::accountTipsId();
+        $idV = \App\Payday2\LocalSettings::accountVietnamId();
+        $andrey = (int)($byId[$idA] ?? 0) + (int)($byId[$idT] ?? 0);
+        $vietnam = (int)($byId[$idV] ?? 0);
         $cash = (int)($byId[2] ?? 0);
         $total = 0;
         foreach ($byId as $b) $total += (int)$b;
@@ -1605,7 +1614,8 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_plan') {
 
         $type = $diffCents > 0 ? 1 : 0;
         $amount = sprintf('%.2f', abs($diffCents) / 100);
-        $accountId = 8;
+        $accountId = \App\Payday2\LocalSettings::balanceSincAccountId();
+        $svcUserId = \App\Payday2\LocalSettings::serviceUserId();
         $accountName = '';
         try {
             $accountName = (string)$db->query("SELECT name FROM {$pa} WHERE account_id = ? LIMIT 1", [$accountId])->fetchColumn();
@@ -1629,7 +1639,7 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_plan') {
                 'id' => 1,
                 'type' => $type,
                 'category' => 4,
-                'user_id' => 4,
+                'user_id' => $svcUserId,
                 'date' => date('Y-m-d H:i:s'),
                 'comment' => 'Коррекция излишек - недостачи за счет чая',
                 'account_name' => $accountName,
@@ -1682,7 +1692,8 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
 
         $type = $diffCents > 0 ? 1 : 0;
         $amount = sprintf('%.2f', abs($diffCents) / 100);
-        $accountId = 8;
+        $accountId = \App\Payday2\LocalSettings::balanceSincAccountId();
+        $svcUserId = \App\Payday2\LocalSettings::serviceUserId();
         $comment = 'Коррекция излишек - недостачи за счет чая';
         $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
         if ($by !== '') $comment .= ' by ' . $by;
@@ -1732,7 +1743,7 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
             'id' => 1,
             'type' => $type,
             'category' => 4,
-            'user_id' => 4,
+            'user_id' => $svcUserId,
             'date' => date('Y-m-d H:i:s'),
             'comment' => $comment,
         ];
