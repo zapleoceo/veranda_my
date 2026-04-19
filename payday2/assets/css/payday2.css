@@ -8,8 +8,9 @@
 .pd2-tab-gold { background: rgba(184,135,70,0.15); color: #B88746; }
 .pd2-ml-5 { margin-left: 5px; }
 .pd2-top-forms-wrap { display: flex; gap: 10px; margin-left: 10px; align-items: center; flex-wrap: wrap; }
+#dateForm { width: 112px; }
 .pd2-date-form { display: flex; gap: 10px; margin: 0; align-items: center; }
-.pd2-date-input { padding: 0 6px; width: 108px; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; }
+.pd2-date-input { padding: 0 2px !important; width: 108px !important; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; }
 .pd2-date-input::-webkit-calendar-picker-indicator { margin-left: 2px; padding: 0; }
 
 /* Match height for nav elements and tabs */
@@ -37,9 +38,21 @@
 }
 
 @media (max-width: 800px) {
-    .pd2-date-input { width: 92px !important; height: 34px !important; padding: 0 4px !important; border-radius: 10px !important; }
+    #dateForm { width: 96px !important; }
+    .pd2-date-input { width: 92px !important; height: 34px !important; padding: 0 2px !important; border-radius: 10px !important; }
     
-    .pd2-nav-title-row { grid-column: 1; grid-row: 1; }
+    .pd2-nav-title-row {
+        grid-column: 1;
+        grid-row: 1;
+        min-width: 0;
+        flex-wrap: wrap;
+    }
+    .user-menu {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        justify-self: end !important;
+        align-self: start !important;
+    }
     
     #topFormsWrap {
         grid-column: 1 !important;
