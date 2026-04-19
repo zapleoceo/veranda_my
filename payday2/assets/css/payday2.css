@@ -21,7 +21,7 @@
     box-sizing: border-box;
     padding: 0 12px;
 }
-#payday2BetaInfoBtn {
+#payday2InfoBtn {
     height: 34px;
     display: flex;
     align-items: center;
@@ -171,7 +171,7 @@
 }
 
 .pd2-settings-modal.confirm-modal { max-width: 520px; }
-#payday2BetaModal .confirm-modal { max-width: 440px; }
+#payday2InfoModal .confirm-modal { max-width: 440px; }
 .pd2-settings-err { margin-top: 10px; }
 
 .pd2-soft-reset-btn {

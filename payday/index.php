@@ -5974,13 +5974,13 @@ window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''),
     <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2PromoTitle">
         <h3 id="payday2PromoTitle">Доступна новая версия</h3>
         <div class="body">
-            Есть новая обновленная версия <b>Payda2beta</b>.
+            Есть новая обновленная версия <b>Payday2</b>.
             <br><br>
             Можно перейти на нее сейчас или остаться на текущей странице Payday.
         </div>
         <div class="actions">
             <button type="button" class="btn2" id="payday2PromoStay">Остаться в Payday</button>
-            <a href="/payday2/" class="btn2 primary" style="display:inline-flex; text-decoration:none;">Перейти в Payda2beta</a>
+            <a href="/payday2/" class="btn2 primary" style="display:inline-flex; text-decoration:none;">Перейти в Payday2</a>
         </div>
     </div>
 </div>

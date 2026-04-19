@@ -152,9 +152,9 @@ window.initPayday2 = function() {
 
     const modeToggleEl = document.getElementById('modeToggle');
     const modeToggleOutEl = document.getElementById('modeToggleOut');
-    const payday2BetaInfoBtn = document.getElementById('payday2BetaInfoBtn');
-    const payday2BetaModal = document.getElementById('payday2BetaModal');
-    const payday2BetaModalClose = document.getElementById('payday2BetaModalClose');
+    const payday2InfoBtn = document.getElementById('payday2InfoBtn');
+    const payday2InfoModal = document.getElementById('payday2InfoModal');
+    const payday2InfoModalClose = document.getElementById('payday2InfoModalClose');
     const payday2SettingsBtn = document.getElementById('payday2SettingsBtn');
     const payday2SettingsModal = document.getElementById('payday2SettingsModal');
     const payday2SettingsCancel = document.getElementById('payday2SettingsCancel');
@@ -266,11 +266,11 @@ window.initPayday2 = function() {
     };
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
     if (tabOut) tabOut.addEventListener('click', () => setTab('out'));
-    const openPayday2BetaModal = () => {
-        if (payday2BetaModal) payday2BetaModal.style.display = 'flex';
+    const openPayday2InfoModal = () => {
+        if (payday2InfoModal) payday2InfoModal.style.display = 'flex';
     };
-    const closePayday2BetaModal = () => {
-        if (payday2BetaModal) payday2BetaModal.style.display = 'none';
+    const closePayday2InfoModal = () => {
+        if (payday2InfoModal) payday2InfoModal.style.display = 'none';
     };
     const fillPayday2SettingsForm = () => {
         const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
@@ -348,11 +348,11 @@ window.initPayday2 = function() {
             if (ev.target === payday2SettingsModal) closePayday2SettingsModal();
         });
     }
-    if (payday2BetaInfoBtn) payday2BetaInfoBtn.addEventListener('click', openPayday2BetaModal);
-    if (payday2BetaModalClose) payday2BetaModalClose.addEventListener('click', closePayday2BetaModal);
-    if (payday2BetaModal) {
-        payday2BetaModal.addEventListener('click', (ev) => {
-            if (ev.target === payday2BetaModal) closePayday2BetaModal();
+    if (payday2InfoBtn) payday2InfoBtn.addEventListener('click', openPayday2InfoModal);
+    if (payday2InfoModalClose) payday2InfoModalClose.addEventListener('click', closePayday2InfoModal);
+    if (payday2InfoModal) {
+        payday2InfoModal.addEventListener('click', (ev) => {
+            if (ev.target === payday2InfoModal) closePayday2InfoModal();
         });
     }
     pd2on(document, 'keydown', (ev) => {
@@ -361,8 +361,8 @@ window.initPayday2 = function() {
             closePayday2SettingsModal();
             return;
         }
-        if (payday2BetaModal && payday2BetaModal.style.display === 'flex') {
-            closePayday2BetaModal();
+        if (payday2InfoModal && payday2InfoModal.style.display === 'flex') {
+            closePayday2InfoModal();
         }
     });
     const loadOutMail = (onProgress) => {

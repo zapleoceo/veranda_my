@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0043';
+$payday2AssetVersion = '20260419_0044';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -392,7 +392,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
     <div class="top-nav">
         <div class="nav-left">
             <div class="pd2-nav-title-row pd2-d-flex pd2-align-center pd2-gap-8">
-                <div class="nav-title pd2-pointer" id="payday2BetaInfoBtn">Payda2beta</div>
+                <div class="nav-title pd2-pointer" id="payday2InfoBtn">Payday2</div>
                 <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2SettingsBtn" title="Настройки Payday2">⚙</button>
                 <div class="pd2-d-flex">
                     <button type="button" class="pd2-icon-btn" id="btnKashShift" title="KashShift">
@@ -1094,9 +1094,9 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     </div>
                 </div>
             </div>
-            <div class="confirm-backdrop" id="payday2BetaModal">
-                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2BetaModalTitle">
-                    <h3 id="payday2BetaModalTitle" class="pd2-m-0">Payda2beta</h3>
+            <div class="confirm-backdrop" id="payday2InfoModal">
+                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2InfoModalTitle">
+                    <h3 id="payday2InfoModalTitle" class="pd2-m-0">Payday2</h3>
                     <div class="body pd2-text-center pd2-lh-135">
                         Это обновленная и оптимизированная версия payday.
                         <br><br>
@@ -1104,7 +1104,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     </div>
                     <div class="actions pd2-justify-center">
                         <a href="/payday/" class="btn2 primary pd2-inline-flex pd2-text-dec-none pd2-min-w-140 pd2-justify-center">Payday</a>
-                        <button type="button" class="btn2 pd2-min-w-140" id="payday2BetaModalClose">Закрыть</button>
+                        <button type="button" class="btn2 pd2-min-w-140" id="payday2InfoModalClose">Закрыть</button>
                     </div>
                 </div>
             </div>

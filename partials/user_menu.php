@@ -51,7 +51,7 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
 
         <?php if ($canPayday): ?>
             <a class="ud-link" href="/payday">PayDay</a>
-            <a class="ud-link" href="/payday2">PayDay2(beta)</a>
+            <a class="ud-link" href="/payday2">PayDay2</a>
         <?php endif; ?>
         <?php if ($canAdmin): ?><a class="ud-link" href="/admin/">Управление</a><?php endif; ?>
         <div class="ud-sep"></div>
