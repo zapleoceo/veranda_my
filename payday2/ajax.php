@@ -1314,12 +1314,12 @@ if (($_GET['ajax'] ?? '') === 'create_poster_transaction') {
         if ($date === '') throw new \Exception('Invalid date');
 
         $payload = [
-            'type' => $type,
+            'type' => $type === 1 ? 1 : ($type === 2 ? 0 : 2), // Poster API: 1=income, 0=expense, 2=transfer
             'date' => $date,
             'comment' => $comment,
         ];
         if ($categoryId > 0) {
-            $payload['category_id'] = $categoryId;
+            $payload['category'] = $categoryId;
         }
 
         if ($type === 1) { // income
