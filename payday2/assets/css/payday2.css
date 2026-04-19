@@ -191,6 +191,19 @@
     object-fit: contain;
 }
 
+.tabs .tab,
+.pd2-icon-btn,
+#tablesRoot .btn,
+#outSection .btn,
+.bottom-two .btn,
+#payday2SettingsBtn,
+#tablesRoot .btn svg,
+#outSection .btn svg,
+.bottom-two .btn svg,
+.bottom-two .btn svg path {
+    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out, fill 0.2s ease-in-out, stroke 0.2s ease-in-out;
+}
+
 .tabs .tab:hover,
 .pd2-icon-btn:hover,
 #tablesRoot .btn:hover,
