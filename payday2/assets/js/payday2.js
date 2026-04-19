@@ -173,6 +173,11 @@ window.initPayday2 = function() {
     const payday2BetaInfoBtn = document.getElementById('payday2BetaInfoBtn');
     const payday2BetaModal = document.getElementById('payday2BetaModal');
     const payday2BetaModalClose = document.getElementById('payday2BetaModalClose');
+    const payday2SettingsBtn = document.getElementById('payday2SettingsBtn');
+    const payday2SettingsModal = document.getElementById('payday2SettingsModal');
+    const payday2SettingsCancel = document.getElementById('payday2SettingsCancel');
+    const payday2SettingsSave = document.getElementById('payday2SettingsSave');
+    const payday2SettingsErr = document.getElementById('payday2SettingsErr');
     const applyMode = (mode) => {
         const m = (mode === 'lite') ? 'lite' : 'full';
         document.body.classList.toggle('mode-lite', m === 'lite');
@@ -291,6 +296,82 @@ window.initPayday2 = function() {
     const closePayday2BetaModal = () => {
         if (payday2BetaModal) payday2BetaModal.style.display = 'none';
     };
+    const fillPayday2SettingsForm = () => {
+        const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
+        if (!ls) return;
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v !== undefined && v !== null ? String(v) : ''; };
+        set('pd2sett_tg_chat', ls.telegram_chat_id);
+        set('pd2sett_tg_thread', ls.telegram_message_thread_id);
+        set('pd2sett_svc_user', ls.service_user_id);
+        if (ls.accounts) {
+            set('pd2sett_acc_andrey', ls.accounts.andrey);
+            set('pd2sett_acc_tips', ls.accounts.tips);
+            set('pd2sett_acc_vietnam', ls.accounts.vietnam);
+        }
+        set('pd2sett_balance_sinc', ls.balance_sinc_account_id);
+    };
+    const readPayday2SettingsPayload = () => {
+        const num = (id) => {
+            const el = document.getElementById(id);
+            const n = el ? parseInt(String(el.value || '').trim(), 10) : NaN;
+            return Number.isFinite(n) ? n : 0;
+        };
+        const str = (id) => {
+            const el = document.getElementById(id);
+            return el ? String(el.value || '').trim() : '';
+        };
+        return {
+            telegram_chat_id: str('pd2sett_tg_chat'),
+            telegram_message_thread_id: str('pd2sett_tg_thread'),
+            service_user_id: num('pd2sett_svc_user'),
+            accounts: {
+                andrey: num('pd2sett_acc_andrey'),
+                tips: num('pd2sett_acc_tips'),
+                vietnam: num('pd2sett_acc_vietnam'),
+            },
+            balance_sinc_account_id: num('pd2sett_balance_sinc'),
+        };
+    };
+    const openPayday2SettingsModal = () => {
+        if (payday2SettingsErr) { payday2SettingsErr.style.display = 'none'; payday2SettingsErr.textContent = ''; }
+        fillPayday2SettingsForm();
+        if (payday2SettingsModal) payday2SettingsModal.style.display = 'flex';
+    };
+    const closePayday2SettingsModal = () => {
+        if (payday2SettingsModal) payday2SettingsModal.style.display = 'none';
+    };
+    if (payday2SettingsBtn) payday2SettingsBtn.addEventListener('click', openPayday2SettingsModal);
+    if (payday2SettingsCancel) payday2SettingsCancel.addEventListener('click', closePayday2SettingsModal);
+    if (payday2SettingsSave) {
+        payday2SettingsSave.addEventListener('click', () => {
+            const payload = readPayday2SettingsPayload();
+            if (payday2SettingsErr) { payday2SettingsErr.style.display = 'none'; payday2SettingsErr.textContent = ''; }
+            payday2SettingsSave.disabled = true;
+            fetch('?ajax=save_local_config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+                .then((r) => r.json())
+                .then((j) => {
+                    if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка сохранения');
+                    if (window.PAYDAY_CONFIG) window.PAYDAY_CONFIG.localSettings = payload;
+                    closePayday2SettingsModal();
+                })
+                .catch((e) => {
+                    if (payday2SettingsErr) {
+                        payday2SettingsErr.textContent = e && e.message ? e.message : 'Ошибка';
+                        payday2SettingsErr.style.display = 'block';
+                    }
+                })
+                .finally(() => { payday2SettingsSave.disabled = false; });
+        });
+    }
+    if (payday2SettingsModal) {
+        payday2SettingsModal.addEventListener('click', (ev) => {
+            if (ev.target === payday2SettingsModal) closePayday2SettingsModal();
+        });
+    }
     if (payday2BetaInfoBtn) payday2BetaInfoBtn.addEventListener('click', openPayday2BetaModal);
     if (payday2BetaModalClose) payday2BetaModalClose.addEventListener('click', closePayday2BetaModal);
     if (payday2BetaModal) {
@@ -299,7 +380,12 @@ window.initPayday2 = function() {
         });
     }
     document.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Escape' && payday2BetaModal && payday2BetaModal.style.display === 'flex') {
+        if (ev.key !== 'Escape') return;
+        if (payday2SettingsModal && payday2SettingsModal.style.display === 'flex') {
+            closePayday2SettingsModal();
+            return;
+        }
+        if (payday2BetaModal && payday2BetaModal.style.display === 'flex') {
             closePayday2BetaModal();
         }
     });

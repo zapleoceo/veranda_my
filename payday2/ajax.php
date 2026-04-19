@@ -21,6 +21,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+if (($_GET['ajax'] ?? '') === 'save_local_config') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    if (!is_array($payload)) {
+        $payload = [];
+    }
+    $r = \App\Payday2\LocalSettings::persistPayload($payload);
+    if (!$r['ok']) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => $r['error']], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

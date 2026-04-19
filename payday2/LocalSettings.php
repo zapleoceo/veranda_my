@@ -90,4 +90,88 @@ final class LocalSettings
     {
         return (int)self::merged()['balance_sinc_account_id'];
     }
+
+    /** Payload for PAYDAY_CONFIG / settings form (matches local_config.json shape). */
+    public static function toClientPayload(): array
+    {
+        $m = self::merged();
+        return [
+            'telegram_chat_id' => (string)$m['telegram_chat_id'],
+            'telegram_message_thread_id' => (string)$m['telegram_message_thread_id'],
+            'service_user_id' => (int)$m['service_user_id'],
+            'accounts' => [
+                'andrey' => (int)$m['account_andrey_id'],
+                'tips' => (int)$m['account_tips_id'],
+                'vietnam' => (int)$m['account_vietnam_id'],
+            ],
+            'balance_sinc_account_id' => (int)$m['balance_sinc_account_id'],
+        ];
+    }
+
+    public static function resetMergedCache(): void
+    {
+        self::$merged = null;
+    }
+
+    /**
+     * @param array<string,mixed> $in
+     * @return array{ok: true}|array{ok: false, error: string}
+     */
+    public static function persistPayload(array $in): array
+    {
+        $tgChat = isset($in['telegram_chat_id']) ? trim((string)$in['telegram_chat_id']) : '';
+        if ($tgChat === '' || mb_strlen($tgChat) > 80) {
+            return ['ok' => false, 'error' => 'Укажите telegram_chat_id (до 80 символов).'];
+        }
+        $thread = isset($in['telegram_message_thread_id']) ? trim((string)$in['telegram_message_thread_id']) : '';
+        if (mb_strlen($thread) > 32) {
+            return ['ok' => false, 'error' => 'telegram_message_thread_id слишком длинный.'];
+        }
+        $svc = isset($in['service_user_id']) ? (int)$in['service_user_id'] : 0;
+        if ($svc <= 0 || $svc > 999999999) {
+            return ['ok' => false, 'error' => 'Неверный service_user_id.'];
+        }
+        $accIn = isset($in['accounts']) && is_array($in['accounts']) ? $in['accounts'] : [];
+        $a = isset($accIn['andrey']) ? (int)$accIn['andrey'] : 0;
+        $t = isset($accIn['tips']) ? (int)$accIn['tips'] : 0;
+        $v = isset($accIn['vietnam']) ? (int)$accIn['vietnam'] : 0;
+        foreach (['andrey' => $a, 'tips' => $t, 'vietnam' => $v] as $label => $id) {
+            if ($id <= 0 || $id > 999999999) {
+                return ['ok' => false, 'error' => 'Неверный ID счёта: ' . $label];
+            }
+        }
+        $bs = isset($in['balance_sinc_account_id']) ? (int)$in['balance_sinc_account_id'] : 0;
+        if ($bs <= 0 || $bs > 999999999) {
+            return ['ok' => false, 'error' => 'Неверный balance_sinc_account_id.'];
+        }
+
+        $out = [
+            'telegram_chat_id' => $tgChat,
+            'telegram_message_thread_id' => $thread,
+            'service_user_id' => $svc,
+            'accounts' => [
+                'andrey' => $a,
+                'tips' => $t,
+                'vietnam' => $v,
+            ],
+            'balance_sinc_account_id' => $bs,
+        ];
+
+        $path = __DIR__ . DIRECTORY_SEPARATOR . 'local_config.json';
+        $json = json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        if ($json === false) {
+            return ['ok' => false, 'error' => 'Ошибка кодирования JSON'];
+        }
+        $tmp = $path . '.tmp.' . bin2hex(random_bytes(6));
+        if (file_put_contents($tmp, $json . "\n") === false) {
+            @unlink($tmp);
+            return ['ok' => false, 'error' => 'Не удалось записать временный файл (права на payday2/?)'];
+        }
+        if (!@rename($tmp, $path)) {
+            @unlink($tmp);
+            return ['ok' => false, 'error' => 'Не удалось сохранить local_config.json'];
+        }
+        self::$merged = null;
+        return ['ok' => true];
+    }
 }

@@ -315,7 +315,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0006';
+$payday2AssetVersion = '20260419_0007';
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -334,7 +334,10 @@ $payday2AssetVersion = '20260419_0006';
 <div class="container">
     <div class="top-nav">
         <div class="nav-left">
-            <div class="nav-title pd2-pointer" id="payday2BetaInfoBtn">Payda2beta</div>
+            <div class="pd2-nav-title-row pd2-d-flex pd2-align-center pd2-gap-8">
+                <div class="nav-title pd2-pointer" id="payday2BetaInfoBtn">Payda2beta</div>
+                <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2SettingsBtn" title="Настройки Payday2">⚙</button>
+            </div>
             <div class="tabs">
                 <button type="button" class="tab active" id="tabIn">IN</button>
                 <button type="button" class="tab" id="tabOut">OUT</button>
@@ -1005,6 +1008,37 @@ $payday2AssetVersion = '20260419_0006';
                     </div>
                 </div>
             </div>
+            <div class="confirm-backdrop" id="payday2SettingsModal" style="display:none;">
+                <div class="confirm-modal pd2-settings-modal" role="dialog" aria-modal="true" aria-labelledby="payday2SettingsTitle" style="max-width: 420px;">
+                    <h3 id="payday2SettingsTitle" class="pd2-m-0">Настройки Payday2</h3>
+                    <p class="muted pd2-fs-12 pd2-mb-10">Сохраняется в <code>payday2/local_config.json</code> на сервере.</p>
+                    <div class="pd2-settings-fields">
+                        <label class="pd2-settings-label">Telegram chat_id
+                            <input type="text" class="btn pd2-w-100" id="pd2sett_tg_chat" autocomplete="off">
+                        </label>
+                        <label class="pd2-settings-label">Telegram message_thread_id
+                            <input type="text" class="btn pd2-w-100" id="pd2sett_tg_thread" autocomplete="off" placeholder="пусто = без темы">
+                        </label>
+                        <label class="pd2-settings-label">Poster service user_id
+                            <input type="number" class="btn pd2-w-100" id="pd2sett_svc_user" min="1" step="1">
+                        </label>
+                        <div class="pd2-settings-label pd2-text-left">Счета Poster</div>
+                        <div class="pd2-settings-grid">
+                            <label>Andrey <input type="number" class="btn pd2-w-100" id="pd2sett_acc_andrey" min="1" step="1"></label>
+                            <label>Tips <input type="number" class="btn pd2-w-100" id="pd2sett_acc_tips" min="1" step="1"></label>
+                            <label>Vietnam <input type="number" class="btn pd2-w-100" id="pd2sett_acc_vietnam" min="1" step="1"></label>
+                        </div>
+                        <label class="pd2-settings-label">Коррекция «чай» (account_id)
+                            <input type="number" class="btn pd2-w-100" id="pd2sett_balance_sinc" min="1" step="1">
+                        </label>
+                    </div>
+                    <div id="payday2SettingsErr" class="error" style="display:none; margin-top:10px;"></div>
+                    <div class="actions pd2-justify-center pd2-mt-6">
+                        <button type="button" class="btn2" id="payday2SettingsCancel">Отмена</button>
+                        <button type="button" class="btn2 primary" id="payday2SettingsSave">Сохранить</button>
+                    </div>
+                </div>
+            </div>
             <div class="confirm-backdrop" id="payday2BetaModal">
                 <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2BetaModalTitle" style="max-width: 440px;">
                     <h3 id="payday2BetaModalTitle" class="pd2-m-0">Payda2beta</h3>
@@ -1026,6 +1060,7 @@ $payday2AssetVersion = '20260419_0006';
         csrfToken: <?= json_encode($payday2CsrfToken, JSON_UNESCAPED_UNICODE) ?>,
         dateFrom: <?= json_encode($dateFrom, JSON_UNESCAPED_UNICODE) ?>,
         dateTo: <?= json_encode($dateTo, JSON_UNESCAPED_UNICODE) ?>,
+        localSettings: <?= json_encode(LocalSettings::toClientPayload(), JSON_UNESCAPED_UNICODE) ?>,
         links: <?= json_encode(array_values(array_map(function ($l) {
                 return [
                     'poster_transaction_id' => (int)$l['poster_transaction_id'],
