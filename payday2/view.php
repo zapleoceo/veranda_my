@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0066';
+$payday2AssetVersion = '20260419_0067';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1103,7 +1103,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <button type="button" class="pd2-modal-close" id="createTxSuccessClose">✕</button>
                     </div>
                     <div class="body pd2-modal-body pd2-p-15 pd2-text-center">
-                        <div class="pd2-mb-15 pd2-fs-16">
+                        <div class="pd2-mb-15 pd2-fs-16" id="createTxSuccessTitle">
                             Транзакция успешно создана в Poster!
                         </div>
                         <div id="createTxSuccessDetails" class="muted pd2-mb-15"></div>

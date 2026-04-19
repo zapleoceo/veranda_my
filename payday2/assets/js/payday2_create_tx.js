@@ -21,6 +21,7 @@ window.initPaydayCreateTx = function() {
     const successModal = document.getElementById('createTxSuccessModal');
     const successCloseBtn = document.getElementById('createTxSuccessClose');
     const successDetails = document.getElementById('createTxSuccessDetails');
+    const successTitle = document.getElementById('createTxSuccessTitle');
 
     let accountsLoaded = false;
     let categoriesLoaded = false;
@@ -153,9 +154,12 @@ window.initPaydayCreateTx = function() {
         showError('');
     };
 
-    const openSuccessModal = (detailsHtml) => {
+    const openSuccessModal = (detailsHtml, titleText) => {
         if (!successModal || !successDetails) return;
         successDetails.innerHTML = detailsHtml;
+        if (successTitle && titleText) {
+            successTitle.innerHTML = titleText;
+        }
         successModal.style.display = 'flex';
     };
 
@@ -250,15 +254,45 @@ window.initPaydayCreateTx = function() {
             const tText = typeSelect.options[typeSelect.selectedIndex].text;
             details += `<div><strong>Тип:</strong> ${escapeHtml(tText)}</div>`;
             details += `<div><strong>Сумма:</strong> ${Math.round(amount).toLocaleString('en-US').replace(/,/g, '\u202F')} VND</div>`;
-            if (t === '1') details += `<div><strong>На счет:</strong> ${escapeHtml(accToSelect.options[accToSelect.selectedIndex].text)}</div>`;
-            if (t === '2') details += `<div><strong>Со счета:</strong> ${escapeHtml(accFromSelect.options[accFromSelect.selectedIndex].text)}</div>`;
-            if (t === '3') {
-                details += `<div><strong>Со счета:</strong> ${escapeHtml(accFromSelect.options[accFromSelect.selectedIndex].text)}</div>`;
-                details += `<div><strong>На счет:</strong> ${escapeHtml(accToSelect.options[accToSelect.selectedIndex].text)}</div>`;
-            }
-            if (categoryId) details += `<div><strong>Категория:</strong> ${escapeHtml(categorySelect.options[categorySelect.selectedIndex].text)}</div>`;
             
-            openSuccessModal(details);
+            let successTitleText = 'Транзакция успешно создана в Poster!';
+            let accName = '';
+            let catName = '';
+
+            if (t === '1') {
+                accName = accToSelect.options[accToSelect.selectedIndex].text;
+                details += `<div><strong>На счет:</strong> ${escapeHtml(accName)}</div>`;
+                successTitleText = `Приход на счет «${escapeHtml(accName)}» успешно создан!`;
+            }
+            if (t === '2') {
+                accName = accFromSelect.options[accFromSelect.selectedIndex].text;
+                details += `<div><strong>Со счета:</strong> ${escapeHtml(accName)}</div>`;
+                successTitleText = `Расход со счета «${escapeHtml(accName)}» успешно создан!`;
+            }
+            if (t === '3') {
+                const accFromText = accFromSelect.options[accFromSelect.selectedIndex].text;
+                const accToText = accToSelect.options[accToSelect.selectedIndex].text;
+                details += `<div><strong>Со счета:</strong> ${escapeHtml(accFromText)}</div>`;
+                details += `<div><strong>На счет:</strong> ${escapeHtml(accToText)}</div>`;
+                successTitleText = `Перевод «${escapeHtml(accFromText)}» ➔ «${escapeHtml(accToText)}» успешно создан!`;
+            }
+            
+            if (categoryId) {
+                catName = categorySelect.options[categorySelect.selectedIndex].text;
+                details += `<div><strong>Категория:</strong> ${escapeHtml(catName)}</div>`;
+                // Если это приход или расход (не перевод) и есть категория, добавим её в заголовок
+                if (t !== '3') {
+                    successTitleText += `<br><span style="font-size: 14px; font-weight: normal; color: var(--muted);">Категория: ${escapeHtml(catName)}</span>`;
+                }
+            }
+            
+            openSuccessModal(details, successTitleText);
+
+            // Автоматическое обновление таблицы Poster тр-ии
+            const outFinanceBtn = document.getElementById('outFinanceBtn');
+            if (outFinanceBtn) {
+                outFinanceBtn.click();
+            }
             
         } catch (err) {
             showError(err.message);
