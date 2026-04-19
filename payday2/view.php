@@ -315,7 +315,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0009';
+$payday2AssetVersion = '20260419_0010';
 ?>
 <!DOCTYPE html>
 <html lang="ru">

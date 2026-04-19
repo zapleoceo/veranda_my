@@ -1031,15 +1031,7 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
             return $result;
         }
     }
-    if (file_exists(__DIR__ . '/../.env')) {
-        $lines = file(__DIR__ . '/../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach ($lines as $line) {
-            $t = trim($line);
-            if ($t === '' || $t[0] === '#' || strpos($line, '=') === false) continue;
-            [$name, $value] = explode('=', $line, 2);
-            $_ENV[trim($name)] = trim(trim($value), '"\'');
-        }
-    }
+    // MAIL_* уже в $_ENV после auth_check.php (загрузка .env при старте запроса).
     $mailUser = $_ENV['MAIL_USER'] ?? '';
     $mailPass = $_ENV['MAIL_PASS'] ?? '';
     if (!extension_loaded('imap') || $mailUser === '' || $mailPass === '') {
@@ -1053,8 +1045,13 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
     }
     $fromTs = strtotime($dFrom !== '' ? ($dFrom . ' 00:00:00') : ($dTo . ' 00:00:00'));
     $toTs = strtotime($dTo . ' 23:59:59');
-    
-    $searchQuery = 'FROM "bidvsmartbanking@bidv.com.vn" SINCE "' . date('d-M-Y', $fromTs) . '"';
+    // Узкий диапазон на стороне IMAP: SINCE … inclusive, BEFORE — эксклюзивно следующий календарный день после dateTo.
+    $beforeTs = strtotime($dTo . ' +1 day');
+    if ($fromTs === false || $toTs === false || $beforeTs === false) {
+        echo json_encode(['ok' => false, 'error' => 'Bad date range'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $searchQuery = 'FROM "bidvsmartbanking@bidv.com.vn" SINCE "' . date('d-M-Y', $fromTs) . '" BEFORE "' . date('d-M-Y', $beforeTs) . '"';
     $emails = imap_search($inbox, $searchQuery) ?: [];
     rsort($emails);
     
