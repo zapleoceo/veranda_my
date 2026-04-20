@@ -77,10 +77,22 @@
 
 @media (max-width: 800px) {
     #dateForm { width: 96px !important; }
+    
     .pd2-unified-tabs {
         margin-left: 0;
         justify-content: flex-start;
+        gap: 2px;
+        flex-wrap: nowrap;
     }
+    .pd2-unified-btn {
+        min-width: unset;
+        padding: 0 4px !important;
+        font-size: 11px;
+    }
+    .pd2-unified-icon {
+        height: 14px;
+    }
+
     .pd2-date-input { width: 92px !important; height: 34px !important; padding: 0 2px !important; border-radius: 10px !important; }
     
     .pd2-nav-title-row {
