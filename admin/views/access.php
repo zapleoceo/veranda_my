@@ -1,19 +1,19 @@
-<div class="card">
+<div class="card admin-access">
             <h3>Управление доступом</h3>
-            <form method="POST" class="form-group">
-                <label>Добавить новый email</label>
-                <div style="display:flex; gap:10px;">
-                    <input type="email" name="email" placeholder="example@gmail.com" required>
-                    <button type="submit" name="add_email">Добавить</button>
+            <form method="POST" class="form-group access-add-form">
+                <label class="access-form-label">Добавить новый email</label>
+                <div class="access-add-row">
+                    <input class="access-input" type="email" name="email" placeholder="example@gmail.com" required>
+                    <button type="submit" name="add_email" class="btn2 btn2-primary">Добавить</button>
                 </div>
             </form>
 
             <?php if (empty($users)): ?>
-                <div class="error" style="margin: 14px 0;">
+                <div class="error access-empty-state">
                     Список пользователей пуст. Нажмите «Добавить себя», чтобы восстановить доступы.
-                    <div class="muted" style="margin-top:6px;">Текущий пользователь: <?= htmlspecialchars((string)($_SESSION['user_email'] ?? '—')) ?></div>
-                    <form method="POST" style="margin-top: 10px;">
-                        <button type="submit" name="add_self" value="1">Добавить себя</button>
+                    <div class="muted access-empty-state-user">Текущий пользователь: <?= htmlspecialchars((string)($_SESSION['user_email'] ?? '—')) ?></div>
+                    <form method="POST" class="access-empty-state-form">
+                        <button type="submit" name="add_self" value="1" class="btn2 btn2-primary">Добавить себя</button>
                     </form>
                 </div>
             <?php endif; ?>
@@ -45,38 +45,40 @@
                             }
                         ?></td>
                         <td>
+                            <div class="access-row-actions">
                             <?php
                                 $rawPerms = (string)($user['permissions_json'] ?? '');
                                 $perms = $rawPerms !== '' ? json_decode($rawPerms, true) : null;
                                 if (!is_array($perms)) $perms = null;
                             ?>
-                            <button type="button" class="perm-gear"
+                            <button type="button" class="btn2 perm-gear"
                                 data-email="<?= htmlspecialchars($user['email'], ENT_QUOTES) ?>"
                                 data-perms="<?= htmlspecialchars(json_encode($perms, JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>"
                                 data-tg="<?= htmlspecialchars((string)($user['telegram_username'] ?? ''), ENT_QUOTES) ?>"
                             >Редактировать</button>
                             <?php if ($user['email'] !== $_SESSION['user_email']): ?>
-                                <a href="?delete=<?= urlencode($user['email']) ?>" class="delete-btn" onclick="return confirm('Удалить доступ для <?= $user['email'] ?>?')">Удалить</a>
+                                <a href="?delete=<?= urlencode($user['email']) ?>" class="btn2 delete-btn" onclick="return confirm('Удалить доступ для <?= $user['email'] ?>?')">Удалить</a>
                             <?php else: ?>
-                                <span style="color:#999; font-size:12px;">(Это вы)</span>
+                                <span class="access-self-mark">(Это вы)</span>
                             <?php endif; ?>
+                            </div>
                         </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
             </div>
-            <div class="perm-modal" id="permModal" style="display:none;">
+            <div class="perm-modal" id="permModal" aria-hidden="true">
                 <div class="perm-modal-backdrop"></div>
-                <div class="perm-modal-card">
+                <div class="perm-modal-card confirm-modal">
                     <div class="perm-modal-title">Права доступа</div>
                     <form method="POST" id="permForm">
                         <input type="hidden" name="save_user_permissions" value="1">
                         <input type="hidden" name="perm_email" id="permEmail" value="">
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label style="font-size:12px; font-weight:800; text-transform:uppercase; color:var(--muted);">Telegram username</label>
-                            <input type="text" name="perm_tg_username" id="permTgUsername" placeholder="например: zapleosoft">
-                            <div class="muted" style="margin-top:6px;">Нужен для кнопки «ПРИНЯТО» в Telegram. Пиши без @.</div>
+                        <div class="form-group access-form-group">
+                            <label class="access-form-label">Telegram username</label>
+                            <input class="access-input" type="text" name="perm_tg_username" id="permTgUsername" placeholder="например: zapleosoft">
+                            <div class="muted access-form-help">Нужен для кнопки «ПРИНЯТО» в Telegram. Пиши без @.</div>
                         </div>
                         <div class="perm-list">
                             <?php foreach ($permissionKeys as $k => $label): ?>
@@ -88,8 +90,8 @@
                             <?php endforeach; ?>
                         </div>
                         <div class="perm-actions">
-                            <button type="button" class="perm-cancel" id="permCancel">Отмена</button>
-                            <button type="submit">Сохранить</button>
+                            <button type="button" class="btn2 perm-cancel" id="permCancel">Отмена</button>
+                            <button type="submit" class="btn2 btn2-primary">Сохранить</button>
                         </div>
                     </form>
                 </div>

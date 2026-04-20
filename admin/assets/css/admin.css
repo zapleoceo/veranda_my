@@ -49,3 +49,162 @@
 }
 .alert.ok { background: #dcfce7; color: #065f46; }
 .alert.err { background: #fee2e2; color: #991b1b; }
+
+/* Access tab: payday2-like controls and modal */
+.admin-access .btn2 {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border, #d6d6d6);
+    background: var(--card, #fff);
+    color: var(--text, #111827);
+    font-weight: 900;
+    text-decoration: none;
+    cursor: pointer;
+    transition: filter 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+}
+.admin-access .btn2:hover {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+}
+.admin-access .btn2:disabled {
+    opacity: 0.6;
+    cursor: default;
+    filter: none;
+    transform: none;
+}
+.admin-access .btn2.btn2-primary {
+    background: var(--accent, #b88746);
+    border-color: var(--accent, #b88746);
+    color: #fffaf4;
+}
+.admin-access .btn2.btn2-primary:hover {
+    filter: brightness(1.08);
+}
+
+.admin-access .access-add-form { margin-bottom: 20px; }
+.admin-access .access-add-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.admin-access .access-form-group { margin-bottom: 12px; }
+.admin-access .access-form-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--muted, #6b7280);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+.admin-access .access-input {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 12px;
+    border: 1px solid var(--border, #d6d6d6);
+    border-radius: 10px;
+    background: var(--card, #fff);
+    color: var(--text, #111827);
+    box-sizing: border-box;
+}
+.admin-access .access-input:focus {
+    outline: none;
+    border-color: var(--accent, #b88746);
+    box-shadow: 0 0 0 2px rgba(184, 135, 70, 0.25);
+}
+.admin-access .access-form-help { margin-top: 6px; }
+
+.admin-access .access-empty-state { margin: 14px 0; }
+.admin-access .access-empty-state-user { margin-top: 6px; }
+.admin-access .access-empty-state-form { margin-top: 10px; }
+.admin-access .access-self-mark { color: #999; font-size: 12px; }
+
+.admin-access .access-row-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.admin-access .perm-gear {
+    background: var(--card, #fff);
+    color: var(--text, #111827);
+}
+.admin-access .delete-btn {
+    color: #ef5350;
+    border-color: rgba(239, 83, 80, 0.35);
+    background: rgba(239, 83, 80, 0.08);
+}
+.admin-access .delete-btn:hover {
+    filter: brightness(1.02);
+    background: rgba(239, 83, 80, 0.16);
+}
+
+.admin-access .perm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+}
+.admin-access .perm-modal.is-open { display: flex; }
+.admin-access .perm-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+}
+.admin-access .perm-modal-card.confirm-modal {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    background: var(--card, #fff);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border, #d6d6d6);
+    border-radius: 14px;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+    padding: 14px;
+}
+.admin-access .perm-modal-title {
+    margin: 0 0 10px;
+    font-size: 16px;
+    font-weight: 900;
+    color: var(--text, #111827);
+}
+.admin-access .perm-list {
+    display: grid;
+    gap: 8px;
+    margin: 10px 0 14px;
+}
+.admin-access .perm-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border, #d6d6d6);
+    border-radius: 10px;
+}
+.admin-access .perm-row:hover { background: var(--card2, rgba(255, 255, 255, 0.05)); }
+.admin-access .perm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 12px;
+}
+.admin-access .perm-cancel {
+    background: var(--card, #fff);
+    color: var(--text, #111827);
+}
+
+@media (max-width: 720px) {
+    .admin-access .access-add-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .admin-access .access-add-row .btn2 { width: 100%; }
+}
