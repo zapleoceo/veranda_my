@@ -76,6 +76,7 @@
         const a = Number(acc || 0) || 0;
         if (a === 1) return '<span class="paid-tag">QR</span>';
         if (a === 2) return '<span class="paid-tag">КЕШ</span>';
+        if (a === 9) return '<span class="paid-tag">VC</span>';
         if (a === 8) return '<span class="paid-tag">QR</span>';
         if (a > 0) return '<span class="paid-tag">#' + String(a) + '</span>';
         return '';

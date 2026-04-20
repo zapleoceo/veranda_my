@@ -570,7 +570,7 @@ class EmployeesModel {
                 $acc = isset($t['account_from']) ? (int)$t['account_from'] : (isset($t['account_id']) ? (int)$t['account_id'] : 0);
                 if ($acc > 0) {
                     if ($isTips && $acc !== 8) continue;
-                    if ($isSlr && $acc !== 1 && $acc !== 2) continue;
+                    if ($isSlr && $acc !== 1 && $acc !== 2 && $acc !== 9) continue;
                 }
             }
 
