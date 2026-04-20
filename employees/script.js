@@ -1074,6 +1074,11 @@
     if (payExtraBtn) payExtraBtn.addEventListener('click', () => { openPayExtra().catch((e) => setError(e && e.message ? e.message : 'Ошибка')); });
     if (payExtraCancel) payExtraCancel.addEventListener('click', closePayExtra);
     if (payExtraModal) payExtraModal.addEventListener('click', (e) => { if (e.target === payExtraModal) closePayExtra(); });
+    if (payExtraModal) {
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && payExtraModal.style.display === 'flex') closePayExtra();
+        });
+    }
     if (payExtraEmp) payExtraEmp.addEventListener('change', refreshPayExtraComment);
     if (payExtraAmount) {
         payExtraAmount.addEventListener('input', applyPayExtraAmountFormatting);
