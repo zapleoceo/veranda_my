@@ -2712,10 +2712,15 @@ window.initPayday2 = function() {
         return String(n || '');
     };
 
-    const fmtDec = (v) => {
-        const n = Number(v);
-        if (!isFinite(n)) return '';
-        return n.toFixed(2);
+    const fmtMoney0 = (v) => {
+        if (v == null) return '';
+        const s = String(v).trim();
+        if (!s) return '';
+        const cleaned = s.replaceAll('\u202F', '').replaceAll(' ', '').replaceAll(',', '.');
+        const n = Number(cleaned);
+        if (Number.isFinite(n)) return fmtIntSpaces(Math.trunc(n));
+        const digits = digitsOnly(s);
+        return digits ? fmtIntSpaces(Number(digits) || 0) : '';
     };
 
     let checksAll = [];
@@ -2728,7 +2733,7 @@ window.initPayday2 = function() {
         }
         let html = '<div style="overflow-x:auto;"><table class="pd2-check-table"><thead><tr>';
         html += '<th class="pd2-check-th">transaction_id</th>';
-        html += '<th class="pd2-check-th">table_id</th>';
+        html += '<th class="pd2-check-th">table</th>';
         html += '<th class="pd2-check-th">sum</th>';
         html += '<th class="pd2-check-th">payed_sum</th>';
         html += '<th class="pd2-check-th">status</th>';
@@ -2736,9 +2741,11 @@ window.initPayday2 = function() {
         html += '</tr></thead><tbody>';
         arr.forEach((c) => {
             const id = Number(c && c.transaction_id ? c.transaction_id : 0) || 0;
+            const tableTitle = c && c.table_title ? String(c.table_title) : '';
             const tableId = Number(c && c.table_id ? c.table_id : 0) || 0;
-            const sum = c && c.sum != null ? String(c.sum) : '';
-            const payed = c && c.payed_sum != null ? String(c.payed_sum) : '';
+            const tableCell = tableTitle ? tableTitle : (tableId ? ('#' + String(tableId)) : '');
+            const sum = c && c.sum != null ? fmtMoney0(c.sum) : '';
+            const payed = c && c.payed_sum != null ? fmtMoney0(c.payed_sum) : '';
             const status = Number(c && c.status != null ? c.status : 0) || 0;
             const payType = status === 2 ? payTypeLabel(c && c.pay_type != null ? c.pay_type : 0) : '';
             const statusTxt = statusLabel(status);
@@ -2747,7 +2754,7 @@ window.initPayday2 = function() {
             const rowCls = status === 2 ? ' pd2-check-row-s2' : (status === 3 ? ' pd2-check-row-s3' : '');
             html += '<tr class="pd2-check-row-trigger' + rowCls + '" data-check-id="' + escapeHtml(String(id)) + '" style="cursor:pointer;">';
             html += '<td class="pd2-check-td">' + escapeHtml(String(id)) + '</td>';
-            html += '<td class="pd2-check-td">' + escapeHtml(String(tableId || '')) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(String(tableCell || '')) + '</td>';
             html += '<td class="pd2-check-td">' + escapeHtml(sum) + '</td>';
             html += '<td class="pd2-check-td">' + escapeHtml(payed) + '</td>';
             html += '<td class="pd2-check-td">' + escapeHtml(statusTxt) + '</td>';
@@ -2769,8 +2776,8 @@ window.initPayday2 = function() {
                 products.forEach((p) => {
                     const name = p && p.name ? String(p.name) : '';
                     const qty = p && p.qty != null ? String(p.qty) : '';
-                    const unit = p && p.unit_price != null ? fmtDec(p.unit_price) : '';
-                    const total = p && p.total != null ? fmtDec(p.total) : '';
+                    const unit = p && p.unit_price != null ? fmtMoney0(p.unit_price) : '';
+                    const total = p && p.total != null ? fmtMoney0(p.total) : '';
                     html += '<tr>';
                     html += '<td class="pd2-check-td">' + escapeHtml(name) + '</td>';
                     html += '<td class="pd2-check-td">' + escapeHtml(unit) + '</td>';

@@ -1865,6 +1865,20 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
         if (!isset($_SESSION)) {
             if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         }
+        $amountInt = static function ($raw): int {
+            if (is_int($raw)) return $raw;
+            $s = trim((string)$raw);
+            if ($s === '') return 0;
+            $s = str_replace(',', '.', $s);
+            if (is_numeric($s)) {
+                $f = (float)$s;
+                if (!is_finite($f)) return 0;
+                return (int)floor($f);
+            }
+            $digits = preg_replace('/\D+/', '', $s);
+            return $digits !== '' ? (int)$digits : 0;
+        };
+
         $nameMap = [];
         $cache = $_SESSION['payday2_products_cache'] ?? null;
         $cacheTs = is_array($cache) ? (int)($cache['ts'] ?? 0) : 0;
@@ -1881,6 +1895,62 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
                 if ($pid > 0 && $pname !== '') $nameMap[(string)$pid] = $pname;
             }
             $_SESSION['payday2_products_cache'] = ['ts' => time(), 'map' => $nameMap];
+        }
+
+        $tableMap = [];
+        $tCache = $_SESSION['payday2_tables_cache'] ?? null;
+        $tCacheTs = is_array($tCache) ? (int)($tCache['ts'] ?? 0) : 0;
+        $tCacheMap = is_array($tCache) ? ($tCache['map'] ?? null) : null;
+        if ($tCacheTs > 0 && (time() - $tCacheTs) < 6 * 3600 && is_array($tCacheMap)) {
+            $tableMap = $tCacheMap;
+        } else {
+            $getTables = function (array $params) use ($api) {
+                try {
+                    return $api->request('spots.getTableHallTables', $params, 'GET');
+                } catch (\Throwable $e) {
+                    if (stripos((string)$e->getMessage(), 'http=405') !== false) {
+                        return $api->request('spots.getTableHallTables', $params, 'POST');
+                    }
+                    throw $e;
+                }
+            };
+            $getHalls = function (int $sId) use ($api) {
+                try {
+                    return $api->request('spots.getSpotTablesHalls', ['spot_id' => $sId], 'GET');
+                } catch (\Throwable $e) {
+                    if (stripos((string)$e->getMessage(), 'http=405') !== false) {
+                        return $api->request('spots.getSpotTablesHalls', ['spot_id' => $sId], 'POST');
+                    }
+                    throw $e;
+                }
+            };
+            $spotId = 1;
+            $allTablesFound = [];
+            $halls = [];
+            try { $halls = $getHalls($spotId); } catch (\Throwable $e) {}
+            if (is_array($halls)) {
+                foreach ($halls as $hall) {
+                    $hallId = (int)($hall['hall_id'] ?? 0);
+                    if ($hallId <= 0) continue;
+                    try {
+                        $hallTables = $getTables(['spot_id' => $spotId, 'hall_id' => $hallId, 'without_deleted' => 1]);
+                        if (is_array($hallTables)) $allTablesFound = array_merge($allTablesFound, $hallTables);
+                    } catch (\Throwable $e) {}
+                }
+            }
+            if (empty($allTablesFound)) {
+                try {
+                    $fallback = $getTables(['spot_id' => $spotId, 'without_deleted' => 1]);
+                    if (is_array($fallback)) $allTablesFound = $fallback;
+                } catch (\Throwable $e) {}
+            }
+            foreach ($allTablesFound as $t) {
+                if (!is_array($t)) continue;
+                $tid = (int)($t['table_id'] ?? 0);
+                $title = trim((string)($t['table_title'] ?? ''));
+                if ($tid > 0 && $title !== '') $tableMap[(string)$tid] = $title;
+            }
+            $_SESSION['payday2_tables_cache'] = ['ts' => time(), 'map' => $tableMap];
         }
 
         // Use dash.getTransactions with status=0 to include opened/closed/deleted checks.
@@ -1914,15 +1984,14 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
                 if (!is_array($pr)) continue;
                 $pid = (int)($pr['product_id'] ?? 0);
                 $num = (float)($pr['num'] ?? 0);
-                $sum = (string)($pr['product_sum'] ?? '');
-                $sumF = is_numeric($sum) ? (float)$sum : 0.0;
-                $unit = ($num > 0 && $sumF > 0) ? ($sumF / $num) : 0.0;
+                $sumI = $amountInt($pr['product_sum'] ?? '');
+                $unitI = ($num > 0 && $sumI > 0) ? (int)floor($sumI / $num) : 0;
                 $productsOut[] = [
                     'product_id' => $pid,
                     'name' => $pid > 0 ? (string)($nameMap[(string)$pid] ?? ('#' . $pid)) : '',
                     'qty' => $num,
-                    'unit_price' => $unit > 0 ? $unit : null,
-                    'total' => $sumF > 0 ? $sumF : null,
+                    'unit_price' => $unitI > 0 ? $unitI : null,
+                    'total' => $sumI > 0 ? $sumI : null,
                 ];
             }
             $status = (int)($row['status'] ?? $row['transaction_status'] ?? 0);
@@ -1931,11 +2000,14 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
                 elseif ((string)($row['date_close'] ?? '') !== '') $status = 2;
                 else $status = 1;
             }
+            $tableId = (int)($row['table_id'] ?? 0);
+            $tableTitle = $tableId > 0 ? (string)($tableMap[(string)$tableId] ?? '') : '';
             $out[] = [
                 'transaction_id' => $txId,
-                'table_id' => (int)($row['table_id'] ?? 0),
-                'sum' => (string)($row['sum'] ?? ''),
-                'payed_sum' => (string)($row['payed_sum'] ?? ''),
+                'table_id' => $tableId,
+                'table_title' => $tableTitle,
+                'sum' => $amountInt($row['sum'] ?? ''),
+                'payed_sum' => $amountInt($row['payed_sum'] ?? ''),
                 'pay_type' => (int)($row['pay_type'] ?? 0),
                 'status' => $status,
                 'date_close' => (string)($row['date_close'] ?? ''),

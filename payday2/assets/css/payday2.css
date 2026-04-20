@@ -480,3 +480,6 @@ tr.row-red .out-create-poster-tx-btn {
 .pd2-check-deleted { margin: 0 0 10px; padding: 10px; background: rgba(16,185,129,0.12); color: #10b981; font-weight: 900; border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; }
 .pd2-check-row-s2 > .pd2-check-td { background: rgba(16,185,129,0.22); }
 .pd2-check-row-s3 > .pd2-check-td { background: rgba(239,68,68,0.14); }
+
+#checkFinderModal .pd2-modal-body { overflow-x: visible; }
+.pd2-check-table { width: max-content; min-width: 100%; }
