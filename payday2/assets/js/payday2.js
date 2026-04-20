@@ -2695,40 +2695,99 @@ window.initPayday2 = function() {
         return { dFrom, dTo };
     };
 
-    const renderCheckProducts = (products) => {
-        const arr = Array.isArray(products) ? products : [];
-        if (!arr.length) return '<div class="muted">Нет продуктов</div>';
-        let html = '<div style="overflow-x:auto;"><table class="pd2-check-table"><thead><tr>';
-        html += '<th class="pd2-check-th">product_id</th>';
-        html += '<th class="pd2-check-th">mod_id</th>';
-        html += '<th class="pd2-check-th">num</th>';
-        html += '<th class="pd2-check-th">sum</th>';
-        html += '</tr></thead><tbody>';
-        arr.forEach((p) => {
-            const pid = p && (p.product_id ?? p.productId) ? String(p.product_id ?? p.productId) : '';
-            const mid = p && (p.modification_id ?? p.modificationId) ? String(p.modification_id ?? p.modificationId) : '';
-            const num = p && (p.num ?? p.count) ? String(p.num ?? p.count) : '';
-            const sum = p && (p.product_sum ?? p.sum) ? String(p.product_sum ?? p.sum) : '';
-            html += '<tr>';
-            html += '<td class="pd2-check-td">' + escapeHtml(pid) + '</td>';
-            html += '<td class="pd2-check-td">' + escapeHtml(mid) + '</td>';
-            html += '<td class="pd2-check-td">' + escapeHtml(num) + '</td>';
-            html += '<td class="pd2-check-td">' + escapeHtml(sum) + '</td>';
-            html += '</tr>';
-        });
-        html += '</tbody></table></div>';
-        return html;
+    const payTypeLabel = (v) => {
+        const n = Number(v || 0) || 0;
+        if (n === 0) return '0 — без оплаты';
+        if (n === 1) return '1 — наличные';
+        if (n === 2) return '2 — безнал';
+        if (n === 3) return '3 — смешанная';
+        return String(n);
     };
 
-    const searchCheck = async () => {
-        checkFinderReset();
-        const raw = String(checkFinderNumber ? checkFinderNumber.value : '').trim();
-        const digits = raw.replace(/\D+/g, '');
-        const id = Number(digits || 0) || 0;
-        if (!id) {
-            checkFinderShowError('Укажите номер чека');
+    const fmtDec = (v) => {
+        const n = Number(v);
+        if (!isFinite(n)) return '';
+        return n.toFixed(2);
+    };
+
+    let checksAll = [];
+    const renderChecks = (list) => {
+        const arr = Array.isArray(list) ? list : [];
+        if (!checkFinderResult) return;
+        if (!arr.length) {
+            checkFinderResult.innerHTML = '<div class="muted">Нет чеков</div>';
             return;
         }
+        let html = '<div style="overflow-x:auto;"><table class="pd2-check-table"><thead><tr>';
+        html += '<th class="pd2-check-th">transaction_id</th>';
+        html += '<th class="pd2-check-th">table_id</th>';
+        html += '<th class="pd2-check-th">sum</th>';
+        html += '<th class="pd2-check-th">payed_sum</th>';
+        html += '<th class="pd2-check-th">pay_type</th>';
+        html += '</tr></thead><tbody>';
+        arr.forEach((c) => {
+            const id = Number(c && c.transaction_id ? c.transaction_id : 0) || 0;
+            const tableId = Number(c && c.table_id ? c.table_id : 0) || 0;
+            const sum = c && c.sum != null ? String(c.sum) : '';
+            const payed = c && c.payed_sum != null ? String(c.payed_sum) : '';
+            const payType = payTypeLabel(c && c.pay_type != null ? c.pay_type : 0);
+            const dateClose = c && c.date_close ? String(c.date_close) : '';
+            const products = Array.isArray(c && c.products ? c.products : null) ? c.products : [];
+            html += '<tr class="pd2-check-row-trigger" data-check-id="' + escapeHtml(String(id)) + '" style="cursor:pointer;">';
+            html += '<td class="pd2-check-td">' + escapeHtml(String(id)) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(String(tableId || '')) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(sum) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(payed) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(payType) + '</td>';
+            html += '</tr>';
+
+            html += '<tr class="pd2-check-row-details pd2-d-none" data-check-details="' + escapeHtml(String(id)) + '"><td class="pd2-check-td" colspan="5">';
+            html += '<div class="muted" style="margin-bottom:8px;">date_close: ' + escapeHtml(dateClose || '—') + '</div>';
+            html += '<div style="font-weight:900; margin-bottom:6px;">Состав</div>';
+            if (!products.length) {
+                html += '<div class="muted">Нет продуктов</div>';
+            } else {
+                html += '<div style="overflow-x:auto;"><table class="pd2-check-table"><thead><tr>';
+                html += '<th class="pd2-check-th">Название продукта</th>';
+                html += '<th class="pd2-check-th">Цена</th>';
+                html += '<th class="pd2-check-th">Кол-во</th>';
+                html += '<th class="pd2-check-th">Итог</th>';
+                html += '</tr></thead><tbody>';
+                products.forEach((p) => {
+                    const name = p && p.name ? String(p.name) : '';
+                    const qty = p && p.qty != null ? String(p.qty) : '';
+                    const unit = p && p.unit_price != null ? fmtDec(p.unit_price) : '';
+                    const total = p && p.total != null ? fmtDec(p.total) : '';
+                    html += '<tr>';
+                    html += '<td class="pd2-check-td">' + escapeHtml(name) + '</td>';
+                    html += '<td class="pd2-check-td">' + escapeHtml(unit) + '</td>';
+                    html += '<td class="pd2-check-td">' + escapeHtml(qty) + '</td>';
+                    html += '<td class="pd2-check-td">' + escapeHtml(total) + '</td>';
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div>';
+            }
+            html += '<div style="display:flex; justify-content:flex-end; margin-top:10px;">';
+            html += '<button type="button" class="btn2 pd2-btn-danger pd2-check-del-btn" data-del-check="' + escapeHtml(String(id)) + '">Удалить</button>';
+            html += '</div>';
+            html += '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+        checkFinderResult.innerHTML = html;
+    };
+
+    const filterAndRender = () => {
+        const qRaw = String(checkFinderNumber ? checkFinderNumber.value : '').trim();
+        const q = qRaw.replace(/\D+/g, '');
+        if (!q) {
+            renderChecks(checksAll);
+            return;
+        }
+        renderChecks(checksAll.filter((c) => String(c && c.transaction_id != null ? c.transaction_id : '').indexOf(q) !== -1));
+    };
+
+    const loadChecks = async () => {
+        checkFinderReset();
         const { dFrom, dTo } = getCurrentRange();
         if (!dFrom || !dTo) {
             checkFinderShowError('Не выбран период (dateFrom/dateTo)');
@@ -2736,32 +2795,11 @@ window.initPayday2 = function() {
         }
         if (checkFinderSearchBtn) checkFinderSearchBtn.disabled = true;
         try {
-            const url =
-                '?ajax=poster_check_find' +
-                '&transaction_id=' + encodeURIComponent(String(id)) +
-                '&date_from=' + encodeURIComponent(dFrom) +
-                '&date_to=' + encodeURIComponent(dTo);
+            const url = '?ajax=poster_checks_list&date_from=' + encodeURIComponent(dFrom) + '&date_to=' + encodeURIComponent(dTo);
             const j = await fetchJsonSafe(url);
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-            if (!j.found) {
-                if (checkFinderResult) checkFinderResult.innerHTML = '<div class="muted">Чек не найден за выбранный период</div>';
-                return;
-            }
-            checkFinderFoundId = Number(j.transaction?.transaction_id || j.transaction_id || id) || id;
-            const tx = j.transaction || {};
-            const title = 'Чек #' + escapeHtml(String(checkFinderFoundId));
-            const closed = tx.date_close ? ('<div class="muted">date_close: ' + escapeHtml(String(tx.date_close)) + '</div>') : '';
-            const sum = (tx.sum || tx.payed_sum) ? ('<div class="muted">sum: ' + escapeHtml(String(tx.sum || tx.payed_sum)) + '</div>') : '';
-            const productsHtml = renderCheckProducts(j.products || tx.products || []);
-            if (checkFinderResult) {
-                checkFinderResult.innerHTML =
-                    '<div style="font-weight:900; margin-bottom:6px;">' + title + '</div>' +
-                    closed +
-                    sum +
-                    '<div style="margin-top:10px; font-weight:900;">products</div>' +
-                    '<div style="margin-top:6px;">' + productsHtml + '</div>';
-            }
-            if (checkFinderActions) checkFinderActions.classList.remove('pd2-d-none');
+            checksAll = Array.isArray(j.checks) ? j.checks : [];
+            filterAndRender();
         } catch (e) {
             checkFinderShowError(e && e.message ? e.message : 'Ошибка');
         } finally {
@@ -2769,46 +2807,58 @@ window.initPayday2 = function() {
         }
     };
 
-    const deleteCheck = async () => {
-        const id = Number(checkFinderFoundId || 0) || 0;
-        if (!id) return;
-        if (!confirm('Удалить чек #' + String(id) + ' ?')) return;
+    const deleteCheck = async (id) => {
+        const txId = Number(id || 0) || 0;
+        if (!txId) return;
+        if (!confirm('Удалить чек #' + String(txId) + ' ?')) return;
         checkFinderShowError('');
-        if (checkFinderDeleteBtn) checkFinderDeleteBtn.disabled = true;
         try {
             const r = await fetch('?ajax=poster_check_remove', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ transaction_id: id }),
+                body: JSON.stringify({ transaction_id: txId }),
             });
             const txt = await r.text();
             let j = null;
             try { j = JSON.parse(txt); } catch (_) {}
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-            if (checkFinderResult) checkFinderResult.innerHTML = '<div class="pd2-check-deleted">Удалено</div>' + (checkFinderResult.innerHTML || '');
-            if (checkFinderActions) checkFinderActions.classList.add('pd2-d-none');
+            checksAll = checksAll.filter((c) => Number(c && c.transaction_id ? c.transaction_id : 0) !== txId);
+            filterAndRender();
+            showToast('Удалено: ' + String(txId));
         } catch (e) {
             checkFinderShowError(e && e.message ? e.message : 'Ошибка');
-        } finally {
-            if (checkFinderDeleteBtn) checkFinderDeleteBtn.disabled = false;
         }
     };
 
     if (checkFinderBtn && checkFinderModal) {
-        checkFinderBtn.addEventListener('click', openCheckFinder);
+        checkFinderBtn.addEventListener('click', () => { openCheckFinder(); loadChecks().catch(() => {}); });
         if (checkFinderClose) checkFinderClose.addEventListener('click', closeCheckFinder);
         checkFinderModal.addEventListener('click', (e) => { if (e.target === checkFinderModal) closeCheckFinder(); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && checkFinderModal.style.display === 'flex') closeCheckFinder(); });
-        if (checkFinderSearchBtn) checkFinderSearchBtn.addEventListener('click', () => { searchCheck().catch(() => {}); });
+        if (checkFinderSearchBtn) checkFinderSearchBtn.addEventListener('click', () => { loadChecks().catch(() => {}); });
         if (checkFinderNumber) {
-            checkFinderNumber.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    searchCheck().catch(() => {});
-                }
+            let t = 0;
+            checkFinderNumber.addEventListener('input', () => {
+                if (t) clearTimeout(t);
+                t = setTimeout(() => filterAndRender(), 120);
             });
         }
-        if (checkFinderDeleteBtn) checkFinderDeleteBtn.addEventListener('click', () => { deleteCheck().catch(() => {}); });
+        if (checkFinderResult) {
+            checkFinderResult.addEventListener('click', (e) => {
+                const trg = e.target;
+                const delBtn = trg && trg.closest ? trg.closest('.pd2-check-del-btn') : null;
+                if (delBtn) {
+                    const id = Number(delBtn.getAttribute('data-del-check') || 0) || 0;
+                    deleteCheck(id).catch(() => {});
+                    return;
+                }
+                const row = trg && trg.closest ? trg.closest('.pd2-check-row-trigger') : null;
+                if (!row) return;
+                const id = row.getAttribute('data-check-id') || '';
+                const det = checkFinderResult.querySelector('[data-check-details="' + id + '"]');
+                if (det) det.classList.toggle('pd2-d-none');
+            });
+        }
     }
     
     window.toggleShiftDetail = function(tr, shiftId) {

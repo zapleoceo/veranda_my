@@ -1846,6 +1846,99 @@ if (($_GET['ajax'] ?? '') === 'poster_check_find') {
     }
 }
 
+if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $dFrom = trim((string)($_GET['date_from'] ?? ''));
+    $dTo = trim((string)($_GET['date_to'] ?? ''));
+    if ($dFrom === '' || $dTo === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $api = new \App\Classes\PosterAPI((string)$token);
+        if (!isset($_SESSION)) {
+            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        }
+        $nameMap = [];
+        $cache = $_SESSION['payday2_products_cache'] ?? null;
+        $cacheTs = is_array($cache) ? (int)($cache['ts'] ?? 0) : 0;
+        $cacheMap = is_array($cache) ? ($cache['map'] ?? null) : null;
+        if ($cacheTs > 0 && (time() - $cacheTs) < 6 * 3600 && is_array($cacheMap)) {
+            $nameMap = $cacheMap;
+        } else {
+            $products = $api->request('menu.getProducts', [], 'GET');
+            if (!is_array($products)) $products = [];
+            foreach ($products as $p) {
+                if (!is_array($p)) continue;
+                $pid = (int)($p['product_id'] ?? $p['id'] ?? 0);
+                $pname = trim((string)($p['product_name'] ?? $p['name'] ?? ''));
+                if ($pid > 0 && $pname !== '') $nameMap[(string)$pid] = $pname;
+            }
+            $_SESSION['payday2_products_cache'] = ['ts' => time(), 'map' => $nameMap];
+        }
+
+        $page = 1;
+        $per = 1000;
+        $out = [];
+        while (true) {
+            $resp = $api->request('transactions.getTransactions', [
+                'date_from' => $dFrom,
+                'date_to' => $dTo,
+                'per_page' => $per,
+                'page' => $page,
+            ], 'GET');
+            $data = is_array($resp) ? ($resp['data'] ?? []) : [];
+            if (!is_array($data) || count($data) === 0) break;
+            foreach ($data as $row) {
+                if (!is_array($row)) continue;
+                $txId = (int)($row['transaction_id'] ?? 0);
+                if ($txId <= 0) continue;
+                $productsIn = (isset($row['products']) && is_array($row['products'])) ? $row['products'] : [];
+                $productsOut = [];
+                foreach ($productsIn as $pr) {
+                    if (!is_array($pr)) continue;
+                    $pid = (int)($pr['product_id'] ?? 0);
+                    $num = (float)($pr['num'] ?? 0);
+                    $sum = (string)($pr['product_sum'] ?? '');
+                    $sumF = is_numeric($sum) ? (float)$sum : 0.0;
+                    $unit = ($num > 0 && $sumF > 0) ? ($sumF / $num) : 0.0;
+                    $productsOut[] = [
+                        'product_id' => $pid,
+                        'name' => $pid > 0 ? (string)($nameMap[(string)$pid] ?? ('#' . $pid)) : '',
+                        'qty' => $num,
+                        'unit_price' => $unit > 0 ? $unit : null,
+                        'total' => $sumF > 0 ? $sumF : null,
+                    ];
+                }
+                $out[] = [
+                    'transaction_id' => $txId,
+                    'table_id' => (int)($row['table_id'] ?? 0),
+                    'sum' => (string)($row['sum'] ?? ''),
+                    'payed_sum' => (string)($row['payed_sum'] ?? ''),
+                    'pay_type' => (int)($row['pay_type'] ?? 0),
+                    'date_close' => (string)($row['date_close'] ?? ''),
+                    'products' => $productsOut,
+                ];
+            }
+            if (count($data) < $per) break;
+            $page++;
+            if ($page > 10) break;
+        }
+        echo json_encode(['ok' => true, 'checks' => $out], JSON_UNESCAPED_UNICODE);
+        exit;
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 if (($_GET['ajax'] ?? '') === 'poster_check_remove') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
