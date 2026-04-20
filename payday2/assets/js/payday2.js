@@ -2697,68 +2697,28 @@ window.initPayday2 = function() {
 
     const payTypeLabel = (v) => {
         const n = Number(v || 0) || 0;
-        if (n === 0) return 'без оплаты';
-        if (n === 1) return 'наличные';
-        if (n === 2) return 'безнал';
-        if (n === 3) return 'смешанная';
-        return '';
+        if (n === 0) return '0 — без оплаты';
+        if (n === 1) return '1 — наличные';
+        if (n === 2) return '2 — безнал';
+        if (n === 3) return '3 — смешанная';
+        return String(n);
     };
 
     const statusLabel = (v) => {
         const n = Number(v || 0) || 0;
-        if (n === 1) return 'открыт';
-        if (n === 2) return 'закрыт';
-        if (n === 3) return 'удален';
-        return '';
+        if (n === 1) return '1 — открыт';
+        if (n === 2) return '2 — закрыт';
+        if (n === 3) return '3 — удален';
+        return String(n || '');
     };
 
-    const fmtMoney0 = (v) => {
-        if (v == null) return '';
-        const s = String(v).trim();
-        if (!s) return '';
-        const cleaned = s.replaceAll('\u202F', '').replaceAll(' ', '').replaceAll(',', '.');
-        const n = Number(cleaned);
-        if (Number.isFinite(n)) return fmtIntSpaces(Math.trunc(n));
-        const digits = digitsOnly(s);
-        return digits ? fmtIntSpaces(Number(digits) || 0) : '';
+    const fmtDec = (v) => {
+        const n = Number(v);
+        if (!isFinite(n)) return '';
+        return n.toFixed(2);
     };
 
     let checksAll = [];
-    const checkSort = { key: '', dir: 'asc' };
-
-    const getCheckSumValue = (c) => {
-        const payedNum = Number(c && c.payed_sum != null ? c.payed_sum : 0) || 0;
-        const v = (payedNum > 0 && c && c.payed_sum != null) ? c.payed_sum : (c ? c.sum : 0);
-        return Number(v || 0) || 0;
-    };
-
-    const sortChecks = (list) => {
-        const key = String(checkSort.key || '');
-        if (!key) return list;
-        const dirMul = checkSort.dir === 'desc' ? -1 : 1;
-        const arr = (Array.isArray(list) ? list : []).map((x, i) => ({ x, i }));
-        const cmpNum = (a, b) => (a - b) * dirMul;
-        const cmpStr = (a, b) => String(a || '').localeCompare(String(b || ''), 'ru', { sensitivity: 'base' }) * dirMul;
-        arr.sort((aa, bb) => {
-            const a = aa.x;
-            const b = bb.x;
-            let r = 0;
-            if (key === 'transaction_id') r = cmpNum(Number(a?.transaction_id || 0) || 0, Number(b?.transaction_id || 0) || 0);
-            else if (key === 'table') r = cmpStr(a?.table_title || '', b?.table_title || '');
-            else if (key === 'sum') r = cmpNum(getCheckSumValue(a), getCheckSumValue(b));
-            else if (key === 'status') r = cmpNum(Number(a?.status || 0) || 0, Number(b?.status || 0) || 0);
-            else if (key === 'pay_type') r = cmpStr(
-                (Number(a?.status || 0) === 2) ? payTypeLabel(a?.pay_type) : '',
-                (Number(b?.status || 0) === 2) ? payTypeLabel(b?.pay_type) : ''
-            );
-            if (r !== 0) return r;
-            return aa.i - bb.i;
-        });
-        return arr.map((o) => o.x);
-    };
-
-    const sortMark = (key) => (checkSort.key === key ? (checkSort.dir === 'asc' ? ' ▲' : ' ▼') : '');
-
     const renderChecks = (list) => {
         const arr = Array.isArray(list) ? list : [];
         if (!checkFinderResult) return;
@@ -2767,34 +2727,35 @@ window.initPayday2 = function() {
             return;
         }
         let html = '<div style="overflow-x:auto;"><table class="pd2-check-table"><thead><tr>';
-        html += '<th class="pd2-check-th" data-sort="transaction_id">Чек' + sortMark('transaction_id') + '</th>';
-        html += '<th class="pd2-check-th" data-sort="table">Стол' + sortMark('table') + '</th>';
-        html += '<th class="pd2-check-th" data-sort="sum">Сумма' + sortMark('sum') + '</th>';
-        html += '<th class="pd2-check-th" data-sort="status">Статус' + sortMark('status') + '</th>';
-        html += '<th class="pd2-check-th" data-sort="pay_type">Тип оплаты' + sortMark('pay_type') + '</th>';
+        html += '<th class="pd2-check-th">transaction_id</th>';
+        html += '<th class="pd2-check-th">table_id</th>';
+        html += '<th class="pd2-check-th">sum</th>';
+        html += '<th class="pd2-check-th">payed_sum</th>';
+        html += '<th class="pd2-check-th">status</th>';
+        html += '<th class="pd2-check-th">pay_type</th>';
         html += '</tr></thead><tbody>';
         arr.forEach((c) => {
             const id = Number(c && c.transaction_id ? c.transaction_id : 0) || 0;
-            const tableTitle = c && c.table_title ? String(c.table_title) : '';
             const tableId = Number(c && c.table_id ? c.table_id : 0) || 0;
-            const tableCell = tableTitle ? tableTitle : '—';
-            const payedNum = Number(c && c.payed_sum != null ? c.payed_sum : 0) || 0;
-            const sumVal = (payedNum > 0 && c && c.payed_sum != null) ? c.payed_sum : (c ? c.sum : null);
-            const sumTxt = sumVal != null ? fmtMoney0(sumVal) : '';
+            const sum = c && c.sum != null ? String(c.sum) : '';
+            const payed = c && c.payed_sum != null ? String(c.payed_sum) : '';
             const status = Number(c && c.status != null ? c.status : 0) || 0;
             const payType = status === 2 ? payTypeLabel(c && c.pay_type != null ? c.pay_type : 0) : '';
             const statusTxt = statusLabel(status);
+            const dateClose = c && c.date_close ? String(c.date_close) : '';
             const products = Array.isArray(c && c.products ? c.products : null) ? c.products : [];
             const rowCls = status === 2 ? ' pd2-check-row-s2' : (status === 3 ? ' pd2-check-row-s3' : '');
             html += '<tr class="pd2-check-row-trigger' + rowCls + '" data-check-id="' + escapeHtml(String(id)) + '" style="cursor:pointer;">';
             html += '<td class="pd2-check-td">' + escapeHtml(String(id)) + '</td>';
-            html += '<td class="pd2-check-td">' + escapeHtml(String(tableCell || '')) + '</td>';
-            html += '<td class="pd2-check-td">' + escapeHtml(sumTxt) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(String(tableId || '')) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(sum) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(payed) + '</td>';
             html += '<td class="pd2-check-td">' + escapeHtml(statusTxt) + '</td>';
             html += '<td class="pd2-check-td">' + escapeHtml(payType) + '</td>';
             html += '</tr>';
 
-            html += '<tr class="pd2-check-row-details pd2-d-none" data-check-details="' + escapeHtml(String(id)) + '"><td class="pd2-check-td" colspan="5">';
+            html += '<tr class="pd2-check-row-details pd2-d-none" data-check-details="' + escapeHtml(String(id)) + '"><td class="pd2-check-td" colspan="6">';
+            html += '<div class="muted" style="margin-bottom:8px;">date_close: ' + escapeHtml(dateClose || '—') + '</div>';
             html += '<div style="font-weight:900; margin-bottom:6px;">Состав</div>';
             if (!products.length) {
                 html += '<div class="muted">Нет продуктов</div>';
@@ -2808,8 +2769,8 @@ window.initPayday2 = function() {
                 products.forEach((p) => {
                     const name = p && p.name ? String(p.name) : '';
                     const qty = p && p.qty != null ? String(p.qty) : '';
-                    const unit = p && p.unit_price != null ? fmtMoney0(p.unit_price) : '';
-                    const total = p && p.total != null ? fmtMoney0(p.total) : '';
+                    const unit = p && p.unit_price != null ? fmtDec(p.unit_price) : '';
+                    const total = p && p.total != null ? fmtDec(p.total) : '';
                     html += '<tr>';
                     html += '<td class="pd2-check-td">' + escapeHtml(name) + '</td>';
                     html += '<td class="pd2-check-td">' + escapeHtml(unit) + '</td>';
@@ -2829,24 +2790,13 @@ window.initPayday2 = function() {
     };
 
     const filterAndRender = () => {
-        const q = String(checkFinderNumber ? checkFinderNumber.value : '').trim().toLowerCase();
+        const qRaw = String(checkFinderNumber ? checkFinderNumber.value : '').trim();
+        const q = qRaw.replace(/\D+/g, '');
         if (!q) {
-            renderChecks(sortChecks(checksAll));
+            renderChecks(checksAll);
             return;
         }
-        const filtered = checksAll.filter((c) => {
-            const id = c && c.transaction_id != null ? String(c.transaction_id) : '';
-            const tableTitle = c && c.table_title ? String(c.table_title) : '';
-            const status = statusLabel(c && c.status != null ? c.status : 0);
-            const payType = (Number(c && c.status != null ? c.status : 0) === 2) ? payTypeLabel(c && c.pay_type != null ? c.pay_type : 0) : '';
-            const payedNum = Number(c && c.payed_sum != null ? c.payed_sum : 0) || 0;
-            const sumVal = (payedNum > 0 && c && c.payed_sum != null) ? c.payed_sum : (c ? c.sum : null);
-            const sumTxt = sumVal != null ? fmtMoney0(sumVal) : '';
-            const dateClose = c && c.date_close ? String(c.date_close) : '';
-            const hay = (id + ' ' + tableTitle + ' ' + sumTxt + ' ' + status + ' ' + payType + ' ' + dateClose).toLowerCase();
-            return hay.indexOf(q) !== -1;
-        });
-        renderChecks(sortChecks(filtered));
+        renderChecks(checksAll.filter((c) => String(c && c.transaction_id != null ? c.transaction_id : '').indexOf(q) !== -1));
     };
 
     const loadChecks = async () => {
@@ -2858,15 +2808,6 @@ window.initPayday2 = function() {
         }
         if (checkFinderSearchBtn) checkFinderSearchBtn.disabled = true;
         try {
-            if (checkFinderResult) {
-                checkFinderResult.innerHTML =
-                    '<div class="pd2-text-center muted" style="padding: 14px 0;">' +
-                    '<svg class="pd2-loader-spin pd2-v-align-mid" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
-                    '<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>' +
-                    '</svg>' +
-                    '<span style="margin-left:8px;">Загрузка...</span>' +
-                    '</div>';
-            }
             const url = '?ajax=poster_checks_list&date_from=' + encodeURIComponent(dFrom) + '&date_to=' + encodeURIComponent(dTo);
             const j = await fetchJsonSafe(url);
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
@@ -2907,6 +2848,7 @@ window.initPayday2 = function() {
         if (checkFinderClose) checkFinderClose.addEventListener('click', closeCheckFinder);
         checkFinderModal.addEventListener('click', (e) => { if (e.target === checkFinderModal) closeCheckFinder(); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && checkFinderModal.style.display === 'flex') closeCheckFinder(); });
+        if (checkFinderSearchBtn) checkFinderSearchBtn.addEventListener('click', () => { loadChecks().catch(() => {}); });
         if (checkFinderNumber) {
             let t = 0;
             checkFinderNumber.addEventListener('input', () => {
@@ -2917,16 +2859,6 @@ window.initPayday2 = function() {
         if (checkFinderResult) {
             checkFinderResult.addEventListener('click', (e) => {
                 const trg = e.target;
-                const th = trg && trg.closest ? trg.closest('th[data-sort]') : null;
-                if (th) {
-                    const key = String(th.getAttribute('data-sort') || '');
-                    if (key) {
-                        if (checkSort.key === key) checkSort.dir = (checkSort.dir === 'asc') ? 'desc' : 'asc';
-                        else { checkSort.key = key; checkSort.dir = 'asc'; }
-                        filterAndRender();
-                    }
-                    return;
-                }
                 const delBtn = trg && trg.closest ? trg.closest('.pd2-check-del-btn') : null;
                 if (delBtn) {
                     const id = Number(delBtn.getAttribute('data-del-check') || 0) || 0;
