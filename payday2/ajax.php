@@ -43,6 +43,122 @@ if (($_GET['ajax'] ?? '') === 'save_local_config') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'poster_tx_get') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    if (!is_array($payload)) $payload = [];
+    $txId = (int)($payload['transactionId'] ?? $payload['transaction_id'] ?? 0);
+    $dateFrom = trim((string)($payload['dateFrom'] ?? $payload['date_from'] ?? ''));
+    $dateTo = trim((string)($payload['dateTo'] ?? $payload['date_to'] ?? ''));
+    if ($txId <= 0 || $dateFrom === '' || $dateTo === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Неверный формат даты (нужно YYYY-MM-DD)'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $api = new \App\Classes\PosterAPI((string)$token);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'API init error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $perPage = 1000;
+        $page = 1;
+        $maxPages = 50;
+        $found = null;
+        for ($i = 0; $i < $maxPages; $i++) {
+            $resp = $api->request('transactions.getTransactions', [
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'per_page' => $perPage,
+                'page' => $page,
+            ], 'GET');
+            if (!is_array($resp)) $resp = [];
+            $rows = (isset($resp['data']) && is_array($resp['data'])) ? $resp['data'] : [];
+            foreach ($rows as $row) {
+                if (!is_array($row)) continue;
+                if ((int)($row['transaction_id'] ?? 0) === $txId) {
+                    $found = $row;
+                    break 2;
+                }
+            }
+            if (count($rows) === 0) {
+                break;
+            }
+            $totalCount = isset($resp['count']) ? (int)$resp['count'] : 0;
+            if ($totalCount > 0) {
+                $totalPages = (int)ceil($totalCount / $perPage);
+                if ($page >= $totalPages) break;
+            }
+            $page++;
+        }
+        if ($found === null) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Чек не найден в выбранном периоде'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        echo json_encode(['ok' => true, 'transaction' => $found], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'poster_tx_remove') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    if (!is_array($payload)) $payload = [];
+    $txId = (int)($payload['transactionId'] ?? $payload['transaction_id'] ?? 0);
+    if ($txId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $api = new \App\Classes\PosterAPI((string)$token);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'API init error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $spotTabletId = 1;
+        $userId = \App\Payday2\LocalSettings::serviceUserId();
+        $resp = $api->request('transactions.removeTransaction', [
+            'spot_tablet_id' => $spotTabletId,
+            'transaction_id' => $txId,
+            'user_id' => $userId,
+        ], 'POST');
+        if (!is_array($resp) || (int)($resp['err_code'] ?? -1) !== 0) {
+            throw new \Exception('Poster: не удалось удалить чек');
+        }
+        echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

@@ -1,87 +1,15 @@
 @import url('/assets/css/common.css?v=20260412_0171');
-@import url('./payday_index.css?v=7101');
+@import url('./payday_index.css?v=7100');
 
 /* Utility Classes for payday2/view.php */
 .pd2-pointer { cursor: pointer; }
 .pd2-ml-auto { margin-left: auto; }
 .pd2-d-flex { display: flex; }
-.pd2-flex-column { flex-direction: column; }
 .pd2-tab-gold { background: rgba(184,135,70,0.15); color: #B88746; }
 .pd2-ml-5 { margin-left: 5px; }
-.pd2-top-forms-wrap { display: flex; gap: 10px; margin-left: 10px; align-items: center; flex-wrap: wrap; }
-#dateForm { width: 112px; }
+.pd2-top-forms-wrap { display: flex; gap: 10px; margin-left: 10px; align-items: center; }
 .pd2-date-form { display: flex; gap: 10px; margin: 0; align-items: center; }
-.pd2-date-input { padding: 0 2px !important; width: 108px !important; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; }
-.pd2-date-input::-webkit-calendar-picker-indicator { margin-left: 2px; padding: 0; }
-
-@keyframes pd2-spin {
-    100% { transform: rotate(360deg); }
-}
-.pd2-loader-spin {
-    animation: pd2-spin 1s linear infinite;
-    color: var(--muted);
-    display: inline-block;
-}
-
-/* Match height for nav elements and tabs */
-.tabs .tab {
-    height: 34px;
-    display: flex;
-    align-items: center;
-    box-sizing: border-box;
-    padding: 0 12px;
-}
-#payday2InfoBtn {
-    height: 34px;
-    display: flex;
-    align-items: center;
-    margin: 0;
-}
-#payday2HelpToggleBtn, #payday2SettingsBtn {
-    height: 34px;
-    width: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    padding: 0;
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: bold;
-}
-
-@media (max-width: 800px) {
-    #dateForm { width: 96px !important; }
-    .pd2-date-input { width: 92px !important; height: 34px !important; padding: 0 2px !important; border-radius: 10px !important; }
-    
-    .pd2-nav-title-row {
-        grid-column: 1;
-        grid-row: 1;
-        min-width: 0;
-        flex-wrap: wrap;
-    }
-    .user-menu {
-        grid-column: 2 !important;
-        grid-row: 1 !important;
-        justify-self: end !important;
-        align-self: start !important;
-    }
-    
-    #topFormsWrap {
-        grid-column: 1 !important;
-        grid-row: 2 !important;
-        width: auto !important;
-        margin: 0 !important;
-        flex-wrap: nowrap !important;
-    }
-    .tabs {
-        grid-column: 2 !important;
-        grid-row: 2 !important;
-        margin: 0 !important;
-        justify-content: flex-end;
-        flex-wrap: nowrap !important;
-    }
-}
+.pd2-date-input { padding: 8px 10px; width: 102px; }
 .pd2-m-0 { margin: 0; }
 .pd2-pos-relative { position: relative; }
 .pd2-p-0 { padding: 0; }
@@ -123,28 +51,7 @@
 .pd2-modal-backdrop { display: none; z-index: 9999; align-items: flex-start; padding-top: 5vh; }
 .pd2-modal-content { max-width: 900px; width: 90%; }
 .pd2-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-.pd2-modal-close {
-    min-width: unset;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    margin: 0;
-    font-size: 14px;
-    font-weight: 900;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: var(--muted);
-    transition: background-color 0.2s ease, color 0.2s ease;
-}
-.pd2-modal-close:hover {
-    background: var(--border);
-    color: var(--text);
-}
+.pd2-modal-close { min-width: 40px; font-weight: bold; font-size: 16px; }
 .pd2-modal-body { max-height: 85vh; overflow: auto; }
 .pd2-inline-flex { display: inline-flex; }
 .pd2-text-dec-none { text-decoration: none; }
@@ -159,11 +66,8 @@
 .pd2-settings-modal .pd2-settings-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; align-items: end; }
 .pd2-settings-modal .pd2-settings-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
 .pd2-settings-modal .pd2-settings-grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
-.pd2-settings-modal .pd2-settings-grid-5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; align-items: end; }
 .pd2-settings-modal .pd2-settings-grid label,
-.pd2-settings-modal .pd2-settings-grid-4 label,
-.pd2-settings-modal .pd2-settings-grid-5 label { display: block; font-size: 11px; margin: 0; }
-.pd2-settings-modal .pd2-settings-grid-5 label > span { display: block; font-size: 11px; line-height: 1.1; margin-bottom: 4px; white-space: nowrap; }
+.pd2-settings-modal .pd2-settings-grid-4 label { display: block; font-size: 11px; margin: 0; }
 
 /* --- Этап 4.2: вынесено из view.php --- */
 .pd2-d-none { display: none !important; }
@@ -208,242 +112,24 @@
 }
 
 .pd2-settings-modal.confirm-modal { max-width: 520px; }
-#payday2InfoModal .confirm-modal { max-width: 440px; }
+#payday2BetaModal .confirm-modal { max-width: 440px; }
 .pd2-settings-err { margin-top: 10px; }
 
-.pd2-soft-reset-btn {
-    background: none;
-    border: none;
-    padding: 0;
-    width: 44px;
-    height: 44px;
-    flex-shrink: 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-top: auto;
-    border-radius: 50%;
-    transition: transform 0.2s ease, opacity 0.2s, box-shadow 0.2s ease, background-color 0.2s ease;
-}
-.pd2-soft-reset-btn:not(:disabled):hover {
-    transform: scale(1.05);
-    background-color: rgba(239, 68, 68, 0.4);
-    box-shadow: 0 0 6px 3px rgba(239, 68, 68, 0.4);
-}
-.pd2-soft-reset-btn:active {
-    transform: scale(0.95);
-}
-.pd2-soft-reset-btn.loading {
-    opacity: 0.5;
-    pointer-events: none;
-}
-.pd2-soft-reset-btn img {
-    width: 44px;
-    height: 44px;
-    object-fit: contain;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
-}
+.pd2-modal-backdrop-top { z-index: 10000; }
+.pd2-confirm-small { max-width: 520px; }
 
-.pd2-icon-btn {
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: #e5e7eb;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 34px;
-    width: 34px;
-    overflow: hidden;
-    transition: background 0.2s, border-color 0.2s;
-}
-.pd2-icon-btn img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
+.pd2-btn-danger { background: #ef4444; color: #fff; }
+.pd2-btn-danger:hover { background: #dc2626; }
 
-.tabs .tab,
-.pd2-icon-btn,
-#tablesRoot .btn,
-#outSection .btn,
-.bottom-two .btn,
-#payday2SettingsBtn,
-#payday2HelpToggleBtn,
-#tablesRoot .btn svg,
-#outSection .btn svg,
-.bottom-two .btn svg,
-.bottom-two .btn svg path {
-    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out, fill 0.2s ease-in-out, stroke 0.2s ease-in-out;
-}
-
-.tabs .tab:not(:disabled):hover,
-.pd2-icon-btn:not(:disabled):hover,
-#tablesRoot .btn:not(:disabled):hover,
-#outSection .btn:not(:disabled):hover,
-.bottom-two .btn:not(:disabled):hover {
-    background-color: #b88746 !important;
-    border-color: #b88746 !important;
-    color: #fff !important;
-}
-#tablesRoot .btn:not(:disabled):hover svg,
-#outSection .btn:not(:disabled):hover svg,
-.bottom-two .btn:not(:disabled):hover svg {
-    stroke: #fff !important;
-}
-.pd2-help-mode [data-help] {
-    position: relative;
-}
-.pd2-help-mode [data-help]::after {
-    content: attr(data-help);
-    display: block;
-    font-size: 11px;
-    color: #1557b0;
-    background: #e8f0fe;
-    border: 1px solid #1a73e8;
-    padding: 6px 8px;
-    border-radius: 6px;
-    margin-top: 6px;
-    margin-bottom: 6px;
-    font-weight: 500;
-    text-transform: none;
-    line-height: 1.3;
-    z-index: 10;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-.pd2-help-mode [data-help-abs] {
-    position: relative;
-}
-.pd2-help-mode [data-help-abs]::after {
-    content: attr(data-help-abs);
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 50%;
-    transform: translateX(-50%);
-    width: max-content;
-    max-width: 200px;
-    white-space: normal;
-    font-size: 11px;
-    color: #1557b0;
-    background: #e8f0fe;
-    border: 1px solid #1a73e8;
-    padding: 6px 8px;
-    border-radius: 6px;
-    font-weight: 500;
-    text-transform: none;
-    line-height: 1.3;
-    z-index: 100;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-}
-.pd2-help-mode [data-help-abs-right]::after {
-    left: auto;
-    right: 0;
-    transform: none;
-}
-.pd2-help-mode [data-help-abs-left]::after {
-    left: 0;
-    transform: none;
-}
-
-.pd2-tour-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 10050;
-}
-.pd2-tour-dim {
-    position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.4);
-}
-.pd2-tour-box {
-    position: fixed;
-    background: #fff;
-    border-radius: 12px;
-    padding: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-    width: 360px;
-    max-width: calc(100vw - 16px);
-    z-index: 10060;
-}
-.pd2-tour-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 8px;
-}
-.pd2-tour-title {
-    font-weight: 900;
-    font-size: 14px;
-}
-.pd2-tour-step {
-    font-size: 12px;
-    color: var(--muted);
-    white-space: nowrap;
-}
-.pd2-tour-text {
-    font-size: 13px;
-    line-height: 1.35;
-    color: #111827;
-}
-.pd2-tour-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    margin-top: 10px;
-    flex-wrap: wrap;
-}
-.pd2-tour-target {
-    position: relative;
-    z-index: 10055;
-    outline: 3px solid #1a73e8;
-    outline-offset: 4px;
-    border-radius: 10px;
-    box-shadow: 0 0 0 9999px rgba(0,0,0,0.15);
-}
-.pd2-tour-target-wrap {
-    position: relative;
-    z-index: 10055;
-    border-radius: 20px;
-    box-shadow: 0 0 0 4px #1a73e8, 0 0 0 9999px rgba(0,0,0,0.15);
-}
-
-/* For SVGs that have fill instead of stroke (like Telegram icon) */
-.bottom-two .btn:not(:disabled):not(#posterBalancesTelegramBtn):hover svg[fill]:not([fill="none"]) {
-    fill: #fff !important;
-}
-.bottom-two .btn:not(:disabled):not(#posterBalancesTelegramBtn):hover svg path[fill]:not([fill="none"]) {
-    fill: #fff !important;
-}
-
-.out-create-poster-tx-btn {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    width: 14px;
-    height: 14px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--text);
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 900;
-    line-height: 1;
-    padding: 0;
-    margin-right: 6px;
-}
-.out-create-poster-tx-btn:hover {
-    background: var(--border);
-}
-tr.row-red .out-create-poster-tx-btn {
-    display: inline-flex;
-}
-
-#payday2SettingsBtn:not(:disabled):hover {
-    background-color: #ef4444 !important;
-    border-color: #ef4444 !important;
-    color: #fff !important;
-}
+.pd2-check-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.pd2-check-label { display: block; margin: 0; font-size: 12px; text-align: left; }
+.pd2-check-result { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.pd2-check-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-bottom: 12px; }
+.pd2-check-meta-row { display: flex; gap: 8px; min-width: 0; }
+.pd2-check-meta-k { color: var(--muted); white-space: nowrap; }
+.pd2-check-meta-v { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pd2-check-products-title { font-weight: 900; margin: 8px 0 6px; }
+.pd2-check-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pd2-check-th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--card); }
+.pd2-check-td { padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.pd2-check-deleted { margin: 0 0 10px; padding: 10px; background: rgba(16,185,129,0.12); color: #10b981; font-weight: 900; border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; }

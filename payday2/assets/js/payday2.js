@@ -37,6 +37,7 @@ if (!window._paydayPjaxLoaded) {
     window._paydayPjaxLoaded = true;
 
     window.doPjax = async function(url, options = {}) {
+        document.body.style.opacity = '0.5';
         try {
             const res = await fetch(url, options);
             if (res.redirected) {
@@ -81,6 +82,8 @@ if (!window._paydayPjaxLoaded) {
             if (options.method !== 'POST') {
                 window.location.href = url;
             }
+        } finally {
+            document.body.style.opacity = '1';
         }
     };
 
@@ -152,14 +155,16 @@ window.initPayday2 = function() {
 
     const modeToggleEl = document.getElementById('modeToggle');
     const modeToggleOutEl = document.getElementById('modeToggleOut');
-    const payday2InfoBtn = document.getElementById('payday2InfoBtn');
-    const payday2InfoModal = document.getElementById('payday2InfoModal');
-    const payday2InfoModalClose = document.getElementById('payday2InfoModalClose');
+    const payday2BetaInfoBtn = document.getElementById('payday2BetaInfoBtn');
+    const payday2BetaModal = document.getElementById('payday2BetaModal');
+    const payday2BetaModalClose = document.getElementById('payday2BetaModalClose');
+    const payday2BetaModalCloseX = document.getElementById('payday2BetaModalCloseX');
     const payday2SettingsBtn = document.getElementById('payday2SettingsBtn');
     const payday2SettingsModal = document.getElementById('payday2SettingsModal');
-    const payday2SettingsClose = document.getElementById('payday2SettingsClose');
+    const payday2SettingsCancel = document.getElementById('payday2SettingsCancel');
     const payday2SettingsSave = document.getElementById('payday2SettingsSave');
     const payday2SettingsErr = document.getElementById('payday2SettingsErr');
+    const payday2SettingsClose = document.getElementById('payday2SettingsClose');
     const applyMode = (mode) => {
         const m = (mode === 'lite') ? 'lite' : 'full';
         document.body.classList.toggle('mode-lite', m === 'lite');
@@ -266,11 +271,11 @@ window.initPayday2 = function() {
     };
     if (tabIn) tabIn.addEventListener('click', () => setTab('in'));
     if (tabOut) tabOut.addEventListener('click', () => setTab('out'));
-    const openPayday2InfoModal = () => {
-        if (payday2InfoModal) payday2InfoModal.style.display = 'flex';
+    const openPayday2BetaModal = () => {
+        if (payday2BetaModal) payday2BetaModal.style.display = 'flex';
     };
-    const closePayday2InfoModal = () => {
-        if (payday2InfoModal) payday2InfoModal.style.display = 'none';
+    const closePayday2BetaModal = () => {
+        if (payday2BetaModal) payday2BetaModal.style.display = 'none';
     };
     const fillPayday2SettingsForm = () => {
         const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
@@ -285,75 +290,7 @@ window.initPayday2 = function() {
             set('pd2sett_acc_vietnam', ls.accounts.vietnam);
         }
         set('pd2sett_balance_sinc', ls.balance_sinc_account_id);
-        
-        // Allowed categories will be set after categories are loaded
     };
-    
-    let payday2CategoriesLoaded = false;
-    const loadPayday2Categories = () => {
-        const listEl = document.getElementById('pd2sett_categories_list');
-        if (!listEl || payday2CategoriesLoaded) return;
-        
-        fetchJsonSafe(location.pathname + '?ajax=finance_categories').then(j => {
-            if (!j || !j.ok) throw new Error(j.error || 'Ошибка');
-            listEl.innerHTML = '';
-            const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
-            const allowed = ls && ls.allowed_categories ? ls.allowed_categories : [];
-            const customNames = ls && ls.custom_category_names ? ls.custom_category_names : {};
-            
-            const cats = j.categories || {};
-            
-            // Build tree
-            const roots = [];
-            const byId = {};
-            
-            for (const [idStr, data] of Object.entries(cats)) {
-                const id = Number(idStr);
-                byId[id] = { id, name: data.name, parent_id: Number(data.parent_id || 0), children: [] };
-            }
-            
-            for (const id in byId) {
-                const node = byId[id];
-                if (node.parent_id && byId[node.parent_id]) {
-                    byId[node.parent_id].children.push(node);
-                } else {
-                    roots.push(node);
-                }
-            }
-            
-            const renderNode = (node, depth) => {
-                const checked = allowed.includes(node.id) ? 'checked' : '';
-                const customName = customNames[node.id] || node.name;
-                const margin = depth * 20;
-                
-                let html = `
-                    <div class="pd2-d-flex pd2-align-center pd2-gap-8 pd2-mb-6" style="margin-left: ${margin}px;">
-                        <label class="pd2-d-flex pd2-align-center pd2-gap-8 pd2-pointer pd2-m-0">
-                            <input type="checkbox" class="pd2-sett-cat-cb" value="${node.id}" ${checked}>
-                            <span class="pd2-ws-nowrap">${escapeHtml(node.name)}</span>
-                        </label>
-                        <input type="text" class="btn pd2-sett-cat-name pd2-flex-1" data-id="${node.id}" value="${escapeHtml(customName)}" placeholder="${escapeHtml(node.name)}">
-                    </div>
-                `;
-                
-                for (const child of node.children) {
-                    html += renderNode(child, depth + 1);
-                }
-                return html;
-            };
-            
-            let html = '';
-            for (const root of roots) {
-                html += renderNode(root, 0);
-            }
-            
-            listEl.innerHTML = html;
-            payday2CategoriesLoaded = true;
-        }).catch(e => {
-            listEl.innerHTML = '<div class="error pd2-text-center">Ошибка загрузки категорий</div>';
-        });
-    };
-
     const readPayday2SettingsPayload = () => {
         const num = (id) => {
             const el = document.getElementById(id);
@@ -364,21 +301,6 @@ window.initPayday2 = function() {
             const el = document.getElementById(id);
             return el ? String(el.value || '').trim() : '';
         };
-        
-        const allowedCats = [];
-        const customNames = {};
-        document.querySelectorAll('.pd2-sett-cat-cb:checked').forEach(cb => {
-            const id = Number(cb.value);
-            allowedCats.push(id);
-            const input = document.querySelector(`.pd2-sett-cat-name[data-id="${id}"]`);
-            if (input) {
-                const val = input.value.trim();
-                if (val) {
-                    customNames[id] = val;
-                }
-            }
-        });
-
         return {
             telegram_chat_id: str('pd2sett_tg_chat'),
             telegram_message_thread_id: str('pd2sett_tg_thread'),
@@ -389,26 +311,18 @@ window.initPayday2 = function() {
                 vietnam: num('pd2sett_acc_vietnam'),
             },
             balance_sinc_account_id: num('pd2sett_balance_sinc'),
-            allowed_categories: allowedCats,
-            custom_category_names: customNames,
         };
     };
     const openPayday2SettingsModal = () => {
         if (payday2SettingsErr) { payday2SettingsErr.textContent = ''; payday2SettingsErr.classList.add('pd2-d-none'); }
         fillPayday2SettingsForm();
         if (payday2SettingsModal) payday2SettingsModal.style.display = 'flex';
-        
-        const catSpoiler = document.getElementById('pd2sett_categories_spoiler');
-        if (catSpoiler) {
-            catSpoiler.addEventListener('toggle', () => {
-                if (catSpoiler.open) loadPayday2Categories();
-            });
-        }
     };
     const closePayday2SettingsModal = () => {
         if (payday2SettingsModal) payday2SettingsModal.style.display = 'none';
     };
     if (payday2SettingsBtn) payday2SettingsBtn.addEventListener('click', openPayday2SettingsModal);
+    if (payday2SettingsCancel) payday2SettingsCancel.addEventListener('click', closePayday2SettingsModal);
     if (payday2SettingsClose) payday2SettingsClose.addEventListener('click', closePayday2SettingsModal);
     if (payday2SettingsSave) {
         payday2SettingsSave.addEventListener('click', () => {
@@ -440,21 +354,226 @@ window.initPayday2 = function() {
             if (ev.target === payday2SettingsModal) closePayday2SettingsModal();
         });
     }
-    if (payday2InfoBtn) payday2InfoBtn.addEventListener('click', openPayday2InfoModal);
-    if (payday2InfoModalClose) payday2InfoModalClose.addEventListener('click', closePayday2InfoModal);
-    if (payday2InfoModal) {
-        payday2InfoModal.addEventListener('click', (ev) => {
-            if (ev.target === payday2InfoModal) closePayday2InfoModal();
+    if (payday2BetaInfoBtn) payday2BetaInfoBtn.addEventListener('click', openPayday2BetaModal);
+    if (payday2BetaModalClose) payday2BetaModalClose.addEventListener('click', closePayday2BetaModal);
+    if (payday2BetaModalCloseX) payday2BetaModalCloseX.addEventListener('click', closePayday2BetaModal);
+    if (payday2BetaModal) {
+        payday2BetaModal.addEventListener('click', (ev) => {
+            if (ev.target === payday2BetaModal) closePayday2BetaModal();
+        });
+    }
+    const btnCheck = document.getElementById('btnCheck');
+    const checkModal = document.getElementById('checkModal');
+    const checkModalClose = document.getElementById('checkModalClose');
+    const checkTxId = document.getElementById('checkTxId');
+    const checkFindBtn = document.getElementById('checkFindBtn');
+    const checkErr = document.getElementById('checkErr');
+    const checkResult = document.getElementById('checkResult');
+    const checkDeleteBtn = document.getElementById('checkDeleteBtn');
+
+    const checkDeleteConfirm = document.getElementById('checkDeleteConfirm');
+    const checkDeleteConfirmClose = document.getElementById('checkDeleteConfirmClose');
+    const checkDeleteCancel = document.getElementById('checkDeleteCancel');
+    const checkDeleteOk = document.getElementById('checkDeleteOk');
+    const checkDeleteConfirmId = document.getElementById('checkDeleteConfirmId');
+
+    const setCheckErr = (msg) => {
+        if (!checkErr) return;
+        const t = String(msg || '');
+        checkErr.textContent = t;
+        checkErr.classList.toggle('pd2-d-none', t === '');
+    };
+    const resetCheckModal = () => {
+        setCheckErr('');
+        if (checkResult) {
+            checkResult.innerHTML = '';
+            checkResult.classList.add('pd2-d-none');
+        }
+        if (checkDeleteBtn) {
+            checkDeleteBtn.disabled = true;
+            delete checkDeleteBtn.dataset.txId;
+        }
+    };
+    const openCheckModal = () => {
+        resetCheckModal();
+        if (checkModal) checkModal.style.display = 'flex';
+        if (checkTxId) setTimeout(() => { try { checkTxId.focus(); checkTxId.select(); } catch (_) {} }, 0);
+    };
+    const closeCheckModal = () => {
+        if (checkDeleteConfirm) checkDeleteConfirm.style.display = 'none';
+        if (checkModal) checkModal.style.display = 'none';
+    };
+    const openCheckDeleteConfirm = (txId) => {
+        if (!checkDeleteConfirm) return;
+        if (checkDeleteConfirmId) checkDeleteConfirmId.textContent = String(txId || '');
+        checkDeleteConfirm.style.display = 'flex';
+        if (checkDeleteCancel) setTimeout(() => { try { checkDeleteCancel.focus(); } catch (_) {} }, 0);
+    };
+    const closeCheckDeleteConfirm = () => {
+        if (checkDeleteConfirm) checkDeleteConfirm.style.display = 'none';
+    };
+    const renderCheckTx = (tx) => {
+        if (!checkResult) return;
+        const products = (tx && Array.isArray(tx.products)) ? tx.products : [];
+        const line = (label, val) => `<div class="pd2-check-meta-row"><div class="pd2-check-meta-k">${escapeHtml(label)}</div><div class="pd2-check-meta-v">${escapeHtml(val)}</div></div>`;
+        let html = `<div class="pd2-check-meta">`;
+        html += line('transaction_id', tx && tx.transaction_id != null ? tx.transaction_id : '');
+        html += line('date_close', tx && tx.date_close != null ? tx.date_close : '');
+        html += line('spot_id', tx && tx.spot_id != null ? tx.spot_id : '');
+        html += line('table_id', tx && tx.table_id != null ? tx.table_id : '');
+        html += line('client_id', tx && tx.client_id != null ? tx.client_id : '');
+        html += line('sum', tx && tx.sum != null ? tx.sum : '');
+        html += line('payed_sum', tx && tx.payed_sum != null ? tx.payed_sum : '');
+        html += `</div>`;
+
+        html += `<div class="pd2-check-products-title">Товары</div>`;
+        html += `<div class="pd2-finance-scroll-x"><table class="pd2-check-table"><thead><tr>`;
+        html += `<th class="pd2-check-th">product_id</th>`;
+        html += `<th class="pd2-check-th">num</th>`;
+        html += `<th class="pd2-check-th">product_sum</th>`;
+        html += `<th class="pd2-check-th">payed_sum</th>`;
+        html += `</tr></thead><tbody>`;
+        if (products.length === 0) {
+            html += `<tr><td class="pd2-check-td" colspan="4">Нет товаров</td></tr>`;
+        } else {
+            products.forEach((p) => {
+                if (!p || typeof p !== 'object') return;
+                html += `<tr>`;
+                html += `<td class="pd2-check-td">${escapeHtml(p.product_id != null ? p.product_id : '')}</td>`;
+                html += `<td class="pd2-check-td">${escapeHtml(p.num != null ? p.num : '')}</td>`;
+                html += `<td class="pd2-check-td">${escapeHtml(p.product_sum != null ? p.product_sum : '')}</td>`;
+                html += `<td class="pd2-check-td">${escapeHtml(p.payed_sum != null ? p.payed_sum : '')}</td>`;
+                html += `</tr>`;
+            });
+        }
+        html += `</tbody></table></div>`;
+        checkResult.innerHTML = html;
+        checkResult.classList.remove('pd2-d-none');
+    };
+    const loadCheckTx = async () => {
+        if (!checkTxId) throw new Error('Нет инпута');
+        const txId = parseInt(String(checkTxId.value || '').trim(), 10);
+        if (!Number.isFinite(txId) || txId <= 0) throw new Error('Введите номер чека');
+        const { dateFrom, dateTo } = getDateRange();
+        if (!dateFrom || !dateTo) throw new Error('Укажите дату (dateFrom/dateTo)');
+        const r = await fetch('?ajax=poster_tx_get', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactionId: txId, dateFrom, dateTo }),
+        });
+        const txt = await r.text();
+        let j;
+        try { j = JSON.parse(txt); } catch (_) { throw new Error('Bad JSON: ' + (txt || '(empty)')); }
+        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+        return j.transaction;
+    };
+    const removeCheckTx = async (txId) => {
+        const r = await fetch('?ajax=poster_tx_remove', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactionId: txId }),
+        });
+        const txt = await r.text();
+        let j;
+        try { j = JSON.parse(txt); } catch (_) { throw new Error('Bad JSON: ' + (txt || '(empty)')); }
+        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка удаления');
+        return true;
+    };
+    if (btnCheck) btnCheck.addEventListener('click', openCheckModal);
+    if (checkModalClose) checkModalClose.addEventListener('click', closeCheckModal);
+    if (checkModal) {
+        checkModal.addEventListener('click', (ev) => {
+            if (ev.target === checkModal) closeCheckModal();
+        });
+    }
+    if (checkFindBtn) {
+        checkFindBtn.addEventListener('click', async () => {
+            setCheckErr('');
+            const done = setBtnBusy(checkFindBtn, { pct: 15 });
+            try {
+                const tx = await loadCheckTx();
+                done();
+                renderCheckTx(tx);
+                if (checkDeleteBtn) {
+                    checkDeleteBtn.disabled = false;
+                    checkDeleteBtn.dataset.txId = String(tx && tx.transaction_id != null ? tx.transaction_id : '');
+                }
+            } catch (e) {
+                done();
+                setCheckErr(e && e.message ? e.message : 'Ошибка');
+                if (checkResult) {
+                    checkResult.innerHTML = '';
+                    checkResult.classList.add('pd2-d-none');
+                }
+                if (checkDeleteBtn) {
+                    checkDeleteBtn.disabled = true;
+                    delete checkDeleteBtn.dataset.txId;
+                }
+            }
+        });
+    }
+    if (checkTxId) {
+        checkTxId.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') {
+                ev.preventDefault();
+                if (checkFindBtn && !checkFindBtn.disabled) checkFindBtn.click();
+            }
+        });
+    }
+    if (checkDeleteBtn) {
+        checkDeleteBtn.addEventListener('click', () => {
+            const txId = parseInt(String(checkDeleteBtn.dataset.txId || ''), 10);
+            if (!Number.isFinite(txId) || txId <= 0) return;
+            openCheckDeleteConfirm(txId);
+        });
+    }
+    if (checkDeleteConfirmClose) checkDeleteConfirmClose.addEventListener('click', closeCheckDeleteConfirm);
+    if (checkDeleteCancel) checkDeleteCancel.addEventListener('click', closeCheckDeleteConfirm);
+    if (checkDeleteConfirm) {
+        checkDeleteConfirm.addEventListener('click', (ev) => {
+            if (ev.target === checkDeleteConfirm) closeCheckDeleteConfirm();
+        });
+    }
+    if (checkDeleteOk) {
+        checkDeleteOk.addEventListener('click', async () => {
+            const txId = parseInt(String(checkDeleteBtn && checkDeleteBtn.dataset ? (checkDeleteBtn.dataset.txId || '') : ''), 10);
+            if (!Number.isFinite(txId) || txId <= 0) return;
+            setCheckErr('');
+            const done = setBtnBusy(checkDeleteOk, { pct: 15 });
+            try {
+                await removeCheckTx(txId);
+                done();
+                closeCheckDeleteConfirm();
+                if (checkDeleteBtn) {
+                    checkDeleteBtn.disabled = true;
+                    delete checkDeleteBtn.dataset.txId;
+                }
+                if (checkResult && !checkResult.classList.contains('pd2-d-none')) {
+                    checkResult.insertAdjacentHTML('afterbegin', `<div class="pd2-check-deleted">Чек удалён</div>`);
+                }
+            } catch (e) {
+                done();
+                closeCheckDeleteConfirm();
+                setCheckErr(e && e.message ? e.message : 'Ошибка удаления');
+            }
         });
     }
     pd2on(document, 'keydown', (ev) => {
         if (ev.key !== 'Escape') return;
+        if (checkDeleteConfirm && checkDeleteConfirm.style.display === 'flex') {
+            closeCheckDeleteConfirm();
+            return;
+        }
+        if (checkModal && checkModal.style.display === 'flex') {
+            closeCheckModal();
+            return;
+        }
         if (payday2SettingsModal && payday2SettingsModal.style.display === 'flex') {
             closePayday2SettingsModal();
             return;
         }
-        if (payday2InfoModal && payday2InfoModal.style.display === 'flex') {
-            closePayday2InfoModal();
+        if (payday2BetaModal && payday2BetaModal.style.display === 'flex') {
+            closePayday2BetaModal();
         }
     });
     const loadOutMail = (onProgress) => {
@@ -478,15 +597,10 @@ window.initPayday2 = function() {
                 const dt = formatOutDT(row.tx_time, row.date);
                 const contentShow = (isHidden && hiddenComment) ? hiddenComment : String(row.content || '');
                 tr.innerHTML = `
-                    <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)" data-help-abs="Скрыть транзакцию, если она не относится к расходам Poster.">−</button></td>
+                    <td class="nowrap col-out-hide"><button type="button" class="sepay-hide out-hide" data-mail-uid="${Number(row.mail_uid || 0)}" title="Скрыть (не чек)">−</button></td>
                     <td class="col-out-content">${escapeHtml(contentShow)}</td>
                     <td class="nowrap col-out-time"><div class="col-out-date-part">${escapeHtml(dt.date)}</div><div class="col-out-time-part">${escapeHtml(dt.time)}</div></td>
-                    <td class="sum col-out-sum">
-                        <div class="pd2-d-flex pd2-align-center pd2-justify-end">
-                            <button type="button" class="out-create-poster-tx-btn" title="Создать транзакцию в Poster" data-help-abs="Создать новую транзакцию расхода в Poster." data-amount="${Number(row.amount || 0)}" data-date="${dt.date}" data-time="${dt.time}">+</button>
-                            ${Math.round(Number(row.amount || 0)).toLocaleString('en-US').replace(/,/g, '\u202F')}
-                        </div>
-                    </td>
+                    <td class="sum col-out-sum">${Math.round(Number(row.amount || 0)).toLocaleString('en-US').replace(/,/g, '\u202F')}</td>
                     <td class="col-out-select"><input type="checkbox" class="out-sepay-cb" data-id="${Number(row.mail_uid || 0)}"></td>
                     <td class="col-out-anchor"><span class="anchor" id="out-sepay-${Number(row.mail_uid || 0)}"></span></td>
                 `;
@@ -554,15 +668,7 @@ window.initPayday2 = function() {
                 const amountInt = Math.round(amountVnd);
                 const balanceInt = Math.round(balanceVnd);
                 const userName = String(emps && emps[Number(row.user_id || 0)] ? emps[Number(row.user_id || 0)] : row.user_id || '');
-                let catName = '';
-                const catObj = cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : null;
-                if (catObj && typeof catObj === 'object' && catObj.name) {
-                    catName = String(catObj.name);
-                } else if (typeof catObj === 'string') {
-                    catName = String(catObj);
-                } else {
-                    catName = String(row.category_id || '');
-                }
+                let catName = String(cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : row.category_id || '');
                 if (catName === 'book_category_action_supplies') catName = 'поставки';
                 const tr = document.createElement('tr');
                 tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
@@ -601,7 +707,6 @@ window.initPayday2 = function() {
     if (dateForm) {
         const dateFromInput = dateForm.querySelector('input[name="dateFrom"]');
         const dateToInput = dateForm.querySelector('input[name="dateTo"]');
-        const dateFormLoader = document.getElementById('dateFormLoader');
         let syncingDateRange = false;
         if (dateFromInput && dateToInput) {
             dateFromInput.addEventListener('change', () => {
@@ -609,15 +714,10 @@ window.initPayday2 = function() {
                 syncingDateRange = true;
                 dateToInput.value = dateFromInput.value || '';
                 syncingDateRange = false;
-                dateForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
             });
         }
         dateForm.addEventListener('submit', (ev) => {
             ev.preventDefault();
-            if (dateFormLoader) {
-                dateFormLoader.classList.remove('pd2-d-none');
-                dateFormLoader.classList.add('pd2-d-flex');
-            }
             const formData = new FormData(dateForm);
             const baseUrl = new URL(dateForm.getAttribute('action') || window.location.href, window.location.href);
             const nextUrl = new URL(baseUrl.href);
@@ -640,10 +740,7 @@ window.initPayday2 = function() {
     if (clearDayFormEl) {
         pd2on(clearDayFormEl, 'submit', (ev) => {
             const msg = 'Сбросить день (Soft Reset)? Записи Poster и SePay за выбранную дату будут помечены скрытыми (was_deleted); строки и связи в БД не удаляются физически. После повторной синхронизации данные снова появятся.';
-            if (!confirm(msg)) {
-                ev.preventDefault();
-                ev.stopImmediatePropagation();
-            }
+            if (!confirm(msg)) ev.preventDefault();
         });
     }
 
@@ -982,7 +1079,7 @@ window.initPayday2 = function() {
         }
     });
 
-    if (outLinkMakeBtn) outLinkMakeBtn.addEventListener('click', async () => {
+    if (outLinkMakeBtn) outLinkMakeBtn.addEventListener('click', () => {
         const mails = Array.from(outSelectedMail);
         const fins = Array.from(outSelectedFin);
         const pairs = [];
@@ -1007,20 +1104,18 @@ window.initPayday2 = function() {
             }
         }
         const { dateTo } = getDateRange();
-        
-        const restore = setBtnBusy(outLinkMakeBtn, { title: '🎯', pct: 0 });
-        try {
-            const r = await fetch(location.pathname + '?ajax=out_manual_link', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dateTo, links: pairs }),
-            });
-            const j = await r.json();
+        fetch(location.pathname + '?ajax=out_manual_link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dateTo, links: pairs }),
+        })
+        .then((r) => r.json())
+        .then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_manual_link');
-            
-            const j2 = await fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
+            return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
+        })
+        .then((j2) => {
             if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
-            
             outLinks.length = 0;
             outLinkByMail.clear();
             outLinkByFin.clear();
@@ -1037,35 +1132,28 @@ window.initPayday2 = function() {
             applyOutHideLinked();
             updateOutSelection();
             outScheduleRelayout();
-        } catch (e) {
-            alert(e && e.message ? e.message : 'Ошибка');
-        } finally {
-            restore();
-        }
+        })
+        .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
     });
 
-    if (outLinkClearBtn) outLinkClearBtn.addEventListener('click', async () => {
+    if (outLinkClearBtn) outLinkClearBtn.addEventListener('click', () => {
         const { dateTo } = getDateRange();
-        const restore = setBtnBusy(outLinkClearBtn, { title: '⛓️‍💥', pct: 0 });
-        try {
-            const r = await fetch(location.pathname + '?ajax=out_clear_links', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dateTo }),
-            });
-            const j = await r.json();
+        fetch(location.pathname + '?ajax=out_clear_links', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dateTo }),
+        })
+        .then((r) => r.json())
+        .then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_clear_links');
             outSelectedMail.clear();
             outSelectedFin.clear();
             Array.from(outSepayTable.querySelectorAll('input.out-sepay-cb')).forEach((cb) => { cb.checked = false; });
             Array.from(outPosterTable.querySelectorAll('input.out-poster-cb')).forEach((cb) => { cb.checked = false; });
             outHideLinkedOn = false;
-            await outReloadLinks(dateTo);
-        } catch (e) {
-            alert(e && e.message ? e.message : 'Ошибка');
-        } finally {
-            restore();
-        }
+            return outReloadLinks(dateTo);
+        })
+        .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
     });
 
     if (outHideLinkedBtn) outHideLinkedBtn.addEventListener('click', () => {
@@ -1085,7 +1173,7 @@ window.initPayday2 = function() {
         });
     }
 
-    if (outLinkAutoBtn) outLinkAutoBtn.addEventListener('click', async () => {
+    if (outLinkAutoBtn) outLinkAutoBtn.addEventListener('click', () => {
         const mailRows = Array.from(outSepayTable.tBodies[0]?.rows || []);
         const finRows = Array.from(outPosterTable.tBodies[0]?.rows || []);
         const finBySum = new Map();
@@ -1112,20 +1200,18 @@ window.initPayday2 = function() {
             return;
         }
         const { dateTo } = getDateRange();
-        
-        const restore = setBtnBusy(outLinkAutoBtn, { title: '🧩', pct: 0 });
-        try {
-            const r = await fetch(location.pathname + '?ajax=out_auto_link', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dateTo, links: pairs }),
-            });
-            const j = await r.json();
+        fetch(location.pathname + '?ajax=out_auto_link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dateTo, links: pairs }),
+        })
+        .then((r) => r.json())
+        .then((j) => {
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка out_auto_link');
-            
-            const j2 = await fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
+            return fetchJsonSafe(location.pathname + '?ajax=out_links&dateTo=' + encodeURIComponent(dateTo));
+        })
+        .then((j2) => {
             if (!j2 || !j2.ok) throw new Error((j2 && j2.error) ? j2.error : 'Ошибка out_links');
-            
             outLinks.length = 0;
             outLinkByMail.clear();
             outLinkByFin.clear();
@@ -1142,11 +1228,8 @@ window.initPayday2 = function() {
             applyOutHideLinked();
             updateOutSelection();
             outScheduleRelayout();
-        } catch (e) {
-            alert(e && e.message ? e.message : 'Ошибка');
-        } finally {
-            restore();
-        }
+        })
+        .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
     });
 
     pd2on(document, 'click', (ev) => {
@@ -1192,7 +1275,6 @@ window.initPayday2 = function() {
         const btn = document.getElementById(btnId);
         if (!form || !btn) return;
         form.addEventListener('submit', async (ev) => {
-            if (ev.defaultPrevented) return;
             ev.preventDefault();
             const restore = setBtnBusy(btn, { title: defaultStep || 'Загрузка…', pct: 0 });
             try {
@@ -2275,6 +2357,7 @@ window.initPayday2 = function() {
                 const cb = document.getElementById('financeConfirmChecked');
                 const ok = document.getElementById('financeConfirmOk');
                 const cancel = document.getElementById('financeConfirmCancel');
+                const closeBtn = document.getElementById('financeConfirmClose');
                 if (!backdrop || !text || !cb || !ok || !cancel) return resolve(false);
                 text.innerHTML =
                     `Будет создан перевод в Poster.<br>` +
@@ -2290,6 +2373,7 @@ window.initPayday2 = function() {
                 const close = (v) => {
                     backdrop.style.display = 'none';
                     cancel.removeEventListener('click', onCancel);
+                    if (closeBtn) closeBtn.removeEventListener('click', onCancel);
                     ok.removeEventListener('click', onOk);
                     cb.removeEventListener('change', onCb);
                     backdrop.removeEventListener('click', onBg);
@@ -2304,6 +2388,7 @@ window.initPayday2 = function() {
 
                 cb.addEventListener('change', onCb);
                 cancel.addEventListener('click', onCancel);
+                if (closeBtn) closeBtn.addEventListener('click', onCancel);
                 ok.addEventListener('click', onOk);
                 backdrop.addEventListener('click', onBg);
                 pd2on(document, 'keydown', onEsc, { capture: true });
@@ -2454,7 +2539,7 @@ window.initPayday2 = function() {
     });
 
     if (linkMakeBtn) {
-        linkMakeBtn.addEventListener('click', async () => {
+        linkMakeBtn.addEventListener('click', () => {
             const sepayIds = Array.from(selectedSepay.values()).map((v) => Number(v)).filter((v) => v > 0);
             const posterIds = Array.from(selectedPoster.values()).map((v) => Number(v)).filter((v) => v > 0);
             if (!sepayIds.length || !posterIds.length) return;
@@ -2462,15 +2547,9 @@ window.initPayday2 = function() {
                 alert('Нельзя: выбери 1 платеж и много чеков или 1 чек и много платежей.');
                 return;
             }
-            const restore = setBtnBusy(linkMakeBtn, { title: '🎯', pct: 0 });
-            try {
-                await sendManualLinks(sepayIds, posterIds);
-                clearCheckboxes();
-            } catch (e) {
-                alert(e && e.message ? e.message : 'Ошибка');
-            } finally {
-                restore();
-            }
+            sendManualLinks(sepayIds, posterIds)
+                .then(() => clearCheckboxes())
+                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         });
     }
     if (hideLinkedBtn) {
@@ -2506,30 +2585,18 @@ window.initPayday2 = function() {
         updateSepayHiddenButtonState();
     }
     if (linkAutoBtn) {
-        linkAutoBtn.addEventListener('click', async () => {
-            const restore = setBtnBusy(linkAutoBtn, { title: '🧩', pct: 0 });
-            try {
-                await sendAutoLinks();
-                clearCheckboxes();
-            } catch (e) {
-                alert(e && e.message ? e.message : 'Ошибка');
-            } finally {
-                restore();
-            }
+        linkAutoBtn.addEventListener('click', () => {
+            sendAutoLinks()
+                .then(() => clearCheckboxes())
+                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         });
     }
     if (linkClearBtn) {
-        linkClearBtn.addEventListener('click', async () => {
+        linkClearBtn.addEventListener('click', () => {
             if (!confirm('Удалить все связи за день?')) return;
-            const restore = setBtnBusy(linkClearBtn, { title: '⛓️‍💥', pct: 0 });
-            try {
-                await sendClearLinks();
-                clearCheckboxes();
-            } catch (e) {
-                alert(e && e.message ? e.message : 'Ошибка');
-            } finally {
-                restore();
-            }
+            sendClearLinks()
+                .then(() => clearCheckboxes())
+                .catch((e) => alert(e && e.message ? e.message : 'Ошибка'));
         });
     }
     updateLinkButtonState();

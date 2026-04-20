@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260419_0069';
+$payday2AssetVersion = '20260420_0001';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -392,41 +392,31 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
     <div class="top-nav">
         <div class="nav-left">
             <div class="pd2-nav-title-row pd2-d-flex pd2-align-center pd2-gap-8">
-                <div class="nav-title pd2-pointer" id="payday2InfoBtn">Payday2</div>
-                <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2HelpToggleBtn" title="Справка">❓</button>
-                <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2SettingsBtn" title="Настройки Payday2" data-help-abs="Настройки интеграции с Telegram и счетами Poster.">⚙</button>
-                <div class="pd2-d-flex">
-                    <button type="button" class="pd2-icon-btn" id="btnKashShift" title="KashShift" data-help-abs="Просмотр кассовых смен из Poster.">
-                        <img src="/payday2/img/Cash.png" alt="KashShift">
-                    </button>
-                    <button type="button" class="pd2-icon-btn pd2-ml-5" id="btnSupplies" title="Supplies" data-help-abs="Просмотр списка поставок из Poster.">
-                        <img src="/payday2/img/Supply.png" alt="Supplies">
-                    </button>
+                <div class="nav-title pd2-pointer" id="payday2BetaInfoBtn">Payda2beta</div>
+                <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2SettingsBtn" title="Настройки Payday2">⚙</button>
+            </div>
+            <div class="tabs">
+                <button type="button" class="tab active" id="tabIn">IN</button>
+                <button type="button" class="tab" id="tabOut">OUT</button>
+                <div class="pd2-ml-auto pd2-d-flex">
+                    <button type="button" class="tab pd2-tab-gold" id="btnKashShift">KashShift</button>
+                    <button type="button" class="tab pd2-tab-gold pd2-ml-5" id="btnSupplies">Supplies</button>
+                    <button type="button" class="tab pd2-tab-gold pd2-ml-5" id="btnCheck">Чек</button>
                 </div>
             </div>
-            <div class="tabs" data-help="Переключение режимов сверки финансов: приходы (IN) или расходы (OUT).">
-                <button type="button" class="tab active" id="tabIn" data-help-abs="Режим IN: Сверка входящих платежей.">IN</button>
-                <button type="button" class="tab" id="tabOut" data-help-abs="Режим OUT: Сверка исходящих платежей (затрат).">OUT</button>
-            </div>
-            <div id="topFormsWrap" class="pd2-top-forms-wrap" data-help="Блок выбора рабочего периода для загрузки транзакций.">
-                <form method="GET" id="dateForm" class="pd2-m-0 pd2-d-flex pd2-align-center pd2-gap-10 pd2-pos-relative">
-                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn pd2-date-input pd2-ws-nowrap" data-help-abs="Начальная дата (или единственный день).">
-                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn pd2-date-input pd2-d-none" data-help-abs="Конечная дата.">
-                    <div id="dateFormLoader" class="pd2-d-none pd2-align-center pd2-ml-4">
-                        <svg class="pd2-loader-spin pd2-v-align-mid" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-                        </svg>
-                    </div>
+            <div id="topFormsWrap" class="pd2-top-forms-wrap">
+                <form method="GET" id="dateForm" class="pd2-date-form">
+                    <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn pd2-date-input">
+                    <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn pd2-date-input">
+                    <button class="btn" type="submit">Открыть</button>
                 </form>
-                <form method="POST" id="clearDayForm" class="pd2-m-0 pd2-d-none">
+                <form method="POST" id="clearDayForm" class="pd2-m-0">
                     <input type="hidden" name="payday2_csrf" value="<?= htmlspecialchars($payday2CsrfToken) ?>">
                     <input type="hidden" name="action" value="clear_day">
                     <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
+                    <button class="btn" id="clearDayBtn" type="submit" title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстанавливаются.">SoftReset</button>
                 </form>
-                <div class="pd2-d-flex pd2-align-center pd2-gap-10 pd2-ws-nowrap pd2-d-none">
-                    <button class="btn pd2-ws-nowrap" type="submit" form="dateForm">Открыть</button>
-                </div>
             </div>
         </div>
         <?php require __DIR__ . '/../partials/user_menu.php'; ?>
@@ -438,11 +428,11 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
         <div id="outSection" class="pd2-d-none">
             <div class="grid pd2-pos-relative" id="outGrid">
                 <div id="outLineLayer"></div>
-                <div class="card pd2-p-0 pd2-pos-relative" data-help="Таблица фактических денежных транзакций (списаний), полученных из банка или почты. Отражает реальное движение средств.">
+                <div class="card pd2-p-0 pd2-pos-relative">
                     <div class="table-card-header pd2-card-header">
                         <div class="pd2-card-header-title">
                             <div class="pd2-ws-nowrap">Деньги 📧</div>
-                            <button class="btn tiny" id="outMailBtn" type="button" title="Загрузить из почты" data-help-abs="Загрузить свежие банковские транзакции из почты.">
+                            <button class="btn tiny" id="outMailBtn" type="button" title="Загрузить из почты">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                                     <path d="M21 2v6h-6"></path>
                                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
@@ -462,7 +452,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         </table>
                     </div>
                 </div>
-                <div class="mid-col" id="outMidCol" data-help="Блок управления связями. Позволяет выбрать строки из обеих таблиц и сопоставить их друг с другом.">
+                <div class="mid-col" id="outMidCol">
                     <div class="toggle-wrap pd2-toggle-wrap" title="Lite/Full">
                         <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                         <label class="switch">
@@ -472,7 +462,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
                     </div>
                     <div class="mid-col-glass">
-                        <button class="mid-btn primary" id="outLinkMakeBtn" type="button" title="Связать выбранные" data-help-abs="Связать выбранные банковские переводы с транзакциями Poster." disabled>🎯</button>
+                        <button class="mid-btn primary" id="outLinkMakeBtn" type="button" title="Связать выбранные" disabled>🎯</button>
                         <button class="mid-btn eye-toggle" id="outHideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
                         <button class="mid-btn" id="outLinkAutoBtn" type="button" title="Автосвязи">🧩</button>
                         <button class="mid-btn" id="outLinkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
@@ -488,11 +478,11 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         </div>
                     </div>
                 </div>
-                <div class="card pd2-p-0 pd2-pos-relative" data-help="Таблица транзакций (расходов), созданных кассирами или системой в Poster. Отражает учетные данные.">
+                <div class="card pd2-p-0 pd2-pos-relative">
                     <div class="table-card-header pd2-card-header">
                         <div class="pd2-card-header-title">
                             <div class="pd2-ws-nowrap">Poster тр-ии</div>
-                            <button class="btn tiny" id="outFinanceBtn" type="button" title="Загрузить" data-help-abs="Загрузить актуальные транзакции из системы Poster.">
+                            <button class="btn tiny" id="outFinanceBtn" type="button" title="Загрузить">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                                     <path d="M21 2v6h-6"></path>
                                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
@@ -518,7 +508,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
 
         <div class="grid pd2-pos-relative" id="tablesRoot">
             <div id="lineLayer"></div>
-            <div class="card pd2-p-0 pd2-pos-relative" data-help="Таблица фактических денежных транзакций (приходов), полученных из банка или почты. Отражает реальные поступления.">
+            <div class="card pd2-p-0 pd2-pos-relative">
                 <div class="table-card-header pd2-card-header">
                     <div class="pd2-card-header-title">
                         <div class="pd2-ws-nowrap">Деньги</div>
@@ -527,7 +517,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                             <input type="hidden" name="action" value="reload_sepay_api">
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                            <button class="btn tiny" id="sepaySyncBtn" type="submit" title="Загрузить" data-help-abs="Загрузить свежие банковские приходы из почты.">
+                            <button class="btn tiny" id="sepaySyncBtn" type="submit" title="Загрузить">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                                     <path d="M21 2v6h-6"></path>
                                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
@@ -573,7 +563,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                             ?>
                             <?php $tsRow = strtotime($r['transaction_date']) ?: 0; ?>
                             <tr class="<?= $cls ?>" data-sepay-id="<?= $sid ?>" data-ts="<?= (int)$tsRow ?>" data-sum="<?= (int)$r['transfer_amount'] ?>" data-content="<?= htmlspecialchars(mb_strtolower((string)($r['content'] ?? ''), 'UTF-8')) ?>">
-                                <td class="nowrap col-sepay-hide"><button type="button" class="sepay-hide" data-sepay-id="<?= $sid ?>" title="Скрыть (не чек)" data-help-abs="Скрыть транзакцию, если она не относится к Poster.">−</button></td>
+                                <td class="nowrap col-sepay-hide"><button type="button" class="sepay-hide" data-sepay-id="<?= $sid ?>" title="Скрыть (не чек)">−</button></td>
                                 <td class="col-sepay-content"><?= htmlspecialchars((string)($r['content'] ?? '')) ?></td>
                                 <td class="nowrap col-sepay-time"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
                                 <td class="sum col-sepay-sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
@@ -590,7 +580,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                             ?>
                             <?php $tsRow = strtotime($r['transaction_date']) ?: 0; ?>
                             <tr class="row-hidden" data-hidden="1" data-sepay-id="<?= $sid ?>" data-ts="<?= (int)$tsRow ?>" data-sum="<?= (int)$r['transfer_amount'] ?>" data-content="<?= htmlspecialchars(mb_strtolower($contentShow, 'UTF-8')) ?>">
-                                <td class="nowrap col-sepay-hide"><button type="button" class="sepay-hide" data-sepay-id="<?= $sid ?>" title="Изменить комментарий скрытия" data-help-abs="Восстановить скрытую транзакцию или изменить ее комментарий.">−</button></td>
+                                <td class="nowrap col-sepay-hide"><button type="button" class="sepay-hide" data-sepay-id="<?= $sid ?>" title="Изменить комментарий скрытия">−</button></td>
                                 <td class="col-sepay-content"><?= htmlspecialchars($contentShow) ?></td>
                                 <td class="nowrap col-sepay-time"><?= date('H:i:s', strtotime($r['transaction_date'])) ?></td>
                                 <td class="sum col-sepay-sum"><?= htmlspecialchars($fmtVnd((int)$r['transfer_amount'])) ?></td>
@@ -608,7 +598,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 </div>
             </div>
 
-            <div class="mid-col" id="midCol" data-help="Блок управления связями (приходы). Выбирайте чекбоксы и сопоставляйте банковские поступления с чеками Poster.">
+            <div class="mid-col" id="midCol">
                 <div class="toggle-wrap pd2-toggle-wrap" title="Lite/Full">
                     <span class="toggle-text"><span class="tt-full">Lite</span><span class="tt-short">L</span></span>
                     <label class="switch">
@@ -618,10 +608,10 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     <span class="toggle-text"><span class="tt-full">Full</span><span class="tt-short">F</span></span>
                 </div>
                 <div class="mid-col-glass">
-                    <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные" data-help-abs="Ручное связывание выбранных банковских приходов с чеками Poster.">🎯</button>
-                    <button class="mid-btn eye-toggle" id="hideLinkedBtn" type="button" title="Скрыть связанные" data-help-abs="Скрыть/показать строки, которые уже связаны.">👁</button>
-                    <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день" data-help-abs="Автоматически связать совпадающие по сумме и времени транзакции.">🧩</button>
-                    <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи" data-help-abs="Разорвать ошибочную связь у выбранных строк.">⛓️‍💥</button>
+                    <button class="mid-btn primary" id="linkMakeBtn" type="button" title="Связать выбранные">🎯</button>
+                    <button class="mid-btn eye-toggle" id="hideLinkedBtn" type="button" title="Скрыть связанные">👁</button>
+                    <button class="mid-btn" id="linkAutoBtn" type="button" title="Автосвязи за день">🧩</button>
+                    <button class="mid-btn" id="linkClearBtn" type="button" title="Разорвать связи">⛓️‍💥</button>
                     <div class="muted pd2-text-center pd2-fw-900 pd2-lh-135">
                         <div>←</div>
                         <div id="selSepaySum">0</div>
@@ -641,12 +631,9 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <span id="totalsDiff">—</span>
                     </div>
                 </div>
-                <button class="pd2-soft-reset-btn" id="clearDayBtn" type="submit" form="clearDayForm" title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстанавливаются.">
-                    <img src="/payday2/img/reset.png" alt="SoftReset">
-                </button>
             </div>
 
-            <div class="card pd2-p-0 pd2-pos-relative" data-help="Таблица чеков из Poster, оплаченных картой или чаевыми. Отражает приходы по учету.">
+            <div class="card pd2-p-0 pd2-pos-relative">
                 <div class="table-card-header pd2-card-header">
                     <div class="pd2-card-header-title">
                         <div class="pd2-ws-nowrap">Poster чеки</div>
@@ -655,7 +642,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                             <input type="hidden" name="action" value="load_poster_checks">
                             <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
                             <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
-                            <button class="btn tiny" id="posterSyncBtn" type="submit" title="Загрузить" data-help-abs="Загрузить чеки (безнал) из системы Poster.">
+                            <button class="btn tiny" id="posterSyncBtn" type="submit" title="Загрузить">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                                     <path d="M21 2v6h-6"></path>
                                     <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
@@ -755,11 +742,11 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
 
         <div class="divider"></div>
 
-        <div class="bottom-two" data-help="Блок дополнительных операций: создание сводных финансовых транзакций по итогам дня и проверка текущих балансов счетов.">
-            <div class="card card-finance" data-help="Автоматическое создание финансовых транзакций (переводов) в Poster на основе загруженных чеков.">
+        <div class="bottom-two">
+            <div class="card card-finance">
                 <div class="pd2-justify-between pd2-align-center pd2-d-flex pd2-mb-10">
                     <div class="pd2-fw-900">Финансовые транзакции</div>
-                    <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить" data-help-abs="Обновить статусы созданных финансовых транзакций.">
+                    <button class="btn tiny" id="finance-refresh-all" type="button" title="Обновить">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                             <path d="M21 2v6h-6"></path>
                             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
@@ -922,12 +909,12 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     </div></form>
             </div>
         </div>
-        <div class="card card-balances" data-help="Сводка текущих балансов по счетам в Poster. Позволяет контролировать расхождения между расчетным и фактическим балансом.">
+        <div class="card card-balances">
             <div class="pd2-justify-between pd2-align-center pd2-d-flex pd2-gap-10 pd2-mb-10 pd2-flex-wrap">
                 <div class="pd2-fw-900">Итоговый баланс</div>
                 <div class="pd2-d-flex pd2-gap-8 pd2-align-center pd2-ml-auto">
-                    <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD" data-help-abs="Сохранить/загрузить фактические балансы (если предусмотрено API).">UPLD</button>
-                    <button class="btn tiny pd2-p-4-10" id="posterAccountsBtn" type="button" title="Обновить балансы" data-help-abs="Обновить текущие балансы счетов из Poster.">
+                    <button class="btn tiny" id="balanceSyncBtn" type="button" title="UPLD">UPLD</button>
+                    <button class="btn tiny pd2-p-4-10" id="posterAccountsBtn" type="button" title="Обновить балансы">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pd2-v-align-mid">
                             <path d="M21 2v6h-6"></path>
                             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
@@ -935,7 +922,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                             <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
                         </svg>
                     </button>
-                    <button class="btn tiny pd2-p-4-10" id="posterBalancesTelegramBtn" type="button" title="Отправить в Telegram" data-help-abs-right="Отправить итоговый отчет по балансам в привязанный Telegram-чат.">
+                    <button class="btn tiny pd2-p-4-10" id="posterBalancesTelegramBtn" type="button" title="Отправить в Telegram">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="#0088cc" class="pd2-v-align-mid pd2-mt-n2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.42.91-4.01 2.66-.38.26-.72.39-1.03.38-.34-.01-1-.19-1.48-.35-.59-.19-1.05-.29-1.01-.61.02-.17.29-.35.81-.54 3.17-1.38 5.28-2.29 6.33-2.73 3.01-1.26 3.63-1.48 4.04-1.48.09 0 .29.02.4.11.09.07.12.16.13.25.01.12.02.26.01.37z"/></svg></button>
                 </div>
             </div>
@@ -1024,7 +1011,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
     <div class="confirm-modal pd2-modal-content" role="dialog">
         <div class="pd2-modal-header">
             <h3 class="pd2-m-0">KashShift</h3>
-            <button type="button" class="pd2-modal-close" id="kashshiftClose">✕</button>
+            <button type="button" class="btn2 pd2-modal-close" id="kashshiftClose">✕</button>
         </div>
         <div class="body pd2-modal-body" id="kashshiftBody">
             <div class="pd2-text-center">Загрузка...</div>
@@ -1036,7 +1023,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
     <div class="confirm-modal pd2-modal-content" role="dialog">
         <div class="pd2-modal-header">
             <h3 class="pd2-m-0">Supplies</h3>
-            <button type="button" class="pd2-modal-close" id="suppliesClose">✕</button>
+            <button type="button" class="btn2 pd2-modal-close" id="suppliesClose">✕</button>
         </div>
         <div class="body pd2-modal-body" id="suppliesBody">
             <div class="pd2-text-center">Загрузка...</div>
@@ -1044,76 +1031,51 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
     </div>
 </div>
 
-            <!-- Модалка создания транзакции -->
-            <div class="confirm-backdrop pd2-modal-backdrop" id="createTxModal">
-                <div class="confirm-modal pd2-modal-content" role="dialog" style="max-width: 400px;">
-                    <div class="pd2-modal-header">
-                        <h3 class="pd2-m-0">Новая транзакция</h3>
-                        <button type="button" class="pd2-modal-close" id="createTxClose">✕</button>
-                    </div>
-                    <div class="body pd2-modal-body pd2-p-15">
-                        <form id="createTxForm">
-                            <div class="pd2-mb-10">
-                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Дата и время</label>
-                                <div class="pd2-d-flex pd2-gap-10">
-                                    <input type="date" id="createTxDate" class="btn pd2-w-100" required>
-                                    <input type="time" id="createTxTime" class="btn pd2-w-100" required>
-                                </div>
-                            </div>
-                            <div class="pd2-mb-10">
-                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Тип</label>
-                                <select id="createTxType" class="btn pd2-w-100">
-                                    <option value="2">Расход</option>
-                                    <option value="1">Приход</option>
-                                    <option value="3">Перевод</option>
-                                </select>
-                            </div>
-                            <div class="pd2-mb-10" id="createTxAccountFromWrap">
-                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Счет списания</label>
-                                <select id="createTxAccountFrom" class="btn pd2-w-100"></select>
-                            </div>
-                            <div class="pd2-mb-10 pd2-d-none" id="createTxAccountToWrap">
-                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Счет пополнения</label>
-                                <select id="createTxAccountTo" class="btn pd2-w-100"></select>
-                            </div>
-                            <div class="pd2-mb-10">
-                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Сумма (VND)</label>
-                                <input type="number" id="createTxAmount" class="btn pd2-w-100" step="1" min="1" required>
-                            </div>
-                            <div class="pd2-mb-10">
-                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Категория</label>
-                                <select id="createTxCategory" class="btn pd2-w-100"></select>
-                            </div>
-                            <div class="pd2-mb-10">
-                                <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Комментарий</label>
-                                <input type="text" id="createTxComment" class="btn pd2-w-100">
-                            </div>
-                            <div id="createTxError" class="error pd2-d-none pd2-mb-10"></div>
-                            <button type="submit" class="btn primary pd2-w-100 pd2-fw-900" id="createTxSubmitBtn">Создать</button>
-                        </form>
-                    </div>
-                </div>
+<div class="confirm-backdrop pd2-modal-backdrop" id="checkModal">
+    <div class="confirm-modal pd2-modal-content" role="dialog" aria-modal="true" aria-labelledby="checkModalTitle">
+        <div class="pd2-modal-header">
+            <h3 id="checkModalTitle" class="pd2-m-0">Чек</h3>
+            <button type="button" class="btn2 pd2-modal-close" id="checkModalClose">✕</button>
+        </div>
+        <div class="body pd2-modal-body">
+            <div class="pd2-check-row">
+                <label class="pd2-check-label">НОМЕР ЧЕКА
+                    <input type="number" class="btn pd2-w-100" id="checkTxId" inputmode="numeric" min="1" step="1" autocomplete="off">
+                </label>
+                <button type="button" class="btn2 primary pd2-min-w-140" id="checkFindBtn">Показать</button>
             </div>
+            <div id="checkErr" class="error pd2-settings-err pd2-d-none"></div>
+            <div id="checkResult" class="pd2-check-result pd2-d-none"></div>
+        </div>
+        <div class="actions pd2-justify-between">
+            <div></div>
+            <button type="button" class="btn2 pd2-btn-danger" id="checkDeleteBtn" disabled>Удалить</button>
+        </div>
+    </div>
+</div>
 
-            <!-- Модалка успешного создания транзакции -->
-            <div class="confirm-backdrop pd2-modal-backdrop" id="createTxSuccessModal">
-                <div class="confirm-modal pd2-modal-content" role="dialog" style="max-width: 400px;">
-                    <div class="pd2-modal-header">
-                        <h3 class="pd2-m-0">Успешно</h3>
-                        <button type="button" class="pd2-modal-close" id="createTxSuccessClose">✕</button>
-                    </div>
-                    <div class="body pd2-modal-body pd2-p-15 pd2-text-center">
-                        <div class="pd2-mb-15 pd2-fs-16" id="createTxSuccessTitle">
-                            Транзакция успешно создана в Poster!
-                        </div>
-                        <div id="createTxSuccessDetails" class="muted pd2-mb-15"></div>
-                    </div>
-                </div>
-            </div>
+<div class="confirm-backdrop pd2-modal-backdrop pd2-modal-backdrop-top" id="checkDeleteConfirm">
+    <div class="confirm-modal pd2-modal-content pd2-confirm-small" role="dialog" aria-modal="true" aria-labelledby="checkDeleteConfirmTitle">
+        <div class="pd2-modal-header">
+            <h3 id="checkDeleteConfirmTitle" class="pd2-m-0">ТОЧНО УДАЛИТЬ</h3>
+            <button type="button" class="btn2 pd2-modal-close" id="checkDeleteConfirmClose">✕</button>
+        </div>
+        <div class="body pd2-modal-body">
+            <div class="pd2-text-center">Удалить чек <span id="checkDeleteConfirmId"></span>?</div>
+        </div>
+        <div class="actions pd2-justify-center">
+            <button type="button" class="btn2" id="checkDeleteCancel">Отмена</button>
+            <button type="button" class="btn2 pd2-btn-danger" id="checkDeleteOk">Удалить</button>
+        </div>
+    </div>
+</div>
 
             <div class="confirm-backdrop" id="financeConfirm">
                 <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="financeConfirmTitle">
-                    <h3 id="financeConfirmTitle">Подтверждение</h3>
+                    <div class="pd2-modal-header">
+                        <h3 id="financeConfirmTitle" class="pd2-m-0">Подтверждение</h3>
+                        <button type="button" class="btn2 pd2-modal-close" id="financeConfirmClose">✕</button>
+                    </div>
                     <div class="body" id="financeConfirmText"></div>
                     <div class="sub">
                         <label class="pd2-finance-confirm-label">
@@ -1131,62 +1093,51 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 <div class="confirm-modal pd2-settings-modal" role="dialog" aria-modal="true" aria-labelledby="payday2SettingsTitle">
                     <div class="pd2-modal-header">
                         <h3 id="payday2SettingsTitle" class="pd2-m-0">Настройки Payday2</h3>
-                        <button type="button" class="pd2-modal-close" id="payday2SettingsClose">✕</button>
+                        <button type="button" class="btn2 pd2-modal-close" id="payday2SettingsClose">✕</button>
                     </div>
                     <p class="muted pd2-fs-12 pd2-mb-10">Сохраняется в <code>payday2/local_config.json</code> на сервере.</p>
+                    <p class="pd2-settings-warn">НЕ МЕНЯЙ, ЕСЛИ НЕ ЗНАЕШЬ ЧТО ЭТО</p>
                     <div class="pd2-settings-fields">
-                        
-                        <details class="pd2-settings-spoiler pd2-mb-10">
-                            <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Телеграм</summary>
-                            <div class="pd2-d-flex pd2-gap-10 pd2-mt-10 pd2-align-center">
-                                <label class="pd2-settings-label pd2-m-0 pd2-w-100">chat_id
-                                    <input type="text" class="btn pd2-w-100" id="pd2sett_tg_chat" autocomplete="off">
-                                </label>
-                                <label class="pd2-settings-label pd2-m-0 pd2-w-100">message_thread_id
-                                    <input type="text" class="btn pd2-w-100" id="pd2sett_tg_thread" autocomplete="off" placeholder="пусто = без темы">
-                                </label>
-                            </div>
-                        </details>
-
-                        <details class="pd2-settings-spoiler pd2-mb-10">
-                            <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Постер</summary>
-                            <div class="pd2-settings-grid-5 pd2-mt-10">
-                                <label class="pd2-settings-label pd2-m-0"><span>user_id</span>
-                                    <input type="number" class="btn pd2-w-100" id="pd2sett_svc_user" min="1" step="1">
-                                </label>
-                                <label class="pd2-settings-label pd2-m-0"><span>Andrey (ID)</span>
-                                    <input type="number" class="btn pd2-w-100" id="pd2sett_acc_andrey" min="1" step="1">
-                                </label>
-                                <label class="pd2-settings-label pd2-m-0"><span>Tips (ID)</span>
-                                    <input type="number" class="btn pd2-w-100" id="pd2sett_acc_tips" min="1" step="1">
-                                </label>
-                                <label class="pd2-settings-label pd2-m-0"><span>Vietnam (ID)</span>
-                                    <input type="number" class="btn pd2-w-100" id="pd2sett_acc_vietnam" min="1" step="1">
-                                </label>
-                                <label class="pd2-settings-label pd2-m-0"><span>Чай (ID)</span>
-                                    <input type="number" class="btn pd2-w-100" id="pd2sett_balance_sinc" min="1" step="1">
-                                </label>
-                            </div>
-                        </details>
-
-                        <details class="pd2-settings-spoiler pd2-mb-10" id="pd2sett_categories_spoiler">
-                            <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Категории</summary>
-                            <div id="pd2sett_categories_list" class="pd2-mt-10 pd2-d-flex pd2-flex-column pd2-gap-6" style="max-height: 200px; overflow-y: auto;">
-                                <div class="pd2-text-center muted">Загрузка категорий...</div>
-                            </div>
-                        </details>
-
+                        <label class="pd2-settings-label">Telegram chat_id
+                            <input type="text" class="btn pd2-w-100" id="pd2sett_tg_chat" autocomplete="off">
+                        </label>
+                        <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left pd2-lh-135">
+                            Для супергрупп и каналов в Bot API используется формат <strong>-100…</strong>: к числу из ссылки
+                            <code>t.me/c/3889942420/…</code> (часть после <code>/c/</code>) добавляют префикс <code>-100</code>, получается например <code>-1003889942420</code>.
+                            Число без минуса или с другим префиксом — это другой тип чата; бот должен быть <strong>участником</strong> этой группы.
+                        </p>
+                        <p class="muted pd2-fs-12 pd2-mb-10 pd2-text-left pd2-lh-135">
+                            Для форумов: <code>message_thread_id</code> — это ID <strong>темы</strong> (topic), не номер сообщения в ссылке. Ошибка «chat not found» чаще из‑за неверного <code>chat_id</code>.
+                        </p>
+                        <div class="pd2-settings-row-2">
+                            <label class="pd2-settings-label pd2-mb-0">Telegram message_thread_id
+                                <input type="text" class="btn pd2-w-100" id="pd2sett_tg_thread" autocomplete="off" placeholder="пусто = без темы">
+                            </label>
+                            <label class="pd2-settings-label pd2-mb-0">Poster service user_id
+                                <input type="number" class="btn pd2-w-100" id="pd2sett_svc_user" min="1" step="1">
+                            </label>
+                        </div>
+                        <div class="pd2-settings-label pd2-text-left pd2-mt-6">Счета в Poster (ID)</div>
+                        <div class="pd2-settings-grid-4">
+                            <label>Andrey <input type="number" class="btn pd2-w-100" id="pd2sett_acc_andrey" min="1" step="1"></label>
+                            <label>Tips <input type="number" class="btn pd2-w-100" id="pd2sett_acc_tips" min="1" step="1"></label>
+                            <label>Vietnam <input type="number" class="btn pd2-w-100" id="pd2sett_acc_vietnam" min="1" step="1"></label>
+                            <label>Чай <input type="number" class="btn pd2-w-100" id="pd2sett_balance_sinc" min="1" step="1"></label>
+                        </div>
                     </div>
                     <div id="payday2SettingsErr" class="error pd2-settings-err pd2-d-none"></div>
-                    <div class="actions pd2-justify-between pd2-align-center pd2-mt-6">
-                        <p class="pd2-settings-warn pd2-m-0">НЕ МЕНЯЙ, ЕСЛИ НЕ ЗНАЕШЬ ЧТО ЭТО</p>
+                    <div class="actions pd2-justify-center pd2-mt-6">
+                        <button type="button" class="btn2" id="payday2SettingsCancel">Отмена</button>
                         <button type="button" class="btn2 primary" id="payday2SettingsSave">Сохранить</button>
                     </div>
                 </div>
             </div>
-            <div class="confirm-backdrop" id="payday2InfoModal">
-                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2InfoModalTitle">
-                    <h3 id="payday2InfoModalTitle" class="pd2-m-0">Payday2</h3>
+            <div class="confirm-backdrop" id="payday2BetaModal">
+                <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="payday2BetaModalTitle">
+                    <div class="pd2-modal-header">
+                        <h3 id="payday2BetaModalTitle" class="pd2-m-0">Payda2beta</h3>
+                        <button type="button" class="btn2 pd2-modal-close" id="payday2BetaModalCloseX">✕</button>
+                    </div>
                     <div class="body pd2-text-center pd2-lh-135">
                         Это обновленная и оптимизированная версия payday.
                         <br><br>
@@ -1194,15 +1145,13 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     </div>
                     <div class="actions pd2-justify-center">
                         <a href="/payday/" class="btn2 primary pd2-inline-flex pd2-text-dec-none pd2-min-w-140 pd2-justify-center">Payday</a>
-                        <button type="button" class="btn2 pd2-min-w-140" id="payday2InfoModalClose">Закрыть</button>
+                        <button type="button" class="btn2 pd2-min-w-140" id="payday2BetaModalClose">Закрыть</button>
                     </div>
                 </div>
             </div>
             
 <script type="application/json" id="payday2-config-json"><?= json_encode($payday2ClientConfig, $payday2ConfigJsonFlags) ?></script>
 <script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
-<script src="/payday2/assets/js/payday2_create_tx.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
-<script src="/payday2/assets/js/payday2_help_tour.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 </body>
 </html>
