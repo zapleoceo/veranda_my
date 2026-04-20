@@ -135,7 +135,7 @@
                 </label>
                 <label>
                     Сумма (VND)
-                    <input type="number" id="payExtraAmount" min="1" step="1" inputmode="numeric">
+                    <input type="text" id="payExtraAmount" inputmode="numeric" autocomplete="off">
                 </label>
             </div>
             <label>
@@ -269,7 +269,7 @@
 <script>
 window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 </script>
-<script src="/employees/script.js?v=20260420_0004" defer></script>
+<script src="/employees/script.js?v=20260420_0005" defer></script>
 <script src="/assets/user_menu.js" defer></script>
 </body>
 </html>
