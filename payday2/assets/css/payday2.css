@@ -470,8 +470,7 @@ tr.row-red .out-create-poster-tx-btn {
 
 #checkFinderModal .pd2-modal-content,
 #checkFinderModal .pd2-check-th,
-#checkFinderModal .pd2-check-td,
-#checkFinderModal input.btn {
+#checkFinderModal .pd2-check-td {
     text-align: right;
 }
 
@@ -489,6 +488,11 @@ tr.row-red .out-create-poster-tx-btn {
     background: #dc2626 !important;
     border-color: #dc2626 !important;
     color: #fff !important;
+}
+
+#checkFinderModal .pd2-check-search-input {
+    width: 100px;
+    text-align: left;
 }
 
 #payday2SettingsBtn:not(:disabled):hover {
