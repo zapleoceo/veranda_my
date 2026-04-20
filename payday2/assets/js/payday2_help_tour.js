@@ -66,6 +66,14 @@
             placement: 'bottom-right',
         },
         {
+            key: 'checks',
+            tab: 'in',
+            selector: '#payday2CheckFinderBtn',
+            title: 'Чеки',
+            text: 'Открывает список чеков за выбранный период. Есть живой поиск по тексту, сортировка по клику на заголовок столбца, просмотр состава и удаление чека (с уведомлением в Telegram).',
+            placement: 'bottom-right',
+        },
+        {
             key: 'tabs',
             tab: 'in',
             selector: '.tabs',
@@ -472,4 +480,3 @@
 
     window.PD2HelpTour = { start, stop };
 })();
-
