@@ -78,6 +78,7 @@
             const tgEl = document.getElementById('permTgUsername');
             const cancel = document.getElementById('permCancel');
             if (!modal || !form || !emailEl || !tgEl || !cancel) return;
+            const openClass = 'is-open';
 
             const defaultPerms = {
                 dashboard: false,
@@ -91,7 +92,10 @@
                 exclude_toggle: false,
             };
 
-            const close = () => { modal.style.display = 'none'; };
+            const close = () => {
+                modal.classList.remove(openClass);
+                modal.setAttribute('aria-hidden', 'true');
+            };
             const open = (email, perms, tg) => {
                 emailEl.value = email;
                 tgEl.value = (tg || '').trim();
@@ -102,7 +106,8 @@
                     const k = String(cb.id).slice('perm_'.length);
                     cb.checked = !!p[k];
                 });
-                modal.style.display = 'flex';
+                modal.classList.add(openClass);
+                modal.setAttribute('aria-hidden', 'false');
             };
 
             document.addEventListener('click', (e) => {
@@ -115,10 +120,10 @@
                 open(email, perms, tg);
             });
             modal.addEventListener('click', (e) => {
-                if (e.target.classList.contains('perm-modal-backdrop')) close();
+                if (e.target.classList.contains('perm-modal-backdrop') || e.target === modal) close();
             });
             cancel.addEventListener('click', close);
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') close();
+                if (e.key === 'Escape' && modal.classList.contains(openClass)) close();
             });
         })();

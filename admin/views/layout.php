@@ -7,7 +7,7 @@
     <title>Админ-панель</title>
     <link rel="stylesheet" href="/assets/app.css?v=11">
     <link rel="stylesheet" href="/assets/css/common.css?v=1">
-    <link rel="stylesheet" href="/admin/assets/css/admin.css?v=2">
+    <link rel="stylesheet" href="/admin/assets/css/admin.css?v=20260419_0001">
 </head>
 <body>
 
@@ -52,7 +52,7 @@
 <script src="/assets/app.js?v=2" defer></script>
 <script src="/admin/assets/js/common.js?v=1" defer></script>
 <?php if (file_exists(__DIR__ . '/../assets/js/' . $tab . '.js')): ?>
-    <script src="/admin/assets/js/<?= $tab ?>.js?v=1" defer></script>
+    <script src="/admin/assets/js/<?= $tab ?>.js?v=20260419_0001" defer></script>
 <?php endif; ?>
 <script src="/assets/user_menu.js" defer></script>
 </body>
