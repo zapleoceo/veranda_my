@@ -1077,8 +1077,11 @@
     if (payExtraEmp) payExtraEmp.addEventListener('change', refreshPayExtraComment);
     if (payExtraAmount) {
         payExtraAmount.addEventListener('input', applyPayExtraAmountFormatting);
-        payExtraAmount.addEventListener('paste', () => {
-            setTimeout(applyPayExtraAmountFormatting, 0);
+        payExtraAmount.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const text = (e.clipboardData && e.clipboardData.getData && e.clipboardData.getData('text')) || '';
+            const digits = payExtraAmountDigits(text);
+            payExtraAmount.value = formatPayExtraAmount(digits);
         });
     }
     if (payExtraKind) payExtraKind.addEventListener('change', () => {
