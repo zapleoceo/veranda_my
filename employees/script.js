@@ -1000,6 +1000,22 @@
         payExtraComment.value = uid ? buildPayComment(String(payExtraKind.value || 'tips'), uid, name) : '';
     };
 
+    const payExtraAmountDigits = (value) => String(value || '').replace(/\D+/g, '');
+    const formatPayExtraAmount = (value) => {
+        const digits = payExtraAmountDigits(value);
+        if (!digits) return '';
+        return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    };
+    const readPayExtraAmount = () => {
+        if (!payExtraAmount) return 0;
+        const digits = payExtraAmountDigits(payExtraAmount.value);
+        return Math.round(Number(digits || 0) || 0);
+    };
+    const applyPayExtraAmountFormatting = () => {
+        if (!payExtraAmount) return;
+        payExtraAmount.value = formatPayExtraAmount(payExtraAmount.value);
+    };
+
     const fillPayExtraEmployees = () => {
         if (!payExtraEmp) return;
         payExtraEmp.innerHTML = '';
@@ -1057,6 +1073,12 @@
     if (payExtraCancel) payExtraCancel.addEventListener('click', closePayExtra);
     if (payExtraModal) payExtraModal.addEventListener('click', (e) => { if (e.target === payExtraModal) closePayExtra(); });
     if (payExtraEmp) payExtraEmp.addEventListener('change', refreshPayExtraComment);
+    if (payExtraAmount) {
+        payExtraAmount.addEventListener('input', applyPayExtraAmountFormatting);
+        payExtraAmount.addEventListener('paste', () => {
+            setTimeout(applyPayExtraAmountFormatting, 0);
+        });
+    }
     if (payExtraKind) payExtraKind.addEventListener('change', () => {
         refreshPayExtraComment();
         if (payExtraAccount) {
@@ -1070,7 +1092,7 @@
         if (payExtraSubmitting || payExtraOpening) return;
         const uid = Number(payExtraEmp.value || 0);
         const kind = String(payExtraKind.value || 'tips');
-        const amount = Math.round(Number(payExtraAmount.value || 0) || 0);
+        const amount = readPayExtraAmount();
         const accountFrom = Number(payExtraAccount.value || 0);
         const row = dataRows.find((x) => Number(x.user_id) === uid);
         const empName = row ? String(row.name || '').trim() : '';
