@@ -73,11 +73,12 @@
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
     const accountTagById = (acc) => {
-        const a = Number(acc || 0) || 0;
-        if (a === 1) return '<span class="paid-tag">QR</span>';
-        if (a === 2) return '<span class="paid-tag">КЕШ</span>';
-        if (a === 9) return '<span class="paid-tag">VC</span>';
-        if (a === 8) return '<span class="paid-tag">QR</span>';
+        const raw = String(acc ?? '').trim();
+        const a = Number(raw) || 0;
+        const labels = { 1: 'QR', 2: 'КЕШ', 8: 'QR', 9: 'VC' };
+        if (a > 0 && Object.prototype.hasOwnProperty.call(labels, a)) {
+            return '<span class="paid-tag">' + labels[a] + '</span>';
+        }
         if (a > 0) return '<span class="paid-tag">#' + String(a) + '</span>';
         return '';
     };
