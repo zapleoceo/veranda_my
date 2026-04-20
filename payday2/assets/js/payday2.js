@@ -2724,6 +2724,41 @@ window.initPayday2 = function() {
     };
 
     let checksAll = [];
+    const checkSort = { key: '', dir: 'asc' };
+
+    const getCheckSumValue = (c) => {
+        const payedNum = Number(c && c.payed_sum != null ? c.payed_sum : 0) || 0;
+        const v = (payedNum > 0 && c && c.payed_sum != null) ? c.payed_sum : (c ? c.sum : 0);
+        return Number(v || 0) || 0;
+    };
+
+    const sortChecks = (list) => {
+        const key = String(checkSort.key || '');
+        if (!key) return list;
+        const dirMul = checkSort.dir === 'desc' ? -1 : 1;
+        const arr = (Array.isArray(list) ? list : []).map((x, i) => ({ x, i }));
+        const cmpNum = (a, b) => (a - b) * dirMul;
+        const cmpStr = (a, b) => String(a || '').localeCompare(String(b || ''), 'ru', { sensitivity: 'base' }) * dirMul;
+        arr.sort((aa, bb) => {
+            const a = aa.x;
+            const b = bb.x;
+            let r = 0;
+            if (key === 'transaction_id') r = cmpNum(Number(a?.transaction_id || 0) || 0, Number(b?.transaction_id || 0) || 0);
+            else if (key === 'table') r = cmpStr(a?.table_title || '', b?.table_title || '');
+            else if (key === 'sum') r = cmpNum(getCheckSumValue(a), getCheckSumValue(b));
+            else if (key === 'status') r = cmpNum(Number(a?.status || 0) || 0, Number(b?.status || 0) || 0);
+            else if (key === 'pay_type') r = cmpStr(
+                (Number(a?.status || 0) === 2) ? payTypeLabel(a?.pay_type) : '',
+                (Number(b?.status || 0) === 2) ? payTypeLabel(b?.pay_type) : ''
+            );
+            if (r !== 0) return r;
+            return aa.i - bb.i;
+        });
+        return arr.map((o) => o.x);
+    };
+
+    const sortMark = (key) => (checkSort.key === key ? (checkSort.dir === 'asc' ? ' ▲' : ' ▼') : '');
+
     const renderChecks = (list) => {
         const arr = Array.isArray(list) ? list : [];
         if (!checkFinderResult) return;
@@ -2732,11 +2767,11 @@ window.initPayday2 = function() {
             return;
         }
         let html = '<div style="overflow-x:auto;"><table class="pd2-check-table"><thead><tr>';
-        html += '<th class="pd2-check-th">Чек</th>';
-        html += '<th class="pd2-check-th">Стол</th>';
-        html += '<th class="pd2-check-th">Сумма</th>';
-        html += '<th class="pd2-check-th">Статус</th>';
-        html += '<th class="pd2-check-th">Тип оплаты</th>';
+        html += '<th class="pd2-check-th" data-sort="transaction_id">Чек' + sortMark('transaction_id') + '</th>';
+        html += '<th class="pd2-check-th" data-sort="table">Стол' + sortMark('table') + '</th>';
+        html += '<th class="pd2-check-th" data-sort="sum">Сумма' + sortMark('sum') + '</th>';
+        html += '<th class="pd2-check-th" data-sort="status">Статус' + sortMark('status') + '</th>';
+        html += '<th class="pd2-check-th" data-sort="pay_type">Тип оплаты' + sortMark('pay_type') + '</th>';
         html += '</tr></thead><tbody>';
         arr.forEach((c) => {
             const id = Number(c && c.transaction_id ? c.transaction_id : 0) || 0;
@@ -2796,10 +2831,10 @@ window.initPayday2 = function() {
     const filterAndRender = () => {
         const q = String(checkFinderNumber ? checkFinderNumber.value : '').trim().toLowerCase();
         if (!q) {
-            renderChecks(checksAll);
+            renderChecks(sortChecks(checksAll));
             return;
         }
-        renderChecks(checksAll.filter((c) => {
+        const filtered = checksAll.filter((c) => {
             const id = c && c.transaction_id != null ? String(c.transaction_id) : '';
             const tableTitle = c && c.table_title ? String(c.table_title) : '';
             const status = statusLabel(c && c.status != null ? c.status : 0);
@@ -2810,7 +2845,8 @@ window.initPayday2 = function() {
             const dateClose = c && c.date_close ? String(c.date_close) : '';
             const hay = (id + ' ' + tableTitle + ' ' + sumTxt + ' ' + status + ' ' + payType + ' ' + dateClose).toLowerCase();
             return hay.indexOf(q) !== -1;
-        }));
+        });
+        renderChecks(sortChecks(filtered));
     };
 
     const loadChecks = async () => {
@@ -2881,6 +2917,16 @@ window.initPayday2 = function() {
         if (checkFinderResult) {
             checkFinderResult.addEventListener('click', (e) => {
                 const trg = e.target;
+                const th = trg && trg.closest ? trg.closest('th[data-sort]') : null;
+                if (th) {
+                    const key = String(th.getAttribute('data-sort') || '');
+                    if (key) {
+                        if (checkSort.key === key) checkSort.dir = (checkSort.dir === 'asc') ? 'desc' : 'asc';
+                        else { checkSort.key = key; checkSort.dir = 'asc'; }
+                        filterAndRender();
+                    }
+                    return;
+                }
                 const delBtn = trg && trg.closest ? trg.closest('.pd2-check-del-btn') : null;
                 if (delBtn) {
                     const id = Number(delBtn.getAttribute('data-del-check') || 0) || 0;

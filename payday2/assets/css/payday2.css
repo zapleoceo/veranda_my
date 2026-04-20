@@ -475,6 +475,11 @@ tr.row-red .out-create-poster-tx-btn {
     text-align: right;
 }
 
+#checkFinderModal .pd2-check-th[data-sort] {
+    cursor: pointer;
+    user-select: none;
+}
+
 #payday2SettingsBtn:not(:disabled):hover {
     background-color: #ef4444 !important;
     border-color: #ef4444 !important;
