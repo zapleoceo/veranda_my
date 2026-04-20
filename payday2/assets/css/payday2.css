@@ -494,6 +494,11 @@ tr.row-red .out-create-poster-tx-btn {
     width: 100px;
     text-align: left;
 }
+#checkFinderModal .pd2-check-search-input:focus {
+    outline: none;
+    border-color: #fff;
+    box-shadow: 0 0 0 2px #fff;
+}
 
 #payday2SettingsBtn:not(:disabled):hover {
     background-color: #ef4444 !important;
@@ -508,5 +513,5 @@ tr.row-red .out-create-poster-tx-btn {
 .pd2-check-row-s2 > .pd2-check-td { background: rgba(16,185,129,0.22); }
 .pd2-check-row-s3 > .pd2-check-td { background: rgba(239,68,68,0.14); }
 
-#checkFinderModal .pd2-modal-body { overflow-x: auto; }
+#checkFinderModal .pd2-modal-body { overflow-x: auto; padding-right: 5px !important; }
 #checkFinderModal .pd2-check-table { width: max-content; }
