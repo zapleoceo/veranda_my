@@ -468,6 +468,13 @@ tr.row-red .out-create-poster-tx-btn {
     color: var(--text, #111827);
 }
 
+#checkFinderModal .pd2-modal-content,
+#checkFinderModal .pd2-check-th,
+#checkFinderModal .pd2-check-td,
+#checkFinderModal input.btn {
+    text-align: right;
+}
+
 #payday2SettingsBtn:not(:disabled):hover {
     background-color: #ef4444 !important;
     border-color: #ef4444 !important;

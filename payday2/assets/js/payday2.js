@@ -2749,7 +2749,6 @@ window.initPayday2 = function() {
             const status = Number(c && c.status != null ? c.status : 0) || 0;
             const payType = status === 2 ? payTypeLabel(c && c.pay_type != null ? c.pay_type : 0) : '';
             const statusTxt = statusLabel(status);
-            const dateClose = c && c.date_close ? String(c.date_close) : '';
             const products = Array.isArray(c && c.products ? c.products : null) ? c.products : [];
             const rowCls = status === 2 ? ' pd2-check-row-s2' : (status === 3 ? ' pd2-check-row-s3' : '');
             html += '<tr class="pd2-check-row-trigger' + rowCls + '" data-check-id="' + escapeHtml(String(id)) + '" style="cursor:pointer;">';
@@ -2761,7 +2760,6 @@ window.initPayday2 = function() {
             html += '</tr>';
 
             html += '<tr class="pd2-check-row-details pd2-d-none" data-check-details="' + escapeHtml(String(id)) + '"><td class="pd2-check-td" colspan="5">';
-            html += '<div class="muted" style="margin-bottom:8px;">date_close: ' + escapeHtml(dateClose || '—') + '</div>';
             html += '<div style="font-weight:900; margin-bottom:6px;">Состав</div>';
             if (!products.length) {
                 html += '<div class="muted">Нет продуктов</div>';
