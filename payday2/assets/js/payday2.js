@@ -2640,6 +2640,176 @@ window.initPayday2 = function() {
             }
         });
     }
+
+    const checkFinderBtn = document.getElementById('payday2CheckFinderBtn');
+    const checkFinderModal = document.getElementById('checkFinderModal');
+    const checkFinderClose = document.getElementById('checkFinderClose');
+    const checkFinderNumber = document.getElementById('checkFinderNumber');
+    const checkFinderSearchBtn = document.getElementById('checkFinderSearchBtn');
+    const checkFinderError = document.getElementById('checkFinderError');
+    const checkFinderResult = document.getElementById('checkFinderResult');
+    const checkFinderActions = document.getElementById('checkFinderActions');
+    const checkFinderDeleteBtn = document.getElementById('checkFinderDeleteBtn');
+    let checkFinderFoundId = 0;
+
+    const checkFinderShowError = (msg) => {
+        if (!checkFinderError) return;
+        if (!msg) {
+            checkFinderError.textContent = '';
+            checkFinderError.classList.add('pd2-d-none');
+        } else {
+            checkFinderError.textContent = msg;
+            checkFinderError.classList.remove('pd2-d-none');
+        }
+    };
+
+    const checkFinderReset = () => {
+        checkFinderFoundId = 0;
+        checkFinderShowError('');
+        if (checkFinderResult) checkFinderResult.innerHTML = '';
+        if (checkFinderActions) checkFinderActions.classList.add('pd2-d-none');
+    };
+
+    const openCheckFinder = () => {
+        if (!checkFinderModal) return;
+        checkFinderReset();
+        checkFinderModal.style.display = 'flex';
+        if (checkFinderNumber) {
+            checkFinderNumber.value = '';
+            checkFinderNumber.focus();
+        }
+    };
+
+    const closeCheckFinder = () => {
+        if (!checkFinderModal) return;
+        checkFinderModal.style.display = 'none';
+        checkFinderReset();
+    };
+
+    const getCurrentRange = () => {
+        const dFromEl = document.querySelector('input[name="dateFrom"]');
+        const dToEl = document.querySelector('input[name="dateTo"]');
+        const dFrom = (dFromEl && dFromEl.value) ? String(dFromEl.value) : String(window.PAYDAY_CONFIG?.dateFrom || '');
+        const dToRaw = (dToEl && dToEl.value) ? String(dToEl.value) : String(window.PAYDAY_CONFIG?.dateTo || '');
+        const dTo = dToRaw || dFrom;
+        return { dFrom, dTo };
+    };
+
+    const renderCheckProducts = (products) => {
+        const arr = Array.isArray(products) ? products : [];
+        if (!arr.length) return '<div class="muted">Нет продуктов</div>';
+        let html = '<div style="overflow-x:auto;"><table class="pd2-check-table"><thead><tr>';
+        html += '<th class="pd2-check-th">product_id</th>';
+        html += '<th class="pd2-check-th">mod_id</th>';
+        html += '<th class="pd2-check-th">num</th>';
+        html += '<th class="pd2-check-th">sum</th>';
+        html += '</tr></thead><tbody>';
+        arr.forEach((p) => {
+            const pid = p && (p.product_id ?? p.productId) ? String(p.product_id ?? p.productId) : '';
+            const mid = p && (p.modification_id ?? p.modificationId) ? String(p.modification_id ?? p.modificationId) : '';
+            const num = p && (p.num ?? p.count) ? String(p.num ?? p.count) : '';
+            const sum = p && (p.product_sum ?? p.sum) ? String(p.product_sum ?? p.sum) : '';
+            html += '<tr>';
+            html += '<td class="pd2-check-td">' + escapeHtml(pid) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(mid) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(num) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(sum) + '</td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        return html;
+    };
+
+    const searchCheck = async () => {
+        checkFinderReset();
+        const raw = String(checkFinderNumber ? checkFinderNumber.value : '').trim();
+        const digits = raw.replace(/\D+/g, '');
+        const id = Number(digits || 0) || 0;
+        if (!id) {
+            checkFinderShowError('Укажите номер чека');
+            return;
+        }
+        const { dFrom, dTo } = getCurrentRange();
+        if (!dFrom || !dTo) {
+            checkFinderShowError('Не выбран период (dateFrom/dateTo)');
+            return;
+        }
+        if (checkFinderSearchBtn) checkFinderSearchBtn.disabled = true;
+        try {
+            const url =
+                '?ajax=poster_check_find' +
+                '&transaction_id=' + encodeURIComponent(String(id)) +
+                '&date_from=' + encodeURIComponent(dFrom) +
+                '&date_to=' + encodeURIComponent(dTo);
+            const j = await fetchJsonSafe(url);
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            if (!j.found) {
+                if (checkFinderResult) checkFinderResult.innerHTML = '<div class="muted">Чек не найден за выбранный период</div>';
+                return;
+            }
+            checkFinderFoundId = Number(j.transaction?.transaction_id || j.transaction_id || id) || id;
+            const tx = j.transaction || {};
+            const title = 'Чек #' + escapeHtml(String(checkFinderFoundId));
+            const closed = tx.date_close ? ('<div class="muted">date_close: ' + escapeHtml(String(tx.date_close)) + '</div>') : '';
+            const sum = (tx.sum || tx.payed_sum) ? ('<div class="muted">sum: ' + escapeHtml(String(tx.sum || tx.payed_sum)) + '</div>') : '';
+            const productsHtml = renderCheckProducts(j.products || tx.products || []);
+            if (checkFinderResult) {
+                checkFinderResult.innerHTML =
+                    '<div style="font-weight:900; margin-bottom:6px;">' + title + '</div>' +
+                    closed +
+                    sum +
+                    '<div style="margin-top:10px; font-weight:900;">products</div>' +
+                    '<div style="margin-top:6px;">' + productsHtml + '</div>';
+            }
+            if (checkFinderActions) checkFinderActions.classList.remove('pd2-d-none');
+        } catch (e) {
+            checkFinderShowError(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            if (checkFinderSearchBtn) checkFinderSearchBtn.disabled = false;
+        }
+    };
+
+    const deleteCheck = async () => {
+        const id = Number(checkFinderFoundId || 0) || 0;
+        if (!id) return;
+        if (!confirm('Удалить чек #' + String(id) + ' ?')) return;
+        checkFinderShowError('');
+        if (checkFinderDeleteBtn) checkFinderDeleteBtn.disabled = true;
+        try {
+            const r = await fetch('?ajax=poster_check_remove', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ transaction_id: id }),
+            });
+            const txt = await r.text();
+            let j = null;
+            try { j = JSON.parse(txt); } catch (_) {}
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            if (checkFinderResult) checkFinderResult.innerHTML = '<div class="pd2-check-deleted">Удалено</div>' + (checkFinderResult.innerHTML || '');
+            if (checkFinderActions) checkFinderActions.classList.add('pd2-d-none');
+        } catch (e) {
+            checkFinderShowError(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            if (checkFinderDeleteBtn) checkFinderDeleteBtn.disabled = false;
+        }
+    };
+
+    if (checkFinderBtn && checkFinderModal) {
+        checkFinderBtn.addEventListener('click', openCheckFinder);
+        if (checkFinderClose) checkFinderClose.addEventListener('click', closeCheckFinder);
+        checkFinderModal.addEventListener('click', (e) => { if (e.target === checkFinderModal) closeCheckFinder(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && checkFinderModal.style.display === 'flex') closeCheckFinder(); });
+        if (checkFinderSearchBtn) checkFinderSearchBtn.addEventListener('click', () => { searchCheck().catch(() => {}); });
+        if (checkFinderNumber) {
+            checkFinderNumber.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchCheck().catch(() => {});
+                }
+            });
+        }
+        if (checkFinderDeleteBtn) checkFinderDeleteBtn.addEventListener('click', () => { deleteCheck().catch(() => {}); });
+    }
     
     window.toggleShiftDetail = function(tr, shiftId) {
         const detailTr = document.getElementById('shift_detail_' + shiftId);

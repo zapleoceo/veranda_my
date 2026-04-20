@@ -1790,6 +1790,137 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_plan') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'poster_check_find') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $txId = (int)($_GET['transaction_id'] ?? 0);
+    $dFrom = trim((string)($_GET['date_from'] ?? ''));
+    $dTo = trim((string)($_GET['date_to'] ?? ''));
+    if ($txId <= 0 || $dFrom === '' || $dTo === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $api = new \App\Classes\PosterAPI((string)$token);
+        $page = 1;
+        $per = 1000;
+        $found = null;
+        while (true) {
+            $resp = $api->request('transactions.getTransactions', [
+                'date_from' => $dFrom,
+                'date_to' => $dTo,
+                'per_page' => $per,
+                'page' => $page,
+            ], 'GET');
+            $data = is_array($resp) ? ($resp['data'] ?? []) : [];
+            if (!is_array($data) || count($data) === 0) break;
+            foreach ($data as $row) {
+                if (!is_array($row)) continue;
+                $id = (int)($row['transaction_id'] ?? 0);
+                if ($id === $txId) {
+                    $found = $row;
+                    break 2;
+                }
+            }
+            if (count($data) < $per) break;
+            $page++;
+            if ($page > 50) break;
+        }
+        if (!is_array($found)) {
+            echo json_encode(['ok' => true, 'found' => false], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $products = [];
+        if (isset($found['products']) && is_array($found['products'])) $products = $found['products'];
+        echo json_encode(['ok' => true, 'found' => true, 'transaction' => $found, 'products' => $products], JSON_UNESCAPED_UNICODE);
+        exit;
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
+if (($_GET['ajax'] ?? '') === 'poster_check_remove') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    if (!is_array($payload)) $payload = [];
+    $txId = (int)($payload['transaction_id'] ?? 0);
+    if ($txId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        $api = new \App\Classes\PosterAPI((string)$token);
+        $spotTabletId = 1;
+        $svcUserId = \App\Payday2\LocalSettings::serviceUserId();
+        $resp = $api->request('transactions.removeTransaction', [
+            'spot_tablet_id' => $spotTabletId,
+            'transaction_id' => $txId,
+            'user_id' => $svcUserId,
+        ], 'POST');
+        $err = is_array($resp) ? (int)($resp['err_code'] ?? 0) : 0;
+        if ($err !== 0) {
+            throw new \Exception('Poster: err_code=' . $err);
+        }
+
+        $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+        $tgChatId = '-1003889942420';
+        $threadId = '1950';
+        $byEmail = trim((string)($_SESSION['user_email'] ?? ''));
+        $byName = trim((string)($_SESSION['user_name'] ?? ''));
+        $by = trim($byName . ' ' . $byEmail);
+        if ($by === '') $by = $byEmail !== '' ? $byEmail : '—';
+        $text = 'Удален чек (' . $txId . ') и кем - ' . $by;
+        $tgOk = false;
+        $tgErr = '';
+        if ($tgToken !== '') {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$tgToken}/sendMessage");
+            curl_setopt($ch, CURLOPT_POST, true);
+            $fields = [
+                'chat_id' => $tgChatId,
+                'text' => $text,
+            ];
+            if ($threadId !== '') $fields['message_thread_id'] = $threadId;
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($fields));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            $respTg = curl_exec($ch);
+            $curlErr = curl_error($ch);
+            curl_close($ch);
+            if ($respTg === false) {
+                $tgErr = $curlErr !== '' ? $curlErr : 'Telegram request failed';
+            } else {
+                $jTg = json_decode((string)$respTg, true);
+                if (is_array($jTg) && isset($jTg['ok']) && $jTg['ok']) $tgOk = true;
+                else $tgErr = is_array($jTg) ? (string)($jTg['description'] ?? 'Telegram error') : 'Telegram invalid response';
+            }
+        } else {
+            $tgErr = 'Telegram config is missing';
+        }
+
+        echo json_encode(['ok' => true, 'telegram_ok' => $tgOk, 'telegram_error' => $tgErr], JSON_UNESCAPED_UNICODE);
+        exit;
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

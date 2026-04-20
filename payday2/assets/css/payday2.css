@@ -452,8 +452,20 @@ tr.row-red .out-create-poster-tx-btn {
     color: var(--text, #111827);
 }
 #createTxModal select.btn option {
-    background: #fff;
-    color: #111827;
+    background: var(--card, #fff);
+    color: var(--text, #111827);
+}
+
+#checkFinderModal .btn,
+#checkFinderModal select.btn,
+#checkFinderModal input.btn,
+#checkFinderModal textarea.btn {
+    background: var(--card, #fff);
+    color: var(--text, #111827);
+}
+#checkFinderModal select.btn option {
+    background: var(--card, #fff);
+    color: var(--text, #111827);
 }
 
 #payday2SettingsBtn:not(:disabled):hover {
