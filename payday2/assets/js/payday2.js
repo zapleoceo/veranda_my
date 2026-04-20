@@ -2704,6 +2704,14 @@ window.initPayday2 = function() {
         return String(n);
     };
 
+    const statusLabel = (v) => {
+        const n = Number(v || 0) || 0;
+        if (n === 1) return '1 — открыт';
+        if (n === 2) return '2 — закрыт';
+        if (n === 3) return '3 — удален';
+        return String(n || '');
+    };
+
     const fmtDec = (v) => {
         const n = Number(v);
         if (!isFinite(n)) return '';
@@ -2723,6 +2731,7 @@ window.initPayday2 = function() {
         html += '<th class="pd2-check-th">table_id</th>';
         html += '<th class="pd2-check-th">sum</th>';
         html += '<th class="pd2-check-th">payed_sum</th>';
+        html += '<th class="pd2-check-th">status</th>';
         html += '<th class="pd2-check-th">pay_type</th>';
         html += '</tr></thead><tbody>';
         arr.forEach((c) => {
@@ -2730,18 +2739,22 @@ window.initPayday2 = function() {
             const tableId = Number(c && c.table_id ? c.table_id : 0) || 0;
             const sum = c && c.sum != null ? String(c.sum) : '';
             const payed = c && c.payed_sum != null ? String(c.payed_sum) : '';
-            const payType = payTypeLabel(c && c.pay_type != null ? c.pay_type : 0);
+            const status = Number(c && c.status != null ? c.status : 0) || 0;
+            const payType = status === 2 ? payTypeLabel(c && c.pay_type != null ? c.pay_type : 0) : '';
+            const statusTxt = statusLabel(status);
             const dateClose = c && c.date_close ? String(c.date_close) : '';
             const products = Array.isArray(c && c.products ? c.products : null) ? c.products : [];
-            html += '<tr class="pd2-check-row-trigger" data-check-id="' + escapeHtml(String(id)) + '" style="cursor:pointer;">';
+            const rowCls = status === 2 ? ' pd2-check-row-s2' : (status === 3 ? ' pd2-check-row-s3' : '');
+            html += '<tr class="pd2-check-row-trigger' + rowCls + '" data-check-id="' + escapeHtml(String(id)) + '" style="cursor:pointer;">';
             html += '<td class="pd2-check-td">' + escapeHtml(String(id)) + '</td>';
             html += '<td class="pd2-check-td">' + escapeHtml(String(tableId || '')) + '</td>';
             html += '<td class="pd2-check-td">' + escapeHtml(sum) + '</td>';
             html += '<td class="pd2-check-td">' + escapeHtml(payed) + '</td>';
+            html += '<td class="pd2-check-td">' + escapeHtml(statusTxt) + '</td>';
             html += '<td class="pd2-check-td">' + escapeHtml(payType) + '</td>';
             html += '</tr>';
 
-            html += '<tr class="pd2-check-row-details pd2-d-none" data-check-details="' + escapeHtml(String(id)) + '"><td class="pd2-check-td" colspan="5">';
+            html += '<tr class="pd2-check-row-details pd2-d-none" data-check-details="' + escapeHtml(String(id)) + '"><td class="pd2-check-td" colspan="6">';
             html += '<div class="muted" style="margin-bottom:8px;">date_close: ' + escapeHtml(dateClose || '—') + '</div>';
             html += '<div style="font-weight:900; margin-bottom:6px;">Состав</div>';
             if (!products.length) {

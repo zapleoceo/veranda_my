@@ -1922,6 +1922,7 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
                     'sum' => (string)($row['sum'] ?? ''),
                     'payed_sum' => (string)($row['payed_sum'] ?? ''),
                     'pay_type' => (int)($row['pay_type'] ?? 0),
+                    'status' => (int)($row['status'] ?? $row['transaction_status'] ?? ((string)($row['date_close'] ?? '') !== '' ? 2 : 1)),
                     'date_close' => (string)($row['date_close'] ?? ''),
                     'products' => $productsOut,
                 ];

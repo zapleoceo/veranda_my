@@ -473,3 +473,10 @@ tr.row-red .out-create-poster-tx-btn {
     border-color: #ef4444 !important;
     color: #fff !important;
 }
+
+.pd2-check-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pd2-check-th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--card); }
+.pd2-check-td { padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.pd2-check-deleted { margin: 0 0 10px; padding: 10px; background: rgba(16,185,129,0.12); color: #10b981; font-weight: 900; border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; }
+.pd2-check-row-s2 > .pd2-check-td { background: rgba(16,185,129,0.22); }
+.pd2-check-row-s3 > .pd2-check-td { background: rgba(239,68,68,0.14); }
