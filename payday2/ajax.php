@@ -1897,34 +1897,70 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
             $_SESSION['payday2_products_cache'] = ['ts' => time(), 'map' => $nameMap];
         }
 
-        $tableMap = [];
-        $tCache = $_SESSION['payday2_tables_cache'] ?? null;
-        $tCacheTs = is_array($tCache) ? (int)($tCache['ts'] ?? 0) : 0;
-        $tCacheMap = is_array($tCache) ? ($tCache['map'] ?? null) : null;
-        if ($tCacheTs > 0 && (time() - $tCacheTs) < 6 * 3600 && is_array($tCacheMap)) {
-            $tableMap = $tCacheMap;
-        } else {
-            $getTables = function (array $params) use ($api) {
-                try {
-                    return $api->request('spots.getTableHallTables', $params, 'GET');
-                } catch (\Throwable $e) {
-                    if (stripos((string)$e->getMessage(), 'http=405') !== false) {
-                        return $api->request('spots.getTableHallTables', $params, 'POST');
-                    }
-                    throw $e;
+        // Use dash.getTransactions with status=0 to include opened/closed/deleted checks.
+        $out = [];
+        $rows = $api->request('dash.getTransactions', [
+            'dateFrom' => str_replace('-', '', $dFrom),
+            'dateTo' => str_replace('-', '', $dTo),
+            'include_products' => 'true',
+            'status' => 0,
+        ], 'GET');
+
+        if (!is_array($rows) || !count($rows)) {
+            // Fallback for accounts where dash.getTransactions is unavailable.
+            $resp = $api->request('transactions.getTransactions', [
+                'date_from' => $dFrom,
+                'date_to' => $dTo,
+                'per_page' => 1000,
+                'page' => 1,
+            ], 'GET');
+            $rows = is_array($resp) ? ($resp['data'] ?? []) : [];
+        }
+
+        if (!is_array($rows)) $rows = [];
+
+        $spotIds = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            $sid = (int)($row['spot_id'] ?? $row['spotId'] ?? 1);
+            if ($sid <= 0) $sid = 1;
+            $spotIds[$sid] = true;
+        }
+        if (empty($spotIds)) $spotIds[1] = true;
+
+        $tablesCache = $_SESSION['payday2_tables_cache_v2'] ?? null;
+        $tablesCacheTs = is_array($tablesCache) ? (int)($tablesCache['ts'] ?? 0) : 0;
+        $tablesCacheSpots = is_array($tablesCache) ? ($tablesCache['spots'] ?? null) : null;
+        $spotMaps = (is_array($tablesCacheSpots) && $tablesCacheTs > 0 && (time() - $tablesCacheTs) < 6 * 3600) ? $tablesCacheSpots : [];
+
+        $getTables = function (array $params) use ($api) {
+            try {
+                return $api->request('spots.getTableHallTables', $params, 'GET');
+            } catch (\Throwable $e) {
+                if (stripos((string)$e->getMessage(), 'http=405') !== false) {
+                    return $api->request('spots.getTableHallTables', $params, 'POST');
                 }
-            };
-            $getHalls = function (int $sId) use ($api) {
-                try {
-                    return $api->request('spots.getSpotTablesHalls', ['spot_id' => $sId], 'GET');
-                } catch (\Throwable $e) {
-                    if (stripos((string)$e->getMessage(), 'http=405') !== false) {
-                        return $api->request('spots.getSpotTablesHalls', ['spot_id' => $sId], 'POST');
-                    }
-                    throw $e;
+                throw $e;
+            }
+        };
+        $getHalls = function (int $sId) use ($api) {
+            try {
+                return $api->request('spots.getSpotTablesHalls', ['spot_id' => $sId], 'GET');
+            } catch (\Throwable $e) {
+                if (stripos((string)$e->getMessage(), 'http=405') !== false) {
+                    return $api->request('spots.getSpotTablesHalls', ['spot_id' => $sId], 'POST');
                 }
-            };
-            $spotId = 1;
+                throw $e;
+            }
+        };
+
+        foreach (array_keys($spotIds) as $spotId) {
+            $spotId = (int)$spotId;
+            if ($spotId <= 0) $spotId = 1;
+            $existing = $spotMaps[(string)$spotId] ?? null;
+            if (is_array($existing) && count($existing)) continue;
+
+            $map = [];
             $allTablesFound = [];
             $halls = [];
             try { $halls = $getHalls($spotId); } catch (\Throwable $e) {}
@@ -1948,32 +1984,12 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
                 if (!is_array($t)) continue;
                 $tid = (int)($t['table_id'] ?? 0);
                 $title = trim((string)($t['table_title'] ?? ''));
-                if ($tid > 0 && $title !== '') $tableMap[(string)$tid] = $title;
+                if ($tid > 0 && $title !== '') $map[(string)$tid] = $title;
             }
-            $_SESSION['payday2_tables_cache'] = ['ts' => time(), 'map' => $tableMap];
+            $spotMaps[(string)$spotId] = $map;
         }
+        $_SESSION['payday2_tables_cache_v2'] = ['ts' => time(), 'spots' => $spotMaps];
 
-        // Use dash.getTransactions with status=0 to include opened/closed/deleted checks.
-        $out = [];
-        $rows = $api->request('dash.getTransactions', [
-            'dateFrom' => str_replace('-', '', $dFrom),
-            'dateTo' => str_replace('-', '', $dTo),
-            'include_products' => 'true',
-            'status' => 0,
-        ], 'GET');
-
-        if (!is_array($rows) || !count($rows)) {
-            // Fallback for accounts where dash.getTransactions is unavailable.
-            $resp = $api->request('transactions.getTransactions', [
-                'date_from' => $dFrom,
-                'date_to' => $dTo,
-                'per_page' => 1000,
-                'page' => 1,
-            ], 'GET');
-            $rows = is_array($resp) ? ($resp['data'] ?? []) : [];
-        }
-
-        if (!is_array($rows)) $rows = [];
         foreach ($rows as $row) {
             if (!is_array($row)) continue;
             $txId = (int)($row['transaction_id'] ?? $row['id'] ?? 0);
@@ -2000,8 +2016,14 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
                 elseif ((string)($row['date_close'] ?? '') !== '') $status = 2;
                 else $status = 1;
             }
+            $spotId = (int)($row['spot_id'] ?? $row['spotId'] ?? 1);
+            if ($spotId <= 0) $spotId = 1;
             $tableId = (int)($row['table_id'] ?? 0);
-            $tableTitle = $tableId > 0 ? (string)($tableMap[(string)$tableId] ?? '') : '';
+            $tableTitle = trim((string)($row['table_title'] ?? $row['table_name'] ?? ''));
+            if ($tableTitle === '' && $tableId > 0) {
+                $sm = $spotMaps[(string)$spotId] ?? null;
+                if (is_array($sm)) $tableTitle = (string)($sm[(string)$tableId] ?? '');
+            }
             $out[] = [
                 'transaction_id' => $txId,
                 'table_id' => $tableId,

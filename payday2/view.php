@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260420_0007';
+$payday2AssetVersion = '20260420_0009';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -403,7 +403,9 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                         <img src="/payday2/img/Supply.png" alt="Supplies">
                     </button>
                 </div>
-                <button type="button" class="pd2-icon-btn pd2-ml-5" id="payday2CheckFinderBtn" title="Чек" data-help-abs="Поиск и удаление чека Poster по номеру.">🧾</button>
+                <button type="button" class="pd2-icon-btn pd2-ml-5" id="payday2CheckFinderBtn" title="Чек" data-help-abs="Поиск и удаление чека Poster по номеру.">
+                    <img src="/payday2/img/receipt.png" alt="Чек">
+                </button>
             </div>
             <div class="tabs" data-help="Переключение режимов сверки финансов: приходы (IN) или расходы (OUT).">
                 <button type="button" class="tab active" id="tabIn" data-help-abs="Режим IN: Сверка входящих платежей.">IN</button>
@@ -1113,7 +1115,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
             </div>
 
             <div class="confirm-backdrop pd2-modal-backdrop" id="checkFinderModal">
-                <div class="confirm-modal pd2-modal-content" role="dialog" style="max-width: 520px;">
+                <div class="confirm-modal pd2-modal-content" role="dialog" style="max-width: 1100px; width: 96vw;">
                     <div class="pd2-modal-header">
                         <h3 class="pd2-m-0">Чек</h3>
                         <button type="button" class="pd2-modal-close" id="checkFinderClose">✕</button>
