@@ -24,6 +24,13 @@ final class LocalSettings
             'balance_sinc_account_id' => Config::ACCOUNT_TIPS,
             'allowed_categories' => [],
             'custom_category_names' => [],
+            'poster_admin' => [
+                'account' => '',
+                'pos_session' => '',
+                'ssid' => '',
+                'csrf' => '',
+                'user_agent' => '',
+            ],
         ];
         $path = __DIR__ . DIRECTORY_SEPARATOR . 'local_config.json';
         $file = @file_get_contents($path);
@@ -47,6 +54,7 @@ final class LocalSettings
                 : $defaults['balance_sinc_account_id'],
             'allowed_categories' => isset($j['allowed_categories']) && is_array($j['allowed_categories']) ? array_map('intval', $j['allowed_categories']) : $defaults['allowed_categories'],
             'custom_category_names' => isset($j['custom_category_names']) && is_array($j['custom_category_names']) ? $j['custom_category_names'] : $defaults['custom_category_names'],
+            'poster_admin' => isset($j['poster_admin']) && is_array($j['poster_admin']) ? $j['poster_admin'] : $defaults['poster_admin'],
         ];
         foreach (['service_user_id', 'account_andrey_id', 'account_tips_id', 'account_vietnam_id', 'balance_sinc_account_id'] as $k) {
             if ((int)$row[$k] <= 0) {
@@ -111,6 +119,13 @@ final class LocalSettings
             'balance_sinc_account_id' => (int)$m['balance_sinc_account_id'],
             'allowed_categories' => (array)($m['allowed_categories'] ?? []),
             'custom_category_names' => (array)($m['custom_category_names'] ?? []),
+            'poster_admin' => [
+                'account' => (string)(($m['poster_admin']['account'] ?? '') ?: ''),
+                'pos_session' => (string)(($m['poster_admin']['pos_session'] ?? '') ?: ''),
+                'ssid' => (string)(($m['poster_admin']['ssid'] ?? '') ?: ''),
+                'csrf' => (string)(($m['poster_admin']['csrf'] ?? '') ?: ''),
+                'user_agent' => (string)(($m['poster_admin']['user_agent'] ?? '') ?: ''),
+            ],
         ];
     }
 
@@ -172,6 +187,19 @@ final class LocalSettings
             'balance_sinc_account_id' => $bs,
             'allowed_categories' => $allowedCats,
             'custom_category_names' => $customNames,
+            'poster_admin' => isset($in['poster_admin']) && is_array($in['poster_admin']) ? [
+                'account' => trim((string)($in['poster_admin']['account'] ?? '')),
+                'pos_session' => trim((string)($in['poster_admin']['pos_session'] ?? '')),
+                'ssid' => trim((string)($in['poster_admin']['ssid'] ?? '')),
+                'csrf' => trim((string)($in['poster_admin']['csrf'] ?? '')),
+                'user_agent' => trim((string)($in['poster_admin']['user_agent'] ?? '')),
+            ] : [
+                'account' => '',
+                'pos_session' => '',
+                'ssid' => '',
+                'csrf' => '',
+                'user_agent' => '',
+            ],
         ];
 
         $path = __DIR__ . DIRECTORY_SEPARATOR . 'local_config.json';

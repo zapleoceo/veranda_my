@@ -285,6 +285,13 @@ window.initPayday2 = function() {
             set('pd2sett_acc_vietnam', ls.accounts.vietnam);
         }
         set('pd2sett_balance_sinc', ls.balance_sinc_account_id);
+        if (ls.poster_admin) {
+            set('pd2sett_padm_account', ls.poster_admin.account);
+            set('pd2sett_padm_pos_session', ls.poster_admin.pos_session);
+            set('pd2sett_padm_ssid', ls.poster_admin.ssid);
+            set('pd2sett_padm_csrf', ls.poster_admin.csrf);
+            set('pd2sett_padm_ua', ls.poster_admin.user_agent);
+        }
         
         // Allowed categories will be set after categories are loaded
     };
@@ -391,6 +398,13 @@ window.initPayday2 = function() {
             balance_sinc_account_id: num('pd2sett_balance_sinc'),
             allowed_categories: allowedCats,
             custom_category_names: customNames,
+            poster_admin: {
+                account: str('pd2sett_padm_account'),
+                pos_session: str('pd2sett_padm_pos_session'),
+                ssid: str('pd2sett_padm_ssid'),
+                csrf: str('pd2sett_padm_csrf'),
+                user_agent: str('pd2sett_padm_ua'),
+            },
         };
     };
     const openPayday2SettingsModal = () => {
@@ -2780,7 +2794,8 @@ window.initPayday2 = function() {
                 });
                 html += '</tbody></table></div>';
             }
-            html += '<div style="display:flex; justify-content:flex-end; margin-top:10px;">';
+            html += '<div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">';
+            html += '<button type="button" class="btn2 pd2-check-edit-btn" data-edit-check="' + escapeHtml(String(id)) + '">Редактировать</button>';
             html += '<button type="button" class="btn2 pd2-btn-danger pd2-check-del-btn" data-del-check="' + escapeHtml(String(id)) + '">Удалить</button>';
             html += '</div>';
             html += '</td></tr>';
@@ -2873,6 +2888,12 @@ window.initPayday2 = function() {
             });
         }
     }
+
+    window.addEventListener('pd2_checks_reload', () => {
+        try {
+            if (checkFinderModal && checkFinderModal.style.display === 'flex') loadChecks().catch(() => {});
+        } catch (_) {}
+    });
     
     window.toggleShiftDetail = function(tr, shiftId) {
         const detailTr = document.getElementById('shift_detail_' + shiftId);

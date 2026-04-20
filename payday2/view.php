@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260420_0018';
+$payday2AssetVersion = '20260420_0020';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1193,6 +1193,27 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                             </div>
                         </details>
 
+                        <details class="pd2-settings-spoiler pd2-mb-10">
+                            <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Poster Admin (Edit check)</summary>
+                            <div class="pd2-settings-grid-4 pd2-mt-10">
+                                <label class="pd2-settings-label pd2-m-0"><span>account_url</span>
+                                    <input type="text" class="btn pd2-w-100" id="pd2sett_padm_account" autocomplete="off" placeholder="restpublica2">
+                                </label>
+                                <label class="pd2-settings-label pd2-m-0"><span>ssid</span>
+                                    <input type="text" class="btn pd2-w-100" id="pd2sett_padm_ssid" autocomplete="off">
+                                </label>
+                                <label class="pd2-settings-label pd2-m-0"><span>csrf_cookie_poster</span>
+                                    <input type="text" class="btn pd2-w-100" id="pd2sett_padm_csrf" autocomplete="off">
+                                </label>
+                                <label class="pd2-settings-label pd2-m-0"><span>pos_session</span>
+                                    <input type="text" class="btn pd2-w-100" id="pd2sett_padm_pos_session" autocomplete="off">
+                                </label>
+                                <label class="pd2-settings-label pd2-m-0"><span>user_agent</span>
+                                    <input type="text" class="btn pd2-w-100" id="pd2sett_padm_ua" autocomplete="off" placeholder="опционально">
+                                </label>
+                            </div>
+                        </details>
+
                         <details class="pd2-settings-spoiler pd2-mb-10" id="pd2sett_categories_spoiler">
                             <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Категории</summary>
                             <div id="pd2sett_categories_list" class="pd2-mt-10 pd2-d-flex pd2-flex-column pd2-gap-6" style="max-height: 200px; overflow-y: auto;">
@@ -1227,6 +1248,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
 <script src="/payday2/assets/js/payday2_telegram.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2_create_tx.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2_help_tour.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
+<script src="/payday2/assets/js/paytypeedit.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 </body>
 </html>

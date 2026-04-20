@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../auth_check.php';
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/../src/classes/PosterAdminAjax.php';
 
 veranda_require('payday');
 
@@ -2037,6 +2038,101 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
             ];
         }
         echo json_encode(['ok' => true, 'checks' => $out], JSON_UNESCAPED_UNICODE);
+        exit;
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
+if (($_GET['ajax'] ?? '') === 'poster_admin_get_actions') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    if (!is_array($payload)) $payload = [];
+    $txId = (int)($payload['transaction_id'] ?? 0);
+    if ($txId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        if (!isset($_SESSION)) {
+            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        }
+        $ls = \App\Payday2\LocalSettings::merged();
+        $admin = $ls['poster_admin'] ?? [];
+        if (!is_array($admin)) $admin = [];
+        $st = $_SESSION['payday2_poster_admin'] ?? null;
+        if (!is_array($st)) $st = [];
+        $cfg = [
+            'account' => (string)($admin['account'] ?? ''),
+            'pos_session' => (string)($st['pos_session'] ?? ($admin['pos_session'] ?? '')),
+            'ssid' => (string)($admin['ssid'] ?? ''),
+            'csrf' => (string)($st['csrf'] ?? ($admin['csrf'] ?? '')),
+            'user_agent' => (string)($admin['user_agent'] ?? ''),
+        ];
+        $client = new \App\Classes\PosterAdminAjax($cfg);
+        $params = $client->getActions($txId);
+        $_SESSION['payday2_poster_admin'] = [
+            'pos_session' => $client->getPosSession(),
+            'csrf' => $client->getCsrf(),
+        ];
+        echo json_encode(['ok' => true, 'params' => $params], JSON_UNESCAPED_UNICODE);
+        exit;
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
+if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $raw = file_get_contents('php://input');
+    $payload = json_decode((string)$raw, true);
+    if (!is_array($payload)) $payload = [];
+    $txId = (int)($payload['transaction_id'] ?? 0);
+    $params = $payload['params'] ?? null;
+    if ($txId <= 0 || !is_array($params)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        if (!isset($_SESSION)) {
+            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        }
+        $ls = \App\Payday2\LocalSettings::merged();
+        $admin = $ls['poster_admin'] ?? [];
+        if (!is_array($admin)) $admin = [];
+        $st = $_SESSION['payday2_poster_admin'] ?? null;
+        if (!is_array($st)) $st = [];
+        $cfg = [
+            'account' => (string)($admin['account'] ?? ''),
+            'pos_session' => (string)($st['pos_session'] ?? ($admin['pos_session'] ?? '')),
+            'ssid' => (string)($admin['ssid'] ?? ''),
+            'csrf' => (string)($st['csrf'] ?? ($admin['csrf'] ?? '')),
+            'user_agent' => (string)($admin['user_agent'] ?? ''),
+        ];
+        $client = new \App\Classes\PosterAdminAjax($cfg);
+        $res = $client->editCheck($txId, $params);
+        $_SESSION['payday2_poster_admin'] = [
+            'pos_session' => $client->getPosSession(),
+            'csrf' => $client->getCsrf(),
+        ];
+        echo json_encode(['ok' => true, 'result' => $res], JSON_UNESCAPED_UNICODE);
         exit;
     } catch (\Throwable $e) {
         http_response_code(500);
