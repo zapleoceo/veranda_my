@@ -1883,53 +1883,64 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
             $_SESSION['payday2_products_cache'] = ['ts' => time(), 'map' => $nameMap];
         }
 
-        $page = 1;
-        $per = 1000;
+        // Use dash.getTransactions with status=0 to include opened/closed/deleted checks.
         $out = [];
-        while (true) {
+        $rows = $api->request('dash.getTransactions', [
+            'dateFrom' => str_replace('-', '', $dFrom),
+            'dateTo' => str_replace('-', '', $dTo),
+            'include_products' => 'true',
+            'status' => 0,
+        ], 'GET');
+
+        if (!is_array($rows) || !count($rows)) {
+            // Fallback for accounts where dash.getTransactions is unavailable.
             $resp = $api->request('transactions.getTransactions', [
                 'date_from' => $dFrom,
                 'date_to' => $dTo,
-                'per_page' => $per,
-                'page' => $page,
+                'per_page' => 1000,
+                'page' => 1,
             ], 'GET');
-            $data = is_array($resp) ? ($resp['data'] ?? []) : [];
-            if (!is_array($data) || count($data) === 0) break;
-            foreach ($data as $row) {
-                if (!is_array($row)) continue;
-                $txId = (int)($row['transaction_id'] ?? 0);
-                if ($txId <= 0) continue;
-                $productsIn = (isset($row['products']) && is_array($row['products'])) ? $row['products'] : [];
-                $productsOut = [];
-                foreach ($productsIn as $pr) {
-                    if (!is_array($pr)) continue;
-                    $pid = (int)($pr['product_id'] ?? 0);
-                    $num = (float)($pr['num'] ?? 0);
-                    $sum = (string)($pr['product_sum'] ?? '');
-                    $sumF = is_numeric($sum) ? (float)$sum : 0.0;
-                    $unit = ($num > 0 && $sumF > 0) ? ($sumF / $num) : 0.0;
-                    $productsOut[] = [
-                        'product_id' => $pid,
-                        'name' => $pid > 0 ? (string)($nameMap[(string)$pid] ?? ('#' . $pid)) : '',
-                        'qty' => $num,
-                        'unit_price' => $unit > 0 ? $unit : null,
-                        'total' => $sumF > 0 ? $sumF : null,
-                    ];
-                }
-                $out[] = [
-                    'transaction_id' => $txId,
-                    'table_id' => (int)($row['table_id'] ?? 0),
-                    'sum' => (string)($row['sum'] ?? ''),
-                    'payed_sum' => (string)($row['payed_sum'] ?? ''),
-                    'pay_type' => (int)($row['pay_type'] ?? 0),
-                    'status' => (int)($row['status'] ?? $row['transaction_status'] ?? ((string)($row['date_close'] ?? '') !== '' ? 2 : 1)),
-                    'date_close' => (string)($row['date_close'] ?? ''),
-                    'products' => $productsOut,
+            $rows = is_array($resp) ? ($resp['data'] ?? []) : [];
+        }
+
+        if (!is_array($rows)) $rows = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            $txId = (int)($row['transaction_id'] ?? $row['id'] ?? 0);
+            if ($txId <= 0) continue;
+            $productsIn = (isset($row['products']) && is_array($row['products'])) ? $row['products'] : [];
+            $productsOut = [];
+            foreach ($productsIn as $pr) {
+                if (!is_array($pr)) continue;
+                $pid = (int)($pr['product_id'] ?? 0);
+                $num = (float)($pr['num'] ?? 0);
+                $sum = (string)($pr['product_sum'] ?? '');
+                $sumF = is_numeric($sum) ? (float)$sum : 0.0;
+                $unit = ($num > 0 && $sumF > 0) ? ($sumF / $num) : 0.0;
+                $productsOut[] = [
+                    'product_id' => $pid,
+                    'name' => $pid > 0 ? (string)($nameMap[(string)$pid] ?? ('#' . $pid)) : '',
+                    'qty' => $num,
+                    'unit_price' => $unit > 0 ? $unit : null,
+                    'total' => $sumF > 0 ? $sumF : null,
                 ];
             }
-            if (count($data) < $per) break;
-            $page++;
-            if ($page > 10) break;
+            $status = (int)($row['status'] ?? $row['transaction_status'] ?? 0);
+            if ($status <= 0) {
+                if ((int)($row['delete'] ?? 0) === 1) $status = 3;
+                elseif ((string)($row['date_close'] ?? '') !== '') $status = 2;
+                else $status = 1;
+            }
+            $out[] = [
+                'transaction_id' => $txId,
+                'table_id' => (int)($row['table_id'] ?? 0),
+                'sum' => (string)($row['sum'] ?? ''),
+                'payed_sum' => (string)($row['payed_sum'] ?? ''),
+                'pay_type' => (int)($row['pay_type'] ?? 0),
+                'status' => $status,
+                'date_close' => (string)($row['date_close'] ?? ''),
+                'products' => $productsOut,
+            ];
         }
         echo json_encode(['ok' => true, 'checks' => $out], JSON_UNESCAPED_UNICODE);
         exit;
