@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260420_0009';
+$payday2AssetVersion = '20260420_0010';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1122,9 +1122,8 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                     </div>
                     <div class="body pd2-modal-body pd2-p-15">
                         <div class="pd2-mb-10">
-                            <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Номер чека</label>
                             <div class="pd2-d-flex pd2-gap-10 pd2-align-center">
-                                <input type="text" id="checkFinderNumber" class="btn pd2-w-100" inputmode="numeric" autocomplete="off" placeholder="например: 25221">
+                                <input type="text" id="checkFinderNumber" class="btn pd2-w-100" autocomplete="off" placeholder="поиск по любому тексту">
                                 <button type="button" class="btn pd2-ws-nowrap" id="checkFinderSearchBtn" title="Найти">🔍</button>
                             </div>
                         </div>

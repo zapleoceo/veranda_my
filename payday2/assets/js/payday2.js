@@ -2796,13 +2796,23 @@ window.initPayday2 = function() {
     };
 
     const filterAndRender = () => {
-        const qRaw = String(checkFinderNumber ? checkFinderNumber.value : '').trim();
-        const q = qRaw.replace(/\D+/g, '');
+        const q = String(checkFinderNumber ? checkFinderNumber.value : '').trim().toLowerCase();
         if (!q) {
             renderChecks(checksAll);
             return;
         }
-        renderChecks(checksAll.filter((c) => String(c && c.transaction_id != null ? c.transaction_id : '').indexOf(q) !== -1));
+        renderChecks(checksAll.filter((c) => {
+            const id = c && c.transaction_id != null ? String(c.transaction_id) : '';
+            const tableTitle = c && c.table_title ? String(c.table_title) : '';
+            const status = statusLabel(c && c.status != null ? c.status : 0);
+            const payType = (Number(c && c.status != null ? c.status : 0) === 2) ? payTypeLabel(c && c.pay_type != null ? c.pay_type : 0) : '';
+            const payedNum = Number(c && c.payed_sum != null ? c.payed_sum : 0) || 0;
+            const sumVal = (payedNum > 0 && c && c.payed_sum != null) ? c.payed_sum : (c ? c.sum : null);
+            const sumTxt = sumVal != null ? fmtMoney0(sumVal) : '';
+            const dateClose = c && c.date_close ? String(c.date_close) : '';
+            const hay = (id + ' ' + tableTitle + ' ' + sumTxt + ' ' + status + ' ' + payType + ' ' + dateClose).toLowerCase();
+            return hay.indexOf(q) !== -1;
+        }));
     };
 
     const loadChecks = async () => {
@@ -2814,6 +2824,15 @@ window.initPayday2 = function() {
         }
         if (checkFinderSearchBtn) checkFinderSearchBtn.disabled = true;
         try {
+            if (checkFinderResult) {
+                checkFinderResult.innerHTML =
+                    '<div class="pd2-text-center muted" style="padding: 14px 0;">' +
+                    '<svg class="pd2-loader-spin pd2-v-align-mid" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+                    '<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>' +
+                    '</svg>' +
+                    '<span style="margin-left:8px;">Загрузка...</span>' +
+                    '</div>';
+            }
             const url = '?ajax=poster_checks_list&date_from=' + encodeURIComponent(dFrom) + '&date_to=' + encodeURIComponent(dTo);
             const j = await fetchJsonSafe(url);
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
