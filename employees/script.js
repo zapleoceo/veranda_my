@@ -73,10 +73,9 @@
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
     const accountTagById = (acc) => {
-        const a = Number(acc || 0) || 0;
-        if (a === 1) return '<span class="paid-tag">QR</span>';
-        if (a === 2) return '<span class="paid-tag">КЕШ</span>';
-        if (a === 8) return '<span class="paid-tag">QR</span>';
+        const a = Number(String(acc ?? '').trim()) || 0;
+        const labels = { 1: 'QR', 2: 'КЕШ', 8: 'QR', 9: 'VC' };
+        if (a > 0 && Object.prototype.hasOwnProperty.call(labels, a)) return '<span class="paid-tag">' + labels[a] + '</span>';
         if (a > 0) return '<span class="paid-tag">#' + String(a) + '</span>';
         return '';
     };
@@ -631,7 +630,7 @@
                 <td class="col-ttp" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
                         <span>${esc(fmtMoney(tipsToPayVnd))}</span>
-                        <button type="button" class="paid-btn" data-kind="tips" data-user-id="${esc(r.user_id)}" ${paidDisabled}>PAY</button>
+                        <button type="button" class="paid-btn" data-kind="tips" data-user-id="${esc(r.user_id)}" data-amount-vnd="${esc(String(tipsToPayVnd))}" ${paidDisabled}>PAY</button>
                     </div>
                 </td>
                 <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(salaryVnd))}</td>
@@ -656,7 +655,7 @@
                 <td class="col-salarytopay" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
                         <span>${esc(fmtMoney(salaryToPayVnd))}</span>
-                        <button type="button" class="paid-btn" data-kind="salary" data-user-id="${esc(r.user_id)}" ${salaryPayDisabled}>PAY</button>
+                        <button type="button" class="paid-btn" data-kind="salary" data-user-id="${esc(r.user_id)}" data-amount-vnd="${esc(String(salaryToPayVnd))}" ${salaryPayDisabled}>PAY</button>
                     </div>
                 </td>
             `;
@@ -1000,6 +999,18 @@
         payExtraComment.value = uid ? buildPayComment(String(payExtraKind.value || 'tips'), uid, name) : '';
     };
 
+    const payExtraAmountDigits = (value) => digitsOnly(value);
+    const formatPayExtraAmount = (value) => fmtSpaces(payExtraAmountDigits(value));
+    const readPayExtraAmount = () => {
+        if (!payExtraAmount) return 0;
+        const digits = payExtraAmountDigits(payExtraAmount.value);
+        return Math.round(Number(digits || 0) || 0);
+    };
+    const applyPayExtraAmountFormatting = () => {
+        if (!payExtraAmount) return;
+        payExtraAmount.value = formatPayExtraAmount(payExtraAmount.value);
+    };
+
     const fillPayExtraEmployees = () => {
         if (!payExtraEmp) return;
         payExtraEmp.innerHTML = '';
@@ -1056,7 +1067,16 @@
     if (payExtraBtn) payExtraBtn.addEventListener('click', () => { openPayExtra().catch((e) => setError(e && e.message ? e.message : 'Ошибка')); });
     if (payExtraCancel) payExtraCancel.addEventListener('click', closePayExtra);
     if (payExtraModal) payExtraModal.addEventListener('click', (e) => { if (e.target === payExtraModal) closePayExtra(); });
+    if (payExtraModal) document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && payExtraModal.style.display === 'flex') closePayExtra(); });
     if (payExtraEmp) payExtraEmp.addEventListener('change', refreshPayExtraComment);
+    if (payExtraAmount) {
+        payExtraAmount.addEventListener('input', applyPayExtraAmountFormatting);
+        payExtraAmount.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const text = (e.clipboardData && e.clipboardData.getData && e.clipboardData.getData('text')) || '';
+            payExtraAmount.value = formatPayExtraAmount(text);
+        });
+    }
     if (payExtraKind) payExtraKind.addEventListener('change', () => {
         refreshPayExtraComment();
         if (payExtraAccount) {
@@ -1070,7 +1090,7 @@
         if (payExtraSubmitting || payExtraOpening) return;
         const uid = Number(payExtraEmp.value || 0);
         const kind = String(payExtraKind.value || 'tips');
-        const amount = Math.round(Number(payExtraAmount.value || 0) || 0);
+        const amount = readPayExtraAmount();
         const accountFrom = Number(payExtraAccount.value || 0);
         const row = dataRows.find((x) => Number(x.user_id) === uid);
         const empName = row ? String(row.name || '').trim() : '';
@@ -1138,121 +1158,71 @@
         return name;
     };
 
-    tbody.addEventListener('click', async (e) => {
+    const openPayExtraPreset = async ({ kind, userId, amountVnd }) => {
+        if (!payExtraModal || !payExtraEmp || !payExtraKind || !payExtraAmount || !payExtraAccount || !payExtraChecked || !payExtraPay) return;
+        if (payExtraOpening || payExtraSubmitting) return;
+        if (!dataRows.length) { setError('Сначала нажми ЗАГРУЗИТЬ'); return; }
+
+        payExtraOpening = true;
+        if (payExtraBtn) payExtraBtn.disabled = true;
+        setModalVisible(payExtraModal, true);
+        setPayExtraLoading(true);
+        fillPayExtraEmployees();
+
+        const uid = Number(userId || 0) || 0;
+        const k = (String(kind) === 'salary') ? 'salary' : 'tips';
+        const amt = Math.max(0, Math.round(Number(amountVnd || 0) || 0));
+
+        payExtraKind.value = k;
+
+        if (uid > 0) {
+            const foundOpt = Array.from(payExtraEmp.options).some((o) => String(o.value) === String(uid));
+            if (!foundOpt) {
+                const opt = document.createElement('option');
+                opt.value = String(uid);
+                opt.textContent = `#${String(uid)}`;
+                payExtraEmp.insertBefore(opt, payExtraEmp.firstChild);
+            }
+            payExtraEmp.value = String(uid);
+        }
+
+        try {
+            const meta = await loadPayMetaExtra();
+            payExtraAccount.innerHTML = '';
+            const accs = Array.isArray(meta.accounts) ? meta.accounts : [];
+            accs.forEach((a) => {
+                const id = Number(a && a.id ? a.id : 0);
+                if (!id) return;
+                const opt = document.createElement('option');
+                opt.value = String(id);
+                opt.textContent = String(a.name || ('#' + String(id)));
+                payExtraAccount.appendChild(opt);
+            });
+        } catch (e) {
+            setError(e && e.message ? e.message : 'Ошибка');
+        }
+
+        const defaultAcc = (k === 'salary') ? 1 : 8;
+        if (Array.from(payExtraAccount.options).some((o) => Number(o.value) === defaultAcc)) payExtraAccount.value = String(defaultAcc);
+
+        payExtraAmount.value = amt > 0 ? formatPayExtraAmount(String(amt)) : '';
+        if (payExtraChecked) payExtraChecked.checked = false;
+        if (payExtraPay) payExtraPay.disabled = true;
+        refreshPayExtraComment();
+
+        setPayExtraLoading(false);
+        payExtraOpening = false;
+        if (payExtraBtn) payExtraBtn.disabled = false;
+    };
+
+    tbody.addEventListener('click', (e) => {
         const b = e.target && e.target.closest ? e.target.closest('.paid-btn') : null;
         if (!b) return;
         const kind = String(b.getAttribute('data-kind') || 'tips');
         const uid = Number(b.getAttribute('data-user-id') || 0);
-        if (!uid) return;
-        const row = dataRows.find((x) => Number(x.user_id) === uid);
-        if (!row) return;
-
-        if (kind === 'salary') {
-            const salaryVnd = Math.round(Number(row.salary_minor || 0) || 0);
-            const sp = slrPaidById[String(uid)] || null;
-            const spTotal = sp ? Number(sp.total_amount || 0) : 0;
-            const slrPaidVnd = vndFromMinor(Math.abs(spTotal || 0));
-            const salaryToPayVnd = Math.max(0, salaryVnd - slrPaidVnd);
-            if (salaryToPayVnd <= 0) return;
-            let empName = '';
-            try { empName = await loadEmployeeName(uid); } catch (_) { empName = ''; }
-            if (!empName) empName = String(row.name || '').trim();
-            let meta = null;
-            try { meta = await loadPayMetaSalary(); } catch (_) { meta = null; }
-            const catName = meta && meta.category && meta.category.name ? String(meta.category.name) : '#4';
-            const accName = meta && meta.account_from && meta.account_from.name ? String(meta.account_from.name) : '#1';
-            const payerName = meta && meta.payer && meta.payer.name ? String(meta.payer.name) : '#10';
-            const creatorEmail = String((window.__USER_EMAIL__ || '')).trim();
-            const creatorLabel = creatorEmail ? creatorEmail : '—';
-            const commentText = `SLR ${empName ? empName + ' ' : ''}ID=${String(uid)} by ${creatorLabel}`;
-            const ok = await openPaidConfirm(
-                `Будет создана транзакция расхода на выплату зарплаты.<br>` +
-                `Сотрудник: <b>${esc(empName || ('#' + String(uid)))}</b><br>` +
-                `Сумма: <b>${esc(fmtMoney(salaryToPayVnd))}</b><br>` +
-                `Категория: <b>${esc(catName)}</b><br>` +
-                `Исполнитель: <b>${esc(payerName)}</b><br>` +
-                `Счет списания: <b>${esc(accName)}</b><br>` +
-                `Комментарий: <b>${esc(commentText)}</b>`
-            );
-            if (!ok) return;
-            b.disabled = true;
-            try {
-                const url = new URL(location.href);
-                url.searchParams.set('ajax', 'pay_salary');
-                const res = await fetch(url.toString(), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify({ waiter_id: uid, salary_vnd: salaryToPayVnd, employee_name: empName }),
-                });
-                const txt = await res.text();
-                let j = null;
-                try { j = JSON.parse(txt); } catch (_) {}
-                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                const cur = slrPaidById[String(uid)] || { total_amount: 0, items: [] };
-                const nextTotal = Number(cur.total_amount || 0) + (Math.abs(Number(j.salary_vnd || 0) || salaryToPayVnd) * 100);
-                const nextItems = Array.isArray(cur.items) ? cur.items.slice() : [];
-                if (j.date) nextItems.unshift({ date: String(j.date), amount: -Math.abs((Number(j.salary_vnd || 0) || salaryToPayVnd) * 100), account_id: 1 });
-                slrPaidById[String(uid)] = { total_amount: nextTotal, items: nextItems };
-                renderTable();
-                loadTipsBalance().catch(() => {});
-            } catch (err) {
-                setError(err && err.message ? err.message : 'Ошибка');
-                b.disabled = false;
-            }
-            return;
-        }
-
-        const tipsMinor = Number(row.tips_minor || 0);
-        const tp = tipsPaidById[String(uid)] || null;
-        const tpTotal = tp ? Number(tp.total_amount || 0) : 0;
-        const tipsToPayMinor = Math.max(0, tipsMinor - Math.abs(tpTotal || 0));
-        if (tipsToPayMinor <= 0) return;
-        const tipsToPayVnd = vndFromMinor(tipsToPayMinor);
-        let empName = '';
-        try { empName = await loadEmployeeName(uid); } catch (_) { empName = ''; }
-        if (!empName) empName = String(row.name || '').trim();
-        let meta = null;
-        try { meta = await loadPayMeta(); } catch (_) { meta = null; }
-        const catName = meta && meta.category && meta.category.name ? String(meta.category.name) : '#4';
-        const accName = meta && meta.account_from && meta.account_from.name ? String(meta.account_from.name) : '#8';
-        const payerName = meta && meta.payer && meta.payer.name ? String(meta.payer.name) : '#10';
-        const creatorEmail = String((window.__USER_EMAIL__ || '')).trim();
-        const creatorLabel = creatorEmail ? creatorEmail : '—';
-        const commentText = `TIPS ${empName ? empName + ' ' : ''}ID=${String(uid)} by ${creatorLabel}`;
-        const ok = await openPaidConfirm(
-            `Будет создана транзакция расхода на выплату типсов.<br>` +
-            `Сотрудник: <b>${esc(empName || ('#' + String(uid)))}</b><br>` +
-            `Сумма: <b>${esc(fmtMoney(tipsToPayVnd))}</b><br>` +
-            `Категория: <b>${esc(catName)}</b><br>` +
-            `Исполнитель: <b>${esc(payerName)}</b><br>` +
-            `Счет списания: <b>${esc(accName)}</b><br>` +
-            `Комментарий: <b>${esc(commentText)}</b>`
-        );
-        if (!ok) return;
-        b.disabled = true;
-        try {
-            const url = new URL(location.href);
-            url.searchParams.set('ajax', 'pay_tips');
-            const res = await fetch(url.toString(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ waiter_id: uid, tips_minor: tipsToPayMinor, employee_name: empName }),
-            });
-            const txt = await res.text();
-            let j = null;
-            try { j = JSON.parse(txt); } catch (_) {}
-            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-            const cur = tipsPaidById[String(uid)] || { total_amount: 0, items: [] };
-            const nextTotal = Number(cur.total_amount || 0) + Math.abs(Number(j.amount || 0));
-            const nextItems = Array.isArray(cur.items) ? cur.items.slice() : [];
-            if (j.date) nextItems.unshift({ date: String(j.date), amount: Number(j.amount || 0), account_id: 8 });
-            tipsPaidById[String(uid)] = { total_amount: nextTotal, items: nextItems };
-            renderTable();
-            loadTipsBalance().catch(() => {});
-        } catch (err) {
-            setError(err && err.message ? err.message : 'Ошибка');
-            b.disabled = false;
-        }
+        const amountVnd = Math.round(Number(b.getAttribute('data-amount-vnd') || 0) || 0);
+        if (!uid || amountVnd <= 0) return;
+        openPayExtraPreset({ kind, userId: uid, amountVnd }).catch((err) => setError(err && err.message ? err.message : 'Ошибка'));
     });
     cancelBtn.addEventListener('click', async () => {
         try {
