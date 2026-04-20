@@ -12,7 +12,7 @@
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260413_0200">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260413_0200">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260420_0001">
   <link rel="stylesheet" href="/employees/style.css">
 </head>
 <body>

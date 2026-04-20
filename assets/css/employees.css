@@ -2,7 +2,12 @@
 .filters { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; }
         .filters label { font-size: 12px; color: var(--muted); display:flex; flex-direction: column; gap: 6px; }
         .filters input[type="date"] { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card); }
-        .filters button { padding: 10px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fffaf4; font-weight: 800; cursor: pointer; }
+        .filters button { padding: 10px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fffaf4; font-weight: 800; cursor: pointer; transition: background-color 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease; }
+        #loadBtn:hover {
+            background: #d9a45a;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+            transform: translateY(-1px);
+        }
         .filters button:disabled { opacity: 0.65; cursor: default; }
         .loader { display:none; align-items:center; gap: 10px; }
         .spinner { width: 16px; height: 16px; border: 2px solid rgba(26,115,232,0.22); border-top-color: rgba(26,115,232,0.9); border-radius: 50%; animation: spin 0.8s linear infinite; }
@@ -69,9 +74,34 @@
         .modal .
         .modal .sub { margin-top: 10px; color: var(--muted); font-weight: 800; font-size: 12px; }
         .modal .actions { display:flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
-        .modal .btn2 { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); font-weight: 900; cursor: pointer; }
-        .modal .btn2.primary { background: var(--accent); border-color: var(--accent); color: #fffaf4; }
-        .modal .btn2:disabled { opacity: 0.6; cursor: default; }
+        .modal .btn2 {
+            padding: 9px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            font-weight: 900;
+            cursor: pointer;
+            transition: background-color 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+        }
+        .modal .btn2.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fffaf4;
+        }
+        .modal .btn2:hover {
+            background: var(--card2);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+            transform: translateY(-1px);
+        }
+        .modal .btn2.primary:hover {
+            background: #d9a45a;
+        }
+        .modal .btn2:disabled {
+            opacity: 0.6;
+            cursor: default;
+            box-shadow: none;
+            transform: none;
+        }
         #payExtraModal .modal { max-width: 520px; position: relative; }
         .payextra-fields { display: grid; gap: 10px; }
         .payextra-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
@@ -99,7 +129,7 @@
             flex-direction: column;
             gap: 10px;
             border-radius: 14px;
-            background: rgba(17, 24, 39, 0.55);
+            background: rgba(17, 24, 39, 0.85);
             color: #fffaf4;
             font-weight: 900;
             text-align: center;
@@ -152,7 +182,27 @@
             transform: translateX(-50%) translateY(0);
         }
         .cols-dd { position: relative; display: inline-flex; }
-        .cols-dd > button { white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; }
+        .cols-dd > button {
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(184,135,70,0.55);
+            background: rgba(184,135,70,0.10);
+            color: var(--accent);
+            font-weight: 900;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease, border-color 0.15s ease;
+        }
+        .cols-dd > button:hover {
+            background: rgba(184,135,70,0.22);
+            border-color: rgba(184,135,70,0.9);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+            transform: translateY(-1px);
+        }
         .cols-icon { width: 14px; height: 14px; display: inline-block; }
         .cols-menu {
             position: absolute;
