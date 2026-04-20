@@ -2066,6 +2066,13 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_get_actions') {
         if (!isset($_SESSION)) {
             if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         }
+        $lockUntil = (int)($_SESSION['payday2_poster_admin_lock_until'] ?? 0);
+        if ($lockUntil > time()) {
+            http_response_code(429);
+            echo json_encode(['ok' => false, 'error' => 'Poster Admin: busy, retry later'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $_SESSION['payday2_poster_admin_lock_until'] = time() + 2;
         $ls = \App\Payday2\LocalSettings::merged();
         $admin = $ls['poster_admin'] ?? [];
         if (!is_array($admin)) $admin = [];
@@ -2078,17 +2085,26 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_get_actions') {
             'csrf' => (string)($st['csrf'] ?? ($admin['csrf'] ?? '')),
             'user_agent' => (string)($admin['user_agent'] ?? ''),
         ];
+        if (trim($cfg['account']) === '' || trim($cfg['pos_session']) === '' || trim($cfg['ssid']) === '' || trim($cfg['csrf']) === '') {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Poster Admin: заполните настройки (account_url/pos_session/ssid/csrf_cookie_poster).'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $client = new \App\Classes\PosterAdminAjax($cfg);
         $params = $client->getActions($txId);
         $_SESSION['payday2_poster_admin'] = [
             'pos_session' => $client->getPosSession(),
             'csrf' => $client->getCsrf(),
         ];
+        $_SESSION['payday2_poster_admin_lock_until'] = 0;
         echo json_encode(['ok' => true, 'params' => $params], JSON_UNESCAPED_UNICODE);
         exit;
     } catch (\Throwable $e) {
+        if (!isset($_SESSION)) { if (session_status() !== PHP_SESSION_ACTIVE) @session_start(); }
+        $_SESSION['payday2_poster_admin_lock_until'] = 0;
         http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        @file_put_contents(__DIR__ . '/poster_admin_error.log', date('c') . " get_actions tx={$txId} user=" . (string)($_SESSION['user_email'] ?? '') . " err=" . $e->getMessage() . "\n", FILE_APPEND);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage(), 'where' => 'get_actions'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 }
@@ -2114,6 +2130,13 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
         if (!isset($_SESSION)) {
             if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         }
+        $lockUntil = (int)($_SESSION['payday2_poster_admin_lock_until'] ?? 0);
+        if ($lockUntil > time()) {
+            http_response_code(429);
+            echo json_encode(['ok' => false, 'error' => 'Poster Admin: busy, retry later'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $_SESSION['payday2_poster_admin_lock_until'] = time() + 2;
         $ls = \App\Payday2\LocalSettings::merged();
         $admin = $ls['poster_admin'] ?? [];
         if (!is_array($admin)) $admin = [];
@@ -2126,17 +2149,46 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
             'csrf' => (string)($st['csrf'] ?? ($admin['csrf'] ?? '')),
             'user_agent' => (string)($admin['user_agent'] ?? ''),
         ];
+        if (trim($cfg['account']) === '' || trim($cfg['pos_session']) === '' || trim($cfg['ssid']) === '' || trim($cfg['csrf']) === '') {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Poster Admin: заполните настройки (account_url/pos_session/ssid/csrf_cookie_poster).'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $client = new \App\Classes\PosterAdminAjax($cfg);
-        $res = $client->editCheck($txId, $params);
+        $current = $client->getActions($txId);
+        $fiscal = (int)($current['printFiscal'] ?? $current['print_fiscal'] ?? $current['fiscal'] ?? 0);
+        if ($fiscal === 1) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Нельзя редактировать фискальный чек.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $keys = ['payedCash', 'payedCard', 'payedCert', 'payedEwallet', 'payedBonus', 'payedThirdParty'];
+        $outParams = is_array($current) ? $current : [];
+        $sum = 0;
+        foreach ($keys as $k) {
+            $v = isset($params[$k]) ? (int)$params[$k] : (int)($outParams[$k] ?? 0);
+            if ($v < 0) $v = 0;
+            $outParams[$k] = $v;
+            $sum += $v;
+        }
+        $outParams['payedSum'] = $sum;
+        if (isset($params['usesPayedCert'])) {
+            $outParams['usesPayedCert'] = ((int)$params['usesPayedCert'] === 1) ? 1 : 0;
+        }
+        $res = $client->editCheck($txId, $outParams);
         $_SESSION['payday2_poster_admin'] = [
             'pos_session' => $client->getPosSession(),
             'csrf' => $client->getCsrf(),
         ];
+        $_SESSION['payday2_poster_admin_lock_until'] = 0;
         echo json_encode(['ok' => true, 'result' => $res], JSON_UNESCAPED_UNICODE);
         exit;
     } catch (\Throwable $e) {
+        if (!isset($_SESSION)) { if (session_status() !== PHP_SESSION_ACTIVE) @session_start(); }
+        $_SESSION['payday2_poster_admin_lock_until'] = 0;
         http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        @file_put_contents(__DIR__ . '/poster_admin_error.log', date('c') . " edit_check tx={$txId} user=" . (string)($_SESSION['user_email'] ?? '') . " err=" . $e->getMessage() . "\n", FILE_APPEND);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage(), 'where' => 'edit_check'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 }

@@ -75,6 +75,10 @@ final class PosterAdminAjax
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER => true,
             CURLOPT_ENCODING => '',
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_MAXREDIRS => 0,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 20,
             CURLOPT_HTTPHEADER => [
                 'Accept: */*',
                 'Accept-Language: ru',
@@ -107,6 +111,13 @@ final class PosterAdminAjax
         $body = substr($raw, $headerSize);
         $this->lastBody = $body;
         curl_close($ch);
+
+        if (preg_match('/^Location:\s*(.+)$/mi', $rawHeaders, $m)) {
+            $loc = trim((string)($m[1] ?? ''));
+            if ($this->lastCode >= 300 && $this->lastCode < 400) {
+                throw new \RuntimeException("Poster Admin redirect HTTP {$this->lastCode} to {$loc} (session expired?)");
+            }
+        }
 
         if (preg_match_all('/^Set-Cookie:\s*csrf_cookie_poster=([^;]+)/mi', $rawHeaders, $m)) {
             $this->csrf = (string)end($m[1]);
@@ -160,4 +171,3 @@ final class PosterAdminAjax
         return is_array($json) ? $json : ['raw' => (string)$r['body']];
     }
 }
-

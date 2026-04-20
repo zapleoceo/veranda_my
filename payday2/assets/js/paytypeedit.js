@@ -1,13 +1,43 @@
 (() => {
-    const qs = (sel) => {
-        try { return document.querySelector(sel); } catch (_) { return null; }
-    };
     const ce = (tag) => document.createElement(tag);
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
     const readInt = (el) => {
         if (!el) return 0;
         const d = digitsOnly(el.value);
         return d ? (Number(d) || 0) : 0;
+    };
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const parseJsonLoose = (text) => {
+        try { return JSON.parse(String(text || '')); } catch (_) { return null; }
+    };
+
+    const toast = (msg) => {
+        const text = String(msg || '').trim();
+        if (!text) return;
+        let el = document.getElementById('pd2PaytypeToast');
+        if (!el) {
+            el = ce('div');
+            el.id = 'pd2PaytypeToast';
+            el.style.position = 'fixed';
+            el.style.left = '50%';
+            el.style.bottom = '18px';
+            el.style.transform = 'translateX(-50%)';
+            el.style.zIndex = '100000';
+            el.style.padding = '10px 12px';
+            el.style.borderRadius = '10px';
+            el.style.border = '1px solid var(--border, #d6d6d6)';
+            el.style.background = 'var(--card, #fff)';
+            el.style.color = 'var(--text, #111827)';
+            el.style.fontWeight = '900';
+            el.style.boxShadow = '0 10px 30px rgba(0,0,0,0.22)';
+            el.style.opacity = '0';
+            el.style.transition = 'opacity 0.15s ease';
+            document.body.appendChild(el);
+        }
+        el.textContent = text;
+        el.style.opacity = '1';
+        if (el._t) clearTimeout(el._t);
+        el._t = setTimeout(() => { el.style.opacity = '0'; }, 1800);
     };
 
     const state = {
@@ -53,7 +83,7 @@
                 </div>
                 <div class="pd2-settings-grid-4" style="margin-bottom: 10px;">
                     <label class="pd2-settings-label pd2-m-0"><span>payedSum</span>
-                        <input type="text" class="btn pd2-w-100" id="pte_payedSum" autocomplete="off">
+                        <input type="text" class="btn pd2-w-100" id="pte_payedSum" autocomplete="off" readonly>
                     </label>
                     <label class="pd2-settings-label pd2-m-0"><span>payedCash</span>
                         <input type="text" class="btn pd2-w-100" id="pte_payedCash" autocomplete="off">
@@ -122,30 +152,38 @@
             state.btnSave.addEventListener('click', () => {
                 if (state.saving || !state.currentTxId) return;
                 const txId = state.currentTxId;
-                const params = {
-                    payedSum: readInt(state.fields.payedSum),
+                const parts = {
                     payedCash: readInt(state.fields.payedCash),
                     payedCard: readInt(state.fields.payedCard),
                     payedCert: readInt(state.fields.payedCert),
                     payedEwallet: readInt(state.fields.payedEwallet),
                     payedBonus: readInt(state.fields.payedBonus),
                     payedThirdParty: readInt(state.fields.payedThirdParty),
+                };
+                const sum = Object.values(parts).reduce((a, b) => a + (Number(b) || 0), 0);
+                if (state.fields.payedSum) state.fields.payedSum.value = String(sum);
+                const params = {
+                    payedSum: sum,
+                    ...parts,
                     usesPayedCert: state.fields.usesPayedCert && state.fields.usesPayedCert.checked ? 1 : 0,
                 };
                 state.saving = true;
                 if (state.btnSave) state.btnSave.disabled = true;
-                fetch('?ajax=poster_admin_edit_check', {
+                setLoading(true);
+                sleep(350)
+                    .then(() => fetch('?ajax=poster_admin_edit_check', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify({ transaction_id: txId, params }),
-                })
+                })))
                     .then((r) => r.text())
                     .then((t) => {
-                        let j = null;
-                        try { j = JSON.parse(t); } catch (_) { j = null; }
-                        if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
-                        if (window.showToast) window.showToast('Сохранено');
-                        else alert('Сохранено');
+                        const j = parseJsonLoose(t);
+                        if (!j || !j.ok) {
+                            const msg = (j && j.error) ? String(j.error) : ('Ошибка: ' + String(t || '').slice(0, 300));
+                            throw new Error(msg);
+                        }
+                        toast('Сохранено');
                         close();
                         try { window.dispatchEvent(new CustomEvent('pd2_checks_reload')); } catch (_) {}
                     })
@@ -157,6 +195,7 @@
                     })
                     .finally(() => {
                         state.saving = false;
+                        setLoading(false);
                         if (state.btnSave) state.btnSave.disabled = false;
                     });
             });
@@ -185,9 +224,11 @@
         })
             .then((r) => r.text())
             .then((t) => {
-                let j = null;
-                try { j = JSON.parse(t); } catch (_) { j = null; }
-                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+                const j = parseJsonLoose(t);
+                if (!j || !j.ok) {
+                    const msg = (j && j.error) ? String(j.error) : ('Ошибка: ' + String(t || '').slice(0, 300));
+                    throw new Error(msg);
+                }
                 const p = j.params || {};
                 const set = (k, v) => { if (state.fields[k]) state.fields[k].value = String(v != null ? v : ''); };
                 set('payedSum', p.payedSum ?? 0);
@@ -198,6 +239,25 @@
                 set('payedBonus', p.payedBonus ?? 0);
                 set('payedThirdParty', p.payedThirdParty ?? 0);
                 if (state.fields.usesPayedCert) state.fields.usesPayedCert.checked = Number(p.usesPayedCert ?? 0) === 1;
+
+                const recalc = () => {
+                    const parts = [
+                        readInt(state.fields.payedCash),
+                        readInt(state.fields.payedCard),
+                        readInt(state.fields.payedCert),
+                        readInt(state.fields.payedEwallet),
+                        readInt(state.fields.payedBonus),
+                        readInt(state.fields.payedThirdParty),
+                    ];
+                    const sum = parts.reduce((a, b) => a + (Number(b) || 0), 0);
+                    if (state.fields.payedSum) state.fields.payedSum.value = String(sum);
+                };
+                ['payedCash', 'payedCard', 'payedCert', 'payedEwallet', 'payedBonus', 'payedThirdParty'].forEach((k) => {
+                    const el = state.fields[k];
+                    if (!el) return;
+                    el.oninput = recalc;
+                });
+                recalc();
             })
             .catch((e) => {
                 if (state.err) {
@@ -219,4 +279,3 @@
         open(txId);
     });
 })();
-
