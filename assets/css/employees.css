@@ -114,10 +114,15 @@
             border-radius: 10px;
             font-size: 14px;
             background: var(--card);
+            color: var(--text);
             width: 100%;
             max-width: 100%;
             box-sizing: border-box;
             min-width: 0;
+        }
+        .payextra-fields select option {
+            background: #111827;
+            color: #fffaf4;
         }
         .payextra-fields input[readonly] { background: var(--border); color: var(--text); }
         .payextra-overlay {
