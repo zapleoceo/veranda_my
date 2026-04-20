@@ -2697,19 +2697,19 @@ window.initPayday2 = function() {
 
     const payTypeLabel = (v) => {
         const n = Number(v || 0) || 0;
-        if (n === 0) return '0 — без оплаты';
-        if (n === 1) return '1 — наличные';
-        if (n === 2) return '2 — безнал';
-        if (n === 3) return '3 — смешанная';
-        return String(n);
+        if (n === 0) return 'без оплаты';
+        if (n === 1) return 'наличные';
+        if (n === 2) return 'безнал';
+        if (n === 3) return 'смешанная';
+        return '';
     };
 
     const statusLabel = (v) => {
         const n = Number(v || 0) || 0;
-        if (n === 1) return '1 — открыт';
-        if (n === 2) return '2 — закрыт';
-        if (n === 3) return '3 — удален';
-        return String(n || '');
+        if (n === 1) return 'открыт';
+        if (n === 2) return 'закрыт';
+        if (n === 3) return 'удален';
+        return '';
     };
 
     const fmtMoney0 = (v) => {
@@ -2873,7 +2873,6 @@ window.initPayday2 = function() {
         if (checkFinderClose) checkFinderClose.addEventListener('click', closeCheckFinder);
         checkFinderModal.addEventListener('click', (e) => { if (e.target === checkFinderModal) closeCheckFinder(); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && checkFinderModal.style.display === 'flex') closeCheckFinder(); });
-        if (checkFinderSearchBtn) checkFinderSearchBtn.addEventListener('click', () => { loadChecks().catch(() => {}); });
         if (checkFinderNumber) {
             let t = 0;
             checkFinderNumber.addEventListener('input', () => {
