@@ -50,8 +50,37 @@
     font-weight: bold;
 }
 
+.pd2-unified-tabs {
+    margin-left: auto;
+    flex: 0 1 auto;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.pd2-unified-btn {
+    height: 34px;
+    min-width: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px !important;
+    box-sizing: border-box;
+    font-size: 14px;
+    flex: 1 1 auto;
+}
+.pd2-unified-icon {
+    height: 18px;
+    width: auto;
+    filter: invert(0.8);
+}
+
 @media (max-width: 800px) {
     #dateForm { width: 96px !important; }
+    .pd2-unified-tabs {
+        margin-left: 0;
+        justify-content: flex-start;
+    }
     .pd2-date-input { width: 92px !important; height: 34px !important; padding: 0 2px !important; border-radius: 10px !important; }
     
     .pd2-nav-title-row {

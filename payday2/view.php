@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260420_0021';
+$payday2AssetVersion = '20260419_0072';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -393,23 +393,21 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
         <div class="nav-left">
             <div class="pd2-nav-title-row pd2-d-flex pd2-align-center pd2-gap-8">
                 <div class="nav-title pd2-pointer" id="payday2InfoBtn">Payday2</div>
-                <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2HelpToggleBtn" title="Справка">❓</button>
-                <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2SettingsBtn" title="Настройки Payday2" data-help-abs="Настройки интеграции с Telegram и счетами Poster.">⚙</button>
-                <div class="pd2-d-flex">
-                    <button type="button" class="pd2-icon-btn" id="btnKashShift" title="KashShift" data-help-abs="Просмотр кассовых смен из Poster.">
-                        <img src="/payday2/img/Cash.png" alt="KashShift">
+                <div class="tabs pd2-unified-tabs" data-help="Инструменты и переключение режимов сверки финансов">
+                    <button type="button" class="tab pd2-unified-btn" id="payday2HelpToggleBtn" title="Справка">❓</button>
+                    <button type="button" class="tab pd2-unified-btn" id="payday2SettingsBtn" title="Настройки Payday2" data-help-abs="Настройки интеграции с Telegram и счетами Poster.">⚙</button>
+                    <button type="button" class="tab pd2-unified-btn" id="btnKashShift" title="KashShift" data-help-abs="Просмотр кассовых смен из Poster.">
+                        <img src="/payday2/img/Cash.png" alt="KashShift" class="pd2-unified-icon">
                     </button>
-                    <button type="button" class="pd2-icon-btn pd2-ml-5" id="btnSupplies" title="Supplies" data-help-abs="Просмотр списка поставок из Poster.">
-                        <img src="/payday2/img/Supply.png" alt="Supplies">
+                    <button type="button" class="tab pd2-unified-btn" id="btnSupplies" title="Supplies" data-help-abs="Просмотр списка поставок из Poster.">
+                        <img src="/payday2/img/Supply.png" alt="Supplies" class="pd2-unified-icon">
                     </button>
+                    <button type="button" class="tab pd2-unified-btn" id="payday2CheckFinderBtn" title="Чек" data-help-abs="Поиск и удаление чека Poster по номеру.">
+                        <img src="/payday2/img/receipt.png" alt="Чек" class="pd2-unified-icon">
+                    </button>
+                    <button type="button" class="tab pd2-unified-btn active" id="tabIn" data-help-abs="Режим IN: Сверка входящих платежей.">IN</button>
+                    <button type="button" class="tab pd2-unified-btn" id="tabOut" data-help-abs="Режим OUT: Сверка исходящих платежей (затрат).">OUT</button>
                 </div>
-                <button type="button" class="pd2-icon-btn pd2-ml-5" id="payday2CheckFinderBtn" title="Чек" data-help-abs="Поиск и удаление чека Poster по номеру.">
-                    <img src="/payday2/img/receipt.png" alt="Чек">
-                </button>
-            </div>
-            <div class="tabs" data-help="Переключение режимов сверки финансов: приходы (IN) или расходы (OUT).">
-                <button type="button" class="tab active" id="tabIn" data-help-abs="Режим IN: Сверка входящих платежей.">IN</button>
-                <button type="button" class="tab" id="tabOut" data-help-abs="Режим OUT: Сверка исходящих платежей (затрат).">OUT</button>
             </div>
             <div id="topFormsWrap" class="pd2-top-forms-wrap" data-help="Блок выбора рабочего периода для загрузки транзакций.">
                 <form method="GET" id="dateForm" class="pd2-m-0 pd2-d-flex pd2-align-center pd2-gap-10 pd2-pos-relative">

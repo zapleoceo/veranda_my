@@ -2822,6 +2822,9 @@ window.initPayday2 = function() {
             return;
         }
         if (checkFinderSearchBtn) checkFinderSearchBtn.disabled = true;
+        if (checkFinderResult) {
+            checkFinderResult.innerHTML = '<div style="padding:20px;text-align:center;"><svg class="pd2-loader-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> <span style="vertical-align:middle;margin-left:8px;color:var(--muted);">Загрузка чеков...</span></div>';
+        }
         try {
             const url = '?ajax=poster_checks_list&date_from=' + encodeURIComponent(dFrom) + '&date_to=' + encodeURIComponent(dTo);
             const j = await fetchJsonSafe(url);
@@ -2840,6 +2843,10 @@ window.initPayday2 = function() {
         if (!txId) return;
         if (!confirm('Удалить чек #' + String(txId) + ' ?')) return;
         checkFinderShowError('');
+        if (checkFinderDeleteBtn) {
+            checkFinderDeleteBtn.disabled = true;
+            checkFinderDeleteBtn.textContent = 'Удаление...';
+        }
         try {
             const r = await fetch('?ajax=poster_check_remove', {
                 method: 'POST',
@@ -2853,8 +2860,14 @@ window.initPayday2 = function() {
             checksAll = checksAll.filter((c) => Number(c && c.transaction_id ? c.transaction_id : 0) !== txId);
             filterAndRender();
             showToast('Удалено: ' + String(txId));
+            checkFinderReset();
         } catch (e) {
             checkFinderShowError(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            if (checkFinderDeleteBtn) {
+                checkFinderDeleteBtn.disabled = false;
+                checkFinderDeleteBtn.textContent = 'Удалить';
+            }
         }
     };
 
