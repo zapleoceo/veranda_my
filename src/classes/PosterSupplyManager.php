@@ -67,14 +67,18 @@ class PosterSupplyManager {
                 }
 
                 $num = (float)$ing['supply_ingredient_num'];
-                // По инструкции нужно передать supply_ingredient_sum (поделенный на 100) как sum
+                // Poster отдает ОБЩУЮ сумму в supply_ingredient_sum в копейках.
                 $totalSumVnd = round((float)$ing['supply_ingredient_sum'] / 100, 2);
+                
+                // В updateSupply параметр sum — это ЦЕНА ЗА ЕДИНИЦУ (Price per unit).
+                // Поэтому делим общую сумму на количество:
+                $unitPrice = $num > 0 ? round($totalSumVnd / $num, 2) : 0;
 
                 $item = [
                     'id'   => $id,
                     'type' => $type,
                     'num'  => $num,
-                    'sum'  => $totalSumVnd,
+                    'sum'  => $unitPrice,
                 ];
 
                 if (!empty($ing['pack_id'])) {
