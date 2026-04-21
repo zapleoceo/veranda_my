@@ -139,8 +139,11 @@ window.initPayday2_KashShift = function() {
 
                 p.then(res => {
                         if (!res.ok) throw new Error(res.error || 'Ошибка загрузки транзакций смены');
-                        const arr = res.data;
-                        if (!Array.isArray(arr) || arr.length === 0) {
+                        const arrRaw = res.data;
+                        const arr = Array.isArray(arrRaw)
+                            ? arrRaw.filter((tx) => Number(tx && tx.delete ? tx.delete : 0) !== 1)
+                            : [];
+                        if (arr.length === 0) {
                             contentDiv.innerHTML = '<div style="color:var(--muted);">Нет транзакций в этой смене</div>';
                             return;
                         }
