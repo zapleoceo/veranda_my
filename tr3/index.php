@@ -210,6 +210,17 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
 
+  <div class="modal" id="preorderOkModal" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="preorderOkTitle">
+      <div class="modal-title" id="preorderOkTitle" data-i18n="preorder_accepted_title"><?= htmlspecialchars(tr('preorder_accepted_title')) ?></div>
+      <div class="modal-text" id="preorderOkText" data-i18n="preorder_accepted_msg"><?= htmlspecialchars(tr('preorder_accepted_msg')) ?></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" type="button" id="preorderOkBtn" data-i18n="ok"><?= htmlspecialchars(tr('ok')) ?></button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="reqModal" aria-hidden="true">
     <div class="modal-backdrop" data-modal-close="reqModal"></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reqModalTitle" id="reqModalCard">

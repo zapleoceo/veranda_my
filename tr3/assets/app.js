@@ -909,6 +909,17 @@
           totalEl.className = 'preorder-total';
           totalEl.textContent = t('preorder_amount').replace('{amount}', new Intl.NumberFormat(UI_LOCALE).format(Math.round(totalPrice)));
           targetBox.appendChild(totalEl);
+
+          const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
+          if (guests > 5) {
+            const minAmount = 100000 * guests;
+            if (Math.round(totalPrice) < minAmount) {
+              const warn = document.createElement('div');
+              warn.className = 'preorder-warn';
+              warn.textContent = t('increase_preorder');
+              targetBox.appendChild(warn);
+            }
+          }
         }
       };
 
@@ -1248,7 +1259,11 @@
         const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
         const counts = normalizePreorder(preorderCounts);
         const hasPreorder = Object.keys(counts).some((k) => (Number(counts[k] || 0) || 0) > 0);
-        const preorderOk = guests <= 5 || hasPreorder;
+      const getTotalPreorderAmount = () => Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
+      const totalAmount = getTotalPreorderAmount();
+      const minAmount = (guests > 5) ? (100000 * guests) : 0;
+      const preorderAmountOk = guests <= 5 || (totalAmount >= minAmount);
+      const preorderOk = guests <= 5 || (hasPreorder && preorderAmountOk);
         if (reqPreorderLabel) reqPreorderLabel.hidden = guests <= 5;
         if (reqPreorderBox) reqPreorderBox.classList.toggle('preorder-missing', guests > 5 && !preorderOk);
         const canSubmit = linked && nameOk && phoneOk && startOk && guestsOk && preorderOk && !modalTableBusy;
@@ -1867,6 +1882,12 @@
           const countsNow = normalizePreorder(preorderCounts);
           const hasPreorderNow = Object.keys(countsNow).some((k) => (Number(countsNow[k] || 0) || 0) > 0);
           if (guests > 5 && !hasPreorderNow) missing.push(t('missing_preorder'));
+          const totalAmountNow = getTotalPreorderAmount();
+          const minAmountNow = (guests > 5) ? (100000 * guests) : 0;
+          if (guests > 5 && totalAmountNow < minAmountNow) {
+            if (reqPreorderBox) reqPreorderBox.classList.add('preorder-missing');
+            missing.push(t('increase_preorder'));
+          }
           if (missing.length) {
             logJs('submit prevented: missing fields', { missing }).catch(() => null);
             if (!start && reqStart) reqStart.focus();
@@ -1898,7 +1919,24 @@
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
           setModal(reqModal, false);
           if (history.state && history.state.modal === 'reqModal') history.back();
-          setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableNum, guests: String(guests), name, phone }));
+          try { localStorage.removeItem(DRAFT_KEY); } catch (_) {}
+          preorderCounts = {};
+          renderPreorderBox();
+          if (reqName) reqName.value = '';
+          if (reqPhone) reqPhone.value = '';
+          if (reqComment) reqComment.value = '';
+          if (reqGuests) reqGuests.value = '2';
+          if (typeof updatePreorderUi === 'function') updatePreorderUi();
+          if (typeof syncSubmitState === 'function') syncSubmitState();
+
+          const preorderOkModal = document.getElementById('preorderOkModal');
+          const preorderOkBtn = document.getElementById('preorderOkBtn');
+          if (preorderOkModal && preorderOkBtn && preorder && guests > 5) {
+            setModal(preorderOkModal, true);
+            preorderOkBtn.onclick = () => setModal(preorderOkModal, false);
+          } else {
+            setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableNum, guests: String(guests), name, phone }));
+          }
         } catch (err) {
           const errMsg = String(err && err.message ? err.message : err);
           setOutput({ ok: false, error: errMsg });

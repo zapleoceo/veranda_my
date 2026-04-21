@@ -1351,6 +1351,17 @@
       font-weight: 600;
       color: rgba(255,255,255,0.6);
     }
+    .preorder-warn {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(229,115,115,0.55);
+      background: rgba(229,115,115,0.10);
+      color: rgba(255, 225, 225, 0.95);
+      font-size: 12px;
+      font-weight: 800;
+      text-align: center;
+    }
     .modal-card.wide { width: min(980px, 100%); }
     .req-layout { display: flex; gap: 12px; align-items: flex-start; }
     .req-left { flex: 1 1 440px; min-width: 0; }
