@@ -146,6 +146,11 @@
     color: var(--text);
 }
 .pd2-modal-body { max-height: 85vh; overflow: auto; }
+.confirm-modal select.btn option,
+.confirm-modal select.btn optgroup {
+    color: #111;
+    background-color: #fff;
+}
 .pd2-inline-flex { display: inline-flex; }
 .pd2-text-dec-none { text-decoration: none; }
 .pd2-min-w-140 { min-width: 140px; }
