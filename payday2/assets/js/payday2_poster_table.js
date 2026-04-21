@@ -98,11 +98,15 @@ window.initPayday2_PosterTable = function() {
                 const userName = String(emps && emps[Number(row.user_id || 0)] ? emps[Number(row.user_id || 0)] : row.user_id || '');
                 
                 let catName = '';
-                const catObj = cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : null;
-                const customCatNames = window.PAYDAY_CONFIG.catNames || {};
+                const catId = Number(row.category_id || 0);
+                const catObj = cats && cats[catId] ? cats[catId] : null;
                 
-                if (customCatNames[Number(row.category_id || 0)]) {
-                    catName = String(customCatNames[Number(row.category_id || 0)]);
+                // Get custom names from localSettings directly to be robust
+                const ls = window.PAYDAY_CONFIG?.localSettings || {};
+                const customCatNames = ls.custom_category_names || window.PAYDAY_CONFIG?.catNames || {};
+                
+                if (customCatNames[catId] || customCatNames[String(catId)]) {
+                    catName = String(customCatNames[catId] || customCatNames[String(catId)]);
                 } else if (catObj && typeof catObj === 'object' && catObj.name) {
                     catName = String(catObj.name);
                 } else if (typeof catObj === 'string') {
