@@ -24,7 +24,7 @@ window.initPaydayCreateTx = function() {
     const successTitle = document.getElementById('createTxSuccessTitle');
 
     let accountsLoaded = false;
-    let categoriesLoaded = false;
+    let categoriesData = null;
 
     const mountCustomSelect = (selectEl) => {
         if (!selectEl) return null;
@@ -173,53 +173,52 @@ window.initPaydayCreateTx = function() {
                 accountsLoaded = true;
             }
 
-            if (!categoriesLoaded) {
+            if (!categoriesData) {
                 const r = await fetch('?ajax=finance_categories');
                 const j = await r.json();
                 if (!j || !j.ok) throw new Error(j?.error || 'Ошибка загрузки категорий');
+                categoriesData = j.categories || {};
+            }
                 
-                const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
-                const allowed = ls && ls.allowed_categories ? ls.allowed_categories : [];
-                const customNames = ls && ls.custom_category_names ? ls.custom_category_names : {};
+            const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
+            const allowed = ls && ls.allowed_categories ? ls.allowed_categories : [];
+            const customNames = ls && ls.custom_category_names ? ls.custom_category_names : {};
 
-                const cats = j.categories || {};
-                const roots = [];
-                const byId = {};
-                
-                for (const [idStr, data] of Object.entries(cats)) {
-                    const id = Number(idStr);
-                    byId[id] = { id, name: data.name, parent_id: Number(data.parent_id || 0), children: [] };
+            const cats = categoriesData;
+            const roots = [];
+            const byId = {};
+            
+            for (const [idStr, data] of Object.entries(cats)) {
+                const id = Number(idStr);
+                byId[id] = { id, name: data.name, parent_id: Number(data.parent_id || 0), children: [] };
+            }
+            
+            for (const id in byId) {
+                const node = byId[id];
+                if (node.parent_id && byId[node.parent_id]) {
+                    byId[node.parent_id].children.push(node);
+                } else {
+                    roots.push(node);
                 }
+            }
+
+            categorySelect.innerHTML = '<option value="">Без категории</option>';
+            
+            const renderOptions = (node, depth) => {
+                const isAllowed = allowed.includes(node.id);
                 
-                for (const id in byId) {
-                    const node = byId[id];
-                    if (node.parent_id && byId[node.parent_id]) {
-                        byId[node.parent_id].children.push(node);
-                    } else {
-                        roots.push(node);
-                    }
+                if (isAllowed) {
+                    const customName = customNames[node.id] || node.name;
+                    const prefix = '— '.repeat(depth);
+                    categorySelect.insertAdjacentHTML('beforeend', `<option value="${node.id}">${escapeHtml(prefix + customName)}</option>`);
                 }
-
-                categorySelect.innerHTML = '<option value="">Без категории</option>';
-                
-                const renderOptions = (node, depth) => {
-                    const isAllowed = allowed.includes(node.id);
-                    
-                    if (isAllowed) {
-                        const customName = customNames[node.id] || node.name;
-                        const prefix = '— '.repeat(depth);
-                        categorySelect.insertAdjacentHTML('beforeend', `<option value="${node.id}">${escapeHtml(prefix + customName)}</option>`);
-                    }
-                    for (const child of node.children) {
-                        renderOptions(child, depth + 1);
-                    }
-                };
-
-                for (const root of roots) {
-                    renderOptions(root, 0);
+                for (const child of node.children) {
+                    renderOptions(child, depth + 1);
                 }
+            };
 
-                categoriesLoaded = true;
+            for (const root of roots) {
+                renderOptions(root, 0);
             }
 
             if (!customSelects.type) customSelects.type = mountCustomSelect(typeSelect);
