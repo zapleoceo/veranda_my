@@ -137,7 +137,7 @@ class PosterAPI {
     /**
      * Получение детальной информации о поставке
      */
-    public function getSupply(int $supplyId): array {
+    public function getSupply(int $supplyId) {
         return $this->request('storage.getSupply', [
             'supply_id' => $supplyId
         ]);
@@ -146,7 +146,7 @@ class PosterAPI {
     /**
      * Обновление поставки (редактирование)
      */
-    public function updateSupply(array $payload): array {
+    public function updateSupply(array $payload) {
         return $this->request('storage.updateSupply', $payload, 'POST');
     }
 }

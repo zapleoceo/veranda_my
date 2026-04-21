@@ -16,10 +16,10 @@ class PosterSupplyManager {
      *
      * @param int $supplyId ID поставки
      * @param int $newAccountId Новый ID счета
-     * @return array Ответ от API Poster
+     * @return mixed Ответ от API Poster
      * @throws \Exception Если поставка в инвентаризации или нет ингредиентов
      */
-    public function changeSupplyAccount(int $supplyId, int $newAccountId): array {
+    public function changeSupplyAccount(int $supplyId, int $newAccountId) {
         if ($supplyId <= 0) {
             throw new \InvalidArgumentException('Invalid supply_id');
         }
