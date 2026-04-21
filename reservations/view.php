@@ -55,12 +55,13 @@
                         <div class="res-hall-head">
                             <div>
                                 <div class="res-hall-title">Столы</div>
-                                <div class="res-hall-sub">spot_id=<?= (int)$resSpotId ?> · hall_id=<?= (int)$resHallId ?> · soon_hours=<?= (int)$resSoonHours ?></div>
+                                <div class="res-hall-sub">spot_id=<?= (int)$resSpotId ?> · hall_id=<?= (int)$resHallId ?> · soon_hours=<?= (int)$resSoonHours ?> · min_preorder_per_guest=<?= (int)$resMinPreorderPerGuest ?></div>
                             </div>
                             <div class="res-hall-controls">
                                 <label class="res-hall-label">spot_id <input id="resSpotId" value="<?= (int)$resSpotId ?>" inputmode="numeric"></label>
                                 <label class="res-hall-label">hall_id <input id="resHallId" value="<?= (int)$resHallId ?>" inputmode="numeric"></label>
                                 <label class="res-hall-label">soon <input id="resSoonHours" value="<?= (int)$resSoonHours ?>" inputmode="numeric"></label>
+                                <label class="res-hall-label">min ₫/guest <input id="resMinPreorderPerGuest" value="<?= (int)$resMinPreorderPerGuest ?>" inputmode="numeric"></label>
                                 <button type="button" class="res-btn" id="resHallApply">Применить</button>
                                 <button type="button" class="res-btn" id="resHallRotate">180°</button>
                             </div>

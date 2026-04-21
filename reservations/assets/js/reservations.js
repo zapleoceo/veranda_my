@@ -502,16 +502,26 @@
   };
 
   const bindHall = () => {
-    const data = typeof window !== 'undefined' ? window.RES_HALL_DATA : null;
     const section = q('#resHallSection');
     const board = q('#resHallBoard');
-    if (!data || !section || !board) return;
+    if (!section || !board) return;
+    let data = (typeof window !== 'undefined' ? window.RES_HALL_DATA : null) || null;
+    if (!data && section.dataset && section.dataset.hallData) {
+      try {
+        data = JSON.parse(String(section.dataset.hallData || 'null'));
+        if (data && typeof window !== 'undefined') window.RES_HALL_DATA = data;
+      } catch (_) {
+        data = null;
+      }
+    }
+    if (!data) return;
     if (section.dataset.bound === '1') return;
     section.dataset.bound = '1';
 
     const spotIdInput = q('#resSpotId');
     const hallIdInput = q('#resHallId');
     const soonInput = q('#resSoonHours');
+    const minPreorderInput = q('#resMinPreorderPerGuest');
     const btnApply = q('#resHallApply');
     const btnRotate = q('#resHallRotate');
     const btnAll = q('#resHallAll');
@@ -695,6 +705,12 @@
     if (soonInput) soonInput.addEventListener('change', async () => {
       const v = Number(soonInput.value || 2) || 2;
       await postForm(endpoint + '?ajax=res_soon_hours', { soon_hours: v });
+    });
+
+    if (minPreorderInput) minPreorderInput.addEventListener('change', async () => {
+      const v = Math.max(0, Math.floor(Number(minPreorderInput.value || 0) || 0));
+      const { res, j } = await postForm(endpoint + '?ajax=res_preorder_min_per_guest', { min_per_guest: v });
+      if (res.ok && j && j.ok) minPreorderInput.value = String(Number(j.min_per_guest || v) || v);
     });
 
     render();

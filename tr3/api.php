@@ -210,6 +210,17 @@ if ($ajax === 'bootstrap') {
   header('Content-Type: application/json; charset=utf-8');
   header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
   header('Pragma: no-cache');
+  $minPreorderPerGuest = 100000;
+  try {
+    $dbHost = trim((string)($_ENV['DB_HOST'] ?? ''));
+    $dbName = trim((string)($_ENV['DB_NAME'] ?? ''));
+    $dbUser = trim((string)($_ENV['DB_USER'] ?? ''));
+    if ($dbHost !== '' && $dbName !== '' && $dbUser !== '') {
+      $vals = $metaRepo->getMany(['preorder_min_per_guest_vnd']);
+      $stored = array_key_exists('preorder_min_per_guest_vnd', $vals) ? trim((string)$vals['preorder_min_per_guest_vnd']) : '';
+      if ($stored !== '' && is_numeric($stored)) $minPreorderPerGuest = max(0, (int)$stored);
+    }
+  } catch (\Throwable $e) {}
   echo json_encode([
     'ok' => true,
     'lang' => $lang,
@@ -222,6 +233,7 @@ if ($ajax === 'bootstrap') {
     'soonBookingHours' => $soonBookingHours,
     'latestWorkday' => $latestWorkday,
     'latestWeekend' => $latestWeekend,
+    'minPreorderPerGuest' => $minPreorderPerGuest,
     'apiBase' => '/tr3/api.php',
   ], JSON_UNESCAPED_UNICODE);
   exit;

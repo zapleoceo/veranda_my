@@ -912,7 +912,8 @@
 
           const guests = reqGuests ? (Number(reqGuests.value || 0) || 0) : 0;
           if (guests > 5) {
-            const minAmount = 100000 * guests;
+            const perGuest = Number(cfg.minPreorderPerGuest != null ? cfg.minPreorderPerGuest : 100000) || 100000;
+            const minAmount = perGuest * guests;
             if (Math.round(totalPrice) < minAmount) {
               const warn = document.createElement('div');
               warn.className = 'preorder-warn';
@@ -1261,7 +1262,8 @@
         const hasPreorder = Object.keys(counts).some((k) => (Number(counts[k] || 0) || 0) > 0);
       const getTotalPreorderAmount = () => Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
       const totalAmount = getTotalPreorderAmount();
-      const minAmount = (guests > 5) ? (100000 * guests) : 0;
+      const perGuest = Number(cfg.minPreorderPerGuest != null ? cfg.minPreorderPerGuest : 100000) || 100000;
+      const minAmount = (guests > 5) ? (perGuest * guests) : 0;
       const preorderAmountOk = guests <= 5 || (totalAmount >= minAmount);
       const preorderOk = guests <= 5 || (hasPreorder && preorderAmountOk);
         if (reqPreorderLabel) reqPreorderLabel.hidden = guests <= 5;
@@ -1883,7 +1885,8 @@
           const hasPreorderNow = Object.keys(countsNow).some((k) => (Number(countsNow[k] || 0) || 0) > 0);
           if (guests > 5 && !hasPreorderNow) missing.push(t('missing_preorder'));
           const totalAmountNow = getTotalPreorderAmount();
-          const minAmountNow = (guests > 5) ? (100000 * guests) : 0;
+          const perGuest = Number(cfg.minPreorderPerGuest != null ? cfg.minPreorderPerGuest : 100000) || 100000;
+          const minAmountNow = (guests > 5) ? (perGuest * guests) : 0;
           if (guests > 5 && totalAmountNow < minAmountNow) {
             if (reqPreorderBox) reqPreorderBox.classList.add('preorder-missing');
             missing.push(t('increase_preorder'));

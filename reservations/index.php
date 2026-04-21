@@ -73,7 +73,9 @@ $resSpotId = max(1, (int)($_GET['spot_id'] ?? ($_ENV['POSTER_SPOT_ID'] ?? 1)));
 $resMetaKey = 'reservations_allowed_scheme_nums_hall_' . $resHallId;
 $resCapsMetaKey = 'reservations_table_caps_hall_' . $resHallId;
 $resSoonKey = 'reservations_soon_booking_hours';
+$resMinPreorderKey = 'preorder_min_per_guest_vnd';
 $resSoonHours = 2;
+$resMinPreorderPerGuest = 100000;
 $resAllowedNums = [];
 $resCapsByNum = [];
 $resHallTables = [];
@@ -644,6 +646,26 @@ if ($ajax === 'res_soon_hours') {
     exit;
 }
 
+if ($ajax === 'res_preorder_min_per_guest') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (!$canManageTables) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $v = (int)($_POST['min_per_guest'] ?? 0);
+    if ($v < 0) $v = 0;
+    if ($v > 10000000) $v = 10000000;
+    $model->updateMeta($resMinPreorderKey, (string)$v);
+    echo json_encode(['ok' => true, 'min_per_guest' => $v], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if ($ajax === 'res_hall_data') {
     header('Content-Type: application/json; charset=utf-8');
     if (!$canManageTables) {
@@ -656,7 +678,7 @@ if ($ajax === 'res_hall_data') {
     $metaRepo = new \App\Classes\MetaRepository($db);
     $mk = 'reservations_allowed_scheme_nums_hall_' . $hallId;
     $ck = 'reservations_table_caps_hall_' . $hallId;
-    $saved = $metaRepo->getMany([$mk, $ck, $resSoonKey]);
+    $saved = $metaRepo->getMany([$mk, $ck, $resSoonKey, $resMinPreorderKey]);
 
     $allowed = [];
     $stored = array_key_exists($mk, $saved) ? trim((string)$saved[$mk]) : '';
@@ -686,6 +708,8 @@ if ($ajax === 'res_hall_data') {
     }
     $soonStored = array_key_exists($resSoonKey, $saved) ? trim((string)$saved[$resSoonKey]) : '';
     $soonHours = ($soonStored !== '' && is_numeric($soonStored)) ? max(0, min(24, (int)$soonStored)) : 2;
+    $minStored = array_key_exists($resMinPreorderKey, $saved) ? trim((string)$saved[$resMinPreorderKey]) : '';
+    $minPerGuest = ($minStored !== '' && is_numeric($minStored)) ? max(0, (int)$minStored) : 100000;
 
     $tables = [];
     if (!empty($_ENV['POSTER_API_TOKEN'])) {
@@ -723,7 +747,7 @@ if ($ajax === 'res_hall_data') {
         } catch (\Throwable $e_tbl2) {
         }
     }
-    echo json_encode(['ok' => true, 'spot_id' => $spotId, 'hall_id' => $hallId, 'soon_hours' => $soonHours, 'tables' => $tables], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => true, 'spot_id' => $spotId, 'hall_id' => $hallId, 'soon_hours' => $soonHours, 'min_preorder_per_guest' => $minPerGuest, 'tables' => $tables], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -754,7 +778,7 @@ $defaultCaps = [
 
 try {
     $metaRepo = new \App\Classes\MetaRepository($db);
-    $saved = $metaRepo->getMany([$resMetaKey, $resCapsMetaKey, $resSoonKey]);
+    $saved = $metaRepo->getMany([$resMetaKey, $resCapsMetaKey, $resSoonKey, $resMinPreorderKey]);
 
     $stored = array_key_exists($resMetaKey, $saved) ? trim((string)$saved[$resMetaKey]) : '';
     if ($stored !== '') {
@@ -794,6 +818,10 @@ try {
     $soonStored = array_key_exists($resSoonKey, $saved) ? trim((string)$saved[$resSoonKey]) : '';
     if ($soonStored !== '' && is_numeric($soonStored)) {
         $resSoonHours = max(0, min(24, (int)$soonStored));
+    }
+    $minStored = array_key_exists($resMinPreorderKey, $saved) ? trim((string)$saved[$resMinPreorderKey]) : '';
+    if ($minStored !== '' && is_numeric($minStored)) {
+        $resMinPreorderPerGuest = max(0, (int)$minStored);
     }
 } catch (\Throwable $e_meta) {
 }
