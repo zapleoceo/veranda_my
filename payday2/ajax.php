@@ -3,6 +3,7 @@ require_once __DIR__ . '/../auth_check.php';
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/../src/classes/PosterAdminAjax.php';
+require_once __DIR__ . '/../src/classes/PosterSupplyManager.php';
 
 veranda_require('payday');
 
@@ -1466,68 +1467,9 @@ if (($_GET['ajax'] ?? '') === 'supply_change_account') {
         if ($newAccountId <= 0) throw new \Exception('Invalid account_id');
         
         $api = new \App\Classes\PosterAPI((string)$token);
+        $supplyManager = new \App\Classes\PosterSupplyManager($api);
         
-        // Шаг 1 — читаем текущую поставку
-        $supplyRes = $api->request('storage.getSupply', ['supply_id' => $supplyId]);
-        if (!$supplyRes) throw new \Exception('Supply not found');
-        
-        // Стоп если поставка в инвентаризации
-        if ((int)($supplyRes['in_inventory'] ?? 0) === 1) {
-            throw new \Exception("Поставка заблокирована (in_inventory=1), редактирование невозможно");
-        }
-        
-        // Формируем список ингредиентов (пропускаем удалённые)
-        $ingredients = [];
-        if (isset($supplyRes['ingredients']) && is_array($supplyRes['ingredients'])) {
-            foreach ($supplyRes['ingredients'] as $ing) {
-                if ((string)($ing['ing_delete'] ?? '0') === '1') continue;
-                
-                $item = [
-                    'id'   => $ing['ingredient_id'],
-                    'type' => (int)$ing['type'],
-                    'num'  => (float)$ing['supply_ingredient_num'],
-                    // Переводим копейки в рубли/донги
-                    'sum'  => round((float)$ing['supply_ingredient_sum'] / 100, 2),
-                ];
-                
-                if (!empty($ing['pack_id'])) {
-                    $item['packing'] = $ing['pack_id'];
-                }
-                
-                if (!empty($ing['tax_id'])) {
-                    $item['tax_id'] = $ing['tax_id'];
-                }
-                
-                $ingredients[] = $item;
-            }
-        }
-        
-        if (empty($ingredients)) {
-            throw new \Exception('Поставка не содержит ингредиентов, обновление невозможно');
-        }
-        
-        // Шаг 2 — обновляем с новым account_id и всеми остальными параметрами поставки
-        // Копируем все свойства поставки, чтобы ничего не потерять
-        $supplyData = $supplyRes;
-        // Удаляем ingredients, так как они передаются в отдельном массиве
-        unset($supplyData['ingredients']);
-        // Удаляем read-only поля и служебную информацию
-        unset($supplyData['in_inventory']);
-        unset($supplyData['total_sum']);
-        unset($supplyData['supply_sum']);
-        unset($supplyData['supply_sum_netto']);
-        unset($supplyData['products']);
-        unset($supplyData['delete']);
-        
-        // Устанавливаем новый account_id
-        $supplyData['account_id'] = $newAccountId;
-        
-        $payload = [
-            'supply' => $supplyData,
-            'ingredient' => $ingredients,
-        ];
-        
-        $updateRes = $api->request('storage.updateSupply', $payload, 'POST');
+        $updateRes = $supplyManager->changeSupplyAccount($supplyId, $newAccountId);
         
         echo json_encode(['ok' => true, 'response' => $updateRes], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {

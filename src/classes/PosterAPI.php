@@ -133,4 +133,20 @@ class PosterAPI {
             'include_products' => 1
         ]);
     }
+
+    /**
+     * Получение детальной информации о поставке
+     */
+    public function getSupply(int $supplyId): array {
+        return $this->request('storage.getSupply', [
+            'supply_id' => $supplyId
+        ]);
+    }
+
+    /**
+     * Обновление поставки (редактирование)
+     */
+    public function updateSupply(array $payload): array {
+        return $this->request('storage.updateSupply', $payload, 'POST');
+    }
 }
