@@ -67,11 +67,7 @@ window.initPayday2_KashShift = function() {
                         if ((k.includes('amount') || k.includes('sum')) && val !== '') {
                             const nVal = Number(val);
                             if (!isNaN(nVal)) {
-                                // Poster API for cash shifts often returns major units (VND, not cents/minor units)
-                                // or if it is minor units, we should be careful.
-                                // Typically, poster finance/cash shifts return major units.
-                                // Let's check if we should just format it directly.
-                                val = fmtVnd0(nVal); // Using nVal directly since it's already in VND
+                                val = fmtVnd0(posterMinorToVnd(nVal));
                             }
                         }
                         
@@ -156,13 +152,31 @@ window.initPayday2_KashShift = function() {
                         h += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; width:auto;">Комментарий</th>';
                         h += '</tr></thead><tbody>';
                         
-                        const getTypeLabel = (type) => {
-                            if (type === 1) return '<span style="color:#fbbf24;">Открытие</span>';
-                            if (type === 2) return '<span style="color:#4ade80;">Доход</span>';
-                            if (type === 3) return '<span style="color:#f87171;">Расход</span>';
-                            if (type === 4) return '<span style="color:#fbbf24;">Инкассация</span>';
-                            if (type === 5) return '<span style="color:#fbbf24;">Закрытие</span>';
-                            return String(type);
+                        const getTypeLabel = (tx) => {
+                            const cfg = window.PAYDAY_CONFIG || {};
+                            const ls = cfg.localSettings || {};
+                            const customNames = ls.custom_category_names || {};
+                            const categories = cfg.categories || {};
+                            
+                            const tId = Number(tx.type);
+                            const cId = Number(tx.category_id || tx.reason_id || 0);
+                            
+                            if (cId && customNames[cId]) {
+                                return '<span style="color:#60a5fa;">' + escapeHtml(customNames[cId]) + '</span>';
+                            }
+                            if (cId && categories[cId] && categories[cId].name) {
+                                return '<span style="color:#60a5fa;">' + escapeHtml(categories[cId].name) + '</span>';
+                            }
+                            if (customNames[tId]) {
+                                return escapeHtml(customNames[tId]);
+                            }
+
+                            if (tId === 1) return '<span style="color:#fbbf24;">Открытие</span>';
+                            if (tId === 2) return '<span style="color:#4ade80;">Доход</span>';
+                            if (tId === 3) return '<span style="color:#f87171;">Расход</span>';
+                            if (tId === 4) return '<span style="color:#fbbf24;">Инкассация</span>';
+                            if (tId === 5) return '<span style="color:#fbbf24;">Закрытие</span>';
+                            return String(tx.type || '');
                         };
                         
                         const formatDate = (tsStr) => {
@@ -183,8 +197,12 @@ window.initPayday2_KashShift = function() {
                         };
                         
                         arr.forEach(tx => {
-                            const typeLabel = getTypeLabel(tx.type);
-                            let sumSigned = tx.amount || 0;
+                            const typeLabel = getTypeLabel(tx);
+                            let sumSigned = tx.tr_amount || tx.amount || 0;
+                            // Если API возвращает в копейках, нужно поделить на 100. 
+                            // Но давайте проверим: в Poster tr_amount обычно в копейках.
+                            sumSigned = posterMinorToVnd(sumSigned);
+
                             if (tx.type === 3 || tx.type === 4) {
                                 sumSigned = -Math.abs(sumSigned);
                             }
