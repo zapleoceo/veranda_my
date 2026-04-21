@@ -150,6 +150,7 @@
     background-color: var(--card);
     color: var(--text);
     border-color: var(--border);
+    color-scheme: dark;
 }
 .confirm-modal select.btn option,
 .confirm-modal select.btn optgroup {

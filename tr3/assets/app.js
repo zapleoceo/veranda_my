@@ -528,10 +528,9 @@
     const ensureWeekHeader = () => {
       if (!dtpWeek) return;
       if (dtpWeek.childElementCount) return;
+      const monday = new Date(2020, 5, 1, 12, 0, 0);
       for (let i = 0; i < 7; i++) {
-        const base = new Date(2020, 5, 1 + i);
-        const idx = weekdayIndex(base);
-        const day = new Date(base.getTime() + (idx * 86400000));
+        const day = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i, 12, 0, 0);
         const el = document.createElement('div');
         el.className = 'cal-wd';
         el.textContent = new Intl.DateTimeFormat(UI_LOCALE, { weekday: 'short' }).format(day);
