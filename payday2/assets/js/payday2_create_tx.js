@@ -203,7 +203,9 @@ window.initPaydayCreateTx = function() {
                 categorySelect.innerHTML = '<option value="">Без категории</option>';
                 
                 const renderOptions = (node, depth) => {
-                    if (allowed.length === 0 || allowed.includes(node.id)) {
+                    const isAllowed = allowed.includes(node.id);
+                    
+                    if (isAllowed) {
                         const customName = customNames[node.id] || node.name;
                         const prefix = '— '.repeat(depth);
                         categorySelect.insertAdjacentHTML('beforeend', `<option value="${node.id}">${escapeHtml(prefix + customName)}</option>`);
