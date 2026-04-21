@@ -205,10 +205,11 @@ window.initPaydayCreateTx = function() {
             categorySelect.innerHTML = '<option value="">Без категории</option>';
             
             const renderOptions = (node, depth) => {
-                const isAllowed = allowed.includes(node.id);
+                // Преобразуем оба ID в Number для надежного сравнения, так как JSON может парсить их как строки
+                const isAllowed = allowed.map(Number).includes(Number(node.id));
                 
                 if (isAllowed) {
-                    const customName = customNames[node.id] || node.name;
+                    const customName = customNames[node.id] || customNames[String(node.id)] || node.name;
                     const prefix = '— '.repeat(depth);
                     categorySelect.insertAdjacentHTML('beforeend', `<option value="${node.id}">${escapeHtml(prefix + customName)}</option>`);
                 }
