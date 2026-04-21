@@ -2684,6 +2684,24 @@ window.initPayday2 = function() {
         if (checkFinderActions) checkFinderActions.classList.add('pd2-d-none');
     };
 
+    const showToast = (msg) => {
+        let t = document.getElementById('pd2Toast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'pd2Toast';
+            t.style.cssText = 'visibility:hidden; opacity:0; position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#fff; padding:10px 20px; border-radius:8px; font-size:14px; font-weight:bold; z-index:99999; transition:opacity 0.3s ease, visibility 0.3s ease;';
+            document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        t.style.visibility = 'visible';
+        t.style.opacity = '1';
+        if (t.timer) clearTimeout(t.timer);
+        t.timer = setTimeout(() => {
+            t.style.opacity = '0';
+            setTimeout(() => { t.style.visibility = 'hidden'; }, 300);
+        }, 3000);
+    };
+
     const openCheckFinder = () => {
         if (!checkFinderModal) return;
         checkFinderReset();
