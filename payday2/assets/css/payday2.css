@@ -146,6 +146,10 @@
     color: var(--text);
 }
 .pd2-modal-body { max-height: 85vh; overflow: auto; }
+.confirm-modal select.btn {
+    background-color: #fff;
+    color: #111;
+}
 .confirm-modal select.btn option,
 .confirm-modal select.btn optgroup {
     color: #111;
