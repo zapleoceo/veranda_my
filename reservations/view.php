@@ -5,7 +5,7 @@
     <title>Брони</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="/assets/app.css?v=20260415_1200">
-    <link rel="stylesheet" href="/reservations/assets/css/reservations.css?v=20260417_1236">
+    <link rel="stylesheet" href="/reservations/assets/css/reservations.css?v=<?= (int)@filemtime(__DIR__ . '/assets/css/reservations.css') ?>">
     <link rel="stylesheet" href="/reservations/style.css?v=1">
 </head>
 <body>
@@ -69,6 +69,7 @@
                         <div class="res-hall-board-wrap">
                             <div class="res-hall-board" id="resHallBoard"></div>
                         </div>
+                        <div class="res-hall-empty" id="resHallEmpty" hidden></div>
                         <div class="res-hall-actions">
                             <button type="button" class="res-btn" id="resHallAll">Все доступны</button>
                             <button type="button" class="res-btn danger" id="resHallNone">Снять все</button>
@@ -385,7 +386,7 @@
     <div class="res-hscroll" id="resHScroll" hidden><div class="res-hscroll-inner" id="resHScrollInner"></div></div>
 
     <script src="/assets/user_menu.js?v=20260417_1036"></script>
-    <script src="/reservations/assets/js/reservations.js?v=20260418_0003"></script>
-    <script src="/reservations/script.js?v=1"></script>
+    <script src="/reservations/assets/js/reservations.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/reservations.js') ?>"></script>
+    <script src="/reservations/assets/js/reservations_hall.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/reservations_hall.js') ?>"></script>
 </body>
 </html>

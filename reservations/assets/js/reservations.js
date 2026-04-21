@@ -813,7 +813,6 @@
   bindShowDeleted();
   bindColumns();
   bindLayout();
-  bindHall();
   bindDateFilters();
   bindEdit();
 })();

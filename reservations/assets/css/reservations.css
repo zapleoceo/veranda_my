@@ -123,6 +123,7 @@ body.res-hscroll-on { padding-bottom: 18px; }
 .res-hall-label input:not([type]) { width: 86px; padding: 8px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.22); color: rgba(255,255,255,0.92); font-size: 13px; }
 .res-hall-label input[type="range"] { width: 140px; }
 .res-hall-board-wrap { overflow: auto; margin-top: 12px; border: 1px solid rgba(255,255,255,0.10); border-radius: 16px; background: radial-gradient(circle at 25% 15%, rgba(255,255,255,0.06), rgba(0,0,0,0.15)); }
+.res-hall-empty { margin-top: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(229,115,115,0.40); background: rgba(229,115,115,0.08); color: rgba(255,255,255,0.85); font-weight: 900; font-size: 12px; }
 .res-hall-board { position: relative; width: 980px; height: 620px; transform-origin: center center; }
 .res-hall-board.rot180 { transform: rotate(180deg); }
 .res-hall-tbl { position: absolute; border: 1px solid rgba(184,135,70,0.55); background: rgba(184,135,70,0.10); border-radius: 12px; box-sizing: border-box; padding: 4px; }
