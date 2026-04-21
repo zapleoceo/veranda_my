@@ -1507,23 +1507,25 @@ if (($_GET['ajax'] ?? '') === 'supply_change_account') {
         }
         
         // Шаг 2 — обновляем с новым account_id и всеми остальными параметрами поставки
+        // Копируем все свойства поставки, чтобы ничего не потерять
+        $supplyData = $supplyRes;
+        // Удаляем ingredients, так как они передаются в отдельном массиве
+        unset($supplyData['ingredients']);
+        // Удаляем read-only поля и служебную информацию
+        unset($supplyData['in_inventory']);
+        unset($supplyData['total_sum']);
+        unset($supplyData['supply_sum']);
+        unset($supplyData['supply_sum_netto']);
+        unset($supplyData['products']);
+        unset($supplyData['delete']);
+        
+        // Устанавливаем новый account_id
+        $supplyData['account_id'] = $newAccountId;
+        
         $payload = [
-            'supply' => [
-                'supply_id'      => $supplyId,
-                'storage_id'     => $supplyRes['storage_id'],
-                'supplier_id'    => $supplyRes['supplier_id'],
-                'date'           => $supplyRes['date'],
-                'account_id'     => $newAccountId,
-                'supply_comment' => $supplyRes['supply_comment'] ?? '',
-                'packing'        => $supplyRes['packing'] ?? null,
-            ],
+            'supply' => $supplyData,
             'ingredient' => $ingredients,
         ];
-        
-        // Удаляем null значения
-        if ($payload['supply']['packing'] === null) {
-            unset($payload['supply']['packing']);
-        }
         
         $updateRes = $api->request('storage.updateSupply', $payload, 'POST');
         
