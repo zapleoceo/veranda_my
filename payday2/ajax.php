@@ -1415,7 +1415,12 @@ if (($_GET['ajax'] ?? '') === 'kashshift_detail') {
         $shiftId = trim((string)($_GET['shiftId'] ?? ''));
         if ($shiftId === '') throw new \Exception('No shift ID provided');
         $data = $apiKSDetail->request('finance.getCashShiftTransactions', ['shift_id' => $shiftId]);
-        echo json_encode(['ok' => true, 'data' => is_array($data) ? $data : []], JSON_UNESCAPED_UNICODE);
+        $rows = is_array($data) ? $data : [];
+        $rows = array_values(array_filter($rows, static function ($tx) {
+            if (!is_array($tx)) return false;
+            return (int)($tx['delete'] ?? 0) !== 1;
+        }));
+        echo json_encode(['ok' => true, 'data' => $rows], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
