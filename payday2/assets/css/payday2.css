@@ -152,10 +152,37 @@
     border-color: var(--border);
     color-scheme: dark;
 }
-.confirm-modal select.btn option,
-.confirm-modal select.btn optgroup {
+.pd2-cs { position: relative; }
+.pd2-cs-menu {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 10000;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 18px 45px rgba(0,0,0,0.22);
+    max-height: 260px;
+    overflow: auto;
+}
+.pd2-cs-opt {
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
     color: var(--text);
-    background-color: var(--card);
+    font-weight: 800;
+    cursor: pointer;
+}
+.pd2-cs-opt:hover,
+.pd2-cs-opt[aria-selected="true"] {
+    background: rgba(255,255,255,0.10);
+}
+.pd2-cs-opt:disabled {
+    opacity: 0.6;
+    cursor: default;
 }
 .pd2-inline-flex { display: inline-flex; }
 .pd2-text-dec-none { text-decoration: none; }

@@ -26,6 +26,117 @@ window.initPaydayCreateTx = function() {
     let accountsLoaded = false;
     let categoriesLoaded = false;
 
+    const mountCustomSelect = (selectEl) => {
+        if (!selectEl) return null;
+        if (selectEl.dataset.pd2Custom === '1') {
+            return {
+                refresh: () => {
+                    const btn = selectEl.parentElement ? selectEl.parentElement.querySelector('.pd2-cs-btn') : null;
+                    const menu = selectEl.parentElement ? selectEl.parentElement.querySelector('.pd2-cs-menu') : null;
+                    if (!btn || !menu) return;
+                    menu.innerHTML = '';
+                    for (const opt of Array.from(selectEl.options || [])) {
+                        const b = document.createElement('button');
+                        b.type = 'button';
+                        b.className = 'pd2-cs-opt';
+                        b.textContent = String(opt.text || '');
+                        b.dataset.value = String(opt.value || '');
+                        if (opt.disabled) b.disabled = true;
+                        if (String(opt.value) === String(selectEl.value)) b.setAttribute('aria-selected', 'true');
+                        b.addEventListener('click', () => {
+                            selectEl.value = String(opt.value || '');
+                            selectEl.dispatchEvent(new Event('change'));
+                            btn.textContent = String(opt.text || '');
+                            menu.classList.add('pd2-d-none');
+                        });
+                        menu.appendChild(b);
+                    }
+                    const selected = selectEl.options && selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex] : null;
+                    btn.textContent = selected ? String(selected.text || '') : (selectEl.options && selectEl.options[0] ? String(selectEl.options[0].text || '') : '');
+                }
+            };
+        }
+
+        selectEl.dataset.pd2Custom = '1';
+        const host = document.createElement('div');
+        host.className = 'pd2-cs';
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = selectEl.className ? (selectEl.className + ' pd2-cs-btn') : 'btn pd2-cs-btn';
+
+        const menu = document.createElement('div');
+        menu.className = 'pd2-cs-menu pd2-d-none';
+
+        host.appendChild(btn);
+        host.appendChild(menu);
+        selectEl.insertAdjacentElement('beforebegin', host);
+        selectEl.style.display = 'none';
+
+        const closeAll = () => {
+            menu.classList.add('pd2-d-none');
+        };
+
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const isOpen = !menu.classList.contains('pd2-d-none');
+            if (isOpen) {
+                closeAll();
+            } else {
+                document.querySelectorAll('.pd2-cs-menu').forEach((m) => m.classList.add('pd2-d-none'));
+                menu.classList.remove('pd2-d-none');
+                const sel = menu.querySelector('[aria-selected="true"]');
+                if (sel && typeof sel.scrollIntoView === 'function') sel.scrollIntoView({ block: 'nearest' });
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!host.contains(e.target)) closeAll();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeAll();
+        });
+
+        const api = {
+            refresh: () => {
+                menu.innerHTML = '';
+                for (const opt of Array.from(selectEl.options || [])) {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'pd2-cs-opt';
+                    b.textContent = String(opt.text || '');
+                    b.dataset.value = String(opt.value || '');
+                    if (opt.disabled) b.disabled = true;
+                    if (String(opt.value) === String(selectEl.value)) b.setAttribute('aria-selected', 'true');
+                    b.addEventListener('click', () => {
+                        selectEl.value = String(opt.value || '');
+                        selectEl.dispatchEvent(new Event('change'));
+                        btn.textContent = String(opt.text || '');
+                        closeAll();
+                    });
+                    menu.appendChild(b);
+                }
+                const selected = selectEl.options && selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex] : null;
+                btn.textContent = selected ? String(selected.text || '') : (selectEl.options && selectEl.options[0] ? String(selectEl.options[0].text || '') : '');
+            }
+        };
+
+        selectEl.addEventListener('change', () => {
+            api.refresh();
+        });
+
+        api.refresh();
+        return api;
+    };
+
+    const customSelects = {
+        type: null,
+        accFrom: null,
+        accTo: null,
+        category: null,
+    };
+
     const escapeHtml = (str) => {
         return String(str || '')
             .replace(/&/g, '&amp;')
@@ -108,6 +219,15 @@ window.initPaydayCreateTx = function() {
 
                 categoriesLoaded = true;
             }
+
+            if (!customSelects.type) customSelects.type = mountCustomSelect(typeSelect);
+            if (!customSelects.accFrom) customSelects.accFrom = mountCustomSelect(accFromSelect);
+            if (!customSelects.accTo) customSelects.accTo = mountCustomSelect(accToSelect);
+            if (!customSelects.category) customSelects.category = mountCustomSelect(categorySelect);
+            if (customSelects.type) customSelects.type.refresh();
+            if (customSelects.accFrom) customSelects.accFrom.refresh();
+            if (customSelects.accTo) customSelects.accTo.refresh();
+            if (customSelects.category) customSelects.category.refresh();
         } catch (e) {
             showError(e.message);
         }
