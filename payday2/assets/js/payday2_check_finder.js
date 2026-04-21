@@ -200,7 +200,7 @@ window.initPayday2_CheckFinder = function() {
         }
         if (checkFinderSearchBtn) checkFinderSearchBtn.disabled = true;
         if (checkFinderResult) {
-            checkFinderResult.innerHTML = '<div style="padding:20px;text-align:center;"><svg class="pd2-loader-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> <span style="vertical-align:middle;margin-left:8px;color:var(--muted);">Загрузка чеков...</span></div>';
+            checkFinderResult.innerHTML = '<div style="padding:40px;text-align:center;"><svg class="pd2-loader-spin" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 10px auto;"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg><span style="color:var(--muted);font-size:14px;">Загрузка чеков...</span></div>';
         }
         try {
             const url = '?ajax=poster_checks_list&date_from=' + encodeURIComponent(dFrom) + '&date_to=' + encodeURIComponent(dTo);
