@@ -171,7 +171,7 @@ final class LocalSettings
         foreach ($customNamesIn as $k => $v) {
             $id = (int)$k;
             if ($id > 0 && is_string($v) && trim($v) !== '') {
-                $customNames[$id] = trim($v);
+                $customNames[(string)$id] = trim($v);
             }
         }
 
