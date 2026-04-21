@@ -1494,6 +1494,10 @@ if (($_GET['ajax'] ?? '') === 'supply_change_account') {
                     $item['packing'] = $ing['pack_id'];
                 }
                 
+                if (!empty($ing['tax_id'])) {
+                    $item['tax_id'] = $ing['tax_id'];
+                }
+                
                 $ingredients[] = $item;
             }
         }
@@ -1502,7 +1506,7 @@ if (($_GET['ajax'] ?? '') === 'supply_change_account') {
             throw new \Exception('Поставка не содержит ингредиентов, обновление невозможно');
         }
         
-        // Шаг 2 — обновляем с новым account_id
+        // Шаг 2 — обновляем с новым account_id и всеми остальными параметрами поставки
         $payload = [
             'supply' => [
                 'supply_id'      => $supplyId,
@@ -1511,9 +1515,15 @@ if (($_GET['ajax'] ?? '') === 'supply_change_account') {
                 'date'           => $supplyRes['date'],
                 'account_id'     => $newAccountId,
                 'supply_comment' => $supplyRes['supply_comment'] ?? '',
+                'packing'        => $supplyRes['packing'] ?? null,
             ],
             'ingredient' => $ingredients,
         ];
+        
+        // Удаляем null значения
+        if ($payload['supply']['packing'] === null) {
+            unset($payload['supply']['packing']);
+        }
         
         $updateRes = $api->request('storage.updateSupply', $payload, 'POST');
         
