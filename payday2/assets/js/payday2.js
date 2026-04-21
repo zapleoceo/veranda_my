@@ -528,77 +528,7 @@ window.initPayday2 = function() {
             if (typeof onProgress === 'function') onProgress(100, 'SePay: готово');
         });
     };
-    let employeesMap = null;
-    let categoriesMap = null;
-    const ensureEmployees = () => {
-        if (employeesMap) return Promise.resolve(employeesMap);
-        return fetchJsonSafe(location.pathname + '?ajax=poster_employees')
-            .then((j) => {
-                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка poster_employees');
-                employeesMap = j.employees || {};
-                return employeesMap;
-            });
-    };
-    const ensureCategories = () => {
-        if (categoriesMap) return Promise.resolve(categoriesMap);
-        return fetchJsonSafe(location.pathname + '?ajax=finance_categories')
-            .then((j) => {
-                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_categories');
-                categoriesMap = j.categories || {};
-                return categoriesMap;
-            });
-    };
-    const loadOutFinance = (onProgress) => {
-        const { dateFrom, dateTo } = getDateRange();
-        const qs = new URLSearchParams({ dateFrom, dateTo });
-        if (typeof onProgress === 'function') onProgress(10, 'Poster: пользователи/категории');
-        return Promise.all([
-            ensureEmployees(),
-            ensureCategories(),
-            fetchJsonSafe(location.pathname + '?' + qs.toString() + '&ajax=finance_out'),
-        ]).then(([emps, cats, j]) => {
-            if (typeof onProgress === 'function') onProgress(60, 'Poster: транзакции');
-            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка finance_out');
-            const tbody = outPosterTable.tBodies[0]; tbody.innerHTML = '';
-            (j.rows || []).forEach((row) => {
-                const rawAmount = Number(row.amount || 0);
-                const sign = rawAmount > 0 ? '+' : (rawAmount < 0 ? '−' : '');
-                const amountVnd = posterMinorToVnd(Math.abs(rawAmount));
-                const balanceVnd = posterMinorToVnd(Math.abs(Number(row.balance || 0)));
-                const amountInt = Math.round(amountVnd);
-                const balanceInt = Math.round(balanceVnd);
-                const userName = String(emps && emps[Number(row.user_id || 0)] ? emps[Number(row.user_id || 0)] : row.user_id || '');
-                let catName = '';
-                const catObj = cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : null;
-                if (catObj && typeof catObj === 'object' && catObj.name) {
-                    catName = String(catObj.name);
-                } else if (typeof catObj === 'string') {
-                    catName = String(catObj);
-                } else {
-                    catName = String(row.category_id || '');
-                }
-                if (catName === 'book_category_action_supplies') catName = 'поставки';
-                const tr = document.createElement('tr');
-                tr.setAttribute('data-finance-id', String(row.transaction_id || 0));
-                tr.setAttribute('data-sum', String(amountInt));
-                const dt2 = formatOutDT('', row.date);
-                tr.innerHTML = `
-                    <td class="nowrap"><div class="cell-anchor"><span class="anchor" id="out-poster-${Number(row.transaction_id || 0)}"></span><input type="checkbox" class="out-poster-cb" data-id="${Number(row.transaction_id || 0)}"></div></td>
-                    <td class="nowrap col-out-date"><div class="col-out-date-date">${escapeHtml(dt2.date)}</div><div class="col-out-date-time">${escapeHtml(dt2.time)}</div></td>
-                    <td class="col-out-user">${escapeHtml(userName)}</td>
-                    <td class="col-out-category">${escapeHtml(catName)}</td>
-                    <td class="col-out-type">${Number(row.type || 0)}</td>
-                    <td class="sum col-out-amount">${sign}${fmtVnd0(amountInt)}</td>
-                    <td class="sum col-out-balance">${fmtVnd0(balanceInt)}</td>
-                    <td class="col-out-comment">${escapeHtml(row.comment || '')}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-            applyOutRowClasses();
-            applyOutHideLinked();
-            if (typeof onProgress === 'function') onProgress(100, 'Poster: готово');
-        });
-    };
+    // loadOutFinance logic has been moved to payday2_poster_table.js
     if (outMailBtn) outMailBtn.addEventListener('click', () => {
         const restore = setBtnBusy(outMailBtn, { title: 'OUT SePay', pct: 0 });
         loadOutMail((pct) => updateBtnBusy(outMailBtn, { pct, title: 'OUT SePay' }))
@@ -2557,6 +2487,7 @@ window.initPayday2 = function() {
     if (typeof window.initPayday2_KashShift === 'function') window.initPayday2_KashShift();
     if (typeof window.initPayday2_CheckFinder === 'function') window.initPayday2_CheckFinder();
     if (typeof window.initPayday2_Supplies === 'function') window.initPayday2_Supplies();
+    if (typeof window.initPayday2_PosterTable === 'function') window.initPayday2_PosterTable();
 
     document.querySelectorAll('form.finance-transfer').forEach((form) => {
         if (window.refreshFinanceForm) window.refreshFinanceForm(form, { showLoading: false });
