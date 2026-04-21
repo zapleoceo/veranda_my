@@ -70,23 +70,15 @@ class PosterSupplyManager {
             throw new \Exception('Поставка не содержит ингредиентов, обновление невозможно');
         }
 
-        // Шаг 2 — обновляем с новым account_id и всеми остальными параметрами поставки
-        // Копируем все свойства поставки, чтобы ничего не потерять
-        $supplyData = $supplyRes;
-        
-        // Удаляем ingredients, так как они передаются в отдельном массиве
-        unset($supplyData['ingredients']);
-        
-        // Удаляем read-only поля и служебную информацию, которые Poster вычисляет сам
-        unset($supplyData['in_inventory']);
-        unset($supplyData['total_sum']);
-        unset($supplyData['supply_sum']);
-        unset($supplyData['supply_sum_netto']);
-        unset($supplyData['products']);
-        unset($supplyData['delete']);
-
-        // Устанавливаем новый account_id
-        $supplyData['account_id'] = $newAccountId;
+        // Шаг 2 — обновляем с новым account_id и строго заданными параметрами поставки
+        $supplyData = [
+            'supply_id'      => $supplyId,
+            'storage_id'     => $supplyRes['storage_id'],
+            'supplier_id'    => $supplyRes['supplier_id'],
+            'date'           => $supplyRes['date'],
+            'supply_comment' => $supplyRes['supply_comment'] ?? '',
+            'account_id'     => $newAccountId,
+        ];
 
         $payload = [
             'supply' => $supplyData,
