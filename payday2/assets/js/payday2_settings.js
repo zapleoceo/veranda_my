@@ -66,8 +66,8 @@ window.initPayday2_Settings = function() {
             }
             
             const renderNode = (node, depth) => {
-                const checked = allowed.includes(node.id) ? 'checked' : '';
-                const customName = customNames[node.id] || '';
+                const checked = allowed.map(Number).includes(Number(node.id)) ? 'checked' : '';
+                const customName = customNames[node.id] || customNames[String(node.id)] || '';
                 const margin = depth * 20;
                 
                 let html = `
