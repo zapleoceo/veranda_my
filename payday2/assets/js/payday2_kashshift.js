@@ -154,7 +154,11 @@ window.initPayday2_KashShift = function() {
                         
                         const getTypeLabel = (type) => {
                             const id = Number(type);
-                            const catNames = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.catNames) ? window.PAYDAY_CONFIG.catNames : {};
+                            const cfg = window.PAYDAY_CONFIG || {};
+                            const catNames =
+                                (cfg && cfg.catNames) ? cfg.catNames :
+                                (cfg && cfg.localSettings && cfg.localSettings.custom_category_names) ? cfg.localSettings.custom_category_names :
+                                {};
                             const name = catNames[id] || catNames[String(id)];
                             if (name) return escapeHtml(String(name));
 
