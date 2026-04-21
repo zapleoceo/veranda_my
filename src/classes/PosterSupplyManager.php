@@ -46,12 +46,38 @@ class PosterSupplyManager {
                     continue;
                 }
 
+                $rawType = (int)$ing['type'];
+                
+                // В getSupply ингредиенты приходят с ingredient_id, а товары/техкарты с product_id.
+                // Нам нужно вытащить правильный ID для отправки обратно в updateSupply.
+                $id = (int)($ing['ingredient_id'] ?? 0);
+                if ($id === 0) {
+                    $id = (int)($ing['product_id'] ?? 0);
+                }
+
+                // В getSupply типы: 1 (товар), 2 (техкарта), 3 (полуфабрикат), 8 (модификатор), 10 (ингредиент).
+                // В updateSupply типы: 1 (товар/полуфабрикат/техкарта), 4 (ингредиент), 5 (модификатор).
+                $type = $rawType;
+                if ($rawType === 10) {
+                    $type = 4;
+                } elseif ($rawType === 8) {
+                    $type = 5;
+                } elseif ($rawType === 2 || $rawType === 3) {
+                    $type = 1;
+                }
+
+                $num = (float)$ing['supply_ingredient_num'];
+                // Poster отдает общую сумму в supply_ingredient_sum в копейках.
+                // В updateSupply параметр sum — это сумма за ЕДИНИЦУ в валюте.
+                $totalSumVnd = round((float)$ing['supply_ingredient_sum'] / 100, 2);
+                $unitPrice = $num > 0 ? round($totalSumVnd / $num, 2) : 0;
+
                 $item = [
-                    'id'   => $ing['ingredient_id'],
-                    'type' => (int)$ing['type'],
-                    'num'  => (float)$ing['supply_ingredient_num'],
-                    // Переводим копейки в рубли/донги
-                    'sum'  => round((float)$ing['supply_ingredient_sum'] / 100, 2),
+                    'id'   => $id,
+                    'type' => $type,
+                    'num'  => $num,
+                    // Для updateSupply передаем цену за единицу!
+                    'sum'  => $unitPrice,
                 ];
 
                 if (!empty($ing['pack_id'])) {
