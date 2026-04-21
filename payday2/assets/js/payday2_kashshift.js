@@ -63,11 +63,15 @@ window.initPayday2_KashShift = function() {
                         let val = row[k];
                         if (val === null || val === undefined) val = '';
                         
-                        // Форматирование сумм (убираем копейки)
+                        // Форматирование сумм
                         if ((k.includes('amount') || k.includes('sum')) && val !== '') {
                             const nVal = Number(val);
                             if (!isNaN(nVal)) {
-                                val = fmtVnd0(posterMinorToVnd(nVal));
+                                // Poster API for cash shifts often returns major units (VND, not cents/minor units)
+                                // or if it is minor units, we should be careful.
+                                // Typically, poster finance/cash shifts return major units.
+                                // Let's check if we should just format it directly.
+                                val = fmtVnd0(nVal); // Using nVal directly since it's already in VND
                             }
                         }
                         
@@ -175,7 +179,7 @@ window.initPayday2_KashShift = function() {
                         const fmtSum = (v) => {
                             const n = Number(v);
                             if (isNaN(n)) return v;
-                            return fmtVnd0(posterMinorToVnd(n));
+                            return fmtVnd0(n);
                         };
                         
                         arr.forEach(tx => {

@@ -30,23 +30,15 @@ $apiToken = $db->query("SELECT option_value FROM system_meta WHERE option_key = 
 if (!$apiToken) die("No API token");
 $api = new \App\Classes\PosterAPI($apiToken);
 
-$reservationData = [
-    "spot_id" => "1",
-    "type" => "2",
-    "phone" => "+84933707499",
-    "table_id" => "31",
-    "guests_count" => "2",
-    "date_reservation" => "2026-04-21 17:30:00",
-    "duration" => "7200",
-    "first_name" => "Никита",
-    "last_name" => "",
-    "comment" => "[VERANDA:9A5O1VSE] by Dima Zaporozhets Dmytro",
-    "skip_phone_validation" => "true"
-];
-
 try {
-    $resp = $api->request('incomingOrders.createReservation', $reservationData, 'POST');
-    var_dump($resp);
+    $rows = $api->request('finance.getCashShifts', ['dateFrom' => '20260420', 'dateTo' => '20260421']);
+    echo "First row keys: \n";
+    if (!empty($rows)) {
+        print_r(array_keys($rows[0]));
+        print_r($rows[0]);
+    } else {
+        echo "No data returned\n";
+    }
 } catch (\Throwable $e) {
     echo "Error: " . $e->getMessage() . "\n";
 }
