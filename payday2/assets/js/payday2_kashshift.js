@@ -148,6 +148,7 @@ window.initPayday2_KashShift = function() {
                         let h = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; white-space:nowrap; font-size:13px; background:var(--card);"><thead><tr>';
                         h += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; width:1%;">Дата</th>';
                         h += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; width:1%;">Тип</th>';
+                        h += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; width:1%;">Категория</th>';
                         h += '<th style="text-align:right; border-bottom:1px solid var(--border); padding:6px; width:1%;">Сумма</th>';
                         h += '<th style="text-align:left; border-bottom:1px solid var(--border); padding:6px; width:auto;">Комментарий</th>';
                         h += '</tr></thead><tbody>';
@@ -177,17 +178,27 @@ window.initPayday2_KashShift = function() {
                             if (isNaN(n)) return v;
                             return fmtVnd0(posterMinorToVnd(n));
                         };
+
+                        const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : {};
+                        const customNames = ls.custom_category_names || {};
                         
                         arr.forEach(tx => {
                             const typeLabel = getTypeLabel(tx.type);
-                            let sumSigned = tx.amount || 0;
+                            let sumSigned = tx.tr_amount || tx.amount || tx.sum || 0;
                             if (tx.type === 3 || tx.type === 4) {
                                 sumSigned = -Math.abs(sumSigned);
+                            }
+
+                            const catId = tx.category_id || tx.reason_id || '';
+                            let catLabel = catId;
+                            if (catId && customNames[catId]) {
+                                catLabel = customNames[catId];
                             }
                             
                             h += '<tr>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(formatDate(tx.time)) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + typeLabel + '</td>';
+                            h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%;">' + escapeHtml(catLabel) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:1%; text-align:right;">' + escapeHtml(fmtSum(sumSigned)) + '</td>';
                             h += '<td style="border-bottom:1px solid var(--border); padding:6px; width:auto; white-space:normal;">' + escapeHtml(tx.comment || '') + '</td>';
                             h += '</tr>';
