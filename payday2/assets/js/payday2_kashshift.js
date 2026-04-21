@@ -153,11 +153,16 @@ window.initPayday2_KashShift = function() {
                         h += '</tr></thead><tbody>';
                         
                         const getTypeLabel = (type) => {
-                            if (type === 1) return '<span style="color:#fbbf24;">Открытие</span>';
-                            if (type === 2) return '<span style="color:#4ade80;">Доход</span>';
-                            if (type === 3) return '<span style="color:#f87171;">Расход</span>';
-                            if (type === 4) return '<span style="color:#fbbf24;">Инкассация</span>';
-                            if (type === 5) return '<span style="color:#fbbf24;">Закрытие</span>';
+                            const id = Number(type);
+                            const catNames = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.catNames) ? window.PAYDAY_CONFIG.catNames : {};
+                            const name = catNames[id] || catNames[String(id)];
+                            if (name) return escapeHtml(String(name));
+
+                            if (id === 1) return '<span style="color:#fbbf24;">Открытие</span>';
+                            if (id === 2) return '<span style="color:#4ade80;">Доход</span>';
+                            if (id === 3) return '<span style="color:#f87171;">Расход</span>';
+                            if (id === 4) return '<span style="color:#fbbf24;">Инкассация</span>';
+                            if (id === 5) return '<span style="color:#fbbf24;">Закрытие</span>';
                             return String(type);
                         };
                         
@@ -180,7 +185,7 @@ window.initPayday2_KashShift = function() {
                         
                         arr.forEach(tx => {
                             const typeLabel = getTypeLabel(tx.type);
-                            let sumSigned = tx.amount || 0;
+                            let sumSigned = tx.tr_amount ?? tx.amount ?? 0;
                             if (tx.type === 3 || tx.type === 4) {
                                 sumSigned = -Math.abs(sumSigned);
                             }
