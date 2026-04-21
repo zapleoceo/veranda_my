@@ -147,13 +147,14 @@
 }
 .pd2-modal-body { max-height: 85vh; overflow: auto; }
 .confirm-modal select.btn {
-    background-color: #fff;
-    color: #111;
+    background-color: var(--card);
+    color: var(--text);
+    border-color: var(--border);
 }
 .confirm-modal select.btn option,
 .confirm-modal select.btn optgroup {
-    color: #111;
-    background-color: #fff;
+    color: var(--text);
+    background-color: var(--card);
 }
 .pd2-inline-flex { display: inline-flex; }
 .pd2-text-dec-none { text-decoration: none; }
