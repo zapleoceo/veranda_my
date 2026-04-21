@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+window.initPayday2_Supplies = function() {
     const btnSupplies = document.getElementById('btnSupplies');
     const suppliesModal = document.getElementById('suppliesModal');
     const suppliesClose = document.getElementById('suppliesClose');
@@ -278,4 +278,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-});
+};
