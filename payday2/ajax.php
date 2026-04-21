@@ -1444,6 +1444,87 @@ if (($_GET['ajax'] ?? '') === 'supplies') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'supply_change_account') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        if (!payday2_csrf_valid()) {
+            throw new \Exception('CSRF token mismatch or missing');
+        }
+        $raw = file_get_contents('php://input');
+        $j = json_decode($raw, true);
+        if (!is_array($j)) throw new \Exception('Invalid JSON');
+        
+        $supplyId = (int)($j['supply_id'] ?? 0);
+        $newAccountId = (int)($j['account_id'] ?? 0);
+        
+        if ($supplyId <= 0) throw new \Exception('Invalid supply_id');
+        if ($newAccountId <= 0) throw new \Exception('Invalid account_id');
+        
+        $api = new \App\Classes\PosterAPI((string)$token);
+        
+        // Шаг 1 — читаем текущую поставку
+        $supplyRes = $api->request('storage.getSupply', ['supply_id' => $supplyId]);
+        if (!$supplyRes) throw new \Exception('Supply not found');
+        
+        // Стоп если поставка в инвентаризации
+        if ((int)($supplyRes['in_inventory'] ?? 0) === 1) {
+            throw new \Exception("Поставка заблокирована (in_inventory=1), редактирование невозможно");
+        }
+        
+        // Формируем список ингредиентов (пропускаем удалённые)
+        $ingredients = [];
+        if (isset($supplyRes['ingredients']) && is_array($supplyRes['ingredients'])) {
+            foreach ($supplyRes['ingredients'] as $ing) {
+                if ((string)($ing['ing_delete'] ?? '0') === '1') continue;
+                
+                $item = [
+                    'id'   => $ing['ingredient_id'],
+                    'type' => (int)$ing['type'],
+                    'num'  => (float)$ing['supply_ingredient_num'],
+                    // Переводим копейки в рубли/донги
+                    'sum'  => round((float)$ing['supply_ingredient_sum'] / 100, 2),
+                ];
+                
+                if (!empty($ing['pack_id'])) {
+                    $item['packing'] = $ing['pack_id'];
+                }
+                
+                $ingredients[] = $item;
+            }
+        }
+        
+        if (empty($ingredients)) {
+            throw new \Exception('Поставка не содержит ингредиентов, обновление невозможно');
+        }
+        
+        // Шаг 2 — обновляем с новым account_id
+        $payload = [
+            'supply' => [
+                'supply_id'      => $supplyId,
+                'storage_id'     => $supplyRes['storage_id'],
+                'supplier_id'    => $supplyRes['supplier_id'],
+                'date'           => $supplyRes['date'],
+                'account_id'     => $newAccountId,
+                'supply_comment' => $supplyRes['supply_comment'] ?? '',
+            ],
+            'ingredient' => $ingredients,
+        ];
+        
+        $updateRes = $api->request('storage.updateSupply', $payload, 'POST');
+        
+        echo json_encode(['ok' => true, 'response' => $updateRes], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 if (($_GET['ajax'] ?? '') === 'out_links') {
     header('Content-Type: application/json; charset=utf-8');
     $dTo = trim((string)($_GET['dateTo'] ?? ''));

@@ -3025,12 +3025,39 @@ window.initPayday2 = function() {
                         
                         // Специальная обработка для account_id
                         if (k === 'account_id') {
+                            const supplyId = row.supply_id || row.id || '';
                             const accountId = row.account_id || (row.payed_sum && row.payed_sum.length > 0 ? row.payed_sum[0].account_id : null);
+                            
+                            let accName = '';
                             if (accountId && accMap[accountId]) {
-                                val = accMap[accountId];
+                                accName = accMap[accountId];
                             } else if (accountId) {
-                                val = accountId;
+                                accName = String(accountId);
+                            } else {
+                                accName = '—';
                             }
+                            
+                            // Строим селект для редактирования
+                            let selectHtml = `<select class="pd2-d-none pd2-supply-acc-select" data-supply-id="${escapeHtml(String(supplyId))}" style="margin-right:5px;">`;
+                            if (res.accounts) {
+                                res.accounts.forEach(a => {
+                                    const sel = (String(a.account_id) === String(accountId)) ? ' selected' : '';
+                                    selectHtml += `<option value="${escapeHtml(String(a.account_id))}"${sel}>${escapeHtml(a.account_name || a.name)}</option>`;
+                                });
+                            }
+                            selectHtml += `</select>`;
+                            
+                            val = `
+                                <div class="pd2-d-flex pd2-align-center pd2-supply-acc-wrapper">
+                                    <span class="pd2-supply-acc-text" style="margin-right:5px;">${escapeHtml(accName)}</span>
+                                    ${selectHtml}
+                                    <button type="button" class="btn tiny pd2-p-2-4 pd2-supply-acc-edit" data-supply-id="${escapeHtml(String(supplyId))}" title="Изменить счет">✏️</button>
+                                    <button type="button" class="btn tiny pd2-p-2-4 pd2-supply-acc-save pd2-d-none" data-supply-id="${escapeHtml(String(supplyId))}" title="Сохранить">💾</button>
+                                    <div class="pd2-supply-acc-loader pd2-d-none" style="margin-left:5px;"><svg class="pd2-loader-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg></div>
+                                </div>
+                            `;
+                            html += '<td style="border-bottom:1px solid var(--border); padding:6px;">' + val + '</td>';
+                            return; // Переходим к следующему ключу, td уже добавлен
                         }
                         
                         // Форматирование supply_sum и total_sum (в копейках -> без копеек с пробелами)
@@ -3050,6 +3077,73 @@ window.initPayday2 = function() {
                 
                 html += '</tbody></table></div>';
                 suppliesBody.innerHTML = html;
+                
+                // Навешиваем слушатели на кнопки редактирования
+                const editBtns = suppliesBody.querySelectorAll('.pd2-supply-acc-edit');
+                const saveBtns = suppliesBody.querySelectorAll('.pd2-supply-acc-save');
+                
+                editBtns.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const wrapper = e.target.closest('.pd2-supply-acc-wrapper');
+                        const text = wrapper.querySelector('.pd2-supply-acc-text');
+                        const select = wrapper.querySelector('.pd2-supply-acc-select');
+                        const saveBtn = wrapper.querySelector('.pd2-supply-acc-save');
+                        
+                        text.classList.add('pd2-d-none');
+                        btn.classList.add('pd2-d-none');
+                        
+                        select.classList.remove('pd2-d-none');
+                        saveBtn.classList.remove('pd2-d-none');
+                    });
+                });
+                
+                saveBtns.forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const wrapper = e.target.closest('.pd2-supply-acc-wrapper');
+                        const text = wrapper.querySelector('.pd2-supply-acc-text');
+                        const select = wrapper.querySelector('.pd2-supply-acc-select');
+                        const editBtn = wrapper.querySelector('.pd2-supply-acc-edit');
+                        const loader = wrapper.querySelector('.pd2-supply-acc-loader');
+                        
+                        const supplyId = btn.getAttribute('data-supply-id');
+                        const newAccountId = select.value;
+                        const newAccountText = select.options[select.selectedIndex].text;
+                        
+                        btn.classList.add('pd2-d-none');
+                        select.classList.add('pd2-d-none');
+                        loader.classList.remove('pd2-d-none');
+                        
+                        try {
+                            const r = await fetch('?ajax=supply_change_account', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                                body: JSON.stringify({ supply_id: Number(supplyId), account_id: Number(newAccountId) }),
+                            });
+                            const txt = await r.text();
+                            let j = null;
+                            try { j = JSON.parse(txt); } catch (_) {}
+                            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка сохранения');
+                            
+                            text.textContent = newAccountText;
+                            showToast(`Счет для поставки #${supplyId} изменен`);
+                        } catch (err) {
+                            alert(err && err.message ? err.message : 'Ошибка при сохранении');
+                            // Возвращаем старое значение в селекте
+                            const oldText = text.textContent;
+                            for (let i = 0; i < select.options.length; i++) {
+                                if (select.options[i].text === oldText) {
+                                    select.selectedIndex = i;
+                                    break;
+                                }
+                            }
+                        } finally {
+                            loader.classList.add('pd2-d-none');
+                            text.classList.remove('pd2-d-none');
+                            editBtn.classList.remove('pd2-d-none');
+                        }
+                    });
+                });
+                
             }).catch(e => {
                 suppliesBody.innerHTML = '<div class="error">' + escapeHtml(e.message) + '</div>';
             });
