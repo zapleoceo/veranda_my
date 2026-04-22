@@ -99,7 +99,11 @@ window.initPayday2_PosterTable = function() {
                 
                 let catName = '';
                 const catObj = cats && cats[Number(row.category_id || 0)] ? cats[Number(row.category_id || 0)] : null;
-                const customCatNames = window.PAYDAY_CONFIG.catNames || {};
+                const cfg = window.PAYDAY_CONFIG || {};
+                const customCatNames =
+                    (cfg && cfg.catNames) ? cfg.catNames :
+                    (cfg && cfg.localSettings && cfg.localSettings.custom_category_names) ? cfg.localSettings.custom_category_names :
+                    {};
                 
                 if (customCatNames[Number(row.category_id || 0)]) {
                     catName = String(customCatNames[Number(row.category_id || 0)]);

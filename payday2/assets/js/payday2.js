@@ -26,8 +26,20 @@
 
 (function () {
     const el = document.getElementById('payday2-config-json');
+    const normalizeCfg = (cfg) => {
+        try {
+            if (!cfg || typeof cfg !== 'object') return;
+            if (!cfg.catNames) {
+                const ls = cfg.localSettings;
+                const cn = ls && typeof ls === 'object' ? ls.custom_category_names : null;
+                if (cn && typeof cn === 'object') cfg.catNames = cn;
+                else cfg.catNames = {};
+            }
+        } catch (_) {}
+    };
     try {
         window.PAYDAY_CONFIG = el ? JSON.parse(el.textContent || '{}') : {};
+        normalizeCfg(window.PAYDAY_CONFIG);
     } catch (e) {
         window.PAYDAY_CONFIG = {};
     }
@@ -58,6 +70,13 @@ if (!window._paydayPjaxLoaded) {
             if (jsonCfg) {
                 try {
                     window.PAYDAY_CONFIG = JSON.parse(jsonCfg.textContent || '{}');
+                    try {
+                        if (!window.PAYDAY_CONFIG.catNames) {
+                            const ls = window.PAYDAY_CONFIG.localSettings;
+                            const cn = ls && typeof ls === 'object' ? ls.custom_category_names : null;
+                            window.PAYDAY_CONFIG.catNames = (cn && typeof cn === 'object') ? cn : {};
+                        }
+                    } catch (_) {}
                 } catch (err) {
                     console.error('Payday2 config parse error:', err);
                 }

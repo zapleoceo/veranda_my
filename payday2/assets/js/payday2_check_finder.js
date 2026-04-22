@@ -110,6 +110,30 @@ window.initPayday2_CheckFinder = function() {
     };
 
     let checksAll = [];
+    let sortCol = '';
+    let sortAsc = true;
+    const cmp = (a, b) => (a < b ? -1 : (a > b ? 1 : 0));
+    const getSortVal = (row, col) => {
+        if (!row) return '';
+        if (col === 'transaction_id') return Number(row.transaction_id || 0) || 0;
+        if (col === 'table_id') return Number(row.table_id || 0) || 0;
+        if (col === 'sum') return Number(row.sum || 0) || 0;
+        if (col === 'payed_sum') return Number(row.payed_sum || 0) || 0;
+        if (col === 'status') return Number(row.status || 0) || 0;
+        if (col === 'pay_type') return Number(row.pay_type || 0) || 0;
+        return String(row[col] ?? '');
+    };
+    const sortChecks = () => {
+        if (!sortCol) return;
+        checksAll.sort((a, b) => {
+            const va = getSortVal(a, sortCol);
+            const vb = getSortVal(b, sortCol);
+            const d = (typeof va === 'number' && typeof vb === 'number')
+                ? (va - vb)
+                : cmp(String(va).toLowerCase(), String(vb).toLowerCase());
+            return sortAsc ? d : -d;
+        });
+    };
     const renderChecks = (list) => {
         const arr = Array.isArray(list) ? list : [];
         if (!checkFinderResult) return;
@@ -117,13 +141,17 @@ window.initPayday2_CheckFinder = function() {
             checkFinderResult.innerHTML = '<div class="muted">Нет чеков</div>';
             return;
         }
+        const th = (key, title) => {
+            const ind = sortCol === key ? (sortAsc ? ' ▲' : ' ▼') : '';
+            return '<th class="pd2-check-th pd2-check-sort" data-sort="' + escapeHtml(key) + '" style="cursor:pointer; user-select:none;">' + escapeHtml(title) + ind + '</th>';
+        };
         let html = '<div style="overflow-x:auto;"><table class="pd2-check-table"><thead><tr>';
-        html += '<th class="pd2-check-th">transaction_id</th>';
-        html += '<th class="pd2-check-th">table_id</th>';
-        html += '<th class="pd2-check-th">sum</th>';
-        html += '<th class="pd2-check-th">payed_sum</th>';
-        html += '<th class="pd2-check-th">status</th>';
-        html += '<th class="pd2-check-th">pay_type</th>';
+        html += th('transaction_id', 'transaction_id');
+        html += th('table_id', 'table_id');
+        html += th('sum', 'sum');
+        html += th('payed_sum', 'payed_sum');
+        html += th('status', 'status');
+        html += th('pay_type', 'pay_type');
         html += '</tr></thead><tbody>';
         arr.forEach((c) => {
             const id = Number(c && c.transaction_id ? c.transaction_id : 0) || 0;
@@ -211,6 +239,7 @@ window.initPayday2_CheckFinder = function() {
             const j = await p;
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
             checksAll = Array.isArray(j.checks) ? j.checks : [];
+            sortChecks();
             filterAndRender();
         } catch (e) {
             checkFinderShowError(e && e.message ? e.message : 'Ошибка');
@@ -279,6 +308,17 @@ window.initPayday2_CheckFinder = function() {
         if (checkFinderResult) {
             checkFinderResult.addEventListener('click', (e) => {
                 const trg = e.target;
+                const sortTh = trg && trg.closest ? trg.closest('.pd2-check-sort') : null;
+                if (sortTh) {
+                    const col = String(sortTh.getAttribute('data-sort') || '');
+                    if (col) {
+                        if (sortCol === col) sortAsc = !sortAsc;
+                        else { sortCol = col; sortAsc = true; }
+                        sortChecks();
+                        filterAndRender();
+                    }
+                    return;
+                }
                 const delBtn = trg && trg.closest ? trg.closest('.pd2-check-del-btn') : null;
                 if (delBtn) {
                     const id = Number(delBtn.getAttribute('data-del-check') || 0) || 0;
