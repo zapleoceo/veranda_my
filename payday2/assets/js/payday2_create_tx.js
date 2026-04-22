@@ -183,6 +183,11 @@ window.initPaydayCreateTx = function() {
             const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
             const allowed = ls && ls.allowed_categories ? ls.allowed_categories : [];
             const customNames = ls && ls.custom_category_names ? ls.custom_category_names : {};
+            const allowedSet = new Set(
+                (Array.isArray(allowed) ? allowed : [])
+                    .map((x) => Number(x))
+                    .filter((n) => Number.isFinite(n) && n > 0)
+            );
 
             const cats = categoriesData;
             const roots = [];
@@ -203,15 +208,17 @@ window.initPaydayCreateTx = function() {
             }
 
             categorySelect.innerHTML = '<option value="">Без категории</option>';
+            const renderedAllowed = new Set();
             
             const renderOptions = (node, depth) => {
-                // Преобразуем оба ID в Number для надежного сравнения, так как JSON может парсить их как строки
-                const isAllowed = allowed.map(Number).includes(Number(node.id));
+                const nodeIdNum = Number(node.id);
+                const isAllowed = allowedSet.has(nodeIdNum);
                 
                 if (isAllowed) {
                     const customName = customNames[node.id] || customNames[String(node.id)] || node.name;
                     const prefix = '— '.repeat(depth);
                     categorySelect.insertAdjacentHTML('beforeend', `<option value="${node.id}">${escapeHtml(prefix + customName)}</option>`);
+                    renderedAllowed.add(nodeIdNum);
                 }
                 for (const child of node.children) {
                     renderOptions(child, depth + 1);
@@ -220,6 +227,21 @@ window.initPaydayCreateTx = function() {
 
             for (const root of roots) {
                 renderOptions(root, 0);
+            }
+
+            // Safety net: if some allowed category IDs exist in the categories map but were not rendered (tree edge-cases),
+            // append them at the end so "checked in settings" always appears in "+" modal.
+            const missing = [];
+            for (const id of allowedSet) {
+                if (!renderedAllowed.has(id) && byId[id]) missing.push(id);
+            }
+            if (missing.length) {
+                missing.sort((a, b) => a - b);
+                for (const id of missing) {
+                    const node = byId[id];
+                    const title = customNames[node.id] || customNames[String(node.id)] || node.name || String(id);
+                    categorySelect.insertAdjacentHTML('beforeend', `<option value="${id}">${escapeHtml(title)}</option>`);
+                }
             }
 
             if (!customSelects.type) customSelects.type = mountCustomSelect(typeSelect);
