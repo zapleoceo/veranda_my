@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260421_0095';
+$payday2AssetVersion = '20260423_0096';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1081,7 +1081,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                             </div>
                             <div class="pd2-mb-10">
                                 <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Сумма (VND)</label>
-                                <input type="number" id="createTxAmount" class="btn pd2-w-100" step="1" min="1" required>
+                                <input type="text" id="createTxAmount" class="btn pd2-w-100 pd2-text-right" inputmode="numeric" autocomplete="off" required>
                             </div>
                             <div class="pd2-mb-10">
                                 <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Категория</label>
