@@ -424,14 +424,12 @@ window.initPaydayCreateTx = function() {
             const j = await r.json();
             
             if (!j || !j.ok) throw new Error(j?.error || 'Ошибка при создании транзакции');
-            
-            closeModal();
-            
+
             let details = '';
             const tText = typeSelect.options[typeSelect.selectedIndex].text;
             details += `<div><strong>Тип:</strong> ${escapeHtml(tText)}</div>`;
             details += `<div><strong>Сумма:</strong> ${Math.round(amount).toLocaleString('en-US').replace(/,/g, '\u202F')} VND</div>`;
-            
+
             let successTitleText = 'Транзакция успешно создана в Poster!';
             let accName = '';
             let catName = '';
@@ -453,7 +451,7 @@ window.initPaydayCreateTx = function() {
                 details += `<div><strong>На счет:</strong> ${escapeHtml(accToText)}</div>`;
                 successTitleText = `Перевод «${escapeHtml(accFromText)}» ➔ «${escapeHtml(accToText)}» успешно создан!`;
             }
-            
+
             if (categoryId) {
                 catName = categorySelect.options[categorySelect.selectedIndex].text;
                 details += `<div><strong>Категория:</strong> ${escapeHtml(catName)}</div>`;
@@ -462,7 +460,8 @@ window.initPaydayCreateTx = function() {
                     successTitleText += `<br><span style="font-size: 14px; font-weight: normal; color: var(--muted);">Категория: ${escapeHtml(catName)}</span>`;
                 }
             }
-            
+
+            closeModal();
             openSuccessModal(details, successTitleText);
 
             // Автоматическое обновление таблицы Poster тр-ии
@@ -470,7 +469,43 @@ window.initPaydayCreateTx = function() {
             if (outFinanceBtn) {
                 outFinanceBtn.click();
             }
-            
+
+            // Поиск созданной транзакции в Poster
+            try {
+                const rFind = await fetch('?ajax=find_poster_transaction', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-PAYDAY2-CSRF': window.PAYDAY_CONFIG?.csrfToken || ''
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const jFind = await rFind.json();
+                if (jFind && jFind.ok && jFind.found) {
+                    const f = jFind.found;
+                    const dateFormatted = f.date ? String(f.date) : '—';
+                    let posterDetails = `
+                        <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--border);">
+                            <div style="color: #2ecc71; font-weight: bold; margin-bottom: 5px;">✅ в постере найдено</div>
+                            <div style="font-size: 13px; line-height: 1.4; color: var(--muted);">
+                                <div><strong>Время:</strong> ${escapeHtml(dateFormatted)}</div>
+                                <div><strong>Сумма:</strong> ${escapeHtml(f.sum || f.amount_from || f.amount_to || amount)}</div>
+                                <div><strong>Тип:</strong> ${escapeHtml(f.type == 1 ? 'Приход' : (f.type == 0 ? 'Расход' : 'Перевод'))}</div>
+                                <div><strong>Со счета (ID):</strong> ${escapeHtml(f.account_from || f.account_from_id || '—')}</div>
+                                <div><strong>На счет (ID):</strong> ${escapeHtml(f.account_id || f.account_to_id || '—')}</div>
+                                <div><strong>Категория (ID):</strong> ${escapeHtml(f.category_id || '—')}</div>
+                            </div>
+                        </div>
+                    `;
+                    // Update details dynamically inside the modal
+                    if (successDetails) {
+                        successDetails.insertAdjacentHTML('beforeend', posterDetails);
+                    }
+                }
+            } catch (errFind) {
+                console.error('Poster transaction verify error:', errFind);
+            }
+
         } catch (err) {
             showError(err.message);
         } finally {

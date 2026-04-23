@@ -1364,6 +1364,10 @@ if (($_GET['ajax'] ?? '') === 'create_poster_transaction') {
     exit;
 }
 
+if (($_GET['ajax'] ?? '') === 'find_poster_transaction') {
+    require_once __DIR__ . '/ajax/find_poster_transaction.php';
+}
+
 if (($_GET['ajax'] ?? '') === 'finance_categories') {
     header('Content-Type: application/json; charset=utf-8');
     try {
