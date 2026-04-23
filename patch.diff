@@ -1,0 +1,102 @@
+From 1eecbdd30895431e5705276dedb0bb1647ceaaee Mon Sep 17 00:00:00 2001
+From: zapleoceo <zapleoceo@users.noreply.github.com>
+Date: Thu, 23 Apr 2026 09:52:58 +0000
+Subject: [PATCH] feat: payday2 - fix VND amount formatting and right alignment
+ in create tx modal
+
+---
+ payday2/assets/js/payday2_create_tx.js | 37 ++++++++++++++++++++++++--
+ payday2/view.php                       |  4 +--
+ 2 files changed, 37 insertions(+), 4 deletions(-)
+
+diff --git a/payday2/assets/js/payday2_create_tx.js b/payday2/assets/js/payday2_create_tx.js
+index 97e6f31..9a38a6c 100644
+--- a/payday2/assets/js/payday2_create_tx.js
++++ b/payday2/assets/js/payday2_create_tx.js
+@@ -156,6 +156,29 @@ window.initPaydayCreateTx = function() {
+         }
+     };
+ 
++    const formatVndInt = (value) => {
++        const n = Math.round(Number(value || 0));
++        if (!Number.isFinite(n) || n <= 0) return '';
++        try {
++            return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
++                .format(n)
++                .replace(/,/g, '\u202F');
++        } catch (_) {
++            return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
++        }
++    };
++
++    const parseVndInt = (raw) => {
++        const s = String(raw || '').trim();
++        if (!s) return 0;
++        const cleaned = s
++            .replaceAll('\u202F', '')
++            .replaceAll(' ', '')
++            .replace(/[^\d-]/g, '');
++        const n = parseInt(cleaned, 10);
++        return Number.isFinite(n) ? n : 0;
++    };
++
+     const loadOptions = async () => {
+         try {
+             if (!accountsLoaded) {
+@@ -280,7 +303,8 @@ window.initPaydayCreateTx = function() {
+         typeSelect.value = '2'; // Расход
+         typeSelect.dispatchEvent(new Event('change'));
+ 
+-        amountInput.value = Math.round(Number(amount || 0));
++        const av = Math.round(Number(amount || 0));
++        amountInput.value = formatVndInt(av);
+         
+         const userEmail = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.userEmail) ? window.PAYDAY_CONFIG.userEmail : 'User';
+         commentInput.value = `Created by ${userEmail}`;
+@@ -342,6 +366,15 @@ window.initPaydayCreateTx = function() {
+         }
+     });
+ 
++    amountInput.addEventListener('input', () => {
++        const n = parseVndInt(amountInput.value);
++        amountInput.value = n > 0 ? formatVndInt(n) : '';
++    });
++    amountInput.addEventListener('blur', () => {
++        const n = parseVndInt(amountInput.value);
++        amountInput.value = n > 0 ? formatVndInt(n) : '';
++    });
++
+     form.addEventListener('submit', async (e) => {
+         e.preventDefault();
+         showError('');
+@@ -349,7 +382,7 @@ window.initPaydayCreateTx = function() {
+         const t = typeSelect.value;
+         const date = dateInput.value;
+         const time = timeInput.value;
+-        const amount = Number(amountInput.value);
++        const amount = parseVndInt(amountInput.value);
+         const accFrom = Number(accFromSelect.value);
+         const accTo = Number(accToSelect.value);
+         const categoryId = Number(categorySelect.value);
+diff --git a/payday2/view.php b/payday2/view.php
+index 511a0c6..7512c02 100644
+--- a/payday2/view.php
++++ b/payday2/view.php
+@@ -356,7 +356,7 @@
+ $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
+ $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
+ $payday2CsrfToken = payday2_ensure_csrf();
+-$payday2AssetVersion = '20260421_0095';
++$payday2AssetVersion = '20260423_0096';
+ $payday2ClientConfig = [
+     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
+     'csrfToken' => $payday2CsrfToken,
+@@ -1081,7 +1081,7 @@
+                             </div>
+                             <div class="pd2-mb-10">
+                                 <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Сумма (VND)</label>
+-                                <input type="number" id="createTxAmount" class="btn pd2-w-100" step="1" min="1" required>
++                                <input type="text" id="createTxAmount" class="btn pd2-w-100 pd2-text-right" inputmode="numeric" autocomplete="off" required>
+                             </div>
+                             <div class="pd2-mb-10">
+                                 <label class="pd2-d-block pd2-mb-4 pd2-fw-900 muted">Категория</label>
