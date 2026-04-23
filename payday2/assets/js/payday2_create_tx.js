@@ -156,6 +156,29 @@ window.initPaydayCreateTx = function() {
         }
     };
 
+    const formatVndInt = (value) => {
+        const n = Math.round(Number(value || 0));
+        if (!Number.isFinite(n) || n <= 0) return '';
+        try {
+            return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
+                .format(n)
+                .replace(/,/g, '\u202F');
+        } catch (_) {
+            return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
+        }
+    };
+
+    const parseVndInt = (raw) => {
+        const s = String(raw || '').trim();
+        if (!s) return 0;
+        const cleaned = s
+            .replaceAll('\u202F', '')
+            .replaceAll(' ', '')
+            .replace(/[^\d-]/g, '');
+        const n = parseInt(cleaned, 10);
+        return Number.isFinite(n) ? n : 0;
+    };
+
     const loadOptions = async () => {
         try {
             if (!accountsLoaded) {
@@ -280,7 +303,8 @@ window.initPaydayCreateTx = function() {
         typeSelect.value = '2'; // Расход
         typeSelect.dispatchEvent(new Event('change'));
 
-        amountInput.value = Math.round(Number(amount || 0));
+        const av = Math.round(Number(amount || 0));
+        amountInput.value = formatVndInt(av);
         
         const userEmail = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.userEmail) ? window.PAYDAY_CONFIG.userEmail : 'User';
         commentInput.value = `Created by ${userEmail}`;
@@ -342,6 +366,15 @@ window.initPaydayCreateTx = function() {
         }
     });
 
+    amountInput.addEventListener('input', () => {
+        const n = parseVndInt(amountInput.value);
+        amountInput.value = n > 0 ? formatVndInt(n) : '';
+    });
+    amountInput.addEventListener('blur', () => {
+        const n = parseVndInt(amountInput.value);
+        amountInput.value = n > 0 ? formatVndInt(n) : '';
+    });
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         showError('');
@@ -349,7 +382,7 @@ window.initPaydayCreateTx = function() {
         const t = typeSelect.value;
         const date = dateInput.value;
         const time = timeInput.value;
-        const amount = Number(amountInput.value);
+        const amount = parseVndInt(amountInput.value);
         const accFrom = Number(accFromSelect.value);
         const accTo = Number(accToSelect.value);
         const categoryId = Number(categorySelect.value);
