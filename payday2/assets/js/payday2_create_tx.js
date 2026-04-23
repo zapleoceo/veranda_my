@@ -392,7 +392,6 @@ window.initPaydayCreateTx = function() {
             
             if (!j || !j.ok) throw new Error(j?.error || 'Ошибка при создании транзакции');
             
-            closeModal();
             
             let details = '';
             const tText = typeSelect.options[typeSelect.selectedIndex].text;
@@ -430,12 +429,49 @@ window.initPaydayCreateTx = function() {
                 }
             }
             
+            closeModal();
             openSuccessModal(details, successTitleText);
 
             // Автоматическое обновление таблицы Poster тр-ии
             const outFinanceBtn = document.getElementById('outFinanceBtn');
             if (outFinanceBtn) {
                 outFinanceBtn.click();
+            }
+
+            // Поиск созданной транзакции в Poster
+            try {
+                const rFind = await fetch('?ajax=find_poster_transaction', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-PAYDAY2-CSRF': window.PAYDAY_CONFIG?.csrfToken || ''
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const jFind = await rFind.json();
+                if (jFind && jFind.ok && jFind.found) {
+                    const f = jFind.found;
+                    const dateFormatted = f.date ? String(f.date) : '—';
+                    let posterDetails = `
+                        <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--border);">
+                            <div style="color: #2ecc71; font-weight: bold; margin-bottom: 5px;">✅ в постере найдено</div>
+                            <div style="font-size: 13px; line-height: 1.4; color: var(--muted);">
+                                <div><strong>Время:</strong> ${escapeHtml(dateFormatted)}</div>
+                                <div><strong>Сумма:</strong> ${escapeHtml(f.sum || f.amount_from || f.amount_to || amount)}</div>
+                                <div><strong>Тип:</strong> ${escapeHtml(f.type == 1 ? 'Приход' : (f.type == 0 ? 'Расход' : 'Перевод'))}</div>
+                                <div><strong>Со счета (ID):</strong> ${escapeHtml(f.account_from || f.account_from_id || '—')}</div>
+                                <div><strong>На счет (ID):</strong> ${escapeHtml(f.account_id || f.account_to_id || '—')}</div>
+                                <div><strong>Категория (ID):</strong> ${escapeHtml(f.category_id || '—')}</div>
+                            </div>
+                        </div>
+                    `;
+                    // Update details dynamically inside the modal
+                    if (successDetails) {
+                        successDetails.insertAdjacentHTML('beforeend', posterDetails);
+                    }
+                }
+            } catch (errFind) {
+                console.error('Poster transaction verify error:', errFind);
             }
             
         } catch (err) {
