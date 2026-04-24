@@ -331,6 +331,90 @@ window.initPaydayCreateTx = function() {
         successModal.style.display = 'flex';
     };
 
+    const posterVerifyStart = async (targetElId, payload) => {
+        const wrap = document.getElementById(targetElId);
+        if (!wrap) return;
+
+        const setHtml = (html) => { wrap.innerHTML = html; };
+        const esc = escapeHtml;
+
+        const fmtMoney = (n) => Math.round(Number(n || 0)).toLocaleString('en-US').replace(/,/g, '\u202F');
+
+        const renderReq = (req) => {
+            const docsUrl = String(req?.docs || '');
+            const rqs = Array.isArray(req?.requests) ? req.requests : [];
+            let html = '';
+            html += `<div class="pd2-poster-verify-head">Проверка в Poster</div>`;
+            html += `<div class="pd2-poster-verify-sub">API: <a href="${esc(docsUrl)}" target="_blank" rel="noreferrer">${esc(req?.api || 'finance.getTransactions')}</a></div>`;
+            if (rqs.length) {
+                html += `<div class="pd2-poster-verify-sub">Запросы:</div>`;
+                for (const q of rqs) {
+                    const lines = [];
+                    for (const [k, v] of Object.entries(q || {})) {
+                        lines.push(`${esc(k)}=${esc(v)}`);
+                    }
+                    html += `<div class="pd2-poster-verify-req">${lines.join('<br>')}</div>`;
+                }
+            }
+            return html;
+        };
+
+        const renderFound = (match) => {
+            if (!match) return '';
+            const lines = [];
+            lines.push('В постере транзакция создана — OK');
+            lines.push(`ID: ${esc(match.transaction_id)}`);
+            if (match.date) lines.push(`Дата: ${esc(match.date)}`);
+            if (match.amount !== undefined && match.amount !== null) lines.push(`Сумма: ${esc(fmtMoney(match.amount))} VND`);
+            if (match.account_id) lines.push(`Счет: ${esc(match.account_name || match.account_id)}`);
+            if (match.category_id) lines.push(`Категория: ${esc(match.category_name || match.category_id)}`);
+            if (match.comment) lines.push(`Комментарий: ${esc(match.comment)}`);
+            return `<div class="pd2-poster-verify-result">${lines.join('<br>')}</div>`;
+        };
+
+        const renderNotFound = () => `<div class="pd2-poster-verify-result">Транзакция в постере не найдена.</div>`;
+
+        const attempts = [800, 1500, 2500];
+        setHtml(`<div class="pd2-poster-verify-loading">Проверяю транзакцию в Poster…</div>`);
+
+        for (let i = 0; i < attempts.length; i++) {
+            if (i > 0) await new Promise((r) => setTimeout(r, attempts[i]));
+            try {
+                const r = await fetch('?ajax=poster_verify_transaction', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const j = await r.json();
+                if (!j || !j.ok) throw new Error(j?.error || 'Poster verify error');
+
+                const base = renderReq(j.request);
+                if (j.found) {
+                    setHtml(base + renderFound(j.match));
+                    return;
+                }
+                setHtml(base + `<div class="pd2-poster-verify-loading">Пока не вижу в Poster, повторяю…</div>`);
+            } catch (_) {
+                setHtml(`<div class="pd2-poster-verify-loading">Проверяю транзакцию в Poster…</div>`);
+            }
+        }
+
+        try {
+            const r = await fetch('?ajax=poster_verify_transaction', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const j = await r.json();
+            if (j && j.ok) {
+                setHtml(renderReq(j.request) + (j.found ? renderFound(j.match) : renderNotFound()));
+                return;
+            }
+        } catch (_) {}
+
+        setHtml(renderNotFound());
+    };
+
     const closeSuccessModal = () => {
         if (successModal) successModal.style.display = 'none';
         // Click the refresh button of out table instead of reloading the whole page via form submit
@@ -460,50 +544,17 @@ window.initPaydayCreateTx = function() {
                     successTitleText += `<br><span style="font-size: 14px; font-weight: normal; color: var(--muted);">Категория: ${escapeHtml(catName)}</span>`;
                 }
             }
-
             closeModal();
+
+            const verifyTargetId = `pd2PosterVerify_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+            details += `<div class="pd2-poster-verify"><div id="${verifyTargetId}"></div></div>`;
             openSuccessModal(details, successTitleText);
+            posterVerifyStart(verifyTargetId, payload);
 
             // Автоматическое обновление таблицы Poster тр-ии
             const outFinanceBtn = document.getElementById('outFinanceBtn');
             if (outFinanceBtn) {
                 outFinanceBtn.click();
-            }
-
-            // Поиск созданной транзакции в Poster
-            try {
-                const rFind = await fetch('?ajax=find_poster_transaction', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-PAYDAY2-CSRF': window.PAYDAY_CONFIG?.csrfToken || ''
-                    },
-                    body: JSON.stringify(payload)
-                });
-                const jFind = await rFind.json();
-                if (jFind && jFind.ok && jFind.found) {
-                    const f = jFind.found;
-                    const dateFormatted = f.date ? String(f.date) : '—';
-                    let posterDetails = `
-                        <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--border);">
-                            <div style="color: #2ecc71; font-weight: bold; margin-bottom: 5px;">✅ в постере найдено</div>
-                            <div style="font-size: 13px; line-height: 1.4; color: var(--muted);">
-                                <div><strong>Время:</strong> ${escapeHtml(dateFormatted)}</div>
-                                <div><strong>Сумма:</strong> ${escapeHtml(f.sum || f.amount_from || f.amount_to || amount)}</div>
-                                <div><strong>Тип:</strong> ${escapeHtml(f.type == 1 ? 'Приход' : (f.type == 0 ? 'Расход' : 'Перевод'))}</div>
-                                <div><strong>Со счета (ID):</strong> ${escapeHtml(f.account_from || f.account_from_id || '—')}</div>
-                                <div><strong>На счет (ID):</strong> ${escapeHtml(f.account_id || f.account_to_id || '—')}</div>
-                                <div><strong>Категория (ID):</strong> ${escapeHtml(f.category_id || '—')}</div>
-                            </div>
-                        </div>
-                    `;
-                    // Update details dynamically inside the modal
-                    if (successDetails) {
-                        successDetails.insertAdjacentHTML('beforeend', posterDetails);
-                    }
-                }
-            } catch (errFind) {
-                console.error('Poster transaction verify error:', errFind);
             }
 
         } catch (err) {

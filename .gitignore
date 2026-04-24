@@ -17,6 +17,9 @@ Thumbs.db
 # Generated artifacts
 *.tmp
 
+# Payday2 local config (must be environment-specific, not tracked)
+/payday2/local_config.json
+
 # Project docs (local only)
 /docs/
 /ops/

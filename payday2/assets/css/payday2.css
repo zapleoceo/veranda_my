@@ -553,3 +553,19 @@ tr.row-red .out-create-poster-tx-btn {
 
 #checkFinderModal .pd2-modal-body { overflow-x: auto; padding-right: 5px !important; }
 #checkFinderModal .pd2-check-table { width: max-content; }
+
+.pd2-poster-verify {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 12px;
+    background: rgba(16,185,129,0.14);
+    border: 1px solid rgba(16,185,129,0.28);
+    color: #10b981;
+    font-weight: 800;
+}
+.pd2-poster-verify a { color: #10b981; text-decoration: underline; }
+.pd2-poster-verify-head { font-size: 13px; font-weight: 900; margin-bottom: 6px; }
+.pd2-poster-verify-sub { font-size: 12px; font-weight: 800; margin-top: 6px; }
+.pd2-poster-verify-req { font-size: 12px; font-weight: 800; margin-top: 6px; line-height: 1.25; }
+.pd2-poster-verify-loading { font-size: 12px; font-weight: 800; }
+.pd2-poster-verify-result { font-size: 12px; font-weight: 900; margin-top: 8px; line-height: 1.3; }

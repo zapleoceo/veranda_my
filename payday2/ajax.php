@@ -1366,6 +1366,174 @@ if (($_GET['ajax'] ?? '') === 'create_poster_transaction') {
 
 if (($_GET['ajax'] ?? '') === 'find_poster_transaction') {
     require_once __DIR__ . '/ajax/find_poster_transaction.php';
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'poster_verify_transaction') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    try {
+        if (!payday2_csrf_valid()) {
+            throw new \Exception('CSRF token mismatch or missing');
+        }
+        $raw = file_get_contents('php://input');
+        $data = json_decode((string)$raw, true);
+        if (!is_array($data)) {
+            throw new \Exception('Invalid JSON');
+        }
+        $typeUi = (int)($data['type'] ?? 0);
+        $amount = (int)($data['amount'] ?? 0);
+        $dt = trim((string)($data['date'] ?? ''));
+        $categoryId = (int)($data['category_id'] ?? 0);
+        $accountFrom = (int)($data['account_from'] ?? 0);
+        $accountTo = (int)($data['account_to'] ?? 0);
+
+        if ($typeUi < 1 || $typeUi > 3) throw new \Exception('Invalid type');
+        if ($amount <= 0) throw new \Exception('Invalid amount');
+        if ($dt === '') throw new \Exception('Invalid date');
+
+        $wantedPosterType = $typeUi === 1 ? 1 : ($typeUi === 2 ? 0 : 2);
+        $wantedTs = strtotime($dt);
+        if ($wantedTs === false || $wantedTs <= 0) {
+            throw new \Exception('Bad date');
+        }
+        $wantedYmd = date('Ymd', $wantedTs);
+
+        $accountsToQuery = [];
+        if ($typeUi === 1) {
+            if ($accountTo <= 0) throw new \Exception('Missing account');
+            $accountsToQuery[] = $accountTo;
+        } elseif ($typeUi === 2) {
+            if ($accountFrom <= 0) throw new \Exception('Missing account');
+            $accountsToQuery[] = $accountFrom;
+        } else {
+            if ($accountFrom <= 0 || $accountTo <= 0) throw new \Exception('Missing accounts');
+            $accountsToQuery[] = $accountFrom;
+            if ($accountTo !== $accountFrom) $accountsToQuery[] = $accountTo;
+        }
+
+        $api = new \App\Classes\PosterAPI((string)$token);
+        $requests = [];
+        $allRows = [];
+        foreach ($accountsToQuery as $accId) {
+            $params = [
+                'dateFrom' => $wantedYmd,
+                'dateTo' => $wantedYmd,
+                'account_id' => $accId,
+                'timezone' => 'client',
+            ];
+            if ($wantedPosterType !== 2) {
+                $params['type'] = $wantedPosterType;
+            }
+            if ($categoryId > 0) {
+                $params['category_id'] = $categoryId;
+            }
+            $requests[] = $params;
+
+            $rows = [];
+            try {
+                $rows = $api->request('finance.getTransactions', $params);
+            } catch (\Throwable $e) {
+                $rows = [];
+            }
+            if (!is_array($rows) || count($rows) === 0) {
+                $params2 = $params;
+                $params2['dateFrom'] = date('dmY', $wantedTs);
+                $params2['dateTo'] = date('dmY', $wantedTs);
+                $requests[] = $params2;
+                try {
+                    $rows = $api->request('finance.getTransactions', $params2);
+                } catch (\Throwable $e) {
+                    $rows = [];
+                }
+            }
+            if (!is_array($rows)) $rows = [];
+            foreach ($rows as $r) {
+                if (is_array($r)) $allRows[] = $r;
+            }
+        }
+
+        $absWanted = abs($amount);
+        $wantedCents = $absWanted * 100;
+        $matches = [];
+        foreach ($allRows as $row) {
+            $tRaw = (string)($row['type'] ?? '');
+            $tNum = (int)$tRaw;
+            if ($tNum !== $wantedPosterType) continue;
+
+            $accId = (int)($row['account_id'] ?? $row['accountId'] ?? 0);
+            if (!in_array($accId, $accountsToQuery, true)) continue;
+
+            if ($categoryId > 0 && (int)($row['category_id'] ?? 0) !== $categoryId) continue;
+
+            $dRaw = $row['date'] ?? $row['created_at'] ?? $row['createdAt'] ?? $row['time'] ?? $row['datetime'] ?? $row['date_time'] ?? $row['created'] ?? null;
+            $ts = null;
+            if (is_numeric($dRaw)) {
+                $n = (int)$dRaw;
+                if ($n > 2000000000000) $n = (int)round($n / 1000);
+                if ($n > 0) $ts = $n;
+            } elseif (is_string($dRaw) && trim($dRaw) !== '') {
+                $t = strtotime($dRaw);
+                if ($t !== false && $t > 0) $ts = $t;
+            }
+            if ($ts === null) continue;
+            if (abs($ts - $wantedTs) > 10 * 60) continue;
+
+            $aRaw = $row['amount'] ?? $row['sum'] ?? 0;
+            $sumInt = 0;
+            if (is_int($aRaw) || is_float($aRaw)) $sumInt = (int)round((float)$aRaw);
+            else if (is_string($aRaw)) $sumInt = (int)round((float)str_replace(',', '.', str_replace(' ', '', trim($aRaw))));
+
+            $sumAbs = abs($sumInt);
+            if ($sumAbs !== $absWanted && $sumAbs !== $wantedCents) continue;
+
+            $txId = (int)($row['transaction_id'] ?? $row['transactionId'] ?? $row['id'] ?? 0);
+            if ($txId <= 0) continue;
+
+            $matches[] = [
+                'transaction_id' => $txId,
+                'date' => is_string($row['date'] ?? null) ? (string)$row['date'] : '',
+                'amount' => $sumInt,
+                'account_id' => $accId,
+                'account_name' => (string)($row['account_name'] ?? ''),
+                'category_id' => (int)($row['category_id'] ?? 0),
+                'category_name' => (string)($row['category_name'] ?? ''),
+                'comment' => (string)($row['comment'] ?? ''),
+            ];
+        }
+
+        usort($matches, static function ($a, $b) {
+            return ((int)$b['transaction_id']) <=> ((int)$a['transaction_id']);
+        });
+        $best = count($matches) ? $matches[0] : null;
+
+        echo json_encode([
+            'ok' => true,
+            'found' => $best !== null,
+            'request' => [
+                'api' => 'finance.getTransactions',
+                'docs' => 'https://dev.joinposter.com/docs/v3/web/finance/getTransactions',
+                'wanted' => [
+                    'type' => $wantedPosterType,
+                    'amount' => $amount,
+                    'date' => $dt,
+                    'account_from' => $accountFrom,
+                    'account_to' => $accountTo,
+                    'category_id' => $categoryId,
+                ],
+                'requests' => $requests,
+            ],
+            'match' => $best,
+        ], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
 }
 
 if (($_GET['ajax'] ?? '') === 'finance_categories') {
