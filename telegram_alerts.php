@@ -456,12 +456,15 @@ try {
 
         $currentMsgId = $prevMsgId;
         if ($prevMsgId > 0 && $prevHash === $textHash) {
-            $db->query(
-                "UPDATE {$tgItems}
-                 SET last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
-                 WHERE transaction_date = ? AND kitchen_stats_id = ?",
-                [$nowDt, $today, $kid]
-            );
+            // Only update last_seen_at if we didn't artificially skip the edit
+            if (!$skipEdit) {
+                $db->query(
+                    "UPDATE {$tgItems}
+                     SET last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
+                     WHERE transaction_date = ? AND kitchen_stats_id = ?",
+                    [$nowDt, $today, $kid]
+                );
+            }
             $unchangedCount++;
         } else {
             $editedOk = false;

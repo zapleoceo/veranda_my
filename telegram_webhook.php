@@ -370,7 +370,7 @@ if ($ackBy === '') {
             if ($mid > 0 && $chatId !== '') {
                 $postJson('deleteMessage', ['chat_id' => $chatId, 'message_id' => $mid]);
             }
-            $db->query("DELETE FROM {$itemsTable} WHERE kitchen_stats_id = ? AND transaction_date = ?", [$itemId, (string)($row['transaction_date'] ?? $dRow['transaction_date'] ?? date('Y-m-d'))]);
+            $db->query("DELETE FROM {$itemsTable} WHERE kitchen_stats_id = ? AND transaction_date = ?", [$itemId, (string)($row['transaction_date'] ?? date('Y-m-d'))]);
         } catch (\Throwable $eDel) {
         }
         $callbackText = 'Игнор блюда установлен.';
