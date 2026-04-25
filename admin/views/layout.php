@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/assets/app.css?v=11">
     <link rel="stylesheet" href="/assets/css/common.css?v=1">
     <link rel="stylesheet" href="/admin/assets/css/admin.css?v=20260425_0001">
+    <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
 

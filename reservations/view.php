@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/assets/app.css?v=20260425_0001">
     <link rel="stylesheet" href="/reservations/assets/css/reservations.css?v=<?= (int)@filemtime(__DIR__ . '/assets/css/reservations.css') ?>">
     <link rel="stylesheet" href="/reservations/style.css?v=1">
+    <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
     <div class="container res-page">
