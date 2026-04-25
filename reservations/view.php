@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Брони</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="stylesheet" href="/assets/app.css?v=20260415_1200">
+    <link rel="stylesheet" href="/assets/app.css?v=20260425_0001">
     <link rel="stylesheet" href="/reservations/assets/css/reservations.css?v=<?= (int)@filemtime(__DIR__ . '/assets/css/reservations.css') ?>">
     <link rel="stylesheet" href="/reservations/style.css?v=1">
 </head>
@@ -385,7 +385,7 @@
 
     <div class="res-hscroll" id="resHScroll" hidden><div class="res-hscroll-inner" id="resHScrollInner"></div></div>
 
-    <script src="/assets/user_menu.js?v=20260417_1036"></script>
+    <script src="/assets/user_menu.js?v=20260425_0001"></script>
     <script src="/reservations/assets/js/reservations.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/reservations.js') ?>"></script>
     <script src="/reservations/assets/js/reservations_hall.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/reservations_hall.js') ?>"></script>
 </body>

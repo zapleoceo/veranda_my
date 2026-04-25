@@ -1520,7 +1520,7 @@ if ($tab === 'menu' || $tab === 'categories') {
                 </form>
             </div>
 
-            <script src="/assets/js/admin.js?v=20260411_0635"></script>
+            <script src="/assets/js/admin.js?v=20260425_0001"></script>
         <?php elseif ($tab === 'sync'): ?>
             <?php
                 $syncDefs = [

@@ -8,7 +8,7 @@
     <script src="/assets/app.js" defer></script>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/banya.css?v=20260410_0007">
+    <link rel="stylesheet" href="/assets/css/banya.css?v=20260425_0001">
     <link rel="stylesheet" href="/banya/style.css">
 </head>
 <body>
