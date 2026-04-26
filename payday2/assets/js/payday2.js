@@ -1231,6 +1231,24 @@ window.initPayday2 = function() {
     updateTotalActual();
     updateBalanceDiffs();
 
+    // Load actual balances from server
+    if (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.dateFrom) {
+        fetch(`?ajax=load_actual_balances&date=${encodeURIComponent(window.PAYDAY_CONFIG.dateFrom)}`)
+            .then(res => res.json())
+            .then(j => {
+                if (j.ok && j.data) {
+                    const d = j.data;
+                    if (balAndreyActualEl && d.bal_andrey !== null) balAndreyActualEl.value = fmtVndCentsJs(d.bal_andrey);
+                    if (balVietnamActualEl && d.bal_vietnam !== null) balVietnamActualEl.value = fmtVndCentsJs(d.bal_vietnam);
+                    if (balCashActualEl && d.bal_cash !== null) balCashActualEl.value = fmtVndCentsJs(d.bal_cash);
+                    if (balTotalActualEl && d.bal_total !== null) balTotalActualEl.value = fmtVndCentsJs(d.bal_total);
+                    updateTotalActual();
+                    updateBalanceDiffs();
+                }
+            })
+            .catch(e => console.warn('Failed to load actual balances from server', e));
+    }
+
     [balAndreyActualEl, balVietnamActualEl, balCashActualEl].forEach((el) => {
         if (!el) return;
         el.addEventListener('input', () => {

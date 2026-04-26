@@ -7,6 +7,8 @@ require_once __DIR__ . '/../src/classes/PosterSupplyManager.php';
 
 veranda_require('payday');
 
+$db->createPaydayTables();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!function_exists('payday2_ensure_csrf')) {
         header('Content-Type: application/json; charset=utf-8');
@@ -21,6 +23,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['ok' => false, 'error' => 'Сессия устарела. Обновите страницу (CSRF).'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+}
+
+if (($_GET['ajax'] ?? '') === 'save_actual_balances') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $payload = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($payload)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Invalid JSON'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $targetDate = trim((string)($payload['target_date'] ?? ''));
+    if ($targetDate === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Missing target_date'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $ab = $db->t('payday_actual_balances');
+    $db->query("INSERT INTO {$ab} (target_date, bal_andrey, bal_vietnam, bal_cash, bal_total) VALUES (?, ?, ?, ?, ?)", [
+        $targetDate,
+        $payload['bal_andrey'] ?? null,
+        $payload['bal_vietnam'] ?? null,
+        $payload['bal_cash'] ?? null,
+        $payload['bal_total'] ?? null,
+    ]);
+    echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if (($_GET['ajax'] ?? '') === 'load_actual_balances') {
+    header('Content-Type: application/json; charset=utf-8');
+    $date = trim((string)($_GET['date'] ?? ''));
+    if ($date === '') {
+        echo json_encode(['ok' => false, 'error' => 'Missing date']);
+        exit;
+    }
+    
+    try {
+        $dt = new DateTime($date, new DateTimeZone('Asia/Ho_Chi_Minh'));
+    } catch (\Exception $e) {
+        $dt = new DateTime($date);
+    }
+    $startStr = $dt->format('Y-m-d 00:00:00');
+    $dt->modify('+1 day');
+    $dt->setTime(2, 59, 59);
+    $endStr = $dt->format('Y-m-d H:i:s');
+    
+    $ab = $db->t('payday_actual_balances');
+    $stmt = $db->query("SELECT * FROM {$ab} WHERE created_at >= ? AND created_at <= ? ORDER BY created_at DESC LIMIT 1", [
+        $startStr,
+        $endStr
+    ]);
+    $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+    echo json_encode(['ok' => true, 'data' => $row ?: null], JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
 if (($_GET['ajax'] ?? '') === 'save_local_config') {

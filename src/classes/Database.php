@@ -284,7 +284,20 @@ class Database {
         $pt = $this->t('poster_transactions');
         $pa = $this->t('poster_accounts');
         $pl = $this->t('check_payment_links');
+        $ab = $this->t('payday_actual_balances');
         $fkTag = $this->tableSuffix !== '' ? substr(sha1($this->tableSuffix), 0, 6) : 'base';
+
+        $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$ab} (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            target_date DATE NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            bal_andrey BIGINT NULL,
+            bal_vietnam BIGINT NULL,
+            bal_cash BIGINT NULL,
+            bal_total BIGINT NULL,
+            KEY idx_target_date (target_date),
+            KEY idx_created_at (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$st} (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
