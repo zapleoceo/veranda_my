@@ -799,7 +799,7 @@ class EmployeesModel {
                 'is_fiscal' => (int)($cs['is_fiscal'] ?? 0),
                 'comment' => $newComment,
             ];
-            $api->request('finance.updateCashShiftTransaction', $payload, 'GET');
+            $api->request('finance.updateCashShiftTransaction', $payload, 'POST');
         } else {
             $dateRaw = (string)($tx['date'] ?? '');
             $tsDate = $dateRaw !== '' ? strtotime($dateRaw) : false;
