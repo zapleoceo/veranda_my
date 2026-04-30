@@ -803,7 +803,7 @@ class EmployeesModel {
         } else {
             $dateRaw = (string)($tx['date'] ?? '');
             $tsDate = $dateRaw !== '' ? strtotime($dateRaw) : false;
-            $dateYmd = $tsDate !== false ? date('Ymd', $tsDate) : date('Ymd');
+            $dateDmy = $tsDate !== false ? date('dmY', $tsDate) : date('dmY');
 
             $payload = [
                 'transaction_id' => $transactionId,
@@ -812,7 +812,7 @@ class EmployeesModel {
                 'user_id' => (int)($tx['user_id'] ?? 0),
                 'amount_from' => $amountVnd,
                 'account_from' => (int)($tx['account_id'] ?? 0),
-                'date' => $dateYmd,
+                'date' => $dateDmy,
                 'comment' => $newComment,
             ];
             if (!empty($tx['agreement_date'])) {
