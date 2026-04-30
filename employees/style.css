@@ -23,6 +23,7 @@
 #fixModal .modal {
   position: relative;
   width: min(1400px, calc(100vw - 16px));
+  max-width: 1400px;
   max-height: calc(100vh - 24px);
   overflow: hidden;
 }
@@ -38,6 +39,7 @@
 }
 
 #fixBody table {
+  width: max-content;
   min-width: 980px;
 }
 

@@ -475,7 +475,7 @@
             return;
         }
         const html = [];
-        html.push('<div><table style="width:100%; border-collapse:collapse;">');
+        html.push('<div><table style="border-collapse:collapse;">');
         html.push('<thead><tr>');
         html.push('<th style="text-align:left; padding:6px 8px;">Дата</th>');
         html.push('<th style="text-align:right; padding:6px 8px;">Сумма</th>');
