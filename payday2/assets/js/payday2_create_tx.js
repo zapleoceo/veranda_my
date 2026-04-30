@@ -313,6 +313,18 @@ window.initPaydayCreateTx = function() {
         
         submitBtn.disabled = true;
         await loadOptions();
+        const defAcc = '1';
+        const hasOpt = (sel, v) => Array.from(sel && sel.options ? sel.options : []).some(o => String(o.value) === String(v));
+        if (hasOpt(accFromSelect, defAcc)) {
+            accFromSelect.value = defAcc;
+            accFromSelect.dispatchEvent(new Event('change'));
+            if (customSelects.accFrom) customSelects.accFrom.refresh();
+        }
+        if (hasOpt(accToSelect, defAcc)) {
+            accToSelect.value = defAcc;
+            accToSelect.dispatchEvent(new Event('change'));
+            if (customSelects.accTo) customSelects.accTo.refresh();
+        }
         submitBtn.disabled = false;
     };
 
