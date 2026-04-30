@@ -103,10 +103,11 @@ window.initPayday2_CheckFinder = function() {
         return String(n || '');
     };
 
-    const fmtDec = (v) => {
+    const fmtIntSpaces = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
+    const fmtMoney = (v) => {
         const n = Number(v);
         if (!isFinite(n)) return '';
-        return n.toFixed(2);
+        return fmtIntSpaces(Math.trunc(n));
     };
 
     let checksAll = [];
@@ -156,8 +157,8 @@ window.initPayday2_CheckFinder = function() {
         arr.forEach((c) => {
             const id = Number(c && c.transaction_id ? c.transaction_id : 0) || 0;
             const tableId = Number(c && c.table_id ? c.table_id : 0) || 0;
-            const sum = c && c.sum != null ? String(c.sum) : '';
-            const payed = c && c.payed_sum != null ? String(c.payed_sum) : '';
+            const sum = c && c.sum != null ? fmtMoney(c.sum) : '';
+            const payed = c && c.payed_sum != null ? fmtMoney(c.payed_sum) : '';
             const status = Number(c && c.status != null ? c.status : 0) || 0;
             const payType = status === 2 ? payTypeLabel(c && c.pay_type != null ? c.pay_type : 0) : '';
             const statusTxt = statusLabel(status);
@@ -188,8 +189,8 @@ window.initPayday2_CheckFinder = function() {
                 products.forEach((p) => {
                     const name = p && p.name ? String(p.name) : '';
                     const qty = p && p.qty != null ? String(p.qty) : '';
-                    const unit = p && p.unit_price != null ? fmtDec(p.unit_price) : '';
-                    const total = p && p.total != null ? fmtDec(p.total) : '';
+                    const unit = p && p.unit_price != null ? fmtMoney(p.unit_price) : '';
+                    const total = p && p.total != null ? fmtMoney(p.total) : '';
                     html += '<tr>';
                     html += '<td class="pd2-check-td">' + escapeHtml(name) + '</td>';
                     html += '<td class="pd2-check-td">' + escapeHtml(unit) + '</td>';
