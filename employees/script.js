@@ -35,6 +35,7 @@
     const fixBtn = document.getElementById('fixBtn');
     const fixModal = document.getElementById('fixModal');
     const fixClose = document.getElementById('fixClose');
+    const fixEyeBtn = document.getElementById('fixEyeBtn');
     const fixBody = document.getElementById('fixBody');
     const payExtraModal = document.getElementById('payExtraModal');
     const payExtraEmp = document.getElementById('payExtraEmp');
@@ -504,17 +505,22 @@
             const acc = esc(row?.account_from || '—');
             const c = esc(row?.comment || '');
             const txId = Number(row?.transaction_id || 0) || 0;
-            html.push('<tr>');
+            const isSlr = /^SLR\b/i.test(String(row?.comment || '').trim());
+            if (isSlr) html.push('<tr class="fix-row-slr">');
+            else html.push('<tr>');
             html.push('<td class="fix-td" style="white-space:nowrap;">' + d + '</td>');
             html.push('<td class="fix-td" style="text-align:right; white-space:nowrap;">' + esc(a) + '</td>');
             html.push('<td class="fix-td" style="white-space:nowrap;">' + acc + '</td>');
             html.push('<td class="fix-td fix-td-comment">' + c + '</td>');
             html.push('<td class="fix-td" style="white-space:nowrap;"><select class="fix-emp-select" data-tx-id="' + esc(String(txId)) + '">' + empOptHtml + '</select></td>');
-            html.push('<td class="fix-td" style="white-space:nowrap;"><button type="button" class="fix-update-btn" data-tx-id="' + esc(String(txId)) + '">Обновить</button></td>');
+            html.push('<td class="fix-td" style="white-space:nowrap;"><button type="button" class="fix-update-btn" data-tx-id="' + esc(String(txId)) + '" title="Обновить">⟳</button></td>');
             html.push('</tr>');
         }
         html.push('</tbody></table></div>');
         fixBody.innerHTML = html.join('');
+        if (fixModal && fixModal.getAttribute('data-hide-slr') === '1') {
+            Array.from(fixBody.querySelectorAll('.fix-row-slr')).forEach((tr) => { tr.style.display = 'none'; });
+        }
     };
 
     const closeFix = () => { if (fixModal) setModalVisible(fixModal, false); };
@@ -522,6 +528,17 @@
     if (fixClose) fixClose.addEventListener('click', closeFix);
     if (fixModal) fixModal.addEventListener('click', (e) => { if (e.target === fixModal) closeFix(); });
     if (fixModal) document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fixModal.style.display === 'flex') closeFix(); });
+    if (fixEyeBtn) {
+        fixEyeBtn.addEventListener('click', () => {
+            if (!fixModal || !fixBody) return;
+            const cur = fixModal.getAttribute('data-hide-slr') === '1';
+            const next = !cur;
+            fixModal.setAttribute('data-hide-slr', next ? '1' : '0');
+            Array.from(fixBody.querySelectorAll('.fix-row-slr')).forEach((tr) => {
+                tr.style.display = next ? 'none' : '';
+            });
+        });
+    }
     if (fixBody) {
         fixBody.addEventListener('click', async (e) => {
             const t = e.target;
@@ -547,6 +564,13 @@
                 const tr = t.closest('tr');
                 const cell = tr ? tr.querySelector('.fix-td-comment') : null;
                 if (cell) cell.textContent = String(j.comment || '');
+                if (tr) {
+                    if (/^SLR\b/i.test(String(j.comment || '').trim())) tr.classList.add('fix-row-slr');
+                    else tr.classList.remove('fix-row-slr');
+                    if (fixModal && fixModal.getAttribute('data-hide-slr') === '1' && tr.classList.contains('fix-row-slr')) {
+                        tr.style.display = 'none';
+                    }
+                }
             } catch (err) {
                 setError(err && err.message ? err.message : 'Ошибка');
             } finally {

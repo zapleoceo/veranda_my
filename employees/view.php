@@ -11,9 +11,9 @@
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260430_0005">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260430_0005">
-  <link rel="stylesheet" href="/employees/style.css?v=20260430_0005">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260430_0006">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260430_0006">
+  <link rel="stylesheet" href="/employees/style.css?v=20260430_0006">
 </head>
 <body>
 <div class="container">
@@ -168,7 +168,7 @@
 <div class="modal-backdrop" id="fixModal">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fixTitle">
         <button type="button" id="fixClose" style="position:absolute; top:10px; right:10px; background:transparent; border:0; font-size:20px; line-height:20px; cursor:pointer;">✕</button>
-        <h3 id="fixTitle">FIX</h3>
+        <h3 id="fixTitle">FIX <button type="button" id="fixEyeBtn" style="background:transparent; border:0; cursor:pointer; padding:0 6px; font-size:18px; line-height:18px; vertical-align:middle;" title="Скрыть/показать SLR">👁</button></h3>
         <div class="body" id="fixBody"></div>
     </div>
 </div>
@@ -278,7 +278,7 @@
 <script>
 window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 </script>
-<script src="/employees/script.js?v=20260430_0005" defer></script>
+<script src="/employees/script.js?v=20260430_0006" defer></script>
 <script src="/assets/user_menu.js" defer></script>
 </body>
 </html>
