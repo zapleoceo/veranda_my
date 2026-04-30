@@ -93,6 +93,11 @@ if ($ajax === 'pay_tips') {
     exit;
 }
 
+if ($ajax === 'fix_salary_tx') {
+    $model->fixSalaryTx();
+    exit;
+}
+
 
 $today = date('Y-m-d');
 $firstOfMonth = date('Y-m-01');

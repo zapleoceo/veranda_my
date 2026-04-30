@@ -43,6 +43,7 @@
                     <div class="desc" id="progDesc"></div>
                 </div>
                 <button type="button" class="secondary" id="payExtraBtn">PayExtra</button>
+                <button type="button" class="secondary" id="fixBtn">FIX</button>
             </div>
             <button type="button" class="help-btn" id="helpBtn" title="Инструкция">?</button>
         </div>
@@ -164,6 +165,14 @@
     </div>
 </div>
 
+<div class="modal-backdrop" id="fixModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fixTitle">
+        <button type="button" id="fixClose" style="position:absolute; top:10px; right:10px; background:transparent; border:0; font-size:20px; line-height:20px; cursor:pointer;">✕</button>
+        <h3 id="fixTitle">FIX</h3>
+        <div class="body" id="fixBody"></div>
+    </div>
+</div>
+
 <div class="modal-backdrop" id="paidModal">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="paidTitle">
         <h3 id="paidTitle">Подтверждение</h3>
@@ -269,7 +278,7 @@
 <script>
 window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 </script>
-<script src="/employees/script.js?v=20260425_0001" defer></script>
+<script src="/employees/script.js?v=20260430_0001" defer></script>
 <script src="/assets/user_menu.js" defer></script>
 </body>
 </html>

@@ -32,6 +32,10 @@
     const helpModal = document.getElementById('helpModal');
     const helpClose = document.getElementById('helpClose');
     const payExtraBtn = document.getElementById('payExtraBtn');
+    const fixBtn = document.getElementById('fixBtn');
+    const fixModal = document.getElementById('fixModal');
+    const fixClose = document.getElementById('fixClose');
+    const fixBody = document.getElementById('fixBody');
     const payExtraModal = document.getElementById('payExtraModal');
     const payExtraEmp = document.getElementById('payExtraEmp');
     const payExtraKind = document.getElementById('payExtraKind');
@@ -457,6 +461,48 @@
             });
         });
     }
+
+    const openFix = async () => {
+        if (!fixModal || !fixBody) return;
+        setModalVisible(fixModal, true);
+        fixBody.innerHTML = '<div class="muted" style="padding:10px 0;">Загрузка…</div>';
+        const r = await fetch('?ajax=fix_salary_tx');
+        const j = await r.json();
+        if (!j || !j.ok) throw new Error(j?.error || 'Ошибка');
+        const rows = Array.isArray(j.rows) ? j.rows : [];
+        if (!rows.length) {
+            fixBody.innerHTML = '<div class="muted" style="padding:10px 0;">Нет данных</div>';
+            return;
+        }
+        const html = [];
+        html.push('<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse;">');
+        html.push('<thead><tr>');
+        html.push('<th style="text-align:left; padding:6px 8px;">Дата</th>');
+        html.push('<th style="text-align:right; padding:6px 8px;">Сумма</th>');
+        html.push('<th style="text-align:left; padding:6px 8px;">Счет</th>');
+        html.push('<th style="text-align:left; padding:6px 8px;">Комментарий</th>');
+        html.push('</tr></thead><tbody>');
+        for (const row of rows) {
+            const d = esc(row?.date || '');
+            const a = fmtMoney(row?.amount || 0);
+            const acc = esc(row?.account_from || '—');
+            const c = esc(row?.comment || '');
+            html.push('<tr>');
+            html.push('<td style="padding:6px 8px; border-top:1px solid rgba(255,255,255,0.08); white-space:nowrap;">' + d + '</td>');
+            html.push('<td style="padding:6px 8px; border-top:1px solid rgba(255,255,255,0.08); text-align:right; white-space:nowrap;">' + esc(a) + '</td>');
+            html.push('<td style="padding:6px 8px; border-top:1px solid rgba(255,255,255,0.08); white-space:nowrap;">' + acc + '</td>');
+            html.push('<td style="padding:6px 8px; border-top:1px solid rgba(255,255,255,0.08);">' + c + '</td>');
+            html.push('</tr>');
+        }
+        html.push('</tbody></table></div>');
+        fixBody.innerHTML = html.join('');
+    };
+
+    const closeFix = () => { if (fixModal) setModalVisible(fixModal, false); };
+    if (fixBtn) fixBtn.addEventListener('click', () => { openFix().catch((e) => setError(e && e.message ? e.message : 'Ошибка')); });
+    if (fixClose) fixClose.addEventListener('click', closeFix);
+    if (fixModal) fixModal.addEventListener('click', (e) => { if (e.target === fixModal) closeFix(); });
+    if (fixModal) document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fixModal.style.display === 'flex') closeFix(); });
 
     function ensureStickyHeader() {
         if (!empTable || !empTable.tHead || !tableWrap) return;

@@ -617,6 +617,89 @@ class EmployeesModel {
     exit;
     }
 
+    public function fixSalaryTx() {
+
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+
+    $dateTo = date('Y-m-d');
+    $tsFrom = strtotime($dateTo . ' -30 days');
+    if ($tsFrom === false) $tsFrom = time() - 30 * 86400;
+    $dateFrom = date('Y-m-d', $tsFrom);
+
+    try {
+        $api = new \App\Classes\PosterAPI($this->posterToken);
+
+        $accById = [];
+        try {
+            $accs = $api->request('finance.getAccounts', [], 'GET');
+            if (is_array($accs)) {
+                foreach ($accs as $a) {
+                    if (!is_array($a)) continue;
+                    $aid = (int)($a['account_id'] ?? $a['id'] ?? 0);
+                    if ($aid <= 0) continue;
+                    $nm = trim((string)($a['name'] ?? $a['title'] ?? ''));
+                    $accById[$aid] = $nm !== '' ? $nm : ('#' . $aid);
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $txs = $api->request('finance.getTransactions', [
+            'dateFrom' => str_replace('-', '', $dateFrom),
+            'dateTo' => str_replace('-', '', $dateTo),
+            'type' => 0,
+        ], 'GET');
+        if (!is_array($txs)) $txs = [];
+
+        $rows = [];
+        foreach ($txs as $t) {
+            if (!is_array($t)) continue;
+            $type = (string)($t['type'] ?? '');
+            if ($type !== '0' && $type !== 'expense' && $type !== 'out') continue;
+
+            $cat = isset($t['category']) ? (int)$t['category'] : (isset($t['category_id']) ? (int)$t['category_id'] : 0);
+            if ($cat !== 6) continue;
+
+            $dt = $t['date'] ?? '';
+            $ts = false;
+            if (is_numeric($dt)) {
+                $v = (int)$dt;
+                if ($v > 10000000000) $v = (int)round($v / 1000);
+                if ($v > 0) $ts = $v;
+            } else {
+                $s = trim((string)$dt);
+                if ($s !== '') $ts = strtotime($s);
+            }
+            if ($ts === false || (int)$ts <= 0) continue;
+
+            $amount = (int)($t['amount'] ?? 0);
+            $accId = isset($t['account_from']) ? (int)$t['account_from'] : (isset($t['account_id']) ? (int)$t['account_id'] : 0);
+            $accName = $accId > 0 ? (string)($accById[$accId] ?? ('#' . $accId)) : '—';
+            $comment = trim((string)($t['comment'] ?? ''));
+
+            $rows[] = [
+                'ts' => (int)$ts,
+                'date' => date('Y-m-d H:i', (int)$ts),
+                'amount' => $amount,
+                'account_from' => $accName,
+                'comment' => $comment,
+            ];
+        }
+
+        usort($rows, fn($a, $b) => ((int)($b['ts'] ?? 0)) <=> ((int)($a['ts'] ?? 0)));
+        foreach ($rows as &$r) { unset($r['ts']); }
+        unset($r);
+
+        echo json_encode(['ok' => true, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+    }
+
     public function payMeta() {
 
     header('Content-Type: application/json; charset=utf-8');
