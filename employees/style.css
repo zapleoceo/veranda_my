@@ -13,3 +13,21 @@
 .emp-style-12 { cursor:pointer; }
 .emp-style-13 { display: inline-flex; flex-direction: column; }
 .emp-style-14 { display:flex; align-items:center; gap: 5px; margin: 0; }
+
+#fixModal {
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+#fixModal .modal {
+  position: relative;
+  width: min(1100px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+}
+
+#fixBody {
+  max-height: calc(100vh - 160px);
+  overflow: auto;
+}

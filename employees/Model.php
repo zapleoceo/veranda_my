@@ -674,7 +674,8 @@ class EmployeesModel {
             }
             if ($ts === false || (int)$ts <= 0) continue;
 
-            $amount = (int)($t['amount'] ?? 0);
+            $amountMinor = (int)($t['amount'] ?? 0);
+            $amountVnd = (int)round($amountMinor / 100);
             $accId = isset($t['account_from']) ? (int)$t['account_from'] : (isset($t['account_id']) ? (int)$t['account_id'] : 0);
             $accName = $accId > 0 ? (string)($accById[$accId] ?? ('#' . $accId)) : '—';
             $comment = trim((string)($t['comment'] ?? ''));
@@ -682,7 +683,7 @@ class EmployeesModel {
             $rows[] = [
                 'ts' => (int)$ts,
                 'date' => date('Y-m-d H:i', (int)$ts),
-                'amount' => $amount,
+                'amount_vnd' => $amountVnd,
                 'account_from' => $accName,
                 'comment' => $comment,
             ];

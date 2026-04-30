@@ -484,7 +484,7 @@
         html.push('</tr></thead><tbody>');
         for (const row of rows) {
             const d = esc(row?.date || '');
-            const a = fmtMoney(row?.amount || 0);
+            const a = fmtMoney(row?.amount_vnd || 0);
             const acc = esc(row?.account_from || '—');
             const c = esc(row?.comment || '');
             html.push('<tr>');
