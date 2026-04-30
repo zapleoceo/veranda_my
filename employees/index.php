@@ -98,6 +98,11 @@ if ($ajax === 'fix_salary_tx') {
     exit;
 }
 
+if ($ajax === 'fix_salary_update_comment') {
+    $model->fixSalaryUpdateComment();
+    exit;
+}
+
 
 $today = date('Y-m-d');
 $firstOfMonth = date('Y-m-01');

@@ -40,7 +40,7 @@
 
 #fixBody table {
   width: max-content;
-  min-width: 980px;
+  table-layout: auto;
 }
 
 #fixBody th,
@@ -55,4 +55,18 @@
 #fixBody th:nth-child(3),
 #fixBody td:nth-child(3) {
   white-space: nowrap;
+}
+
+.fix-td {
+  padding: 6px 8px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.fix-td-comment {
+  max-width: 520px;
+  white-space: normal;
+}
+
+.fix-emp-select {
+  max-width: 240px;
 }

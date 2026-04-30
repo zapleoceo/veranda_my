@@ -476,22 +476,41 @@
         }
         const html = [];
         html.push('<div><table style="border-collapse:collapse;">');
+        if (!dataRows.length) {
+            fixBody.innerHTML = '<div class="muted" style="padding:10px 0;">Сначала нажмите ЗАГРУЗИТЬ</div>';
+            return;
+        }
+        const empRows = dataRows.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru'));
+        const empOpts = ['<option value=\"\">—</option>'];
+        for (const e of empRows) {
+            const id = Number(e && e.user_id ? e.user_id : 0) || 0;
+            if (!id) continue;
+            const nm = esc(String(e && e.name ? e.name : ('#' + id)));
+            empOpts.push('<option value=\"' + esc(String(id)) + '\">' + nm + '</option>');
+        }
+        const empOptHtml = empOpts.join('');
+
         html.push('<thead><tr>');
         html.push('<th style="text-align:left; padding:6px 8px;">Дата</th>');
         html.push('<th style="text-align:right; padding:6px 8px;">Сумма</th>');
         html.push('<th style="text-align:left; padding:6px 8px;">Счет</th>');
         html.push('<th style="text-align:left; padding:6px 8px;">Комментарий</th>');
+        html.push('<th style="text-align:left; padding:6px 8px;">Сотрудник</th>');
+        html.push('<th style="text-align:left; padding:6px 8px;"></th>');
         html.push('</tr></thead><tbody>');
         for (const row of rows) {
             const d = esc(row?.date || '');
             const a = fmtMoney(row?.amount_vnd || 0);
             const acc = esc(row?.account_from || '—');
             const c = esc(row?.comment || '');
+            const txId = Number(row?.transaction_id || 0) || 0;
             html.push('<tr>');
-            html.push('<td style="padding:6px 8px; border-top:1px solid rgba(255,255,255,0.08); white-space:nowrap;">' + d + '</td>');
-            html.push('<td style="padding:6px 8px; border-top:1px solid rgba(255,255,255,0.08); text-align:right; white-space:nowrap;">' + esc(a) + '</td>');
-            html.push('<td style="padding:6px 8px; border-top:1px solid rgba(255,255,255,0.08); white-space:nowrap;">' + acc + '</td>');
-            html.push('<td style="padding:6px 8px; border-top:1px solid rgba(255,255,255,0.08);">' + c + '</td>');
+            html.push('<td class="fix-td" style="white-space:nowrap;">' + d + '</td>');
+            html.push('<td class="fix-td" style="text-align:right; white-space:nowrap;">' + esc(a) + '</td>');
+            html.push('<td class="fix-td" style="white-space:nowrap;">' + acc + '</td>');
+            html.push('<td class="fix-td fix-td-comment">' + c + '</td>');
+            html.push('<td class="fix-td" style="white-space:nowrap;"><select class="fix-emp-select" data-tx-id="' + esc(String(txId)) + '">' + empOptHtml + '</select></td>');
+            html.push('<td class="fix-td" style="white-space:nowrap;"><button type="button" class="fix-update-btn" data-tx-id="' + esc(String(txId)) + '">Обновить</button></td>');
             html.push('</tr>');
         }
         html.push('</tbody></table></div>');
@@ -503,6 +522,38 @@
     if (fixClose) fixClose.addEventListener('click', closeFix);
     if (fixModal) fixModal.addEventListener('click', (e) => { if (e.target === fixModal) closeFix(); });
     if (fixModal) document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fixModal.style.display === 'flex') closeFix(); });
+    if (fixBody) {
+        fixBody.addEventListener('click', async (e) => {
+            const t = e.target;
+            if (!t || !t.classList || !t.classList.contains('fix-update-btn')) return;
+            const txId = Number(t.getAttribute('data-tx-id') || 0) || 0;
+            if (!txId) return;
+            const sel = fixBody.querySelector(`.fix-emp-select[data-tx-id="${CSS.escape(String(txId))}"]`);
+            const waiterId = Number(sel && sel.value ? sel.value : 0) || 0;
+            if (!waiterId) { setError('Выберите сотрудника'); return; }
+            const opt = sel.options && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+            const empName = opt ? String(opt.textContent || '').trim() : '';
+
+            const prevDisabled = t.disabled;
+            t.disabled = true;
+            try {
+                const r = await fetch('?ajax=fix_salary_update_comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ transaction_id: txId, waiter_id: waiterId, employee_name: empName })
+                });
+                const j = await r.json();
+                if (!j || !j.ok) throw new Error(j?.error || 'Ошибка');
+                const tr = t.closest('tr');
+                const cell = tr ? tr.querySelector('.fix-td-comment') : null;
+                if (cell) cell.textContent = String(j.comment || '');
+            } catch (err) {
+                setError(err && err.message ? err.message : 'Ошибка');
+            } finally {
+                t.disabled = prevDisabled;
+            }
+        });
+    }
 
     function ensureStickyHeader() {
         if (!empTable || !empTable.tHead || !tableWrap) return;

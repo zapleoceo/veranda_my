@@ -679,9 +679,12 @@ class EmployeesModel {
             $accId = isset($t['account_from']) ? (int)$t['account_from'] : (isset($t['account_id']) ? (int)$t['account_id'] : 0);
             $accName = $accId > 0 ? (string)($accById[$accId] ?? ('#' . $accId)) : '—';
             $comment = trim((string)($t['comment'] ?? ''));
+            $txId = (int)($t['transaction_id'] ?? $t['id'] ?? 0);
+            if ($txId <= 0) continue;
 
             $rows[] = [
                 'ts' => (int)$ts,
+                'transaction_id' => $txId,
                 'date' => date('Y-m-d H:i', (int)$ts),
                 'amount_vnd' => $amountVnd,
                 'account_from' => $accName,
@@ -694,6 +697,131 @@ class EmployeesModel {
         unset($r);
 
         echo json_encode(['ok' => true, 'date_from' => $dateFrom, 'date_to' => $dateTo, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+    }
+
+    public function fixSalaryUpdateComment() {
+
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    if (!veranda_can('admin')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $raw = file_get_contents('php://input');
+    $j = json_decode((string)$raw, true);
+    if (!is_array($j)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $transactionId = (int)($j['transaction_id'] ?? 0);
+    $waiterId = (int)($j['waiter_id'] ?? 0);
+    $empName = trim((string)($j['employee_name'] ?? ''));
+    if ($empName !== '') {
+        $empName = preg_replace('/\s+/u', ' ', $empName);
+        $empName = preg_replace('/[^\p{L}\p{N}\s\.\-\'"()]+/u', '', (string)$empName);
+        $empName = trim((string)$empName);
+        if (mb_strlen($empName, 'UTF-8') > 60) $empName = mb_substr($empName, 0, 60, 'UTF-8');
+    }
+    if ($transactionId <= 0 || $waiterId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    try {
+        $api = new \App\Classes\PosterAPI($this->posterToken);
+        $tx = $api->request('finance.getTransaction', ['transaction_id' => $transactionId], 'GET');
+        if (!is_array($tx)) throw new \Exception('Transaction not found');
+
+        $type = (string)($tx['type'] ?? '');
+        $cat = (int)($tx['category_id'] ?? $tx['category'] ?? 0);
+        if ($type !== '0' && $type !== 'expense' && $type !== 'out') {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Unsupported transaction type'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($cat !== 6) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Not salary category'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
+        $prefix = 'SLR' . ($empName !== '' ? (' ' . $empName) : '') . ' ID=' . $waiterId . ($by !== '' ? (' by ' . $by) : '');
+
+        $old = (string)($tx['comment'] ?? '');
+        $rest = $old;
+        if (preg_match('/^SLR\b/iu', $old)) {
+            $rest = (string)preg_replace('/^SLR.*?ID=\d+(?:\s+by[^\n]*)?\s*/iu', '', $old, 1);
+        }
+        $rest = trim($rest);
+        $newComment = $prefix . ($rest !== '' ? (' ' . $rest) : '');
+
+        $bindingType = (int)($tx['binding_type'] ?? 0);
+        $bindingId = (int)($tx['binding_id'] ?? 0);
+        $amountMinor = (int)($tx['amount'] ?? 0);
+        $amountVnd = (int)round(abs($amountMinor) / 100);
+
+        if ($bindingType === 14 && $bindingId > 0) {
+            $cs = $api->request('finance.getCashShiftTransaction', ['cash_shift_transaction_id' => $bindingId], 'GET');
+            if (!is_array($cs)) throw new \Exception('Cash shift transaction not found');
+
+            $timeRaw = $cs['time'] ?? '';
+            $ts = 0;
+            if (is_numeric($timeRaw)) {
+                $v = (int)$timeRaw;
+                if ($v > 10000000000) $v = (int)round($v / 1000);
+                if ($v > 0) $ts = $v;
+            }
+            $timeStr = $ts > 0 ? date('Y-m-d H:i', $ts) : (string)($tx['date'] ?? '');
+            if ($timeStr !== '') {
+                $tss = strtotime($timeStr);
+                if ($tss !== false) $timeStr = date('Y-m-d H:i', $tss);
+            }
+            if ($timeStr === '') $timeStr = date('Y-m-d H:i');
+
+            $payload = [
+                'cash_shift_transaction_id' => $bindingId,
+                'type_id' => (int)($cs['type'] ?? 3),
+                'category_id' => 6,
+                'user_id' => (int)($cs['user_id'] ?? $tx['user_id'] ?? 0),
+                'amount' => $amountVnd,
+                'time' => $timeStr,
+                'is_fiscal' => (int)($cs['is_fiscal'] ?? 0),
+                'comment' => $newComment,
+            ];
+            $api->request('finance.updateCashShiftTransaction', $payload, 'GET');
+        } else {
+            $dateRaw = (string)($tx['date'] ?? '');
+            $tsDate = $dateRaw !== '' ? strtotime($dateRaw) : false;
+            $dateYmd = $tsDate !== false ? date('Ymd', $tsDate) : date('Ymd');
+
+            $payload = [
+                'transaction_id' => $transactionId,
+                'type' => 0,
+                'category' => 6,
+                'user_id' => (int)($tx['user_id'] ?? 0),
+                'amount_from' => $amountVnd,
+                'account_from' => (int)($tx['account_id'] ?? 0),
+                'date' => $dateYmd,
+                'comment' => $newComment,
+            ];
+            if (!empty($tx['agreement_date'])) {
+                $payload['agreement_date'] = (string)$tx['agreement_date'];
+            }
+            $api->request('finance.updateTransactions', $payload, 'POST');
+        }
+
+        echo json_encode(['ok' => true, 'transaction_id' => $transactionId, 'comment' => $newComment], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
