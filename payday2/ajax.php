@@ -2225,7 +2225,8 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
                 if (!is_array($pr)) continue;
                 $pid = (int)($pr['product_id'] ?? 0);
                 $num = (float)($pr['num'] ?? 0);
-                $sumI = $amountInt($pr['product_sum'] ?? '');
+                $sumMinor = $amountInt($pr['product_sum'] ?? '');
+                $sumI = (int)$posterCentsToVnd($sumMinor);
                 $unitI = ($num > 0 && $sumI > 0) ? (int)floor($sumI / $num) : 0;
                 $productsOut[] = [
                     'product_id' => $pid,
@@ -2253,8 +2254,8 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
                 'transaction_id' => $txId,
                 'table_id' => $tableId,
                 'table_title' => $tableTitle,
-                'sum' => $amountInt($row['sum'] ?? ''),
-                'payed_sum' => $amountInt($row['payed_sum'] ?? ''),
+                'sum' => (int)$posterCentsToVnd($amountInt($row['sum'] ?? '')),
+                'payed_sum' => (int)$posterCentsToVnd($amountInt($row['payed_sum'] ?? '')),
                 'pay_type' => (int)($row['pay_type'] ?? 0),
                 'status' => $status,
                 'date_close' => (string)($row['date_close'] ?? ''),
