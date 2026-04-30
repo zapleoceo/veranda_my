@@ -11,9 +11,9 @@
     <link rel="stylesheet" href="/assets/app.css?v=1" />
     <script src="/assets/app.js" defer></script>
       <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260425_0001">
-  <link rel="stylesheet" href="/assets/css/employees.css?v=20260425_0001">
-  <link rel="stylesheet" href="/employees/style.css">
+  <link rel="stylesheet" href="/assets/css/common.css?v=20260430_0002">
+  <link rel="stylesheet" href="/assets/css/employees.css?v=20260430_0002">
+  <link rel="stylesheet" href="/employees/style.css?v=20260430_0002">
 </head>
 <body>
 <div class="container">
@@ -278,7 +278,7 @@
 <script>
 window.__USER_EMAIL__ = <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 </script>
-<script src="/employees/script.js?v=20260430_0001" defer></script>
+<script src="/employees/script.js?v=20260430_0002" defer></script>
 <script src="/assets/user_menu.js" defer></script>
 </body>
 </html>
