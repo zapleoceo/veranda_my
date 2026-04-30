@@ -21,5 +21,8 @@ Thumbs.db
 /payday2/local_config.json
 
 # Project docs (local only)
-/docs/
+/docs/*
+!/docs/superpowers/
+!/docs/superpowers/specs/
+!/docs/superpowers/specs/**
 /ops/
