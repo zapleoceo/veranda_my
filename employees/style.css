@@ -22,7 +22,7 @@
 
 #fixModal .modal {
   position: relative;
-  width: min(1100px, calc(100vw - 24px));
+  width: min(1400px, calc(100vw - 16px));
   max-height: calc(100vh - 24px);
   overflow: hidden;
 }
@@ -30,4 +30,27 @@
 #fixBody {
   max-height: calc(100vh - 160px);
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#fixBody > div {
+  overflow-x: auto;
+}
+
+#fixBody table {
+  min-width: 980px;
+}
+
+#fixBody th,
+#fixBody td {
+  vertical-align: top;
+}
+
+#fixBody th:nth-child(1),
+#fixBody td:nth-child(1),
+#fixBody th:nth-child(2),
+#fixBody td:nth-child(2),
+#fixBody th:nth-child(3),
+#fixBody td:nth-child(3) {
+  white-space: nowrap;
 }
