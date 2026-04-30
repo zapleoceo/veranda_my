@@ -1157,6 +1157,11 @@ window.initPayday2 = function() {
 
     if (posterAccountsBtn) {
         posterAccountsBtn.addEventListener('click', () => {
+            try {
+                if (typeof window.payday2SaveActualBalances === 'function') {
+                    window.payday2SaveActualBalances();
+                }
+            } catch (_) {}
             posterAccountsBtn.classList.add('loading');
             posterAccountsBtn.disabled = true;
             refreshPosterAccounts()

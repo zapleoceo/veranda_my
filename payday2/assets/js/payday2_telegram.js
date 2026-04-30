@@ -30,41 +30,9 @@ window.initPaydayTelegramScreenshot = function() {
 
         try {
             if (typeof updateBtnBusy === 'function') updateBtnBusy(btn, { pct: 10, title: 'Сохранение...' });
-
-            const getCents = (id) => {
-                const el = document.getElementById(id);
-                if (!el || !el.value) return null;
-                const v = String(el.value).replace(/[^\d-]/g, '');
-                return v ? parseInt(v, 10) * 100 : null; // format is VND int, so multiply by 100 to get cents
-            };
-            
-            // Re-use parseVndCentsJs logic if possible, but safely re-implementing here to be sure:
-            const parseCents = (id) => {
-                const el = document.getElementById(id);
-                if (!el) return null;
-                const v = String(el.value).trim();
-                if (v === '') return null;
-                const digits = v.replace(/[^\d-]/g, '');
-                const num = parseInt(digits, 10);
-                return isNaN(num) ? null : num * 100;
-            };
-
-            const payload = {
-                target_date: window.PAYDAY_CONFIG ? window.PAYDAY_CONFIG.dateFrom : new Date().toISOString().split('T')[0],
-                bal_andrey: parseCents('balAndreyActual'),
-                bal_vietnam: parseCents('balVietnamActual'),
-                bal_cash: parseCents('balCashActual'),
-                bal_total: parseCents('balTotalActual')
-            };
-
-            await fetch('?ajax=save_actual_balances', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': window.PAYDAY_CONFIG ? window.PAYDAY_CONFIG.csrf : ''
-                },
-                body: JSON.stringify(payload)
-            }).catch(e => console.warn('Failed to save actual balances:', e));
+            if (typeof window.payday2SaveActualBalances === 'function') {
+                await window.payday2SaveActualBalances();
+            }
 
             if (typeof updateBtnBusy === 'function') updateBtnBusy(btn, { pct: 20, title: 'Рендер...' });
 
