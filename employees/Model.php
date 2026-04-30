@@ -775,27 +775,12 @@ class EmployeesModel {
             $cs = $api->request('finance.getCashShiftTransaction', ['cash_shift_transaction_id' => $bindingId], 'GET');
             if (!is_array($cs)) throw new \Exception('Cash shift transaction not found');
 
-            $timeRaw = $cs['time'] ?? '';
-            $ts = 0;
-            if (is_numeric($timeRaw)) {
-                $v = (int)$timeRaw;
-                if ($v > 10000000000) $v = (int)round($v / 1000);
-                if ($v > 0) $ts = $v;
-            }
-            $timeStr = $ts > 0 ? date('Y-m-d H:i', $ts) : (string)($tx['date'] ?? '');
-            if ($timeStr !== '') {
-                $tss = strtotime($timeStr);
-                if ($tss !== false) $timeStr = date('Y-m-d H:i', $tss);
-            }
-            if ($timeStr === '') $timeStr = date('Y-m-d H:i');
-
             $payload = [
                 'cash_shift_transaction_id' => $bindingId,
                 'type_id' => (int)($cs['type'] ?? 3),
                 'category_id' => 6,
                 'user_id' => (int)($cs['user_id'] ?? $tx['user_id'] ?? 0),
                 'amount' => $amountVnd,
-                'time' => $timeStr,
                 'is_fiscal' => (int)($cs['is_fiscal'] ?? 0),
                 'comment' => $newComment,
             ];
