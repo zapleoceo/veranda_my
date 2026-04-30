@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../auth_check.php';
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
+require_once __DIR__ . '/http.php';
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
@@ -16,90 +17,33 @@ if ($posterToken === '') {
 require_once __DIR__ . '/Model.php';
 $model = new \App\Models\EmployeesModel($db, $posterToken);
 
-$ajax = $_GET['ajax'] ?? '';
+$employeesCsrf = employees_csrf_ensure();
+$ajax = (string)($_GET['ajax'] ?? '');
 
-if ($ajax === 'save_rate') {
-    $model->saveRate();
-    exit;
-}
-
-if ($ajax === 'load') {
-    $model->load();
-    exit;
-}
-
-if ($ajax === 'hours_by_day') {
-    $model->hoursByDay();
-    exit;
-}
-
-if ($ajax === 'tips_prepare') {
-    $model->tipsPrepare();
-    exit;
-}
-
-if ($ajax === 'tips_run') {
-    $model->tipsRun();
-    exit;
-}
-
-if ($ajax === 'tips_cancel') {
-    $model->tipsCancel();
-    exit;
-}
-
-if ($ajax === 'pay_salary') {
-    $model->paySalary();
-    exit;
-}
-
-if ($ajax === 'pay_extra') {
-    $model->payExtra();
-    exit;
-}
-
-if ($ajax === 'ltp_load') {
-    $model->ltpLoad();
-    exit;
-}
-
-if ($ajax === 'pay_meta') {
-    $model->payMeta();
-    exit;
-}
-
-if ($ajax === 'pay_meta_salary') {
-    $model->payMetaSalary();
-    exit;
-}
-
-if ($ajax === 'pay_meta_extra') {
-    $model->payMetaExtra();
-    exit;
-}
-
-if ($ajax === 'tips_balance') {
-    $model->tipsBalance();
-    exit;
-}
-
-if ($ajax === 'employee_lookup') {
-    $model->employeeLookup();
-    exit;
-}
-
-if ($ajax === 'pay_tips') {
-    $model->payTips();
-    exit;
-}
-
-if ($ajax === 'fix_salary_tx') {
-    $model->fixSalaryTx();
-    exit;
-}
-
-if ($ajax === 'fix_salary_update_comment') {
-    $model->fixSalaryUpdateComment();
+if ($ajax !== '') {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        employees_csrf_require();
+    }
+    switch ($ajax) {
+        case 'save_rate': $model->saveRate(); break;
+        case 'load': $model->load(); break;
+        case 'hours_by_day': $model->hoursByDay(); break;
+        case 'tips_prepare': $model->tipsPrepare(); break;
+        case 'tips_run': $model->tipsRun(); break;
+        case 'tips_cancel': $model->tipsCancel(); break;
+        case 'pay_salary': $model->paySalary(); break;
+        case 'pay_extra': $model->payExtra(); break;
+        case 'ltp_load': $model->ltpLoad(); break;
+        case 'pay_meta': $model->payMeta(); break;
+        case 'pay_meta_salary': $model->payMetaSalary(); break;
+        case 'pay_meta_extra': $model->payMetaExtra(); break;
+        case 'tips_balance': $model->tipsBalance(); break;
+        case 'employee_lookup': $model->employeeLookup(); break;
+        case 'pay_tips': $model->payTips(); break;
+        case 'fix_salary_tx': $model->fixSalaryTx(); break;
+        case 'fix_salary_update_comment': $model->fixSalaryUpdateComment(); break;
+        default: employees_json_exit(['ok' => false, 'error' => 'Unknown action'], 400);
+    }
     exit;
 }
 

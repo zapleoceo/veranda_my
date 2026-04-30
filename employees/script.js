@@ -52,6 +52,7 @@
     let stickyWrap = null;
     let stickyTable = null;
     let lastStickyVisible = false;
+    const csrfToken = String(window.__EMPLOYEES_CSRF__ || '');
 
     const setLoading = (on) => {
         btn.disabled = on;
@@ -76,6 +77,11 @@
         t.timer = setTimeout(() => t.classList.remove('show'), 2000);
     };
     const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const withCsrf = (h) => {
+        const headers = Object.assign({}, h || {});
+        if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+        return headers;
+    };
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
     const accountTagById = (acc) => {
         const a = Number(String(acc ?? '').trim()) || 0;
@@ -422,7 +428,7 @@
                     url.searchParams.set('ajax', 'save_rate');
                     const res = await fetch(url.toString(), {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        headers: withCsrf({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
                         body: JSON.stringify({ user_id: uid, rate: String(next) }),
                     });
                     const txt = await res.text();
@@ -556,7 +562,7 @@
             try {
                 const r = await fetch('?ajax=fix_salary_update_comment', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: withCsrf({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify({ transaction_id: txId, waiter_id: waiterId, employee_name: empName })
                 });
                 const j = await r.json();
@@ -1225,7 +1231,7 @@
             url.searchParams.set('ajax', 'pay_extra');
             const res = await fetch(url.toString(), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers: withCsrf({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
                 body: JSON.stringify({ waiter_id: uid, kind, amount_vnd: amount, account_from: accountFrom, employee_name: empName }),
             });
             const txt = await res.text();

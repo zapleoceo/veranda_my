@@ -47,25 +47,21 @@ class EmployeesModel {
 
     public function saveRate() {
 
-    header('Content-Type: application/json; charset=utf-8');
-    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-    header('Pragma: no-cache');
+    if (!veranda_can('admin')) {
+        employees_json_exit(['ok' => false, 'error' => 'Forbidden'], 403);
+    }
 
     $raw = file_get_contents('php://input');
     $j = json_decode((string)$raw, true);
     if (!is_array($j)) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        employees_json_exit(['ok' => false, 'error' => 'Bad request'], 400);
     }
     $userId = (int)($j['user_id'] ?? 0);
     $rate = (string)($j['rate'] ?? '');
     $rateDigits = preg_replace('/\D+/', '', $rate);
     $rateInt = (int)($rateDigits !== '' ? $rateDigits : '0');
     if ($userId <= 0) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        employees_json_exit(['ok' => false, 'error' => 'Bad request'], 400);
     }
     try {
         $by = trim((string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''));
@@ -74,12 +70,11 @@ class EmployeesModel {
              ON DUPLICATE KEY UPDATE rate = VALUES(rate), updated_by = VALUES(updated_by)",
             [$userId, $rateInt, ($by !== '' ? $by : null)]
         );
-        echo json_encode(['ok' => true, 'user_id' => $userId, 'rate' => $rateInt], JSON_UNESCAPED_UNICODE);
+        employees_json_exit(['ok' => true, 'user_id' => $userId, 'rate' => $rateInt], 200);
     } catch (\Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        error_log((string)$e);
+        employees_json_exit(['ok' => false, 'error' => 'Internal error'], 500);
     }
-    exit;
     }
 
     public function load() {
