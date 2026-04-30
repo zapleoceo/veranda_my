@@ -67,6 +67,7 @@ date_default_timezone_set($apiTzName);
 
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
 require_once __DIR__ . '/../src/classes/TelegramBot.php';
+require_once __DIR__ . '/../src/classes/ReservationTelegram.php';
 
 function wa_bridge_send(string $phone, string $text, string $imageUrl = ''): bool {
   $host = trim((string)($_ENV['WA_HTTP_HOST'] ?? '127.0.0.1'));
@@ -804,10 +805,11 @@ if ($ajax === 'submit_booking') {
   }
 
   $db->query("INSERT INTO {$resTable} (
-    created_at, start_time, guests, table_num, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+    created_at, start_time, duration, guests, table_num, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
     (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
     $startDt->format('Y-m-d H:i:s'),
+    $duration_m,
     $guests,
     $tableNum,
     $name,
@@ -835,50 +837,24 @@ if ($ajax === 'submit_booking') {
     $respondError(500, 'Telegram не настроен');
   }
 
-  $text = '<b>Новая бронь с сайта #' . htmlspecialchars((string)$qrCode) . '</b>' . "\n";
-  $text .= 'Дата: <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
-  $text .= 'Время: <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
-  if ($duration_m > 0) {
-    $hours = floor($duration_m / 60);
-    $mins = $duration_m % 60;
-    $durStr = $hours . ' ч' . ($mins > 0 ? ' ' . $mins . ' м' : '');
-    $text .= 'Продолжительность: <b>' . htmlspecialchars($durStr) . '</b>' . "\n";
-  }
-  $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
-  $text .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
-  $text .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
-  $text .= 'Номер телефона: <b>' . htmlspecialchars($phoneNorm) . '</b>';
-  if ($waPhoneNorm !== '') {
-    $waClean = preg_replace('/\D+/', '', $waPhoneNorm);
-    $text .= "\n" . 'WhatsApp: <a href="https://wa.me/' . htmlspecialchars($waClean) . '">+' . htmlspecialchars($waClean) . '</a>';
-  }
-  if ($comment !== '') {
-    $text .= "\n";
-    $text .= '<b>Комментарий:</b>' . "\n" . htmlspecialchars($comment);
-  }
-  $preForGroup = $preorderRu !== '' ? $preorderRu : $preorder;
-  if ($preForGroup !== '') {
-    $text .= "\n";
-    $text .= '<b>Предзаказ:</b>' . "\n" . htmlspecialchars($preForGroup);
-  }
-  if ($waPhoneNorm === '' && ($tgUn !== '' || $tgUid > 0)) {
-    $text .= "\n";
-    $text .= 'Telegram: ';
-    if ($tgUn !== '') {
-      $text .= '<a href="https://t.me/' . htmlspecialchars($tgUn) . '">@' . htmlspecialchars($tgUn) . '</a>';
-      if ($tgUid > 0) $text .= ' · <a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a>';
-    } elseif ($tgUid > 0) {
-      $text .= '<a href="tg://user?id=' . htmlspecialchars((string)$tgUid) . '">Открыть чат</a> (id ' . htmlspecialchars((string)$tgUid) . ')';
-    }
-  }
-  $text .= "\n\n@Ollushka90 @ce_akh1  свяжитесь с гостем";
+  $text = \App\Classes\ReservationTelegram::buildManagerText([
+    'qr_code' => (string)$qrCode,
+    'start_time' => $startDt->format('Y-m-d H:i:s'),
+    'duration' => $duration_m,
+    'guests' => $guests,
+    'table_num' => $tableNum,
+    'name' => $name,
+    'phone' => $phoneNorm,
+    'whatsapp_phone' => $waPhoneNorm !== '' ? $waPhoneNorm : '',
+    'comment' => $comment,
+    'preorder_text' => $preorder,
+    'preorder_ru' => $preorderRu,
+    'tg_user_id' => $tgUid,
+    'tg_username' => $tgUn,
+  ]);
 
   $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
-  $keyboard = [];
-  $keyboard[] = [[
-    'text' => 'вPoster',
-    'callback_data' => 'vposter:' . $resId
-  ]];
+  $keyboard = \App\Classes\ReservationTelegram::keyboardActive((int)$resId);
   if (!empty($keyboard)) {
     $ok = $bot->sendMessageGetIdWithKeyboard($text, $keyboard, $tgThreadNum > 0 ? $tgThreadNum : null);
   } else {

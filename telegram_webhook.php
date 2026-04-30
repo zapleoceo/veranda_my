@@ -177,7 +177,7 @@ $message = $callback['message'] ?? [];
 $messageId = isset($message['message_id']) ? (int)$message['message_id'] : 0;
 $chatId = isset($message['chat']['id']) ? (string)$message['chat']['id'] : '';
 
-if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx|vposter):(\d+)$/', $data, $m)) {
+if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx|vposter|vdecline|vrestore|vposter_fix|vposter_cancel):(\d+)$/', $data, $m)) {
     echo 'ok';
     exit;
 }
@@ -216,8 +216,8 @@ if ($ackBy === '') {
         }
     }
     
-    if ($action === 'vposter' && empty($userPermissions['vposter_button']) && empty($userPermissions['admin'])) {
-        $isAllowed = false; // Specific check for vposter button
+    if (in_array($action, ['vposter', 'vdecline', 'vrestore', 'vposter_fix', 'vposter_cancel'], true) && empty($userPermissions['vposter_button']) && empty($userPermissions['admin'])) {
+        $isAllowed = false;
     }
 
     if (!$isAllowed) {
@@ -232,7 +232,7 @@ if ($ackBy === '') {
         exit;
     }
 
-    if (in_array($action, ['vposter', 'ignore_tx', 'ignore_item', 'ack_tx', 'ack_alert']) && $id > 0) {
+    if (in_array($action, ['vposter', 'vdecline', 'vrestore', 'vposter_fix', 'vposter_cancel', 'ignore_tx', 'ignore_item', 'ack_tx', 'ack_alert'], true) && $id > 0) {
         $actionFile = __DIR__ . '/webhook_actions/' . $action . '.php';
         if (file_exists($actionFile)) {
             require_once $actionFile;
