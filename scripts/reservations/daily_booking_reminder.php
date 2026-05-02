@@ -42,6 +42,7 @@ $from = $today . ' 00:00:00';
 $to = $today . ' 23:59:59';
 
 $rows = [];
+$dbOk = true;
 try {
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
     $db->createReservationsTable();
@@ -57,6 +58,7 @@ try {
     if (!is_array($rows)) $rows = [];
 } catch (Throwable $e) {
     $rows = [];
+    $dbOk = false;
 }
 
 $esc = function (string $s): string {
@@ -78,7 +80,7 @@ $lines[] = '<b>Доброе утро, брони на сегодня</b> (' . $e
 $lines[] = '';
 
 if (!count($rows)) {
-    $lines[] = 'Броней на сегодня нет.';
+    $lines[] = $dbOk ? 'Броней на сегодня нет.' : 'Не удалось проверить брони (ошибка БД).';
 } else {
     $i = 0;
     foreach ($rows as $r) {
@@ -118,4 +120,3 @@ try {
 } catch (Throwable $e) {
     exit(0);
 }
-
