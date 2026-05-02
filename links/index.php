@@ -126,6 +126,15 @@ $icons = [
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
+    <meta name="description" content="<?= htmlspecialchars($lang === 'ru' ? 'Быстрые ссылки Veranda: меню, бронирование, контакты и карта.' : ($lang === 'vi' ? 'Liên kết nhanh Veranda: thực đơn, đặt bàn, liên hệ và bản đồ.' : ($lang === 'ko' ? 'Veranda 빠른 링크: 메뉴, 예약, 연락처, 지도.' : 'Veranda quick links: menu, booking, contacts and map.'))) ?>">
+    <link rel="canonical" href="https://veranda.my/links/<?= $lang ? ('?lang=' . urlencode($lang)) : '' ?>">
+    <meta property="og:site_name" content="Veranda">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Links | Veranda">
+    <meta property="og:description" content="<?= htmlspecialchars($lang === 'ru' ? 'Быстрые ссылки: меню, бронирование, контакты и карта.' : ($lang === 'vi' ? 'Liên kết nhanh: thực đơn, đặt bàn, liên hệ và bản đồ.' : ($lang === 'ko' ? '빠른 링크: 메뉴, 예약, 연락처, 지도.' : 'Quick links: menu, booking, contacts and map.'))) ?>">
+    <meta property="og:url" content="https://veranda.my/links/<?= $lang ? ('?lang=' . urlencode($lang)) : '' ?>">
+    <meta property="og:image" content="https://veranda.my/links/gray-tiles-texture.jpg">
+    <meta name="twitter:card" content="summary_large_image">
     <title>Links | Veranda</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">
@@ -175,5 +184,16 @@ $icons = [
             <div>© <?= date('Y') ?> Veranda</div>
         </div>
     </div>
+    <script type="application/ld+json"><?= json_encode([
+        '@context' => 'https://schema.org',
+        '@type' => 'Restaurant',
+        'name' => 'Veranda',
+        'url' => 'https://veranda.my/links/',
+        'sameAs' => [
+            'https://t.me/gamezone_vietnam',
+            'https://www.instagram.com/veranda.my',
+            'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9'
+        ],
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
 </body>
 </html>

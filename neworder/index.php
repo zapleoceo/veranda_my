@@ -1,12 +1,15 @@
 <?php
 $title = 'Новый заказ';
 $assetVersion = '20260417_001';
+header('X-Robots-Tag: noindex, nofollow', true);
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
+  <meta name="robots" content="noindex, nofollow">
   <title><?= htmlspecialchars($title) ?></title>
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=<?= $assetVersion ?>">

@@ -34,6 +34,8 @@ if ($auth->isLoggedIn()) {
 }
 
 $loginUrl = $auth->getGoogleLoginUrl();
+
+header('X-Robots-Tag: noindex, nofollow', true);
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -41,6 +43,7 @@ $loginUrl = $auth->getGoogleLoginUrl();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
+    <meta name="robots" content="noindex, nofollow">
     <title>Вход - Kitchen Analytics</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css">

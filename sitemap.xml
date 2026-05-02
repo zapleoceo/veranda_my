@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://veranda.my/links/?lang=ru</loc>
+    <lastmod>2026-05-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/links/?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/links/?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/links/?lang=vi"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://veranda.my/links/?lang=ko"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/links/"/>
+  </url>
+
+  <url>
+    <loc>https://veranda.my/links/menu-beta.php?lang=ru</loc>
+    <lastmod>2026-05-02</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/links/menu-beta.php?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/links/menu-beta.php?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/links/menu-beta.php?lang=vi"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://veranda.my/links/menu-beta.php?lang=ko"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/links/menu-beta.php"/>
+  </url>
+
+  <url>
+    <loc>https://veranda.my/tr3?lang=ru</loc>
+    <lastmod>2026-05-02</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/tr3?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/tr3?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/tr3?lang=vi"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/tr3"/>
+  </url>
+</urlset>

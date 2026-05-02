@@ -37,6 +37,10 @@ $auth = new \App\Classes\Auth($db, $googleClientId, $googleClientSecret, $google
 
 $auth->requireAuth();
 
+header('X-Robots-Tag: noindex, nofollow', true);
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0', true);
+header('Pragma: no-cache', true);
+
 if (!function_exists('veranda_get_user_permissions')) {
     function veranda_get_user_permissions(\App\Classes\Database $db, string $email): array {
         $defaults = [

@@ -60,6 +60,15 @@ $mk = function (string $l) use ($self, $baseQs) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars(tr('page_title')) ?></title>
   <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
+  <meta name="description" content="<?= htmlspecialchars($lang === 'ru' ? 'Бронирование столика в Veranda: выберите стол и время.' : ($lang === 'vi' ? 'Đặt bàn tại Veranda: chọn bàn và thời gian.' : ($lang === 'en' ? 'Reserve a table at Veranda: pick a table and time.' : 'Veranda 테이블 예약: 테이블과 시간을 선택하세요.'))) ?>">
+  <link rel="canonical" href="https://veranda.my/tr3?lang=<?= urlencode($lang) ?>">
+  <meta property="og:site_name" content="Veranda">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="<?= htmlspecialchars(tr('page_title')) ?>">
+  <meta property="og:description" content="<?= htmlspecialchars($lang === 'ru' ? 'Онлайн бронирование столика.' : ($lang === 'vi' ? 'Đặt bàn online.' : ($lang === 'en' ? 'Online table reservation.' : '온라인 테이블 예약.'))) ?>">
+  <meta property="og:url" content="https://veranda.my/tr3?lang=<?= urlencode($lang) ?>">
+  <meta property="og:image" content="https://veranda.my/links/gray-tiles-texture.jpg">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
@@ -386,6 +395,19 @@ $mk = function (string $l) use ($self, $baseQs) {
     </div>
   </div>
   
+  <script type="application/ld+json"><?= json_encode([
+    '@context' => 'https://schema.org',
+    '@type' => 'Restaurant',
+    'name' => 'Veranda',
+    'url' => 'https://veranda.my/tr3?lang=' . $lang,
+    'potentialAction' => [
+      '@type' => 'ReserveAction',
+      'target' => [
+        '@type' => 'EntryPoint',
+        'urlTemplate' => 'https://veranda.my/tr3?lang=' . $lang,
+      ],
+    ],
+  ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
   <script src="/tr3/assets/tr3.boot.js?v=20260425_0001" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>

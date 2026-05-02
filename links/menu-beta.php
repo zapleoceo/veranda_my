@@ -162,6 +162,15 @@ $bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <meta name="description" content="<?= htmlspecialchars($lang === 'ru' ? 'Онлайн меню Veranda по категориям.' : ($lang === 'vi' ? 'Thực đơn online của Veranda theo danh mục.' : ($lang === 'ko' ? 'Veranda 온라인 메뉴(카테고리별).' : 'Veranda online menu by categories.'))) ?>">
+    <link rel="canonical" href="https://veranda.my/links/menu-beta.php?lang=<?= urlencode($lang) ?>">
+    <meta property="og:site_name" content="Veranda">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="<?= htmlspecialchars($pageTitle) ?> | Veranda">
+    <meta property="og:description" content="<?= htmlspecialchars($lang === 'ru' ? 'Онлайн меню по категориям.' : ($lang === 'vi' ? 'Thực đơn theo danh mục.' : ($lang === 'ko' ? '카테고리별 메뉴.' : 'Menu by categories.'))) ?>">
+    <meta property="og:url" content="https://veranda.my/links/menu-beta.php?lang=<?= urlencode($lang) ?>">
+    <meta property="og:image" content="https://veranda.my/links/gray-tiles-texture.jpg">
+    <meta name="twitter:card" content="summary_large_image">
     <title><?= htmlspecialchars($pageTitle) ?> | Veranda</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=20260425_0001">
@@ -229,7 +238,7 @@ $bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
                                         </div>
                                         <?php if ($hasImg): ?>
                                             <div class="thumb">
-                                                <img src="<?= htmlspecialchars($img) ?>" alt="">
+                                                <img src="<?= htmlspecialchars($img) ?>" alt="<?= htmlspecialchars($title !== '' ? $title : $pageTitle) ?>">
                                             </div>
                                         <?php endif; ?>
                                     </div>
@@ -247,6 +256,55 @@ $bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
             </div>
         <?php endif; ?>
     </div>
+    <script type="application/ld+json"><?php
+        $sections = [];
+        foreach ($groups as $station => $cats) {
+            if (!is_array($cats) || empty($cats)) continue;
+            foreach ($cats as $catLabel => $list) {
+                if (!is_array($list) || empty($list)) continue;
+                $items = [];
+                foreach ($list as $it) {
+                    if (!is_array($it)) continue;
+                    $title = trim((string)($it['title'] ?? ''));
+                    if ($title === '') continue;
+                    $desc = trim((string)($it['description'] ?? ''));
+                    $price = $it['price_raw'] ?? null;
+                    $img = trim((string)($it['image_url'] ?? ''));
+                    $obj = [
+                        '@type' => 'MenuItem',
+                        'name' => $title,
+                    ];
+                    if ($desc !== '') $obj['description'] = $desc;
+                    if ($img !== '') $obj['image'] = $img;
+                    if (is_numeric($price)) {
+                        $obj['offers'] = [
+                            '@type' => 'Offer',
+                            'priceCurrency' => 'VND',
+                            'price' => (float)$price,
+                        ];
+                    }
+                    $items[] = $obj;
+                }
+                if (empty($items)) continue;
+                $sections[] = [
+                    '@type' => 'MenuSection',
+                    'name' => trim((string)$station) . ' · ' . trim((string)$catLabel),
+                    'hasMenuItem' => $items,
+                ];
+            }
+        }
+        echo json_encode([
+            '@context' => 'https://schema.org',
+            '@type' => 'Restaurant',
+            'name' => 'Veranda',
+            'url' => 'https://veranda.my/links/menu-beta.php?lang=' . $lang,
+            'hasMenu' => [
+                '@type' => 'Menu',
+                'name' => $pageTitle,
+                'hasMenuSection' => $sections,
+            ],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    ?></script>
     <script src="/assets/js/menu-beta.js?v=20260425_0001"></script>
 </body>
 </html>
