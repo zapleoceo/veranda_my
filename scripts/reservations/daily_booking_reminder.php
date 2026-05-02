@@ -76,7 +76,7 @@ $tgMsgLink = function (string $chatId, int $messageId) use ($esc): string {
 };
 
 $lines = [];
-$lines[] = '<b>Доброе утро, брони на сегодня</b> (' . $esc($today) . ')';
+$lines[] = '<b>Доброе утро, брони !!с сайта!! на сегодня</b> (' . $esc($today) . ')';
 $lines[] = '';
 
 if (!count($rows)) {
