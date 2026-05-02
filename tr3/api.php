@@ -829,10 +829,8 @@ if ($ajax === 'submit_booking') {
 
   $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
   $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
-  if ($tgChatId === '') $tgChatId = '3397075474';
   $tgThreadId = trim((string)($_ENV['TABLE_RESERVATION_THREAD_ID'] ?? ''));
-  $tgThreadNum = $tgThreadId !== '' ? (int)$tgThreadId : 1938;
-  if ($tgThreadNum <= 0) $tgThreadNum = 1938;
+  $tgThreadNum = $tgThreadId !== '' ? (int)$tgThreadId : 0;
   if ($tgToken === '' || $tgChatId === '') {
     $respondError(500, 'Telegram не настроен');
   }
