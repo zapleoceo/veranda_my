@@ -68,6 +68,7 @@ date_default_timezone_set($apiTzName);
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
 require_once __DIR__ . '/../src/classes/TelegramBot.php';
 require_once __DIR__ . '/../src/classes/ReservationTelegram.php';
+require_once __DIR__ . '/../reservations/tg_send_manager.php';
 
 function wa_bridge_send(string $phone, string $text, string $imageUrl = ''): bool {
   $host = trim((string)($_ENV['WA_HTTP_HOST'] ?? '127.0.0.1'));
@@ -827,15 +828,7 @@ if ($ajax === 'submit_booking') {
   ]);
   $resId = $db->getPdo()->lastInsertId();
 
-  $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
-  $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
-  $tgThreadId = trim((string)($_ENV['TABLE_RESERVATION_THREAD_ID'] ?? ''));
-  $tgThreadNum = $tgThreadId !== '' ? (int)$tgThreadId : 0;
-  if ($tgToken === '' || $tgChatId === '') {
-    $respondError(500, 'Telegram не настроен');
-  }
-
-  $text = \App\Classes\ReservationTelegram::buildManagerText([
+  $payload = [
     'qr_code' => (string)$qrCode,
     'start_time' => $startDt->format('Y-m-d H:i:s'),
     'duration' => $duration_m,
@@ -849,17 +842,14 @@ if ($ajax === 'submit_booking') {
     'preorder_ru' => $preorderRu,
     'tg_user_id' => $tgUid,
     'tg_username' => $tgUn,
-  ]);
-
-  $bot = new \App\Classes\TelegramBot($tgToken, $tgChatId);
+  ];
   $keyboard = \App\Classes\ReservationTelegram::keyboardActive((int)$resId);
-  if (!empty($keyboard)) {
-    $ok = $bot->sendMessageGetIdWithKeyboard($text, $keyboard, $tgThreadNum > 0 ? $tgThreadNum : null);
-  } else {
-    $ok = $bot->sendMessage($text, $tgThreadNum > 0 ? $tgThreadNum : null);
+  try {
+    $msgId = reservations_send_manager_booking($db, $resTable, (int)$resId, $payload, $keyboard);
+  } catch (\Throwable $e) {
+    $msgId = 0;
   }
-  if ($ok > 1) { $db->query("UPDATE {$resTable} SET tg_message_id = ? WHERE id = ?", [$ok, $resId]); }
-  if (!$ok) {
+  if ($msgId <= 0) {
     $respondError(500, 'Не удалось отправить сообщение в Telegram');
   }
 

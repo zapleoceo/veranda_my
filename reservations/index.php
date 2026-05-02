@@ -15,6 +15,7 @@ require_once dirname(__DIR__) . '/src/classes/Database.php';
 require_once dirname(__DIR__) . '/src/classes/MetaRepository.php';
 require_once dirname(__DIR__) . '/src/classes/PosterAPI.php';
 require_once dirname(__DIR__) . '/src/classes/TelegramBot.php';
+require_once __DIR__ . '/tg_config.php';
 
 require_once __DIR__ . '/Model.php';
 
@@ -230,10 +231,9 @@ if ($ajax === 'resend') {
         exit;
     }
 
-    $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
-    $tgChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
-    $tgThreadId = trim((string)($_ENV['TABLE_RESERVATION_THREAD_ID'] ?? ''));
-    $tgThreadNum = $tgThreadId !== '' ? (int)$tgThreadId : 0;
+    $tgToken = reservations_tg_token();
+    $tgChatId = reservations_tg_chat_id();
+    $tgThreadNum = reservations_tg_thread_id();
     $target = strtolower(trim((string)($_POST['target'] ?? 'both')));
     if (!in_array($target, ['both', 'guest', 'manager'], true)) $target = 'both';
 
