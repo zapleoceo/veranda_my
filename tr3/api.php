@@ -649,7 +649,7 @@ if ($ajax === 'submit_booking') {
   if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     if ($wantsJson) echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-    else echo '<!doctype html><meta charset="utf-8"><h1>Method not allowed</h1>';
+    else echo '<!doctype html><html lang="ru" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/svg+xml" href="/links/favicon.svg"><title>Method not allowed</title></head><body><h1>Method not allowed</h1></body></html>';
     exit;
   }
   $payload = [];
@@ -667,7 +667,7 @@ if ($ajax === 'submit_booking') {
       echo json_encode(['ok' => false, 'error' => $msg], JSON_UNESCAPED_UNICODE);
     } else {
       $safe = htmlspecialchars($msg, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-      echo '<!doctype html><meta charset="utf-8"><h1>Ошибка</h1><p>' . $safe . '</p>';
+      echo '<!doctype html><html lang="ru" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/svg+xml" href="/links/favicon.svg"><title>Ошибка</title></head><body><h1>Ошибка</h1><p>' . $safe . '</p></body></html>';
     }
     exit;
   };
@@ -679,7 +679,7 @@ if ($ajax === 'submit_booking') {
       $id = htmlspecialchars((string)($data['id'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
       $body = $code !== '' ? ('<p>Код брони: <b>' . $code . '</b></p>') : '';
       if ($id !== '') $body .= '<p>ID: <b>' . $id . '</b></p>';
-      echo '<!doctype html><meta charset="utf-8"><h1>Заявка отправлена</h1>' . $body . '<p>Мы с вами свяжемся в ближайшее время.</p>';
+      echo '<!doctype html><html lang="ru" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/svg+xml" href="/links/favicon.svg"><title>Заявка отправлена</title></head><body><h1>Заявка отправлена</h1>' . $body . '<p>Мы с вами свяжемся в ближайшее время.</p></body></html>';
     }
     exit;
   };

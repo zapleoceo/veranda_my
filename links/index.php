@@ -133,7 +133,7 @@ $icons = [
     <meta property="og:title" content="Links | Veranda">
     <meta property="og:description" content="<?= htmlspecialchars($lang === 'ru' ? 'Быстрые ссылки: меню, бронирование, контакты и карта.' : ($lang === 'vi' ? 'Liên kết nhanh: thực đơn, đặt bàn, liên hệ và bản đồ.' : ($lang === 'ko' ? '빠른 링크: 메뉴, 예약, 연락처, 지도.' : 'Quick links: menu, booking, contacts and map.'))) ?>">
     <meta property="og:url" content="https://veranda.my/links/<?= $lang ? ('?lang=' . urlencode($lang)) : '' ?>">
-    <meta property="og:image" content="https://veranda.my/links/gray-tiles-texture.jpg">
+    <meta property="og:image" content="https://veranda.my/tr3/assets/og-image.svg">
     <meta name="twitter:card" content="summary_large_image">
     <title>Links | Veranda</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>

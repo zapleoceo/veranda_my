@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#000"/>
+  <g transform="translate(600 315)">
+    <circle r="285" fill="#050505"/>
+    <circle r="285" fill="none" stroke="#B88746" stroke-width="14"/>
+    <g fill="none" stroke="#B88746" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M-210 10 L-120 -70 L-20 10" stroke-width="14"/>
+      <path d="M-40 10 L60 -120 L200 10" stroke-width="14"/>
+      <path d="M120 10 L175 -40 L245 10" stroke-width="14"/>
+    </g>
+    <text x="0" y="120" fill="#B88746" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="118" letter-spacing="10">VERANDA</text>
+    <text x="0" y="200" fill="#B88746" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="500" font-size="46" letter-spacing="6">RESTAURANT &amp; BAR</text>
+  </g>
+</svg>

@@ -67,7 +67,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <meta property="og:title" content="<?= htmlspecialchars(tr('page_title')) ?>">
   <meta property="og:description" content="<?= htmlspecialchars($lang === 'ru' ? 'Онлайн бронирование столика.' : ($lang === 'vi' ? 'Đặt bàn online.' : ($lang === 'en' ? 'Online table reservation.' : '온라인 테이블 예약.'))) ?>">
   <meta property="og:url" content="https://veranda.my/tr3?lang=<?= urlencode($lang) ?>">
-  <meta property="og:image" content="https://veranda.my/links/gray-tiles-texture.jpg">
+  <meta property="og:image" content="https://veranda.my/tr3/assets/og-image.svg">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://api.fontshare.com">
   <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>

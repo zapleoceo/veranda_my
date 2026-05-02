@@ -169,7 +169,7 @@ $bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
     <meta property="og:title" content="<?= htmlspecialchars($pageTitle) ?> | Veranda">
     <meta property="og:description" content="<?= htmlspecialchars($lang === 'ru' ? 'Онлайн меню по категориям.' : ($lang === 'vi' ? 'Thực đơn theo danh mục.' : ($lang === 'ko' ? '카테고리별 메뉴.' : 'Menu by categories.'))) ?>">
     <meta property="og:url" content="https://veranda.my/links/menu-beta.php?lang=<?= urlencode($lang) ?>">
-    <meta property="og:image" content="https://veranda.my/links/gray-tiles-texture.jpg">
+    <meta property="og:image" content="https://veranda.my/tr3/assets/og-image.svg">
     <meta name="twitter:card" content="summary_large_image">
     <title><?= htmlspecialchars($pageTitle) ?> | Veranda</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>

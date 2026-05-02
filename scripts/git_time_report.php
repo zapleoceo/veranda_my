@@ -52,7 +52,7 @@ function section(string $p): string {
     if (preg_match('#^sepay/#', $p)) return 'SePay webhook';
     if (preg_match('#^neworder/#', $p)) return 'Neworder';
 
-    if (preg_match('#^links/index\.php$|^assets/css/links_index\.css$|^links/favicon\.svg$|^links/(grass_corner_1_7|gray-tiles-texture)\.(png|jpg)$#', $p)) return 'Links (публичные)';
+    if (preg_match('#^links/index\.php$|^assets/css/links_index\.css$|^links/favicon\.svg$#', $p)) return 'Links (публичные)';
     if (preg_match('#^links/table-reservation\.(js|css)$#', $p)) return 'TableReservation (legacy)';
 
     if ($p === 'poster_getReservations_test.php') return 'Reservations';
