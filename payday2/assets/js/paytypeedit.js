@@ -71,6 +71,14 @@
             this.btnSave = null;
             this.fields = {};
             this.onSave = null;
+            this.onChange = null;
+            this.isLoading = false;
+            this.canSave = true;
+        }
+
+        updateSaveState() {
+            this.ensure();
+            if (this.btnSave) this.btnSave.disabled = this.isLoading || !this.canSave;
         }
 
         ensure() {
@@ -104,16 +112,16 @@
                         <span style="margin-left:8px;">Загрузка...</span>
                     </div>
                     <div class="pd2-settings-grid-4" style="margin-bottom: 10px;">
-                        <label class="pd2-settings-label pd2-m-0"><span>payedSum</span>
+                        <label class="pd2-settings-label pd2-m-0"><span>Общая сумма</span>
                             <input type="text" class="btn pd2-w-100" id="pte_payedSum" autocomplete="off" readonly>
                         </label>
-                        <label class="pd2-settings-label pd2-m-0"><span>payedCash</span>
+                        <label class="pd2-settings-label pd2-m-0"><span>Кеш</span>
                             <input type="text" class="btn pd2-w-100" id="pte_payedCash" autocomplete="off">
                         </label>
-                        <label class="pd2-settings-label pd2-m-0"><span>payedCard</span>
+                        <label class="pd2-settings-label pd2-m-0"><span>Картой</span>
                             <input type="text" class="btn pd2-w-100" id="pte_payedCard" autocomplete="off">
                         </label>
-                        <label class="pd2-settings-label pd2-m-0"><span>payedCert</span>
+                        <label class="pd2-settings-label pd2-m-0"><span>Сертификатом</span>
                             <input type="text" class="btn pd2-w-100" id="pte_payedCert" autocomplete="off">
                         </label>
                     </div>
@@ -198,8 +206,9 @@
 
         setLoading(on) {
             this.ensure();
+            this.isLoading = !!on;
             if (this.loadingEl) this.loadingEl.classList.toggle('pd2-d-none', !on);
-            if (this.btnSave) this.btnSave.disabled = !!on;
+            this.updateSaveState();
         }
 
         setError(msg) {
@@ -211,6 +220,12 @@
 
         clearError() {
             this.setError('');
+        }
+
+        setCanSave(canSave) {
+            this.ensure();
+            this.canSave = !!canSave;
+            this.updateSaveState();
         }
 
         setAuthActionsVisible(on) {
@@ -241,7 +256,10 @@
             ['payedCash', 'payedCard', 'payedCert'].forEach((k) => {
                 const el = this.fields[k];
                 if (!el) return;
-                el.oninput = keepTotal;
+                el.oninput = () => {
+                    keepTotal();
+                    if (typeof this.onChange === 'function') this.onChange();
+                };
             });
         }
 
@@ -264,12 +282,30 @@
             this.total = 0;
             this.opening = false;
             this.saving = false;
+            this.validationErrorActive = false;
             this.view.onSave = () => this.save().catch(() => {});
+            this.view.onChange = () => this.validate();
         }
 
         needsAuthMessage(msg) {
             const s = String(msg || '');
             return /redirect http|session expired|\blogin\b|не настроены cookies|заполните настройки|access denied/i.test(s);
+        }
+
+        validate() {
+            const params = this.view.getFormParams();
+            const sum = PosterAdminEditCheckModel.computePayedSum(params);
+            const total = Number(this.total) || 0;
+            const ok = sum === total;
+            if (!ok) {
+                this.view.setError('Общая сумма должна быть равна сумме: Кеш + Картой + Сертификатом. Сейчас: ' + String(sum) + '. Должна быть: ' + String(total) + '.');
+                this.validationErrorActive = true;
+            } else {
+                if (this.validationErrorActive) this.view.clearError();
+                this.validationErrorActive = false;
+            }
+            this.view.setCanSave(ok);
+            return ok;
         }
 
         async open(transactionId) {
@@ -282,15 +318,18 @@
             this.view.setTxId(txId);
             this.view.clearError();
             this.view.setAuthActionsVisible(false);
+            this.view.setCanSave(false);
             this.view.setLoading(true);
             try {
                 const j = await this.api.getActions(txId);
                 const params = PosterAdminEditCheckModel.fromParams(j.params || {});
                 this.total = Number(params.payedSum || 0) || 0;
                 this.view.setForm(params);
+                this.validate();
             } catch (e) {
                 const msg = e && e.message ? String(e.message) : 'Ошибка';
                 this.view.setError(msg);
+                this.validationErrorActive = false;
                 if (this.needsAuthMessage(msg)) this.view.setAuthActionsVisible(true);
             } finally {
                 this.view.setLoading(false);
@@ -300,14 +339,15 @@
 
         async save() {
             if (!this.txId || this.saving) return;
+            if (!this.validate()) return;
             this.saving = true;
             this.view.setLoading(true);
             this.view.clearError();
             try {
                 const params = this.view.getFormParams();
                 const sum = PosterAdminEditCheckModel.computePayedSum(params);
-                if ((Number(this.total) || 0) > 0 && sum !== this.total) {
-                    throw new Error('Сумма должна оставаться ' + String(this.total) + '. Сейчас: ' + String(sum) + '.');
+                if (sum !== this.total) {
+                    throw new Error('Общая сумма должна быть равна сумме: Кеш + Картой + Сертификатом. Сейчас: ' + String(sum) + '. Должна быть: ' + String(this.total) + '.');
                 }
                 await this.api.editCheck(this.txId, params);
                 if (typeof window.showToast === 'function') window.showToast('Сохранено');
@@ -316,6 +356,7 @@
             } catch (e) {
                 const msg = e && e.message ? String(e.message) : 'Ошибка';
                 this.view.setError(msg);
+                this.validationErrorActive = false;
                 if (this.needsAuthMessage(msg)) this.view.setAuthActionsVisible(true);
             } finally {
                 this.view.setLoading(false);
