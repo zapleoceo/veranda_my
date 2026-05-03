@@ -175,6 +175,8 @@
       if (!tr) continue
       const titleEl = btn.querySelector('.primary-title')
       swapText(titleEl, tr.title || '')
+      const subEl = btn.querySelector('.primary-sub')
+      swapText(subEl, tr.subtitle || '')
     }
 
     const cards = document.querySelectorAll('.card[data-key]')
@@ -184,6 +186,8 @@
       if (!tr) continue
       const titleEl = card.querySelector('.title')
       swapText(titleEl, tr.title || '')
+      const subEl = card.querySelector('.sub')
+      swapText(subEl, tr.subtitle || '')
     }
 
     const hoursTitleEl = document.querySelector('.hours__title')

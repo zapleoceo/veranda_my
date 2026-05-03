@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0021">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0022">
 </head>
 <body>
     <main class="links-page">
@@ -75,9 +75,7 @@
                                             <div class="primary-icon"><?= $icons[$item['icon']] ?? '' ?></div>
                                             <div class="primary-text">
                                                 <div class="primary-title"><?= htmlspecialchars($item['title']) ?></div>
-                                                <?php if (!empty($item['subtitle'])): ?>
-                                                    <div class="primary-sub"><?= htmlspecialchars($item['subtitle']) ?></div>
-                                                <?php endif; ?>
+                                                <div class="primary-sub"><?= htmlspecialchars((string)($item['subtitle'] ?? '')) ?></div>
                                             </div>
                                             <div class="primary-arrow" aria-hidden="true">
                                                 <svg viewBox="0 0 24 24"><path d="M13.2 5 11.8 6.4 16.4 11H4v2h12.4l-4.6 4.6L13.2 19l8-8Z"/></svg>
@@ -98,9 +96,7 @@
                                             <div class="icon"><?= $icons[$item['icon']] ?? '' ?></div>
                                             <div class="texts">
                                                 <div class="title"><?= htmlspecialchars($item['title']) ?></div>
-                                                <?php if (!empty($item['subtitle'])): ?>
-                                                    <div class="sub"><?= htmlspecialchars($item['subtitle']) ?></div>
-                                                <?php endif; ?>
+                                                <div class="sub"><?= htmlspecialchars((string)($item['subtitle'] ?? '')) ?></div>
                                             </div>
                                             <div class="arrow" aria-hidden="true">
                                                 <svg viewBox="0 0 24 24"><path d="M13.2 5 11.8 6.4 16.4 11H4v2h12.4l-4.6 4.6L13.2 19l8-8Z"/></svg>
@@ -118,8 +114,8 @@
                         <div class="hours">
                             <div class="hours__title"><?= htmlspecialchars($hoursTitle) ?></div>
                             <div class="hours__lines">
-                                <?php if ($hoursLine1 !== ''): ?><div><?= htmlspecialchars($hoursLine1) ?></div><?php endif; ?>
-                                <?php if ($hoursLine2 !== ''): ?><div><?= htmlspecialchars($hoursLine2) ?></div><?php endif; ?>
+                                <div><?= htmlspecialchars($hoursLine1) ?></div>
+                                <div><?= htmlspecialchars($hoursLine2) ?></div>
                             </div>
                         </div>
                     <?php endif; ?>
@@ -136,6 +132,6 @@
         window.LINKS_TITLE = <?= json_encode($seoTitles ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         window.LINKS_META = <?= json_encode($metaDescriptions ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
-    <script src="/links/links_fx.js?v=20260504_0021" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0022" defer></script>
 </body>
 </html>
