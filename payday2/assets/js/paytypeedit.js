@@ -292,6 +292,11 @@
             return /redirect http|session expired|\blogin\b|не настроены cookies|заполните настройки|access denied/i.test(s);
         }
 
+        isNotEditableMessage(msg) {
+            const s = String(msg || '');
+            return /\bedit action not found\b/i.test(s);
+        }
+
         validate() {
             const params = this.view.getFormParams();
             const sum = PosterAdminEditCheckModel.computePayedSum(params);
@@ -314,25 +319,33 @@
             this.txId = txId;
             this.total = 0;
             this.opening = true;
-            this.view.show();
-            this.view.setTxId(txId);
-            this.view.clearError();
-            this.view.setAuthActionsVisible(false);
-            this.view.setCanSave(false);
-            this.view.setLoading(true);
             try {
                 const j = await this.api.getActions(txId);
                 const params = PosterAdminEditCheckModel.fromParams(j.params || {});
                 this.total = Number(params.payedSum || 0) || 0;
+                this.view.show();
+                this.view.setTxId(txId);
+                this.view.clearError();
+                this.view.setAuthActionsVisible(false);
+                this.view.setCanSave(false);
+                this.view.setLoading(false);
                 this.view.setForm(params);
                 this.validate();
             } catch (e) {
                 const msg = e && e.message ? String(e.message) : 'Ошибка';
+                if (this.isNotEditableMessage(msg)) {
+                    if (typeof window.showToast === 'function') window.showToast('Этот чек нередактируемый');
+                    else window.alert('Этот чек нередактируемый');
+                    this.view.hide();
+                    this.validationErrorActive = false;
+                    return;
+                }
+                this.view.show();
+                this.view.setTxId(txId);
                 this.view.setError(msg);
                 this.validationErrorActive = false;
                 if (this.needsAuthMessage(msg)) this.view.setAuthActionsVisible(true);
             } finally {
-                this.view.setLoading(false);
                 this.opening = false;
             }
         }
