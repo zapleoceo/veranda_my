@@ -73,6 +73,11 @@ if ($dateFrom > $dateTo) {
 // Include helper functions and table initializations
 require_once __DIR__ . '/functions.php';
 
+if (($_GET['tool'] ?? '') === 'poster_admin_edit_check_tester') {
+    require_once __DIR__ . '/poster_admin_edit_check_tester.php';
+    exit;
+}
+
 // Route AJAX requests
 if (isset($_GET['ajax']) && $_GET['ajax'] !== '') {
     require_once __DIR__ . '/ajax.php';
