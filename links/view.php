@@ -18,7 +18,7 @@
     <title>Links | Veranda</title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260503_0001">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260503_0002">
 </head>
 <body>
     <div class="auth-float">
@@ -95,6 +95,6 @@
     </main>
 
     <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <script src="/links/links_fx.js?v=20260503_0001" defer></script>
+    <script src="/links/links_fx.js?v=20260503_0002" defer></script>
 </body>
 </html>
