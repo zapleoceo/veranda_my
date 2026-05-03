@@ -320,6 +320,19 @@ window.initPayday2_CheckFinder = function() {
                     }
                     return;
                 }
+                const editBtn = trg && trg.closest ? trg.closest('.pd2-check-edit-btn') : null;
+                if (editBtn) {
+                    const id = Number(editBtn.getAttribute('data-edit-check') || 0) || 0;
+                    if (!id) return;
+                    try {
+                        if (typeof window.pd2OpenPaytypeEdit === 'function') {
+                            window.pd2OpenPaytypeEdit(id);
+                        } else {
+                            window.dispatchEvent(new CustomEvent('pd2_edit_check', { detail: { txId: id } }));
+                        }
+                    } catch (_) {}
+                    return;
+                }
                 const delBtn = trg && trg.closest ? trg.closest('.pd2-check-del-btn') : null;
                 if (delBtn) {
                     const id = Number(delBtn.getAttribute('data-del-check') || 0) || 0;

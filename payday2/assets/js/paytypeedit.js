@@ -314,7 +314,14 @@
             });
     };
 
-    document.addEventListener('click', (e) => {
+    window.pd2OpenPaytypeEdit = open;
+    document.addEventListener('pd2_edit_check', (e) => {
+        const txId = Number(e && e.detail && e.detail.txId ? e.detail.txId : 0) || 0;
+        if (!txId) return;
+        open(txId);
+    });
+
+    const onEditBtnClick = (e) => {
         const trg = (e && e.target instanceof Element)
             ? e.target
             : (e && e.target && e.target.parentElement instanceof Element ? e.target.parentElement : null);
@@ -322,6 +329,9 @@
         if (!btn) return;
         const txId = Number(btn.getAttribute('data-edit-check') || 0) || 0;
         if (!txId) return;
+        try { e.preventDefault(); } catch (_) {}
         open(txId);
-    });
+    };
+    document.addEventListener('click', onEditBtnClick, true);
+    document.addEventListener('click', onEditBtnClick, false);
 })();
