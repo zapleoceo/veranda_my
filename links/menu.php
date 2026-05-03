@@ -143,18 +143,7 @@ foreach ($groups as $station => $cats) {
 }
 
 $pageTitle = $lang === 'ru' ? 'Online меню' : ($lang === 'vi' ? 'Thực đơn online' : ($lang === 'ko' ? '온라인 메뉴' : 'Online menu'));
-$bgImageUrls = [
-    'https://images.pexels.com/photos/958545/pexels-photo-958545.jpeg',
-    'https://images.pexels.com/photos/376464/pexels-photo-376464.jpeg',
-    'https://images.pexels.com/photos/769289/pexels-photo-769289.jpeg',
-    'https://images.pexels.com/photos/70497/pexels-photo-70497.jpeg',
-];
-$bgIdx = (int)date('z') % max(1, count($bgImageUrls));
-if (isset($_GET['bg']) && is_numeric($_GET['bg'])) {
-    $i = (int)$_GET['bg'];
-    if ($i >= 0 && $i < count($bgImageUrls)) $bgIdx = $i;
-}
-$bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
+$menuLabel = $lang === 'ru' ? 'МЕНЮ' : ($lang === 'vi' ? 'THỰC ĐƠN' : ($lang === 'ko' ? '메뉴' : 'MENU'));
 ?>
 <!doctype html>
 <html lang="<?= htmlspecialchars($lang) ?>">
@@ -173,89 +162,111 @@ $bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
     <meta name="twitter:card" content="summary_large_image">
     <title><?= htmlspecialchars($pageTitle) ?> | Veranda</title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css?v=20260425_0001">
-  <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260425_0001">
+    <link rel="preload" as="image" href="/assets/img/links_bg.png" fetchpriority="high">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/common.css?v=20260425_0001">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0025">
+    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0026">
 </head>
 <body>
-    <div class="parallax-bg" data-bg="<?= htmlspecialchars($bgImageUrl) ?>" aria-hidden="true"></div>
-    <div class="parallax-vignette" aria-hidden="true"></div>
-    <div class="wrap">
-        <div class="header">
-            <div class="header-top">
-                <h1><?= htmlspecialchars($pageTitle) ?></h1>
-                <div class="subtitle"><?= htmlspecialchars($lang === 'ru' ? 'Меню по категориям' : ($lang === 'vi' ? 'Thực đơn theo danh mục' : ($lang === 'ko' ? '카테고리별 메뉴' : 'Menu by categories'))) ?></div>
-            </div>
-            <div class="header-main">
-                <div class="brand">
-                    <a class="back" href="/links/?lang=<?= urlencode($lang) ?>">←</a>
-                    <div class="logo"><span>V</span></div>
+    <main class="links-page">
+        <header class="links-hero">
+            <div class="links-hero__bg" aria-hidden="true">
+                <div class="links-mesh" aria-hidden="true">
+                    <div class="blob b1"></div>
+                    <div class="blob b2"></div>
+                    <div class="blob b3"></div>
                 </div>
-                <div class="lang" aria-label="Language">
-                    <a href="?lang=ru" class="<?= $lang === 'ru' ? 'active' : '' ?>">RU</a>
-                    <a href="?lang=en" class="<?= $lang === 'en' ? 'active' : '' ?>">EN</a>
-                    <a href="?lang=vi" class="<?= $lang === 'vi' ? 'active' : '' ?>">VI</a>
-                    <a href="?lang=ko" class="<?= $lang === 'ko' ? 'active' : '' ?>">KO</a>
-                </div>
+                <div class="links-spotlight" aria-hidden="true"></div>
             </div>
-        </div>
-
-        <?php if (empty($groups)): ?>
-            <div class="muted"><?= htmlspecialchars($lang === 'ru' ? 'Пока нет опубликованных позиций.' : ($lang === 'vi' ? 'Chưa có món được hiển thị.' : ($lang === 'ko' ? '표시할 메뉴가 없습니다.' : 'No published items yet.'))) ?></div>
-        <?php else: ?>
-            <?php foreach ($groups as $mainLabel => $cats): ?>
-                <div class="section">
-                    <div class="section-title"><?= htmlspecialchars($mainLabel) ?></div>
-                    <?php foreach ($cats as $catLabel => $list): ?>
-                        <details>
-                            <summary>
-                                <span><?= htmlspecialchars($catLabel) ?></span>
-                                <span class="sum-right"><?= count($list) ?></span>
+            <div class="links-hero__inner">
+                <div class="links-header">
+                    <div class="brand brand--center">
+                        <h1 class="brand-title">
+                            <span class="brand-name">VERANDA</span>
+                            <span class="brand-tagline">— <?= htmlspecialchars($menuLabel) ?></span>
+                        </h1>
+                    </div>
+                    <div class="header-right">
+                        <a class="menu-back" href="/links/?lang=<?= urlencode($lang) ?>">←</a>
+                        <details class="lang-menu">
+                            <summary aria-label="Language">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm7.93 9h-3.2a15.7 15.7 0 0 0-1.47-5 8.05 8.05 0 0 1 4.67 5ZM12 4c1.1 0 2.7 2.2 3.4 7H8.6C9.3 6.2 10.9 4 12 4ZM4.07 11a8.05 8.05 0 0 1 4.67-5 15.7 15.7 0 0 0-1.47 5Zm0 2h3.2a15.7 15.7 0 0 0 1.47 5 8.05 8.05 0 0 1-4.67-5ZM12 20c-1.1 0-2.7-2.2-3.4-7h6.8c-.7 4.8-2.3 7-3.4 7Zm3.26-2a15.7 15.7 0 0 0 1.47-5h3.2a8.05 8.05 0 0 1-4.67 5Z"/></svg>
                             </summary>
-                            <div class="items">
-                                <?php foreach ($list as $it): ?>
-                                    <?php
-                                        $title = trim((string)($it['title'] ?? ''));
-                                        $desc = trim((string)($it['description'] ?? ''));
-                                        $img = trim((string)($it['image_url'] ?? ''));
-                                        $price = $it['price_raw'];
-                                        $priceText = '—';
-                                        if (is_numeric($price)) {
-                                            $priceText = number_format((float)$price, 0, '.', ' ') . ' ₫';
-                                        } elseif (is_string($price) && $price !== '') {
-                                            $priceText = $price . ' ₫';
-                                        }
-                                        $hasImg = $img !== '';
-                                    ?>
-                                    <div class="item <?= $hasImg ? '' : 'noimg' ?>">
-                                        <div>
-                                            <div class="item-head">
-                                                <div class="item-title"><?= htmlspecialchars($title !== '' ? $title : '—') ?></div>
-                                                <div class="item-price"><?= htmlspecialchars($priceText) ?></div>
-                                            </div>
-                                            <?php if ($desc !== ''): ?>
-                                                <div class="item-desc"><?= htmlspecialchars($desc) ?></div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php if ($hasImg): ?>
-                                            <div class="thumb">
-                                                <img src="<?= htmlspecialchars($img) ?>" alt="<?= htmlspecialchars($title !== '' ? $title : $pageTitle) ?>">
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endforeach; ?>
+                            <div class="lang-panel">
+                                <a href="?lang=ru" class="<?= $lang === 'ru' ? 'active' : '' ?>" aria-label="Русский">Русский</a>
+                                <a href="?lang=en" class="<?= $lang === 'en' ? 'active' : '' ?>" aria-label="English">English</a>
+                                <a href="?lang=vi" class="<?= $lang === 'vi' ? 'active' : '' ?>" aria-label="Tiếng Việt">Tiếng Việt</a>
+                                <a href="?lang=ko" class="<?= $lang === 'ko' ? 'active' : '' ?>" aria-label="한국어">한국어</a>
                             </div>
                         </details>
-                    <?php endforeach; ?>
+                    </div>
                 </div>
-            <?php endforeach; ?>
-        <?php endif; ?>
-        <?php if ($lastMenuSyncAt !== null): ?>
-            <div class="muted" style="margin-top:14px; text-align:center;">
-                <?= htmlspecialchars($lang === 'ru' ? 'Последнее обновление меню:' : ($lang === 'vi' ? 'Cập nhật thực đơn lần cuối:' : ($lang === 'ko' ? '마지막 메뉴 동기화:' : 'Last menu sync:'))) ?>
-                <?= htmlspecialchars(date('d.m.Y H:i', strtotime($lastMenuSyncAt))) ?>
+
+                <div class="menu-content" id="menuContent">
+                    <?php if (empty($groups)): ?>
+                        <div class="muted"><?= htmlspecialchars($lang === 'ru' ? 'Пока нет опубликованных позиций.' : ($lang === 'vi' ? 'Chưa có món được hiển thị.' : ($lang === 'ko' ? '표시할 메뉴가 없습니다.' : 'No published items yet.'))) ?></div>
+                    <?php else: ?>
+                        <?php foreach ($groups as $mainLabel => $cats): ?>
+                            <div class="section">
+                                <div class="section-title"><?= htmlspecialchars($mainLabel) ?></div>
+                                <?php foreach ($cats as $catLabel => $list): ?>
+                                    <details>
+                                        <summary>
+                                            <span><?= htmlspecialchars($catLabel) ?></span>
+                                            <span class="sum-right"><?= count($list) ?></span>
+                                        </summary>
+                                        <div class="items">
+                                            <?php foreach ($list as $it): ?>
+                                                <?php
+                                                    $title = trim((string)($it['title'] ?? ''));
+                                                    $desc = trim((string)($it['description'] ?? ''));
+                                                    $img = trim((string)($it['image_url'] ?? ''));
+                                                    $price = $it['price_raw'];
+                                                    $priceText = '—';
+                                                    if (is_numeric($price)) {
+                                                        $priceText = number_format((float)$price, 0, '.', ' ') . ' ₫';
+                                                    } elseif (is_string($price) && $price !== '') {
+                                                        $priceText = $price . ' ₫';
+                                                    }
+                                                    $hasImg = $img !== '';
+                                                ?>
+                                                <div class="item <?= $hasImg ? '' : 'noimg' ?>">
+                                                    <div>
+                                                        <div class="item-head">
+                                                            <div class="item-title"><?= htmlspecialchars($title !== '' ? $title : '—') ?></div>
+                                                            <div class="item-price"><?= htmlspecialchars($priceText) ?></div>
+                                                        </div>
+                                                        <?php if ($desc !== ''): ?>
+                                                            <div class="item-desc"><?= htmlspecialchars($desc) ?></div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <?php if ($hasImg): ?>
+                                                        <div class="thumb">
+                                                            <img src="<?= htmlspecialchars($img) ?>" alt="<?= htmlspecialchars($title !== '' ? $title : $pageTitle) ?>">
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </details>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+
+                    <?php if ($lastMenuSyncAt !== null): ?>
+                        <div class="muted menu-sync">
+                            <?= htmlspecialchars($lang === 'ru' ? 'Последнее обновление меню:' : ($lang === 'vi' ? 'Cập nhật thực đơn lần cuối:' : ($lang === 'ko' ? '마지막 메뉴 동기화:' : 'Last menu sync:'))) ?>
+                            <?= htmlspecialchars(date('d.m.Y H:i', strtotime($lastMenuSyncAt))) ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
-        <?php endif; ?>
-    </div>
+        </header>
+    </main>
     <script type="application/ld+json"><?php
         $sections = [];
         foreach ($groups as $station => $cats) {
@@ -305,6 +316,7 @@ $bgImageUrl = $bgImageUrls[$bgIdx] ?? $bgImageUrls[0];
             ],
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/assets/js/menu-beta.js?v=20260425_0001"></script>
+    <script src="/links/links_fx.js?v=20260504_0025" defer></script>
+    <script src="/assets/js/menu-beta.js?v=20260504_0026" defer></script>
 </body>
 </html>

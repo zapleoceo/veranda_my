@@ -1,88 +1,27 @@
-        html { background: var(--bg); }
         body { background: transparent !important; }
-        .parallax-bg {
-            position: fixed;
-            /* Make the background taller and wider so it doesn't run out of pixels when scrolled or blurred */
-            top: -35%; left: -20%; right: -20%; bottom: -35%;
-            background-size: cover;
-            background-position: center center;
-            filter: brightness(0.6) blur(5px);
-            will-change: transform;
-            z-index: -1;
-            /* Optional: ensure it behaves as a separate hardware layer */
-            transform: translate3d(0,0,0);
-        }
-        .parallax-vignette {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: -1;
-            background:
-                radial-gradient(900px 420px at 20% -10%, rgba(184,135,70,0.16), transparent 60%),
-                radial-gradient(900px 420px at 85% 0%, rgba(184,135,70,0.08), transparent 55%),
-                radial-gradient(1100px 900px at 50% 70%, rgba(0,0,0,0.55), rgba(0,0,0,0.85));
-        }
-        @media (max-width: 520px) {
-            .parallax-bg { filter: brightness(0.6) blur(7px); }
-        }
-        .wrap { max-width: 920px; margin: 0 auto; padding: 26px 18px 40px; position: relative; z-index: 1; }
-        .header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
-        .header-top { width: 100%; }
-        .header-main { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-        .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-        .logo {
-            width: 42px; height: 42px;
-            border-radius: 12px;
-            background: linear-gradient(145deg, rgba(184,135,70,0.30), rgba(184,135,70,0.08));
-            border: 1px solid rgba(184,135,70,0.35);
-            box-shadow: 0 12px 30px rgba(0,0,0,0.35);
-            display: grid; place-items: center;
-            flex: 0 0 auto;
-        }
-        .logo span { color: var(--accent); font-weight: 800; letter-spacing: 0.06em; font-size: 14px; }
-        h1 { margin: 0; font-size: 20px; line-height: 1.15; width: 100%; }
-        .subtitle { margin-top: 4px; color: var(--muted); font-size: 13px; }
-        .lang {
+
+        .menu-content { margin-top: 18px; }
+
+        .menu-back {
+            width: 34px;
+            height: 34px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.03);
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 6px;
-            border-radius: 999px;
-            border: 1px solid rgba(255,255,255,0.10);
-            background: rgba(255,255,255,0.03);
-            flex: 0 0 auto;
-        }
-        .lang a {
+            justify-content: center;
             text-decoration: none;
-            color: rgba(255,255,255,0.65);
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            padding: 6px 10px;
-            border-radius: 999px;
-            border: 1px solid transparent;
+            color: rgba(255,255,255,0.70);
+            font-weight: 800;
             line-height: 1;
         }
-        .lang a.active {
-            color: rgba(0,0,0,0.95);
-            background: rgba(184,135,70,0.95);
-            border-color: rgba(184,135,70,0.55);
-        }
-        .lang a:not(.active):hover {
-            color: rgba(255,255,255,0.85);
-            border-color: rgba(184,135,70,0.35);
-        }
-        .back {
-            text-decoration: none;
-            color: rgba(255,255,255,0.75);
-            border: 1px solid rgba(255,255,255,0.10);
-            background: rgba(255,255,255,0.03);
-            padding: 8px 12px;
-            border-radius: 999px;
-            font-size: 13px;
-            font-weight: 700;
-        }
-        .back:hover { border-color: rgba(184,135,70,0.35); color: rgba(255,255,255,0.92); }
+
+        .menu-back:hover { border-color: rgba(184,135,70,0.35); color: rgba(255,255,255,0.92); }
+        .menu-back:focus-visible { outline: 2px solid rgba(184,135,70,0.55); outline-offset: 3px; }
+
+        .menu-sync { margin-top: 14px; text-align: center; }
+
         .section { margin-top: 14px; }
         .section-title {
             font-size: 16px;
@@ -135,6 +74,3 @@
         }
         .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .muted { color: var(--muted); font-size: 12px; }
-        @media (max-width: 520px) {
-            .subtitle { display: none; }
-        }
