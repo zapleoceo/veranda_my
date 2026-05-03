@@ -795,38 +795,82 @@ if ($ajax === 'submit_booking') {
 
   $db->createReservationsTable();
   $resTable = $db->t('reservations');
+
+  if ($waPhoneNorm === '' && $tgUid <= 0) {
+    $respondError(400, 'Мессенджер не привязан');
+  }
+
+  $existing = null;
+  try {
+    $existing = $db->query(
+      "SELECT * FROM {$resTable}
+       WHERE start_time = ?
+         AND duration = ?
+         AND guests = ?
+         AND table_num = ?
+         AND phone = ?
+         AND name = ?
+       ORDER BY id DESC
+       LIMIT 1",
+      [
+        $startDt->format('Y-m-d H:i:s'),
+        $duration_m,
+        $guests,
+        $tableNum,
+        $phoneNorm,
+        $name,
+      ]
+    )->fetch();
+  } catch (\Throwable $e) {
+    $existing = null;
+  }
+
+  $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
+  if ($tgToken === '' && $waPhoneNorm === '') {
+    $respondError(500, 'Telegram bot token not configured');
+  }
+
   $qrUrl = '';
   $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   $qrCode = '';
-  for ($i = 0; $i < 8; $i++) {
-    $qrCode .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-  }
-  if ($totalAmount > 0) {
-    $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES{$qrCode}");
-  }
+  $resId = 0;
+  $msgId = 0;
+  if (is_array($existing) && !empty($existing['id'])) {
+    $resId = (int)$existing['id'];
+    $qrCode = preg_replace('/[^A-Z0-9]/', '', strtoupper((string)($existing['qr_code'] ?? '')));
+    $qrUrl = (string)($existing['qr_url'] ?? '');
+    $msgId = (int)($existing['tg_message_id'] ?? 0);
+  } else {
+    for ($i = 0; $i < 8; $i++) {
+      $qrCode .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+    }
+    if ($totalAmount > 0) {
+      $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES{$qrCode}");
+    }
 
-  $db->query("INSERT INTO {$resTable} (
-    created_at, start_time, duration, guests, table_num, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-    (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
-    $startDt->format('Y-m-d H:i:s'),
-    $duration_m,
-    $guests,
-    $tableNum,
-    $name,
-    $phoneNorm,
-    $waPhoneNorm !== '' ? $waPhoneNorm : null,
-    $comment,
-    $preorder,
-    $preorderRu,
-    $tgUid > 0 ? $tgUid : null,
-    $tgUn !== '' ? $tgUn : null,
-    $userLang,
-    $totalAmount,
-    $qrUrl,
-    $qrCode
-  ]);
-  $resId = $db->getPdo()->lastInsertId();
+    $db->query("INSERT INTO {$resTable} (
+      created_at, start_time, duration, guests, table_num, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+      (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
+      $startDt->format('Y-m-d H:i:s'),
+      $duration_m,
+      $guests,
+      $tableNum,
+      $name,
+      $phoneNorm,
+      $waPhoneNorm !== '' ? $waPhoneNorm : null,
+      $comment,
+      $preorder,
+      $preorderRu,
+      $tgUid > 0 ? $tgUid : null,
+      $tgUn !== '' ? $tgUn : null,
+      $userLang,
+      $totalAmount,
+      $qrUrl,
+      $qrCode
+    ]);
+    $resId = (int)$db->getPdo()->lastInsertId();
+  }
 
   $payload = [
     'qr_code' => (string)$qrCode,
@@ -845,16 +889,14 @@ if ($ajax === 'submit_booking') {
   ];
   $keyboard = \App\Classes\ReservationTelegram::keyboardActive((int)$resId);
   try {
-    $msgId = reservations_send_manager_booking($db, $resTable, (int)$resId, $payload, $keyboard);
+    if ($msgId <= 0) {
+      $msgId = reservations_send_manager_booking($db, $resTable, (int)$resId, $payload, $keyboard);
+    }
   } catch (\Throwable $e) {
     $msgId = 0;
   }
   if ($msgId <= 0) {
     $respondError(500, 'Не удалось отправить сообщение в Telegram');
-  }
-
-  if ($waPhoneNorm === '' && $tgUid <= 0) {
-    $respondError(400, 'Мессенджер не привязан');
   }
 
   if ($waPhoneNorm !== '') {
