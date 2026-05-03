@@ -220,6 +220,40 @@ window.initPayday2_Settings = function() {
             if (ev.target === payday2SettingsModal) closePayday2SettingsModal();
         });
     }
+
+    const parsePosterAdminCookie = () => {
+        const cookieEl = document.getElementById('pd2sett_padm_cookie');
+        if (!cookieEl) return;
+        let raw = String(cookieEl.value || '').trim();
+        if (!raw) return;
+        raw = raw.replace(/^Cookie:\s*/i, '').trim();
+        const parts = raw.split(';').map((p) => String(p || '').trim()).filter(Boolean);
+        const map = {};
+        parts.forEach((p) => {
+            const i = p.indexOf('=');
+            if (i <= 0) return;
+            const k = p.slice(0, i).trim();
+            const v = p.slice(i + 1).trim();
+            if (!k) return;
+            map[k] = v;
+        });
+        const set = (id, v) => { const el = document.getElementById(id); if (el && v != null && String(v).trim() !== '') el.value = String(v).trim(); };
+        set('pd2sett_padm_account', map.account_url || map.account || '');
+        set('pd2sett_padm_pos_session', map.pos_session || '');
+        set('pd2sett_padm_ssid', map.ssid || '');
+        set('pd2sett_padm_csrf', map.csrf_cookie_poster || map.csrf || '');
+    };
+    const openPosterAdminLogin = () => {
+        const accEl = document.getElementById('pd2sett_padm_account');
+        const acc = accEl ? String(accEl.value || '').trim() : '';
+        if (!acc) return;
+        const url = 'https://' + encodeURIComponent(acc) + '.joinposter.com/manage/login';
+        window.open(url, '_blank', 'noopener,noreferrer');
+    };
+    const parseBtn = document.getElementById('pd2sett_padm_parse_btn');
+    if (parseBtn) parseBtn.addEventListener('click', parsePosterAdminCookie);
+    const loginBtn = document.getElementById('pd2sett_padm_login_btn');
+    if (loginBtn) loginBtn.addEventListener('click', openPosterAdminLogin);
     
     document.addEventListener('keydown', (ev) => {
         if (ev.key !== 'Escape') return;

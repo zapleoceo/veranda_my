@@ -1212,6 +1212,16 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                                     <input type="text" class="btn pd2-w-100" id="pd2sett_padm_ua" autocomplete="off" placeholder="опционально">
                                 </label>
                             </div>
+                            <div class="pd2-mt-10">
+                                <div class="pd2-d-flex pd2-gap-10 pd2-align-center pd2-justify-between pd2-mb-8" style="flex-wrap: wrap;">
+                                    <div class="muted pd2-fs-12">Если сессия устарела — вставьте Cookie-строку и нажмите «Разобрать», затем «Сохранить».</div>
+                                    <button type="button" class="btn2" id="pd2sett_padm_login_btn">Открыть Poster login</button>
+                                </div>
+                                <div class="pd2-d-flex pd2-gap-10" style="flex-wrap: wrap;">
+                                    <input type="text" class="btn pd2-flex-1" id="pd2sett_padm_cookie" autocomplete="off" placeholder="Cookie: account_url=restpublica2; pos_session=...; ssid=...; csrf_cookie_poster=...">
+                                    <button type="button" class="btn2" id="pd2sett_padm_parse_btn">Разобрать</button>
+                                </div>
+                            </div>
                         </details>
 
                         <details class="pd2-settings-spoiler pd2-mb-10" id="pd2sett_categories_spoiler">

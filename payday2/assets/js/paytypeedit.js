@@ -49,6 +49,9 @@
         btnCancel: null,
         btnSave: null,
         loadingEl: null,
+        authActions: null,
+        btnOpenPosterLogin: null,
+        btnOpenSettings: null,
         currentTxId: 0,
         fields: {},
         opening: false,
@@ -75,6 +78,10 @@
             <div class="body pd2-modal-body pd2-p-15">
                 <div class="muted" id="paytypeEditTxId" style="margin-bottom:10px;"></div>
                 <div id="paytypeEditErr" class="error pd2-d-none" style="margin-bottom:10px;"></div>
+                <div id="paytypeEditAuthActions" class="pd2-d-none" style="display:flex; justify-content:flex-end; gap:10px; margin-bottom:10px; flex-wrap: wrap;">
+                    <button type="button" class="btn2" id="paytypeEditOpenPosterLogin">Открыть Poster login</button>
+                    <button type="button" class="btn2" id="paytypeEditOpenSettings">Открыть настройки</button>
+                </div>
                 <div id="paytypeEditLoading" class="pd2-d-none pd2-text-center muted" style="padding: 14px 0;">
                     <svg class="pd2-loader-spin pd2-v-align-mid" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
@@ -125,6 +132,9 @@
         state.btnCancel = modal.querySelector('#paytypeEditCancel');
         state.btnSave = modal.querySelector('#paytypeEditSave');
         state.loadingEl = modal.querySelector('#paytypeEditLoading');
+        state.authActions = modal.querySelector('#paytypeEditAuthActions');
+        state.btnOpenPosterLogin = modal.querySelector('#paytypeEditOpenPosterLogin');
+        state.btnOpenSettings = modal.querySelector('#paytypeEditOpenSettings');
         state.fields = {
             payedSum: modal.querySelector('#pte_payedSum'),
             payedCash: modal.querySelector('#pte_payedCash'),
@@ -141,12 +151,38 @@
             state.modal.style.display = 'none';
             state.currentTxId = 0;
             if (state.err) { state.err.textContent = ''; state.err.classList.add('pd2-d-none'); }
+            if (state.authActions) state.authActions.classList.add('pd2-d-none');
         };
 
         if (state.btnClose) state.btnClose.addEventListener('click', close);
         if (state.btnCancel) state.btnCancel.addEventListener('click', close);
         state.modal.addEventListener('click', (e) => { if (e.target === state.modal) close(); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.modal && state.modal.style.display === 'flex') close(); });
+
+        const getAccount = () => {
+            try {
+                const ls = window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings ? window.PAYDAY_CONFIG.localSettings : null;
+                const acc = ls && ls.poster_admin && ls.poster_admin.account ? String(ls.poster_admin.account).trim() : '';
+                return acc;
+            } catch (_) {
+                return '';
+            }
+        };
+        const openPosterLogin = () => {
+            const acc = getAccount();
+            if (!acc) return;
+            window.open('https://' + encodeURIComponent(acc) + '.joinposter.com/manage/login', '_blank', 'noopener,noreferrer');
+        };
+        const openSettings = () => {
+            const btn = document.getElementById('payday2SettingsBtn');
+            if (btn) btn.click();
+            try {
+                const cookieEl = document.getElementById('pd2sett_padm_cookie');
+                if (cookieEl && typeof cookieEl.focus === 'function') cookieEl.focus();
+            } catch (_) {}
+        };
+        if (state.btnOpenPosterLogin) state.btnOpenPosterLogin.addEventListener('click', openPosterLogin);
+        if (state.btnOpenSettings) state.btnOpenSettings.addEventListener('click', openSettings);
 
         if (state.btnSave) {
             state.btnSave.addEventListener('click', () => {
@@ -188,10 +224,13 @@
                         try { window.dispatchEvent(new CustomEvent('pd2_checks_reload')); } catch (_) {}
                     })
                     .catch((e) => {
+                        const msg = e && e.message ? String(e.message) : 'Ошибка';
                         if (state.err) {
-                            state.err.textContent = e && e.message ? e.message : 'Ошибка';
+                            state.err.textContent = msg;
                             state.err.classList.remove('pd2-d-none');
                         }
+                        const needAuth = /redirect http|session expired|\blogin\b|не настроены cookies|заполните настройки/i.test(msg);
+                        if (needAuth && state.authActions) state.authActions.classList.remove('pd2-d-none');
                     })
                     .finally(() => {
                         state.saving = false;
@@ -215,6 +254,7 @@
         if (state.modal) state.modal.style.display = 'flex';
         if (state.txIdEl) state.txIdEl.textContent = 'tx_id: ' + String(state.currentTxId);
         if (state.err) { state.err.textContent = ''; state.err.classList.add('pd2-d-none'); }
+        if (state.authActions) state.authActions.classList.add('pd2-d-none');
         setLoading(true);
 
         fetch('?ajax=poster_admin_get_actions', {
@@ -260,10 +300,13 @@
                 recalc();
             })
             .catch((e) => {
+                const msg = e && e.message ? String(e.message) : 'Ошибка';
                 if (state.err) {
-                    state.err.textContent = e && e.message ? e.message : 'Ошибка';
+                    state.err.textContent = msg;
                     state.err.classList.remove('pd2-d-none');
                 }
+                const needAuth = /redirect http|session expired|\blogin\b|не настроены cookies|заполните настройки/i.test(msg);
+                if (needAuth && state.authActions) state.authActions.classList.remove('pd2-d-none');
             })
             .finally(() => {
                 setLoading(false);

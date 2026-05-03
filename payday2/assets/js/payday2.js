@@ -50,7 +50,17 @@ if (!window._paydayPjaxLoaded) {
 
     window.doPjax = async function(url, options = {}) {
         try {
-            const res = await fetch(url, options);
+            const preserveSelectors = Array.isArray(options.preserveSelectors) ? options.preserveSelectors.filter(Boolean) : [];
+            const preserved = [];
+            preserveSelectors.forEach((sel) => {
+                const el = typeof sel === 'string' ? document.querySelector(sel) : null;
+                if (el) preserved.push({ selector: sel, el });
+            });
+
+            const fetchOptions = Object.assign({}, options);
+            delete fetchOptions.preserveSelectors;
+
+            const res = await fetch(url, fetchOptions);
             if (res.redirected) {
                 url = res.url;
             }
@@ -62,6 +72,14 @@ if (!window._paydayPjaxLoaded) {
             const oldContainer = document.querySelector('.container');
             if (newContainer && oldContainer) {
                 oldContainer.innerHTML = newContainer.innerHTML;
+                preserved.forEach(({ selector, el }) => {
+                    const placeholder = typeof selector === 'string' ? document.querySelector(selector) : null;
+                    if (placeholder && placeholder !== el) {
+                        try {
+                            placeholder.parentNode.replaceChild(el, placeholder);
+                        } catch (_) {}
+                    }
+                });
             } else {
                 document.body.innerHTML = doc.body.innerHTML;
             }
@@ -999,13 +1017,17 @@ window.initPayday2 = function() {
                             }
                             if (j.ok) {
                                 updateBtnBusy(btn, { pct: 100, title: 'Готово. Обновление...' });
-                                setTimeout(() => { if(window.doPjax) window.doPjax(window.location.href); else window.location.reload(); }, 400);
+                                setTimeout(() => {
+                                    if (window.doPjax) window.doPjax(window.location.href, { preserveSelectors: ['#outSection'] });
+                                    else window.location.reload();
+                                }, 400);
                                 return;
                             }
                         } catch(e) {}
                     }
                 }
-                if(window.doPjax) window.doPjax(window.location.href); else window.location.reload();
+                if (window.doPjax) window.doPjax(window.location.href, { preserveSelectors: ['#outSection'] });
+                else window.location.reload();
             } catch (err) {
                 alert(err && err.message ? err.message : 'Ошибка');
                 restore();
