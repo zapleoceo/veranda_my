@@ -8,20 +8,28 @@
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <meta name="description" content="<?= htmlspecialchars($metaDescription) ?>">
     <link rel="canonical" href="<?= htmlspecialchars($canonicalUrl) ?>">
+    <?php if (isset($hreflang) && is_array($hreflang)): ?>
+        <?php foreach ($hreflang as $code => $href): ?>
+            <link rel="alternate" hreflang="<?= htmlspecialchars((string)$code) ?>" href="<?= htmlspecialchars((string)$href) ?>">
+        <?php endforeach; ?>
+    <?php endif; ?>
     <meta property="og:site_name" content="Veranda">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Links | Veranda">
+    <meta property="og:title" content="<?= htmlspecialchars($seoTitle ?? 'Veranda') ?>">
     <meta property="og:description" content="<?= htmlspecialchars($metaOgDescription) ?>">
     <meta property="og:url" content="<?= htmlspecialchars($canonicalUrl) ?>">
-    <meta property="og:image" content="https://veranda.my/tr3/assets/og-image.svg">
+    <meta property="og:image" content="<?= htmlspecialchars($ogImage ?? 'https://veranda.my/assets/img/links_bg.png') ?>">
     <meta name="twitter:card" content="summary_large_image">
-    <title>Links | Veranda</title>
+    <meta name="twitter:title" content="<?= htmlspecialchars($seoTitle ?? 'Veranda') ?>">
+    <meta name="twitter:description" content="<?= htmlspecialchars($metaOgDescription) ?>">
+    <meta name="twitter:image" content="<?= htmlspecialchars($ogImage ?? 'https://veranda.my/assets/img/links_bg.png') ?>">
+    <title><?= htmlspecialchars($seoTitle ?? 'Veranda') ?></title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0020">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0021">
 </head>
 <body>
     <main class="links-page">
@@ -125,9 +133,9 @@
     <script>
         window.LINKS_LANG = <?= json_encode($lang, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         window.LINKS_I18N = <?= json_encode($i18n, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        window.LINKS_TITLE = <?= json_encode($seoTitles ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         window.LINKS_META = <?= json_encode($metaDescriptions ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-        window.LINKS_META_OG = <?= json_encode($metaOgDescriptions ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
-    <script src="/links/links_fx.js?v=20260504_0020" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0021" defer></script>
 </body>
 </html>

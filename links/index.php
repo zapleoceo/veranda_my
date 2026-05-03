@@ -2,10 +2,12 @@
 require_once __DIR__ . '/links_data.php';
 
 $lang = null;
+$explicitLang = null;
 if (isset($_GET['lang'])) {
     $candidate = strtolower(trim((string)$_GET['lang']));
     if (in_array($candidate, $supportedLangs, true)) {
         $lang = $candidate;
+        $explicitLang = $lang;
         setcookie('links_lang', $lang, [
             'expires' => time() + 31536000,
             'path' => '/',
@@ -41,22 +43,36 @@ $subtitle = (string)($i18n[$lang]['subtitle'] ?? 'Быстрые ссылки');
 $hoursTitle = (string)($i18n[$lang]['hours']['title'] ?? '');
 $hoursLine1 = (string)($i18n[$lang]['hours']['line1'] ?? '');
 $hoursLine2 = (string)($i18n[$lang]['hours']['line2'] ?? '');
-$metaDescriptions = [
-    'ru' => 'Veranda: меню, бронирование и контакты.',
-    'en' => 'Veranda: menu, reservations and contacts.',
-    'vi' => 'Veranda: thực đơn, đặt bàn và liên hệ.',
-    'ko' => 'Veranda: 메뉴, 예약, 연락처.',
-];
-$metaOgDescriptions = [
-    'ru' => 'Меню, бронирование и контакты.',
-    'en' => 'Menu, reservations and contacts.',
-    'vi' => 'Thực đơn, đặt bàn và liên hệ.',
-    'ko' => '메뉴, 예약, 연락처.',
-];
-$metaDescription = (string)($metaDescriptions[$lang] ?? $metaDescriptions['ru']);
-$metaOgDescription = (string)($metaOgDescriptions[$lang] ?? $metaOgDescriptions['ru']);
 
-$canonicalUrl = 'https://veranda.my/links/' . ($lang ? ('?lang=' . urlencode($lang)) : '');
+$baseUrl = 'https://veranda.my/links/';
+$langUrl = static fn(string $code): string => $baseUrl . '?lang=' . urlencode($code);
+
+$seoTitles = [
+    'ru' => 'Veranda — ресторан и бар, Нячанг, Вьетнам',
+    'en' => 'Veranda - restaurant and bar. Nha Trang, Vietnam',
+    'vi' => 'Veranda - nhà hàng & quầy bar. Nha Trang, Việt Nam',
+    'ko' => 'Veranda — 레스토랑 & 바, 나트랑, 베트남',
+];
+$metaDescriptions = [
+    'ru' => 'Veranda — ресторан и бар в Нячанге, Вьетнам. Меню, бронирование столика и контакты: Telegram, WhatsApp, звонок.',
+    'en' => 'Veranda is a restaurant & bar in Nha Trang, Vietnam. Menu, table reservations and contacts: Telegram, WhatsApp, phone call.',
+    'vi' => 'Veranda là nhà hàng & quầy bar tại Nha Trang, Việt Nam. Thực đơn, đặt bàn và liên hệ: Telegram, WhatsApp, gọi điện.',
+    'ko' => '베트남 나트랑의 Veranda 레스토랑 & 바. 메뉴, 테이블 예약, 문의: Telegram, WhatsApp, 전화.',
+];
+
+$seoTitle = (string)($seoTitles[$lang] ?? $seoTitles['en']);
+$metaDescription = (string)($metaDescriptions[$lang] ?? $metaDescriptions['en']);
+$metaOgDescription = $metaDescription;
+
+$canonicalUrl = $explicitLang === null ? $baseUrl : $langUrl($lang);
+
+$hreflang = [
+    'x-default' => $baseUrl,
+    'ru' => $langUrl('ru'),
+    'en' => $langUrl('en'),
+    'vi' => $langUrl('vi'),
+    'ko' => $langUrl('ko'),
+];
 
 $icons = [
     'telegram' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 15.6 9.2 19c.6 0 .9-.2 1.3-.6l3.1-3 6.4 4.6c1.2.7 2 .3 2.3-1.1l4.1-19.1c.4-1.7-.7-2.4-1.9-1.9L1.2 9.2c-1.6.6-1.6 1.5-.3 1.9l6 1.9L20.2 4c.7-.4 1.3-.2.8.3Z"/></svg>',
@@ -88,11 +104,29 @@ foreach ($sections as $sectionKey => $keys) {
     if ($secItems) $sectionView[] = ['key' => $sectionKey, 'title' => $secTitle, 'items' => $secItems];
 }
 
+$telephone = '+84396314266';
+$ogImage = 'https://veranda.my/assets/img/links_bg.png';
+
 $jsonLd = [
     '@context' => 'https://schema.org',
     '@type' => 'Restaurant',
     'name' => 'Veranda',
-    'url' => 'https://veranda.my/links/',
+    'url' => $canonicalUrl,
+    'image' => $ogImage,
+    'telephone' => $telephone,
+    'address' => [
+        '@type' => 'PostalAddress',
+        'addressLocality' => 'Nha Trang',
+        'addressRegion' => 'Khánh Hòa',
+        'addressCountry' => 'Vietnam',
+    ],
+    'hasMenu' => 'https://veranda.my/links/menu.php',
+    'potentialAction' => [
+        [
+            '@type' => 'ReserveAction',
+            'target' => 'https://veranda.my/tr3',
+        ],
+    ],
     'sameAs' => [
         $linkDefs['tg_group']['href'],
         $linkDefs['tg_veranda']['href'],

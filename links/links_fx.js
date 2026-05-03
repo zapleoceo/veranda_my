@@ -99,8 +99,8 @@
   const root = document.documentElement
   const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const knownLangs = Object.keys(i18n)
+  const titleByLang = window.LINKS_TITLE || {}
   const metaByLang = window.LINKS_META || {}
-  const metaOgByLang = window.LINKS_META_OG || {}
 
   const clampLang = (v) => knownLangs.includes(v) ? v : (knownLangs.includes('ru') ? 'ru' : knownLangs[0])
 
@@ -120,12 +120,20 @@
   }
 
   const metaUpdate = (lang) => {
+    const title = titleByLang[lang]
     const md = metaByLang[lang]
-    const ogd = metaOgByLang[lang]
+    if (typeof title === 'string') document.title = title
+    const ogt = document.querySelector('meta[property="og:title"]')
+    if (ogt && typeof title === 'string') ogt.setAttribute('content', title)
+    const twt = document.querySelector('meta[name="twitter:title"]')
+    if (twt && typeof title === 'string') twt.setAttribute('content', title)
+
     const desc = document.querySelector('meta[name="description"]')
     if (desc && typeof md === 'string') desc.setAttribute('content', md)
     const og = document.querySelector('meta[property="og:description"]')
-    if (og && typeof ogd === 'string') og.setAttribute('content', ogd)
+    if (og && typeof md === 'string') og.setAttribute('content', md)
+    const twd = document.querySelector('meta[name="twitter:description"]')
+    if (twd && typeof md === 'string') twd.setAttribute('content', md)
   }
 
   const swapText = (el, next) => {
