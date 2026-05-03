@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0022">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0023">
 </head>
 <body>
     <main class="links-page">
@@ -132,6 +132,6 @@
         window.LINKS_TITLE = <?= json_encode($seoTitles ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         window.LINKS_META = <?= json_encode($metaDescriptions ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
-    <script src="/links/links_fx.js?v=20260504_0022" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0023" defer></script>
 </body>
 </html>

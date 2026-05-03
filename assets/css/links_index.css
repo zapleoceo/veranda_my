@@ -177,6 +177,17 @@
     color: rgba(255,255,255,0.65);
 }
 
+.brand-title {
+    cursor: default;
+    transition: color 180ms ease, text-shadow 180ms ease;
+}
+
+.brand-title:hover,
+.brand-title:focus-within {
+    color: var(--accent);
+    text-shadow: 0 0 22px rgba(184,135,70,0.35);
+}
+
 .header-right {
     display: inline-flex;
     align-items: center;
