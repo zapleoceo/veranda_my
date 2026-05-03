@@ -9,6 +9,7 @@ final class PosterAdminAjax
     private string $posSession;
     private string $ssid;
     private string $csrf;
+    private string $cookieRaw;
     private string $userAgent;
     private ?string $lastBody = null;
     private int $lastCode = 0;
@@ -19,14 +20,19 @@ final class PosterAdminAjax
         $this->posSession = trim((string)($cfg['pos_session'] ?? ''));
         $this->ssid = trim((string)($cfg['ssid'] ?? ''));
         $this->csrf = trim((string)($cfg['csrf'] ?? ''));
+        $this->cookieRaw = trim((string)($cfg['cookie'] ?? ''));
         $this->userAgent = trim((string)($cfg['user_agent'] ?? ''));
         if ($this->userAgent === '') {
             $this->userAgent =
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' .
                 '(KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36';
         }
-        if ($this->account === '' || $this->posSession === '' || $this->ssid === '' || $this->csrf === '') {
-            throw new \RuntimeException('Poster Admin: не настроены cookies (account/pos_session/ssid/csrf).');
+        if ($this->cookieRaw === '') {
+            if ($this->account === '' || $this->posSession === '' || $this->ssid === '' || $this->csrf === '') {
+                throw new \RuntimeException('Poster Admin: не настроены cookies (cookie или account/pos_session/ssid/csrf).');
+            }
+        } else {
+            $this->cookieRaw = preg_replace('/^\s*Cookie:\s*/i', '', $this->cookieRaw) ?: $this->cookieRaw;
         }
     }
 
@@ -57,6 +63,15 @@ final class PosterAdminAjax
 
     private function cookieHeader(): string
     {
+        if ($this->cookieRaw !== '') {
+            $raw = $this->cookieRaw;
+            if ($this->account !== '' && !preg_match('/(?:^|;\s*)account_url=/i', $raw)) {
+                $raw = rtrim($raw);
+                if ($raw !== '' && !str_ends_with($raw, ';')) $raw .= ';';
+                $raw .= ' account_url=' . rawurlencode($this->account);
+            }
+            return $raw;
+        }
         return http_build_query([
             'pos_session' => $this->posSession,
             'ssid' => $this->ssid,
@@ -119,11 +134,37 @@ final class PosterAdminAjax
             }
         }
 
+        $newCsrf = null;
+        $newPos = null;
         if (preg_match_all('/^Set-Cookie:\s*csrf_cookie_poster=([^;]+)/mi', $rawHeaders, $m)) {
-            $this->csrf = (string)end($m[1]);
+            $newCsrf = (string)end($m[1]);
+            $this->csrf = $newCsrf;
         }
         if (preg_match_all('/^Set-Cookie:\s*pos_session=([^;]+)/mi', $rawHeaders, $m)) {
-            $this->posSession = (string)end($m[1]);
+            $newPos = (string)end($m[1]);
+            $this->posSession = $newPos;
+        }
+        if ($this->cookieRaw !== '' && ($newCsrf !== null || $newPos !== null)) {
+            $raw = $this->cookieRaw;
+            if ($newCsrf !== null) {
+                if (preg_match('/(?:^|;\s*)csrf_cookie_poster=[^;]*/i', $raw)) {
+                    $raw = preg_replace('/((?:^|;\s*)csrf_cookie_poster=)[^;]*/i', '$1' . $newCsrf, $raw) ?: $raw;
+                } else {
+                    $raw = rtrim($raw);
+                    if ($raw !== '' && !str_ends_with($raw, ';')) $raw .= ';';
+                    $raw .= ' csrf_cookie_poster=' . $newCsrf;
+                }
+            }
+            if ($newPos !== null) {
+                if (preg_match('/(?:^|;\s*)pos_session=[^;]*/i', $raw)) {
+                    $raw = preg_replace('/((?:^|;\s*)pos_session=)[^;]*/i', '$1' . $newPos, $raw) ?: $raw;
+                } else {
+                    $raw = rtrim($raw);
+                    if ($raw !== '' && !str_ends_with($raw, ';')) $raw .= ';';
+                    $raw .= ' pos_session=' . $newPos;
+                }
+            }
+            $this->cookieRaw = $raw;
         }
 
         return [
@@ -160,8 +201,17 @@ final class PosterAdminAjax
         if ($txId <= 0) {
             throw new \RuntimeException('Poster Admin: invalid txId');
         }
-        $fields = $newParams;
-        $fields['csrf_token_poster'] = $this->csrf;
+        $payedCash = $newParams['payedCash'] ?? $newParams['payed_cash'] ?? 0;
+        $payedCard = $newParams['payedCard'] ?? $newParams['payed_card'] ?? 0;
+        $payedCert = $newParams['payedCert'] ?? $newParams['payed_cert'] ?? 0;
+        $payedEwallet = $newParams['payedEwallet'] ?? $newParams['payed_ewallet'] ?? 0;
+
+        $fields = [
+            'payed_cash' => max(0, (int)$payedCash),
+            'payed_card' => max(0, (int)$payedCard),
+            'payed_cert' => max(0, (int)$payedCert),
+            'payed_ewallet' => max(0, (int)$payedEwallet),
+        ];
 
         $r = $this->request('POST', "/manage/ajax/edit_check/{$txId}", $fields);
         if ((int)$r['code'] !== 200) {

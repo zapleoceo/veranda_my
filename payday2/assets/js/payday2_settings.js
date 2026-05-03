@@ -30,6 +30,7 @@ window.initPayday2_Settings = function() {
             set('pd2sett_padm_pos_session', ls.poster_admin.pos_session);
             set('pd2sett_padm_ssid', ls.poster_admin.ssid);
             set('pd2sett_padm_csrf', ls.poster_admin.csrf);
+            set('pd2sett_padm_cookie', ls.poster_admin.cookie);
             set('pd2sett_padm_ua', ls.poster_admin.user_agent);
         }
     };
@@ -150,6 +151,7 @@ window.initPayday2_Settings = function() {
                 pos_session: str('pd2sett_padm_pos_session'),
                 ssid: str('pd2sett_padm_ssid'),
                 csrf: str('pd2sett_padm_csrf'),
+                cookie: str('pd2sett_padm_cookie').replace(/^Cookie:\s*/i, '').trim(),
                 user_agent: str('pd2sett_padm_ua'),
             },
         };

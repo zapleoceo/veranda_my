@@ -29,6 +29,7 @@ final class LocalSettings
                 'pos_session' => '',
                 'ssid' => '',
                 'csrf' => '',
+                'cookie' => '',
                 'user_agent' => '',
             ],
         ];
@@ -124,6 +125,7 @@ final class LocalSettings
                 'pos_session' => (string)(($m['poster_admin']['pos_session'] ?? '') ?: ''),
                 'ssid' => (string)(($m['poster_admin']['ssid'] ?? '') ?: ''),
                 'csrf' => (string)(($m['poster_admin']['csrf'] ?? '') ?: ''),
+                'cookie' => (string)(($m['poster_admin']['cookie'] ?? '') ?: ''),
                 'user_agent' => (string)(($m['poster_admin']['user_agent'] ?? '') ?: ''),
             ],
         ];
@@ -192,12 +194,14 @@ final class LocalSettings
                 'pos_session' => trim((string)($in['poster_admin']['pos_session'] ?? '')),
                 'ssid' => trim((string)($in['poster_admin']['ssid'] ?? '')),
                 'csrf' => trim((string)($in['poster_admin']['csrf'] ?? '')),
+                'cookie' => trim((string)($in['poster_admin']['cookie'] ?? '')),
                 'user_agent' => trim((string)($in['poster_admin']['user_agent'] ?? '')),
             ] : [
                 'account' => '',
                 'pos_session' => '',
                 'ssid' => '',
                 'csrf' => '',
+                'cookie' => '',
                 'user_agent' => '',
             ],
         ];

@@ -12,10 +12,7 @@
                 payedCash: Number(p.payedCash ?? 0) || 0,
                 payedCard: Number(p.payedCard ?? 0) || 0,
                 payedCert: Number(p.payedCert ?? 0) || 0,
-                payedEwallet: Number(p.payedEwallet ?? 0) || 0,
-                payedBonus: Number(p.payedBonus ?? 0) || 0,
-                payedThirdParty: Number(p.payedThirdParty ?? 0) || 0,
-                usesPayedCert: Number(p.usesPayedCert ?? 0) === 1 ? 1 : 0,
+                payedSum: Number(p.payedSum ?? 0) || 0,
             };
         }
 
@@ -23,10 +20,7 @@
             const p = params && typeof params === 'object' ? params : {};
             const sum = (Number(p.payedCash) || 0)
                 + (Number(p.payedCard) || 0)
-                + (Number(p.payedCert) || 0)
-                + (Number(p.payedEwallet) || 0)
-                + (Number(p.payedBonus) || 0)
-                + (Number(p.payedThirdParty) || 0);
+                + (Number(p.payedCert) || 0);
             return sum;
         }
     }
@@ -122,18 +116,6 @@
                         <label class="pd2-settings-label pd2-m-0"><span>payedCert</span>
                             <input type="text" class="btn pd2-w-100" id="pte_payedCert" autocomplete="off">
                         </label>
-                        <label class="pd2-settings-label pd2-m-0"><span>payedEwallet</span>
-                            <input type="text" class="btn pd2-w-100" id="pte_payedEwallet" autocomplete="off">
-                        </label>
-                        <label class="pd2-settings-label pd2-m-0"><span>payedBonus</span>
-                            <input type="text" class="btn pd2-w-100" id="pte_payedBonus" autocomplete="off">
-                        </label>
-                        <label class="pd2-settings-label pd2-m-0"><span>payedThirdParty</span>
-                            <input type="text" class="btn pd2-w-100" id="pte_payedThirdParty" autocomplete="off">
-                        </label>
-                        <label class="pd2-settings-label pd2-m-0"><span>usesPayedCert</span>
-                            <input type="checkbox" id="pte_usesPayedCert" style="margin-top: 10px;">
-                        </label>
                     </div>
                     <div class="actions pd2-justify-between pd2-align-center pd2-mt-6">
                         <button type="button" class="btn2" id="paytypeEditCancel">Отмена</button>
@@ -156,10 +138,6 @@
                 payedCash: modal.querySelector('#pte_payedCash'),
                 payedCard: modal.querySelector('#pte_payedCard'),
                 payedCert: modal.querySelector('#pte_payedCert'),
-                payedEwallet: modal.querySelector('#pte_payedEwallet'),
-                payedBonus: modal.querySelector('#pte_payedBonus'),
-                payedThirdParty: modal.querySelector('#pte_payedThirdParty'),
-                usesPayedCert: modal.querySelector('#pte_usesPayedCert'),
             };
 
             const btnClose = modal.querySelector('#paytypeEditClose');
@@ -250,28 +228,21 @@
             this.ensure();
             const set = (k, v) => { if (this.fields[k]) this.fields[k].value = String(v != null ? v : ''); };
             const p = params && typeof params === 'object' ? params : {};
+            const total = Number(p.payedSum ?? 0) || 0;
+            set('payedSum', total);
             set('payedCash', p.payedCash ?? 0);
             set('payedCard', p.payedCard ?? 0);
             set('payedCert', p.payedCert ?? 0);
-            set('payedEwallet', p.payedEwallet ?? 0);
-            set('payedBonus', p.payedBonus ?? 0);
-            set('payedThirdParty', p.payedThirdParty ?? 0);
-            if (this.fields.usesPayedCert) this.fields.usesPayedCert.checked = Number(p.usesPayedCert ?? 0) === 1;
-            this.recalcSum();
-
-            const recalc = () => this.recalcSum();
-            ['payedCash', 'payedCard', 'payedCert', 'payedEwallet', 'payedBonus', 'payedThirdParty'].forEach((k) => {
+            const keepTotal = () => {
+                if (!this.fields.payedSum) return;
+                const t = String(total);
+                if (this.fields.payedSum.value !== t) this.fields.payedSum.value = t;
+            };
+            ['payedCash', 'payedCard', 'payedCert'].forEach((k) => {
                 const el = this.fields[k];
                 if (!el) return;
-                el.oninput = recalc;
+                el.oninput = keepTotal;
             });
-        }
-
-        recalcSum() {
-            this.ensure();
-            const params = this.getFormParams();
-            const sum = PosterAdminEditCheckModel.computePayedSum(params);
-            if (this.fields.payedSum) this.fields.payedSum.value = String(sum);
         }
 
         getFormParams() {
@@ -280,12 +251,7 @@
                 payedCash: this.readIntField(this.fields.payedCash),
                 payedCard: this.readIntField(this.fields.payedCard),
                 payedCert: this.readIntField(this.fields.payedCert),
-                payedEwallet: this.readIntField(this.fields.payedEwallet),
-                payedBonus: this.readIntField(this.fields.payedBonus),
-                payedThirdParty: this.readIntField(this.fields.payedThirdParty),
-                usesPayedCert: this.fields.usesPayedCert && this.fields.usesPayedCert.checked ? 1 : 0,
             };
-            params.payedSum = PosterAdminEditCheckModel.computePayedSum(params);
             return params;
         }
     }
@@ -295,6 +261,7 @@
             this.api = api;
             this.view = view;
             this.txId = 0;
+            this.total = 0;
             this.opening = false;
             this.saving = false;
             this.view.onSave = () => this.save().catch(() => {});
@@ -309,6 +276,7 @@
             const txId = Number(transactionId || 0) || 0;
             if (!txId || this.opening) return;
             this.txId = txId;
+            this.total = 0;
             this.opening = true;
             this.view.show();
             this.view.setTxId(txId);
@@ -318,6 +286,7 @@
             try {
                 const j = await this.api.getActions(txId);
                 const params = PosterAdminEditCheckModel.fromParams(j.params || {});
+                this.total = Number(params.payedSum || 0) || 0;
                 this.view.setForm(params);
             } catch (e) {
                 const msg = e && e.message ? String(e.message) : 'Ошибка';
@@ -336,6 +305,10 @@
             this.view.clearError();
             try {
                 const params = this.view.getFormParams();
+                const sum = PosterAdminEditCheckModel.computePayedSum(params);
+                if ((Number(this.total) || 0) > 0 && sum !== this.total) {
+                    throw new Error('Сумма должна оставаться ' + String(this.total) + '. Сейчас: ' + String(sum) + '.');
+                }
                 await this.api.editCheck(this.txId, params);
                 if (typeof window.showToast === 'function') window.showToast('Сохранено');
                 this.view.hide();

@@ -2308,21 +2308,24 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_get_actions') {
             'pos_session' => (string)($st['pos_session'] ?? ($admin['pos_session'] ?? '')),
             'ssid' => (string)($admin['ssid'] ?? ''),
             'csrf' => (string)($st['csrf'] ?? ($admin['csrf'] ?? '')),
+            'cookie' => (string)($admin['cookie'] ?? ''),
             'user_agent' => (string)($admin['user_agent'] ?? ''),
         ];
-        if (trim($cfg['account']) === '' || trim($cfg['pos_session']) === '' || trim($cfg['ssid']) === '' || trim($cfg['csrf']) === '') {
+        if (trim($cfg['cookie']) === '' && (trim($cfg['account']) === '' || trim($cfg['pos_session']) === '' || trim($cfg['ssid']) === '' || trim($cfg['csrf']) === '')) {
             http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Poster Admin: заполните настройки (account_url/pos_session/ssid/csrf_cookie_poster).'], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['ok' => false, 'error' => 'Poster Admin: заполните настройки (Cookie или account_url/pos_session/ssid/csrf_cookie_poster).'], JSON_UNESCAPED_UNICODE);
             exit;
         }
         $client = new \App\Classes\PosterAdminAjax($cfg);
         $params = $client->getActions($txId);
-        $_SESSION['payday2_poster_admin'] = [
-            'pos_session' => $client->getPosSession(),
-            'csrf' => $client->getCsrf(),
+        $out = [
+            'payedCash' => (int)($params['payedCash'] ?? $params['payed_cash'] ?? 0),
+            'payedCard' => (int)($params['payedCard'] ?? $params['payed_card'] ?? 0),
+            'payedCert' => (int)($params['payedCert'] ?? $params['payed_cert'] ?? 0),
         ];
+        $out['payedSum'] = (int)($params['payedSum'] ?? $params['payed_sum'] ?? ((int)$out['payedCash'] + (int)$out['payedCard'] + (int)$out['payedCert']));
         $_SESSION['payday2_poster_admin_lock_until'] = 0;
-        echo json_encode(['ok' => true, 'params' => $params], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => true, 'params' => $out], JSON_UNESCAPED_UNICODE);
         exit;
     } catch (\Throwable $e) {
         if (!isset($_SESSION)) { if (session_status() !== PHP_SESSION_ACTIVE) @session_start(); }
@@ -2372,11 +2375,12 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
             'pos_session' => (string)($st['pos_session'] ?? ($admin['pos_session'] ?? '')),
             'ssid' => (string)($admin['ssid'] ?? ''),
             'csrf' => (string)($st['csrf'] ?? ($admin['csrf'] ?? '')),
+            'cookie' => (string)($admin['cookie'] ?? ''),
             'user_agent' => (string)($admin['user_agent'] ?? ''),
         ];
-        if (trim($cfg['account']) === '' || trim($cfg['pos_session']) === '' || trim($cfg['ssid']) === '' || trim($cfg['csrf']) === '') {
+        if (trim($cfg['cookie']) === '' && (trim($cfg['account']) === '' || trim($cfg['pos_session']) === '' || trim($cfg['ssid']) === '' || trim($cfg['csrf']) === '')) {
             http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Poster Admin: заполните настройки (account_url/pos_session/ssid/csrf_cookie_poster).'], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['ok' => false, 'error' => 'Poster Admin: заполните настройки (Cookie или account_url/pos_session/ssid/csrf_cookie_poster).'], JSON_UNESCAPED_UNICODE);
             exit;
         }
         $client = new \App\Classes\PosterAdminAjax($cfg);
@@ -2387,24 +2391,32 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
             echo json_encode(['ok' => false, 'error' => 'Нельзя редактировать фискальный чек.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        $keys = ['payedCash', 'payedCard', 'payedCert', 'payedEwallet', 'payedBonus', 'payedThirdParty'];
-        $outParams = is_array($current) ? $current : [];
-        $sum = 0;
-        foreach ($keys as $k) {
-            $v = isset($params[$k]) ? (int)$params[$k] : (int)($outParams[$k] ?? 0);
-            if ($v < 0) $v = 0;
-            $outParams[$k] = $v;
-            $sum += $v;
+        $origTotal = (int)($current['payedSum'] ?? $current['payed_sum'] ?? 0);
+        if ($origTotal <= 0) {
+            $origTotal =
+                (int)($current['payedCash'] ?? $current['payed_cash'] ?? 0) +
+                (int)($current['payedCard'] ?? $current['payed_card'] ?? 0) +
+                (int)($current['payedCert'] ?? $current['payed_cert'] ?? 0);
         }
-        $outParams['payedSum'] = $sum;
-        if (isset($params['usesPayedCert'])) {
-            $outParams['usesPayedCert'] = ((int)$params['usesPayedCert'] === 1) ? 1 : 0;
+        $cash = isset($params['payedCash']) ? (int)$params['payedCash'] : (isset($params['payed_cash']) ? (int)$params['payed_cash'] : (int)($current['payedCash'] ?? $current['payed_cash'] ?? 0));
+        $card = isset($params['payedCard']) ? (int)$params['payedCard'] : (isset($params['payed_card']) ? (int)$params['payed_card'] : (int)($current['payedCard'] ?? $current['payed_card'] ?? 0));
+        $cert = isset($params['payedCert']) ? (int)$params['payedCert'] : (isset($params['payed_cert']) ? (int)$params['payed_cert'] : (int)($current['payedCert'] ?? $current['payed_cert'] ?? 0));
+        if ($cash < 0) $cash = 0;
+        if ($card < 0) $card = 0;
+        if ($cert < 0) $cert = 0;
+        $sum = $cash + $card + $cert;
+        if ($origTotal > 0 && $sum !== $origTotal) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Сумма должна оставаться ' . $origTotal . '. Сейчас: ' . $sum . '.'], JSON_UNESCAPED_UNICODE);
+            exit;
         }
-        $res = $client->editCheck($txId, $outParams);
-        $_SESSION['payday2_poster_admin'] = [
-            'pos_session' => $client->getPosSession(),
-            'csrf' => $client->getCsrf(),
-        ];
+
+        $res = $client->editCheck($txId, [
+            'payedCash' => $cash,
+            'payedCard' => $card,
+            'payedCert' => $cert,
+            'payedEwallet' => 0,
+        ]);
         $_SESSION['payday2_poster_admin_lock_until'] = 0;
         echo json_encode(['ok' => true, 'result' => $res], JSON_UNESCAPED_UNICODE);
         exit;

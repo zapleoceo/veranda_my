@@ -10,7 +10,7 @@ use App\Classes\PosterAdminAjax;
 
 final class PosterAdminEditCheckTestModel
 {
-    public const PAY_KEYS = ['payedCash', 'payedCard', 'payedCert', 'payedEwallet', 'payedBonus', 'payedThirdParty'];
+    public const PAY_KEYS = ['payedCash', 'payedCard', 'payedCert'];
 
     public static function normalizeParams(array $p): array
     {
@@ -190,7 +190,7 @@ final class PosterAdminEditCheckTesterService
 
         foreach (PosterAdminEditCheckTestModel::PAY_KEYS as $k) {
             $p = PosterAdminEditCheckTestModel::buildCaseParams($base, $total, [$k => $total], $this->origUsesPayedCert);
-            $cases = array_merge($cases, $this->withUsesPayedCertVariants("ONE: {$k}", $p));
+            $cases[] = ['name' => "ONE: {$k}", 'params' => $p];
         }
 
         $pairs = [];
@@ -203,11 +203,11 @@ final class PosterAdminEditCheckTesterService
         foreach ($pairs as [$a, $b]) {
             $half = intdiv($total, 2);
             $p1 = PosterAdminEditCheckTestModel::buildCaseParams($base, $total, [$a => $half, $b => $total - $half], $this->origUsesPayedCert);
-            $cases = array_merge($cases, $this->withUsesPayedCertVariants("TWO: {$a}+{$b} half", $p1));
+            $cases[] = ['name' => "TWO: {$a}+{$b} half", 'params' => $p1];
 
             $x = min(1000, $total);
             $p2 = PosterAdminEditCheckTestModel::buildCaseParams($base, $total, [$a => $x, $b => $total - $x], $this->origUsesPayedCert);
-            $cases = array_merge($cases, $this->withUsesPayedCertVariants("TWO: {$a}+{$b} 1000/rest", $p2));
+            $cases[] = ['name' => "TWO: {$a}+{$b} 1000/rest", 'params' => $p2];
         }
 
         $triples = [];
@@ -222,34 +222,15 @@ final class PosterAdminEditCheckTesterService
             $x = min(1000, $total);
             $y = min(1000, max(0, $total - $x));
             $p1 = PosterAdminEditCheckTestModel::buildCaseParams($base, $total, [$a => $x, $b => $y, $c => max(0, $total - $x - $y)], $this->origUsesPayedCert);
-            $cases = array_merge($cases, $this->withUsesPayedCertVariants("THREE: {$a}+{$b}+{$c} 1000/1000/rest", $p1));
+            $cases[] = ['name' => "THREE: {$a}+{$b}+{$c} 1000/1000/rest", 'params' => $p1];
 
             $p10 = (int)floor($total * 0.10);
             $p20 = (int)floor($total * 0.20);
             $p1b = PosterAdminEditCheckTestModel::buildCaseParams($base, $total, [$a => $p10, $b => $p20, $c => max(0, $total - $p10 - $p20)], $this->origUsesPayedCert);
-            $cases = array_merge($cases, $this->withUsesPayedCertVariants("THREE: {$a}+{$b}+{$c} 10/20/70", $p1b));
+            $cases[] = ['name' => "THREE: {$a}+{$b}+{$c} 10/20/70", 'params' => $p1b];
         }
 
         return $cases;
-    }
-
-    private function withUsesPayedCertVariants(string $name, array $params): array
-    {
-        $hasCert = ((int)($params['payedCert'] ?? 0) > 0);
-        if (!$hasCert) {
-            return [[
-                'name' => $name,
-                'params' => $params,
-            ]];
-        }
-        $p0 = $params;
-        $p0['usesPayedCert'] = 0;
-        $p1 = $params;
-        $p1['usesPayedCert'] = 1;
-        return [
-            ['name' => $name . ' usesPayedCert=0', 'params' => $p0],
-            ['name' => $name . ' usesPayedCert=1', 'params' => $p1],
-        ];
     }
 
     private function trimPosterResult(array $r): array
@@ -302,6 +283,7 @@ final class PosterAdminEditCheckTesterView
             'pos_session' => trim((string)($cfg['pos_session'] ?? '')),
             'ssid' => trim((string)($cfg['ssid'] ?? '')),
             'csrf' => trim((string)($cfg['csrf'] ?? '')),
+            'cookie' => trim((string)($cfg['cookie'] ?? '')),
             'user_agent' => trim((string)($cfg['user_agent'] ?? '')),
         ];
 
@@ -350,8 +332,8 @@ final class PosterAdminEditCheckTesterView
         echo '</form>';
         echo '</div>';
 
-        if ($cfgNormalized['account'] === '' || $cfgNormalized['pos_session'] === '' || $cfgNormalized['ssid'] === '' || $cfgNormalized['csrf'] === '') {
-            echo '<div class="err">Poster Admin cookies не настроены. Открой Payday2 → Settings → Poster Admin (Edit check) и заполни account_url / ssid / csrf_cookie_poster / pos_session.</div>';
+        if ($cfgNormalized['cookie'] === '' && ($cfgNormalized['account'] === '' || $cfgNormalized['pos_session'] === '' || $cfgNormalized['ssid'] === '' || $cfgNormalized['csrf'] === '')) {
+            echo '<div class="err">Poster Admin cookies не настроены. Открой Payday2 → Settings → Poster Admin (Edit check) и заполни Cookie (рекомендуется) или account_url / ssid / csrf_cookie_poster / pos_session.</div>';
         }
 
         if ($error !== '') {
