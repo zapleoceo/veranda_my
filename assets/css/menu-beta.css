@@ -40,12 +40,13 @@
 
         .section { margin-top: 14px; }
         .section-title {
+            font-family: "Montserrat", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
             font-size: 16px;
-            font-weight: 800;
-            letter-spacing: 0.02em;
+            font-weight: 500;
+            letter-spacing: 0.01em;
             margin: 18px 0 10px;
         }
-        details {
+        .menu-content details {
             border: 1px solid rgba(184,135,70,0.18);
             background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
             border-radius: 16px;
@@ -54,22 +55,25 @@
             backdrop-filter: blur(16px) saturate(120%);
             -webkit-backdrop-filter: blur(16px) saturate(120%);
         }
-        summary {
+        .menu-content details > summary {
             cursor: pointer;
             padding: 14px 14px;
-            font-weight: 800;
+            font-family: "Montserrat", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            font-weight: 500;
+            font-size: 16px;
+            letter-spacing: 0.01em;
             list-style: none;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 10px;
         }
-        summary::-webkit-details-marker { display: none; }
-        summary:hover { background: rgba(255,255,255,0.03); }
-        summary:focus-visible { outline: 2px solid rgba(184,135,70,0.55); outline-offset: -2px; }
-        .sum-right { color: var(--muted); font-size: 12px; font-weight: 700; }
-        .items { padding: 4px 12px 12px; display: grid; gap: 10px; }
-        .item {
+        .menu-content details > summary::-webkit-details-marker { display: none; }
+        .menu-content details > summary:hover { background: rgba(255,255,255,0.03); }
+        .menu-content details > summary:focus-visible { outline: 2px solid rgba(184,135,70,0.55); outline-offset: -2px; }
+        .menu-content .sum-right { color: var(--muted); font-size: 13px; font-weight: 500; }
+        .menu-content .items { padding: 4px 12px 12px; display: grid; gap: 10px; }
+        .menu-content .item {
             border: 1px solid rgba(184,135,70,0.14);
             background: rgba(255,255,255,0.03);
             border-radius: 14px;
@@ -79,12 +83,32 @@
             gap: 12px;
             align-items: start;
         }
-        .item.noimg { grid-template-columns: 1fr; }
-        .item-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-        .item-title { font-weight: 800; font-size: 14px; line-height: 1.25; }
-        .item-price { font-weight: 800; color: rgba(255,255,255,0.90); font-size: 14px; white-space: nowrap; }
-        .item-desc { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.35; }
-        .thumb {
+        .menu-content .item.noimg { grid-template-columns: 1fr; }
+        .menu-content .item-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+        .menu-content .item-title {
+            font-family: "Montserrat", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            font-weight: 500;
+            font-size: 16px;
+            line-height: 1.25;
+            letter-spacing: 0.01em;
+        }
+        .menu-content .item-price {
+            font-family: "Montserrat", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            font-weight: 500;
+            color: rgba(255,255,255,0.90);
+            font-size: 16px;
+            white-space: nowrap;
+        }
+        .menu-content .item-desc {
+            margin-top: 6px;
+            color: var(--muted);
+            font-family: "Montserrat", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            font-weight: 300;
+            font-size: 13px;
+            line-height: 1.35;
+            letter-spacing: 0.01em;
+        }
+        .menu-content .thumb {
             width: 78px; height: 78px;
             border-radius: 14px;
             border: 1px solid rgba(184,135,70,0.28);
@@ -92,5 +116,5 @@
             overflow: hidden;
             flex: 0 0 auto;
         }
-        .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .muted { color: var(--muted); font-size: 12px; }
+        .menu-content .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .menu-content .muted { color: var(--muted); font-size: 12px; }

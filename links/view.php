@@ -133,6 +133,6 @@
         window.LINKS_TITLE = <?= json_encode($seoTitles ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         window.LINKS_META = <?= json_encode($metaDescriptions ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
-    <script src="/links/links_fx.js?v=20260504_0027" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0028" defer></script>
 </body>
 </html>

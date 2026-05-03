@@ -214,7 +214,7 @@ $telephone = '+84396314266';
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css?v=20260425_0001">
     <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0027">
-    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0029">
+    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0031">
 </head>
 <body>
     <main class="links-page">
@@ -377,7 +377,7 @@ $telephone = '+84396314266';
             ],
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/links/links_fx.js?v=20260504_0027" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0028" defer></script>
     <script src="/assets/js/menu-beta.js?v=20260504_0028" defer></script>
 </body>
 </html>

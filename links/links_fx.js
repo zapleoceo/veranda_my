@@ -1,4 +1,4 @@
-(() => {
+;(() => {
   const hero = document.querySelector('.links-hero')
   const bg = hero ? hero.querySelector('.links-hero__bg') : null
   const spotlight = hero ? hero.querySelector('.links-spotlight') : null
@@ -48,7 +48,7 @@
   }
 })()
 
-(() => {
+;(() => {
   const hero = document.querySelector('.links-hero')
   const spotlight = document.querySelector('.links-spotlight')
   if (!hero || !spotlight) return
@@ -139,7 +139,7 @@
   requestAnimationFrame(tick)
 })()
 
-(() => {
+;(() => {
   const panelLinks = Array.from(document.querySelectorAll('.lang-panel a'))
   if (!panelLinks.length) return
 
