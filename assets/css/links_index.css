@@ -284,14 +284,34 @@
 
 .lang-panel a:focus-visible { outline: 2px solid rgba(184,135,70,0.55); outline-offset: 2px; }
 
-.i18n-swap {
-    transition: opacity 160ms ease, transform 160ms ease;
+.i18n-xfade {
+    overflow: hidden;
+}
+
+.i18n-xfade > .i18n-layer {
+    grid-area: 1 / 1;
+    transition: opacity 220ms ease, transform 220ms ease;
     will-change: opacity, transform;
 }
 
-.i18n-swap.is-out {
+.i18n-xfade > .i18n-layer--old {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.i18n-xfade > .i18n-layer--new {
     opacity: 0;
     transform: translateY(6px);
+}
+
+.i18n-xfade.is-animating > .i18n-layer--old {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+
+.i18n-xfade.is-animating > .i18n-layer--new {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .hours {

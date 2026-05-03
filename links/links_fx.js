@@ -138,16 +138,45 @@
 
   const swapText = (el, next) => {
     if (!el) return
+    if (el.dataset.i18nBusy === '1') return
     const current = (el.textContent || '').trim()
     const target = (next || '').trim()
     if (current === target) return
-    el.classList.add('i18n-swap')
     if (reduced) { el.textContent = target; return }
-    el.classList.add('is-out')
+
+    el.dataset.i18nBusy = '1'
+    const cs = window.getComputedStyle(el)
+    const isInline = cs.display.startsWith('inline')
+    const prevDisplay = el.style.display
+    const prevOverflow = el.style.overflow
+    const prevAlign = el.style.alignItems
+
+    el.classList.add('i18n-xfade')
+    el.style.display = isInline ? 'inline-grid' : 'grid'
+    el.style.alignItems = 'start'
+    el.style.overflow = 'hidden'
+
+    const oldSpan = document.createElement('span')
+    oldSpan.className = 'i18n-layer i18n-layer--old'
+    oldSpan.textContent = current
+
+    const newSpan = document.createElement('span')
+    newSpan.className = 'i18n-layer i18n-layer--new'
+    newSpan.textContent = target
+
+    el.replaceChildren(oldSpan, newSpan)
+    el.getBoundingClientRect()
+    el.classList.add('is-animating')
+
     window.setTimeout(() => {
+      el.classList.remove('is-animating')
+      el.classList.remove('i18n-xfade')
+      el.style.display = prevDisplay
+      el.style.overflow = prevOverflow
+      el.style.alignItems = prevAlign
       el.textContent = target
-      el.classList.remove('is-out')
-    }, 150)
+      delete el.dataset.i18nBusy
+    }, 240)
   }
 
   const applyLang = (lang) => {

@@ -25,11 +25,12 @@
     <meta name="twitter:image" content="<?= htmlspecialchars($ogImage ?? 'https://veranda.my/assets/img/links_bg.png') ?>">
     <title><?= htmlspecialchars($seoTitle ?? 'Veranda') ?></title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+    <link rel="preload" as="image" href="/assets/img/links_bg.png" fetchpriority="high">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0023">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0024">
 </head>
 <body>
     <main class="links-page">
@@ -132,6 +133,6 @@
         window.LINKS_TITLE = <?= json_encode($seoTitles ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
         window.LINKS_META = <?= json_encode($metaDescriptions ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
-    <script src="/links/links_fx.js?v=20260504_0023" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0024" defer></script>
 </body>
 </html>
