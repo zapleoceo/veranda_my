@@ -342,7 +342,7 @@
 
 .links-layout {
     display: grid;
-    gap: 18px;
+    gap: 12px;
     margin-top: 16px;
     max-width: 760px;
     margin-left: auto;
