@@ -208,6 +208,20 @@ window.initPayday2_CheckFinder = function() {
         });
         html += '</tbody></table></div>';
         checkFinderResult.innerHTML = html;
+        try {
+            checkFinderResult.querySelectorAll('.pd2-check-edit-btn').forEach((btn) => {
+                btn.addEventListener('click', (e) => {
+                    try { e.preventDefault(); e.stopPropagation(); } catch (_) {}
+                    const id = Number(btn.getAttribute('data-edit-check') || 0) || 0;
+                    if (!id) return;
+                    if (typeof window.pd2OpenPaytypeEdit === 'function') {
+                        window.pd2OpenPaytypeEdit(id);
+                        return;
+                    }
+                    if (typeof window.showToast === 'function') window.showToast('Редактор оплаты не загружен (обновите страницу)');
+                });
+            });
+        } catch (_) {}
     };
 
     const filterAndRender = () => {
