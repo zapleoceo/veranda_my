@@ -109,7 +109,7 @@ $sections = [
 
 $linkDefs = [
     'tg_group' => ['href' => 'https://t.me/gamezone_vietnam', 'icon' => 'telegram'],
-    'tg_veranda' => ['href' => 'https://t.me/veranda.my', 'icon' => 'telegram'],
+    'tg_veranda' => ['href' => 'https://t.me/Veranda_my', 'icon' => 'telegram'],
     'whatsapp' => ['href' => 'https://wa.me/84396314266', 'icon' => 'whatsapp'],
     'phone' => ['href' => 'tel:+84396314266', 'icon' => 'phone'],
     'menu' => ['href' => '/links/menu.php', 'icon' => 'menu'],
