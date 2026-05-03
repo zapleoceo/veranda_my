@@ -166,7 +166,10 @@
 
     el.replaceChildren(oldSpan, newSpan)
     el.getBoundingClientRect()
-    el.classList.add('is-animating')
+    requestAnimationFrame(() => {
+      if (!document.body.contains(el)) return
+      el.classList.add('is-animating')
+    })
 
     window.setTimeout(() => {
       el.classList.remove('is-animating')
@@ -176,7 +179,7 @@
       el.style.alignItems = prevAlign
       el.textContent = target
       delete el.dataset.i18nBusy
-    }, 240)
+    }, 280)
   }
 
   const applyLang = (lang) => {
