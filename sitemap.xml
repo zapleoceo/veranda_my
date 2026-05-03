@@ -3,7 +3,19 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://veranda.my/links/?lang=ru</loc>
-    <lastmod>2026-05-02</lastmod>
+    <lastmod>2026-05-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/links/?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/links/?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/links/?lang=vi"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://veranda.my/links/?lang=ko"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/links/"/>
+  </url>
+
+  <url>
+    <loc>https://veranda.my/links/</loc>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/links/?lang=ru"/>
@@ -15,7 +27,19 @@
 
   <url>
     <loc>https://veranda.my/links/menu.php?lang=ru</loc>
-    <lastmod>2026-05-02</lastmod>
+    <lastmod>2026-05-03</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/links/menu.php?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/links/menu.php?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/links/menu.php?lang=vi"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://veranda.my/links/menu.php?lang=ko"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/links/menu.php"/>
+  </url>
+
+  <url>
+    <loc>https://veranda.my/links/menu.php</loc>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/links/menu.php?lang=ru"/>
@@ -27,7 +51,18 @@
 
   <url>
     <loc>https://veranda.my/tr3?lang=ru</loc>
-    <lastmod>2026-05-02</lastmod>
+    <lastmod>2026-05-03</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/tr3?lang=ru"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/tr3?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/tr3?lang=vi"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/tr3"/>
+  </url>
+
+  <url>
+    <loc>https://veranda.my/tr3</loc>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/tr3?lang=ru"/>
