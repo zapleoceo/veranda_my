@@ -18,7 +18,7 @@
     <title>Links | Veranda</title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0002">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0003">
 </head>
 <body>
     <div class="auth-float">
@@ -43,15 +43,8 @@
                         <div class="logo"><span>V</span></div>
                         <div>
                             <h1>Veranda</h1>
-                            <div class="subtitle"><?= htmlspecialchars($subtitle) ?></div>
-                            <?php if ($hoursTitle !== '' && ($hoursLine1 !== '' || $hoursLine2 !== '')): ?>
-                                <div class="hours">
-                                    <div class="hours__title"><?= htmlspecialchars($hoursTitle) ?></div>
-                                    <div class="hours__lines">
-                                        <?php if ($hoursLine1 !== ''): ?><div><?= htmlspecialchars($hoursLine1) ?></div><?php endif; ?>
-                                        <?php if ($hoursLine2 !== ''): ?><div><?= htmlspecialchars($hoursLine2) ?></div><?php endif; ?>
-                                    </div>
-                                </div>
+                            <?php if ($subtitle !== ''): ?>
+                                <div class="subtitle"><?= htmlspecialchars($subtitle) ?></div>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -117,6 +110,15 @@
                 </div>
 
                 <footer class="footer">
+                    <?php if ($hoursTitle !== '' && ($hoursLine1 !== '' || $hoursLine2 !== '')): ?>
+                        <div class="hours">
+                            <div class="hours__title"><?= htmlspecialchars($hoursTitle) ?></div>
+                            <div class="hours__lines">
+                                <?php if ($hoursLine1 !== ''): ?><div><?= htmlspecialchars($hoursLine1) ?></div><?php endif; ?>
+                                <?php if ($hoursLine2 !== ''): ?><div><?= htmlspecialchars($hoursLine2) ?></div><?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                     <div>© <?= date('Y') ?> Veranda</div>
                 </footer>
             </div>
@@ -124,6 +126,6 @@
     </main>
 
     <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <script src="/links/links_fx.js?v=20260504_0002" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0003" defer></script>
 </body>
 </html>

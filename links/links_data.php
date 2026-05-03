@@ -4,7 +4,7 @@ $supportedLangs = ['ru', 'en', 'vi', 'ko'];
 
 $i18n = [
     'ru' => [
-        'subtitle' => 'Меню · Бронирование · Контакты',
+        'subtitle' => '',
         'hours' => [
             'title' => 'Время работы',
             'line1' => 'Пн–Чт 10:00–22:00',
@@ -27,7 +27,7 @@ $i18n = [
         ],
     ],
     'en' => [
-        'subtitle' => 'Menu · Reservations · Contacts',
+        'subtitle' => '',
         'hours' => [
             'title' => 'Working hours',
             'line1' => 'Mon–Thu 10:00–22:00',
@@ -50,7 +50,7 @@ $i18n = [
         ],
     ],
     'vi' => [
-        'subtitle' => 'Thực đơn · Đặt bàn · Liên hệ',
+        'subtitle' => '',
         'hours' => [
             'title' => 'Giờ mở cửa',
             'line1' => 'Th 2–Th 5 10:00–22:00',
@@ -73,7 +73,7 @@ $i18n = [
         ],
     ],
     'ko' => [
-        'subtitle' => '메뉴 · 예약 · 연락처',
+        'subtitle' => '',
         'hours' => [
             'title' => '영업시간',
             'line1' => '월–목 10:00–22:00',

@@ -424,6 +424,10 @@ h1 { margin: 0; font-size: 20px; line-height: 1.15; }
     text-align: center;
 }
 
+.footer .hours {
+    margin: 0 auto 14px;
+}
+
 @media (max-width: 840px) {
     .primary-actions { grid-template-columns: 1fr; }
 }
