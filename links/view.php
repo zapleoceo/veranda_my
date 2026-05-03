@@ -18,7 +18,7 @@
     <title>Links | Veranda</title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260503_0002">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260503_0003">
 </head>
 <body>
     <div class="auth-float">
@@ -56,12 +56,16 @@
                         </div>
                     </div>
                     <div class="header-right">
-                        <nav class="lang" aria-label="Language">
-                            <a href="?lang=ru" class="<?= $lang === 'ru' ? 'active' : '' ?>">RU</a>
-                            <a href="?lang=en" class="<?= $lang === 'en' ? 'active' : '' ?>">EN</a>
-                            <a href="?lang=vi" class="<?= $lang === 'vi' ? 'active' : '' ?>">VI</a>
-                            <a href="?lang=ko" class="<?= $lang === 'ko' ? 'active' : '' ?>">KO</a>
-                        </nav>
+                        <details class="lang-menu">
+                            <summary aria-label="Language">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm7.93 9h-3.2a15.7 15.7 0 0 0-1.47-5 8.05 8.05 0 0 1 4.67 5ZM12 4c1.1 0 2.7 2.2 3.4 7H8.6C9.3 6.2 10.9 4 12 4ZM4.07 11a8.05 8.05 0 0 1 4.67-5 15.7 15.7 0 0 0-1.47 5Zm0 2h3.2a15.7 15.7 0 0 0 1.47 5 8.05 8.05 0 0 1-4.67-5ZM12 20c-1.1 0-2.7-2.2-3.4-7h6.8c-.7 4.8-2.3 7-3.4 7Zm3.26-2a15.7 15.7 0 0 0 1.47-5h3.2a8.05 8.05 0 0 1-4.67 5Z"/></svg>
+                            </summary>
+                            <div class="lang-panel">
+                                <?php foreach ($langMenu as $li): ?>
+                                    <a href="?lang=<?= htmlspecialchars($li['code']) ?>" class="<?= $lang === $li['code'] ? 'active' : '' ?>" aria-label="<?= htmlspecialchars($li['label']) ?>"><?= htmlspecialchars($li['label']) ?></a>
+                                <?php endforeach; ?>
+                            </div>
+                        </details>
                     </div>
                 </div>
 
@@ -75,7 +79,9 @@
                                         <div class="icon"><?= $icons[$item['icon']] ?? '' ?></div>
                                         <div class="texts">
                                             <div class="title"><?= htmlspecialchars($item['title']) ?></div>
-                                            <div class="sub"><?= htmlspecialchars($item['subtitle']) ?></div>
+                                            <?php if (!empty($item['subtitle'])): ?>
+                                                <div class="sub"><?= htmlspecialchars($item['subtitle']) ?></div>
+                                            <?php endif; ?>
                                         </div>
                                         <div class="arrow">
                                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.2 5 11.8 6.4 16.4 11H4v2h12.4l-4.6 4.6L13.2 19l8-8Z"/></svg>
@@ -95,6 +101,6 @@
     </main>
 
     <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <script src="/links/links_fx.js?v=20260503_0002" defer></script>
+    <script src="/links/links_fx.js?v=20260503_0003" defer></script>
 </body>
 </html>

@@ -30,6 +30,13 @@ if ($lang === null) {
 if ($lang === null) $lang = 'ru';
 if (!isset($i18n[$lang])) $lang = 'ru';
 
+$langMenu = [
+    ['code' => 'ru', 'label' => 'Русский'],
+    ['code' => 'en', 'label' => 'English'],
+    ['code' => 'vi', 'label' => 'Tiếng Việt'],
+    ['code' => 'ko', 'label' => '한국어'],
+];
+
 $subtitle = (string)($i18n[$lang]['subtitle'] ?? 'Быстрые ссылки');
 $hoursTitle = (string)($i18n[$lang]['hours']['title'] ?? '');
 $hoursLine1 = (string)($i18n[$lang]['hours']['line1'] ?? '');
