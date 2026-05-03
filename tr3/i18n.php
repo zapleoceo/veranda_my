@@ -123,6 +123,7 @@ return [
       'qr_payment_title' => 'Оплата предзаказа',
       'qr_payment_body' => 'Пожалуйста, отсканируйте QR-код для оплаты предзаказа. В назначении платежа уже указан номер вашей брони.',
       'fountain_tooltip' => 'а тут у нас рыбки',
+      'contact_manager' => 'Для связи с менеджером напишите, пожалуйста:',
     ],
     'en' => [
       'page_title' => 'Booking Map',
@@ -244,6 +245,7 @@ return [
       'qr_payment_title' => 'Pre-order Payment',
       'qr_payment_body' => 'Please scan the QR code to pay for your pre-order. The reservation number is already included in the payment description.',
       'fountain_tooltip' => 'and here we have fishes',
+      'contact_manager' => 'To contact our manager, please message:',
     ],
     'vi' => [
       'page_title' => 'Sơ đồ đặt bàn',
@@ -365,6 +367,7 @@ return [
       'qr_payment_title' => 'Thanh toán đặt trước',
       'qr_payment_body' => 'Vui lòng quét mã QR để thanh toán đặt trước. Số đặt bàn của bạn đã được bao gồm trong mô tả thanh toán.',
       'fountain_tooltip' => 'và đây chúng tôi có cá',
+      'contact_manager' => 'Để liên hệ quản lý, vui lòng nhắn tin:',
     ],
     'ko' => [
       'booking_request' => '테이블 예약 요청',

@@ -197,6 +197,9 @@ function tr3_api_submit_booking(array $ctx): void {
     $waSecret = trim((string)($_ENV['WA_NODE_SECRET'] ?? ($_ENV['WA_BRIDGE_SECRET'] ?? '')));
     if ($waSecret === '') api_error(500, $trFor('err_wa_not_configured'));
 
+    $mgrPhone = '+84396314266';
+    $mgrWaLink = 'https://wa.me/84396314266';
+
     $waText = $trFor('tg_thanks_title') . ' ' . $trFor('tg_thanks_body') . "\n\n";
     if ($qrUrl !== '') {
       $waText .= ($trFor('qr_payment_title') ?: 'Оплата предзаказа') . "\n";
@@ -212,12 +215,16 @@ function tr3_api_submit_booking(array $ctx): void {
     $waText .= $trFor('tg_phone') . ': ' . $phoneNorm;
     if ($comment !== '') $waText .= "\n\n" . $trFor('tg_comment') . ":\n" . $comment;
     if ($preorder !== '') $waText .= "\n\n" . $trFor('tg_preorder') . ":\n" . $preorder;
+    $waText .= "\n\n" . $trFor('contact_manager') . ' ' . $mgrPhone . "\n" . $mgrWaLink;
 
     $sent = wa_bridge_send($waPhoneNorm, $waText);
     if (!$sent) api_error(500, $trFor('err_wa_send_failed'));
 
     api_ok(['id' => $resId, 'qr_code' => $qrCode]);
   }
+
+  $mgrPhone = '+84396314266';
+  $mgrWaLink = 'https://wa.me/84396314266';
 
   $userText = '<b>' . htmlspecialchars($trFor('tg_thanks_title')) . '</b> ' . htmlspecialchars($trFor('tg_thanks_body')) . "\n\n";
   if ($qrUrl !== '') {
@@ -241,6 +248,8 @@ function tr3_api_submit_booking(array $ctx): void {
     $userText .= '<b>' . htmlspecialchars($trFor('tg_preorder')) . ':</b>' . "\n" . htmlspecialchars($preorder);
   }
   $userText .= "\n\n" . htmlspecialchars($trFor('booking_note'));
+  $userText .= "\n\n" . htmlspecialchars($trFor('contact_manager')) . ' <b>' . htmlspecialchars($mgrPhone) . '</b>' . "\n";
+  $userText .= '<a href="' . htmlspecialchars($mgrWaLink) . '">WhatsApp</a>';
 
   $ch = curl_init();
   if ($qrUrl !== '') {
