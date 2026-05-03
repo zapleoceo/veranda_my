@@ -18,7 +18,8 @@
 
   let lastMoveTs = performance.now()
   let idle = false
-  let driftT = 0
+  let autoT = 0
+  let autoPhi = 0
   let prevTs = performance.now()
 
   const setTargetFromClient = (clientX, clientY) => {
@@ -57,16 +58,19 @@
     if (idleNow) {
       if (!idle) {
         idle = true
-        driftT = 0
+        rect = hero.getBoundingClientRect()
+        const ux = clamp((baseX / Math.max(1, rect.width)) * 2 - 1, -1, 1)
+        const uy = clamp((baseY / Math.max(1, rect.height)) * 2 - 1, -1, 1)
+        const t0 = Math.asin(ux)
+        const phi0 = Math.asin(uy) - t0 * 0.73
+        autoT = Number.isFinite(t0) ? t0 : 0
+        autoPhi = Number.isFinite(phi0) ? phi0 : 0
       }
 
-      driftT += dt
       rect = hero.getBoundingClientRect()
-      const ampX = Math.min(110, rect.width * 0.06)
-      const ampY = Math.min(90, rect.height * 0.05)
-      const t = driftT * 0.00084
-      x = baseX + Math.sin(t) * ampX
-      y = baseY + Math.sin(t * 0.83) * ampY
+      autoT += dt * 0.00045
+      x = ((Math.sin(autoT) + 1) / 2) * rect.width
+      y = ((Math.sin(autoT * 0.73 + autoPhi) + 1) / 2) * rect.height
     } else {
       idle = false
       x += (targetX - x) * 0.22
