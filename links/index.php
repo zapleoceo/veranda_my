@@ -1,7 +1,7 @@
 <?php
-$supportedLangs = ['ru', 'en', 'vi', 'ko'];
-$lang = null;
+require_once __DIR__ . '/links_data.php';
 
+$lang = null;
 if (isset($_GET['lang'])) {
     $candidate = strtolower(trim((string)$_GET['lang']));
     if (in_array($candidate, $supportedLangs, true)) {
@@ -13,187 +13,81 @@ if (isset($_GET['lang'])) {
         ]);
     }
 }
-
 if ($lang === null) {
     $cookieLang = strtolower(trim((string)($_COOKIE['links_lang'] ?? '')));
-    if (in_array($cookieLang, $supportedLangs, true)) {
-        $lang = $cookieLang;
-    }
+    if (in_array($cookieLang, $supportedLangs, true)) $lang = $cookieLang;
 }
-
 if ($lang === null) {
     $accept = (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '');
     $parts = preg_split('/\s*,\s*/', $accept);
     foreach ($parts as $part) {
-        if ($part === '') {
-            continue;
-        }
+        if ($part === '') continue;
         $code = strtolower(trim(explode(';', $part, 2)[0]));
         $base = explode('-', $code, 2)[0];
-        if (in_array($base, $supportedLangs, true)) {
-            $lang = $base;
-            break;
-        }
+        if (in_array($base, $supportedLangs, true)) { $lang = $base; break; }
     }
 }
+if ($lang === null) $lang = 'ru';
+if (!isset($i18n[$lang])) $lang = 'ru';
 
-if ($lang === null) {
-    $lang = 'ru';
-}
+$subtitle = (string)($i18n[$lang]['subtitle'] ?? 'Быстрые ссылки');
+$metaDescription = $lang === 'ru'
+    ? 'Быстрые ссылки Veranda: меню, бронирование, контакты и карта.'
+    : ($lang === 'vi'
+        ? 'Liên kết nhanh Veranda: thực đơn, đặt bàn, liên hệ và bản đồ.'
+        : ($lang === 'ko'
+            ? 'Veranda 빠른 링크: 메뉴, 예약, 연락처, 지도.'
+            : 'Veranda quick links: menu, booking, contacts and map.'));
+$metaOgDescription = $lang === 'ru'
+    ? 'Быстрые ссылки: меню, бронирование, контакты и карта.'
+    : ($lang === 'vi'
+        ? 'Liên kết nhanh: thực đơn, đặt bàn, liên hệ và bản đồ.'
+        : ($lang === 'ko'
+            ? '빠른 링크: 메뉴, 예약, 연락처, 지도.'
+            : 'Quick links: menu, booking, contacts and map.'));
 
-$t = [
-    'ru' => [
-        'subtitle' => 'Быстрые ссылки',
-        'items' => [
-            ['title' => 'Telegram группа', 'subtitle' => '@gamezone_vietnam'],
-            ['title' => 'Instagram', 'subtitle' => '@veranda.my'],
-            ['title' => 'Онлайн меню', 'subtitle' => 'Сайт'],
-            ['title' => 'Бронирование столика', 'subtitle' => 'Сайт'],
-            ['title' => 'Связаться с директором', 'subtitle' => '@Veranda_my'],
-            ['title' => 'Google Карта', 'subtitle' => 'Как добраться'],
-        ],
-    ],
-    'en' => [
-        'subtitle' => 'Quick links',
-        'items' => [
-            ['title' => 'Telegram group', 'subtitle' => '@gamezone_vietnam'],
-            ['title' => 'Instagram', 'subtitle' => '@veranda.my'],
-            ['title' => 'Online menu', 'subtitle' => 'Website'],
-            ['title' => 'Table Reservation', 'subtitle' => 'Website'],
-            ['title' => 'Contact manager', 'subtitle' => '@Veranda_my'],
-            ['title' => 'Google Maps', 'subtitle' => 'Directions'],
-        ],
-    ],
-    'vi' => [
-        'subtitle' => 'Liên kết nhanh',
-        'items' => [
-            ['title' => 'Nhóm Telegram', 'subtitle' => '@gamezone_vietnam'],
-            ['title' => 'Instagram', 'subtitle' => '@veranda.my'],
-            ['title' => 'Online menu', 'subtitle' => 'Website'],
-            ['title' => 'Đặt bàn', 'subtitle' => 'Website'],
-            ['title' => 'Liên hệ quản lý', 'subtitle' => '@Veranda_my'],
-            ['title' => 'Google Maps', 'subtitle' => 'Chỉ đường'],
-        ],
-    ],
-    'ko' => [
-        'subtitle' => '빠른 링크',
-        'items' => [
-            ['title' => '텔레그램 그룹', 'subtitle' => '@gamezone_vietnam'],
-            ['title' => '인스타그램', 'subtitle' => '@veranda.my'],
-            ['title' => '온라인 메뉴', 'subtitle' => '웹사이트'],
-            ['title' => '테이블 예약', 'subtitle' => '웹사이트'],
-            ['title' => '매니저에게 문의', 'subtitle' => '@Veranda_my'],
-            ['title' => '구글 지도', 'subtitle' => '길찾기'],
-        ],
-    ],
-];
-
-$links = [
-    ['href' => 'https://t.me/gamezone_vietnam', 'icon' => 'telegram'],
-    ['href' => 'https://www.instagram.com/veranda.my', 'icon' => 'instagram'],
-    ['href' => '/links/menu-beta.php', 'icon' => 'menu'],
-    ['href' => '/tr3', 'icon' => 'reserve'],
-    ['href' => 'https://t.me/Veranda_my', 'icon' => 'manager'],
-    ['href' => 'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9', 'icon' => 'map'],
-];
-
-$items = [];
-foreach ($links as $i => $baseItem) {
-    $tr = $t[$lang]['items'][$i] ?? null;
-    if (!$tr) {
-        continue;
-    }
-    $items[] = [
-        'title' => $tr['title'],
-        'subtitle' => $tr['subtitle'],
-        'href' => $baseItem['href'],
-        'icon' => $baseItem['icon']
-    ];
-}
+$canonicalUrl = 'https://veranda.my/links/' . ($lang ? ('?lang=' . urlencode($lang)) : '');
 
 $icons = [
     'telegram' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 15.6 9.2 19c.6 0 .9-.2 1.3-.6l3.1-3 6.4 4.6c1.2.7 2 .3 2.3-1.1l4.1-19.1c.4-1.7-.7-2.4-1.9-1.9L1.2 9.2c-1.6.6-1.6 1.5-.3 1.9l6 1.9L20.2 4c.7-.4 1.3-.2.8.3Z"/></svg>',
-    'instagram' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 2h9.6A5.2 5.2 0 0 1 22 7.2v9.6A5.2 5.2 0 0 1 16.8 22H7.2A5.2 5.2 0 0 1 2 16.8V7.2A5.2 5.2 0 0 1 7.2 2Zm0 2A3.2 3.2 0 0 0 4 7.2v9.6A3.2 3.2 0 0 0 7.2 20h9.6A3.2 3.2 0 0 0 20 16.8V7.2A3.2 3.2 0 0 0 16.8 4Zm4.8 3.5A4.5 4.5 0 1 1 7.5 12 4.5 4.5 0 0 1 12 7.5Zm0 2A2.5 2.5 0 1 0 14.5 12 2.5 2.5 0 0 0 12 9.5ZM17.3 6.7a1 1 0 1 1-1 1 1 1 0 0 1 1-1Z"/></svg>',
+    'whatsapp' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.1 3.9A11.8 11.8 0 0 0 12 0 12 12 0 0 0 1.6 17.6L0 24l6.6-1.6A12 12 0 0 0 24 12a11.8 11.8 0 0 0-3.9-8.1ZM12 21.9a10 10 0 0 1-5.1-1.4l-.4-.2-3.9 1 1-3.8-.2-.4A10 10 0 1 1 12 21.9Zm5.8-7.4c-.3-.2-1.8-.9-2.1-1s-.5-.2-.7.2-.8 1-.9 1.2-.3.2-.6.1a8.2 8.2 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6a2.3 2.3 0 0 0 .3-.5.6.6 0 0 0 0-.5c0-.2-.7-1.7-1-2.3s-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.8 3.8 0 0 0-1.2 2.8 6.5 6.5 0 0 0 1.4 3.4 14.8 14.8 0 0 0 5.7 5 6.8 6.8 0 0 0 3.3.9 3.2 3.2 0 0 0 2.1-.9 2.6 2.6 0 0 0 .6-1.9c0-.2-.2-.3-.5-.4Z"/></svg>',
+    'facebook' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H8v-3h2.4V9.7c0-2.4 1.4-3.7 3.6-3.7 1 0 2 .2 2 .2v2.3h-1.1c-1.1 0-1.4.7-1.4 1.4V12H18l-.5 3h-2.4v7A10 10 0 0 0 22 12Z"/></svg>',
     'menu' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l3 3v17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V6h2.5ZM7 9h8v2H7Zm0 4h10v2H7Zm0 4h10v2H7Z"/></svg>',
     'reserve' => '<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M1 5h2v8h3v8H4v-6H3v6H1Zm20 0h2v16h-2v-6h-1v6h-2v-8h3V5ZM8 12h8a1 1 0 0 1 1 1v1H7v-1a1 1 0 0 1 1-1Zm3 2h2v6h-2Zm-2 6h6v1H9Zm-1-8c0-2.21 1.79-4 4-4s4 1.79 4 4Zm3.5-6h1v2h-1Z"/></svg>',
-    'manager' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/><path d="M20 8h2v6h-2zM2 8h2v6H2z"/></svg>',
+    'director' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/><path d="M20 8h2v6h-2zM2 8h2v6H2z"/></svg>',
     'map' => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 14.5 9 2.5 2.5 0 0 1 12 11.5Z"/></svg>',
 ];
-?>
-<!doctype html>
-<html lang="<?= htmlspecialchars($lang) ?>">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
-    <meta name="description" content="<?= htmlspecialchars($lang === 'ru' ? 'Быстрые ссылки Veranda: меню, бронирование, контакты и карта.' : ($lang === 'vi' ? 'Liên kết nhanh Veranda: thực đơn, đặt bàn, liên hệ và bản đồ.' : ($lang === 'ko' ? 'Veranda 빠른 링크: 메뉴, 예약, 연락처, 지도.' : 'Veranda quick links: menu, booking, contacts and map.'))) ?>">
-    <link rel="canonical" href="https://veranda.my/links/<?= $lang ? ('?lang=' . urlencode($lang)) : '' ?>">
-    <meta property="og:site_name" content="Veranda">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Links | Veranda">
-    <meta property="og:description" content="<?= htmlspecialchars($lang === 'ru' ? 'Быстрые ссылки: меню, бронирование, контакты и карта.' : ($lang === 'vi' ? 'Liên kết nhanh: thực đơn, đặt bàn, liên hệ và bản đồ.' : ($lang === 'ko' ? '빠른 링크: 메뉴, 예약, 연락처, 지도.' : 'Quick links: menu, booking, contacts and map.'))) ?>">
-    <meta property="og:url" content="https://veranda.my/links/<?= $lang ? ('?lang=' . urlencode($lang)) : '' ?>">
-    <meta property="og:image" content="https://veranda.my/tr3/assets/og-image.svg">
-    <meta name="twitter:card" content="summary_large_image">
-    <title>Links | Veranda</title>
-        <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
-  <link rel="stylesheet" href="/assets/css/common.css">
-  <link rel="stylesheet" href="/assets/css/links_index.css">
-</head>
-<body>
-    <div class="auth-float">
-        <a class="auth-btn" href="/dashboard.php" title="Войти" aria-label="Войти">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14a4 4 0 1 1 3.9-5H22v3h-2v2h-3v-2h-2v2h-3.1A4 4 0 0 1 7 14Zm0-6a2 2 0 1 0 2 2 2 2 0 0 0-2-2ZM2 20v-2h20v2Z"/></svg>
-        </a>
-    </div>
-    <div class="wrap">
-        <div class="header">
-            <div class="brand">
-                <div class="logo"><span>V</span></div>
-                <div>
-                    <h1>Veranda</h1>
-                    <div class="subtitle"><?= htmlspecialchars($t[$lang]['subtitle'] ?? 'Быстрые ссылки') ?></div>
-                </div>
-            </div>
-            <div class="header-right">
-                <div class="lang" aria-label="Language">
-                    <a href="?lang=ru" class="<?= $lang === 'ru' ? 'active' : '' ?>">RU</a>
-                    <a href="?lang=en" class="<?= $lang === 'en' ? 'active' : '' ?>">EN</a>
-                    <a href="?lang=vi" class="<?= $lang === 'vi' ? 'active' : '' ?>">VI</a>
-                    <a href="?lang=ko" class="<?= $lang === 'ko' ? 'active' : '' ?>">KO</a>
-                </div>
-            </div>
-        </div>
 
-        <div class="grid">
-            <?php foreach ($items as $item): ?>
-                <a class="card" href="<?= htmlspecialchars($item['href']) ?>" target="_blank" rel="noopener noreferrer">
-                    <div class="icon"><?= $icons[$item['icon']] ?? '' ?></div>
-                    <div class="texts">
-                        <div class="title"><?= htmlspecialchars($item['title']) ?></div>
-                        <div class="sub"><?= htmlspecialchars($item['subtitle']) ?></div>
-                    </div>
-                    <div class="arrow">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.2 5 11.8 6.4 16.4 11H4v2h12.4l-4.6 4.6L13.2 19l8-8Z"/></svg>
-                    </div>
-                </a>
-            <?php endforeach; ?>
-        </div>
+$sectionView = [];
+foreach ($sections as $sectionKey => $keys) {
+    $secTitle = (string)($i18n[$lang]['sections'][$sectionKey] ?? $sectionKey);
+    $secItems = [];
+    foreach ($keys as $k) {
+        $tr = $i18n[$lang]['items'][$k] ?? null;
+        $def = $linkDefs[$k] ?? null;
+        if (!$tr || !$def) continue;
+        $secItems[] = [
+            'title' => $tr['title'],
+            'subtitle' => $tr['subtitle'],
+            'href' => $def['href'],
+            'icon' => $def['icon'],
+        ];
+    }
+    if ($secItems) $sectionView[] = ['key' => $sectionKey, 'title' => $secTitle, 'items' => $secItems];
+}
 
-        <div class="footer">
-            <div>© <?= date('Y') ?> Veranda</div>
-        </div>
-    </div>
-    <script type="application/ld+json"><?= json_encode([
-        '@context' => 'https://schema.org',
-        '@type' => 'Restaurant',
-        'name' => 'Veranda',
-        'url' => 'https://veranda.my/links/',
-        'sameAs' => [
-            'https://t.me/gamezone_vietnam',
-            'https://www.instagram.com/veranda.my',
-            'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9'
-        ],
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-</body>
-</html>
+$jsonLd = [
+    '@context' => 'https://schema.org',
+    '@type' => 'Restaurant',
+    'name' => 'Veranda',
+    'url' => 'https://veranda.my/links/',
+    'sameAs' => [
+        $linkDefs['tg_group']['href'],
+        $linkDefs['tg_veranda']['href'],
+        $linkDefs['whatsapp']['href'],
+        $linkDefs['facebook']['href'],
+        $linkDefs['map']['href'],
+    ],
+];
+
+require_once __DIR__ . '/view.php';
