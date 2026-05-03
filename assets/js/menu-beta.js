@@ -146,8 +146,11 @@
     bind() {
       for (const a of dom.panelLinks) {
         a.addEventListener('click', (e) => {
-          if (a.classList.contains('active')) return
           e.preventDefault()
+          if (a.classList.contains('active')) {
+            if (dom.details) dom.details.open = false
+            return
+          }
           if (dom.details) dom.details.open = false
           controller.loadLang(a.getAttribute('href') || '')
         })
