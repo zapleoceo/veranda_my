@@ -78,6 +78,7 @@ foreach ($sections as $sectionKey => $keys) {
         $def = $linkDefs[$k] ?? null;
         if (!$tr || !$def) continue;
         $secItems[] = [
+            'key' => $k,
             'title' => $tr['title'],
             'subtitle' => $tr['subtitle'],
             'href' => $def['href'],

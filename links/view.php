@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0016">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0017">
 </head>
 <body>
     <main class="links-page">
@@ -63,7 +63,7 @@
                                 <div class="primary-actions">
                                     <?php foreach ($section['items'] as $item): ?>
                                         <?php $external = (string)($item['href'] ?? '') !== '' && (string)($item['href'])[0] !== '/'; ?>
-                                        <a class="primary-btn" href="<?= htmlspecialchars($item['href']) ?>" <?= $external ? 'target="_blank" rel="noopener noreferrer"' : '' ?>>
+                                        <a class="primary-btn" href="<?= htmlspecialchars($item['href']) ?>" data-key="<?= htmlspecialchars((string)($item['key'] ?? '')) ?>" <?= $external ? 'target="_blank" rel="noopener noreferrer"' : '' ?>>
                                             <div class="primary-icon"><?= $icons[$item['icon']] ?? '' ?></div>
                                             <div class="primary-text">
                                                 <div class="primary-title"><?= htmlspecialchars($item['title']) ?></div>
@@ -86,7 +86,7 @@
                                 <div class="links-cards">
                                     <?php foreach ($section['items'] as $item): ?>
                                         <?php $external = (string)($item['href'] ?? '') !== '' && (string)($item['href'])[0] !== '/'; ?>
-                                        <a class="card" href="<?= htmlspecialchars($item['href']) ?>" <?= $external ? 'target="_blank" rel="noopener noreferrer"' : '' ?>>
+                                        <a class="card" href="<?= htmlspecialchars($item['href']) ?>" data-key="<?= htmlspecialchars((string)($item['key'] ?? '')) ?>" <?= $external ? 'target="_blank" rel="noopener noreferrer"' : '' ?>>
                                             <div class="icon"><?= $icons[$item['icon']] ?? '' ?></div>
                                             <div class="texts">
                                                 <div class="title"><?= htmlspecialchars($item['title']) ?></div>
@@ -122,6 +122,6 @@
     </main>
 
     <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <script src="/links/links_fx.js?v=20260504_0016" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0017" defer></script>
 </body>
 </html>
