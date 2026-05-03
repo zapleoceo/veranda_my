@@ -21,15 +21,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0009">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0010">
 </head>
 <body>
-    <div class="auth-float">
-        <a class="auth-btn" href="/dashboard.php" title="Войти" aria-label="Войти">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14a4 4 0 1 1 3.9-5H22v3h-2v2h-3v-2h-2v2h-3.1A4 4 0 0 1 7 14Zm0-6a2 2 0 1 0 2 2 2 2 0 0 0-2-2ZM2 20v-2h20v2Z"/></svg>
-        </a>
-    </div>
-
     <main class="links-page">
         <header class="links-hero">
             <div class="links-hero__bg" aria-hidden="true">
@@ -128,6 +122,6 @@
     </main>
 
     <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <script src="/links/links_fx.js?v=20260504_0009" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0010" defer></script>
 </body>
 </html>
