@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="slides-format" content="viewport">
+    <title>IT STEP × AI — Стратегия</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <style type="text/tailwindcss">
+        @theme {
+            --color-bg: #0a0f1e;
+            --color-bg-deep: #060b16;
+            --color-surface: #111827;
+            --color-text: #f0f6ff;
+            --color-text-secondary: #b8cfea;
+            --color-text-muted: #607a99;
+            --color-accent-1: #3b82f6;
+            --color-accent-2: #f59e0b;
+            --color-accent-3: #60a5fa;
+            --color-glass-bg: rgba(255,255,255,0.05);
+            --color-glass-border: rgba(255,255,255,0.09);
+            --color-vignette: rgba(0,0,0,0.45);
+            --font-display: 'Instrument Serif', serif;
+            --font-body: 'DM Sans', sans-serif;
+        }
+    </style>
+
+    <style>
+        :root { --color-bg: #0a0f1e; --color-text: #f0f6ff; --glow-color-rgb: 59,130,246; }
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { background: var(--color-bg); margin: 0; }
+        body { font-family: var(--font-body); color: var(--color-text); overflow: hidden; height: 100vh; width: 100vw; }
+        .deck { width: 100vw; height: 100vh; position: relative; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--color-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transform: scale(0.95); transition: opacity 0.7s ease, transform 0.7s ease; pointer-events: none; overflow: hidden; }
+        .slide.active { opacity: 1; transform: scale(1); pointer-events: all; }
+        .slide > .content { position: relative; z-index: 2; width: 100%; max-width: 1100px; padding: clamp(1.5rem, 3.5vw, 3.5rem); }
+        .nav-controls { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; z-index: 100; background: var(--color-glass-bg); backdrop-filter: blur(10px); padding: 8px 22px; border-radius: 40px; border: 1px solid var(--color-glass-border); }
+        .nav-btn { width: 36px; height: 36px; border: none; background: var(--color-glass-bg); color: var(--color-accent-1); border-radius: 50%; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.3s; }
+        .nav-btn:hover { background: var(--color-glass-border); }
+        .slide-dots { display: flex; gap: 7px; }
+        .slide-dots .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-glass-border); cursor: pointer; transition: background 0.3s, transform 0.3s; }
+        .slide-dots .dot.active { background: var(--color-accent-1); transform: scale(1.3); }
+        .slide-counter { font-size: 0.75rem; color: var(--color-text-muted); min-width: 36px; text-align: center; }
+        .reveal { opacity: 0; transform: translateY(18px); }
+
+        .text-glow { text-shadow: 0 0 20px rgba(59,130,246,0.5), 0 0 40px rgba(59,130,246,0.2); }
+        .stat-glow { text-shadow: 0 0 28px rgba(245,158,11,0.6), 0 0 55px rgba(245,158,11,0.25); }
+        @keyframes float-slow { 0%{transform:translate(0,0) scale(1)} 25%{transform:translate(55px,-45px) scale(1.1)} 50%{transform:translate(-35px,35px) scale(0.92)} 75%{transform:translate(45px,18px) scale(1.07)} 100%{transform:translate(0,0) scale(1)} }
+        @keyframes float-drift { 0%{transform:translate(0,0) scale(1) rotate(0deg)} 33%{transform:translate(-45px,-55px) scale(1.13) rotate(3deg)} 66%{transform:translate(38px,28px) scale(0.9) rotate(-2deg)} 100%{transform:translate(0,0) scale(1) rotate(0deg)} }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes glow-pulse { 0%,100%{text-shadow:0 0 20px rgba(59,130,246,0.5),0 0 40px rgba(59,130,246,0.2)} 50%{text-shadow:0 0 30px rgba(59,130,246,0.8),0 0 60px rgba(59,130,246,0.3)} }
+        .gradient-mesh { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+        .blob { position: absolute; border-radius: 50%; filter: blur(80px); animation: float-slow 10s ease-in-out infinite; }
+        .blob:nth-child(2) { animation: float-drift 14s ease-in-out infinite; }
+        .blob:nth-child(3) { animation: float-slow 18s ease-in-out infinite reverse; }
+        .slide::before { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); background-repeat:repeat; background-size:256px 256px; opacity:0.03; mix-blend-mode:overlay; }
+        .slide::after { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background:radial-gradient(ellipse at center, transparent 50%, var(--color-vignette) 100%); }
+
+        .bar-fill { border-radius: 0 4px 4px 0; transition: width 0.7s ease; }
+        .bar-track { background: rgba(255,255,255,0.07); border-radius: 4px; overflow: hidden; height: 22px; }
+
+        @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:0.01ms !important; transition-duration:0.2s !important; } }
+    </style>
+</head>
+<body>
+
+<div class="mouse-spotlight" style="position:fixed;inset:0;z-index:99;pointer-events:none;"></div>
+
+<div class="deck">
+
+<!-- SLIDE 1: TITLE -->
+<div class="slide active" data-slide="1">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:500px;height:500px;top:-120px;right:-100px;background:var(--color-accent-1);opacity:0.14;"></div>
+        <div class="blob" style="width:320px;height:320px;bottom:-80px;left:-60px;background:var(--color-accent-2);opacity:0.11;"></div>
+        <div class="blob" style="width:220px;height:220px;top:40%;left:12%;background:var(--color-accent-3);opacity:0.09;"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content text-center">
+        <div style="display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:14px 28px;margin-bottom:1.8rem;animation:float 3s ease-in-out infinite;" class="reveal">
+            <img src="https://pplx-res.cloudinary.com/image/upload/pplx_search_images/762e71e9283cbec5716d3b38fec64ffa27031240.jpg" alt="IT STEP Academy" style="height:56px;object-fit:contain;filter:brightness(0) invert(1);">
+        </div>
+        <h1 class="font-display text-[clamp(2.4rem,5.5vw,4.4rem)] font-black bg-linear-to-br from-accent-1 via-accent-3 to-accent-2 bg-clip-text text-transparent tracking-tight mb-4 reveal" style="line-height:1.15;">AI-бонус для выпускников<br>как новое конкурентное преимущество</h1>
+        <p class="text-[clamp(0.85rem,1.4vw,1.2rem)] font-light text-text-muted tracking-[5px] uppercase reveal">Стратегия партнёрства с AI-вендорами · 2026</p>
+        <div class="reveal" style="margin-top:2rem;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+            <span style="background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.25);border-radius:20px;padding:6px 18px;font-size:0.78rem;color:var(--color-accent-3);">Питч для директора по маркетингу</span>
+            <span style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:20px;padding:6px 18px;font-size:0.78rem;color:var(--color-accent-2);">Международная экспансия IT STEP</span>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 2: ТРЕНД — УНИВЕРСИТЕТЫ РАЗДАЮТ AI -->
+<div class="slide" data-slide="2">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:380px;height:380px;top:-80px;right:-80px;background:var(--color-accent-1);opacity:0.09;"></div>
+        <div class="blob" style="width:260px;height:260px;bottom:-60px;left:-40px;background:var(--color-accent-2);opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <p class="uppercase tracking-[4px] text-accent-2 text-xs mb-3 reveal font-body">Мировой тренд · 2026</p>
+        <h2 class="font-display text-[clamp(1.8rem,4vw,2.8rem)] font-bold reveal mb-2">Топ-университеты уже дают AI всем студентам</h2>
+        <p class="text-text-secondary text-sm mb-6 reveal">Это не будущее — это происходит прямо сейчас. Школы без AI-стека проигрывают в конкурентной борьбе за студентов.</p>
+        <div class="grid grid-cols-2 gap-4 reveal" style="gap:16px;">
+            <div style="background:var(--color-glass-bg);backdrop-filter:blur(12px);border:1px solid var(--color-glass-border);border-radius:12px;padding:18px;border-left:3px solid var(--color-accent-1);">
+                <div style="font-size:1.1rem;font-weight:700;color:var(--color-accent-1);">Univ. of Manchester</div>
+                <div style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;">Microsoft 365 Copilot — всем 65 000 студентам и сотрудникам. Первый вуз в мире с полным охватом.</div>
+            </div>
+            <div style="background:var(--color-glass-bg);backdrop-filter:blur(12px);border:1px solid var(--color-glass-border);border-radius:12px;padding:18px;border-left:3px solid var(--color-accent-2);">
+                <div style="font-size:1.1rem;font-weight:700;color:var(--color-accent-2);">NTU Singapore</div>
+                <div style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;">Gemini Enterprise + Google AI Studio + Vertex AI — все 33 000 студентов, с авг. 2026. AI в 40% курсов к 2030.</div>
+            </div>
+            <div style="background:var(--color-glass-bg);backdrop-filter:blur(12px);border:1px solid var(--color-glass-border);border-radius:12px;padding:18px;border-left:3px solid var(--color-accent-3);">
+                <div style="font-size:1.1rem;font-weight:700;color:var(--color-accent-3);">Univ. of Georgia</div>
+                <div style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;">$800 000 пилот: ChatGPT Edu + Gemini Pro для тысяч студентов. Цель — конкурентоспособность на рынке труда.</div>
+            </div>
+            <div style="background:var(--color-glass-bg);backdrop-filter:blur(12px);border:1px solid var(--color-glass-border);border-radius:12px;padding:18px;border-left:3px solid #a78bfa;">
+                <div style="font-size:1.1rem;font-weight:700;color:#a78bfa;">OpenAI → 700 000+ лицензий</div>
+                <div style="font-size:0.8rem;color:var(--color-text-secondary);margin-top:4px;">ChatGPT Edu — 35 универов США, ~$2/студент/мес. оптом. California State Univ: $15 млн/год на 500 000 человек.</div>
+            </div>
+        </div>
+        <p class="text-text-muted text-xs mt-4 reveal">Вывод: AI-доступ из бонуса превратился в базовое ожидание студента. IT STEP может быть первой школой такого уровня в своём регионе.</p>
+    </div>
+</div>
+
+<!-- SLIDE 3: ЧТО ДАЮТ КОНКУРЕНТЫ ВЫПУСКНИКАМ -->
+<div class="slide" data-slide="3">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:400px;height:400px;top:-90px;left:-80px;background:var(--color-accent-2);opacity:0.08;"></div>
+        <div class="blob" style="width:280px;height:280px;bottom:-50px;right:-40px;background:var(--color-accent-1);opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <p class="uppercase tracking-[4px] text-accent-1 text-xs mb-3 reveal">Конкуренты · бенчмарк</p>
+        <h2 class="font-display text-[clamp(1.6rem,3.5vw,2.5rem)] font-bold reveal mb-5">Что делают лучшие школы после выпуска</h2>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            <div class="reveal" style="display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:start;background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px 18px;">
+                <div style="font-weight:700;color:var(--color-accent-2);font-size:0.95rem;">Le Wagon</div>
+                <div style="font-size:0.82rem;color:var(--color-text-secondary);">Пожизненный доступ к материалам + AI-инструменты Huntr & EnhanCV бесплатно для поиска работы + 32 000 алумни-сеть + карьер-коучинг после выпуска.</div>
+            </div>
+            <div class="reveal" style="display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:start;background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px 18px;">
+                <div style="font-weight:700;color:var(--color-accent-1);font-size:0.95rem;">General Assembly</div>
+                <div style="font-size:0.82rem;color:var(--color-text-secondary);">Prentus AI бесплатно (трекер вакансий, resume AI, LinkedIn AI) + приоритетный доступ на AI-воркшопы + 100 000+ алумни + 25% скидка на все курсы.</div>
+            </div>
+            <div class="reveal" style="display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:start;background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px 18px;">
+                <div style="font-weight:700;color:var(--color-accent-3);font-size:0.95rem;">TripleTen</div>
+                <div style="font-size:0.82rem;color:var(--color-text-secondary);">Пожизненный доступ к экстернатам (реальные проекты) + AI-инструменты для поиска работы + 3 сессии карьер-коучинга в год бессрочно. Job guarantee: возврат 100% при незачислении.</div>
+            </div>
+            <div class="reveal" style="display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:start;background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px 18px;">
+                <div style="font-weight:700;color:#a78bfa;font-size:0.95rem;">BrainStation</div>
+                <div style="font-size:0.82rem;color:var(--color-text-secondary);">AI-воркшопы для алумни (AI Agents, AI Evals, AI для PM) + доступ к глобальной сети Spotify/Uber/Amazon партнёров. Рейтинг 4.7/5.</div>
+            </div>
+        </div>
+        <div class="reveal" style="margin-top:14px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:12px 16px;">
+            <span style="color:var(--color-accent-2);font-weight:600;font-size:0.85rem;">💡 Разрыв IT STEP:</span>
+            <span style="font-size:0.82rem;color:var(--color-text-secondary);"> конкуренты дают career-AI-инструменты. IT STEP может пойти дальше — дать профессиональные AI-инструменты (Copilot, Cursor, Perplexity), которыми выпускники реально работают в индустрии.</span>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 4: 5 КЕЙСОВ AI В ОБУЧЕНИИ И РАБОТЕ -->
+<div class="slide" data-slide="4">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:350px;height:350px;top:-70px;right:-70px;background:var(--color-accent-3);opacity:0.08;"></div>
+        <div class="blob" style="width:250px;height:250px;bottom:-50px;left:-30px;background:var(--color-accent-1);opacity:0.07;"></div>
+    </div>
+    <canvas class="particle-canvas-ambient" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content">
+        <p class="uppercase tracking-[4px] text-accent-3 text-xs mb-3 reveal">5 ключевых кейсов</p>
+        <h2 class="font-display text-[clamp(1.5rem,3.2vw,2.3rem)] font-bold reveal mb-4">AI на каждом этапе пути — от учёбы до работы</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="reveal" style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px 16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <span style="font-size:1.5rem;">📱</span>
+                    <span style="font-weight:700;font-size:0.9rem;color:var(--color-accent-1);">Учёба в маршрутке</span>
+                </div>
+                <div style="font-size:0.78rem;color:var(--color-text-secondary);">ChatGPT / Perplexity в браузере телефона — объясняет концепт, генерирует мини-задачи, проверяет ответы. Открыл ноутбук дома — та же сессия, контекст сохранён. Никакой привязки к классу или ПК.</div>
+            </div>
+            <div class="reveal" style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px 16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <span style="font-size:1.5rem;">🤖</span>
+                    <span style="font-weight:700;font-size:0.9rem;color:var(--color-accent-2);">AI-ассистент разработчика</span>
+                </div>
+                <div style="font-size:0.78rem;color:var(--color-text-secondary);">GitHub Copilot / Cursor пишет код прямо в редакторе. Студент ставит задачу в чат → получает код → пушит → деплоит — всё без переключения контекста. IBM: 85% принятых предложений, продуктивность +45%.</div>
+            </div>
+            <div class="reveal" style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px 16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <span style="font-size:1.5rem;">🐛</span>
+                    <span style="font-weight:700;font-size:0.9rem;color:var(--color-accent-3);">Дебаггинг за секунды</span>
+                </div>
+                <div style="font-size:0.78rem;color:var(--color-text-secondary);">Вставил сломанный код в Cursor/Claude — AI объясняет ошибку, предлагает фикс, пишет тест. Для студента это 24/7 ментор по синтаксису и логике без очереди к преподавателю.</div>
+            </div>
+            <div class="reveal" style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px 16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <span style="font-size:1.5rem;">💼</span>
+                    <span style="font-weight:700;font-size:0.9rem;color:#a78bfa;">Портфолио после выпуска</span>
+                </div>
+                <div style="font-size:0.78rem;color:var(--color-text-secondary);">AI помогает закончить пет-проект, добавить фичи, написать README и задеплоить. Выпускник приходит на собеседование не с пустым GitHub, а с реальными проектами — 6 месяцев AI-доступа превращаются в карьерный старт.</div>
+            </div>
+        </div>
+        <div class="reveal" style="margin-top:12px;background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px 16px;display:flex;align-items:start;gap:10px;">
+            <span style="font-size:1.5rem;">🎯</span>
+            <div>
+                <span style="font-weight:700;font-size:0.9rem;color:var(--color-accent-2);">Маркетинг, дизайн, аналитика</span>
+                <div style="font-size:0.78rem;color:var(--color-text-secondary);margin-top:4px;">AI-инструменты работают не только для программистов. Маркетолог — Perplexity для ресёрча, ChatGPT для копирайтинга, Canva AI для дизайна. Аналитик — ChatGPT Code Interpreter для работы с данными. Весь стек — через браузер.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 5: СТОИМОСТЬ И МОДЕЛЬ -->
+<div class="slide" data-slide="5">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:420px;height:420px;top:-100px;right:-90px;background:var(--color-accent-2);opacity:0.09;"></div>
+        <div class="blob" style="width:280px;height:280px;bottom:-60px;left:-50px;background:var(--color-accent-1);opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <p class="uppercase tracking-[4px] text-accent-2 text-xs mb-3 reveal">Финансовая модель</p>
+        <h2 class="font-display text-[clamp(1.5rem,3.2vw,2.3rem)] font-bold reveal mb-5">Сколько стоит и что получает школа</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div>
+                <p class="reveal" style="font-size:0.8rem;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:3px;margin-bottom:10px;">Розничная vs оптовая цена</p>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <div class="reveal" style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:8px;padding:12px 14px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:0.82rem;font-weight:600;">GitHub Copilot Pro</span>
+                            <span style="color:var(--color-accent-2);font-weight:700;font-size:0.9rem;">$10/мес → бесплатно для студентов</span>
+                        </div>
+                        <div style="font-size:0.72rem;color:var(--color-text-muted);margin-top:3px;">Верифицированным студентам через GitHub Education — 0$. Школам — оптовый канал.</div>
+                    </div>
+                    <div class="reveal" style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:8px;padding:12px 14px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:0.82rem;font-weight:600;">Perplexity Education Pro</span>
+                            <span style="color:var(--color-accent-1);font-weight:700;font-size:0.9rem;">$10/мес (−50%)</span>
+                        </div>
+                        <div style="font-size:0.72rem;color:var(--color-text-muted);margin-top:3px;">Образовательным орг: Enterprise Pro $30/сиденье/мес вместо $40. По верификации SheerID.</div>
+                    </div>
+                    <div class="reveal" style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:8px;padding:12px 14px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:0.82rem;font-weight:600;">ChatGPT Edu (оптом)</span>
+                            <span style="color:#a78bfa;font-weight:700;font-size:0.9rem;">~$2/студент/мес</span>
+                        </div>
+                        <div style="font-size:0.72rem;color:var(--color-text-muted);margin-top:3px;">OpenAI даёт вузам bulk licensing в 10× дешевле розницы. CSU: $15M/год на 500K человек = $2.50/чел/мес.</div>
+                    </div>
+                    <div class="reveal" style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:8px;padding:12px 14px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:0.82rem;font-weight:600;">Cursor Pro</span>
+                            <span style="color:var(--color-accent-3);font-weight:700;font-size:0.9rem;">$20/мес → edu пилот</span>
+                        </div>
+                        <div style="font-size:0.72rem;color:var(--color-text-muted);margin-top:3px;">Нет готовой edu-программы, но есть student verification. Пилот на когорту — переговорная позиция.</div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <p class="reveal" style="font-size:0.8rem;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:3px;margin-bottom:10px;">Расчёт на 100 выпускников / 6 мес</p>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <div class="reveal" style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.15);border-radius:8px;padding:12px 14px;">
+                        <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">Розничная стоимость для 100 чел.</div>
+                        <div style="font-size:0.75rem;color:var(--color-text-secondary);">Copilot: $10 × 100 × 6 = <b style="color:var(--color-accent-2);">$6 000</b></div>
+                        <div style="font-size:0.75rem;color:var(--color-text-secondary);">Perplexity Pro: $20 × 100 × 6 = <b style="color:var(--color-accent-2);">$12 000</b></div>
+                        <div style="font-size:0.75rem;color:var(--color-text-secondary);">ChatGPT Plus: $20 × 100 × 6 = <b style="color:var(--color-accent-2);">$12 000</b></div>
+                        <div style="font-size:0.78rem;color:var(--color-text-muted);margin-top:6px;">Итого розница: <span style="color:var(--color-accent-2);font-weight:700;">$30 000</span></div>
+                    </div>
+                    <div class="reveal" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:12px 14px;">
+                        <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">Оптовая / edu стоимость</div>
+                        <div style="font-size:0.75rem;color:var(--color-text-secondary);">Copilot: через GitHub Education = <b style="color:var(--color-accent-1);">$0</b> (free verified)</div>
+                        <div style="font-size:0.75rem;color:var(--color-text-secondary);">Perplexity edu: $10 × 100 × 6 = <b style="color:var(--color-accent-1);">$6 000</b></div>
+                        <div style="font-size:0.75rem;color:var(--color-text-secondary);">ChatGPT Edu: ~$2.50 × 100 × 6 = <b style="color:var(--color-accent-1);">$1 500</b></div>
+                        <div style="font-size:0.78rem;color:var(--color-text-muted);margin-top:6px;">Итого оптом: <span style="color:var(--color-accent-1);font-weight:700;">~$7 500</span></div>
+                    </div>
+                    <div class="reveal" style="background:rgba(96,165,250,0.07);border:1px solid rgba(96,165,250,0.15);border-radius:8px;padding:10px 14px;">
+                        <div style="font-size:0.78rem;color:var(--color-text-secondary);">Воспринимаемая ценность выпускником: <span style="color:var(--color-accent-3);font-weight:700;">$300 / человек</span> (6 мес × $50 розница). Реальная стоимость для школы: <span style="color:var(--color-accent-2);font-weight:700;">$75 / человек</span> оптом.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 6: ПРЕДЛОЖЕНИЕ + ФИНАЛЬНЫЙ МЕССЕДЖ -->
+<div class="slide" data-slide="6">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:500px;height:500px;top:-120px;right:-100px;background:var(--color-accent-1);opacity:0.13;"></div>
+        <div class="blob" style="width:320px;height:320px;bottom:-80px;left:-60px;background:var(--color-accent-2);opacity:0.1;"></div>
+        <div class="blob" style="width:200px;height:200px;top:35%;left:10%;background:var(--color-accent-3);opacity:0.08;"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content">
+        <p class="uppercase tracking-[4px] text-accent-2 text-xs mb-3 reveal text-center">Предложение для директора по маркетингу</p>
+        <h2 class="font-display text-[clamp(1.7rem,3.8vw,2.7rem)] font-bold reveal mb-5 text-center">Один слайд. Одно решение.</h2>
+        <div style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);border-radius:14px;padding:20px 24px;margin-bottom:16px;" class="reveal">
+            <p style="font-size:clamp(1rem,2vw,1.25rem);font-weight:600;color:var(--color-text);line-height:1.55;font-family:var(--font-display);font-style:italic;">"Учись на тех же AI-инструментах, которыми пользуется индустрия — и сохраняй доступ к ним ещё 6 месяцев после выпуска, работая с телефона, ноутбука или любого браузера."</p>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;" class="reveal">
+            <div style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:1.8rem;font-weight:900;color:var(--color-accent-2);" data-count="4" data-suffix="×">4×</div>
+                <div style="font-size:0.75rem;color:var(--color-text-secondary);margin-top:4px;">больше воспринимаемая ценность vs реальная стоимость ($300 vs $75)</div>
+            </div>
+            <div style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:1.8rem;font-weight:900;color:var(--color-accent-1);" data-count="45" data-suffix="%">45%</div>
+                <div style="font-size:0.75rem;color:var(--color-text-secondary);margin-top:4px;">рост продуктивности разработчика с AI (IBM, GitHub, 2026)</div>
+            </div>
+            <div style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:1.8rem;font-weight:900;color:var(--color-accent-3);" data-count="51" data-suffix="%">51%</div>
+                <div style="font-size:0.75rem;color:var(--color-text-secondary);margin-top:4px;">рост зарплаты у выпускников технических школ в первые 12 мес</div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+            <div class="reveal" style="border-left:3px solid var(--color-accent-1);padding:10px 14px;background:var(--color-glass-bg);border-radius:0 8px 8px 0;">
+                <div style="font-weight:700;font-size:0.85rem;color:var(--color-accent-1);">Что делать сейчас</div>
+                <div style="font-size:0.75rem;color:var(--color-text-secondary);margin-top:4px;">GitHub Education партнёрство → Perplexity edu → ChatGPT Edu пилот → затем Cursor для IT-программ. Начинать с тех, у кого уже есть edu-инфраструктура.</div>
+            </div>
+            <div class="reveal" style="border-left:3px solid var(--color-accent-2);padding:10px 14px;background:var(--color-glass-bg);border-radius:0 8px 8px 0;">
+                <div style="font-weight:700;font-size:0.85rem;color:var(--color-accent-2);">Что получает IT STEP</div>
+                <div style="font-size:0.75rem;color:var(--color-text-secondary);margin-top:4px;">Новый дифференциатор для продажи + рост NPS выпускников + PR-сторис + довод для лидогенерации на новых рынках. Стоимость: $75/выпускник оптом против $300 воспринимаемой ценности.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<div class="nav-controls">
+    <button class="nav-btn" onclick="changeSlide(-1)">&#8249;</button>
+    <div class="slide-dots" id="dots"></div>
+    <button class="nav-btn" onclick="changeSlide(1)">&#8250;</button>
+    <span class="slide-counter" id="counter">1 / 6</span>
+</div>
+
+<script>
+    let current = 1;
+    const total = document.querySelectorAll('.slide').length;
+    const dotsContainer = document.getElementById('dots');
+    const counter = document.getElementById('counter');
+    for (let i = 1; i <= total; i++) { const dot = document.createElement('div'); dot.className = 'dot' + (i === 1 ? ' active' : ''); dot.onclick = () => goToSlide(i); dotsContainer.appendChild(dot); }
+    function goToSlide(n) {
+        const prev = document.querySelector('.slide.active');
+        const next = document.querySelector(`.slide[data-slide="${n}"]`);
+        if (prev) prev.classList.remove('active');
+        if (next) { next.classList.add('active'); animateSlide(next); }
+        current = n; updateNav();
+    }
+    function changeSlide(dir) { let next = current + dir; if (next < 1) next = total; if (next > total) next = 1; goToSlide(next); }
+    function updateNav() { document.querySelectorAll('.dot').forEach((d, i) => { d.classList.toggle('active', i + 1 === current); }); counter.textContent = current + ' / ' + total; }
+    document.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); changeSlide(1); } if (e.key === 'ArrowLeft') { e.preventDefault(); changeSlide(-1); } });
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+    document.addEventListener('touchend', (e) => { const diff = touchStartX - e.changedTouches[0].clientX; if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1); });
+
+    function animateSlide(slide) {
+        slide.querySelectorAll('.reveal').forEach((el, i) => {
+            el.style.transition = 'none'; el.style.opacity = '0'; el.style.transform = 'translateY(18px)';
+            el.offsetHeight;
+            const delay = i * 0.07;
+            el.style.transition = `opacity 0.35s ease ${delay}s, transform 0.35s ease ${delay}s`;
+            el.style.opacity = '1'; el.style.transform = 'translateY(0)';
+        });
+        animateSlideEffects(slide);
+    }
+
+    function animateSlideEffects(slide) {
+        slide.querySelectorAll('[data-count]:not(.counted)').forEach(el => {
+            el.classList.add('counted');
+            const target = parseInt(el.dataset.count);
+            const suffix = el.dataset.suffix || '', prefix = el.dataset.prefix || '';
+            let cur = 0; const step = target / 40;
+            const timer = setInterval(() => { cur += step; if (cur >= target) { cur = target; clearInterval(timer); } el.textContent = prefix + Math.round(cur).toLocaleString() + suffix; }, 30);
+        });
+        slide.querySelectorAll('.bar-fill:not(.fill-init)').forEach((bar, i) => {
+            bar.classList.add('fill-init');
+            bar.style.width = '0%'; bar.style.transition = `width 0.6s ease ${i * 0.1}s`; bar.offsetHeight; bar.style.width = bar.dataset.width + '%';
+        });
+    }
+
+    document.addEventListener('mousemove', (e) => {
+        const spotlight = document.querySelector('.mouse-spotlight');
+        if (spotlight) {
+            spotlight.style.background = `radial-gradient(600px circle at ${e.clientX}px ${e.clientY}px, rgba(59,130,246,0.05), transparent 40%)`;
+        }
+    });
+
+    (function() {
+        let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+        const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+        document.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+        (function tick() {
+            const ox = (mouseX - cx) / cx, oy = (mouseY - cy) / cy;
+            document.querySelectorAll('.deco-shape').forEach(shape => {
+                const speed = parseFloat(shape.dataset.speed) || 0.03;
+                shape.style.transform = `translate(${ox * speed * 100}px, ${oy * speed * 100}px)`;
+            });
+            requestAnimationFrame(tick);
+        })();
+    })();
+
+    window.initParticles = function(canvas, options) {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+        const interactive = options.interactive !== false;
+        const count = options.count || (interactive ? 50 : 16);
+        let mx = -1000, my = -1000;
+        const particles = Array.from({ length: count }, () => ({
+            x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+            vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+            size: Math.random() * 2.2 + 0.7, alpha: Math.random() * 0.3 + 0.08
+        }));
+        if (interactive) {
+            canvas.addEventListener('mousemove', (e) => { const rect = canvas.getBoundingClientRect(); mx = e.clientX - rect.left; my = e.clientY - rect.top; });
+            canvas.addEventListener('mouseleave', () => { mx = -1000; my = -1000; });
+        }
+        (function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                if (interactive) { const dx = p.x - mx, dy = p.y - my, dist = Math.sqrt(dx*dx+dy*dy); if (dist < 110) { const force = (110 - dist) / 110 * 2; p.vx += (dx/dist)*force*0.1; p.vy += (dy/dist)*force*0.1; } }
+                p.vx *= 0.98; p.vy *= 0.98; p.x += p.vx; p.y += p.vy;
+                if (p.x < 0) p.x = canvas.width; if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height; if (p.y > canvas.height) p.y = 0;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(59,130,246,${p.alpha})`; ctx.fill();
+            });
+            requestAnimationFrame(animate);
+        })();
+    };
+    document.querySelectorAll('.particle-canvas').forEach(c => window.initParticles(c, { interactive: true, count: 50 }));
+    document.querySelectorAll('.particle-canvas-ambient').forEach(c => window.initParticles(c, { interactive: false, count: 16 }));
+
+    try { animateSlide(document.querySelector('.slide.active')); } catch(e) { console.warn(e); }
+</script>
+</body>
+</html>
