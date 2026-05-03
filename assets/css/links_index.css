@@ -12,6 +12,9 @@
 .links-hero {
     position: relative;
     padding: 26px 18px 40px;
+    overflow: clip;
+    --mx: 60%;
+    --my: 32%;
 }
 
 .links-hero__bg {
@@ -24,10 +27,111 @@
     pointer-events: none;
 }
 
+.links-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 320px 320px;
+    mix-blend-mode: overlay;
+    z-index: 0;
+}
+
+.links-hero::after {
+    content: '';
+    position: absolute;
+    inset: -12%;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.78) 76%, rgba(0,0,0,0.92) 100%);
+    z-index: 0;
+}
+
+.links-mesh {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+
+.blob {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(80px);
+    opacity: 0.16;
+    background: rgba(184,135,70,0.35);
+    animation: blob-float-a 12s ease-in-out infinite;
+}
+
+.blob.b1 {
+    width: 520px;
+    height: 520px;
+    top: -220px;
+    right: -220px;
+    opacity: 0.13;
+}
+
+.blob.b2 {
+    width: 360px;
+    height: 360px;
+    bottom: -180px;
+    left: -140px;
+    opacity: 0.10;
+    animation: blob-float-b 16s ease-in-out infinite;
+}
+
+.blob.b3 {
+    width: 260px;
+    height: 260px;
+    top: 44%;
+    left: 10%;
+    opacity: 0.08;
+    animation: blob-float-c 18s ease-in-out infinite;
+}
+
+@keyframes blob-float-a {
+    0% { transform: translate(0,0) scale(1); }
+    35% { transform: translate(-50px, 30px) scale(1.08); }
+    70% { transform: translate(20px, -30px) scale(0.96); }
+    100% { transform: translate(0,0) scale(1); }
+}
+
+@keyframes blob-float-b {
+    0% { transform: translate(0,0) scale(1); }
+    33% { transform: translate(55px, -45px) scale(1.1); }
+    66% { transform: translate(-30px, 25px) scale(0.92); }
+    100% { transform: translate(0,0) scale(1); }
+}
+
+@keyframes blob-float-c {
+    0% { transform: translate(0,0) scale(1) rotate(0deg); }
+    50% { transform: translate(40px, -35px) scale(1.1) rotate(2deg); }
+    100% { transform: translate(0,0) scale(1) rotate(0deg); }
+}
+
+.links-spotlight {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background:
+        radial-gradient(circle 240px at var(--mx) var(--my), rgba(184,135,70,0.18), transparent 62%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M18 18h6l8 20 8-20h6L36 46h-8Z' fill='none' stroke='%23B88746' stroke-width='2.2' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat, no-repeat;
+    background-position: 0 0, 50% 56%;
+    background-size: 100% 100%, 560px 560px;
+    opacity: 0.95;
+    mix-blend-mode: screen;
+    -webkit-mask-image: radial-gradient(circle 220px at var(--mx) var(--my), rgba(0,0,0,1) 0%, rgba(0,0,0,0) 68%);
+    mask-image: radial-gradient(circle 220px at var(--mx) var(--my), rgba(0,0,0,1) 0%, rgba(0,0,0,0) 68%);
+}
+
 .links-hero__inner {
     position: relative;
     max-width: 920px;
     margin: 0 auto;
+    z-index: 2;
 }
 
 .links-header {
@@ -123,6 +227,29 @@
 h1 { margin: 0; font-size: 20px; line-height: 1.15; }
 .subtitle { margin-top: 4px; color: var(--muted); font-size: 13px; }
 
+.hours {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.10);
+    background: rgba(255,255,255,0.03);
+    max-width: 320px;
+}
+
+.hours__title {
+    font-size: 11px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+}
+
+.hours__lines {
+    margin-top: 6px;
+    color: rgba(255,255,255,0.78);
+    font-size: 13px;
+    line-height: 1.35;
+}
+
 .links-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -207,8 +334,15 @@ h1 { margin: 0; font-size: 20px; line-height: 1.15; }
 
 @media (max-width: 640px) {
     .auth-float { transform: scale(0.5); transform-origin: top right; }
+    .blob { filter: blur(70px); }
+    .links-spotlight { background-size: 100% 100%, 420px 420px; }
 }
 
 @media (max-width: 420px) {
     .links-hero { padding: 20px 14px 34px; }
+    .hours { max-width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .blob { animation: none; }
 }

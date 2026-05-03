@@ -5,6 +5,11 @@ $supportedLangs = ['ru', 'en', 'vi', 'ko'];
 $i18n = [
     'ru' => [
         'subtitle' => 'Быстрые ссылки',
+        'hours' => [
+            'title' => 'Время работы',
+            'line1' => 'Пн–Чт 10:00–22:00',
+            'line2' => 'Пт–Вс 10:00–23:00',
+        ],
         'sections' => [
             'actions' => 'Сервис',
             'social' => 'Контакты и соцсети',
@@ -22,6 +27,11 @@ $i18n = [
     ],
     'en' => [
         'subtitle' => 'Quick links',
+        'hours' => [
+            'title' => 'Working hours',
+            'line1' => 'Mon–Thu 10:00–22:00',
+            'line2' => 'Fri–Sun 10:00–23:00',
+        ],
         'sections' => [
             'actions' => 'Service',
             'social' => 'Contacts & social',
@@ -39,6 +49,11 @@ $i18n = [
     ],
     'vi' => [
         'subtitle' => 'Liên kết nhanh',
+        'hours' => [
+            'title' => 'Giờ mở cửa',
+            'line1' => 'Th 2–Th 5 10:00–22:00',
+            'line2' => 'Th 6–CN 10:00–23:00',
+        ],
         'sections' => [
             'actions' => 'Dịch vụ',
             'social' => 'Liên hệ & mạng xã hội',
@@ -56,6 +71,11 @@ $i18n = [
     ],
     'ko' => [
         'subtitle' => '빠른 링크',
+        'hours' => [
+            'title' => '영업시간',
+            'line1' => '월–목 10:00–22:00',
+            'line2' => '금–일 10:00–23:00',
+        ],
         'sections' => [
             'actions' => '서비스',
             'social' => '연락처 & SNS',
@@ -88,4 +108,3 @@ $linkDefs = [
     'facebook' => ['href' => 'https://www.facebook.com/share/1LSPvAR8X7/', 'icon' => 'facebook'],
     'map' => ['href' => 'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9', 'icon' => 'map'],
 ];
-

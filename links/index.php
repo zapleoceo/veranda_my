@@ -31,6 +31,9 @@ if ($lang === null) $lang = 'ru';
 if (!isset($i18n[$lang])) $lang = 'ru';
 
 $subtitle = (string)($i18n[$lang]['subtitle'] ?? 'Быстрые ссылки');
+$hoursTitle = (string)($i18n[$lang]['hours']['title'] ?? '');
+$hoursLine1 = (string)($i18n[$lang]['hours']['line1'] ?? '');
+$hoursLine2 = (string)($i18n[$lang]['hours']['line2'] ?? '');
 $metaDescription = $lang === 'ru'
     ? 'Быстрые ссылки Veranda: меню, бронирование, контакты и карта.'
     : ($lang === 'vi'

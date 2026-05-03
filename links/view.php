@@ -18,7 +18,7 @@
     <title>Links | Veranda</title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260503_0001">
 </head>
 <body>
     <div class="auth-float">
@@ -29,7 +29,14 @@
 
     <main class="links-page">
         <header class="links-hero">
-            <div class="links-hero__bg" aria-hidden="true"></div>
+            <div class="links-hero__bg" aria-hidden="true">
+                <div class="links-mesh" aria-hidden="true">
+                    <div class="blob b1"></div>
+                    <div class="blob b2"></div>
+                    <div class="blob b3"></div>
+                </div>
+                <div class="links-spotlight" aria-hidden="true"></div>
+            </div>
             <div class="links-hero__inner">
                 <div class="links-header">
                     <div class="brand">
@@ -37,6 +44,15 @@
                         <div>
                             <h1>Veranda</h1>
                             <div class="subtitle"><?= htmlspecialchars($subtitle) ?></div>
+                            <?php if ($hoursTitle !== '' && ($hoursLine1 !== '' || $hoursLine2 !== '')): ?>
+                                <div class="hours">
+                                    <div class="hours__title"><?= htmlspecialchars($hoursTitle) ?></div>
+                                    <div class="hours__lines">
+                                        <?php if ($hoursLine1 !== ''): ?><div><?= htmlspecialchars($hoursLine1) ?></div><?php endif; ?>
+                                        <?php if ($hoursLine2 !== ''): ?><div><?= htmlspecialchars($hoursLine2) ?></div><?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="header-right">
@@ -79,6 +95,6 @@
     </main>
 
     <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
+    <script src="/links/links_fx.js?v=20260503_0001" defer></script>
 </body>
 </html>
-
