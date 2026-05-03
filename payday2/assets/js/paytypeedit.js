@@ -314,6 +314,8 @@
             });
     };
 
+    window.pd2OpenPaytypeEdit = open;
+
     document.addEventListener('click', (e) => {
         const btn = e.target && e.target.closest ? e.target.closest('.pd2-check-edit-btn') : null;
         if (!btn) return;

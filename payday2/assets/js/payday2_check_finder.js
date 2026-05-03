@@ -308,7 +308,9 @@ window.initPayday2_CheckFinder = function() {
         }
         if (checkFinderResult) {
             checkFinderResult.addEventListener('click', (e) => {
-                const trg = e.target;
+                const trg = (e && e.target instanceof Element)
+                    ? e.target
+                    : (e && e.target && e.target.parentElement instanceof Element ? e.target.parentElement : null);
                 const sortTh = trg && trg.closest ? trg.closest('.pd2-check-sort') : null;
                 if (sortTh) {
                     const col = String(sortTh.getAttribute('data-sort') || '');
@@ -318,6 +320,19 @@ window.initPayday2_CheckFinder = function() {
                         sortChecks();
                         filterAndRender();
                     }
+                    return;
+                }
+                const editBtn = trg && trg.closest ? trg.closest('.pd2-check-edit-btn') : null;
+                if (editBtn) {
+                    const id = Number(editBtn.getAttribute('data-edit-check') || 0) || 0;
+                    if (!id) return;
+                    try {
+                        if (typeof window.pd2OpenPaytypeEdit === 'function') {
+                            window.pd2OpenPaytypeEdit(id);
+                        } else if (typeof window.showToast === 'function') {
+                            window.showToast('Редактор оплаты не загружен (обновите страницу)');
+                        }
+                    } catch (_) {}
                     return;
                 }
                 const delBtn = trg && trg.closest ? trg.closest('.pd2-check-del-btn') : null;
