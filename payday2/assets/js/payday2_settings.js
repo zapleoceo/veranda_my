@@ -12,6 +12,19 @@ window.initPayday2_Settings = function() {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 
+    const unescapeCmdCarets = (s) => {
+        let out = String(s || '');
+        out = out
+            .replace(/\r\n/g, '\n')
+            .replace(/\^\s*\n/g, '')
+            .replace(/\^"/g, '"')
+            .replace(/\^'/g, "'")
+            .replace(/\^%/g, '%')
+            .replace(/`/g, '');
+        out = out.replace(/\^(.)/g, '$1');
+        return out;
+    };
+
     const fillPayday2SettingsForm = () => {
         const ls = (window.PAYDAY_CONFIG && window.PAYDAY_CONFIG.localSettings) ? window.PAYDAY_CONFIG.localSettings : null;
         if (!ls) return;
@@ -228,6 +241,7 @@ window.initPayday2_Settings = function() {
         if (!cookieEl) return;
         let raw = String(cookieEl.value || '').trim();
         if (!raw) return;
+        raw = unescapeCmdCarets(raw).trim();
         raw = raw.replace(/^Cookie:\s*/i, '').trim();
         const parts = raw.split(';').map((p) => String(p || '').trim()).filter(Boolean);
         const map = {};
@@ -251,13 +265,7 @@ window.initPayday2_Settings = function() {
         let raw = String(curlEl.value || '').trim();
         if (!raw) return;
 
-        raw = raw
-            .replace(/\r\n/g, '\n')
-            .replace(/\^\s*\n/g, '')
-            .replace(/\^"/g, '"')
-            .replace(/\^'/g, "'")
-            .replace(/\^%/g, '%')
-            .replace(/`/g, '');
+        raw = unescapeCmdCarets(raw).trim();
 
         let urlStr = '';
         const urlM = raw.match(/https?:\/\/[^\s"'<>]+/i);
