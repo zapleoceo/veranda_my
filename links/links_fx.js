@@ -88,3 +88,28 @@
   hero.style.setProperty('--my', `${y}px`)
   requestAnimationFrame(tick)
 })()
+
+(() => {
+  const panelLinks = document.querySelectorAll('.lang-panel a')
+  if (!panelLinks.length) return
+
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const root = document.documentElement
+
+  window.addEventListener('pageshow', () => {
+    root.classList.remove('lang-leave')
+  }, { passive: true })
+
+  for (const a of panelLinks) {
+    a.addEventListener('click', (e) => {
+      if (a.classList.contains('active')) return
+      if (reduced) return
+      e.preventDefault()
+      const href = a.href
+      const details = a.closest('details')
+      if (details) details.open = false
+      root.classList.add('lang-leave')
+      window.setTimeout(() => { window.location.href = href }, 190)
+    })
+  }
+})()
