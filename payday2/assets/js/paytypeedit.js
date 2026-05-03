@@ -315,7 +315,10 @@
     };
 
     document.addEventListener('click', (e) => {
-        const btn = e.target && e.target.closest ? e.target.closest('.pd2-check-edit-btn') : null;
+        const trg = (e && e.target instanceof Element)
+            ? e.target
+            : (e && e.target && e.target.parentElement instanceof Element ? e.target.parentElement : null);
+        const btn = trg && trg.closest ? trg.closest('.pd2-check-edit-btn') : null;
         if (!btn) return;
         const txId = Number(btn.getAttribute('data-edit-check') || 0) || 0;
         if (!txId) return;
