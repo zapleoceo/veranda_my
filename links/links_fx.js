@@ -1,27 +1,38 @@
 (() => {
   const hero = document.querySelector('.links-hero')
   const bg = hero ? hero.querySelector('.links-hero__bg') : null
-  if (!hero || !bg) return
+  const spotlight = hero ? hero.querySelector('.links-spotlight') : null
+  if (!hero || !bg || !spotlight) return
 
-  let stack = bg.querySelector('.links-bg-stack')
-  if (!stack) {
-    stack = document.createElement('div')
-    stack.className = 'links-bg-stack'
-    bg.prepend(stack)
+  const ensureStack = (host, className) => {
+    let stack = host.querySelector('.' + className.split(' ').join('.'))
+    if (!stack) {
+      stack = document.createElement('div')
+      stack.className = className
+      host.prepend(stack)
+    }
+    return stack
   }
+
+  const baseStack = ensureStack(bg, 'links-bg-stack')
+  const spotStack = ensureStack(spotlight, 'links-bg-stack links-bg-stack--spot')
 
   const build = () => {
     const tile = window.matchMedia && window.matchMedia('(max-width: 640px)').matches ? 520 : 720
     const h = Math.max(hero.scrollHeight, document.documentElement.scrollHeight, document.body.scrollHeight)
     const count = Math.max(1, Math.ceil(h / tile) + 1)
-    if (stack.childElementCount === count) return
-    stack.replaceChildren()
-    for (let i = 0; i < count; i++) {
-      const t = document.createElement('div')
-      t.className = 'links-bg-tile'
-      t.style.flexBasis = tile + 'px'
-      stack.appendChild(t)
+    const sync = (stack) => {
+      if (stack.childElementCount === count) return
+      stack.replaceChildren()
+      for (let i = 0; i < count; i++) {
+        const t = document.createElement('div')
+        t.className = 'links-bg-tile'
+        t.style.flexBasis = tile + 'px'
+        stack.appendChild(t)
+      }
     }
+    sync(baseStack)
+    sync(spotStack)
   }
 
   build()

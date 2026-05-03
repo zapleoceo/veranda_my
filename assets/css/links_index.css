@@ -27,8 +27,15 @@
     display: flex;
     flex-direction: column;
     pointer-events: none;
-    opacity: 0.92;
+    opacity: 0.32;
     mix-blend-mode: screen;
+}
+
+.links-bg-stack--spot {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    opacity: 0.92;
 }
 
 .links-bg-tile {
@@ -129,7 +136,7 @@
     pointer-events: none;
     background:
         radial-gradient(circle 260px at var(--mx) var(--my), rgba(184,135,70,0.22), transparent 64%);
-    opacity: 0.85;
+    opacity: 1;
     mix-blend-mode: screen;
     -webkit-mask-image: radial-gradient(circle 220px at var(--mx) var(--my), rgba(0,0,0,1) 0%, rgba(0,0,0,0) 68%);
     mask-image: radial-gradient(circle 220px at var(--mx) var(--my), rgba(0,0,0,1) 0%, rgba(0,0,0,0) 68%);
