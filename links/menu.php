@@ -3,11 +3,13 @@ require_once __DIR__ . '/../src/classes/Database.php';
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
 $lang = null;
+$explicitLang = null;
 
 if (isset($_GET['lang'])) {
     $candidate = strtolower(trim((string)$_GET['lang']));
     if (in_array($candidate, $supportedLangs, true)) {
         $lang = $candidate;
+        $explicitLang = $lang;
         setcookie('links_lang', $lang, [
             'expires' => time() + 31536000,
             'path' => '/',
@@ -116,6 +118,8 @@ $items = $db->query(
 
 $groups = [];
 foreach ($items as $it) {
+    $workshopId = (int)($it['workshop_id'] ?? 0);
+    $categoryId = (int)($it['category_id'] ?? 0);
     $mainLabel = trim((string)($it['main_label'] ?? ''));
     $subLabel = trim((string)($it['sub_label'] ?? ''));
     if ($mainLabel === '') {
@@ -124,26 +128,62 @@ foreach ($items as $it) {
     if ($subLabel === '') {
         $subLabel = $lang === 'ru' ? 'Без подкатегории' : ($lang === 'vi' ? 'Không danh mục con' : ($lang === 'ko' ? '하위 분류 없음' : 'No subcategory'));
     }
-    if (!isset($groups[$mainLabel])) {
-        $groups[$mainLabel] = [];
+
+    if (!isset($groups[$workshopId])) {
+        $groups[$workshopId] = [
+            'label' => $mainLabel,
+            'cats' => [],
+        ];
     }
-    if (!isset($groups[$mainLabel][$subLabel])) {
-        $groups[$mainLabel][$subLabel] = [];
+    if (!isset($groups[$workshopId]['cats'][$categoryId])) {
+        $groups[$workshopId]['cats'][$categoryId] = [
+            'label' => $subLabel,
+            'items' => [],
+        ];
     }
-    $groups[$mainLabel][$subLabel][] = $it;
+    $groups[$workshopId]['cats'][$categoryId]['items'][] = $it;
 }
 
-$groups = array_filter($groups, function ($cats) {
-    if (!is_array($cats)) return false;
-    $cats = array_filter($cats, fn($list) => is_array($list) && count($list) > 0);
-    return count($cats) > 0;
-});
-foreach ($groups as $station => $cats) {
-    $groups[$station] = array_filter($cats, fn($list) => is_array($list) && count($list) > 0);
+foreach ($groups as $workshopId => $g) {
+    if (!is_array($g) || empty($g['cats']) || !is_array($g['cats'])) { unset($groups[$workshopId]); continue; }
+    foreach ($g['cats'] as $categoryId => $cat) {
+        if (!is_array($cat) || empty($cat['items']) || !is_array($cat['items'])) unset($groups[$workshopId]['cats'][$categoryId]);
+    }
+    if (empty($groups[$workshopId]['cats'])) unset($groups[$workshopId]);
 }
 
 $pageTitle = $lang === 'ru' ? 'Online меню' : ($lang === 'vi' ? 'Thực đơn online' : ($lang === 'ko' ? '온라인 메뉴' : 'Online menu'));
 $menuLabel = $lang === 'ru' ? 'МЕНЮ' : ($lang === 'vi' ? 'THỰC ĐƠN' : ($lang === 'ko' ? '메뉴' : 'MENU'));
+
+$baseUrl = 'https://veranda.my/links/menu.php';
+$langUrl = static fn(string $code): string => $baseUrl . '?lang=' . urlencode($code);
+$canonicalUrl = $explicitLang === null ? $baseUrl : $langUrl($lang);
+$hreflang = [
+    'x-default' => $baseUrl,
+    'ru' => $langUrl('ru'),
+    'en' => $langUrl('en'),
+    'vi' => $langUrl('vi'),
+    'ko' => $langUrl('ko'),
+];
+
+$seoTitles = [
+    'ru' => 'Veranda — меню, Нячанг, Вьетнам',
+    'en' => 'Veranda - menu. Nha Trang, Vietnam',
+    'vi' => 'Veranda - thực đơn. Nha Trang, Việt Nam',
+    'ko' => 'Veranda — 메뉴, 나트랑, 베트남',
+];
+$metaDescriptions = [
+    'ru' => 'Онлайн меню Veranda — ресторан и бар в Нячанге, Вьетнам. Блюда по категориям и цены.',
+    'en' => 'Veranda online menu — restaurant & bar in Nha Trang, Vietnam. Dishes by categories and prices.',
+    'vi' => 'Thực đơn online Veranda — nhà hàng & quầy bar tại Nha Trang, Việt Nam. Món theo danh mục và giá.',
+    'ko' => 'Veranda 온라인 메뉴 — 베트남 나트랑의 레스토랑 & 바. 카테고리별 메뉴와 가격.',
+];
+$seoTitle = (string)($seoTitles[$lang] ?? $seoTitles['en']);
+$metaDescription = (string)($metaDescriptions[$lang] ?? $metaDescriptions['en']);
+$metaOgDescription = $metaDescription;
+
+$ogImage = 'https://veranda.my/assets/img/links_bg.png';
+$telephone = '+84396314266';
 ?>
 <!doctype html>
 <html lang="<?= htmlspecialchars($lang) ?>">
@@ -151,16 +191,22 @@ $menuLabel = $lang === 'ru' ? 'МЕНЮ' : ($lang === 'vi' ? 'THỰC ĐƠN' : ($
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
-    <meta name="description" content="<?= htmlspecialchars($lang === 'ru' ? 'Онлайн меню Veranda по категориям.' : ($lang === 'vi' ? 'Thực đơn online của Veranda theo danh mục.' : ($lang === 'ko' ? 'Veranda 온라인 메뉴(카테고리별).' : 'Veranda online menu by categories.'))) ?>">
-    <link rel="canonical" href="https://veranda.my/links/menu.php?lang=<?= urlencode($lang) ?>">
+    <meta name="description" content="<?= htmlspecialchars($metaDescription) ?>">
+    <link rel="canonical" href="<?= htmlspecialchars($canonicalUrl) ?>">
+    <?php foreach ($hreflang as $code => $href): ?>
+        <link rel="alternate" hreflang="<?= htmlspecialchars((string)$code) ?>" href="<?= htmlspecialchars((string)$href) ?>">
+    <?php endforeach; ?>
     <meta property="og:site_name" content="Veranda">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="<?= htmlspecialchars($pageTitle) ?> | Veranda">
-    <meta property="og:description" content="<?= htmlspecialchars($lang === 'ru' ? 'Онлайн меню по категориям.' : ($lang === 'vi' ? 'Thực đơn theo danh mục.' : ($lang === 'ko' ? '카테고리별 메뉴.' : 'Menu by categories.'))) ?>">
-    <meta property="og:url" content="https://veranda.my/links/menu.php?lang=<?= urlencode($lang) ?>">
-    <meta property="og:image" content="https://veranda.my/tr3/assets/og-image.svg">
+    <meta property="og:title" content="<?= htmlspecialchars($seoTitle) ?>">
+    <meta property="og:description" content="<?= htmlspecialchars($metaOgDescription) ?>">
+    <meta property="og:url" content="<?= htmlspecialchars($canonicalUrl) ?>">
+    <meta property="og:image" content="<?= htmlspecialchars($ogImage) ?>">
     <meta name="twitter:card" content="summary_large_image">
-    <title><?= htmlspecialchars($pageTitle) ?> | Veranda</title>
+    <meta name="twitter:title" content="<?= htmlspecialchars($seoTitle) ?>">
+    <meta name="twitter:description" content="<?= htmlspecialchars($metaOgDescription) ?>">
+    <meta name="twitter:image" content="<?= htmlspecialchars($ogImage) ?>">
+    <title><?= htmlspecialchars($seoTitle) ?></title>
         <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="preload" as="image" href="/assets/img/links_bg.png" fetchpriority="high">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -168,7 +214,7 @@ $menuLabel = $lang === 'ru' ? 'МЕНЮ' : ($lang === 'vi' ? 'THỰC ĐƠN' : ($
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css?v=20260425_0001">
     <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0025">
-    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0026">
+    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0027">
 </head>
 <body>
     <main class="links-page">
@@ -209,13 +255,14 @@ $menuLabel = $lang === 'ru' ? 'МЕНЮ' : ($lang === 'vi' ? 'THỰC ĐƠN' : ($
                     <?php if (empty($groups)): ?>
                         <div class="muted"><?= htmlspecialchars($lang === 'ru' ? 'Пока нет опубликованных позиций.' : ($lang === 'vi' ? 'Chưa có món được hiển thị.' : ($lang === 'ko' ? '표시할 메뉴가 없습니다.' : 'No published items yet.'))) ?></div>
                     <?php else: ?>
-                        <?php foreach ($groups as $mainLabel => $cats): ?>
+                        <?php foreach ($groups as $workshopId => $g): ?>
                             <div class="section">
-                                <div class="section-title"><?= htmlspecialchars($mainLabel) ?></div>
-                                <?php foreach ($cats as $catLabel => $list): ?>
-                                    <details>
+                                <div class="section-title"><?= htmlspecialchars((string)($g['label'] ?? '')) ?></div>
+                                <?php foreach (($g['cats'] ?? []) as $categoryId => $cat): ?>
+                                    <?php $list = is_array($cat['items'] ?? null) ? $cat['items'] : []; ?>
+                                    <details data-key="<?= htmlspecialchars((string)$workshopId . ':' . (string)$categoryId) ?>">
                                         <summary>
-                                            <span><?= htmlspecialchars($catLabel) ?></span>
+                                            <span><?= htmlspecialchars((string)($cat['label'] ?? '')) ?></span>
                                             <span class="sum-right"><?= count($list) ?></span>
                                         </summary>
                                         <div class="items">
@@ -269,9 +316,13 @@ $menuLabel = $lang === 'ru' ? 'МЕНЮ' : ($lang === 'vi' ? 'THỰC ĐƠN' : ($
     </main>
     <script type="application/ld+json"><?php
         $sections = [];
-        foreach ($groups as $station => $cats) {
+        foreach ($groups as $workshopId => $g) {
+            $station = trim((string)($g['label'] ?? ''));
+            $cats = $g['cats'] ?? [];
             if (!is_array($cats) || empty($cats)) continue;
-            foreach ($cats as $catLabel => $list) {
+            foreach ($cats as $categoryId => $cat) {
+                $catLabel = trim((string)($cat['label'] ?? ''));
+                $list = $cat['items'] ?? [];
                 if (!is_array($list) || empty($list)) continue;
                 $items = [];
                 foreach ($list as $it) {
@@ -308,7 +359,15 @@ $menuLabel = $lang === 'ru' ? 'МЕНЮ' : ($lang === 'vi' ? 'THỰC ĐƠN' : ($
             '@context' => 'https://schema.org',
             '@type' => 'Restaurant',
             'name' => 'Veranda',
-            'url' => 'https://veranda.my/links/menu.php?lang=' . $lang,
+            'url' => $canonicalUrl,
+            'image' => $ogImage,
+            'telephone' => $telephone,
+            'address' => [
+                '@type' => 'PostalAddress',
+                'addressLocality' => 'Nha Trang',
+                'addressRegion' => 'Khánh Hòa',
+                'addressCountry' => 'Vietnam',
+            ],
             'hasMenu' => [
                 '@type' => 'Menu',
                 'name' => $pageTitle,
@@ -317,6 +376,6 @@ $menuLabel = $lang === 'ru' ? 'МЕНЮ' : ($lang === 'vi' ? 'THỰC ĐƠN' : ($
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     ?></script>
     <script src="/links/links_fx.js?v=20260504_0025" defer></script>
-    <script src="/assets/js/menu-beta.js?v=20260504_0026" defer></script>
+    <script src="/assets/js/menu-beta.js?v=20260504_0027" defer></script>
 </body>
 </html>

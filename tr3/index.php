@@ -69,10 +69,10 @@ $mk = function (string $l) use ($self, $baseQs) {
   <meta property="og:url" content="https://veranda.my/tr3?lang=<?= urlencode($lang) ?>">
   <meta property="og:image" content="https://veranda.my/tr3/assets/og-image.svg">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="preconnect" href="https://api.fontshare.com">
-  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
-  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260425_0001">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260504_0001">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -106,11 +106,16 @@ $mk = function (string $l) use ($self, $baseQs) {
             <input id="mapZoomRange" type="range" min="10" max="100" step="1" value="100" aria-label="<?= htmlspecialchars(tr('zoom')) ?>">
           </label>
         </div>
-        <div class="lang" aria-label="Language">
-          <a href="<?= htmlspecialchars($mk('ru')) ?>" class="<?= $lang === 'ru' ? 'active' : '' ?>">RU</a>
-          <a href="<?= htmlspecialchars($mk('en')) ?>" class="<?= $lang === 'en' ? 'active' : '' ?>">EN</a>
-          <a href="<?= htmlspecialchars($mk('vi')) ?>" class="<?= $lang === 'vi' ? 'active' : '' ?>">VI</a>
-        </div>
+        <details class="lang-menu lang-menu--fixed">
+          <summary aria-label="Language">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm7.93 9h-3.2a15.7 15.7 0 0 0-1.47-5 8.05 8.05 0 0 1 4.67 5ZM12 4c1.1 0 2.7 2.2 3.4 7H8.6C9.3 6.2 10.9 4 12 4ZM4.07 11a8.05 8.05 0 0 1 4.67-5 15.7 15.7 0 0 0-1.47 5Zm0 2h3.2a15.7 15.7 0 0 0 1.47 5 8.05 8.05 0 0 1-4.67-5ZM12 20c-1.1 0-2.7-2.2-3.4-7h6.8c-.7 4.8-2.3 7-3.4 7Zm3.26-2a15.7 15.7 0 0 0 1.47-5h3.2a8.05 8.05 0 0 1-4.67 5Z"/></svg>
+          </summary>
+          <div class="lang-panel">
+            <a href="<?= htmlspecialchars($mk('ru')) ?>" data-lang="ru" class="<?= $lang === 'ru' ? 'active' : '' ?>" aria-label="Русский">Русский</a>
+            <a href="<?= htmlspecialchars($mk('en')) ?>" data-lang="en" class="<?= $lang === 'en' ? 'active' : '' ?>" aria-label="English">English</a>
+            <a href="<?= htmlspecialchars($mk('vi')) ?>" data-lang="vi" class="<?= $lang === 'vi' ? 'active' : '' ?>" aria-label="Tiếng Việt">Tiếng Việt</a>
+          </div>
+        </details>
       </div>
   
       <section class="layout">
@@ -408,7 +413,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr3/assets/tr3.boot.js?v=20260425_0001" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260504_0001" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>

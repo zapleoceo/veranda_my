@@ -90,7 +90,23 @@
         }, 280);
     };
 
+    const captureState = () => {
+        const cur = document.getElementById('menuContent');
+        const openKeys = cur ? Array.from(cur.querySelectorAll('details[data-key][open]')).map((d) => String(d.getAttribute('data-key') || '')).filter(Boolean) : [];
+        return { openKeys, scrollY: window.scrollY };
+    };
+
+    const applyState = (node, state) => {
+        if (!node || !state) return;
+        const openSet = new Set(Array.isArray(state.openKeys) ? state.openKeys : []);
+        node.querySelectorAll('details[data-key]').forEach((d) => {
+            const k = String(d.getAttribute('data-key') || '');
+            if (openSet.has(k)) d.open = true;
+        });
+    };
+
     const loadLang = async (href) => {
+        const state = captureState();
         const url = new URL(href, window.location.href);
         const lang = (url.searchParams.get('lang') || '').toLowerCase();
         if (!lang) return;
@@ -104,6 +120,7 @@
             if (!nextContent) throw new Error('No content');
 
             nextContent.id = 'menuContent';
+            applyState(nextContent, state);
             root.setAttribute('lang', doc.documentElement.getAttribute('lang') || lang);
             copyMeta(doc);
             setActive(lang);
@@ -116,6 +133,10 @@
             }
 
             animateSwap(current, nextContent);
+            window.setTimeout(() => {
+                const y = Number(state && state.scrollY != null ? state.scrollY : 0) || 0;
+                window.scrollTo(0, y);
+            }, 320);
         } catch (_) {
             window.location.href = url.toString();
         }

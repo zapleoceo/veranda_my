@@ -16,5 +16,16 @@ body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+    font-family: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
 }
+
+.i18n-xfade { overflow: hidden; }
+.i18n-xfade > .i18n-layer {
+    grid-area: 1 / 1;
+    transition: opacity 220ms ease, transform 220ms ease;
+    will-change: opacity, transform;
+}
+.i18n-xfade > .i18n-layer--old { opacity: 1; transform: translateY(0); }
+.i18n-xfade > .i18n-layer--new { opacity: 0; transform: translateY(6px); }
+.i18n-xfade.is-animating > .i18n-layer--old { opacity: 0; transform: translateY(-6px); }
+.i18n-xfade.is-animating > .i18n-layer--new { opacity: 1; transform: translateY(0); }

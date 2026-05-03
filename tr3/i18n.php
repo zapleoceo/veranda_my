@@ -4,7 +4,7 @@ return [
   'supported' => ['ru', 'en', 'vi'],
   'i18n' => [
     'ru' => [
-      'page_title' => 'Схема бронирования',
+      'page_title' => 'Бронирование стола',
       'data_on' => 'Данные на',
       'pick_date' => 'Выбрать дату',
       'comment_placeholder' => 'Комментарий. Особые пожелания',
@@ -126,7 +126,7 @@ return [
       'contact_manager' => 'Для связи с менеджером напишите, пожалуйста:',
     ],
     'en' => [
-      'page_title' => 'Booking Map',
+      'page_title' => 'Table reservation',
       'data_on' => 'Data for',
       'pick_date' => 'Pick date',
       'comment_placeholder' => 'Comment. Special requests',
@@ -248,7 +248,7 @@ return [
       'contact_manager' => 'To contact our manager, please message:',
     ],
     'vi' => [
-      'page_title' => 'Sơ đồ đặt bàn',
+      'page_title' => 'Đặt bàn',
       'data_on' => 'Dữ liệu ngày',
       'pick_date' => 'Chọn ngày',
       'comment_placeholder' => 'Ghi chú. Yêu cầu đặc biệt',

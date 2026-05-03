@@ -20,8 +20,8 @@
       --radius-md: 16px;
       --radius-lg: 24px;
       --radius-full: 999px;
-      --font-body: 'Satoshi', sans-serif;
-      --font-display: 'Clash Display', 'Satoshi', sans-serif;
+      --font-body: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      --font-display: 'Cinzel', Georgia, "Times New Roman", serif;
     }
   
     * { box-sizing: border-box; }
@@ -107,21 +107,8 @@
       min-width: 0;
       justify-self: center;
     }
-    .lang {
-      display: inline-flex;
-      align-items: center;
-      gap: 1px;
-      padding: 6px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.10);
-      background: rgba(255,255,255,0.03);
-      flex: 0 0 auto;
-      justify-self: end;
-      position: fixed;
-      top: 5px;
-      right: 5px;
-      z-index: 999;
-    }
+    .lang-menu { position: relative; z-index: 999; }
+    .lang-menu--fixed { position: fixed; top: 5px; right: 5px; }
     @media (max-width: 640px) {
       .topbar {
         grid-template-columns: 1fr;
@@ -131,7 +118,7 @@
       .title-wrap { justify-self: stretch; }
       .title-wrap h1 { text-align: left; }
       .date-wrap { justify-content: flex-start; }
-      .lang { padding: 5px; }
+      .lang-menu--fixed { top: 5px; right: 5px; }
       .controls { justify-self: stretch; justify-content: center; }
       .map-invite { margin-top: 5px; }
     }
@@ -139,26 +126,73 @@
       #reqModal .req-layout { overflow-x: auto; overflow-y: auto; }
       #reqModal .modal-grid { min-width: 352px; }
     }
-    .lang a {
-      text-decoration: none;
-      color: rgba(255,255,255,0.65);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      padding: 6px 10px;
+    .lang-menu summary {
+      list-style: none;
+      width: 34px;
+      height: 34px;
       border-radius: 999px;
-      border: 1px solid transparent;
-      line-height: 1;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(12px) saturate(120%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: rgba(255,255,255,0.70);
     }
-    .lang a.active {
+    .lang-menu summary::-webkit-details-marker { display: none; }
+    .lang-menu summary svg { width: 18px; height: 18px; fill: currentColor; opacity: 0.95; }
+    .lang-menu summary:hover { border-color: rgba(184,135,70,0.35); color: rgba(255,255,255,0.85); }
+    .lang-menu summary:focus-visible { outline: 2px solid rgba(184,135,70,0.55); outline-offset: 3px; }
+
+    .lang-panel {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      width: 160px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(14px) saturate(120%);
+      padding: 6px;
+      opacity: 0;
+      transform: translateY(-6px) scale(0.98);
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
+    }
+    .lang-menu[open] .lang-panel {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      visibility: visible;
+      pointer-events: auto;
+      transition: opacity 180ms ease, transform 180ms ease, visibility 0s linear 0s;
+    }
+
+    .lang-panel a {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      text-decoration: none;
+      color: rgba(255,255,255,0.75);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 10px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      line-height: 1.1;
+    }
+    .lang-panel a.active {
       color: rgba(0,0,0,0.95);
       background: rgba(184,135,70,0.95);
       border-color: rgba(184,135,70,0.55);
     }
-    .lang a:not(.active):hover {
-      color: rgba(255,255,255,0.85);
-      border-color: rgba(184,135,70,0.35);
+    .lang-panel a:not(.active):hover {
+      color: rgba(255,255,255,0.92);
+      border-color: rgba(184,135,70,0.25);
     }
+    .lang-panel a:focus-visible { outline: 2px solid rgba(184,135,70,0.55); outline-offset: 2px; }
   
     .controls { display: none; }
   

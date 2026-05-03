@@ -14,6 +14,54 @@
   const SOON_BOOK_HOURS = Number(cfg.soonBookingHours != null ? cfg.soonBookingHours : 2) || 2;
   const SOON_BOOK_MIN = Math.max(0, Math.round(SOON_BOOK_HOURS * 60));
   const setLangCookie = (l) => { try { document.cookie = 'links_lang=' + encodeURIComponent(l) + '; path=/; samesite=lax; max-age=' + (365*24*3600); } catch (_) {} };
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let animateI18n = false;
+
+  const swapText = (el, next) => {
+    if (!el) return;
+    if (reduced || !animateI18n) { el.textContent = String(next ?? ''); return; }
+    if (el.dataset.i18nBusy === '1') return;
+    const current = (el.textContent || '').trim();
+    const target = String(next ?? '').trim();
+    if (current === target) return;
+
+    el.dataset.i18nBusy = '1';
+    const cs = window.getComputedStyle(el);
+    const isInline = cs.display.startsWith('inline');
+    const prevDisplay = el.style.display;
+    const prevOverflow = el.style.overflow;
+    const prevAlign = el.style.alignItems;
+
+    el.classList.add('i18n-xfade');
+    el.style.display = isInline ? 'inline-grid' : 'grid';
+    el.style.alignItems = 'start';
+    el.style.overflow = 'hidden';
+
+    const oldSpan = document.createElement('span');
+    oldSpan.className = 'i18n-layer i18n-layer--old';
+    oldSpan.textContent = current;
+
+    const newSpan = document.createElement('span');
+    newSpan.className = 'i18n-layer i18n-layer--new';
+    newSpan.textContent = target;
+
+    el.replaceChildren(oldSpan, newSpan);
+    el.getBoundingClientRect();
+    requestAnimationFrame(() => {
+      if (!document.body.contains(el)) return;
+      el.classList.add('is-animating');
+    });
+
+    window.setTimeout(() => {
+      el.classList.remove('is-animating');
+      el.classList.remove('i18n-xfade');
+      el.style.display = prevDisplay;
+      el.style.overflow = prevOverflow;
+      el.style.alignItems = prevAlign;
+      el.textContent = target;
+      delete el.dataset.i18nBusy;
+    }, 280);
+  };
   const applyI18n = () => {
     document.documentElement.lang = UI_LANG;
     document.title = t('page_title');
@@ -21,7 +69,7 @@
       if (!(el instanceof HTMLElement)) return;
       const key = String(el.getAttribute('data-i18n') || '').trim();
       if (!key) return;
-      el.textContent = t(key);
+      swapText(el, t(key));
     });
     const reqComment = document.getElementById('reqComment');
     if (reqComment) reqComment.setAttribute('placeholder', t('comment_placeholder'));
@@ -47,7 +95,9 @@
       if (typeof preorderMenuLoading !== 'undefined') preorderMenuLoading = false;
       if (typeof preorderBody !== 'undefined' && preorderBody) preorderBody.innerHTML = '';
     } catch (_) {}
+    animateI18n = true;
     applyI18n();
+    window.setTimeout(() => { animateI18n = false; }, 350);
     if (typeof setStatus === 'function') setStatus(selectedTableNum);
     if (typeof renderSelectedTable === 'function') renderSelectedTable();
     if (typeof updatePreorderUi === 'function') updatePreorderUi();
@@ -59,19 +109,22 @@
     }
   };
   (() => {
-    const langEl = document.querySelector('.lang');
-    if (!langEl) return;
-    langEl.addEventListener('click', (e) => {
-      const a = e.target && e.target.closest ? e.target.closest('a') : null;
-      if (!a) return;
-      e.preventDefault();
-      const txt = String(a.textContent || '').trim().toLowerCase();
-      const map = { ru: 'ru', en: 'en', vi: 'vi' };
-      const l = map[txt] || (txt.includes('ru') ? 'ru' : (txt.includes('en') ? 'en' : (txt.includes('vi') ? 'vi' : null)));
-      if (l) switchLang(l);
-      Array.from(langEl.querySelectorAll('a')).forEach((x) => x.classList.remove('active'));
-      a.classList.add('active');
-    });
+    const details = document.querySelector('.lang-menu');
+    const links = Array.from(document.querySelectorAll('.lang-panel a[data-lang]'));
+    if (!links.length) return;
+    for (const a of links) {
+      a.addEventListener('click', (e) => {
+        if (a.classList.contains('active')) return;
+        e.preventDefault();
+        const l = String(a.getAttribute('data-lang') || '').trim().toLowerCase();
+        if (details) details.open = false;
+        if (l) switchLang(l);
+        for (const x of links) x.classList.remove('active');
+        a.classList.add('active');
+        const href = a.getAttribute('href') || '';
+        try { window.history.replaceState({}, '', href); } catch (_) {}
+      });
+    }
   })();
   const root = document.documentElement;
     const mapShell = document.querySelector('.map-shell');
