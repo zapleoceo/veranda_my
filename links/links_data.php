@@ -18,9 +18,10 @@ $i18n = [
         'items' => [
             'menu' => ['title' => 'Открыть меню', 'subtitle' => ''],
             'reserve' => ['title' => 'Забронировать столик', 'subtitle' => ''],
-            'whatsapp' => ['title' => 'Написать нам в WhatsApp', 'subtitle' => '+84 396 314 266'],
-            'tg_veranda' => ['title' => 'Написать нам в Telegram', 'subtitle' => ''],
+            'whatsapp' => ['title' => 'Написать в WhatsApp', 'subtitle' => ''],
+            'tg_veranda' => ['title' => 'Написать в Telegram', 'subtitle' => ''],
             'tg_group' => ['title' => 'Наша группа в Telegram', 'subtitle' => ''],
+            'phone' => ['title' => 'Позвонить нам', 'subtitle' => ''],
             'facebook' => ['title' => 'Мы в Facebook', 'subtitle' => ''],
             'director' => ['title' => 'Написать управляющему', 'subtitle' => ''],
             'map' => ['title' => 'Как добраться', 'subtitle' => ''],
@@ -41,9 +42,10 @@ $i18n = [
         'items' => [
             'menu' => ['title' => 'Open menu', 'subtitle' => ''],
             'reserve' => ['title' => 'Reserve a table', 'subtitle' => ''],
-            'whatsapp' => ['title' => 'Message us on WhatsApp', 'subtitle' => '+84 396 314 266'],
-            'tg_veranda' => ['title' => 'Message us on Telegram', 'subtitle' => ''],
+            'whatsapp' => ['title' => 'Message on WhatsApp', 'subtitle' => ''],
+            'tg_veranda' => ['title' => 'Message on Telegram', 'subtitle' => ''],
             'tg_group' => ['title' => 'Our Telegram group', 'subtitle' => ''],
+            'phone' => ['title' => 'Call us', 'subtitle' => ''],
             'facebook' => ['title' => 'We are on Facebook', 'subtitle' => ''],
             'director' => ['title' => 'Message manager', 'subtitle' => ''],
             'map' => ['title' => 'Get directions', 'subtitle' => ''],
@@ -64,9 +66,10 @@ $i18n = [
         'items' => [
             'menu' => ['title' => 'Mở thực đơn', 'subtitle' => ''],
             'reserve' => ['title' => 'Đặt bàn', 'subtitle' => ''],
-            'whatsapp' => ['title' => 'Nhắn cho chúng tôi qua WhatsApp', 'subtitle' => '+84 396 314 266'],
-            'tg_veranda' => ['title' => 'Nhắn cho chúng tôi qua Telegram', 'subtitle' => ''],
+            'whatsapp' => ['title' => 'Nhắn qua WhatsApp', 'subtitle' => ''],
+            'tg_veranda' => ['title' => 'Nhắn qua Telegram', 'subtitle' => ''],
             'tg_group' => ['title' => 'Nhóm Telegram của chúng tôi', 'subtitle' => ''],
+            'phone' => ['title' => 'Gọi cho chúng tôi', 'subtitle' => ''],
             'facebook' => ['title' => 'Facebook', 'subtitle' => ''],
             'director' => ['title' => 'Nhắn quản lý', 'subtitle' => ''],
             'map' => ['title' => 'Chỉ đường', 'subtitle' => ''],
@@ -87,9 +90,10 @@ $i18n = [
         'items' => [
             'menu' => ['title' => '메뉴 열기', 'subtitle' => ''],
             'reserve' => ['title' => '테이블 예약', 'subtitle' => ''],
-            'whatsapp' => ['title' => 'WhatsApp으로 문의하기', 'subtitle' => '+84 396 314 266'],
-            'tg_veranda' => ['title' => 'Telegram으로 문의하기', 'subtitle' => ''],
+            'whatsapp' => ['title' => 'WhatsApp으로 메시지', 'subtitle' => ''],
+            'tg_veranda' => ['title' => 'Telegram으로 메시지', 'subtitle' => ''],
             'tg_group' => ['title' => 'Telegram 그룹', 'subtitle' => ''],
+            'phone' => ['title' => '전화하기', 'subtitle' => ''],
             'facebook' => ['title' => 'Facebook', 'subtitle' => ''],
             'director' => ['title' => '매니저에게 메시지', 'subtitle' => ''],
             'map' => ['title' => '오시는 길', 'subtitle' => ''],
@@ -99,7 +103,7 @@ $i18n = [
 
 $sections = [
     'primary' => ['menu', 'reserve'],
-    'contacts' => ['whatsapp', 'tg_veranda', 'tg_group', 'facebook', 'director'],
+    'contacts' => ['whatsapp', 'tg_veranda', 'tg_group', 'phone', 'facebook', 'director'],
     'visit' => ['map'],
 ];
 
@@ -107,6 +111,7 @@ $linkDefs = [
     'tg_group' => ['href' => 'https://t.me/gamezone_vietnam', 'icon' => 'telegram'],
     'tg_veranda' => ['href' => 'https://t.me/veranda.my', 'icon' => 'telegram'],
     'whatsapp' => ['href' => 'https://wa.me/84396314266', 'icon' => 'whatsapp'],
+    'phone' => ['href' => 'tel:+84396314266', 'icon' => 'phone'],
     'menu' => ['href' => '/links/menu.php', 'icon' => 'menu'],
     'reserve' => ['href' => '/tr3', 'icon' => 'reserve'],
     'director' => ['href' => 'https://t.me/zapleo_ceo', 'icon' => 'director'],
