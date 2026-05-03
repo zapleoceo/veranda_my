@@ -90,26 +90,111 @@
 })()
 
 (() => {
-  const panelLinks = document.querySelectorAll('.lang-panel a')
+  const panelLinks = Array.from(document.querySelectorAll('.lang-panel a'))
   if (!panelLinks.length) return
 
-  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const root = document.documentElement
+  const i18n = window.LINKS_I18N
+  if (!i18n) return
 
-  window.addEventListener('pageshow', () => {
-    root.classList.remove('lang-leave')
-  }, { passive: true })
+  const root = document.documentElement
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const knownLangs = Object.keys(i18n)
+  const metaByLang = window.LINKS_META || {}
+  const metaOgByLang = window.LINKS_META_OG || {}
+
+  const clampLang = (v) => knownLangs.includes(v) ? v : (knownLangs.includes('ru') ? 'ru' : knownLangs[0])
+
+  const cookieSet = (name, value) => {
+    const maxAge = 31536000
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`
+  }
+
+  const qsUpdate = (lang) => {
+    const u = new URL(window.location.href)
+    u.searchParams.set('lang', lang)
+    window.history.replaceState({}, '', u.toString())
+    const canonical = document.querySelector('link[rel="canonical"]')
+    if (canonical) canonical.setAttribute('href', u.origin + u.pathname + '?lang=' + encodeURIComponent(lang))
+    const ogUrl = document.querySelector('meta[property="og:url"]')
+    if (ogUrl) ogUrl.setAttribute('content', u.origin + u.pathname + '?lang=' + encodeURIComponent(lang))
+  }
+
+  const metaUpdate = (lang) => {
+    const md = metaByLang[lang]
+    const ogd = metaOgByLang[lang]
+    const desc = document.querySelector('meta[name="description"]')
+    if (desc && typeof md === 'string') desc.setAttribute('content', md)
+    const og = document.querySelector('meta[property="og:description"]')
+    if (og && typeof ogd === 'string') og.setAttribute('content', ogd)
+  }
+
+  const swapText = (el, next) => {
+    if (!el) return
+    const current = (el.textContent || '').trim()
+    const target = (next || '').trim()
+    if (current === target) return
+    el.classList.add('i18n-swap')
+    if (reduced) { el.textContent = target; return }
+    el.classList.add('is-out')
+    window.setTimeout(() => {
+      el.textContent = target
+      el.classList.remove('is-out')
+    }, 150)
+  }
+
+  const applyLang = (lang) => {
+    const nextLang = clampLang(lang)
+    const data = i18n[nextLang]
+    if (!data) return
+
+    root.setAttribute('lang', nextLang)
+    window.LINKS_LANG = nextLang
+    cookieSet('links_lang', nextLang)
+    qsUpdate(nextLang)
+    metaUpdate(nextLang)
+
+    for (const a of panelLinks) {
+      const href = a.getAttribute('href') || ''
+      const m = href.match(/[?&]lang=([a-zA-Z-]+)/)
+      const code = m ? m[1].toLowerCase() : ''
+      a.classList.toggle('active', code === nextLang)
+    }
+
+    const primaryBtns = document.querySelectorAll('.primary-btn[data-key]')
+    for (const btn of primaryBtns) {
+      const key = btn.getAttribute('data-key') || ''
+      const tr = data.items && data.items[key]
+      if (!tr) continue
+      const titleEl = btn.querySelector('.primary-title')
+      swapText(titleEl, tr.title || '')
+    }
+
+    const cards = document.querySelectorAll('.card[data-key]')
+    for (const card of cards) {
+      const key = card.getAttribute('data-key') || ''
+      const tr = data.items && data.items[key]
+      if (!tr) continue
+      const titleEl = card.querySelector('.title')
+      swapText(titleEl, tr.title || '')
+    }
+
+    const hoursTitleEl = document.querySelector('.hours__title')
+    if (hoursTitleEl) swapText(hoursTitleEl, (data.hours && data.hours.title) || '')
+    const lineEls = Array.from(document.querySelectorAll('.hours__lines > div'))
+    if (lineEls[0]) swapText(lineEls[0], (data.hours && data.hours.line1) || '')
+    if (lineEls[1]) swapText(lineEls[1], (data.hours && data.hours.line2) || '')
+  }
 
   for (const a of panelLinks) {
     a.addEventListener('click', (e) => {
       if (a.classList.contains('active')) return
-      if (reduced) return
       e.preventDefault()
-      const href = a.href
       const details = a.closest('details')
       if (details) details.open = false
-      root.classList.add('lang-leave')
-      window.setTimeout(() => { window.location.href = href }, 190)
+      const href = a.getAttribute('href') || ''
+      const m = href.match(/[?&]lang=([a-zA-Z-]+)/)
+      const nextLang = m ? m[1].toLowerCase() : ''
+      applyLang(nextLang)
     })
   }
 })()

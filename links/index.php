@@ -41,20 +41,20 @@ $subtitle = (string)($i18n[$lang]['subtitle'] ?? 'Быстрые ссылки');
 $hoursTitle = (string)($i18n[$lang]['hours']['title'] ?? '');
 $hoursLine1 = (string)($i18n[$lang]['hours']['line1'] ?? '');
 $hoursLine2 = (string)($i18n[$lang]['hours']['line2'] ?? '');
-$metaDescription = $lang === 'ru'
-    ? 'Veranda: меню, бронирование и контакты.'
-    : ($lang === 'vi'
-        ? 'Veranda: thực đơn, đặt bàn và liên hệ.'
-        : ($lang === 'ko'
-            ? 'Veranda: 메뉴, 예약, 연락처.'
-            : 'Veranda: menu, reservations and contacts.'));
-$metaOgDescription = $lang === 'ru'
-    ? 'Меню, бронирование и контакты.'
-    : ($lang === 'vi'
-        ? 'Thực đơn, đặt bàn và liên hệ.'
-        : ($lang === 'ko'
-            ? '메뉴, 예약, 연락처.'
-            : 'Menu, reservations and contacts.'));
+$metaDescriptions = [
+    'ru' => 'Veranda: меню, бронирование и контакты.',
+    'en' => 'Veranda: menu, reservations and contacts.',
+    'vi' => 'Veranda: thực đơn, đặt bàn và liên hệ.',
+    'ko' => 'Veranda: 메뉴, 예약, 연락처.',
+];
+$metaOgDescriptions = [
+    'ru' => 'Меню, бронирование и контакты.',
+    'en' => 'Menu, reservations and contacts.',
+    'vi' => 'Thực đơn, đặt bàn và liên hệ.',
+    'ko' => '메뉴, 예약, 연락처.',
+];
+$metaDescription = (string)($metaDescriptions[$lang] ?? $metaDescriptions['ru']);
+$metaOgDescription = (string)($metaOgDescriptions[$lang] ?? $metaOgDescriptions['ru']);
 
 $canonicalUrl = 'https://veranda.my/links/' . ($lang ? ('?lang=' . urlencode($lang)) : '');
 

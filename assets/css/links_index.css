@@ -299,13 +299,14 @@
 
 .lang-panel a:focus-visible { outline: 2px solid rgba(184,135,70,0.55); outline-offset: 2px; }
 
-html.lang-leave .links-hero__inner {
-    opacity: 0;
-    transform: translateY(10px);
+.i18n-swap {
+    transition: opacity 160ms ease, transform 160ms ease;
+    will-change: opacity, transform;
 }
 
-.links-hero__inner {
-    transition: opacity 180ms ease, transform 180ms ease;
+.i18n-swap.is-out {
+    opacity: 0;
+    transform: translateY(6px);
 }
 
 .logo {
