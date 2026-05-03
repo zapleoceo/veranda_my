@@ -20,32 +20,6 @@
     pointer-events: none;
 }
 
-.links-bg-stack {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    display: flex;
-    flex-direction: column;
-    pointer-events: none;
-    opacity: 0.32;
-    mix-blend-mode: screen;
-}
-
-.links-bg-stack--spot {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    opacity: 0.92;
-}
-
-.links-bg-tile {
-    flex: 0 0 var(--bg-tile-h, 720px);
-    background-image: url("/assets/img/links_bg.png");
-    background-repeat: no-repeat;
-    background-position: 50% 58%;
-    background-size: var(--bg-img-size, 720px) var(--bg-img-size, 720px);
-}
-
 .links-hero::before {
     content: '';
     position: absolute;
@@ -135,8 +109,12 @@
     z-index: 1;
     pointer-events: none;
     background:
-        radial-gradient(circle 260px at var(--mx) var(--my), rgba(184,135,70,0.22), transparent 64%);
-    opacity: 1;
+        radial-gradient(circle 260px at var(--mx) var(--my), rgba(184,135,70,0.16), transparent 64%),
+        url("/assets/img/links_bg.png");
+    background-repeat: no-repeat, repeat-y;
+    background-position: 0 0, 50% 0;
+    background-size: 100% 100%, 720px 720px;
+    opacity: 0.95;
     mix-blend-mode: screen;
     -webkit-mask-image: radial-gradient(circle 220px at var(--mx) var(--my), rgba(0,0,0,1) 0%, rgba(0,0,0,0) 68%);
     mask-image: radial-gradient(circle 220px at var(--mx) var(--my), rgba(0,0,0,1) 0%, rgba(0,0,0,0) 68%);
@@ -540,10 +518,7 @@
 
 @media (max-width: 640px) {
     .blob { filter: blur(70px); }
-    .links-bg-tile {
-        flex-basis: 520px;
-        background-size: 520px 520px;
-    }
+    .links-spotlight { background-size: 100% 100%, 520px 520px; }
 }
 
 @media (max-width: 420px) {
