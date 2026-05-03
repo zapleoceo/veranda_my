@@ -18,7 +18,7 @@
     <title>Links | Veranda</title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0004">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0005">
 </head>
 <body>
     <div class="auth-float">
@@ -39,14 +39,9 @@
             </div>
             <div class="links-hero__inner">
                 <div class="links-header">
-                    <div class="brand">
-                        <div class="logo"><span>V</span></div>
-                        <div>
-                            <h1>Veranda</h1>
-                            <?php if ($subtitle !== ''): ?>
-                                <div class="subtitle"><?= htmlspecialchars($subtitle) ?></div>
-                            <?php endif; ?>
-                        </div>
+                    <div class="brand brand--center">
+                        <h1 class="brand-title">Veranda — restaurant &amp; bar</h1>
+                        <div class="brand-sub">A1</div>
                     </div>
                     <div class="header-right">
                         <details class="lang-menu">
@@ -128,6 +123,6 @@
     </main>
 
     <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <script src="/links/links_fx.js?v=20260504_0004" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0005" defer></script>
 </body>
 </html>
