@@ -1,5 +1,11 @@
         body { background: transparent !important; }
 
+        .menu-page .links-hero::after {
+            background: radial-gradient(ellipse at center, transparent 22%, rgba(0,0,0,0.84) 74%, rgba(0,0,0,0.95) 100%);
+        }
+
+        .menu-page .links-spotlight { opacity: 0.9; }
+
         .menu-content {
             margin-top: 18px;
             font-family: "Montserrat", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;

@@ -214,10 +214,10 @@ $telephone = '+84396314266';
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css?v=20260425_0001">
     <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0028">
-    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0034">
+    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0035">
 </head>
-<body>
-    <main class="links-page">
+<body class="menu-page">
+    <main class="links-page menu-page">
         <header class="links-hero">
             <div class="links-hero__bg" aria-hidden="true">
                 <div class="links-mesh" aria-hidden="true">
