@@ -17,8 +17,11 @@
     <meta name="twitter:card" content="summary_large_image">
     <title>Links | Veranda</title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0007">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0008">
 </head>
 <body>
     <div class="auth-float">
@@ -40,7 +43,10 @@
             <div class="links-hero__inner">
                 <div class="links-header">
                     <div class="brand brand--center">
-                        <h1 class="brand-title">Veranda- restaurant and bar</h1>
+                        <h1 class="brand-title">
+                            <span class="brand-name">VERANDA</span>
+                            <span class="brand-tagline">RESTAURANT &amp; BAR</span>
+                        </h1>
                     </div>
                     <div class="header-right">
                         <details class="lang-menu">
@@ -122,6 +128,6 @@
     </main>
 
     <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <script src="/links/links_fx.js?v=20260504_0007" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0008" defer></script>
 </body>
 </html>
