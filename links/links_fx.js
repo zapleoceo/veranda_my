@@ -64,7 +64,7 @@
       rect = hero.getBoundingClientRect()
       const ampX = Math.min(110, rect.width * 0.06)
       const ampY = Math.min(90, rect.height * 0.05)
-      const t = driftT * 0.00028
+      const t = driftT * 0.00084
       x = baseX + Math.sin(t) * ampX
       y = baseY + Math.sin(t * 0.83) * ampY
     } else {
