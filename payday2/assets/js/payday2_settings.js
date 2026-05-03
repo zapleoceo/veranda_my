@@ -243,6 +243,87 @@ window.initPayday2_Settings = function() {
         set('pd2sett_padm_ssid', map.ssid || '');
         set('pd2sett_padm_csrf', map.csrf_cookie_poster || map.csrf || '');
     };
+    const parsePosterAdminCurl = () => {
+        const curlEl = document.getElementById('pd2sett_padm_curl');
+        if (!curlEl) return;
+        let raw = String(curlEl.value || '').trim();
+        if (!raw) return;
+
+        raw = raw
+            .replace(/\r\n/g, '\n')
+            .replace(/\^\s*\n/g, '')
+            .replace(/\^"/g, '"')
+            .replace(/\^'/g, "'")
+            .replace(/\^%/g, '%')
+            .replace(/`/g, '');
+
+        let urlStr = '';
+        const urlM = raw.match(/https?:\/\/[^\s"'<>]+/i);
+        if (urlM && urlM[0]) urlStr = String(urlM[0]);
+
+        let accountFromUrl = '';
+        if (urlStr) {
+            try {
+                const u = new URL(urlStr);
+                const m = String(u.hostname || '').match(/^([a-z0-9-]+)\.joinposter\.com$/i);
+                if (m && m[1]) accountFromUrl = String(m[1]);
+            } catch (_) {}
+        }
+
+        let cookieRaw = '';
+        const bM = raw.match(/(?:^|\s)-(?:b|cookie)\s+(\"[^\"]*\"|'[^']*'|[^\s]+)/i);
+        if (bM && bM[1]) {
+            cookieRaw = String(bM[1]).trim();
+            if ((cookieRaw.startsWith('"') && cookieRaw.endsWith('"')) || (cookieRaw.startsWith("'") && cookieRaw.endsWith("'"))) {
+                cookieRaw = cookieRaw.slice(1, -1);
+            }
+        }
+
+        let ua = '';
+        const aM = raw.match(/(?:^|\s)-(?:A|-user-agent|--user-agent)\s+\"([^\"]+)\"/i);
+        if (aM && aM[1]) ua = String(aM[1]).trim();
+
+        const hdrRe = /(?:^|\s)-H\s+\"([^\"]+)\"|(?:^|\s)-H\s+'([^']+)'/gi;
+        let hm;
+        while ((hm = hdrRe.exec(raw))) {
+            const line = String(hm[1] || hm[2] || '').trim();
+            const idx = line.indexOf(':');
+            if (idx <= 0) continue;
+            const k = line.slice(0, idx).trim().toLowerCase();
+            const v = line.slice(idx + 1).trim();
+            if (k === 'user-agent' && !ua) ua = v;
+            if (k === 'cookie' && !cookieRaw) cookieRaw = v.replace(/^Cookie:\s*/i, '').trim();
+        }
+
+        const cookieEl = document.getElementById('pd2sett_padm_cookie');
+        if (cookieEl && cookieRaw) cookieEl.value = 'Cookie: ' + cookieRaw;
+
+        if (cookieRaw) {
+            const parts = cookieRaw.split(';').map((p) => String(p || '').trim()).filter(Boolean);
+            const map = {};
+            parts.forEach((p) => {
+                const i = p.indexOf('=');
+                if (i <= 0) return;
+                const k = p.slice(0, i).trim();
+                const v = p.slice(i + 1).trim();
+                if (!k) return;
+                map[k] = v;
+            });
+            const set = (id, v) => { const el = document.getElementById(id); if (el && v != null && String(v).trim() !== '') el.value = String(v).trim(); };
+            set('pd2sett_padm_account', map.account_url || map.account || accountFromUrl || '');
+            set('pd2sett_padm_pos_session', map.pos_session || '');
+            set('pd2sett_padm_ssid', map.ssid || '');
+            set('pd2sett_padm_csrf', map.csrf_cookie_poster || map.csrf || '');
+        } else if (accountFromUrl) {
+            const accEl = document.getElementById('pd2sett_padm_account');
+            if (accEl && String(accEl.value || '').trim() === '') accEl.value = accountFromUrl;
+        }
+
+        if (ua) {
+            const uaEl = document.getElementById('pd2sett_padm_ua');
+            if (uaEl) uaEl.value = ua;
+        }
+    };
     const openPosterAdminLogin = () => {
         const accEl = document.getElementById('pd2sett_padm_account');
         const acc = accEl ? String(accEl.value || '').trim() : '';
@@ -254,6 +335,8 @@ window.initPayday2_Settings = function() {
     if (parseBtn) parseBtn.addEventListener('click', parsePosterAdminCookie);
     const loginBtn = document.getElementById('pd2sett_padm_login_btn');
     if (loginBtn) loginBtn.addEventListener('click', openPosterAdminLogin);
+    const curlParseBtn = document.getElementById('pd2sett_padm_curl_parse_btn');
+    if (curlParseBtn) curlParseBtn.addEventListener('click', parsePosterAdminCurl);
     
     document.addEventListener('keydown', (ev) => {
         if (ev.key !== 'Escape') return;

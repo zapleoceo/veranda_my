@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260503_0001';
+$payday2AssetVersion = '20260503_0002';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -1195,6 +1195,13 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
 
                         <details class="pd2-settings-spoiler pd2-mb-10">
                             <summary class="pd2-fw-900 pd2-pointer pd2-p-8 pd2-bg-card pd2-border-radius-10 pd2-border">Poster Admin (Edit check)</summary>
+                            <div class="pd2-mt-10">
+                                <div class="muted pd2-fs-12 pd2-mb-6">Вставьте cURL (как скопировали из DevTools) и нажмите «Разобрать».</div>
+                                <div class="pd2-d-flex pd2-gap-10" style="flex-wrap: wrap;">
+                                    <textarea class="btn pd2-flex-1" id="pd2sett_padm_curl" rows="4" autocomplete="off" placeholder="curl &quot;https://restpublica2.joinposter.com/listings/dash_receipts/get-actions/12345&quot; -X &quot;POST&quot; -b &quot;account_url=...; ssid=...; csrf_cookie_poster=...; pos_session=...&quot; -H &quot;user-agent: ...&quot;"></textarea>
+                                    <button type="button" class="btn2" id="pd2sett_padm_curl_parse_btn">Разобрать</button>
+                                </div>
+                            </div>
                             <div class="pd2-settings-grid-4 pd2-mt-10">
                                 <label class="pd2-settings-label pd2-m-0"><span>account_url</span>
                                     <input type="text" class="btn pd2-w-100" id="pd2sett_padm_account" autocomplete="off" placeholder="restpublica2">
