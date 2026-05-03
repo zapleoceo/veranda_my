@@ -213,8 +213,8 @@ $telephone = '+84396314266';
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css?v=20260425_0001">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0025">
-    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0027">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0026">
+    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0028">
 </head>
 <body>
     <main class="links-page">
@@ -229,6 +229,9 @@ $telephone = '+84396314266';
             </div>
             <div class="links-hero__inner">
                 <div class="links-header">
+                    <div class="header-left">
+                        <a class="menu-back" href="/links/?lang=<?= urlencode($lang) ?>">←</a>
+                    </div>
                     <div class="brand brand--center">
                         <h1 class="brand-title">
                             <span class="brand-name">VERANDA</span>
@@ -236,7 +239,6 @@ $telephone = '+84396314266';
                         </h1>
                     </div>
                     <div class="header-right">
-                        <a class="menu-back" href="/links/?lang=<?= urlencode($lang) ?>">←</a>
                         <details class="lang-menu">
                             <summary aria-label="Language">
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm7.93 9h-3.2a15.7 15.7 0 0 0-1.47-5 8.05 8.05 0 0 1 4.67 5ZM12 4c1.1 0 2.7 2.2 3.4 7H8.6C9.3 6.2 10.9 4 12 4ZM4.07 11a8.05 8.05 0 0 1 4.67-5 15.7 15.7 0 0 0-1.47 5Zm0 2h3.2a15.7 15.7 0 0 0 1.47 5 8.05 8.05 0 0 1-4.67-5ZM12 20c-1.1 0-2.7-2.2-3.4-7h6.8c-.7 4.8-2.3 7-3.4 7Zm3.26-2a15.7 15.7 0 0 0 1.47-5h3.2a8.05 8.05 0 0 1-4.67 5Z"/></svg>
@@ -375,7 +377,7 @@ $telephone = '+84396314266';
             ],
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/links/links_fx.js?v=20260504_0025" defer></script>
-    <script src="/assets/js/menu-beta.js?v=20260504_0027" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0026" defer></script>
+    <script src="/assets/js/menu-beta.js?v=20260504_0028" defer></script>
 </body>
 </html>

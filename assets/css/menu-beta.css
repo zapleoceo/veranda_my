@@ -2,12 +2,22 @@
 
         .menu-content { margin-top: 18px; }
 
+        .header-left {
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 40;
+            display: inline-flex;
+            align-items: center;
+        }
+
         .menu-back {
             width: 34px;
             height: 34px;
             border-radius: 999px;
             border: 1px solid rgba(255,255,255,0.10);
             background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(12px) saturate(120%);
             display: inline-flex;
             align-items: center;
             justify-content: center;
