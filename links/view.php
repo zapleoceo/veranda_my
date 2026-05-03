@@ -18,7 +18,7 @@
     <title>Links | Veranda</title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0003">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0004">
 </head>
 <body>
     <div class="auth-float">
@@ -86,7 +86,9 @@
                             </section>
                         <?php else: ?>
                             <section class="links-section">
-                                <h2 class="links-section__title"><?= htmlspecialchars($section['title']) ?></h2>
+                                <?php if (!empty($section['title'])): ?>
+                                    <h2 class="links-section__title"><?= htmlspecialchars($section['title']) ?></h2>
+                                <?php endif; ?>
                                 <div class="links-cards">
                                     <?php foreach ($section['items'] as $item): ?>
                                         <?php $external = (string)($item['href'] ?? '') !== '' && (string)($item['href'])[0] !== '/'; ?>
@@ -126,6 +128,6 @@
     </main>
 
     <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <script src="/links/links_fx.js?v=20260504_0003" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0004" defer></script>
 </body>
 </html>
