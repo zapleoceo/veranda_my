@@ -42,19 +42,19 @@ $hoursTitle = (string)($i18n[$lang]['hours']['title'] ?? '');
 $hoursLine1 = (string)($i18n[$lang]['hours']['line1'] ?? '');
 $hoursLine2 = (string)($i18n[$lang]['hours']['line2'] ?? '');
 $metaDescription = $lang === 'ru'
-    ? 'Быстрые ссылки Veranda: меню, бронирование, контакты и карта.'
+    ? 'Veranda: меню, бронирование и контакты.'
     : ($lang === 'vi'
-        ? 'Liên kết nhanh Veranda: thực đơn, đặt bàn, liên hệ và bản đồ.'
+        ? 'Veranda: thực đơn, đặt bàn và liên hệ.'
         : ($lang === 'ko'
-            ? 'Veranda 빠른 링크: 메뉴, 예약, 연락처, 지도.'
-            : 'Veranda quick links: menu, booking, contacts and map.'));
+            ? 'Veranda: 메뉴, 예약, 연락처.'
+            : 'Veranda: menu, reservations and contacts.'));
 $metaOgDescription = $lang === 'ru'
-    ? 'Быстрые ссылки: меню, бронирование, контакты и карта.'
+    ? 'Меню, бронирование и контакты.'
     : ($lang === 'vi'
-        ? 'Liên kết nhanh: thực đơn, đặt bàn, liên hệ và bản đồ.'
+        ? 'Thực đơn, đặt bàn và liên hệ.'
         : ($lang === 'ko'
-            ? '빠른 링크: 메뉴, 예약, 연락처, 지도.'
-            : 'Quick links: menu, booking, contacts and map.'));
+            ? '메뉴, 예약, 연락처.'
+            : 'Menu, reservations and contacts.'));
 
 $canonicalUrl = 'https://veranda.my/links/' . ($lang ? ('?lang=' . urlencode($lang)) : '');
 

@@ -147,7 +147,7 @@ if (!empty($update['message'])) {
                             [
                                 [
                                     'text' => 'Посмотреть меню',
-                                    'web_app' => ['url' => 'https://veranda.my/links/menu-beta.php'],
+                                    'web_app' => ['url' => 'https://veranda.my/links/menu.php'],
                                 ],
                             ],
                             [
@@ -250,4 +250,3 @@ if ($callbackId !== '') {
 }
 
 echo 'ok';
-

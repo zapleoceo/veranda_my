@@ -18,7 +18,7 @@
     <title>Links | Veranda</title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0001">
+    <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0002">
 </head>
 <body>
     <div class="auth-float">
@@ -69,27 +69,50 @@
                     </div>
                 </div>
 
-                <div class="links-grid">
+                <div class="links-layout">
                     <?php foreach ($sectionView as $section): ?>
-                        <section class="links-section">
-                            <h2 class="links-section__title"><?= htmlspecialchars($section['title']) ?></h2>
-                            <div class="links-cards">
-                                <?php foreach ($section['items'] as $item): ?>
-                                    <a class="card" href="<?= htmlspecialchars($item['href']) ?>" target="_blank" rel="noopener noreferrer">
-                                        <div class="icon"><?= $icons[$item['icon']] ?? '' ?></div>
-                                        <div class="texts">
-                                            <div class="title"><?= htmlspecialchars($item['title']) ?></div>
-                                            <?php if (!empty($item['subtitle'])): ?>
-                                                <div class="sub"><?= htmlspecialchars($item['subtitle']) ?></div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="arrow">
-                                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.2 5 11.8 6.4 16.4 11H4v2h12.4l-4.6 4.6L13.2 19l8-8Z"/></svg>
-                                        </div>
-                                    </a>
-                                <?php endforeach; ?>
-                            </div>
-                        </section>
+                        <?php if (($section['key'] ?? '') === 'primary'): ?>
+                            <section class="primary">
+                                <div class="primary-actions">
+                                    <?php foreach ($section['items'] as $item): ?>
+                                        <?php $external = (string)($item['href'] ?? '') !== '' && (string)($item['href'])[0] !== '/'; ?>
+                                        <a class="primary-btn" href="<?= htmlspecialchars($item['href']) ?>" <?= $external ? 'target="_blank" rel="noopener noreferrer"' : '' ?>>
+                                            <div class="primary-icon"><?= $icons[$item['icon']] ?? '' ?></div>
+                                            <div class="primary-text">
+                                                <div class="primary-title"><?= htmlspecialchars($item['title']) ?></div>
+                                                <?php if (!empty($item['subtitle'])): ?>
+                                                    <div class="primary-sub"><?= htmlspecialchars($item['subtitle']) ?></div>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="primary-arrow" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24"><path d="M13.2 5 11.8 6.4 16.4 11H4v2h12.4l-4.6 4.6L13.2 19l8-8Z"/></svg>
+                                            </div>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </div>
+                            </section>
+                        <?php else: ?>
+                            <section class="links-section">
+                                <h2 class="links-section__title"><?= htmlspecialchars($section['title']) ?></h2>
+                                <div class="links-cards">
+                                    <?php foreach ($section['items'] as $item): ?>
+                                        <?php $external = (string)($item['href'] ?? '') !== '' && (string)($item['href'])[0] !== '/'; ?>
+                                        <a class="card" href="<?= htmlspecialchars($item['href']) ?>" <?= $external ? 'target="_blank" rel="noopener noreferrer"' : '' ?>>
+                                            <div class="icon"><?= $icons[$item['icon']] ?? '' ?></div>
+                                            <div class="texts">
+                                                <div class="title"><?= htmlspecialchars($item['title']) ?></div>
+                                                <?php if (!empty($item['subtitle'])): ?>
+                                                    <div class="sub"><?= htmlspecialchars($item['subtitle']) ?></div>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="arrow" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24"><path d="M13.2 5 11.8 6.4 16.4 11H4v2h12.4l-4.6 4.6L13.2 19l8-8Z"/></svg>
+                                            </div>
+                                        </a>
+                                    <?php endforeach; ?>
+                                </div>
+                            </section>
+                        <?php endif; ?>
                     <?php endforeach; ?>
                 </div>
 
@@ -101,6 +124,6 @@
     </main>
 
     <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-    <script src="/links/links_fx.js?v=20260504_0001" defer></script>
+    <script src="/links/links_fx.js?v=20260504_0002" defer></script>
 </body>
 </html>
