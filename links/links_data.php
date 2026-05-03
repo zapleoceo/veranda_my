@@ -103,7 +103,7 @@ $i18n = [
 
 $sections = [
     'primary' => ['menu', 'reserve'],
-    'contacts' => ['whatsapp', 'tg_veranda', 'phone', 'tg_group', 'facebook', 'director'],
+    'contacts' => ['tg_veranda', 'whatsapp', 'phone', 'tg_group', 'facebook', 'director'],
     'visit' => ['map'],
 ];
 
