@@ -414,6 +414,7 @@
 .menu-filters input[name="q"] {
     width: 32ch;
     min-height: 40px;
+    border-radius: 10px;
     padding-top: 0;
     padding-bottom: 0;
 }
