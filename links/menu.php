@@ -86,9 +86,9 @@ $trLang = $lang === 'vi' ? 'vn' : $lang;
 $items = $db->query(
     "SELECT
         w.id AS workshop_id,
-        COALESCE(NULLIF(wtr.name,''), NULLIF(w.name_raw,''), '') AS main_label,
+        COALESCE(NULLIF(wtr.name,''), NULLIF(wtr_ru.name,''), '') AS main_label,
         c.id AS category_id,
-        COALESCE(NULLIF(ctr.name,''), NULLIF(c.name_raw,''), '') AS sub_label,
+        COALESCE(NULLIF(ctr.name,''), NULLIF(ctr_ru.name,''), '') AS sub_label,
         p.poster_id,
         p.price_raw,
         COALESCE(NULLIF(itr.title,''), NULLIF(itr_ru.title,''), NULLIF(p.name_raw,''), '') AS title,
@@ -105,6 +105,8 @@ $items = $db->query(
      LEFT JOIN {$miTr} itr_ru ON itr_ru.item_id = mi.id AND itr_ru.lang = 'ru'
      LEFT JOIN {$mcTr} ctr ON ctr.category_id = c.id AND ctr.lang = ?
      LEFT JOIN {$mwTr} wtr ON wtr.workshop_id = w.id AND wtr.lang = ?
+     JOIN {$mcTr} ctr_ru ON ctr_ru.category_id = c.id AND ctr_ru.lang = 'ru' AND ctr_ru.name <> ''
+     JOIN {$mwTr} wtr_ru ON wtr_ru.workshop_id = w.id AND wtr_ru.lang = 'ru' AND wtr_ru.name <> ''
      WHERE mi.is_published = 1
      ORDER BY
         w.sort_order ASC,
@@ -122,11 +124,8 @@ foreach ($items as $it) {
     $categoryId = (int)($it['category_id'] ?? 0);
     $mainLabel = trim((string)($it['main_label'] ?? ''));
     $subLabel = trim((string)($it['sub_label'] ?? ''));
-    if ($mainLabel === '') {
-        $mainLabel = $lang === 'ru' ? 'Без категории' : ($lang === 'vi' ? 'Không danh mục' : ($lang === 'ko' ? '미분류' : 'Uncategorized'));
-    }
-    if ($subLabel === '') {
-        $subLabel = $lang === 'ru' ? 'Без подкатегории' : ($lang === 'vi' ? 'Không danh mục con' : ($lang === 'ko' ? '하위 분류 없음' : 'No subcategory'));
+    if ($mainLabel === '' || $subLabel === '') {
+        continue;
     }
 
     if (!isset($groups[$workshopId])) {
