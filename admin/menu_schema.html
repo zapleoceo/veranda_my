@@ -71,16 +71,18 @@
     }
     .grid {
       position: relative;
-      display: grid;
-      grid-template-columns: 1.2fr 1.4fr 1.2fr;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
       gap: 14px;
       padding: 14px;
       min-height: 520px;
     }
     .col {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: 14px;
-      align-content: start;
+      width: fit-content;
     }
     .box {
       position: relative;
@@ -89,6 +91,8 @@
       background: var(--card);
       padding: 12px 12px 10px;
       box-shadow: 0 10px 26px rgba(0,0,0,0.25);
+      width: fit-content;
+      max-width: 100%;
       touch-action: none;
     }
     .box .title {
@@ -127,22 +131,28 @@
       list-style: none;
       padding: 0;
       margin: 0;
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: 6px;
       font-size: 12px;
       color: rgba(255,255,255,0.82);
+      width: fit-content;
+      max-width: 100%;
     }
     li {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-start;
+      align-items: center;
       gap: 10px;
       border: 1px solid rgba(255,255,255,0.06);
       background: rgba(0,0,0,0.10);
       border-radius: 10px;
       padding: 6px 8px;
+      width: fit-content;
+      max-width: 100%;
     }
-    .k { color: rgba(255,255,255,0.92); font-weight: 850; }
-    .v { color: rgba(255,255,255,0.62); }
+    .k { color: rgba(255,255,255,0.92); font-weight: 850; white-space: nowrap; }
+    .v { color: rgba(255,255,255,0.62); white-space: nowrap; }
     .foot {
       margin-top: 12px;
       color: var(--muted);
@@ -159,7 +169,7 @@
     .grid { z-index: 1; }
     canvas.links { z-index: 0; }
     @media (max-width: 980px) {
-      .grid { grid-template-columns: 1fr; min-height: 860px; }
+      .grid { flex-direction: column; min-height: 860px; }
     }
   </style>
 </head>
@@ -188,7 +198,7 @@
               <span class="tag"><span class="dot bad"></span>Poster</span>
             </div>
             <ul>
-              <li><span class="k">id</span><span class="v">PK</span></li>
+              <li id="f_poster_menu_items_id"><span class="k">id</span><span class="v">PK</span></li>
               <li><span class="k">poster_id</span><span class="v">ID в Poster</span></li>
               <li><span class="k">is_active</span><span class="v">0/1</span></li>
               <li><span class="k">name_raw</span><span class="v">raw</span></li>
@@ -204,9 +214,9 @@
               <span class="tag"><span class="dot warn"></span>Позиции</span>
             </div>
             <ul>
-              <li><span class="k">id</span><span class="v">PK</span></li>
-              <li><span class="k">poster_item_id</span><span class="v">→ poster_menu_items.id</span></li>
-              <li><span class="k">category_id</span><span class="v">→ menu_categories.id</span></li>
+              <li id="f_menu_items_id"><span class="k">id</span><span class="v">PK</span></li>
+              <li id="f_menu_items_poster_item_id"><span class="k">poster_item_id</span><span class="v">→ poster_menu_items.id</span></li>
+              <li id="f_menu_items_category_id"><span class="k">category_id</span><span class="v">→ menu_categories.id</span></li>
               <li><span class="k">is_published</span><span class="v">0/1</span></li>
               <li><span class="k">sort_order</span><span class="v">int</span></li>
               <li><span class="k">image_url</span><span class="v">url</span></li>
@@ -219,7 +229,7 @@
               <span class="tag"><span class="dot warn"></span>Переводы</span>
             </div>
             <ul>
-              <li><span class="k">item_id</span><span class="v">→ menu_items.id</span></li>
+              <li id="f_menu_item_tr_item_id"><span class="k">item_id</span><span class="v">→ menu_items.id</span></li>
               <li><span class="k">lang</span><span class="v">ru/en/vn/ko</span></li>
               <li><span class="k">title</span><span class="v">text</span></li>
               <li><span class="k">description</span><span class="v">text</span></li>
@@ -234,8 +244,8 @@
               <span class="tag"><span class="dot ok"></span>Структура</span>
             </div>
             <ul>
-              <li><span class="k">id</span><span class="v">PK</span></li>
-              <li><span class="k">workshop_id</span><span class="v">→ menu_workshops.id</span></li>
+              <li id="f_menu_categories_id"><span class="k">id</span><span class="v">PK</span></li>
+              <li id="f_menu_categories_workshop_id"><span class="k">workshop_id</span><span class="v">→ menu_workshops.id</span></li>
               <li><span class="k">name_raw</span><span class="v">raw</span></li>
               <li><span class="k">show_on_site</span><span class="v">0/1</span></li>
               <li><span class="k">sort_order</span><span class="v">int</span></li>
@@ -248,7 +258,7 @@
               <span class="tag"><span class="dot ok"></span>Переводы</span>
             </div>
             <ul>
-              <li><span class="k">category_id</span><span class="v">→ menu_categories.id</span></li>
+              <li id="f_menu_category_tr_category_id"><span class="k">category_id</span><span class="v">→ menu_categories.id</span></li>
               <li><span class="k">lang</span><span class="v">ru/en/vn/ko</span></li>
               <li><span class="k">name</span><span class="v">text</span></li>
             </ul>
@@ -262,7 +272,7 @@
               <span class="tag"><span class="dot ok"></span>Цехи</span>
             </div>
             <ul>
-              <li><span class="k">id</span><span class="v">PK</span></li>
+              <li id="f_menu_workshops_id"><span class="k">id</span><span class="v">PK</span></li>
               <li><span class="k">name_raw</span><span class="v">raw</span></li>
               <li><span class="k">show_on_site</span><span class="v">0/1</span></li>
               <li><span class="k">sort_order</span><span class="v">int</span></li>
@@ -275,7 +285,7 @@
               <span class="tag"><span class="dot ok"></span>Переводы</span>
             </div>
             <ul>
-              <li><span class="k">workshop_id</span><span class="v">→ menu_workshops.id</span></li>
+              <li id="f_menu_workshop_tr_workshop_id"><span class="k">workshop_id</span><span class="v">→ menu_workshops.id</span></li>
               <li><span class="k">lang</span><span class="v">ru/en/vn/ko</span></li>
               <li><span class="k">name</span><span class="v">text</span></li>
             </ul>
@@ -355,6 +365,28 @@
         return { x: (b.left + b.right) / 2 - c.left, y: b.bottom - c.top };
       };
 
+      const center = (el) => {
+        const b = el.getBoundingClientRect();
+        const c = board.getBoundingClientRect();
+        return { x: (b.left + b.right) / 2 - c.left, y: (b.top + b.bottom) / 2 - c.top };
+      };
+
+      const anchorTo = (el, toPoint) => {
+        const b = el.getBoundingClientRect();
+        const c = board.getBoundingClientRect();
+        const cx = (b.left + b.right) / 2 - c.left;
+        const cy = (b.top + b.bottom) / 2 - c.top;
+        const dx = (toPoint.x - cx);
+        const dy = (toPoint.y - cy);
+
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          const x = (dx >= 0) ? (b.right - c.left) : (b.left - c.left);
+          return { x, y: cy };
+        }
+        const y = (dy >= 0) ? (b.bottom - c.top) : (b.top - c.top);
+        return { x: cx, y };
+      };
+
       const drawArrow = (x, y, angle, size, color) => {
         ctx.save();
         ctx.translate(x, y);
@@ -415,31 +447,35 @@
         const cssH = parseInt(String(canvas.dataset.cssh || '0'), 10) || board.getBoundingClientRect().height;
         ctx.clearRect(0, 0, cssW, cssH);
 
-        const pmi = getBox('t_poster_menu_items');
-        const mi = getBox('t_menu_items');
-        const mitr = getBox('t_menu_item_tr');
-        const mc = getBox('t_menu_categories');
-        const mctr = getBox('t_menu_category_tr');
-        const mw = getBox('t_menu_workshops');
-        const mwtr = getBox('t_menu_workshop_tr');
-        if (!pmi || !mi || !mitr || !mc || !mctr || !mw || !mwtr) return;
+        const fPmiId = getBox('f_poster_menu_items_id');
+        const fMiPosterItemId = getBox('f_menu_items_poster_item_id');
+        const fMiCategoryId = getBox('f_menu_items_category_id');
+        const fMiId = getBox('f_menu_items_id');
+        const fMiTrItemId = getBox('f_menu_item_tr_item_id');
+        const fMcId = getBox('f_menu_categories_id');
+        const fMcWorkshopId = getBox('f_menu_categories_workshop_id');
+        const fMcTrCategoryId = getBox('f_menu_category_tr_category_id');
+        const fMwId = getBox('f_menu_workshops_id');
+        const fMwTrWorkshopId = getBox('f_menu_workshop_tr_workshop_id');
+        if (!fPmiId || !fMiPosterItemId || !fMiCategoryId || !fMiId || !fMiTrItemId || !fMcId || !fMcWorkshopId || !fMcTrCategoryId || !fMwId || !fMwTrWorkshopId) return;
 
-        if (window.matchMedia && window.matchMedia('(max-width: 980px)').matches) {
-          addPath(centerBottom(pmi), centerTop(mi));
-          addPath(centerBottom(mi), centerTop(mitr), { secondary: true });
-          addPath(centerRight(mi), centerLeft(mc));
-          addPath(centerBottom(mc), centerTop(mctr), { secondary: true });
-          addPath(centerRight(mc), centerLeft(mw));
-          addPath(centerBottom(mw), centerTop(mwtr), { secondary: true });
-          return;
-        }
+        const cPmiId = center(fPmiId);
+        const cMiPosterItemId = center(fMiPosterItemId);
+        const cMiCategoryId = center(fMiCategoryId);
+        const cMiId = center(fMiId);
+        const cMiTrItemId = center(fMiTrItemId);
+        const cMcId = center(fMcId);
+        const cMcWorkshopId = center(fMcWorkshopId);
+        const cMcTrCategoryId = center(fMcTrCategoryId);
+        const cMwId = center(fMwId);
+        const cMwTrWorkshopId = center(fMwTrWorkshopId);
 
-        addPath(centerRight(pmi), centerLeft(mi));
-        addPath(centerBottom(mi), centerTop(mitr), { secondary: true });
-        addPath(centerRight(mi), centerLeft(mc));
-        addPath(centerBottom(mc), centerTop(mctr), { secondary: true });
-        addPath(centerRight(mc), centerLeft(mw));
-        addPath(centerBottom(mw), centerTop(mwtr), { secondary: true });
+        addPath(anchorTo(fMiPosterItemId, cPmiId), anchorTo(fPmiId, cMiPosterItemId));
+        addPath(anchorTo(fMiTrItemId, cMiId), anchorTo(fMiId, cMiTrItemId), { secondary: true });
+        addPath(anchorTo(fMiCategoryId, cMcId), anchorTo(fMcId, cMiCategoryId));
+        addPath(anchorTo(fMcTrCategoryId, cMcId), anchorTo(fMcId, cMcTrCategoryId), { secondary: true });
+        addPath(anchorTo(fMcWorkshopId, cMwId), anchorTo(fMwId, cMcWorkshopId));
+        addPath(anchorTo(fMwTrWorkshopId, cMwId), anchorTo(fMwId, cMwTrWorkshopId), { secondary: true });
       };
 
       const render = () => {
@@ -492,6 +528,13 @@
             const startY = e.clientY;
             const baseX = parseFloat(String(el.dataset.tx || '0')) || 0;
             const baseY = parseFloat(String(el.dataset.ty || '0')) || 0;
+            const boardRect = board.getBoundingClientRect();
+            const elRect = el.getBoundingClientRect();
+            const pad = 8;
+            const minDx = -(elRect.left - boardRect.left) + pad;
+            const maxDx = (boardRect.right - elRect.right) - pad;
+            const minDy = -(elRect.top - boardRect.top) + pad;
+            const maxDy = (boardRect.bottom - elRect.bottom) - pad;
 
             el.classList.add('is-dragging');
             el.style.zIndex = '20';
@@ -502,7 +545,9 @@
               if (!(ev instanceof PointerEvent)) return;
               const dx = ev.clientX - startX;
               const dy = ev.clientY - startY;
-              setTranslate(el, baseX + dx, baseY + dy);
+              const clampedDx = Math.max(minDx, Math.min(maxDx, dx));
+              const clampedDy = Math.max(minDy, Math.min(maxDy, dy));
+              setTranslate(el, baseX + clampedDx, baseY + clampedDy);
               scheduleDraw();
             };
             const onUp = (ev) => {
