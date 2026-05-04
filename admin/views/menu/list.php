@@ -89,7 +89,7 @@
     <input type="hidden" name="cols" value="<?= htmlspecialchars($colsHidden) ?>">
     <div class="form-group">
         <label>Цех</label>
-        <select name="workshop_id">
+        <select name="workshop_id" class="menu-filter-select" data-autowidth="1">
             <option value="">Все</option>
             <?php foreach ($menuWorkshops as $w): ?>
                 <?php $id = (int)$w['id']; $name = $stripNumberPrefix((string)($w['name_ru'] ?? $w['name_raw'])); ?>
@@ -99,7 +99,7 @@
     </div>
     <div class="form-group">
         <label>Категория</label>
-        <select name="category_id">
+        <select name="category_id" class="menu-filter-select" data-autowidth="1">
             <option value="">Все</option>
             <?php foreach ($menuCategories as $c): ?>
                 <?php
@@ -157,24 +157,24 @@
 <table class="menu-table">
     <thead>
         <tr>
-            <th data-col="poster_id"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('poster_id')) ?>">Poster ID <span class="sort-arrow"><?= $sortArrow('poster_id') ?></span></a></th>
-            <th data-col="title_ru"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('title_ru')) ?>">Название RU <span class="sort-arrow"><?= $sortArrow('title_ru') ?></span></a></th>
-            <th data-col="title_en"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('title_en')) ?>">EN <span class="sort-arrow"><?= $sortArrow('title_en') ?></span></a></th>
-            <th data-col="title_vn"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('title_vn')) ?>">VN <span class="sort-arrow"><?= $sortArrow('title_vn') ?></span></a></th>
-            <th data-col="title_ko"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('title_ko')) ?>">KO <span class="sort-arrow"><?= $sortArrow('title_ko') ?></span></a></th>
-            <th data-col="price"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('price')) ?>">Цена <span class="sort-arrow"><?= $sortArrow('price') ?></span></a></th>
-            <th data-col="poster_station"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('poster_station')) ?>">Станция Poster <span class="sort-arrow"><?= $sortArrow('poster_station') ?></span></a></th>
-            <th data-col="poster_workshop"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('poster_workshop')) ?>">Цех Poster <span class="sort-arrow"><?= $sortArrow('poster_workshop') ?></span></a></th>
-            <th data-col="poster_category"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('poster_category')) ?>">Категория Poster <span class="sort-arrow"><?= $sortArrow('poster_category') ?></span></a></th>
-            <th data-col="adapted_workshop_ru"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_ru')) ?>">Цех адапт. RU <span class="sort-arrow"><?= $sortArrow('adapted_workshop_ru') ?></span></a></th>
-            <th data-col="adapted_workshop_en"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_en')) ?>">Цех адапт. EN <span class="sort-arrow"><?= $sortArrow('adapted_workshop_en') ?></span></a></th>
-            <th data-col="adapted_workshop_vn"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_vn')) ?>">Цех адапт. VN <span class="sort-arrow"><?= $sortArrow('adapted_workshop_vn') ?></span></a></th>
-            <th data-col="adapted_workshop_ko"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_ko')) ?>">Цех адапт. KO <span class="sort-arrow"><?= $sortArrow('adapted_workshop_ko') ?></span></a></th>
-            <th data-col="adapted_category_ru"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_category_ru')) ?>">Категория адапт. RU <span class="sort-arrow"><?= $sortArrow('adapted_category_ru') ?></span></a></th>
-            <th data-col="adapted_category_en"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_category_en')) ?>">Категория адапт. EN <span class="sort-arrow"><?= $sortArrow('adapted_category_en') ?></span></a></th>
-            <th data-col="adapted_category_vn"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_category_vn')) ?>">Категория адапт. VN <span class="sort-arrow"><?= $sortArrow('adapted_category_vn') ?></span></a></th>
-            <th data-col="adapted_category_ko"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('adapted_category_ko')) ?>">Категория адапт. KO <span class="sort-arrow"><?= $sortArrow('adapted_category_ko') ?></span></a></th>
-            <th data-col="status"><a class="sort-link" href="<?= htmlspecialchars($buildSortHref('status')) ?>">Статус <span class="sort-arrow"><?= $sortArrow('status') ?></span></a></th>
+            <th data-col="poster_id"><a class="sort-link js-sort" data-sort-key="poster_id" href="<?= htmlspecialchars($buildSortHref('poster_id')) ?>">Poster ID <span class="sort-arrow"></span></a></th>
+            <th data-col="title_ru"><a class="sort-link js-sort" data-sort-key="title_ru" href="<?= htmlspecialchars($buildSortHref('title_ru')) ?>">Название RU <span class="sort-arrow"></span></a></th>
+            <th data-col="title_en"><a class="sort-link js-sort" data-sort-key="title_en" href="<?= htmlspecialchars($buildSortHref('title_en')) ?>">EN <span class="sort-arrow"></span></a></th>
+            <th data-col="title_vn"><a class="sort-link js-sort" data-sort-key="title_vn" href="<?= htmlspecialchars($buildSortHref('title_vn')) ?>">VN <span class="sort-arrow"></span></a></th>
+            <th data-col="title_ko"><a class="sort-link js-sort" data-sort-key="title_ko" href="<?= htmlspecialchars($buildSortHref('title_ko')) ?>">KO <span class="sort-arrow"></span></a></th>
+            <th data-col="price"><a class="sort-link js-sort" data-sort-key="price" href="<?= htmlspecialchars($buildSortHref('price')) ?>">Цена <span class="sort-arrow"></span></a></th>
+            <th data-col="poster_station"><a class="sort-link js-sort" data-sort-key="poster_station" href="<?= htmlspecialchars($buildSortHref('poster_station')) ?>">Станция Poster <span class="sort-arrow"></span></a></th>
+            <th data-col="poster_workshop"><a class="sort-link js-sort" data-sort-key="poster_workshop" href="<?= htmlspecialchars($buildSortHref('poster_workshop')) ?>">Цех Poster <span class="sort-arrow"></span></a></th>
+            <th data-col="poster_category"><a class="sort-link js-sort" data-sort-key="poster_category" href="<?= htmlspecialchars($buildSortHref('poster_category')) ?>">Категория Poster <span class="sort-arrow"></span></a></th>
+            <th data-col="adapted_workshop_ru"><a class="sort-link js-sort" data-sort-key="adapted_workshop_ru" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_ru')) ?>">Цех адапт. RU <span class="sort-arrow"></span></a></th>
+            <th data-col="adapted_workshop_en"><a class="sort-link js-sort" data-sort-key="adapted_workshop_en" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_en')) ?>">Цех адапт. EN <span class="sort-arrow"></span></a></th>
+            <th data-col="adapted_workshop_vn"><a class="sort-link js-sort" data-sort-key="adapted_workshop_vn" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_vn')) ?>">Цех адапт. VN <span class="sort-arrow"></span></a></th>
+            <th data-col="adapted_workshop_ko"><a class="sort-link js-sort" data-sort-key="adapted_workshop_ko" href="<?= htmlspecialchars($buildSortHref('adapted_workshop_ko')) ?>">Цех адапт. KO <span class="sort-arrow"></span></a></th>
+            <th data-col="adapted_category_ru"><a class="sort-link js-sort" data-sort-key="adapted_category_ru" href="<?= htmlspecialchars($buildSortHref('adapted_category_ru')) ?>">Категория адапт. RU <span class="sort-arrow"></span></a></th>
+            <th data-col="adapted_category_en"><a class="sort-link js-sort" data-sort-key="adapted_category_en" href="<?= htmlspecialchars($buildSortHref('adapted_category_en')) ?>">Категория адапт. EN <span class="sort-arrow"></span></a></th>
+            <th data-col="adapted_category_vn"><a class="sort-link js-sort" data-sort-key="adapted_category_vn" href="<?= htmlspecialchars($buildSortHref('adapted_category_vn')) ?>">Категория адапт. VN <span class="sort-arrow"></span></a></th>
+            <th data-col="adapted_category_ko"><a class="sort-link js-sort" data-sort-key="adapted_category_ko" href="<?= htmlspecialchars($buildSortHref('adapted_category_ko')) ?>">Категория адапт. KO <span class="sort-arrow"></span></a></th>
+            <th data-col="status"><a class="sort-link js-sort" data-sort-key="status" href="<?= htmlspecialchars($buildSortHref('status')) ?>">Статус <span class="sort-arrow"></span></a></th>
             <th>Скрыть</th>
             <th></th>
         </tr>
@@ -195,14 +195,17 @@
                 }
                 $posterWorkshop = $stripNumberPrefix((string)($it['main_category_name'] ?? ''));
                 $posterCategory = $stripNumberPrefix((string)($it['sub_category_name'] ?? ''));
-                $statusPills = [];
-                $statusPills[] = $isActive ? '<span class="pill ok">Poster</span>' : '<span class="pill bad">Не найдено</span>';
-                $statusPills[] = $isPublished && $isActive ? '<span class="pill ok">Опублик.</span>' : '<span class="pill warn">Скрыто</span>';
-                if ($isUnadapted) $statusPills[] = '<span class="pill warn">!</span>';
+                $statusParts = [];
+                $statusParts[] = $isActive ? '<span class="status-ind status-ok">Poster</span>' : '<span class="status-ind status-bad">Не найдено</span>';
+                $statusParts[] = ($isPublished && $isActive) ? '<span class="status-ind status-ok">Опублик.</span>' : '<span class="status-ind status-warn">Скрыто</span>';
+                if ($isUnadapted) $statusParts[] = '<span class="status-ind status-warn">!</span>';
                 $hideChecked = !$isPublished || !$isActive;
+                $posterIdInt = (int)$it['poster_id'];
+                $priceNum = is_numeric($it['price_raw'] ?? null) ? (float)$it['price_raw'] : null;
+                $priceText = ($priceNum !== null) ? number_format($priceNum, 0, '.', ' ') : (string)($it['price_raw'] ?? '');
             ?>
-            <tr>
-                <td data-col="poster_id"><?= (int)$it['poster_id'] ?></td>
+            <tr data-poster-id="<?= $posterIdInt ?>">
+                <td data-col="poster_id"><?= $posterIdInt ?></td>
                 <td data-col="title_ru">
                     <div style="font-weight:700;"><?= htmlspecialchars($ruTitle !== '' ? $ruTitle : (string)$it['name_raw']) ?></div>
                     <div class="muted"><?= htmlspecialchars((string)$it['name_raw']) ?></div>
@@ -210,7 +213,7 @@
                 <td data-col="title_en"><?= htmlspecialchars($enTitle) ?></td>
                 <td data-col="title_vn"><?= htmlspecialchars($vnTitle) ?></td>
                 <td data-col="title_ko"><?= htmlspecialchars($koTitle) ?></td>
-                <td data-col="price"><?= htmlspecialchars((string)($it['price_raw'] ?? '')) ?></td>
+                <td data-col="price"><?= htmlspecialchars($priceText) ?></td>
                 <td data-col="poster_station"><?= htmlspecialchars($posterStation) ?></td>
                 <td data-col="poster_workshop"><?= htmlspecialchars($posterWorkshop) ?></td>
                 <td data-col="poster_category"><?= htmlspecialchars($posterCategory) ?></td>
@@ -222,16 +225,19 @@
                 <td data-col="adapted_category_en"><?= htmlspecialchars((string)($it['adapted_category_en'] ?? '')) ?></td>
                 <td data-col="adapted_category_vn"><?= htmlspecialchars((string)($it['adapted_category_vn'] ?? '')) ?></td>
                 <td data-col="adapted_category_ko"><?= htmlspecialchars((string)($it['adapted_category_ko'] ?? '')) ?></td>
-                <td data-col="status"><?= implode(' ', $statusPills) ?></td>
+                <td data-col="status" data-status-active="<?= $isActive ? '1' : '0' ?>" data-status-published="<?= $isPublished ? '1' : '0' ?>" data-status-unadapted="<?= $isUnadapted ? '1' : '0' ?>"><?= implode(' ', $statusParts) ?></td>
                 <td>
-                    <input type="checkbox"
-                           class="publish-toggle"
-                           data-poster-id="<?= (int)$it['poster_id'] ?>"
-                           <?= $hideChecked ? 'checked' : '' ?>
-                           <?= !$isActive ? 'disabled' : '' ?>>
+                    <label class="switch" title="Скрыть/Показать">
+                        <input type="checkbox"
+                               class="publish-toggle"
+                               data-poster-id="<?= $posterIdInt ?>"
+                               <?= $hideChecked ? 'checked' : '' ?>
+                               <?= !$isActive ? 'disabled' : '' ?>>
+                        <span class="slider"></span>
+                    </label>
                 </td>
                 <td>
-                    <a href="?tab=menu&view=edit&poster_id=<?= (int)$it['poster_id'] ?>" style="text-decoration:none; color:var(--accent); font-weight:800;" title="Редактировать">&#9998;</a>
+                    <a href="?tab=menu&view=edit&poster_id=<?= $posterIdInt ?>" class="icon-btn js-edit-btn" data-poster-id="<?= $posterIdInt ?>" title="Редактировать">&#9998;</a>
                 </td>
             </tr>
         <?php endforeach; ?>

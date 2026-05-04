@@ -679,3 +679,47 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
         'stripNumberPrefix' => $stripNumberPrefix,
     ];
 }
+
+function admin_menu_get_list_row_by_poster_id(\App\Classes\Database $db, int $posterId): ?array
+{
+    if ($posterId <= 0) return null;
+
+    $posterMenuItemsTable = $db->t('poster_menu_items');
+    $menuItemsTable = $db->t('menu_items');
+    $menuItemsTrTable = $db->t('menu_item_tr');
+
+    $row = $db->query(
+        "SELECT
+            p.poster_id,
+            p.name_raw,
+            p.price_raw,
+            p.is_active,
+            p.main_category_name,
+            p.sub_category_name,
+            p.station_id,
+            p.station_name,
+            COALESCE(mi.is_published, 0) is_published,
+            COALESCE(ru.title, '') ru_title,
+            COALESCE(en.title, '') en_title,
+            COALESCE(vn.title, '') vn_title,
+            COALESCE(ko.title, '') ko_title
+         FROM {$posterMenuItemsTable} p
+         LEFT JOIN {$menuItemsTable} mi ON mi.poster_item_id = p.id
+         LEFT JOIN {$menuItemsTrTable} ru ON ru.item_id = mi.id AND ru.lang = 'ru'
+         LEFT JOIN {$menuItemsTrTable} en ON en.item_id = mi.id AND en.lang = 'en'
+         LEFT JOIN {$menuItemsTrTable} vn ON vn.item_id = mi.id AND vn.lang = 'vn'
+         LEFT JOIN {$menuItemsTrTable} ko ON ko.item_id = mi.id AND ko.lang = 'ko'
+         WHERE p.poster_id = ?
+         LIMIT 1",
+        [$posterId]
+    )->fetch();
+
+    if (!$row || !is_array($row)) {
+        return null;
+    }
+
+    $row['poster_id'] = (int)($row['poster_id'] ?? 0);
+    $row['is_active'] = (int)($row['is_active'] ?? 0);
+    $row['is_published'] = (int)($row['is_published'] ?? 0);
+    return $row;
+}
