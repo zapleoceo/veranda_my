@@ -1,6 +1,7 @@
 <?php
     $filterWorkshop = ($_GET['workshop_id'] ?? '') !== '' ? (int)$_GET['workshop_id'] : null;
     $filterCategory = ($_GET['category_id'] ?? '') !== '' ? (int)$_GET['category_id'] : null;
+    $filterAdaptedCategoryRu = trim((string)($_GET['adapted_category_ru'] ?? ''));
     $filterQ = trim((string)($_GET['q'] ?? ''));
     if (array_key_exists('status', $_GET)) {
         $filterStatus = trim((string)($_GET['status'] ?? ''));
@@ -119,6 +120,16 @@
                     $label = $wName !== '' ? ($wName . ' / ' . $catName) : $catName;
                 ?>
                 <option value="<?= $id ?>" <?= $filterCategory === $id ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Категория адапт. RU</label>
+        <select name="adapted_category_ru" class="menu-filter-select" data-autowidth="1">
+            <option value="">Все</option>
+            <?php foreach (($menuAdaptedCategoriesRu ?? []) as $name): ?>
+                <?php $name = (string)$name; ?>
+                <option value="<?= htmlspecialchars($name) ?>" <?= $filterAdaptedCategoryRu === $name ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option>
             <?php endforeach; ?>
         </select>
     </div>

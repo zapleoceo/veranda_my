@@ -473,6 +473,23 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
          ORDER BY c.sort_order ASC, c.name_raw ASC"
     )->fetchAll();
 
+    $menuAdaptedCategoriesRu = [];
+    $rows = $db->query(
+        "SELECT DISTINCT
+            COALESCE(ctr_ru.name, c.name_raw, p.sub_category_name) name
+         FROM {$posterMenuItemsTable} p
+         LEFT JOIN {$menuItemsTable} mi ON mi.poster_item_id = p.id
+         LEFT JOIN {$menuCategoriesTable} c ON c.id = mi.category_id
+         LEFT JOIN {$menuCategoriesTrTable} ctr_ru ON ctr_ru.category_id = c.id AND ctr_ru.lang='ru'
+         WHERE p.is_active = 1
+         ORDER BY name ASC"
+    )->fetchAll();
+    foreach ($rows as $r) {
+        $name = trim((string)($r['name'] ?? ''));
+        if ($name === '') continue;
+        $menuAdaptedCategoriesRu[] = $name;
+    }
+
     $mainItemCounts = [];
     $rows = $db->query(
         "SELECT w.id id, COUNT(*) c
@@ -527,6 +544,7 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
     if ($menuView === 'list') {
         $filterWorkshop = ($_GET['workshop_id'] ?? '') !== '' ? (int)$_GET['workshop_id'] : null;
         $filterCategory = ($_GET['category_id'] ?? '') !== '' ? (int)$_GET['category_id'] : null;
+        $filterAdaptedCategoryRu = trim((string)($_GET['adapted_category_ru'] ?? ''));
         $filterQ = trim((string)($_GET['q'] ?? ''));
         if (array_key_exists('status', $_GET)) {
             $filterStatus = trim((string)($_GET['status'] ?? ''));
@@ -548,6 +566,10 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
         if ($filterCategory !== null) {
             $where[] = "mi.category_id = ?";
             $params[] = $filterCategory;
+        }
+        if ($filterAdaptedCategoryRu !== '') {
+            $where[] = "COALESCE(ctr_ru.name, c.name_raw, p.sub_category_name) = ?";
+            $params[] = $filterAdaptedCategoryRu;
         }
         if ($filterQ !== '') {
             $where[] = "(p.name_raw LIKE ? OR ru.title LIKE ? OR en.title LIKE ? OR vn.title LIKE ? OR ko.title LIKE ?)";
@@ -578,6 +600,7 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
              LEFT JOIN {$menuItemsTrTable} vn ON vn.item_id = mi.id AND vn.lang = 'vn'
              LEFT JOIN {$menuItemsTrTable} ko ON ko.item_id = mi.id AND ko.lang = 'ko'
              LEFT JOIN {$menuCategoriesTable} c ON c.id = mi.category_id
+             LEFT JOIN {$menuCategoriesTrTable} ctr_ru ON ctr_ru.category_id = c.id AND ctr_ru.lang='ru'
              $whereSql",
             $params
         )->fetch();
@@ -672,6 +695,7 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
         'menuEdit' => $menuEdit,
         'menuWorkshops' => $menuWorkshops,
         'menuCategories' => $menuCategories,
+        'menuAdaptedCategoriesRu' => $menuAdaptedCategoriesRu,
         'menuSyncMeta' => $menuSyncMeta,
         'menuSyncAtIso' => $menuSyncAtIso,
         'menuView' => $menuView,

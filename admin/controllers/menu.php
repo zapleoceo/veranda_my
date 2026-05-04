@@ -17,6 +17,7 @@ if ($ajax === 'menu_list') {
     $menuPage = $state['menuPage'];
     $menuWorkshops = $state['menuWorkshops'];
     $menuCategories = $state['menuCategories'];
+    $menuAdaptedCategoriesRu = $state['menuAdaptedCategoriesRu'];
     $mainItemCounts = $state['mainItemCounts'];
     $stripNumberPrefix = $state['stripNumberPrefix'];
 
@@ -104,6 +105,7 @@ $menuPage = $state['menuPage'];
 $menuEdit = $state['menuEdit'];
 $menuWorkshops = $state['menuWorkshops'];
 $menuCategories = $state['menuCategories'];
+$menuAdaptedCategoriesRu = $state['menuAdaptedCategoriesRu'];
 $menuSyncMeta = $state['menuSyncMeta'];
 $menuSyncAtIso = $state['menuSyncAtIso'];
 $menuView = $state['menuView'];
