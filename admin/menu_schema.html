@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Veranda — схема таблиц меню</title>
+  <style>
+    :root {
+      --bg: #0b0b0b;
+      --card: rgba(255,255,255,0.06);
+      --card2: rgba(255,255,255,0.09);
+      --border: rgba(255,255,255,0.12);
+      --text: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.62);
+      --accent: #B88746;
+      --ok: rgba(16,185,129,0.9);
+      --warn: rgba(245,158,11,0.9);
+      --bad: rgba(239,83,80,0.9);
+    }
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    body { margin: 0; }
+    .wrap {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 18px 18px 40px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: 0.2px;
+    }
+    .sub {
+      color: var(--muted);
+      margin: 0 0 16px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.ok { background: var(--ok); }
+    .dot.warn { background: var(--warn); }
+    .dot.bad { background: var(--bad); }
+    .board {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      overflow: hidden;
+    }
+    .grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1.2fr 1.4fr 1.2fr;
+      gap: 14px;
+      padding: 14px;
+      min-height: 520px;
+    }
+    .col {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+    .box {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--card);
+      padding: 12px 12px 10px;
+      box-shadow: 0 10px 26px rgba(0,0,0,0.25);
+    }
+    .box .title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-weight: 950;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .box code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      color: rgba(255,255,255,0.86);
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      background: var(--card2);
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 11px;
+      font-weight: 900;
+      color: rgba(255,255,255,0.92);
+      white-space: nowrap;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.82);
+    }
+    li {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(0,0,0,0.10);
+      border-radius: 10px;
+      padding: 6px 8px;
+    }
+    .k { color: rgba(255,255,255,0.92); font-weight: 850; }
+    .v { color: rgba(255,255,255,0.62); }
+    .foot {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    svg.links {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .link-line {
+      stroke: rgba(184, 135, 70, 0.75);
+      stroke-width: 2;
+      fill: none;
+    }
+    .link-line.secondary { stroke: rgba(255,255,255,0.28); stroke-dasharray: 4 4; }
+    .link-label {
+      fill: rgba(255,255,255,0.72);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; min-height: 860px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Схема таблиц: online меню + админка</h1>
+    <p class="sub">
+      Источник данных: <code>poster_menu_items</code> (слепок из Poster) + наши таблицы публикации/структуры/переводов.
+      Стрелки показывают ключевые связи (FK-логика) и как собирается <code>/links/menu.php</code>.
+    </p>
+
+    <div class="legend">
+      <div class="pill"><span class="dot bad"></span>Poster слепок</div>
+      <div class="pill"><span class="dot ok"></span>Структура сайта (цехи/категории)</div>
+      <div class="pill"><span class="dot warn"></span>Позиции и переводы</div>
+    </div>
+
+    <div class="board" id="board">
+      <svg class="links" id="linksSvg" aria-hidden="true">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(184, 135, 70, 0.75)"></path>
+          </marker>
+          <marker id="arrowSoft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(255,255,255,0.28)"></path>
+          </marker>
+        </defs>
+      </svg>
+
+      <div class="grid">
+        <div class="col">
+          <div class="box" id="t_poster_menu_items">
+            <div class="title">
+              <span><code>poster_menu_items</code></span>
+              <span class="tag"><span class="dot bad"></span>Poster</span>
+            </div>
+            <ul>
+              <li><span class="k">id</span><span class="v">PK</span></li>
+              <li><span class="k">poster_id</span><span class="v">ID в Poster</span></li>
+              <li><span class="k">is_active</span><span class="v">0/1</span></li>
+              <li><span class="k">name_raw</span><span class="v">raw</span></li>
+              <li><span class="k">price_raw</span><span class="v">VND</span></li>
+              <li><span class="k">main_category_name</span><span class="v">raw</span></li>
+              <li><span class="k">sub_category_name</span><span class="v">raw</span></li>
+            </ul>
+          </div>
+
+          <div class="box" id="t_menu_items">
+            <div class="title">
+              <span><code>menu_items</code></span>
+              <span class="tag"><span class="dot warn"></span>Позиции</span>
+            </div>
+            <ul>
+              <li><span class="k">id</span><span class="v">PK</span></li>
+              <li><span class="k">poster_item_id</span><span class="v">→ poster_menu_items.id</span></li>
+              <li><span class="k">category_id</span><span class="v">→ menu_categories.id</span></li>
+              <li><span class="k">is_published</span><span class="v">0/1</span></li>
+              <li><span class="k">sort_order</span><span class="v">int</span></li>
+              <li><span class="k">image_url</span><span class="v">url</span></li>
+            </ul>
+          </div>
+
+          <div class="box" id="t_menu_item_tr">
+            <div class="title">
+              <span><code>menu_item_tr</code></span>
+              <span class="tag"><span class="dot warn"></span>Переводы</span>
+            </div>
+            <ul>
+              <li><span class="k">item_id</span><span class="v">→ menu_items.id</span></li>
+              <li><span class="k">lang</span><span class="v">ru/en/vn/ko</span></li>
+              <li><span class="k">title</span><span class="v">text</span></li>
+              <li><span class="k">description</span><span class="v">text</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="box" id="t_menu_categories">
+            <div class="title">
+              <span><code>menu_categories</code></span>
+              <span class="tag"><span class="dot ok"></span>Структура</span>
+            </div>
+            <ul>
+              <li><span class="k">id</span><span class="v">PK</span></li>
+              <li><span class="k">workshop_id</span><span class="v">→ menu_workshops.id</span></li>
+              <li><span class="k">name_raw</span><span class="v">raw</span></li>
+              <li><span class="k">show_on_site</span><span class="v">0/1</span></li>
+              <li><span class="k">sort_order</span><span class="v">int</span></li>
+            </ul>
+          </div>
+
+          <div class="box" id="t_menu_category_tr">
+            <div class="title">
+              <span><code>menu_category_tr</code></span>
+              <span class="tag"><span class="dot ok"></span>Переводы</span>
+            </div>
+            <ul>
+              <li><span class="k">category_id</span><span class="v">→ menu_categories.id</span></li>
+              <li><span class="k">lang</span><span class="v">ru/en/vn/ko</span></li>
+              <li><span class="k">name</span><span class="v">text</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="box" id="t_menu_workshops">
+            <div class="title">
+              <span><code>menu_workshops</code></span>
+              <span class="tag"><span class="dot ok"></span>Цехи</span>
+            </div>
+            <ul>
+              <li><span class="k">id</span><span class="v">PK</span></li>
+              <li><span class="k">name_raw</span><span class="v">raw</span></li>
+              <li><span class="k">show_on_site</span><span class="v">0/1</span></li>
+              <li><span class="k">sort_order</span><span class="v">int</span></li>
+            </ul>
+          </div>
+
+          <div class="box" id="t_menu_workshop_tr">
+            <div class="title">
+              <span><code>menu_workshop_tr</code></span>
+              <span class="tag"><span class="dot ok"></span>Переводы</span>
+            </div>
+            <ul>
+              <li><span class="k">workshop_id</span><span class="v">→ menu_workshops.id</span></li>
+              <li><span class="k">lang</span><span class="v">ru/en/vn/ko</span></li>
+              <li><span class="k">name</span><span class="v">text</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      На <code>/links/menu.php</code> попадают только: <code>menu_items.is_published=1</code>, <code>poster_menu_items.is_active=1</code>,
+      <code>menu_categories.show_on_site=1</code>, <code>menu_workshops.show_on_site=1</code>.
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const svg = document.getElementById('linksSvg');
+      const board = document.getElementById('board');
+      if (!svg || !board) return;
+
+      const getBox = (id) => document.getElementById(id);
+
+      const clear = () => {
+        const keep = svg.querySelector('defs');
+        svg.innerHTML = '';
+        if (keep) svg.appendChild(keep);
+      };
+
+      const centerRight = (el) => {
+        const b = el.getBoundingClientRect();
+        const c = board.getBoundingClientRect();
+        return { x: b.right - c.left, y: (b.top + b.bottom) / 2 - c.top };
+      };
+      const centerLeft = (el) => {
+        const b = el.getBoundingClientRect();
+        const c = board.getBoundingClientRect();
+        return { x: b.left - c.left, y: (b.top + b.bottom) / 2 - c.top };
+      };
+      const centerTop = (el) => {
+        const b = el.getBoundingClientRect();
+        const c = board.getBoundingClientRect();
+        return { x: (b.left + b.right) / 2 - c.left, y: b.top - c.top };
+      };
+      const centerBottom = (el) => {
+        const b = el.getBoundingClientRect();
+        const c = board.getBoundingClientRect();
+        return { x: (b.left + b.right) / 2 - c.left, y: b.bottom - c.top };
+      };
+
+      const addPath = (from, to, label, opts = {}) => {
+        const pad = 14;
+        const x1 = from.x, y1 = from.y;
+        const x2 = to.x, y2 = to.y;
+        const mx = (x1 + x2) / 2;
+        const d = `M ${x1} ${y1} C ${x1 + pad} ${y1}, ${x2 - pad} ${y2}, ${x2} ${y2}`;
+        const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        p.setAttribute('d', d);
+        p.setAttribute('class', opts.secondary ? 'link-line secondary' : 'link-line');
+        p.setAttribute('marker-end', opts.secondary ? 'url(#arrowSoft)' : 'url(#arrow)');
+        svg.appendChild(p);
+
+        if (label) {
+          const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          t.setAttribute('x', String(mx));
+          t.setAttribute('y', String((y1 + y2) / 2 - 6));
+          t.setAttribute('text-anchor', 'middle');
+          t.setAttribute('class', 'link-label');
+          t.textContent = label;
+          svg.appendChild(t);
+        }
+      };
+
+      const render = () => {
+        clear();
+
+        const pmi = getBox('t_poster_menu_items');
+        const mi = getBox('t_menu_items');
+        const mitr = getBox('t_menu_item_tr');
+        const mc = getBox('t_menu_categories');
+        const mctr = getBox('t_menu_category_tr');
+        const mw = getBox('t_menu_workshops');
+        const mwtr = getBox('t_menu_workshop_tr');
+        if (!pmi || !mi || !mitr || !mc || !mctr || !mw || !mwtr) return;
+
+        if (window.matchMedia && window.matchMedia('(max-width: 980px)').matches) {
+          addPath(centerBottom(pmi), centerTop(mi), 'menu_items.poster_item_id → poster_menu_items.id');
+          addPath(centerBottom(mi), centerTop(mitr), 'menu_item_tr.item_id → menu_items.id', { secondary: true });
+          addPath(centerRight(mi), centerLeft(mc), 'menu_items.category_id → menu_categories.id');
+          addPath(centerBottom(mc), centerTop(mctr), 'menu_category_tr.category_id → menu_categories.id', { secondary: true });
+          addPath(centerRight(mc), centerLeft(mw), 'menu_categories.workshop_id → menu_workshops.id');
+          addPath(centerBottom(mw), centerTop(mwtr), 'menu_workshop_tr.workshop_id → menu_workshops.id', { secondary: true });
+          return;
+        }
+
+        addPath(centerRight(pmi), centerLeft(mi), 'poster_menu_items.id ← menu_items.poster_item_id');
+        addPath(centerBottom(mi), centerTop(mitr), 'menu_item_tr.item_id → menu_items.id', { secondary: true });
+        addPath(centerRight(mi), centerLeft(mc), 'menu_items.category_id → menu_categories.id');
+        addPath(centerBottom(mc), centerTop(mctr), 'menu_category_tr.category_id → menu_categories.id', { secondary: true });
+        addPath(centerRight(mc), centerLeft(mw), 'menu_categories.workshop_id → menu_workshops.id');
+        addPath(centerBottom(mw), centerTop(mwtr), 'menu_workshop_tr.workshop_id → menu_workshops.id', { secondary: true });
+      };
+
+      const debounced = (() => {
+        let t = 0;
+        return () => {
+          window.clearTimeout(t);
+          t = window.setTimeout(render, 60);
+        };
+      })();
+
+      window.addEventListener('resize', debounced);
+      window.addEventListener('load', render);
+      render();
+    })();
+  </script>
+</body>
+</html>
+
