@@ -192,6 +192,69 @@
         });
     };
 
+    const initInputAutoWidth = () => {
+        const inputs = qsa('input[data-autowidth="1"]');
+        if (inputs.length === 0) return;
+
+        let meas = window.__adminMenuInputMeas;
+        if (!meas || !meas.parentNode) {
+            meas = document.createElement('span');
+            meas.style.position = 'absolute';
+            meas.style.visibility = 'hidden';
+            meas.style.whiteSpace = 'pre';
+            meas.style.left = '-9999px';
+            meas.style.top = '-9999px';
+            document.body.appendChild(meas);
+            window.__adminMenuInputMeas = meas;
+        }
+
+        const px = (v) => {
+            const n = parseFloat(String(v || '0'));
+            return Number.isFinite(n) ? n : 0;
+        };
+
+        const updateOne = (inp) => {
+            if (!inp || inp.disabled) return;
+            const cs = window.getComputedStyle(inp);
+            meas.style.font = cs.font;
+            meas.textContent = String(inp.value || inp.placeholder || '').trim() || ' ';
+
+            const textW = meas.getBoundingClientRect().width;
+            const extra =
+                px(cs.paddingLeft) +
+                px(cs.paddingRight) +
+                px(cs.borderLeftWidth) +
+                px(cs.borderRightWidth) +
+                10;
+
+            const w = Math.ceil(textW + extra);
+            inp.style.width = `${w}px`;
+            inp.style.maxWidth = '100%';
+        };
+
+        const updateAll = () => {
+            qsa('input[data-autowidth="1"]').forEach(updateOne);
+        };
+        window.__adminMenuInputAutoWidthUpdate = updateAll;
+
+        inputs.forEach((inp) => {
+            updateOne(inp);
+            inp.addEventListener('input', () => updateOne(inp));
+        });
+
+        if (!window.__adminMenuInputAutoWidthInited) {
+            window.__adminMenuInputAutoWidthInited = true;
+            window.addEventListener('resize', () => {
+                window.clearTimeout(window.__adminMenuInputT);
+                window.__adminMenuInputT = window.setTimeout(() => {
+                    if (typeof window.__adminMenuInputAutoWidthUpdate === 'function') {
+                        window.__adminMenuInputAutoWidthUpdate();
+                    }
+                }, 150);
+            });
+        }
+    };
+
     const initClientSort = () => {
         const table = qs('table.menu-table');
         if (!table) return;
@@ -479,6 +542,7 @@
         initColumnToggles();
         initPublishToggle();
         initSelectAutoWidth();
+        initInputAutoWidth();
         initClientSort();
         initEditModal();
         initFiltersAjax();

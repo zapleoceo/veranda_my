@@ -135,7 +135,7 @@
     </div>
     <div class="form-group menu-filter-grow">
         <label>Поиск</label>
-        <input name="q" value="<?= htmlspecialchars($filterQ) ?>" placeholder="name_raw / RU / EN / VN / KO" />
+        <input type="search" name="q" value="<?= htmlspecialchars($filterQ) ?>" placeholder="name_raw / RU / EN / VN / KO" data-autowidth="1" />
     </div>
     <div class="form-group">
         <label>Статус</label>

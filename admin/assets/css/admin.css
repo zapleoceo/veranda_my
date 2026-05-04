@@ -412,7 +412,9 @@
     padding-bottom: 0;
 }
 .menu-filters input[name="q"] {
-    width: 32ch;
+    width: auto;
+    max-width: 100%;
+    box-sizing: border-box;
     min-height: 40px;
     border-radius: 10px;
     padding-top: 0;
