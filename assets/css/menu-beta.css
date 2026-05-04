@@ -159,3 +159,11 @@
         }
         .menu-content .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .menu-content .muted { color: var(--muted); font-size: 12px; }
+
+        @media (max-width: 640px) {
+            .menu-content details {
+                width: min(100%, 520px);
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
