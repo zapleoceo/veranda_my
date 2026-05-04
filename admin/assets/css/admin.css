@@ -199,6 +199,7 @@
 
 .menu-table td { vertical-align: top; }
 .menu-table input, .menu-table select, .menu-table textarea { max-width: 100%; }
+.menu-table td[data-col="price"] { white-space: nowrap; }
 
 .status-ind {
     display: inline-flex;
@@ -405,6 +406,10 @@
     width: fit-content;
     min-width: 0;
     margin: 0;
+}
+.menu-filters select {
+    padding-top: 0;
+    padding-bottom: 0;
 }
 .menu-filters .menu-filter-grow {
     flex: 1 1 280px;
