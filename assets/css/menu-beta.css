@@ -47,7 +47,7 @@
             border-radius: 999px;
             border: 1px solid rgba(255,255,255,0.10);
             background: rgba(255,255,255,0.03);
-            backdrop-filter: blur(12px) saturate(120%);
+            backdrop-filter: blur(8px) saturate(120%);
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -76,8 +76,8 @@
             border-radius: 16px;
             overflow: hidden;
             margin-top: 10px;
-            backdrop-filter: blur(14px) saturate(120%);
-            -webkit-backdrop-filter: blur(14px) saturate(120%);
+            backdrop-filter: blur(10px) saturate(120%);
+            -webkit-backdrop-filter: blur(10px) saturate(120%);
             transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
         }
         .menu-content details:not([open]):hover {
@@ -115,8 +115,8 @@
             grid-template-columns: 1fr auto;
             gap: 12px;
             align-items: start;
-            backdrop-filter: blur(14px) saturate(120%);
-            -webkit-backdrop-filter: blur(14px) saturate(120%);
+            backdrop-filter: blur(10px) saturate(120%);
+            -webkit-backdrop-filter: blur(10px) saturate(120%);
             transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
         }
         .menu-content .item:hover {
