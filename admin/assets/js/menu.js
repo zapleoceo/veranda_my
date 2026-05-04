@@ -374,6 +374,7 @@
         if (!form) return;
         if (form.getAttribute('data-ajax-inited') === '1') return;
         form.setAttribute('data-ajax-inited', '1');
+        let inFlight = null;
 
         const buildParams = () => {
             const fd = new FormData(form);
@@ -391,6 +392,18 @@
         };
 
         const apply = async () => {
+            const active = document.activeElement;
+            const restoreFocus =
+                active &&
+                active.matches &&
+                active.matches('#admin-menu-list-root input[name="q"]')
+                    ? {
+                        value: String(active.value || ''),
+                        selStart: typeof active.selectionStart === 'number' ? active.selectionStart : null,
+                        selEnd: typeof active.selectionEnd === 'number' ? active.selectionEnd : null,
+                    }
+                    : null;
+
             const params = buildParams();
             const url = new URL('/admin/', window.location.origin);
             url.searchParams.set('ajax', 'menu_list');
@@ -405,7 +418,15 @@
             target.setAttribute('aria-busy', 'true');
 
             try {
-                const res = await fetch(url.toString(), { method: 'GET', headers: { 'X-Requested-With': 'fetch' } });
+                if (inFlight && typeof inFlight.abort === 'function') {
+                    inFlight.abort();
+                }
+                inFlight = new AbortController();
+                const res = await fetch(url.toString(), {
+                    method: 'GET',
+                    headers: { 'X-Requested-With': 'fetch' },
+                    signal: inFlight.signal
+                });
                 const html = await res.text();
                 if (!res.ok) {
                     alert('Ошибка фильтрации');
@@ -415,7 +436,21 @@
                 if (typeof window.__adminMenuInit === 'function') {
                     window.__adminMenuInit();
                 }
+                if (restoreFocus) {
+                    const newQ = qs('input[name="q"]', target);
+                    if (newQ) {
+                        if (String(newQ.value || '') !== restoreFocus.value) {
+                            newQ.value = restoreFocus.value;
+                        }
+                        try { newQ.focus({ preventScroll: true }); } catch (_e) { newQ.focus(); }
+                        if (restoreFocus.selStart !== null && restoreFocus.selEnd !== null) {
+                            try { newQ.setSelectionRange(restoreFocus.selStart, restoreFocus.selEnd); } catch (_e) {}
+                        }
+                    }
+                }
+                inFlight = null;
             } catch (_e) {
+                if (_e && _e.name === 'AbortError') return;
                 alert('Ошибка сети');
             } finally {
                 target.setAttribute('aria-busy', 'false');
