@@ -83,11 +83,13 @@
       align-content: start;
     }
     .box {
+      position: relative;
       border: 1px solid var(--border);
       border-radius: 14px;
       background: var(--card);
       padding: 12px 12px 10px;
       box-shadow: 0 10px 26px rgba(0,0,0,0.25);
+      touch-action: none;
     }
     .box .title {
       display: flex;
@@ -97,6 +99,11 @@
       font-weight: 950;
       font-size: 14px;
       margin-bottom: 8px;
+      cursor: grab;
+      user-select: none;
+    }
+    .box.is-dragging .title {
+      cursor: grabbing;
     }
     .box code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -293,6 +300,28 @@
 
       const getBox = (id) => document.getElementById(id);
 
+      const storageKey = 'menu_schema_box_pos:v1';
+      const readPositions = () => {
+        try {
+          const raw = localStorage.getItem(storageKey);
+          const json = raw ? JSON.parse(raw) : null;
+          return (json && typeof json === 'object') ? json : {};
+        } catch (_e) {
+          return {};
+        }
+      };
+      const writePositions = (pos) => {
+        try { localStorage.setItem(storageKey, JSON.stringify(pos)); } catch (_e) {}
+      };
+
+      const setTranslate = (el, tx, ty) => {
+        const x = Number.isFinite(tx) ? tx : 0;
+        const y = Number.isFinite(ty) ? ty : 0;
+        el.dataset.tx = String(x);
+        el.dataset.ty = String(y);
+        el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      };
+
       const resizeCanvas = () => {
         const r = board.getBoundingClientRect();
         const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
@@ -301,6 +330,8 @@
         canvas.style.width = `${Math.round(r.width)}px`;
         canvas.style.height = `${Math.round(r.height)}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        canvas.dataset.cssw = String(Math.round(r.width));
+        canvas.dataset.cssh = String(Math.round(r.height));
       };
 
       const centerRight = (el) => {
@@ -379,9 +410,10 @@
         drawArrow(x2, y2, ang, isSecondary ? 6 : 7, stroke);
       };
 
-      const render = () => {
-        resizeCanvas();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const draw = () => {
+        const cssW = parseInt(String(canvas.dataset.cssw || '0'), 10) || board.getBoundingClientRect().width;
+        const cssH = parseInt(String(canvas.dataset.cssh || '0'), 10) || board.getBoundingClientRect().height;
+        ctx.clearRect(0, 0, cssW, cssH);
 
         const pmi = getBox('t_poster_menu_items');
         const mi = getBox('t_menu_items');
@@ -410,6 +442,88 @@
         addPath(centerBottom(mw), centerTop(mwtr), { secondary: true });
       };
 
+      const render = () => {
+        resizeCanvas();
+        draw();
+      };
+
+      const initDragging = () => {
+        const boxes = Array.from(board.querySelectorAll('.box'));
+        if (boxes.length === 0) return;
+
+        const initial = readPositions();
+        for (const el of boxes) {
+          const id = String(el.id || '');
+          const p = (id && initial && initial[id]) ? initial[id] : null;
+          if (p && typeof p === 'object') {
+            setTranslate(el, Number(p.x || 0), Number(p.y || 0));
+          }
+        }
+
+        let raf = 0;
+        const scheduleDraw = () => {
+          if (raf) return;
+          raf = requestAnimationFrame(() => {
+            raf = 0;
+            draw();
+          });
+        };
+
+        const persist = () => {
+          const pos = readPositions();
+          for (const el of boxes) {
+            const id = String(el.id || '');
+            if (!id) continue;
+            const x = parseFloat(String(el.dataset.tx || '0'));
+            const y = parseFloat(String(el.dataset.ty || '0'));
+            pos[id] = { x: Number.isFinite(x) ? x : 0, y: Number.isFinite(y) ? y : 0 };
+          }
+          writePositions(pos);
+        };
+
+        boxes.forEach((el) => {
+          const handle = el.querySelector('.title') || el;
+          handle.addEventListener('pointerdown', (e) => {
+            if (!(e instanceof PointerEvent)) return;
+            if (e.button !== 0) return;
+
+            e.preventDefault();
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const baseX = parseFloat(String(el.dataset.tx || '0')) || 0;
+            const baseY = parseFloat(String(el.dataset.ty || '0')) || 0;
+
+            el.classList.add('is-dragging');
+            el.style.zIndex = '20';
+
+            try { el.setPointerCapture(e.pointerId); } catch (_e2) {}
+
+            const onMove = (ev) => {
+              if (!(ev instanceof PointerEvent)) return;
+              const dx = ev.clientX - startX;
+              const dy = ev.clientY - startY;
+              setTranslate(el, baseX + dx, baseY + dy);
+              scheduleDraw();
+            };
+            const onUp = (ev) => {
+              if (ev && ev.pointerId !== e.pointerId) return;
+              el.classList.remove('is-dragging');
+              el.style.zIndex = '';
+              try { el.releasePointerCapture(e.pointerId); } catch (_e2) {}
+              window.removeEventListener('pointermove', onMove, true);
+              window.removeEventListener('pointerup', onUp, true);
+              window.removeEventListener('pointercancel', onUp, true);
+              persist();
+              scheduleDraw();
+            };
+
+            window.addEventListener('pointermove', onMove, true);
+            window.addEventListener('pointerup', onUp, true);
+            window.addEventListener('pointercancel', onUp, true);
+          });
+        });
+      };
+
       const debounced = (() => {
         let t = 0;
         return () => {
@@ -420,6 +534,7 @@
 
       window.addEventListener('resize', debounced);
       window.addEventListener('load', () => requestAnimationFrame(render));
+      initDragging();
       requestAnimationFrame(render);
     })();
   </script>
