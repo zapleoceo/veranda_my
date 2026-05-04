@@ -134,6 +134,7 @@ function admin_menu_export_items_csv(\App\Classes\Database $db): void
 
     fputcsv($out, [
         'Poster ID',
+        'Poster raw',
         'Название RU',
         'Описание RU',
         'Название EN',
@@ -153,6 +154,7 @@ function admin_menu_export_items_csv(\App\Classes\Database $db): void
     $rows = $db->query(
         "SELECT
             p.poster_id,
+            p.name_raw,
             COALESCE(ru.title, '') ru_title,
             COALESCE(ru.description, '') ru_desc,
             COALESCE(en.title, '') en_title,
@@ -185,6 +187,7 @@ function admin_menu_export_items_csv(\App\Classes\Database $db): void
     foreach ($rows as $r) {
         fputcsv($out, [
             (string)($r['poster_id'] ?? ''),
+            (string)($r['name_raw'] ?? ''),
             (string)($r['ru_title'] ?? ''),
             (string)($r['ru_desc'] ?? ''),
             (string)($r['en_title'] ?? ''),
