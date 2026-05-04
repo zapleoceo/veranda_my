@@ -33,6 +33,21 @@ $forceCategories = false;
 if (isset($argv) && is_array($argv) && in_array('--force-categories', $argv, true)) {
     $forceCategories = true;
 }
+$fixPosterCategoryId = null;
+if (isset($argv) && is_array($argv)) {
+    foreach ($argv as $a) {
+        if (!is_string($a)) continue;
+        if (str_starts_with($a, '--fix-poster-category=')) {
+            $fixPosterCategoryId = (int)trim(substr($a, strlen('--fix-poster-category=')));
+        }
+        if (str_starts_with($a, '--fix-category=')) {
+            $fixPosterCategoryId = (int)trim(substr($a, strlen('--fix-category=')));
+        }
+    }
+    if ($fixPosterCategoryId !== null && $fixPosterCategoryId <= 0) {
+        $fixPosterCategoryId = null;
+    }
+}
 
 $now = date('Y-m-d H:i:s');
 
@@ -50,6 +65,41 @@ try {
     echo "[{$now}] Starting menu sync...\n";
     $result = $sync->sync($forceCategories);
     $now2 = date('Y-m-d H:i:s');
+
+    if ($fixPosterCategoryId !== null) {
+        $pmi = $db->t('poster_menu_items');
+        $mc = $db->t('menu_categories');
+        $mi = $db->t('menu_items');
+        $dbName2 = (string)$db->query('SELECT DATABASE()')->fetchColumn();
+        $col = $db->query(
+            "SELECT IS_NULLABLE
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = ?
+               AND TABLE_NAME = ?
+               AND COLUMN_NAME = 'category_id'
+             LIMIT 1",
+            [$dbName2, $mi]
+        )->fetch();
+        $canNullCategoryId = (string)($col['IS_NULLABLE'] ?? '') === 'YES';
+        $nullExpr = $canNullCategoryId ? 'NULL' : '0';
+
+        echo "[{$now2}] Fixing items with poster category={$fixPosterCategoryId}...\n";
+        $updated = $db->query(
+            "UPDATE {$mi} i
+             JOIN {$pmi} p ON p.id = i.poster_item_id
+             LEFT JOIN {$mc} oldc ON oldc.id = i.category_id
+             LEFT JOIN {$mc} newc ON newc.poster_id = (
+                CASE
+                    WHEN p.sub_category_id IS NOT NULL AND p.sub_category_id <> 0 THEN p.sub_category_id
+                    ELSE p.main_category_id
+                END
+             )
+             SET i.category_id = (CASE WHEN newc.id IS NOT NULL THEN newc.id ELSE {$nullExpr} END)
+             WHERE (oldc.poster_id = ? OR p.sub_category_id = ? OR p.main_category_id = ?)",
+            [$fixPosterCategoryId, $fixPosterCategoryId, $fixPosterCategoryId]
+        )->rowCount();
+        echo "[{$now2}] Fixed rows: {$updated}\n";
+    }
 
     $summary = 'ok=1';
     if (is_array($result)) {
