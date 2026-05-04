@@ -2,7 +2,6 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-require_once __DIR__ . '/../src/classes/Database.php';
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
 require_once __DIR__ . '/Model.php';
 
@@ -49,57 +48,7 @@ if ($spotId <= 0) {
 
 $apiToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
 $posterApi = $apiToken !== '' ? new \App\Classes\PosterAPI($apiToken) : null;
-$model = new NewOrderModel(null, $posterApi, $spotId);
-
-if ($ajax === 'get_menu') {
-    $dbHost = trim((string)($_ENV['DB_HOST'] ?? ''));
-    $dbName = trim((string)($_ENV['DB_NAME'] ?? ''));
-    $dbUser = trim((string)($_ENV['DB_USER'] ?? ''));
-    $dbPass = (string)($_ENV['DB_PASS'] ?? '');
-    $dbSuffix = trim((string)($_ENV['DB_TABLE_SUFFIX'] ?? ''));
-
-    if ($dbHost === '' || $dbName === '' || $dbUser === '') {
-        $respondError(500, 'Database credentials not configured');
-    }
-
-    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $dbSuffix);
-    if (!$db) {
-        $respondError(500, 'Database connection failed');
-    }
-
-    try {
-        $db->createMenuTables();
-    } catch (\Throwable $e) {
-    }
-
-    $model = new NewOrderModel($db, $posterApi, $spotId);
-    $lang = strtolower(trim((string)($_GET['lang'] ?? 'ru')));
-    $supportedLangs = ['ru', 'en', 'vi', 'ko'];
-    if (!in_array($lang, $supportedLangs, true)) {
-        $lang = 'ru';
-    }
-    $trLang = $lang === 'vi' ? 'vn' : $lang;
-    try {
-        [$groups, $lastMenuSyncAt] = $model->getMenuGroups($trLang);
-    } catch (\Throwable $e) {
-        $respondError(500, 'Menu query failed: ' . $e->getMessage());
-    }
-    $respondOk(['groups' => $groups, 'last_sync_at' => $lastMenuSyncAt]);
-}
-
-if ($ajax === 'search_products') {
-    $q = (string)($_GET['q'] ?? '');
-    $q = trim($q);
-    if ($q === '') {
-        $respondOk(['products' => []]);
-    }
-    try {
-        $products = $model->searchProducts($q, 30);
-    } catch (\Throwable $e) {
-        $respondError(500, 'Search failed: ' . $e->getMessage());
-    }
-    $respondOk(['products' => $products]);
-}
+$model = new NewOrderModel($posterApi, $spotId);
 
 if ($ajax === 'get_products') {
     if (!$posterApi) {
