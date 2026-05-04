@@ -31,13 +31,26 @@ header('X-Robots-Tag: noindex, nofollow', true);
       </div>
     </div>
 
+    <div class="search-bar">
+      <input type="search" id="productSearchInput" class="search-input" placeholder="Поиск блюд..." autocomplete="off">
+      <button type="button" class="btn search-clear" id="productSearchClear" hidden>×</button>
+    </div>
+
     <div class="content-wrapper">
       <div class="categories-sidebar" id="categoriesSidebar">
         <!-- Categories injected here -->
       </div>
       <div class="menu-main" id="menuMain">
-        <!-- Menu injected here -->
-        <div class="loading-state" id="loadingState">Загрузка меню...</div>
+        <div class="search-section" id="searchSection" hidden>
+          <div class="menu-section-title" id="searchTitle">Результаты поиска</div>
+          <div class="loading-state" id="searchLoading" hidden>Поиск...</div>
+          <div class="loading-state" id="searchEmpty" hidden>Ничего не найдено</div>
+          <div class="products-grid" id="searchGrid"></div>
+        </div>
+        <div class="menu-sections" id="menuSections">
+          <!-- Menu injected here -->
+          <div class="loading-state" id="loadingState">Загрузка меню...</div>
+        </div>
       </div>
       
       <!-- Right Panel: Cart & Checkout -->
