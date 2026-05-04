@@ -149,6 +149,86 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
         }
     }
 
+    if (isset($_POST['import_normalized_titles_csv'])) {
+        try {
+            $raw = trim((string)($_POST['normalized_titles_csv'] ?? ''));
+            if ($raw === '') {
+                throw new \Exception('Вставьте CSV нормализованных названий.');
+            }
+
+            $db->createMenuTables();
+
+            $lines = preg_split("/\r\n|\n|\r/", $raw) ?: [];
+            $rows = [];
+            foreach ($lines as $line) {
+                $line = trim((string)$line);
+                if ($line === '') continue;
+                $cols = str_getcsv($line, ';');
+                if (!$cols || count($cols) < 3) continue;
+                $first = trim((string)($cols[0] ?? ''));
+                $first = preg_replace('/^\xEF\xBB\xBF/u', '', $first) ?? $first;
+                if ($first === '' || mb_strtolower($first) === 'id') {
+                    continue;
+                }
+                $posterId = (int)$first;
+                if ($posterId <= 0) continue;
+
+                $ruTitle = trim((string)($cols[2] ?? ''));
+                $enTitle = trim((string)($cols[3] ?? ''));
+                $vnTitle = trim((string)($cols[4] ?? ''));
+                $koTitle = trim((string)($cols[5] ?? ''));
+
+                $rows[] = [
+                    'poster_id' => $posterId,
+                    'ru' => $ruTitle,
+                    'en' => $enTitle,
+                    'vn' => $vnTitle,
+                    'ko' => $koTitle,
+                ];
+            }
+            if (empty($rows)) {
+                throw new \Exception('Не найдено строк для импорта (ожидается: ID;Название;RU;EN;VN;KO).');
+            }
+
+            $updatedTitles = 0;
+            $missingPosterIds = 0;
+
+            foreach ($rows as $r) {
+                $posterId = (int)$r['poster_id'];
+                $menuItemId = (int)$db->query(
+                    "SELECT mi.id
+                     FROM {$menuItemsTable} mi
+                     JOIN {$posterMenuItemsTable} p ON p.id = mi.poster_item_id
+                     WHERE p.poster_id = ?
+                     LIMIT 1",
+                    [$posterId]
+                )->fetchColumn();
+                if ($menuItemId <= 0) {
+                    $missingPosterIds++;
+                    continue;
+                }
+
+                foreach (['ru', 'en', 'vn', 'ko'] as $lang) {
+                    $title = trim((string)($r[$lang] ?? ''));
+                    if ($title === '') continue;
+                    $db->query(
+                        "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description)
+                         VALUES (?, ?, ?, NULL)
+                         ON DUPLICATE KEY UPDATE
+                            title = VALUES(title),
+                            last_update = CURRENT_TIMESTAMP",
+                        [$menuItemId, $lang, $title]
+                    );
+                    $updatedTitles++;
+                }
+            }
+
+            $message = 'Названия обновлены: ' . $updatedTitles . '. Не найдено позиций по Poster ID: ' . $missingPosterIds;
+        } catch (\Throwable $e) {
+            $error = 'Ошибка импорта названий: ' . $e->getMessage();
+        }
+    }
+
     if (isset($_POST['import_categories_csv'])) {
         try {
             $raw = trim((string)($_POST['categories_csv'] ?? ''));

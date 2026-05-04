@@ -28,3 +28,14 @@
         </div>
     </form>
 </details>
+
+<details style="margin-top: 12px;">
+    <summary style="cursor:pointer; font-weight:800;">Импорт нормализованных названий</summary>
+    <div class="muted" style="margin-top: 8px;">Вставь CSV в формате: ID;Название;RU;EN;VN;KO (ID = Poster ID)</div>
+    <form method="POST" style="margin-top: 10px;">
+        <textarea name="normalized_titles_csv" rows="8" placeholder="ID;Название;Нормализованное название на русском;Нормализованное название на английском;Нормализованное название на вьетнамском;Нормализованное название на корейском"></textarea>
+        <div style="margin-top: 10px;">
+            <button type="submit" name="import_normalized_titles_csv" value="1">Импортировать названия</button>
+        </div>
+    </form>
+</details>
