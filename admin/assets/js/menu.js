@@ -55,6 +55,7 @@
             keys.forEach((k) => {
                 const show = selected.has(k);
                 qsa(`[data-col="${k}"]`).forEach((el) => {
+                    el.hidden = !show;
                     el.style.display = show ? '' : 'none';
                 });
             });
