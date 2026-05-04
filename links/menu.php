@@ -213,7 +213,7 @@ $telephone = '+84396314266';
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/common.css?v=20260425_0001">
     <link rel="stylesheet" href="/assets/css/links_index.css?v=20260504_0029">
-    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0038">
+    <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0039">
 </head>
 <body class="menu-page">
     <main class="links-page menu-page">

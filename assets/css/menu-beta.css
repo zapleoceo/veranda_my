@@ -7,9 +7,9 @@
             pointer-events: none;
             background:
                 radial-gradient(ellipse at 50% 35%,
-                    rgba(24,16,10,0.18) 0%,
-                    rgba(14,9,5,0.62) 58%,
-                    rgba(10,6,3,0.82) 100%);
+                    rgba(184,135,70,0.08) 0%,
+                    rgba(0,0,0,0.70) 58%,
+                    rgba(0,0,0,0.88) 100%);
             z-index: 0;
         }
 
