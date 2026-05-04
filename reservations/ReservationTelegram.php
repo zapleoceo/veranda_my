@@ -6,9 +6,20 @@ class ReservationTelegram {
     public static function buildManagerText(array $r): string {
         $qrCode = (string)($r['qr_code'] ?? '');
         $startRaw = (string)($r['start_time'] ?? '');
+        $spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+        if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+            $spotTzName = 'Asia/Ho_Chi_Minh';
+        }
+        $spotTz = new \DateTimeZone($spotTzName);
         $startDt = null;
-        try { $startDt = new \DateTimeImmutable($startRaw); } catch (\Throwable $e) {}
+        if ($startRaw !== '') {
+            $startDt = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $startRaw, $spotTz) ?: null;
+        }
+        if (!$startDt) {
+            try { $startDt = new \DateTimeImmutable($startRaw, $spotTz); } catch (\Throwable $e) {}
+        }
         if (!$startDt) $startDt = new \DateTimeImmutable('now');
+        $startDt = $startDt->setTimezone($spotTz);
 
         $duration = (int)($r['duration'] ?? 0);
         if ($duration <= 0) $duration = 0;
@@ -113,4 +124,3 @@ class ReservationTelegram {
         ];
     }
 }
-
