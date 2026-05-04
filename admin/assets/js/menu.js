@@ -3,7 +3,7 @@
                         const keys = toggles.map((cb) => cb.getAttribute('data-col')).filter(Boolean);
                         const params = new URLSearchParams(window.location.search);
                         const fromUrl = (params.get('cols') || '').trim();
-                        const userEmail = <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+                        const userEmail = (window.ADMIN && typeof window.ADMIN.userEmail === 'string') ? window.ADMIN.userEmail : '';
                         const storageKey = userEmail ? `menu_cols:${userEmail}` : 'menu_cols';
                         let fromSession = '';
                         let fromStorage = '';

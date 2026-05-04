@@ -52,6 +52,7 @@
 
 <script src="/assets/app.js?v=2" defer></script>
 <script src="/admin/assets/js/common.js?v=1" defer></script>
+<script>window.ADMIN = window.ADMIN || {}; window.ADMIN.userEmail = <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;</script>
 <?php if (file_exists(__DIR__ . '/../assets/js/' . $tab . '.js')): ?>
     <script src="/admin/assets/js/<?= $tab ?>.js?v=20260425_0001" defer></script>
 <?php endif; ?>

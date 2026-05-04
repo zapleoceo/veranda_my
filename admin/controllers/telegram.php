@@ -31,7 +31,11 @@ foreach ($settingKeys as $key => $default) {
     }
 }
 
-
+$telegramMeta = [];
+foreach (['telegram_last_run_at', 'telegram_last_run_result', 'telegram_last_run_error'] as $k) {
+    $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$k])->fetch();
+    $telegramMeta[$k] = $row ? (string)$row['meta_value'] : '';
+}
 
 if (($_GET['ajax'] ?? '') === 'telegram_test') {
     header('Content-Type: application/json; charset=utf-8');
@@ -200,4 +204,3 @@ if (($_GET['ajax'] ?? '') === 'telegram_status_ensure') {
     }
     exit;
 }
-

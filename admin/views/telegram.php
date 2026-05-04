@@ -1,10 +1,3 @@
-<?php
-            $telegramMeta = [];
-            foreach (['telegram_last_run_at', 'telegram_last_run_result', 'telegram_last_run_error'] as $k) {
-                $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$k])->fetch();
-                $telegramMeta[$k] = $row ? (string)$row['meta_value'] : '';
-            }
-        ?>
         <div class="card">
             <div style="display:flex; align-items:flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
                 <div>
