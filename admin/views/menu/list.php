@@ -119,7 +119,7 @@
             <?php endforeach; ?>
         </select>
     </div>
-    <div class="form-group">
+    <div class="form-group menu-filter-grow">
         <label>Поиск</label>
         <input name="q" value="<?= htmlspecialchars($filterQ) ?>" placeholder="name_raw / RU / EN / VN / KO" />
     </div>
@@ -133,9 +133,9 @@
             <option value="unadapted" <?= $filterStatus === 'unadapted' ? 'selected' : '' ?>>Неадаптировано</option>
         </select>
     </div>
-    <div style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center;">
+    <div class="menu-filters-actions">
         <button type="submit">Применить</button>
-        <a href="?tab=menu&view=list" style="text-decoration:none; color:var(--muted); font-weight:600;">Сбросить</a>
+        <a href="?tab=menu&view=list" class="menu-reset-link">Сбросить</a>
         <span class="muted">Всего: <?= (int)$menuTotal ?></span>
     </div>
 </form>

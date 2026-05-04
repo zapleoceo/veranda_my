@@ -391,8 +391,9 @@
 .menu-actions a:hover { filter: brightness(1.08); }
 
 .menu-filters {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(180px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
     gap: 12px;
     margin-top: 14px;
     padding: 12px;
@@ -400,11 +401,27 @@
     border: 1px solid var(--border, rgba(255,255,255,0.10));
     background: rgba(255,255,255,0.04);
 }
-.menu-filters > div[style*="grid-column"] {
+.menu-filters .form-group {
+    width: fit-content;
+    min-width: 0;
+    margin: 0;
+}
+.menu-filters .menu-filter-grow {
+    flex: 1 1 280px;
+    width: auto;
+    min-width: 220px;
+}
+.menu-filters-actions {
+    flex-basis: 100%;
     display: flex;
     gap: 10px;
     align-items: center;
     flex-wrap: wrap;
+}
+.menu-reset-link {
+    text-decoration: none;
+    color: var(--muted, rgba(255,255,255,0.62));
+    font-weight: 800;
 }
 
 .col-chip {
@@ -433,10 +450,9 @@ details > summary {
 details > summary::-webkit-details-marker { display: none; }
 
 @media (max-width: 980px) {
-    .menu-filters { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+    .menu-filters .menu-filter-grow { flex-basis: 100%; }
 }
 @media (max-width: 560px) {
-    .menu-filters { grid-template-columns: 1fr; }
     .menu-actions .left { width: 100%; }
     .menu-actions form, .menu-actions a { width: 100%; }
 }
