@@ -231,6 +231,7 @@ function admin_menu_export_items_missing_ko_csv(\App\Classes\Database $db): void
     fputcsv($out, [
         'Item ID',
         'Poster ID',
+        'Poster raw',
         'Название RU',
         'Название KO',
     ], ';');
@@ -239,6 +240,7 @@ function admin_menu_export_items_missing_ko_csv(\App\Classes\Database $db): void
         "SELECT
             mi.id item_id,
             p.poster_id,
+            p.name_raw,
             COALESCE(ru.title, '') ru_title,
             COALESCE(ko.title, '') ko_title
          FROM {$menuItemsTable} mi
@@ -255,6 +257,7 @@ function admin_menu_export_items_missing_ko_csv(\App\Classes\Database $db): void
         fputcsv($out, [
             (string)($r['item_id'] ?? ''),
             (string)($r['poster_id'] ?? ''),
+            (string)($r['name_raw'] ?? ''),
             (string)($r['ru_title'] ?? ''),
             (string)($r['ko_title'] ?? ''),
         ], ';');
