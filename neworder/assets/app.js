@@ -3,7 +3,8 @@ let menuData = [];
 let cart = {}; // product_id -> { item, count }
 
 const elCategories = d.getElementById('categoriesSidebar');
-const elMenu = d.getElementById('menuMain');
+const elMenuMain = d.getElementById('menuMain');
+const elMenuSections = d.getElementById('menuSections');
 const elCartSidebar = d.getElementById('cartSidebar');
 const elCartBadge = d.getElementById('cartBadge');
 const elCartItems = d.getElementById('cartItems');
@@ -11,6 +12,14 @@ const elCartTotal = d.getElementById('cartTotalSum');
 const elCartFooter = d.getElementById('cartFooter');
 const elEmptyCart = d.getElementById('emptyCart');
 const elToast = d.getElementById('toast');
+
+const elSearchInput = d.getElementById('productSearchInput');
+const elSearchClear = d.getElementById('productSearchClear');
+const elSearchSection = d.getElementById('searchSection');
+const elSearchTitle = d.getElementById('searchTitle');
+const elSearchLoading = d.getElementById('searchLoading');
+const elSearchEmpty = d.getElementById('searchEmpty');
+const elSearchGrid = d.getElementById('searchGrid');
 
 const fmtPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
 
@@ -22,18 +31,18 @@ async function loadMenu() {
     menuData = json.groups || [];
     renderMenu();
   } catch (err) {
-    elMenu.innerHTML = `<div class="error-msg">Не удалось загрузить меню: ${err.message}</div>`;
+    elMenuSections.innerHTML = `<div class="error-msg">Не удалось загрузить меню: ${err.message}</div>`;
   }
 }
 
 function renderMenu() {
   if (!menuData.length) {
-    elMenu.innerHTML = '<div class="loading-state">Меню пусто</div>';
+    elMenuSections.innerHTML = '<div class="loading-state">Меню пусто</div>';
     return;
   }
   
   elCategories.innerHTML = '';
-  elMenu.innerHTML = '';
+  elMenuSections.innerHTML = '';
 
   menuData.forEach((group, idx) => {
     // Category Link
@@ -98,7 +107,7 @@ function renderMenu() {
     });
 
     section.appendChild(grid);
-    elMenu.appendChild(section);
+    elMenuSections.appendChild(section);
   });
 }
 
@@ -220,6 +229,111 @@ function showToast(msg, isError = false) {
   elToast.className = 'toast ' + (isError ? 'error' : '');
   elToast.hidden = false;
   setTimeout(() => elToast.hidden = true, 3000);
+}
+
+let searchTimer = null;
+let searchAbort = null;
+
+function setSearchActive(active) {
+  elSearchSection.hidden = !active;
+  elMenuSections.hidden = active;
+  elCategories.hidden = active;
+  if (!active) {
+    elSearchGrid.innerHTML = '';
+    elSearchLoading.hidden = true;
+    elSearchEmpty.hidden = true;
+  }
+}
+
+function renderSearchResults(query, products) {
+  elSearchTitle.textContent = `Результаты поиска: ${query}`;
+  elSearchGrid.innerHTML = '';
+
+  (products || []).forEach(item => {
+    const priceVal = Number(item.price || 0) / 100;
+
+    const card = d.createElement('div');
+    card.className = 'product-card';
+
+    const name = d.createElement('h3');
+    name.className = 'product-name';
+    name.textContent = item.name;
+
+    const desc = d.createElement('p');
+    desc.className = 'product-desc';
+    desc.textContent = item.desc || '';
+
+    const footer = d.createElement('div');
+    footer.className = 'product-footer';
+
+    const price = d.createElement('div');
+    price.className = 'product-price';
+    price.textContent = fmtPrice(priceVal);
+
+    const addBtn = d.createElement('button');
+    addBtn.className = 'product-add';
+    addBtn.textContent = '+';
+    addBtn.onclick = () => addToCart(item, priceVal);
+
+    footer.appendChild(price);
+    footer.appendChild(addBtn);
+
+    card.appendChild(name);
+    card.appendChild(desc);
+    card.appendChild(footer);
+    elSearchGrid.appendChild(card);
+  });
+
+  elSearchLoading.hidden = true;
+  elSearchEmpty.hidden = (products || []).length > 0;
+}
+
+async function doSearch(query) {
+  if (searchAbort) {
+    searchAbort.abort();
+  }
+  searchAbort = new AbortController();
+
+  elSearchLoading.hidden = false;
+  elSearchEmpty.hidden = true;
+  elSearchGrid.innerHTML = '';
+
+  try {
+    const res = await fetch('/neworder/api.php?ajax=search_products&q=' + encodeURIComponent(query), { signal: searchAbort.signal });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Ошибка поиска');
+    renderSearchResults(query, json.products || []);
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+    elSearchLoading.hidden = true;
+    elSearchEmpty.hidden = false;
+    showToast(err.message || 'Ошибка поиска', true);
+  }
+}
+
+function handleSearchInput() {
+  const q = (elSearchInput.value || '').trim();
+  elSearchClear.hidden = q === '';
+
+  if (searchTimer) clearTimeout(searchTimer);
+
+  if (q.length < 2) {
+    if (searchAbort) searchAbort.abort();
+    setSearchActive(false);
+    return;
+  }
+
+  setSearchActive(true);
+  searchTimer = setTimeout(() => doSearch(q), 250);
+}
+
+if (elSearchInput && elSearchClear) {
+  elSearchInput.addEventListener('input', handleSearchInput);
+  elSearchClear.addEventListener('click', () => {
+    elSearchInput.value = '';
+    handleSearchInput();
+    elSearchInput.focus();
+  });
 }
 
 const phoneDigits = (raw) => String(raw || '').replace(/\D+/g, '').slice(0, 15);
