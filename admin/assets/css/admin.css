@@ -417,6 +417,11 @@
     border-radius: 10px;
     padding-top: 0;
     padding-bottom: 0;
+    box-shadow: none;
+}
+.menu-filters input[name="q"]:focus {
+    box-shadow: none;
+    border-color: var(--border, rgba(255,255,255,0.10));
 }
 .menu-filters .menu-filter-grow {
     flex: 0 0 auto;
