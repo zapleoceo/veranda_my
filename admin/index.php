@@ -31,6 +31,7 @@ $ajax = (string)($_GET['ajax'] ?? '');
 
 if ($ajax === 'menu_publish') $tab = 'menu';
 if ($ajax === 'menu_edit_form' || $ajax === 'menu_edit_save') $tab = 'menu';
+if ($ajax === 'menu_list') $tab = 'menu';
 if ($ajax === 'telegram_test' || $ajax === 'telegram_status_ensure') $tab = 'telegram';
 
 if ($tab === 'main') $tab = 'access';

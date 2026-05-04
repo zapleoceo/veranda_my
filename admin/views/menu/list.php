@@ -81,6 +81,9 @@
     ];
     $pages = max(1, (int)ceil($menuTotal / $menuPerPage));
 ?>
+<?php if (!defined('ADMIN_MENU_AJAX_LIST')): ?>
+<div id="admin-menu-list-root">
+<?php endif; ?>
 <form method="GET" class="menu-filters">
     <input type="hidden" name="tab" value="menu">
     <input type="hidden" name="view" value="list">
@@ -134,9 +137,8 @@
         </select>
     </div>
     <div class="menu-filters-actions">
-        <button type="submit">Применить</button>
         <a href="?tab=menu&view=list" class="menu-reset-link">Сбросить</a>
-        <span class="muted">Всего: <?= (int)$menuTotal ?></span>
+        <span class="muted">Всего: <span class="js-menu-total"><?= (int)$menuTotal ?></span></span>
     </div>
 </form>
 
@@ -258,4 +260,7 @@
             <a href="<?= htmlspecialchars($href) ?>" class="<?= $p === $menuPage ? 'pill ok' : 'pill warn' ?>" style="text-decoration:none;"><?= $p ?></a>
         <?php endfor; ?>
     </div>
+<?php endif; ?>
+<?php if (!defined('ADMIN_MENU_AJAX_LIST')): ?>
+</div>
 <?php endif; ?>

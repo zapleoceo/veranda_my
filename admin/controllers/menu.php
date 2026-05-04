@@ -7,6 +7,30 @@ if (($_GET['ajax'] ?? '') === 'menu_publish') {
 }
 
 $ajax = (string)($_GET['ajax'] ?? '');
+if ($ajax === 'menu_list') {
+    $_GET['view'] = 'list';
+    $menuView = 'list';
+    $state = admin_menu_section_state($db, $posterToken, 'menu', $message, $error);
+    $menuItems = $state['menuItems'];
+    $menuTotal = $state['menuTotal'];
+    $menuPerPage = $state['menuPerPage'];
+    $menuPage = $state['menuPage'];
+    $menuWorkshops = $state['menuWorkshops'];
+    $menuCategories = $state['menuCategories'];
+    $mainItemCounts = $state['mainItemCounts'];
+    $stripNumberPrefix = $state['stripNumberPrefix'];
+
+    header('Content-Type: text/html; charset=utf-8');
+    if ($error !== '') {
+        http_response_code(400);
+    }
+    define('ADMIN_MENU_AJAX_LIST', 1);
+    ob_start();
+    require __DIR__ . '/../views/menu/list.php';
+    echo (string)ob_get_clean();
+    exit;
+}
+
 if ($ajax === 'menu_edit_form') {
     $posterId = (int)($_GET['poster_id'] ?? 0);
     if ($posterId <= 0) {

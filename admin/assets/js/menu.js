@@ -265,6 +265,9 @@
     };
 
     const initEditModal = () => {
+        if (window.__adminMenuEditModalInited) return;
+        window.__adminMenuEditModalInited = true;
+
         const ensureModal = () => {
             let modal = qs('#adminMenuModal');
             if (modal) return modal;
@@ -365,9 +368,87 @@
         });
     };
 
-    initColumnToggles();
-    initPublishToggle();
-    initSelectAutoWidth();
-    initClientSort();
-    initEditModal();
+    const initFiltersAjax = () => {
+        const root = qs('#admin-menu-list-root');
+        const form = qs('form.menu-filters', root || document);
+        if (!form) return;
+        if (form.getAttribute('data-ajax-inited') === '1') return;
+        form.setAttribute('data-ajax-inited', '1');
+
+        const buildParams = () => {
+            const fd = new FormData(form);
+            const params = new URLSearchParams();
+            for (const [k, v] of fd.entries()) {
+                const key = String(k);
+                const val = String(v);
+                if (val === '') continue;
+                params.set(key, val);
+            }
+            params.set('tab', 'menu');
+            params.set('view', 'list');
+            params.set('page', '1');
+            return params;
+        };
+
+        const apply = async () => {
+            const params = buildParams();
+            const url = new URL('/admin/', window.location.origin);
+            url.searchParams.set('ajax', 'menu_list');
+            params.forEach((v, k) => url.searchParams.set(k, v));
+
+            const viewUrl = new URL('/admin/', window.location.origin);
+            params.forEach((v, k) => viewUrl.searchParams.set(k, v));
+            window.history.replaceState({}, '', viewUrl.pathname + '?' + viewUrl.searchParams.toString());
+
+            const target = qs('#admin-menu-list-root');
+            if (!target) return;
+            target.setAttribute('aria-busy', 'true');
+
+            try {
+                const res = await fetch(url.toString(), { method: 'GET', headers: { 'X-Requested-With': 'fetch' } });
+                const html = await res.text();
+                if (!res.ok) {
+                    alert('Ошибка фильтрации');
+                    return;
+                }
+                target.innerHTML = html;
+                if (typeof window.__adminMenuInit === 'function') {
+                    window.__adminMenuInit();
+                }
+            } catch (_e) {
+                alert('Ошибка сети');
+            } finally {
+                target.setAttribute('aria-busy', 'false');
+            }
+        };
+
+        const debounce = (fn, ms) => {
+            let t = 0;
+            return (...args) => {
+                window.clearTimeout(t);
+                t = window.setTimeout(() => fn(...args), ms);
+            };
+        };
+        const applyDebounced = debounce(apply, 250);
+
+        qsa('select', form).forEach((sel) => {
+            sel.addEventListener('change', () => { apply(); });
+        });
+        const q = qs('input[name="q"]', form);
+        if (q) {
+            q.addEventListener('input', () => { applyDebounced(); });
+        }
+    };
+
+    const initAdminMenu = () => {
+        initColumnToggles();
+        initPublishToggle();
+        initSelectAutoWidth();
+        initClientSort();
+        initEditModal();
+        initFiltersAjax();
+    };
+
+    window.__adminMenuInit = initAdminMenu;
+    initAdminMenu();
 })();
