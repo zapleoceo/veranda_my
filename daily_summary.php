@@ -1,7 +1,5 @@
 <?php
 
-date_default_timezone_set('Asia/Ho_Chi_Minh');
-
 require_once __DIR__ . '/src/classes/Database.php';
 
 $logPath = __DIR__ . '/daily_summary.log';
@@ -22,6 +20,17 @@ $loadEnv = function (string $path): void {
 };
 
 $loadEnv(__DIR__ . '/.env');
+
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+    $spotTzName = 'Asia/Ho_Chi_Minh';
+}
+$apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
+if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
+    $apiTzName = $spotTzName;
+}
+date_default_timezone_set($apiTzName);
+$spotTz = new DateTimeZone($spotTzName);
 
 $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
 $tgUserId = '169510539';
@@ -144,8 +153,8 @@ $cronLog = $root . '/cron.log';
 $menuLog = $root . '/menu_sync.log';
 $tgLog = $root . '/telegram.log';
 
-$yesterday = (new DateTimeImmutable('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->modify('-1 day')->format('Y-m-d');
-$today = (new DateTimeImmutable('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Y-m-d');
+$yesterday = (new DateTimeImmutable('now', $spotTz))->modify('-1 day')->format('Y-m-d');
+$today = (new DateTimeImmutable('now', $spotTz))->format('Y-m-d');
 
 $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
 $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
@@ -234,7 +243,7 @@ $fmt = function (string $s): string {
 };
 
 $text = '<b>Сводка синков</b>' . "\n"
-    . 'Дата: ' . $fmt($today) . ' (Asia/Ho_Chi_Minh)' . "\n\n"
+    . 'Дата: ' . $fmt($today) . ' (' . $fmt($spotTzName) . ')' . "\n\n"
     . '• <b>Menu sync</b>: last=' . $fmt($menuLast) . ', yesterday=' . (int)$menuCount . "\n"
     . '• <b>Telegram alerts</b>: last=' . $fmt($tgLast) . ', yesterday=' . (int)$tgCount . "\n"
     . '• <b>Kitchen online</b>: last=' . $fmt($kitchenLast) . ', yesterday=' . (int)$kitchenCount . "\n"

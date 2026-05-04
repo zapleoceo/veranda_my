@@ -1,6 +1,4 @@
 <?php
-date_default_timezone_set('Asia/Ho_Chi_Minh');
-
 require_once __DIR__ . '/../../src/classes/Database.php';
 
 if (file_exists(__DIR__ . '/../../.env')) {
@@ -12,6 +10,16 @@ if (file_exists(__DIR__ . '/../../.env')) {
         $_ENV[$name] = trim($value);
     }
 }
+
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+    $spotTzName = 'Asia/Ho_Chi_Minh';
+}
+$apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
+if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
+    $apiTzName = $spotTzName;
+}
+date_default_timezone_set($apiTzName);
 
 $tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 $db = new \App\Classes\Database($_ENV['DB_HOST'] ?? 'localhost', $_ENV['DB_NAME'] ?? 'veranda_my', $_ENV['DB_USER'] ?? 'veranda_my', $_ENV['DB_PASS'] ?? '', $tableSuffix);

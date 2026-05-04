@@ -27,11 +27,22 @@ if (empty($_ENV['POSTER_API_TOKEN'])) {
     exit;
 }
 
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+    $spotTzName = 'Asia/Ho_Chi_Minh';
+}
+$spotTz = new DateTimeZone($spotTzName);
+
 $startRaw = (string)($row['start_time'] ?? '');
 $startDt = null;
-try { $startDt = new DateTimeImmutable($startRaw); } catch (\Throwable $e) {}
+if ($startRaw !== '') {
+    $startDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $startRaw, $spotTz) ?: null;
+}
+if (!$startDt) {
+    try { $startDt = new DateTimeImmutable($startRaw, $spotTz); } catch (\Throwable $e) {}
+}
 if ($startDt) {
-    $now = new DateTimeImmutable('now');
+    $now = new DateTimeImmutable('now', $spotTz);
     if ($startDt->getTimestamp() <= $now->getTimestamp()) {
         $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь устарела', 'show_alert' => false]);
         $baseText = \App\Classes\ReservationTelegram::buildManagerText($row);

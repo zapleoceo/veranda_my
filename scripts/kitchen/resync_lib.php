@@ -1,6 +1,4 @@
 <?php
-date_default_timezone_set('Asia/Ho_Chi_Minh');
-
 require_once __DIR__ . '/../../src/classes/Database.php';
 require_once __DIR__ . '/../../src/classes/PosterAPI.php';
 require_once __DIR__ . '/../../src/classes/KitchenAnalytics.php';
@@ -17,6 +15,17 @@ function veranda_resync_range_period(string $from, string $to): void {
             $_ENV[$k] = trim($v);
         }
     }
+
+    $spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+    if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+        $spotTzName = 'Asia/Ho_Chi_Minh';
+    }
+    $apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
+    if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
+        $apiTzName = $spotTzName;
+    }
+    date_default_timezone_set($apiTzName);
+    $spotTz = new DateTimeZone($spotTzName);
 
     $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
     $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
@@ -207,7 +216,7 @@ function veranda_resync_range_period(string $from, string $to): void {
                 $closedAt = null;
                 if (!empty($tx['date_close']) && (int)$tx['date_close'] > 0) {
                     $candidate = new DateTime('@' . round(((int)$tx['date_close']) / 1000));
-                    $candidate->setTimezone(new DateTimeZone('Asia/Ho_Chi_Minh'));
+                    $candidate->setTimezone($spotTz);
                     if ((int)$candidate->format('Y') >= 2000) {
                         $closedAt = $candidate->format('Y-m-d H:i:s');
                     }

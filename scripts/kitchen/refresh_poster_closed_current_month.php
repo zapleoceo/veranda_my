@@ -1,6 +1,4 @@
 <?php
-date_default_timezone_set('Asia/Ho_Chi_Minh');
-
 require_once __DIR__ . '/../../src/classes/Database.php';
 require_once __DIR__ . '/../../src/classes/PosterAPI.php';
 
@@ -13,6 +11,17 @@ if (file_exists(__DIR__ . '/../../.env')) {
         $_ENV[$name] = trim($value);
     }
 }
+
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+    $spotTzName = 'Asia/Ho_Chi_Minh';
+}
+$apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
+if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
+    $apiTzName = $spotTzName;
+}
+date_default_timezone_set($apiTzName);
+$spotTz = new DateTimeZone($spotTzName);
 
 $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
 $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
@@ -52,7 +61,7 @@ try {
         [$start, $end]
     )->fetchAll();
 
-    $parseClosedAt = function (array $tx): ?string {
+    $parseClosedAt = function (array $tx) use ($spotTz): ?string {
         if (!empty($tx['date_close_date']) && $tx['date_close_date'] !== '0000-00-00 00:00:00') {
             $ts = strtotime((string)$tx['date_close_date']);
             if ($ts !== false && $ts > 0 && (int)date('Y', $ts) >= 2000) {
@@ -65,7 +74,7 @@ try {
                 $v = (int)round($v / 1000);
             }
             if ($v > 0) {
-                $dt = (new DateTimeImmutable('@' . $v))->setTimezone(new DateTimeZone('Asia/Ho_Chi_Minh'));
+                $dt = (new DateTimeImmutable('@' . $v))->setTimezone($spotTz);
                 if ((int)$dt->format('Y') >= 2000) {
                     return $dt->format('Y-m-d H:i:s');
                 }

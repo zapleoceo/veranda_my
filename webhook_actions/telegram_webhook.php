@@ -1,7 +1,5 @@
 <?php
 $root = dirname(__DIR__);
-date_default_timezone_set('Asia/Ho_Chi_Minh');
-
 require_once $root . '/src/classes/Database.php';
 
 if (file_exists($root . '/.env')) {
@@ -14,6 +12,16 @@ if (file_exists($root . '/.env')) {
         $_ENV[$name] = trim($value);
     }
 }
+
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+    $spotTzName = 'Asia/Ho_Chi_Minh';
+}
+$apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
+if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
+    $apiTzName = $spotTzName;
+}
+date_default_timezone_set($apiTzName);
 
 $tgToken = $_ENV['TELEGRAM_BOT_TOKEN'] ?? '';
 $dbHost = $_ENV['DB_HOST'] ?? 'localhost';

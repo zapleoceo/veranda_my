@@ -7,8 +7,6 @@ require_once __DIR__ . '/src/classes/MetaRepository.php';
 require_once __DIR__ . '/src/classes/KitchenAnalytics.php';
 require_once __DIR__ . '/src/classes/EventLogger.php';
 
-date_default_timezone_set('Asia/Ho_Chi_Minh');
-
 if (file_exists(__DIR__ . '/.env')) {
     $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
@@ -18,6 +16,16 @@ if (file_exists(__DIR__ . '/.env')) {
         $_ENV[$name] = trim($value);
     }
 }
+
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+    $spotTzName = 'Asia/Ho_Chi_Minh';
+}
+$apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
+if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
+    $apiTzName = $spotTzName;
+}
+date_default_timezone_set($apiTzName);
 
 try {
     $startedAt = microtime(true);

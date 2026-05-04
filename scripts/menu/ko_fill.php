@@ -1,7 +1,5 @@
 <?php
 
-date_default_timezone_set('Asia/Ho_Chi_Minh');
-
 require_once __DIR__ . '/../../src/classes/Database.php';
 
 $loadEnv = function (string $path): void {
@@ -31,6 +29,16 @@ foreach ($argv as $a) {
 if ($limit < 0) $limit = 0;
 
 $loadEnv(__DIR__ . '/../../.env');
+
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+    $spotTzName = 'Asia/Ho_Chi_Minh';
+}
+$apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
+if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) {
+    $apiTzName = $spotTzName;
+}
+date_default_timezone_set($apiTzName);
 
 $dbHost = $_ENV['DB_HOST'] ?? 'localhost';
 $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
@@ -122,4 +130,3 @@ if ($mode === 'apply') {
 
 fwrite(STDERR, "Unknown mode: {$mode}\n");
 exit(1);
-

@@ -18,6 +18,12 @@ if (empty($_ENV['POSTER_API_TOKEN'])) {
     exit;
 }
 
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) {
+    $spotTzName = 'Asia/Ho_Chi_Minh';
+}
+$spotTz = new DateTimeZone($spotTzName);
+
 $pushedState = (int)($row['is_poster_pushed'] ?? 0);
 if ($pushedState === 2) {
     $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь уже отправляется в Poster', 'show_alert' => false]);
@@ -30,13 +36,18 @@ if ($pushedState === 1) {
 
 $startRaw = (string)($row['start_time'] ?? '');
 $startDt = null;
-try { $startDt = new DateTimeImmutable($startRaw); } catch (\Throwable $e) {}
-if (!$startDt) $startDt = new DateTimeImmutable('now');
+if ($startRaw !== '') {
+    $startDt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $startRaw, $spotTz) ?: null;
+}
+if (!$startDt) {
+    try { $startDt = new DateTimeImmutable($startRaw, $spotTz); } catch (\Throwable $e) {}
+}
+if (!$startDt) $startDt = new DateTimeImmutable('now', $spotTz);
 $duration = (int)($row['duration'] ?? 0);
 if ($duration <= 0) $duration = 120;
 $oldEnd = $startDt->modify('+' . $duration . ' minutes');
 
-$now = new DateTimeImmutable('now');
+$now = new DateTimeImmutable('now', $spotTz);
 $newStart = $now->setTime((int)$now->format('H'), (int)$now->format('i'), 0);
 if ($oldEnd->getTimestamp() <= $newStart->getTimestamp()) {
     $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Бронь уже полностью прошла', 'show_alert' => true]);
@@ -97,4 +108,3 @@ $postJson('editMessageText', [
     'reply_markup' => ['inline_keyboard' => []]
 ]);
 exit;
-
