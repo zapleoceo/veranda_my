@@ -1,7 +1,7 @@
         body { background: transparent !important; }
 
         .menu-page .links-hero::after {
-            background: radial-gradient(ellipse at center, transparent 22%, rgba(0,0,0,0.84) 74%, rgba(0,0,0,0.95) 100%);
+            background: none;
         }
 
         .menu-page .links-spotlight { opacity: 0.9; }
