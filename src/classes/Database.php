@@ -272,9 +272,23 @@ class Database {
             lang VARCHAR(8) NOT NULL,
             title VARCHAR(512) NULL,
             description TEXT NULL,
+            last_update DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (item_id, lang),
             CONSTRAINT fk_menu_item_tr_item_{$fkTag} FOREIGN KEY (item_id) REFERENCES {$mi}(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+        try {
+            $cols = $this->pdo->query("SHOW COLUMNS FROM {$miTr}")->fetchAll(\PDO::FETCH_ASSOC);
+            $have = [];
+            foreach ($cols as $c) {
+                $f = strtolower((string)($c['Field'] ?? ''));
+                if ($f !== '') $have[$f] = true;
+            }
+            if (empty($have['last_update'])) {
+                $this->pdo->exec("ALTER TABLE {$miTr} ADD COLUMN last_update DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+            }
+        } catch (\Throwable $e) {
+        }
     }
 
     public function createPaydayTables(): void {
