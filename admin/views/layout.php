@@ -7,7 +7,7 @@
     <title>Админ-панель</title>
     <link rel="stylesheet" href="/assets/app.css?v=11">
     <link rel="stylesheet" href="/assets/css/common.css?v=1">
-    <link rel="stylesheet" href="/admin/assets/css/admin.css?v=20260504_0001">
+    <link rel="stylesheet" href="/admin/assets/css/admin.css?v=20260504_0002">
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 </head>
 <body>
@@ -54,7 +54,7 @@
 <script src="/admin/assets/js/common.js?v=1" defer></script>
 <script>window.ADMIN = window.ADMIN || {}; window.ADMIN.userEmail = <?= json_encode((string)($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;</script>
 <?php if (file_exists(__DIR__ . '/../assets/js/' . $tab . '.js')): ?>
-    <script src="/admin/assets/js/<?= $tab ?>.js?v=20260504_0001" defer></script>
+    <script src="/admin/assets/js/<?= $tab ?>.js?v=20260504_0002" defer></script>
 <?php endif; ?>
 <script src="/assets/user_menu.js" defer></script>
 </body>

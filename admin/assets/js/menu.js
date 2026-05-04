@@ -147,13 +147,37 @@
                 const cs = window.getComputedStyle(sel);
                 meas.style.font = cs.font;
                 let maxW = 0;
-                for (const opt of Array.from(sel.options || [])) {
+                let maxIdx = 0;
+                const opts = Array.from(sel.options || []);
+                let idx = 0;
+                for (const opt of opts) {
                     meas.textContent = String(opt.textContent || '').trim();
                     const w = meas.getBoundingClientRect().width;
-                    if (w > maxW) maxW = w;
+                    if (w > maxW) {
+                        maxW = w;
+                        maxIdx = idx;
+                    }
+                    idx++;
                 }
-                const pad = 48;
-                sel.style.width = `${Math.ceil(maxW + pad)}px`;
+                const clone = sel.cloneNode(true);
+                try {
+                    clone.selectedIndex = maxIdx;
+                } catch (_e) {}
+                clone.setAttribute('data-autowidth', '1');
+                clone.style.position = 'absolute';
+                clone.style.visibility = 'hidden';
+                clone.style.whiteSpace = 'nowrap';
+                clone.style.left = '-9999px';
+                clone.style.top = '-9999px';
+                clone.style.width = 'auto';
+                clone.style.maxWidth = 'none';
+                clone.style.minWidth = '0';
+                const container = document.querySelector('.container') || document.body;
+                container.appendChild(clone);
+                const cloneW = clone.getBoundingClientRect().width;
+                clone.remove();
+
+                sel.style.width = `${Math.ceil(cloneW)}px`;
                 sel.style.maxWidth = '100%';
             }
 

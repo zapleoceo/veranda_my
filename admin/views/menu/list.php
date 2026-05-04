@@ -125,7 +125,7 @@
     </div>
     <div class="form-group">
         <label>Статус</label>
-        <select name="status">
+        <select name="status" class="menu-filter-select" data-autowidth="1">
             <option value="" <?= $filterStatus === '' ? 'selected' : '' ?>>Все</option>
             <option value="published" <?= $filterStatus === 'published' ? 'selected' : '' ?>>Опубликовано</option>
             <option value="hidden" <?= $filterStatus === 'hidden' ? 'selected' : '' ?>>Скрыто</option>
