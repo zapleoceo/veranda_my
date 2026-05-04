@@ -72,7 +72,12 @@ $posterApi = $apiToken !== '' ? new \App\Classes\PosterAPI($apiToken) : null;
 $model = new NewOrderModel($db, $posterApi, $spotId);
 
 if ($ajax === 'get_menu') {
-    $trLang = 'ru';
+    $lang = strtolower(trim((string)($_GET['lang'] ?? 'ru')));
+    $supportedLangs = ['ru', 'en', 'vi', 'ko'];
+    if (!in_array($lang, $supportedLangs, true)) {
+        $lang = 'ru';
+    }
+    $trLang = $lang === 'vi' ? 'vn' : $lang;
     try {
         [$groups, $lastMenuSyncAt] = $model->getMenuGroups($trLang);
     } catch (\Throwable $e) {

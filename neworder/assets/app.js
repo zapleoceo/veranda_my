@@ -21,23 +21,212 @@ const elSearchLoading = d.getElementById('searchLoading');
 const elSearchEmpty = d.getElementById('searchEmpty');
 const elSearchGrid = d.getElementById('searchGrid');
 
+const elPageTitle = d.getElementById('pageTitle');
+const elCartBtnLabel = d.getElementById('cartBtnLabel');
+const elCartTitle = d.getElementById('cartTitle');
+const elCartTotalLabel = d.getElementById('cartTotalLabel');
+const elCheckoutTitle = d.getElementById('checkoutTitle');
+const elLabelName = d.getElementById('labelName');
+const elLabelPhone = d.getElementById('labelPhone');
+const elLabelServiceMode = d.getElementById('labelServiceMode');
+const elServiceInPlaceLabel = d.getElementById('serviceInPlaceLabel');
+const elServiceTakeawayLabel = d.getElementById('serviceTakeawayLabel');
+const elOrderName = d.getElementById('orderName');
+const elOrderPhone = d.getElementById('orderPhone');
+const elSubmitBtn = d.getElementById('submitBtn');
+const elLoadingState = d.getElementById('loadingState');
+const elLangMenu = d.getElementById('langMenu');
+
 const fmtPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
+
+const supportedLangs = ['ru', 'en', 'vi', 'ko'];
+let currentLang = (document.documentElement.getAttribute('lang') || 'ru').toLowerCase();
+if (!supportedLangs.includes(currentLang)) currentLang = 'ru';
+
+const i18n = {
+  ru: {
+    title: 'Новый заказ',
+    cart: 'Корзина',
+    searchPlaceholder: 'Поиск блюд...',
+    searchResultsPrefix: 'Результаты поиска',
+    searchLoading: 'Поиск...',
+    searchEmpty: 'Ничего не найдено',
+    menuLoading: 'Загрузка меню...',
+    menuEmpty: 'Меню пусто',
+    loadMenuFailPrefix: 'Не удалось загрузить меню: ',
+    addedPrefix: 'Добавлено: ',
+    emptyCart: 'Корзина пуста',
+    total: 'Итого:',
+    checkout: 'Оформление заказа',
+    name: 'Имя',
+    namePh: 'Как к вам обращаться?',
+    phone: 'Телефон',
+    phonePh: 'Ваш номер телефона',
+    orderType: 'Тип заказа',
+    inPlace: 'В заведении',
+    takeaway: 'С собой',
+    submit: 'Подтвердить заказ',
+    sending: 'Отправка...',
+    phoneInvalid: 'Проверьте корректность номера телефона',
+    orderUnknown: 'Неизвестная ошибка',
+    orderSuccessPrefix: 'Заказ успешно создан! ID: ',
+    searchFail: 'Ошибка поиска',
+  },
+  en: {
+    title: 'New order',
+    cart: 'Cart',
+    searchPlaceholder: 'Search dishes...',
+    searchResultsPrefix: 'Search results',
+    searchLoading: 'Searching...',
+    searchEmpty: 'Nothing found',
+    menuLoading: 'Loading menu...',
+    menuEmpty: 'Menu is empty',
+    loadMenuFailPrefix: 'Failed to load menu: ',
+    addedPrefix: 'Added: ',
+    emptyCart: 'Cart is empty',
+    total: 'Total:',
+    checkout: 'Checkout',
+    name: 'Name',
+    namePh: 'Your name',
+    phone: 'Phone',
+    phonePh: 'Your phone number',
+    orderType: 'Order type',
+    inPlace: 'Dine in',
+    takeaway: 'Takeaway',
+    submit: 'Place order',
+    sending: 'Sending...',
+    phoneInvalid: 'Check phone number',
+    orderUnknown: 'Unknown error',
+    orderSuccessPrefix: 'Order created! ID: ',
+    searchFail: 'Search error',
+  },
+  vi: {
+    title: 'Đơn mới',
+    cart: 'Giỏ hàng',
+    searchPlaceholder: 'Tìm món...',
+    searchResultsPrefix: 'Kết quả tìm kiếm',
+    searchLoading: 'Đang tìm...',
+    searchEmpty: 'Không tìm thấy',
+    menuLoading: 'Đang tải menu...',
+    menuEmpty: 'Không có món',
+    loadMenuFailPrefix: 'Không tải được menu: ',
+    addedPrefix: 'Đã thêm: ',
+    emptyCart: 'Giỏ hàng trống',
+    total: 'Tổng:',
+    checkout: 'Xác nhận đơn',
+    name: 'Tên',
+    namePh: 'Bạn tên gì?',
+    phone: 'Số điện thoại',
+    phonePh: 'Số điện thoại của bạn',
+    orderType: 'Loại đơn',
+    inPlace: 'Dùng tại chỗ',
+    takeaway: 'Mang đi',
+    submit: 'Đặt hàng',
+    sending: 'Đang gửi...',
+    phoneInvalid: 'Kiểm tra số điện thoại',
+    orderUnknown: 'Lỗi không xác định',
+    orderSuccessPrefix: 'Đã tạo đơn! ID: ',
+    searchFail: 'Lỗi tìm kiếm',
+  },
+  ko: {
+    title: '새 주문',
+    cart: '장바구니',
+    searchPlaceholder: '메뉴 검색...',
+    searchResultsPrefix: '검색 결과',
+    searchLoading: '검색 중...',
+    searchEmpty: '검색 결과 없음',
+    menuLoading: '메뉴 불러오는 중...',
+    menuEmpty: '메뉴가 없습니다',
+    loadMenuFailPrefix: '메뉴 로드 실패: ',
+    addedPrefix: '추가됨: ',
+    emptyCart: '장바구니가 비어있습니다',
+    total: '합계:',
+    checkout: '주문하기',
+    name: '이름',
+    namePh: '이름을 입력하세요',
+    phone: '전화번호',
+    phonePh: '전화번호를 입력하세요',
+    orderType: '주문 방식',
+    inPlace: '매장 식사',
+    takeaway: '포장',
+    submit: '주문 확정',
+    sending: '전송 중...',
+    phoneInvalid: '전화번호를 확인하세요',
+    orderUnknown: '알 수 없는 오류',
+    orderSuccessPrefix: '주문 생성됨! ID: ',
+    searchFail: '검색 오류',
+  }
+};
+
+function cookieSet(name, value) {
+  const maxAge = 31536000;
+  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+}
+
+function setActiveLangLink(lang) {
+  if (!elLangMenu) return;
+  const links = Array.from(elLangMenu.querySelectorAll('.lang-panel a'));
+  links.forEach((a) => {
+    const href = String(a.getAttribute('href') || '');
+    const m = href.match(/[?&]lang=([a-zA-Z-]+)/);
+    const code = m ? m[1].toLowerCase() : '';
+    a.classList.toggle('active', code === lang);
+  });
+}
+
+function applyLang(lang) {
+  const next = String(lang || '').toLowerCase();
+  if (!supportedLangs.includes(next)) return;
+  currentLang = next;
+  const t = i18n[currentLang] || i18n.ru;
+
+  document.documentElement.setAttribute('lang', currentLang);
+  document.title = t.title;
+  setActiveLangLink(currentLang);
+
+  if (elPageTitle) elPageTitle.textContent = t.title;
+  if (elCartBtnLabel) elCartBtnLabel.textContent = t.cart;
+  if (elCartTitle) elCartTitle.textContent = t.cart;
+  if (elEmptyCart) elEmptyCart.textContent = t.emptyCart;
+  if (elCartTotalLabel) elCartTotalLabel.textContent = t.total;
+  if (elCheckoutTitle) elCheckoutTitle.textContent = t.checkout;
+  if (elLabelName) elLabelName.textContent = t.name;
+  if (elLabelPhone) elLabelPhone.textContent = t.phone;
+  if (elLabelServiceMode) elLabelServiceMode.textContent = t.orderType;
+  if (elServiceInPlaceLabel) elServiceInPlaceLabel.textContent = t.inPlace;
+  if (elServiceTakeawayLabel) elServiceTakeawayLabel.textContent = t.takeaway;
+  if (elSubmitBtn && !elSubmitBtn.disabled) elSubmitBtn.textContent = t.submit;
+  if (elOrderName) elOrderName.placeholder = t.namePh;
+  if (elOrderPhone) elOrderPhone.placeholder = t.phonePh;
+  if (elLoadingState) elLoadingState.textContent = t.menuLoading;
+  if (elSearchInput) elSearchInput.placeholder = t.searchPlaceholder;
+  if (elSearchLoading) elSearchLoading.textContent = t.searchLoading;
+  if (elSearchEmpty) elSearchEmpty.textContent = t.searchEmpty;
+
+  const url = new URL(window.location.href);
+  url.searchParams.set('lang', currentLang);
+  window.history.replaceState({}, '', url.toString());
+  cookieSet('links_lang', currentLang);
+}
 
 async function loadMenu() {
   try {
-    const res = await fetch('/neworder/api.php?ajax=get_menu');
+    const res = await fetch('/neworder/api.php?ajax=get_menu&lang=' + encodeURIComponent(currentLang));
     const json = await res.json();
-    if (!json.ok) throw new Error(json.error || 'Ошибка загрузки меню');
+    const t = i18n[currentLang] || i18n.ru;
+    if (!json.ok) throw new Error(json.error || t.loadMenuFailPrefix.trim());
     menuData = json.groups || [];
     renderMenu();
   } catch (err) {
-    elMenuSections.innerHTML = `<div class="error-msg">Не удалось загрузить меню: ${err.message}</div>`;
+    const t = i18n[currentLang] || i18n.ru;
+    elMenuSections.innerHTML = `<div class="error-msg">${t.loadMenuFailPrefix}${err.message}</div>`;
   }
 }
 
 function renderMenu() {
   if (!menuData.length) {
-    elMenuSections.innerHTML = '<div class="loading-state">Меню пусто</div>';
+    const t = i18n[currentLang] || i18n.ru;
+    elMenuSections.innerHTML = `<div class="loading-state">${t.menuEmpty}</div>`;
     return;
   }
   
@@ -120,7 +309,8 @@ function addToCart(item, priceVal) {
   }
   updateCartBadge();
   renderCart();
-  showToast(`Добавлено: ${item.name}`);
+  const t = i18n[currentLang] || i18n.ru;
+  showToast(`${t.addedPrefix}${item.name}`);
 }
 
 function updateCart(pid, delta) {
@@ -246,7 +436,8 @@ function setSearchActive(active) {
 }
 
 function renderSearchResults(query, products) {
-  elSearchTitle.textContent = `Результаты поиска: ${query}`;
+  const t = i18n[currentLang] || i18n.ru;
+  elSearchTitle.textContent = `${t.searchResultsPrefix}: ${query}`;
   elSearchGrid.innerHTML = '';
 
   (products || []).forEach(item => {
@@ -299,15 +490,17 @@ async function doSearch(query) {
   elSearchGrid.innerHTML = '';
 
   try {
-    const res = await fetch('/neworder/api.php?ajax=search_products&q=' + encodeURIComponent(query), { signal: searchAbort.signal });
+    const res = await fetch('/neworder/api.php?ajax=search_products&q=' + encodeURIComponent(query) + '&lang=' + encodeURIComponent(currentLang), { signal: searchAbort.signal });
     const json = await res.json();
-    if (!json.ok) throw new Error(json.error || 'Ошибка поиска');
+    const t = i18n[currentLang] || i18n.ru;
+    if (!json.ok) throw new Error(json.error || t.searchFail);
     renderSearchResults(query, json.products || []);
   } catch (err) {
     if (err && err.name === 'AbortError') return;
     elSearchLoading.hidden = true;
     elSearchEmpty.hidden = false;
-    showToast(err.message || 'Ошибка поиска', true);
+    const t = i18n[currentLang] || i18n.ru;
+    showToast(err.message || t.searchFail, true);
   }
 }
 
@@ -369,7 +562,8 @@ async function submitOrder(e) {
   const sm = d.querySelector('input[name="service_mode"]:checked').value;
 
   if (!isPhoneValid(rawPhone)) {
-    errEl.textContent = 'Проверьте корректность номера телефона';
+    const t = i18n[currentLang] || i18n.ru;
+    errEl.textContent = t.phoneInvalid;
     errEl.hidden = false;
     return;
   }
@@ -382,7 +576,10 @@ async function submitOrder(e) {
   }));
 
   btn.disabled = true;
-  btn.textContent = 'Отправка...';
+  {
+    const t = i18n[currentLang] || i18n.ru;
+    btn.textContent = t.sending;
+  }
 
   try {
     const res = await fetch('/neworder/api.php?ajax=create_order', {
@@ -397,9 +594,10 @@ async function submitOrder(e) {
     });
     
     const json = await res.json();
-    if (!json.ok) throw new Error(json.error || 'Неизвестная ошибка');
+    const t = i18n[currentLang] || i18n.ru;
+    if (!json.ok) throw new Error(json.error || t.orderUnknown);
 
-    showToast('Заказ успешно создан! ID: ' + json.order_id);
+    showToast(t.orderSuccessPrefix + json.order_id);
     closeCheckoutModal();
     cart = {};
     updateCartBadge();
@@ -409,7 +607,10 @@ async function submitOrder(e) {
     errEl.hidden = false;
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Подтвердить заказ';
+    {
+      const t = i18n[currentLang] || i18n.ru;
+      btn.textContent = t.submit;
+    }
   }
 }
 
@@ -420,4 +621,25 @@ elCartSidebar.addEventListener('click', (e) => {
   }
 });
 
+if (elLangMenu) {
+  const links = Array.from(elLangMenu.querySelectorAll('.lang-panel a'));
+  links.forEach((a) => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const href = String(a.getAttribute('href') || '');
+      const m = href.match(/[?&]lang=([a-zA-Z-]+)/);
+      const lang = m ? m[1].toLowerCase() : '';
+      if (!lang || lang === currentLang) {
+        elLangMenu.open = false;
+        return;
+      }
+      elLangMenu.open = false;
+      applyLang(lang);
+      loadMenu();
+      handleSearchInput();
+    });
+  });
+}
+
+applyLang(currentLang);
 loadMenu();
