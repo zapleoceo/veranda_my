@@ -42,26 +42,6 @@ if (file_exists(__DIR__ . '/../.env')) {
     }
 }
 
-$dbHost = trim((string)($_ENV['DB_HOST'] ?? ''));
-$dbName = trim((string)($_ENV['DB_NAME'] ?? ''));
-$dbUser = trim((string)($_ENV['DB_USER'] ?? ''));
-$dbPass = (string)($_ENV['DB_PASS'] ?? '');
-$dbSuffix = trim((string)($_ENV['DB_TABLE_SUFFIX'] ?? ''));
-
-if ($dbHost === '' || $dbName === '' || $dbUser === '') {
-    $respondError(500, 'Database credentials not configured');
-}
-
-$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $dbSuffix);
-if (!$db) {
-    $respondError(500, 'Database connection failed');
-}
-
-try {
-    $db->createMenuTables();
-} catch (\Throwable $e) {
-}
-
 $spotId = (int)($_ENV['POSTER_SPOT_ID'] ?? 1);
 if ($spotId <= 0) {
     $spotId = 1;
@@ -69,9 +49,30 @@ if ($spotId <= 0) {
 
 $apiToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
 $posterApi = $apiToken !== '' ? new \App\Classes\PosterAPI($apiToken) : null;
-$model = new NewOrderModel($db, $posterApi, $spotId);
+$model = new NewOrderModel(null, $posterApi, $spotId);
 
 if ($ajax === 'get_menu') {
+    $dbHost = trim((string)($_ENV['DB_HOST'] ?? ''));
+    $dbName = trim((string)($_ENV['DB_NAME'] ?? ''));
+    $dbUser = trim((string)($_ENV['DB_USER'] ?? ''));
+    $dbPass = (string)($_ENV['DB_PASS'] ?? '');
+    $dbSuffix = trim((string)($_ENV['DB_TABLE_SUFFIX'] ?? ''));
+
+    if ($dbHost === '' || $dbName === '' || $dbUser === '') {
+        $respondError(500, 'Database credentials not configured');
+    }
+
+    $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $dbSuffix);
+    if (!$db) {
+        $respondError(500, 'Database connection failed');
+    }
+
+    try {
+        $db->createMenuTables();
+    } catch (\Throwable $e) {
+    }
+
+    $model = new NewOrderModel($db, $posterApi, $spotId);
     $lang = strtolower(trim((string)($_GET['lang'] ?? 'ru')));
     $supportedLangs = ['ru', 'en', 'vi', 'ko'];
     if (!in_array($lang, $supportedLangs, true)) {
@@ -98,6 +99,18 @@ if ($ajax === 'search_products') {
         $respondError(500, 'Search failed: ' . $e->getMessage());
     }
     $respondOk(['products' => $products]);
+}
+
+if ($ajax === 'get_products') {
+    if (!$posterApi) {
+        $respondError(500, 'Poster API Token not set');
+    }
+    try {
+        $products = $model->getPosterProductsDirect();
+    } catch (\Throwable $e) {
+        $respondError(500, 'Poster Error: ' . $e->getMessage());
+    }
+    $respondOk(['products' => $products, 'spot_id' => $spotId]);
 }
 
 if ($ajax === 'create_order') {

@@ -5,11 +5,11 @@ require_once __DIR__ . '/../src/classes/PosterAPI.php';
 
 class NewOrderModel
 {
-    private \App\Classes\Database $db;
+    private ?\App\Classes\Database $db;
     private ?\App\Classes\PosterAPI $posterApi;
     private int $spotId;
 
-    public function __construct(\App\Classes\Database $db, ?\App\Classes\PosterAPI $posterApi, int $spotId)
+    public function __construct(?\App\Classes\Database $db, ?\App\Classes\PosterAPI $posterApi, int $spotId)
     {
         $this->db = $db;
         $this->posterApi = $posterApi;
@@ -18,6 +18,10 @@ class NewOrderModel
 
     public function getMenuGroups(string $trLang = 'ru'): array
     {
+        if (!$this->db) {
+            throw new \RuntimeException('Database not configured');
+        }
+
         $metaTable = $this->db->t('system_meta');
         $pmi = $this->db->t('poster_menu_items');
         $mw = $this->db->t('menu_workshops');
@@ -130,7 +134,7 @@ class NewOrderModel
             return [];
         }
 
-        $all = $this->getPosterProductsCached();
+        $all = $this->getPosterProductsDirect();
         $out = [];
 
         foreach ($all as $p) {
@@ -167,6 +171,16 @@ class NewOrderModel
         return $out;
     }
 
+    public function getPosterProductsDirect(): array
+    {
+        if (!$this->posterApi) {
+            throw new \RuntimeException('Poster API Token not set');
+        }
+
+        $resp = $this->posterApi->request('menu.getProducts', ['type' => 'products'], 'GET');
+        return is_array($resp) ? $resp : [];
+    }
+
     public function createIncomingOrder(string $phoneE164, string $name, int $serviceMode, array $products): array
     {
         if (!$this->posterApi) {
@@ -188,52 +202,6 @@ class NewOrderModel
         }
 
         return ['order_id' => $orderId];
-    }
-
-    private function getPosterProductsCached(): array
-    {
-        if (!$this->posterApi) {
-            throw new \RuntimeException('Poster API Token not set');
-        }
-
-        $ttlSec = 300;
-        $now = time();
-        $cached = '';
-        $cachedAt = 0;
-
-        try {
-            $meta = $this->db->t('system_meta');
-            $row = $this->db->query("SELECT meta_value FROM {$meta} WHERE meta_key = 'poster_products_cache_json' LIMIT 1")->fetch();
-            $cached = (string)($row['meta_value'] ?? '');
-            $row2 = $this->db->query("SELECT meta_value FROM {$meta} WHERE meta_key = 'poster_products_cache_updated_at' LIMIT 1")->fetch();
-            $cachedAt = (int)($row2['meta_value'] ?? 0);
-        } catch (\Throwable $e) {
-        }
-
-        if ($cached !== '' && $cachedAt > 0 && ($now - $cachedAt) < $ttlSec) {
-            $decoded = json_decode($cached, true);
-            if (is_array($decoded)) {
-                return $decoded;
-            }
-        }
-
-        $resp = $this->posterApi->request('menu.getProducts', ['type' => 'products']);
-        $products = is_array($resp) ? $resp : [];
-
-        try {
-            $meta = $this->db->t('system_meta');
-            $this->db->query(
-                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
-                ['poster_products_cache_json', json_encode($products, JSON_UNESCAPED_UNICODE)]
-            );
-            $this->db->query(
-                "INSERT INTO {$meta} (meta_key, meta_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
-                ['poster_products_cache_updated_at', (string)$now]
-            );
-        } catch (\Throwable $e) {
-        }
-
-        return $products;
     }
 
     private function extractProductPrice(array $p): ?int
@@ -279,4 +247,3 @@ class NewOrderModel
         return null;
     }
 }
-

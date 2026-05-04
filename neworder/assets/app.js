@@ -39,6 +39,11 @@ const elLangMenu = d.getElementById('langMenu');
 
 const fmtPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
 
+let posterProducts = [];
+let posterSpotId = 1;
+const lsProductsKey = 'neworder_poster_products_v1';
+const lsProductsTsKey = 'neworder_poster_products_ts_v1';
+
 const supportedLangs = ['ru', 'en', 'vi', 'ko'];
 let currentLang = (document.documentElement.getAttribute('lang') || 'ru').toLowerCase();
 if (!supportedLangs.includes(currentLang)) currentLang = 'ru';
@@ -209,13 +214,98 @@ function applyLang(lang) {
   cookieSet('links_lang', currentLang);
 }
 
-async function loadMenu() {
+function extractPosterPriceCents(p) {
+  const spots = p && p.spots ? p.spots : null;
+  if (Array.isArray(spots)) {
+    for (const s of spots) {
+      if (!s || typeof s !== 'object') continue;
+      if (Number(s.spot_id || 0) !== Number(posterSpotId || 0)) continue;
+      if (String(s.visible || '1') === '0') continue;
+      const v = s.price;
+      if (typeof v === 'number' && Number.isFinite(v)) return Math.trunc(v);
+      if (typeof v === 'string' && /^\d+$/.test(v)) return Number(v);
+    }
+  }
+
+  const price = p && p.price ? p.price : null;
+  if (price && typeof price === 'object' && !Array.isArray(price)) {
+    const key = String(posterSpotId);
+    if (price[key] != null && /^\d+$/.test(String(price[key]))) return Number(price[key]);
+    for (const k of Object.keys(price)) {
+      if (price[k] != null && /^\d+$/.test(String(price[k]))) return Number(price[k]);
+    }
+  }
+
+  return 0;
+}
+
+function buildMenuFromPosterProducts(products) {
+  const catMap = new Map();
+
+  (products || []).forEach((p) => {
+    if (!p || typeof p !== 'object') return;
+    if (String(p.hidden || '0') === '1') return;
+
+    const categoryId = Number(p.menu_category_id || 0) || 0;
+    const categoryName = String(p.category_name || '').trim() || '—';
+    const productId = Number(p.product_id || 0) || 0;
+    const productName = String(p.product_name || '').trim();
+    if (!productId || !productName) return;
+
+    const key = `${categoryId}|${categoryName}`;
+    if (!catMap.has(key)) {
+      catMap.set(key, {
+        id: categoryId || Math.abs(hashString(categoryName)),
+        title: categoryName,
+        items: [],
+      });
+    }
+
+    const item = {
+      id: productId,
+      product_id: productId,
+      product_name: productName,
+      name: productName,
+      desc: categoryName,
+      price: extractPosterPriceCents(p),
+    };
+
+    catMap.get(key).items.push(item);
+  });
+
+  const groups = Array.from(catMap.values());
+  groups.forEach((g) => {
+    g.items.sort((a, b) => String(a.product_name || '').localeCompare(String(b.product_name || ''), undefined, { sensitivity: 'base' }));
+  });
+  groups.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), undefined, { sensitivity: 'base' }));
+  return groups;
+}
+
+function hashString(s) {
+  let h = 0;
+  const str = String(s || '');
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h) + str.charCodeAt(i);
+    h |= 0;
+  }
+  return h || 1;
+}
+
+async function loadProducts() {
   try {
-    const res = await fetch('/neworder/api.php?ajax=get_menu&lang=' + encodeURIComponent(currentLang));
+    const res = await fetch('/neworder/api.php?ajax=get_products', { headers: { 'Accept': 'application/json' } });
     const json = await res.json();
     const t = i18n[currentLang] || i18n.ru;
     if (!json.ok) throw new Error(json.error || t.loadMenuFailPrefix.trim());
-    menuData = json.groups || [];
+    posterProducts = Array.isArray(json.products) ? json.products : [];
+    posterSpotId = Number(json.spot_id || 1) || 1;
+
+    try {
+      localStorage.setItem(lsProductsKey, JSON.stringify({ products: posterProducts, spot_id: posterSpotId }));
+      localStorage.setItem(lsProductsTsKey, String(Date.now()));
+    } catch (e) {}
+
+    menuData = buildMenuFromPosterProducts(posterProducts);
     renderMenu();
   } catch (err) {
     const t = i18n[currentLang] || i18n.ru;
@@ -422,7 +512,6 @@ function showToast(msg, isError = false) {
 }
 
 let searchTimer = null;
-let searchAbort = null;
 
 function setSearchActive(active) {
   elSearchSection.hidden = !active;
@@ -479,29 +568,37 @@ function renderSearchResults(query, products) {
   elSearchEmpty.hidden = (products || []).length > 0;
 }
 
-async function doSearch(query) {
-  if (searchAbort) {
-    searchAbort.abort();
-  }
-  searchAbort = new AbortController();
-
+function doSearch(query) {
   elSearchLoading.hidden = false;
   elSearchEmpty.hidden = true;
   elSearchGrid.innerHTML = '';
 
-  try {
-    const res = await fetch('/neworder/api.php?ajax=search_products&q=' + encodeURIComponent(query) + '&lang=' + encodeURIComponent(currentLang), { signal: searchAbort.signal });
-    const json = await res.json();
-    const t = i18n[currentLang] || i18n.ru;
-    if (!json.ok) throw new Error(json.error || t.searchFail);
-    renderSearchResults(query, json.products || []);
-  } catch (err) {
-    if (err && err.name === 'AbortError') return;
-    elSearchLoading.hidden = true;
-    elSearchEmpty.hidden = false;
-    const t = i18n[currentLang] || i18n.ru;
-    showToast(err.message || t.searchFail, true);
+  const q = String(query || '').trim().toLowerCase();
+  const out = [];
+  for (const p of posterProducts || []) {
+    if (!p || typeof p !== 'object') continue;
+    if (String(p.hidden || '0') === '1') continue;
+    const name = String(p.product_name || '').trim();
+    if (!name) continue;
+    if (!name.toLowerCase().includes(q)) continue;
+
+    const categoryName = String(p.category_name || '').trim();
+    const productId = Number(p.product_id || 0) || 0;
+    if (!productId) continue;
+
+    out.push({
+      id: productId,
+      product_id: productId,
+      product_name: name,
+      name: name,
+      desc: categoryName,
+      price: extractPosterPriceCents(p),
+    });
+
+    if (out.length >= 30) break;
   }
+
+  renderSearchResults(query, out);
 }
 
 function handleSearchInput() {
@@ -511,7 +608,6 @@ function handleSearchInput() {
   if (searchTimer) clearTimeout(searchTimer);
 
   if (q.length < 2) {
-    if (searchAbort) searchAbort.abort();
     setSearchActive(false);
     return;
   }
@@ -635,11 +731,26 @@ if (elLangMenu) {
       }
       elLangMenu.open = false;
       applyLang(lang);
-      loadMenu();
+      loadProducts();
       handleSearchInput();
     });
   });
 }
 
 applyLang(currentLang);
-loadMenu();
+try {
+  const raw = localStorage.getItem(lsProductsKey);
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    const p = parsed && Array.isArray(parsed.products) ? parsed.products : [];
+    const sid = Number(parsed && parsed.spot_id ? parsed.spot_id : 1) || 1;
+    if (p.length) {
+      posterProducts = p;
+      posterSpotId = sid;
+      menuData = buildMenuFromPosterProducts(posterProducts);
+      renderMenu();
+    }
+  }
+} catch (e) {}
+
+loadProducts();
