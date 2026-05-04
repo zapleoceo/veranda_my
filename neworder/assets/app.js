@@ -293,7 +293,7 @@ function hashString(s) {
 
 async function loadProducts() {
   try {
-    const res = await fetch('/neworder/api.php?ajax=get_products', { headers: { 'Accept': 'application/json' } });
+    const res = await fetch('/api/poster/neworder/index.php?ajax=get_products', { headers: { 'Accept': 'application/json' } });
     const json = await res.json();
     const t = i18n[currentLang] || i18n.ru;
     if (!json.ok) throw new Error(json.error || t.loadMenuFailPrefix.trim());
@@ -678,7 +678,7 @@ async function submitOrder(e) {
   }
 
   try {
-    const res = await fetch('/neworder/api.php?ajax=create_order', {
+    const res = await fetch('/api/poster/neworder/index.php?ajax=create_order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

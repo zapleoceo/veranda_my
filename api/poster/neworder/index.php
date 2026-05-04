@@ -2,11 +2,10 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-require_once __DIR__ . '/../src/classes/PosterAPI.php';
 require_once __DIR__ . '/Model.php';
+require_once __DIR__ . '/../../../src/classes/PosterAPI.php';
 
 $ajax = $_GET['ajax'] ?? '';
-$wantsJson = true;
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -23,8 +22,8 @@ $respondError = function(int $code, string $err) {
     exit;
 };
 
-if (file_exists(__DIR__ . '/../.env')) {
-    $lines = file(__DIR__ . '/../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+if (file_exists(__DIR__ . '/../../../.env')) {
+    $lines = file(__DIR__ . '/../../../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
         if (strpos(trim($line), '#') === 0) {
             continue;
@@ -41,14 +40,14 @@ if (file_exists(__DIR__ . '/../.env')) {
     }
 }
 
-$spotId = (int)($_ENV['POSTER_SPOT_ID'] ?? 1);
+$spotId = (int)($_ENV['POSTER_SPOT_ID'] ?? (getenv('POSTER_SPOT_ID') !== false ? getenv('POSTER_SPOT_ID') : 1));
 if ($spotId <= 0) {
     $spotId = 1;
 }
 
-$apiToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
+$apiToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? (getenv('POSTER_API_TOKEN') !== false ? getenv('POSTER_API_TOKEN') : '')));
 $posterApi = $apiToken !== '' ? new \App\Classes\PosterAPI($apiToken) : null;
-$model = new NewOrderModel($posterApi, $spotId);
+$model = new ApiPosterNewOrderModel($posterApi, $spotId);
 
 if ($ajax === 'get_products') {
     if (!$posterApi) {
@@ -67,7 +66,6 @@ if ($ajax === 'create_order') {
     $payload = json_decode($payloadJson, true);
     if (!is_array($payload)) $respondError(400, 'Bad request');
 
-    // Phone validation
     $phone = trim((string)($payload['phone'] ?? ''));
     $phoneNorm = preg_replace('/\D+/', '', $phone);
     if ($phoneNorm === '' || !preg_match('/^[1-9]\d{6,15}$/', $phoneNorm)) {
@@ -83,7 +81,7 @@ if ($ajax === 'create_order') {
         $respondError(400, 'Корзина пуста');
     }
 
-    $serviceMode = (int)($payload['service_mode'] ?? 2); // 2 - Takeaway, 3 - In place
+    $serviceMode = (int)($payload['service_mode'] ?? 2);
     if (!in_array($serviceMode, [1, 2, 3], true)) $serviceMode = 2;
 
     $orderProducts = [];
