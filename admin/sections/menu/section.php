@@ -178,19 +178,30 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
                 $vnTitle = trim((string)($cols[4] ?? ''));
                 $koTitle = trim((string)($cols[5] ?? ''));
 
+                $descColsPresent = count($cols) >= 7;
+                $ruDesc = trim((string)($cols[6] ?? ''));
+                $enDesc = trim((string)($cols[7] ?? ''));
+                $vnDesc = trim((string)($cols[8] ?? ''));
+                $koDesc = trim((string)($cols[9] ?? ''));
+
                 $rows[] = [
                     'poster_id' => $posterId,
                     'ru' => $ruTitle,
                     'en' => $enTitle,
                     'vn' => $vnTitle,
                     'ko' => $koTitle,
+                    'desc_cols_present' => $descColsPresent ? 1 : 0,
+                    'desc_ru' => $ruDesc,
+                    'desc_en' => $enDesc,
+                    'desc_vn' => $vnDesc,
+                    'desc_ko' => $koDesc,
                 ];
             }
             if (empty($rows)) {
-                throw new \Exception('Не найдено строк для импорта (ожидается: ID;Название;RU;EN;VN;KO).');
+                throw new \Exception('Не найдено строк для импорта (ожидается: ID;Название;RU;EN;VN;KO;Описание RU;Описание EN;Описание VN;Описание KO).');
             }
 
-            $updatedTitles = 0;
+            $updatedTr = 0;
             $missingPosterIds = 0;
 
             foreach ($rows as $r) {
@@ -204,26 +215,63 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
                     [$posterId]
                 )->fetchColumn();
                 if ($menuItemId <= 0) {
-                    $missingPosterIds++;
-                    continue;
+                    $menuItemId = (int)$db->query(
+                        "SELECT mi.id
+                         FROM {$menuItemsTable} mi
+                         JOIN {$posterMenuItemsTable} p ON p.id = mi.poster_item_id
+                         WHERE p.id = ?
+                         LIMIT 1",
+                        [$posterId]
+                    )->fetchColumn();
+                    if ($menuItemId <= 0) {
+                        $missingPosterIds++;
+                        continue;
+                    }
                 }
 
-                foreach (['ru', 'en', 'vn', 'ko'] as $lang) {
-                    $title = trim((string)($r[$lang] ?? ''));
-                    if ($title === '') continue;
-                    $db->query(
-                        "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description)
-                         VALUES (?, ?, ?, NULL)
-                         ON DUPLICATE KEY UPDATE
-                            title = VALUES(title),
-                            last_update = CURRENT_TIMESTAMP",
-                        [$menuItemId, $lang, $title]
-                    );
-                    $updatedTitles++;
+                $descColsPresent = !empty($r['desc_cols_present']);
+                $langs = [
+                    'ru' => ['title' => (string)($r['ru'] ?? ''), 'desc' => (string)($r['desc_ru'] ?? '')],
+                    'en' => ['title' => (string)($r['en'] ?? ''), 'desc' => (string)($r['desc_en'] ?? '')],
+                    'vn' => ['title' => (string)($r['vn'] ?? ''), 'desc' => (string)($r['desc_vn'] ?? '')],
+                    'ko' => ['title' => (string)($r['ko'] ?? ''), 'desc' => (string)($r['desc_ko'] ?? '')],
+                ];
+
+                foreach ($langs as $lang => $data) {
+                    $title = trim($data['title']);
+                    $desc = trim($data['desc']);
+
+                    $titleValue = $title !== '' ? $title : null;
+                    if ($descColsPresent) {
+                        $descValue = $desc !== '' ? $desc : null;
+                        $db->query(
+                            "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description)
+                             VALUES (?, ?, ?, ?)
+                             ON DUPLICATE KEY UPDATE
+                                title = COALESCE(VALUES(title), title),
+                                description = VALUES(description),
+                                last_update = CURRENT_TIMESTAMP",
+                            [$menuItemId, $lang, $titleValue, $descValue]
+                        );
+                        $updatedTr++;
+                    } else {
+                        if ($titleValue === null) {
+                            continue;
+                        }
+                        $db->query(
+                            "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description)
+                             VALUES (?, ?, ?, NULL)
+                             ON DUPLICATE KEY UPDATE
+                                title = COALESCE(VALUES(title), title),
+                                last_update = CURRENT_TIMESTAMP",
+                            [$menuItemId, $lang, $titleValue]
+                        );
+                        $updatedTr++;
+                    }
                 }
             }
 
-            $message = 'Названия обновлены: ' . $updatedTitles . '. Не найдено позиций по Poster ID: ' . $missingPosterIds;
+            $message = 'Переводы обновлены: ' . $updatedTr . '. Не найдено позиций по Poster ID: ' . $missingPosterIds;
         } catch (\Throwable $e) {
             $error = 'Ошибка импорта названий: ' . $e->getMessage();
         }
