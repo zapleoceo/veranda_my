@@ -8,6 +8,7 @@
         </form>
         <a href="?tab=menu&export=csv" title="Выгрузка CSV со всеми активными позициями и текущими переводами/категориями.">CSV меню</a>
         <a href="?tab=menu&export=categories_csv" title="Выгрузка CSV справочников цехов и категорий с переводами.">CSV категорий</a>
+        <a href="?tab=menu&export=ko_missing_csv" title="Список позиций, где не заполнено Название KO (берётся Название RU как источник для перевода).">KO пустые</a>
         <?php if (!empty($menuSyncMeta['last_sync_at'])): ?>
             <span class="muted">Последняя синхронизация: <span class="js-local-dt" data-iso="<?= htmlspecialchars($menuSyncAtIso) ?>"><?= htmlspecialchars($menuSyncMeta['last_sync_at']) ?></span></span>
         <?php endif; ?>
@@ -16,3 +17,14 @@
 <?php if (!empty($menuSyncMeta['last_sync_error'])): ?>
     <div style="margin-top:12px;" class="error"><?= htmlspecialchars($menuSyncMeta['last_sync_error']) ?></div>
 <?php endif; ?>
+
+<details style="margin-top: 12px;">
+    <summary style="cursor:pointer; font-weight:800;">Импорт KO названий</summary>
+    <div class="muted" style="margin-top: 8px;">Вставь CSV в формате: Item ID;Название KO</div>
+    <form method="POST" style="margin-top: 10px;">
+        <textarea name="ko_titles_csv" rows="6" placeholder="Item ID;Название KO"></textarea>
+        <div style="margin-top: 10px;">
+            <button type="submit" name="import_ko_titles_csv" value="1">Импортировать KO</button>
+        </div>
+    </form>
+</details>

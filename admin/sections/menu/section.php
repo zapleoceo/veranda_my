@@ -32,6 +32,9 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
     if (($_GET['export'] ?? '') === 'csv') {
         admin_menu_export_items_csv($db);
     }
+    if (($_GET['export'] ?? '') === 'ko_missing_csv') {
+        admin_menu_export_items_missing_ko_csv($db);
+    }
 
     $metaKeys = ['menu_last_sync_at', 'menu_last_sync_result', 'menu_last_sync_error'];
     foreach ($metaKeys as $k) {
@@ -101,6 +104,48 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
             $message = 'Привязка ID выполнена: ' . json_encode($result, JSON_UNESCAPED_UNICODE);
         } catch (\Throwable $e) {
             $error = 'Ошибка автозаполнения меню: ' . $e->getMessage();
+        }
+    }
+
+    if (isset($_POST['import_ko_titles_csv'])) {
+        try {
+            $raw = trim((string)($_POST['ko_titles_csv'] ?? ''));
+            if ($raw === '') {
+                throw new \Exception('Вставьте CSV перевода KO.');
+            }
+            $lines = preg_split("/\r\n|\n|\r/", $raw) ?: [];
+            $rows = [];
+            foreach ($lines as $line) {
+                $line = trim((string)$line);
+                if ($line === '') continue;
+                $cols = str_getcsv($line, ';');
+                if (!$cols || count($cols) < 2) continue;
+                $first = trim((string)($cols[0] ?? ''));
+                if ($first === '' || mb_strtolower($first) === 'item id') {
+                    continue;
+                }
+                $itemId = (int)$first;
+                $koTitle = trim((string)($cols[1] ?? ''));
+                if ($itemId <= 0 || $koTitle === '') continue;
+                $rows[] = ['item_id' => $itemId, 'ko_title' => $koTitle];
+            }
+            if (empty($rows)) {
+                throw new \Exception('Не найдено строк для импорта (ожидается: Item ID;Название KO).');
+            }
+
+            $updated = 0;
+            foreach ($rows as $r) {
+                $db->query(
+                    "INSERT INTO {$menuItemsTrTable} (item_id, lang, title, description)
+                     VALUES (?, 'ko', ?, NULL)
+                     ON DUPLICATE KEY UPDATE title = VALUES(title)",
+                    [(int)$r['item_id'], (string)$r['ko_title']]
+                );
+                $updated++;
+            }
+            $message = 'KO названия обновлены: ' . $updated;
+        } catch (\Throwable $e) {
+            $error = 'Ошибка импорта KO: ' . $e->getMessage();
         }
     }
 
@@ -634,4 +679,3 @@ function admin_menu_section_state(\App\Classes\Database $db, string $posterToken
         'stripNumberPrefix' => $stripNumberPrefix,
     ];
 }
-

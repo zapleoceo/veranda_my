@@ -206,3 +206,60 @@ function admin_menu_export_items_csv(\App\Classes\Database $db): void
     exit;
 }
 
+function admin_menu_export_items_missing_ko_csv(\App\Classes\Database $db): void
+{
+    $posterMenuItemsTable = $db->t('poster_menu_items');
+    $menuItemsTable = $db->t('menu_items');
+    $menuItemsTrTable = $db->t('menu_item_tr');
+
+    ignore_user_abort(true);
+    @set_time_limit(300);
+    header('Content-Type: text/csv; charset=utf-8');
+    $file = 'menu_missing_ko_' . (new DateTime('now', new DateTimeZone('Asia/Ho_Chi_Minh')))->format('Ymd_His') . '.csv';
+    header('Content-Disposition: attachment; filename="' . $file . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    $out = fopen('php://output', 'w');
+    if ($out === false) {
+        http_response_code(500);
+        echo 'Cannot open output';
+        exit;
+    }
+    fwrite($out, "\xEF\xBB\xBF");
+
+    fputcsv($out, [
+        'Item ID',
+        'Poster ID',
+        'Название RU',
+        'Название KO',
+    ], ';');
+
+    $rows = $db->query(
+        "SELECT
+            mi.id item_id,
+            p.poster_id,
+            COALESCE(ru.title, '') ru_title,
+            COALESCE(ko.title, '') ko_title
+         FROM {$menuItemsTable} mi
+         JOIN {$posterMenuItemsTable} p ON p.id = mi.poster_item_id
+         LEFT JOIN {$menuItemsTrTable} ru ON ru.item_id = mi.id AND ru.lang = 'ru'
+         LEFT JOIN {$menuItemsTrTable} ko ON ko.item_id = mi.id AND ko.lang = 'ko'
+         WHERE p.is_active = 1
+           AND COALESCE(NULLIF(TRIM(ru.title), ''), '') <> ''
+           AND COALESCE(NULLIF(TRIM(COALESCE(ko.title, '')), ''), '') = ''
+         ORDER BY p.poster_id ASC"
+    )->fetchAll();
+
+    foreach ($rows as $r) {
+        fputcsv($out, [
+            (string)($r['item_id'] ?? ''),
+            (string)($r['poster_id'] ?? ''),
+            (string)($r['ru_title'] ?? ''),
+            (string)($r['ko_title'] ?? ''),
+        ], ';');
+    }
+
+    fclose($out);
+    exit;
+}
