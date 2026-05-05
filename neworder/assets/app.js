@@ -37,6 +37,8 @@
   const fmtPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
 
   const lsProductsKey = 'neworder_poster_products_v1';
+  const lsSpotKey = 'neworder_spot_id_v1';
+  const lsHallKey = 'neworder_hall_id_v1';
   const supportedLangs = ['ru', 'en', 'vi', 'ko'];
   let currentLang = (d.documentElement.getAttribute('lang') || 'ru').toLowerCase();
   if (!supportedLangs.includes(currentLang)) currentLang = 'ru';
@@ -349,14 +351,19 @@
       Dom.cartBadge.hidden = totalCount <= 0;
     },
 
-    renderSpotSelect(spotId) {
+    renderSpotSelect(spots, selectedSpotId) {
       if (!Dom.spotSelect) return;
       Dom.spotSelect.innerHTML = '';
-      const opt = d.createElement('option');
-      opt.value = String(spotId || 1);
-      opt.textContent = String(spotId || 1);
-      Dom.spotSelect.appendChild(opt);
-      Dom.spotSelect.value = String(spotId || 1);
+      (spots || []).forEach((s) => {
+        const sid = Number(s && s.spot_id ? s.spot_id : 0) || 0;
+        if (!sid) return;
+        const name = String(s && s.name ? s.name : '').trim();
+        const opt = d.createElement('option');
+        opt.value = String(sid);
+        opt.textContent = name ? name : String(sid);
+        Dom.spotSelect.appendChild(opt);
+      });
+      Dom.spotSelect.value = String(Number(selectedSpotId || 0));
     },
 
     renderTableSelect(tables, selectedId = 0) {
@@ -382,19 +389,20 @@
       Dom.tableSelect.value = String(Number(selectedId || 0));
     },
 
-    renderHallSelect(hallIds, selectedId = 0) {
+    renderHallSelect(halls, selectedId = 0) {
       if (!Dom.hallSelect) return;
       Dom.hallSelect.innerHTML = '';
       const any = d.createElement('option');
       any.value = '0';
       any.textContent = '—';
       Dom.hallSelect.appendChild(any);
-      (hallIds || []).forEach((hid) => {
-        const v = Number(hid || 0) || 0;
+      (halls || []).forEach((h) => {
+        const v = Number(h && h.hall_id ? h.hall_id : 0) || 0;
         if (!v) return;
+        const name = String(h && h.hall_name ? h.hall_name : '').trim();
         const opt = d.createElement('option');
         opt.value = String(v);
-        opt.textContent = String(v);
+        opt.textContent = name ? name : String(v);
         Dom.hallSelect.appendChild(opt);
       });
       Dom.hallSelect.value = String(Number(selectedId || 0));
@@ -403,6 +411,8 @@
 
   const Model = {
     spotId: 1,
+    spots: [],
+    halls: [],
     posterProducts: [],
     groupsAll: [],
     query: '',
@@ -410,6 +420,22 @@
     tables: [],
     tableId: 0,
     hallId: 0,
+
+    loadSelection() {
+      try {
+        const sid = Number(localStorage.getItem(lsSpotKey) || 0) || 0;
+        const hid = Number(localStorage.getItem(lsHallKey) || 0) || 0;
+        if (sid > 0) Model.spotId = sid;
+        if (hid > 0) Model.hallId = hid;
+      } catch (e) {}
+    },
+
+    saveSelection() {
+      try {
+        localStorage.setItem(lsSpotKey, String(Number(Model.spotId || 0) || 0));
+        localStorage.setItem(lsHallKey, String(Number(Model.hallId || 0) || 0));
+      } catch (e) {}
+    },
 
     setQuery(q) {
       Model.query = String(q || '').trim();
@@ -458,7 +484,7 @@
         const sid = Number(parsed && parsed.spot_id ? parsed.spot_id : 1) || 1;
         if (!p.length) return false;
         Model.posterProducts = p;
-        Model.spotId = sid;
+        if (!Model.spotId || Model.spotId <= 0) Model.spotId = sid;
         Model.groupsAll = Model.buildGroups(p);
         return true;
       } catch (e) {
@@ -475,14 +501,37 @@
       const products = Array.isArray(json.products) ? json.products : [];
       const spotId = Number(json.spot_id || 1) || 1;
       Model.posterProducts = products;
-      Model.spotId = spotId;
+      if (!Model.spotId || Model.spotId <= 0) Model.spotId = spotId;
       Model.groupsAll = Model.buildGroups(products);
       Model.saveCache();
     },
 
-    async fetchTables(spotId) {
+    async fetchSpots() {
+      const res = await fetch('/api/poster/neworder/index.php?ajax=get_spots', { headers: { 'Accept': 'application/json' } });
+      const json = await res.json();
+      if (!json || !json.ok) throw new Error(String((json && json.error) ? json.error : 'Failed'));
+      const spots = Array.isArray(json.spots) ? json.spots : [];
+      Model.spots = spots;
+      return spots;
+    },
+
+    async fetchHalls(spotId) {
       const sid = Number(spotId || Model.spotId || 1) || 1;
-      const res = await fetch(`/api/poster/neworder/index.php?ajax=get_tables&spot_id=${encodeURIComponent(String(sid))}`, {
+      const res = await fetch(`/api/poster/neworder/index.php?ajax=get_halls&spot_id=${encodeURIComponent(String(sid))}`, { headers: { 'Accept': 'application/json' } });
+      const json = await res.json();
+      if (!json || !json.ok) throw new Error(String((json && json.error) ? json.error : 'Failed'));
+      const halls = Array.isArray(json.halls) ? json.halls : [];
+      Model.halls = halls;
+      return halls;
+    },
+
+    async fetchTables(spotId, hallId) {
+      const sid = Number(spotId || Model.spotId || 1) || 1;
+      const hid = Number(hallId || Model.hallId || 0) || 0;
+      const url = hid > 0
+        ? `/api/poster/neworder/index.php?ajax=get_tables&spot_id=${encodeURIComponent(String(sid))}&hall_id=${encodeURIComponent(String(hid))}`
+        : `/api/poster/neworder/index.php?ajax=get_tables&spot_id=${encodeURIComponent(String(sid))}`;
+      const res = await fetch(url, {
         headers: { 'Accept': 'application/json' }
       });
       const json = await res.json();
@@ -495,21 +544,6 @@
         const ok = tables.some((t) => Number(t.table_id || 0) === Number(Model.tableId));
         if (!ok) Model.tableId = 0;
       }
-    },
-
-    getHallIds() {
-      const set = new Set();
-      (Model.tables || []).forEach((t) => {
-        const hid = Number(t && t.hall_id ? t.hall_id : 0) || 0;
-        if (hid > 0) set.add(hid);
-      });
-      return Array.from(set).sort((a, b) => a - b);
-    },
-
-    getTablesForSelectedHall() {
-      const hid = Number(Model.hallId || 0) || 0;
-      if (!hid) return Model.tables;
-      return (Model.tables || []).filter((t) => Number(t && t.hall_id ? t.hall_id : 0) === hid);
     },
 
     extractPriceCents(p) {
@@ -592,6 +626,7 @@
       const t = i18n[currentLang] || i18n.ru;
       View.applyLang(t);
 
+      Model.loadSelection();
       if (Model.loadCache()) {
         Controller.refreshMenu();
       }
@@ -605,10 +640,28 @@
       const t = i18n[currentLang] || i18n.ru;
       try {
         await Model.fetchProducts();
-        View.renderSpotSelect(Model.spotId);
-        await Model.fetchTables(Model.spotId);
-        View.renderHallSelect(Model.getHallIds(), Model.hallId);
-        View.renderTableSelect(Model.getTablesForSelectedHall(), Model.tableId);
+
+        await Model.fetchSpots();
+        if (Array.isArray(Model.spots) && Model.spots.length) {
+          const okSpot = Model.spots.some((s) => Number(s && s.spot_id ? s.spot_id : 0) === Number(Model.spotId || 0));
+          if (!okSpot) Model.spotId = Number(Model.spots[0].spot_id || 1) || 1;
+        }
+        Model.saveSelection();
+        View.renderSpotSelect(Model.spots, Model.spotId);
+
+        await Model.fetchHalls(Model.spotId);
+        if (Array.isArray(Model.halls) && Model.halls.length) {
+          const okHall = Model.halls.some((h) => Number(h && h.hall_id ? h.hall_id : 0) === Number(Model.hallId || 0));
+          if (!okHall) Model.hallId = Number(Model.halls[0].hall_id || 0) || 0;
+        } else {
+          Model.hallId = 0;
+        }
+        Model.saveSelection();
+        View.renderHallSelect(Model.halls, Model.hallId);
+
+        Model.groupsAll = Model.buildGroups(Model.posterProducts);
+        await Model.fetchTables(Model.spotId, Model.hallId);
+        View.renderTableSelect(Model.tables, Model.tableId);
         Controller.refreshMenu();
       } catch (err) {
         View.renderEmptyMenu(`${t.loadMenuFailPrefix}${String((err && err.message) ? err.message : err)}`);
@@ -747,23 +800,43 @@
         Dom.spotSelect.addEventListener('change', async () => {
           const sid = Number(Dom.spotSelect.value || 0) || Model.spotId || 1;
           Model.spotId = sid;
+          Model.saveSelection();
           try {
-            await Model.fetchTables(sid);
-            Model.hallId = 0;
-            View.renderHallSelect(Model.getHallIds(), Model.hallId);
-            View.renderTableSelect(Model.getTablesForSelectedHall(), Model.tableId);
+            await Model.fetchHalls(sid);
+            if (Array.isArray(Model.halls) && Model.halls.length) {
+              Model.hallId = Number(Model.halls[0].hall_id || 0) || 0;
+            } else {
+              Model.hallId = 0;
+            }
+            Model.tableId = 0;
+            Model.saveSelection();
+            View.renderHallSelect(Model.halls, Model.hallId);
+
+            Model.groupsAll = Model.buildGroups(Model.posterProducts);
+            Controller.refreshMenu();
+
+            await Model.fetchTables(sid, Model.hallId);
+            View.renderTableSelect(Model.tables, 0);
           } catch (e) {
             Model.hallId = 0;
+            Model.tableId = 0;
+            Model.saveSelection();
             View.renderHallSelect([], 0);
             View.renderTableSelect([], 0);
           }
         });
       }
       if (Dom.hallSelect) {
-        Dom.hallSelect.addEventListener('change', () => {
+        Dom.hallSelect.addEventListener('change', async () => {
           Model.hallId = Number(Dom.hallSelect.value || 0) || 0;
           Model.tableId = 0;
-          View.renderTableSelect(Model.getTablesForSelectedHall(), 0);
+          Model.saveSelection();
+          try {
+            await Model.fetchTables(Model.spotId, Model.hallId);
+            View.renderTableSelect(Model.tables, 0);
+          } catch (e) {
+            View.renderTableSelect([], 0);
+          }
         });
       }
       if (Dom.tableSelect) {

@@ -75,6 +75,62 @@ if ($ajax === 'get_tables') {
     $respondOk(['tables' => $tables]);
 }
 
+if ($ajax === 'get_spots') {
+    if (!$posterApi) {
+        $respondError(500, 'Poster API Token not set');
+    }
+    try {
+        $halls = $model->getSpotTablesHalls();
+        $spotIds = [];
+        foreach ($halls as $h) {
+            $sid = (int)($h['spot_id'] ?? 0);
+            if ($sid > 0) $spotIds[$sid] = true;
+        }
+        if (!$spotIds) {
+            $spotIds[$spotId] = true;
+        }
+        $spots = [];
+        foreach (array_keys($spotIds) as $sid) {
+            $s = $model->getSpot((int)$sid);
+            $spots[] = [
+                'spot_id' => (int)($s['spot_id'] ?? $sid),
+                'name' => (string)($s['name'] ?? ('Spot ' . $sid)),
+                'address' => (string)($s['address'] ?? ''),
+            ];
+        }
+    } catch (\Throwable $e) {
+        $respondError(500, 'Poster Error: ' . $e->getMessage());
+    }
+    $respondOk(['spots' => $spots]);
+}
+
+if ($ajax === 'get_halls') {
+    if (!$posterApi) {
+        $respondError(500, 'Poster API Token not set');
+    }
+    $spotIdReq = (int)($_GET['spot_id'] ?? $spotId);
+    if ($spotIdReq <= 0) $spotIdReq = $spotId;
+    try {
+        $hallsAll = $model->getSpotTablesHalls();
+        $halls = [];
+        foreach ($hallsAll as $h) {
+            if ((int)($h['spot_id'] ?? 0) !== $spotIdReq) continue;
+            if ((string)($h['delete'] ?? '0') === '1') continue;
+            $halls[] = [
+                'hall_id' => (int)($h['hall_id'] ?? 0),
+                'hall_name' => (string)($h['hall_name'] ?? ''),
+                'hall_order' => (int)($h['hall_order'] ?? 0),
+            ];
+        }
+        usort($halls, function($a, $b) {
+            return ((int)$a['hall_order'] <=> (int)$b['hall_order']) ?: ((int)$a['hall_id'] <=> (int)$b['hall_id']);
+        });
+    } catch (\Throwable $e) {
+        $respondError(500, 'Poster Error: ' . $e->getMessage());
+    }
+    $respondOk(['halls' => $halls]);
+}
+
 if ($ajax === 'create_order') {
     $payloadJson = file_get_contents('php://input');
     $payload = json_decode($payloadJson, true);

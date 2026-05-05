@@ -44,6 +44,27 @@ class ApiPosterNewOrderModel
         return is_array($resp) ? $resp : [];
     }
 
+    public function getSpot(int $spotId): array
+    {
+        if (!$this->posterApi) {
+            throw new \RuntimeException('Poster API Token not set');
+        }
+
+        $spotId = $spotId > 0 ? $spotId : $this->spotId;
+        $resp = $this->posterApi->request('spots.getSpot', ['spot_id' => $spotId], 'GET');
+        return is_array($resp) ? $resp : [];
+    }
+
+    public function getSpotTablesHalls(): array
+    {
+        if (!$this->posterApi) {
+            throw new \RuntimeException('Poster API Token not set');
+        }
+
+        $resp = $this->posterApi->request('spots.getSpotTablesHalls', [], 'GET');
+        return is_array($resp) ? $resp : [];
+    }
+
     public function createOrder(int $spotId, int $tableId, int $waiterId, int $clientId, int $serviceMode, string $name, array $products): array
     {
         $spotId = $spotId > 0 ? $spotId : $this->spotId;
@@ -104,7 +125,18 @@ class ApiPosterNewOrderModel
             throw new \RuntimeException('Poster API Error: invalid JSON (http=' . $httpCode . ')');
         }
         if ($httpCode < 200 || $httpCode > 299) {
-            throw new \RuntimeException('Poster API Error: http=' . $httpCode);
+            $snippet = mb_substr($resp, 0, 500);
+            $errMsg = '';
+            if (isset($j['error'])) {
+                if (is_string($j['error'])) $errMsg = $j['error'];
+                elseif (is_array($j['error'])) $errMsg = (string)($j['error']['message'] ?? $j['error']['msg'] ?? '');
+                else $errMsg = json_encode($j['error'], JSON_UNESCAPED_UNICODE);
+            }
+            if (isset($j['message']) && $errMsg === '') $errMsg = (string)$j['message'];
+            if ($errMsg !== '') {
+                throw new \RuntimeException('Poster API Error: http=' . $httpCode . ' error=' . $errMsg . ' body=' . $snippet);
+            }
+            throw new \RuntimeException('Poster API Error: http=' . $httpCode . ' body=' . $snippet);
         }
 
         $orderId = (int)($j['response']['id'] ?? 0);
