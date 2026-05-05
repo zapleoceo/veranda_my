@@ -915,6 +915,7 @@
   function controllerBindSpotTable() {
     if (Dom.spotSelect) {
       Dom.spotSelect.addEventListener('change', async () => {
+        Controller.resetOpenTransactions();
         const sid = Number(Dom.spotSelect.value || 0) || Model.spotId || 1;
         Model.spotId = sid;
         Model.saveSelection();
@@ -945,6 +946,7 @@
     }
     if (Dom.hallSelect) {
       Dom.hallSelect.addEventListener('change', async () => {
+        Controller.resetOpenTransactions();
         Model.hallId = Number(Dom.hallSelect.value || 0) || 0;
         Model.tableId = 0;
         Model.saveSelection();
@@ -958,25 +960,36 @@
     }
     if (Dom.tableSelect) {
       Dom.tableSelect.addEventListener('change', async () => {
+        Controller.resetOpenTransactions();
         Model.tableId = Number(Dom.tableSelect.value || 0) || 0;
-        await Controller.checkOpenTransactions();
+        Controller.checkOpenTransactions().catch(() => {});
       });
     }
   }
 
-  async function controllerCheckOpenTransactions() {
+  function controllerResetOpenTransactions() {
     Model.selectedTransactionId = 0;
     Model.openTransactions = [];
+    View.hideOpenChecksModal();
     View.setOpenChecksButton(0);
+  }
+
+  async function controllerCheckOpenTransactions() {
+    const reqId = (Controller.openTransactionsReqId = (Number(Controller.openTransactionsReqId || 0) || 0) + 1);
+    const tableId = Number(Model.tableId || 0) || 0;
+    const spotId = Number(Model.spotId || 0) || 0;
+
     if (!Model.tableId) return;
     try {
-      const list = await Model.fetchOpenTransactions(Model.spotId, Model.tableId);
+      const list = await Model.fetchOpenTransactions(spotId, tableId);
+      if (reqId !== Controller.openTransactionsReqId) return;
+      if (tableId !== (Number(Model.tableId || 0) || 0)) return;
       if (!Array.isArray(list) || !list.length) return;
       Model.openTransactions = list;
       View.setOpenChecksButton(list.length);
     } catch (e) {
-      Model.openTransactions = [];
-      View.setOpenChecksButton(0);
+      if (reqId !== Controller.openTransactionsReqId) return;
+      Controller.resetOpenTransactions();
     }
   }
 
@@ -1065,6 +1078,7 @@
   const Controller = {
     viewState: { sections: [], linksById: new Map(), scrollRaf: 0, lastActive: '' },
     searchTimer: 0,
+    openTransactionsReqId: 0,
     init: controllerInit,
     loadProducts: controllerLoadProducts,
     refreshMenu: controllerRefreshMenu,
@@ -1077,6 +1091,7 @@
     bindLangMenu: controllerBindLangMenu,
     bindCheckout: controllerBindCheckout,
     bindSpotTable: controllerBindSpotTable,
+    resetOpenTransactions: controllerResetOpenTransactions,
     checkOpenTransactions: controllerCheckOpenTransactions,
     bindOpenChecksModal: controllerBindOpenChecksModal,
     submitOrder: controllerSubmitOrder,
