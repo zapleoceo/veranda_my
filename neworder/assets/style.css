@@ -425,6 +425,21 @@ body.menu-only-cart .neworder-shell .cart-sidebar {
   gap: 12px;
 }
 
+.cart-item-comment {
+  width: 72px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card2);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.cart-item-comment::placeholder {
+  color: var(--muted);
+}
+
 .qty-btn {
   background: var(--card2);
   border: 1px solid var(--border);

@@ -312,7 +312,9 @@ if ($ajax === 'add_to_transaction') {
             $commentMethod = 'transactions.changeComment';
         }
 
+        $i = 0;
         foreach ($products as $p) {
+            $i++;
             $pid = (int)($p['product_id'] ?? $p['id'] ?? 0);
             $cnt = $p['count'] ?? 1;
             if ($pid <= 0) continue;
@@ -320,15 +322,29 @@ if ($ajax === 'add_to_transaction') {
             $cnt = (float)$cnt;
             if ($cnt <= 0) continue;
 
+            $time = sprintf('%.6f', microtime(true) + ($i / 1000000));
             $params = [
                 'spot_id' => $spotIdReq,
                 'spot_tablet_id' => $tabletId,
                 'transaction_id' => $transactionId,
                 'product_id' => $pid,
                 'num' => $cnt,
+                'time' => $time,
             ];
 
             $posterApi->request('transactions.addTransactionProduct', $params, 'POST');
+
+            $pc = trim((string)($p['comment'] ?? ''));
+            if ($pc !== '') {
+                $posterApi->request('transactions.changeProductComment', [
+                    'spot_id' => $spotIdReq,
+                    'spot_tablet_id' => $tabletId,
+                    'transaction_id' => $transactionId,
+                    'product_id' => $pid,
+                    'comment' => $pc,
+                    'time' => $time,
+                ], 'POST');
+            }
             $added++;
         }
     } catch (\Throwable $e) {

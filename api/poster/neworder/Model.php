@@ -78,7 +78,12 @@ class ApiPosterNewOrderModel
             $cnt = $p['count'] ?? 1;
             if ($pid <= 0) continue;
             if (!is_numeric($cnt)) $cnt = 1;
-            $orderProducts[] = ['id' => $pid, 'count' => (float)$cnt];
+            $row = ['id' => $pid, 'count' => (float)$cnt];
+            $pc = trim((string)($p['comment'] ?? ''));
+            if ($pc !== '') {
+                $row['comment'] = $pc;
+            }
+            $orderProducts[] = $row;
         }
         if (!$orderProducts) {
             return ['order_id' => 0];

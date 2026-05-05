@@ -67,6 +67,7 @@
     namePh: 'Как к вам обращаться?',
     comment: 'Комментарий',
     commentPh: 'Комментарий к заказу',
+    dishCommentPh: 'Комм',
     openChecksTitle: 'Открытые чеки на столе',
     openChecksBtn: 'Открытые чеки',
     openChecksBtnCount: 'Открытые чеки: ',
@@ -101,6 +102,7 @@
     namePh: 'Your name',
     comment: 'Comment',
     commentPh: 'Order comment',
+    dishCommentPh: 'Cmt',
     openChecksTitle: 'Open checks for table',
     openChecksBtn: 'Open checks',
     openChecksBtnCount: 'Open checks: ',
@@ -415,6 +417,7 @@
 
     let sum = 0;
     items.forEach((c) => {
+      const itemId = String((c.item && c.item.id) ? c.item.id : '');
       const row = d.createElement('div');
       row.className = 'cart-item';
 
@@ -439,7 +442,7 @@
       minus.className = 'qty-btn';
       minus.type = 'button';
       minus.textContent = '−';
-      minus.addEventListener('click', () => Controller.updateCart(String((c.item && c.item.id) ? c.item.id : ''), -1));
+      minus.addEventListener('click', () => Controller.updateCart(itemId, -1));
 
       const count = d.createElement('div');
       count.style.fontWeight = 'bold';
@@ -449,10 +452,22 @@
       plus.className = 'qty-btn';
       plus.type = 'button';
       plus.textContent = '+';
-      plus.addEventListener('click', () => Controller.updateCart(String((c.item && c.item.id) ? c.item.id : ''), 1));
+      plus.addEventListener('click', () => Controller.updateCart(itemId, 1));
+
+      const commentInput = d.createElement('input');
+      commentInput.type = 'text';
+      commentInput.inputMode = 'text';
+      commentInput.autocomplete = 'off';
+      commentInput.spellcheck = false;
+      commentInput.className = 'cart-item-comment';
+      const t = i18n[currentLang] || i18n.ru;
+      commentInput.placeholder = t.dishCommentPh || t.comment;
+      commentInput.value = String(c.comment || '');
+      commentInput.addEventListener('input', () => Controller.setCartComment(itemId, commentInput.value));
 
       controls.appendChild(minus);
       controls.appendChild(count);
+      controls.appendChild(commentInput);
       controls.appendChild(plus);
 
       row.appendChild(info);
@@ -555,11 +570,19 @@
     if (!id) return;
     if (!Model.cart[id]) {
       if (delta <= 0) return;
-      Model.cart[id] = { item, price, count: delta };
+      Model.cart[id] = { item, price, count: delta, comment: '' };
     } else {
       Model.cart[id].count = Number(Model.cart[id].count || 0) + delta;
       if (Model.cart[id].count <= 0) delete Model.cart[id];
     }
+  }
+
+  function modelSetCartComment(itemId, comment) {
+    const id = String(itemId || '');
+    if (!id) return;
+    const cur = Model.cart[id];
+    if (!cur) return;
+    cur.comment = String(comment || '').slice(0, 200);
   }
 
   function modelClearCart() {
@@ -736,6 +759,7 @@
     saveSelection: modelSaveSelection,
     setQuery: modelSetQuery,
     setCartItem: modelSetCartItem,
+    setCartComment: modelSetCartComment,
     clearCart: modelClearCart,
     filterGroups: modelFilterGroups,
     saveCache: modelSaveCache,
@@ -903,6 +927,10 @@
     View.renderCartBadge(Model.cart);
   }
 
+  function controllerSetCartComment(itemId, comment) {
+    Model.setCartComment(itemId, comment);
+  }
+
   function controllerBindLangMenu() {
     if (!Dom.langMenu) return;
     const links = Array.from(Dom.langMenu.querySelectorAll('.lang-panel a'));
@@ -1033,7 +1061,11 @@
     const name = String(Dom.orderName ? Dom.orderName.value : '').trim();
     const comment = String(Dom.orderComment ? Dom.orderComment.value : '').trim();
     const serviceMode = 1;
-    const products = Object.values(Model.cart).map((c) => ({ product_id: Number((c.item && c.item.id) ? c.item.id : 0), count: Number(c.count || 0) }));
+    const products = Object.values(Model.cart).map((c) => ({
+      product_id: Number((c.item && c.item.id) ? c.item.id : 0),
+      count: Number(c.count || 0),
+      comment: String(c.comment || '').trim(),
+    }));
     if (!products.length) {
       if (Dom.checkoutError) {
         Dom.checkoutError.textContent = t.emptyCart;
@@ -1092,6 +1124,7 @@
     onSearchInput: controllerOnSearchInput,
     addToCart: controllerAddToCart,
     updateCart: controllerUpdateCart,
+    setCartComment: controllerSetCartComment,
     bindLangMenu: controllerBindLangMenu,
     bindCheckout: controllerBindCheckout,
     bindSpotTable: controllerBindSpotTable,
