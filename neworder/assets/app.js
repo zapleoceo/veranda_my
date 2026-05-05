@@ -17,12 +17,10 @@
     cartTotalLabel: d.getElementById('cartTotalLabel'),
     checkoutTitle: d.getElementById('checkoutTitle'),
     labelName: d.getElementById('labelName'),
-    labelPhone: d.getElementById('labelPhone'),
     labelServiceMode: d.getElementById('labelServiceMode'),
     serviceInPlaceLabel: d.getElementById('serviceInPlaceLabel'),
     serviceTakeawayLabel: d.getElementById('serviceTakeawayLabel'),
     orderName: d.getElementById('orderName'),
-    orderPhone: d.getElementById('orderPhone'),
     submitBtn: d.getElementById('submitBtn'),
     loadingState: d.getElementById('loadingState'),
     checkoutForm: d.getElementById('checkoutForm'),
@@ -32,6 +30,8 @@
     tableSelect: d.getElementById('tableIdSelect'),
     labelSpot: d.getElementById('labelSpot'),
     labelTable: d.getElementById('labelTable'),
+    hallSelect: d.getElementById('hallIdSelect'),
+    labelHall: d.getElementById('labelHall'),
   };
 
   const fmtPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
@@ -56,14 +56,11 @@
     checkout: 'Оформление заказа',
     name: 'Имя',
     namePh: 'Как к вам обращаться?',
-    phone: 'Телефон',
-    phonePh: 'Ваш номер телефона',
     orderType: 'Тип заказа',
     inPlace: 'В заведении',
     takeaway: 'С собой',
     submit: 'Подтвердить заказ',
     sending: 'Отправка...',
-    phoneInvalid: 'Проверьте корректность номера телефона',
     orderUnknown: 'Неизвестная ошибка',
     orderSuccessPrefix: 'Заказ успешно создан! ID: ',
   },
@@ -81,14 +78,11 @@
     checkout: 'Checkout',
     name: 'Name',
     namePh: 'Your name',
-    phone: 'Phone',
-    phonePh: 'Your phone number',
     orderType: 'Order type',
     inPlace: 'Dine in',
     takeaway: 'Takeaway',
     submit: 'Place order',
     sending: 'Sending...',
-    phoneInvalid: 'Check phone number',
     orderUnknown: 'Unknown error',
     orderSuccessPrefix: 'Order created! ID: ',
   },
@@ -106,14 +100,11 @@
     checkout: 'Xác nhận đơn',
     name: 'Tên',
     namePh: 'Bạn tên gì?',
-    phone: 'Số điện thoại',
-    phonePh: 'Số điện thoại của bạn',
     orderType: 'Loại đơn',
     inPlace: 'Dùng tại chỗ',
     takeaway: 'Mang đi',
     submit: 'Đặt hàng',
     sending: 'Đang gửi...',
-    phoneInvalid: 'Kiểm tra số điện thoại',
     orderUnknown: 'Lỗi không xác định',
     orderSuccessPrefix: 'Đã tạo đơn! ID: ',
   },
@@ -131,14 +122,11 @@
     checkout: '주문하기',
     name: '이름',
     namePh: '이름을 입력하세요',
-    phone: '전화번호',
-    phonePh: '전화번호를 입력하세요',
     orderType: '주문 방식',
     inPlace: '매장 식사',
     takeaway: '포장',
     submit: '주문 확정',
     sending: '전송 중...',
-    phoneInvalid: '전화번호를 확인하세요',
     orderUnknown: '알 수 없는 오류',
     orderSuccessPrefix: '주문 생성됨! ID: ',
   }
@@ -146,6 +134,7 @@
 
   const Config = {
     waiterId: 10,
+    clientId: 71,
   };
 
   const View = {
@@ -158,17 +147,16 @@
       if (Dom.cartTotalLabel) Dom.cartTotalLabel.textContent = t.total;
       if (Dom.checkoutTitle) Dom.checkoutTitle.textContent = t.checkout;
       if (Dom.labelName) Dom.labelName.textContent = t.name;
-      if (Dom.labelPhone) Dom.labelPhone.textContent = t.phone;
       if (Dom.labelServiceMode) Dom.labelServiceMode.textContent = t.orderType;
       if (Dom.serviceInPlaceLabel) Dom.serviceInPlaceLabel.textContent = t.inPlace;
       if (Dom.serviceTakeawayLabel) Dom.serviceTakeawayLabel.textContent = t.takeaway;
       if (Dom.submitBtn && !Dom.submitBtn.disabled) Dom.submitBtn.textContent = t.submit;
       if (Dom.orderName) Dom.orderName.placeholder = t.namePh;
-      if (Dom.orderPhone) Dom.orderPhone.placeholder = t.phonePh;
       if (Dom.loadingState) Dom.loadingState.textContent = t.menuLoading;
       if (Dom.searchInput) Dom.searchInput.placeholder = t.searchPlaceholder;
       if (Dom.labelSpot) Dom.labelSpot.textContent = 'Spot';
       if (Dom.labelTable) Dom.labelTable.textContent = 'Table';
+      if (Dom.labelHall) Dom.labelHall.textContent = 'Hall';
       View.setActiveLangLink(currentLang);
     },
 
@@ -385,6 +373,24 @@
 
       Dom.tableSelect.value = String(Number(selectedId || 0));
     },
+
+    renderHallSelect(hallIds, selectedId = 0) {
+      if (!Dom.hallSelect) return;
+      Dom.hallSelect.innerHTML = '';
+      const any = d.createElement('option');
+      any.value = '0';
+      any.textContent = '—';
+      Dom.hallSelect.appendChild(any);
+      (hallIds || []).forEach((hid) => {
+        const v = Number(hid || 0) || 0;
+        if (!v) return;
+        const opt = d.createElement('option');
+        opt.value = String(v);
+        opt.textContent = String(v);
+        Dom.hallSelect.appendChild(opt);
+      });
+      Dom.hallSelect.value = String(Number(selectedId || 0));
+    },
   };
 
   const Model = {
@@ -395,6 +401,7 @@
     cart: {},
     tables: [],
     tableId: 0,
+    hallId: 0,
 
     setQuery(q) {
       Model.query = String(q || '').trim();
@@ -480,6 +487,21 @@
         const ok = tables.some((t) => Number(t.table_id || 0) === Number(Model.tableId));
         if (!ok) Model.tableId = 0;
       }
+    },
+
+    getHallIds() {
+      const set = new Set();
+      (Model.tables || []).forEach((t) => {
+        const hid = Number(t && t.hall_id ? t.hall_id : 0) || 0;
+        if (hid > 0) set.add(hid);
+      });
+      return Array.from(set).sort((a, b) => a - b);
+    },
+
+    getTablesForSelectedHall() {
+      const hid = Number(Model.hallId || 0) || 0;
+      if (!hid) return Model.tables;
+      return (Model.tables || []).filter((t) => Number(t && t.hall_id ? t.hall_id : 0) === hid);
     },
 
     extractPriceCents(p) {
@@ -577,7 +599,8 @@
         await Model.fetchProducts();
         View.renderSpotSelect(Model.spotId);
         await Model.fetchTables(Model.spotId);
-        View.renderTableSelect(Model.tables, Model.tableId);
+        View.renderHallSelect(Model.getHallIds(), Model.hallId);
+        View.renderTableSelect(Model.getTablesForSelectedHall(), Model.tableId);
         Controller.refreshMenu();
       } catch (err) {
         View.renderEmptyMenu(`${t.loadMenuFailPrefix}${String(err?.message || err)}`);
@@ -718,10 +741,21 @@
           Model.spotId = sid;
           try {
             await Model.fetchTables(sid);
-            View.renderTableSelect(Model.tables, Model.tableId);
+            Model.hallId = 0;
+            View.renderHallSelect(Model.getHallIds(), Model.hallId);
+            View.renderTableSelect(Model.getTablesForSelectedHall(), Model.tableId);
           } catch (e) {
+            Model.hallId = 0;
+            View.renderHallSelect([], 0);
             View.renderTableSelect([], 0);
           }
+        });
+      }
+      if (Dom.hallSelect) {
+        Dom.hallSelect.addEventListener('change', () => {
+          Model.hallId = Number(Dom.hallSelect.value || 0) || 0;
+          Model.tableId = 0;
+          View.renderTableSelect(Model.getTablesForSelectedHall(), 0);
         });
       }
       if (Dom.tableSelect) {
@@ -731,31 +765,6 @@
       }
     },
 
-    phoneDigits(raw) {
-      return String(raw || '').replace(/\D+/g, '').slice(0, 15);
-    },
-
-    isPhoneValid(raw) {
-      try {
-        if (typeof libphonenumber === 'undefined') return /^[1-9]\d{6,15}$/.test(Controller.phoneDigits(raw));
-        const parsed = libphonenumber.parsePhoneNumber(String(raw).trim());
-        return parsed && parsed.isValid();
-      } catch (e) {
-        return false;
-      }
-    },
-
-    getPhoneE164(raw) {
-      try {
-        if (typeof libphonenumber !== 'undefined') {
-          const parsed = libphonenumber.parsePhoneNumber(String(raw).trim());
-          if (parsed && parsed.isValid()) return parsed.format('E.164');
-        }
-      } catch (e) {}
-      const digits = Controller.phoneDigits(raw);
-      return digits ? ('+' + digits) : '';
-    },
-
     async submitOrder(e) {
       e.preventDefault();
       const t = i18n[currentLang] || i18n.ru;
@@ -763,24 +772,14 @@
       if (!Dom.submitBtn) return;
 
       const name = String(Dom.orderName?.value || '').trim();
-      const rawPhone = String(Dom.orderPhone?.value || '');
       const smEl = d.querySelector('input[name="service_mode"]:checked');
       const serviceMode = Number(smEl?.value || 2);
-
-      if (!Controller.isPhoneValid(rawPhone)) {
-        if (Dom.checkoutError) {
-          Dom.checkoutError.textContent = t.phoneInvalid;
-          Dom.checkoutError.hidden = false;
-        }
-        return;
-      }
-
-      const phoneE164 = Controller.getPhoneE164(rawPhone);
       const products = Object.values(Model.cart).map((c) => ({ product_id: Number(c.item?.id || 0), count: Number(c.count || 0) }));
       if (!products.length) {
         if (Dom.checkoutError) {
           Dom.checkoutError.textContent = t.emptyCart;
           Dom.checkoutError.hidden = false;
+        }
         }
         return;
       }
@@ -794,10 +793,10 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name,
-            phone: phoneE164,
             service_mode: serviceMode,
             products,
             waiter_id: Config.waiterId,
+            client_id: Config.clientId,
             spot_id: Number(Model.spotId || 0),
             table_id: Number(Model.tableId || 0),
           }),

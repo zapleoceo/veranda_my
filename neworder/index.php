@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0002';
+$assetVersion = '20260505_0003';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -142,7 +142,6 @@ $t = $i18n[$lang] ?? $i18n['ru'];
   <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
   <link rel="stylesheet" href="/assets/css/common.css?v=<?= $assetVersion ?>">
   <link rel="stylesheet" href="/neworder/assets/style.css?v=<?= $assetVersion ?>">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </head>
 <body>
   <div class="container">
@@ -194,6 +193,10 @@ $t = $i18n[$lang] ?? $i18n['ru'];
               <h3 id="checkoutTitle"><?= htmlspecialchars((string)($t['checkout'] ?? '')) ?></h3>
               <form id="checkoutForm">
                 <div class="form-group">
+                  <label id="labelHall">Hall</label>
+                  <select id="hallIdSelect"></select>
+                </div>
+                <div class="form-group">
                   <label id="labelSpot">Spot</label>
                   <select id="spotIdSelect"></select>
                 </div>
@@ -204,10 +207,6 @@ $t = $i18n[$lang] ?? $i18n['ru'];
                 <div class="form-group">
                   <label id="labelName"><?= htmlspecialchars((string)($t['name'] ?? '')) ?></label>
                   <input type="text" id="orderName" required placeholder="<?= htmlspecialchars((string)($t['name_ph'] ?? '')) ?>">
-                </div>
-                <div class="form-group">
-                  <label id="labelPhone"><?= htmlspecialchars((string)($t['phone'] ?? '')) ?></label>
-                  <input type="tel" id="orderPhone" required placeholder="<?= htmlspecialchars((string)($t['phone_ph'] ?? '')) ?>">
                 </div>
                 <div class="form-group">
                   <label id="labelServiceMode"><?= htmlspecialchars((string)($t['order_type'] ?? '')) ?></label>

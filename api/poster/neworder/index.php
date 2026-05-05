@@ -80,13 +80,6 @@ if ($ajax === 'create_order') {
     $payload = json_decode($payloadJson, true);
     if (!is_array($payload)) $respondError(400, 'Bad request');
 
-    $phone = trim((string)($payload['phone'] ?? ''));
-    $phoneNorm = preg_replace('/\D+/', '', $phone);
-    if ($phoneNorm === '' || !preg_match('/^[1-9]\d{6,15}$/', $phoneNorm)) {
-        $respondError(400, 'Проверьте корректность номера телефона');
-    }
-    $phoneNorm = '+' . $phoneNorm;
-
     $name = trim((string)($payload['name'] ?? ''));
     if ($name === '') $respondError(400, 'Введите имя');
 
@@ -104,9 +97,11 @@ if ($ajax === 'create_order') {
     if ($tableId < 0) $tableId = 0;
     $waiterId = (int)($payload['waiter_id'] ?? 0);
     if ($waiterId < 0) $waiterId = 0;
+    $clientId = (int)($payload['client_id'] ?? 0);
+    if ($clientId < 0) $clientId = 0;
 
     try {
-        $resp = $model->createOrder($spotIdReq, $tableId, $waiterId, $serviceMode, $phoneNorm, $name, $products);
+        $resp = $model->createOrder($spotIdReq, $tableId, $waiterId, $clientId, $serviceMode, $name, $products);
     } catch (\Throwable $e) {
         $respondError(500, 'Poster Error: ' . $e->getMessage());
     }

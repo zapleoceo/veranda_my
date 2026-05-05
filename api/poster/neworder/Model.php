@@ -44,7 +44,7 @@ class ApiPosterNewOrderModel
         return is_array($resp) ? $resp : [];
     }
 
-    public function createOrder(int $spotId, int $tableId, int $waiterId, int $serviceMode, string $phoneE164, string $name, array $products): array
+    public function createOrder(int $spotId, int $tableId, int $waiterId, int $clientId, int $serviceMode, string $name, array $products): array
     {
         $spotId = $spotId > 0 ? $spotId : $this->spotId;
         if ($this->apiToken === '') {
@@ -72,11 +72,11 @@ class ApiPosterNewOrderModel
             'products' => $orderProducts,
         ];
 
-        $phone = trim($phoneE164);
         $name = trim($name);
-        if ($phone !== '' || $name !== '') {
+        $clientId = $clientId > 0 ? $clientId : 0;
+        if ($clientId > 0 || $name !== '') {
             $payload['client'] = [];
-            if ($phone !== '') $payload['client']['phone'] = $phone;
+            if ($clientId > 0) $payload['client']['id'] = $clientId;
             if ($name !== '') $payload['client']['firstName'] = $name;
         }
 
