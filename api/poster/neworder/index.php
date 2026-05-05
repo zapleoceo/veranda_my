@@ -183,7 +183,6 @@ if ($ajax === 'get_open_transactions') {
         $transactions = $posterApi->request('dash.getTransactions', [
             'status' => 1,
             'spot_id' => $spotIdReq,
-            'table_id' => $tableIdReq,
             'service_mode' => 1,
             'include_products' => 'false',
             'include_history' => 'false',
@@ -194,6 +193,7 @@ if ($ajax === 'get_open_transactions') {
 
         $out = [];
         foreach ($transactions as $tr) {
+            if ((int)($tr['table_id'] ?? 0) !== $tableIdReq) continue;
             $trId = (int)($tr['transaction_id'] ?? 0);
             if ($trId <= 0) continue;
 
