@@ -75,10 +75,31 @@ class ApiPosterNewOrderModel
         $orderProducts = [];
         foreach ($products as $p) {
             $pid = (int)($p['product_id'] ?? $p['id'] ?? 0);
+            $mid = (int)($p['modificator_id'] ?? $p['modificatorId'] ?? 0);
+            $dishMods = $p['modification'] ?? null;
             $cnt = $p['count'] ?? 1;
             if ($pid <= 0) continue;
             if (!is_numeric($cnt)) $cnt = 1;
             $row = ['id' => $pid, 'count' => (float)$cnt];
+            if ($mid > 0) {
+                $row['modificatorId'] = $mid;
+            }
+            if (is_array($dishMods) && count($dishMods) > 0) {
+                $modsOut = [];
+                foreach ($dishMods as $dm) {
+                    if (!is_array($dm)) continue;
+                    $did = (int)($dm['id'] ?? $dm['m'] ?? 0);
+                    $dc = $dm['count'] ?? $dm['a'] ?? 1;
+                    if ($did <= 0) continue;
+                    if (!is_numeric($dc)) $dc = 1;
+                    $dc = (float)$dc;
+                    if ($dc <= 0) continue;
+                    $modsOut[] = ['id' => $did, 'count' => $dc];
+                }
+                if ($modsOut) {
+                    $row['modification'] = $modsOut;
+                }
+            }
             $pc = trim((string)($p['comment'] ?? ''));
             if ($pc !== '') {
                 $row['comment'] = $pc;

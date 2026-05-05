@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0100';
+$assetVersion = '20260505_0110';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -251,6 +251,18 @@ $t = $i18n[$lang] ?? $i18n['ru'];
       </div>
       <div class="modal-body">
         <div class="checks-grid" id="openChecksList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modifierModal" hidden>
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div class="modal-title" id="modifierTitle"></div>
+        <button type="button" class="btn modal-close" id="modifierClose">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="modifier-list" id="modifierList"></div>
       </div>
     </div>
   </div>

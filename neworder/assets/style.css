@@ -640,6 +640,14 @@ body.menu-only-cart .neworder-shell .cart-sidebar {
   display: flex;
 }
 
+#modifierModal {
+  display: none;
+}
+
+#modifierModal:not([hidden]) {
+  display: flex;
+}
+
 .modal {
   width: min(900px, 100%);
   max-height: min(80vh, 720px);
@@ -648,6 +656,11 @@ body.menu-only-cart .neworder-shell .cart-sidebar {
   border-radius: 14px;
   overflow: hidden;
   backdrop-filter: blur(10px);
+}
+
+.modal-sm {
+  width: min(420px, 100%);
+  max-height: min(70vh, 520px);
 }
 
 .modal-header {
@@ -712,6 +725,132 @@ body.menu-only-cart .neworder-shell .cart-sidebar {
   color: rgba(255,255,255,0.82);
   margin: -2px 0 8px 0;
   word-break: break-word;
+}
+
+.modifier-list {
+  display: grid;
+  gap: 8px;
+}
+
+.modifier-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  cursor: pointer;
+}
+
+.modifier-item:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.modifier-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.92);
+}
+
+.modifier-price {
+  font-size: 12px;
+  color: rgba(255,255,255,0.70);
+  white-space: nowrap;
+}
+
+.dishmod-group {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.dishmod-group + .dishmod-group {
+  margin-top: 10px;
+}
+
+.dishmod-group-header {
+  margin-bottom: 8px;
+}
+
+.dishmod-group-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.92);
+}
+
+.dishmod-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.dishmod-row:first-of-type {
+  border-top: 0;
+}
+
+.dishmod-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.90);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dishmod-price {
+  font-size: 12px;
+  color: rgba(255,255,255,0.70);
+  white-space: nowrap;
+}
+
+.dishmod-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dishmod-qty-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.92);
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.dishmod-qty-btn:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.dishmod-qty-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.dishmod-count {
+  min-width: 22px;
+  text-align: center;
+  font-weight: 800;
+  color: rgba(255,255,255,0.92);
+  font-size: 13px;
+}
+
+.modifier-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .check-items {

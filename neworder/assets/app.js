@@ -37,6 +37,10 @@
     openChecksList: d.getElementById('openChecksList'),
     openChecksClose: d.getElementById('openChecksClose'),
     openChecksTitle: d.getElementById('openChecksTitle'),
+    modifierModal: d.getElementById('modifierModal'),
+    modifierList: d.getElementById('modifierList'),
+    modifierTitle: d.getElementById('modifierTitle'),
+    modifierClose: d.getElementById('modifierClose'),
   };
 
   const fmtPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
@@ -68,6 +72,9 @@
     comment: 'Комментарий',
     commentPh: 'Комментарий к заказу',
     dishCommentPh: 'Комм',
+    noModifier: 'Без модификатора',
+    add: 'Добавить',
+    chooseModsErrorPrefix: 'Нужно выбрать модификаторы: ',
     openChecksTitle: 'Открытые чеки на столе',
     openChecksBtn: 'Открытые чеки',
     openChecksBtnCount: 'Открытые чеки: ',
@@ -103,6 +110,9 @@
     comment: 'Comment',
     commentPh: 'Order comment',
     dishCommentPh: 'Cmt',
+    noModifier: 'No modifier',
+    add: 'Add',
+    chooseModsErrorPrefix: 'Select modifiers: ',
     openChecksTitle: 'Open checks for table',
     openChecksBtn: 'Open checks',
     openChecksBtnCount: 'Open checks: ',
@@ -137,6 +147,9 @@
     namePh: 'Bạn tên gì?',
     comment: 'Ghi chú',
     commentPh: 'Ghi chú cho đơn',
+    noModifier: 'Không chọn',
+    add: 'Thêm',
+    chooseModsErrorPrefix: 'Chọn modifier: ',
     openChecksTitle: 'Hóa đơn đang mở theo bàn',
     openChecksBtn: 'Hóa đơn mở',
     openChecksBtnCount: 'Hóa đơn mở: ',
@@ -171,6 +184,9 @@
     namePh: '이름을 입력하세요',
     comment: '메모',
     commentPh: '주문 메모',
+    noModifier: '없음',
+    add: '추가',
+    chooseModsErrorPrefix: '모디파이어 선택: ',
     openChecksTitle: '테이블의 열린 체크',
     openChecksBtn: '열린 체크',
     openChecksBtnCount: '열린 체크: ',
@@ -253,6 +269,192 @@
   function viewHideOpenChecksModal() {
     if (Dom.openChecksModal) Dom.openChecksModal.hidden = true;
     if (Dom.openChecksList) Dom.openChecksList.innerHTML = '';
+  }
+
+  function viewHideModifierModal() {
+    if (Dom.modifierModal) Dom.modifierModal.hidden = true;
+    if (Dom.modifierList) Dom.modifierList.innerHTML = '';
+    if (Dom.modifierTitle) Dom.modifierTitle.textContent = '';
+  }
+
+  function viewShowModifierModal(item, modifications, handlers) {
+    if (!Dom.modifierModal || !Dom.modifierList || !Dom.modifierTitle) return;
+    const t = i18n[currentLang] || i18n.ru;
+    Dom.modifierTitle.textContent = String((item && item.name) ? item.name : '');
+    Dom.modifierList.innerHTML = '';
+
+    const baseBtn = d.createElement('button');
+    baseBtn.type = 'button';
+    baseBtn.className = 'modifier-item';
+    baseBtn.addEventListener('click', () => {
+      if (handlers && typeof handlers.onSelect === 'function') {
+        handlers.onSelect({ id: 0, name: t.noModifier, price: null });
+      }
+    });
+    const baseName = d.createElement('div');
+    baseName.className = 'modifier-name';
+    baseName.textContent = t.noModifier;
+    baseBtn.appendChild(baseName);
+    Dom.modifierList.appendChild(baseBtn);
+
+    (modifications || []).forEach((m) => {
+      const btn = d.createElement('button');
+      btn.type = 'button';
+      btn.className = 'modifier-item';
+      btn.addEventListener('click', () => {
+        if (handlers && typeof handlers.onSelect === 'function') {
+          handlers.onSelect(m);
+        }
+      });
+
+      const name = d.createElement('div');
+      name.className = 'modifier-name';
+      name.textContent = String(m && m.name ? m.name : '');
+
+      btn.appendChild(name);
+
+      const priceVal = Number(m && m.price != null ? m.price : NaN);
+      if (Number.isFinite(priceVal)) {
+        const price = d.createElement('div');
+        price.className = 'modifier-price';
+        price.textContent = fmtPrice(priceVal);
+        btn.appendChild(price);
+      }
+
+      Dom.modifierList.appendChild(btn);
+    });
+
+    Dom.modifierModal.hidden = false;
+  }
+
+  function viewShowDishModsModal(item, groups, handlers) {
+    if (!Dom.modifierModal || !Dom.modifierList || !Dom.modifierTitle) return;
+    const t = i18n[currentLang] || i18n.ru;
+    Dom.modifierTitle.textContent = String((item && item.name) ? item.name : '');
+    Dom.modifierList.innerHTML = '';
+
+    const uiByModId = new Map();
+    const groupModIds = new Map();
+
+    (groups || []).forEach((g) => {
+      const group = g && typeof g === 'object' ? g : null;
+      if (!group) return;
+      const gid = Number(group.id || 0) || 0;
+      if (!gid) return;
+
+      const block = d.createElement('div');
+      block.className = 'dishmod-group';
+
+      const header = d.createElement('div');
+      header.className = 'dishmod-group-header';
+      const title = d.createElement('div');
+      title.className = 'dishmod-group-title';
+      const min = Number(group.min || 0) || 0;
+      const max = Number(group.max || 0) || 0;
+      title.textContent = `${String(group.name || '')}${max > 0 ? ` · ${String(min)}–${String(max)}` : ''}`;
+      header.appendChild(title);
+      block.appendChild(header);
+
+      const mods = Array.isArray(group.mods) ? group.mods : [];
+      const ids = [];
+      mods.forEach((m) => {
+        const mod = m && typeof m === 'object' ? m : null;
+        if (!mod) return;
+        const mid = Number(mod.id || 0) || 0;
+        if (!mid) return;
+        ids.push(mid);
+
+        const row = d.createElement('div');
+        row.className = 'dishmod-row';
+
+        const name = d.createElement('div');
+        name.className = 'dishmod-name';
+        name.textContent = String(mod.name || '');
+        row.appendChild(name);
+
+        const priceVal = Number(mod.price != null ? mod.price : NaN);
+        if (Number.isFinite(priceVal) && priceVal !== 0) {
+          const price = d.createElement('div');
+          price.className = 'dishmod-price';
+          price.textContent = fmtPrice(priceVal);
+          row.appendChild(price);
+        }
+
+        const controls = d.createElement('div');
+        controls.className = 'dishmod-controls';
+
+        const minus = d.createElement('button');
+        minus.type = 'button';
+        minus.className = 'dishmod-qty-btn';
+        minus.textContent = '−';
+
+        const count = d.createElement('div');
+        count.className = 'dishmod-count';
+        count.textContent = String(handlers && typeof handlers.getCount === 'function' ? handlers.getCount(gid, mid) : 0);
+
+        const plus = d.createElement('button');
+        plus.type = 'button';
+        plus.className = 'dishmod-qty-btn';
+        plus.textContent = '+';
+
+        const updateGroupUi = () => {
+          const groupTotal = handlers && typeof handlers.getGroupTotal === 'function' ? handlers.getGroupTotal(gid) : 0;
+          const groupMax = handlers && typeof handlers.getGroupMax === 'function' ? handlers.getGroupMax(gid) : 0;
+          const mids = groupModIds.get(gid) || [];
+          mids.forEach((xid) => {
+            const ui = uiByModId.get(xid);
+            if (!ui) return;
+            const c = handlers && typeof handlers.getCount === 'function' ? handlers.getCount(gid, xid) : 0;
+            ui.count.textContent = String(c);
+            ui.minus.disabled = c <= 0;
+            ui.plus.disabled = groupMax > 0 && groupTotal >= groupMax;
+          });
+        };
+
+        minus.addEventListener('click', () => {
+          if (handlers && typeof handlers.onDelta === 'function') handlers.onDelta(gid, mid, -1);
+          updateGroupUi();
+        });
+        plus.addEventListener('click', () => {
+          if (handlers && typeof handlers.onDelta === 'function') handlers.onDelta(gid, mid, 1);
+          updateGroupUi();
+        });
+
+        controls.appendChild(minus);
+        controls.appendChild(count);
+        controls.appendChild(plus);
+        row.appendChild(controls);
+        block.appendChild(row);
+
+        uiByModId.set(mid, { minus, plus, count });
+      });
+      groupModIds.set(gid, ids);
+      Dom.modifierList.appendChild(block);
+
+      const groupTotal = handlers && typeof handlers.getGroupTotal === 'function' ? handlers.getGroupTotal(gid) : 0;
+      const groupMax = handlers && typeof handlers.getGroupMax === 'function' ? handlers.getGroupMax(gid) : 0;
+      ids.forEach((mid) => {
+        const ui = uiByModId.get(mid);
+        if (!ui) return;
+        const c = handlers && typeof handlers.getCount === 'function' ? handlers.getCount(gid, mid) : 0;
+        ui.minus.disabled = c <= 0;
+        ui.plus.disabled = groupMax > 0 && groupTotal >= groupMax;
+      });
+    });
+
+    const actions = d.createElement('div');
+    actions.className = 'modifier-actions';
+    const addBtn = d.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn btn-primary';
+    addBtn.textContent = t.add;
+    addBtn.addEventListener('click', () => {
+      if (handlers && typeof handlers.onConfirm === 'function') handlers.onConfirm();
+    });
+    actions.appendChild(addBtn);
+    Dom.modifierList.appendChild(actions);
+
+    Dom.modifierModal.hidden = false;
   }
 
   function viewSetOpenChecksButton(openCount, selectedTransactionId) {
@@ -417,7 +619,8 @@
 
     let sum = 0;
     items.forEach((c) => {
-      const itemId = String((c.item && c.item.id) ? c.item.id : '');
+      const cartKey = String((c && c.key) ? c.key : ((c.item && c.item.id) ? c.item.id : ''));
+      if (!cartKey) return;
       const row = d.createElement('div');
       row.className = 'cart-item';
 
@@ -426,7 +629,22 @@
 
       const n = d.createElement('div');
       n.className = 'cart-item-name';
-      n.textContent = String((c.item && c.item.name) ? c.item.name : '');
+      const baseName = String((c.item && c.item.name) ? c.item.name : '');
+      const modName = String(c.modificator_name || '').trim();
+      const dishMods = Array.isArray(c.dish_mods) ? c.dish_mods : [];
+      const dishLabel = dishMods
+        .map((m) => {
+          const name = String(m && m.name ? m.name : '').trim();
+          const cnt = Number(m && m.count != null ? m.count : 0) || 0;
+          if (!name) return '';
+          return cnt > 1 ? `${name}×${String(cnt)}` : name;
+        })
+        .filter((x) => x !== '')
+        .join(', ');
+      let label = baseName;
+      if (modName) label += ` (${modName})`;
+      if (dishLabel) label += ` + ${dishLabel}`;
+      n.textContent = label;
 
       const p = d.createElement('div');
       p.className = 'cart-item-price';
@@ -442,7 +660,7 @@
       minus.className = 'qty-btn';
       minus.type = 'button';
       minus.textContent = '−';
-      minus.addEventListener('click', () => Controller.updateCart(itemId, -1));
+      minus.addEventListener('click', () => Controller.updateCart(cartKey, -1));
 
       const count = d.createElement('div');
       count.style.fontWeight = 'bold';
@@ -452,7 +670,7 @@
       plus.className = 'qty-btn';
       plus.type = 'button';
       plus.textContent = '+';
-      plus.addEventListener('click', () => Controller.updateCart(itemId, 1));
+      plus.addEventListener('click', () => Controller.updateCart(cartKey, 1));
 
       const commentInput = d.createElement('input');
       commentInput.type = 'text';
@@ -463,7 +681,7 @@
       const t = i18n[currentLang] || i18n.ru;
       commentInput.placeholder = t.dishCommentPh || t.comment;
       commentInput.value = String(c.comment || '');
-      commentInput.addEventListener('input', () => Controller.setCartComment(itemId, commentInput.value));
+      commentInput.addEventListener('input', () => Controller.setCartComment(cartKey, commentInput.value));
 
       controls.appendChild(minus);
       controls.appendChild(count);
@@ -538,6 +756,9 @@
     showToast: viewShowToast,
     showOpenChecksModal: viewShowOpenChecksModal,
     hideOpenChecksModal: viewHideOpenChecksModal,
+    showModifierModal: viewShowModifierModal,
+    showDishModsModal: viewShowDishModsModal,
+    hideModifierModal: viewHideModifierModal,
     setOpenChecksButton: viewSetOpenChecksButton,
     setMenuCollapsed: viewSetMenuCollapsed,
     renderEmptyMenu: viewRenderEmptyMenu,
@@ -565,15 +786,143 @@
     Model.query = String(q || '').trim();
   }
 
-  function modelSetCartItem(item, price, delta) {
-    const id = String((item && item.id) ? item.id : '');
-    if (!id) return;
-    if (!Model.cart[id]) {
+  function modelMakeCartKey(productId, modificatorId) {
+    const pid = Number(productId || 0) || 0;
+    const mid = Number(modificatorId || 0) || 0;
+    if (!pid) return '';
+    return mid > 0 ? `${String(pid)}:${String(mid)}` : String(pid);
+  }
+
+  function modelMakeDishModsKey(dishMods) {
+    const arr = Array.isArray(dishMods) ? dishMods : [];
+    const parts = [];
+    arr.forEach((m) => {
+      if (!m || typeof m !== 'object') return;
+      const id = Number(m.id || 0) || 0;
+      const cnt = Number(m.count || 0) || 0;
+      if (!id || cnt <= 0) return;
+      parts.push([id, cnt]);
+    });
+    parts.sort((a, b) => (Number(a[0] || 0) - Number(b[0] || 0)));
+    return parts.map((x) => `${String(x[0])}x${String(x[1])}`).join(',');
+  }
+
+  function modelMakeFullCartKey(productId, modificatorId, dishModsKey) {
+    const base = Model.makeCartKey(productId, modificatorId);
+    const dm = String(dishModsKey || '').trim();
+    if (!dm) return base;
+    return `${base}|${dm}`;
+  }
+
+  function modelGetDishGroupMax(group) {
+    const min = Number(group && group.min != null ? group.min : 0) || 0;
+    let max = Number(group && group.max != null ? group.max : 0) || 0;
+    if (max <= 0) max = 999;
+    if (max < min) max = min;
+    return max;
+  }
+
+  function modelInitDishModsState(groups) {
+    const counts = {};
+    const totals = {};
+    (groups || []).forEach((g) => {
+      const gid = Number(g && g.id ? g.id : 0) || 0;
+      if (!gid) return;
+      totals[String(gid)] = 0;
+      (g.mods || []).forEach((m) => {
+        const mid = Number(m && m.id ? m.id : 0) || 0;
+        if (!mid) return;
+        counts[String(gid) + ':' + String(mid)] = 0;
+      });
+    });
+    return { counts, totals };
+  }
+
+  function modelDishModsGetCount(state, groupId, modId) {
+    const key = String(groupId) + ':' + String(modId);
+    return Number(state && state.counts && state.counts[key] != null ? state.counts[key] : 0) || 0;
+  }
+
+  function modelDishModsGetGroupTotal(state, groupId) {
+    const key = String(groupId);
+    return Number(state && state.totals && state.totals[key] != null ? state.totals[key] : 0) || 0;
+  }
+
+  function modelDishModsApplyDelta(groupsById, state, groupId, modId, delta) {
+    const gid = Number(groupId || 0) || 0;
+    const mid = Number(modId || 0) || 0;
+    const dlt = Number(delta || 0) || 0;
+    if (!gid || !mid || !dlt) return false;
+    const group = groupsById.get(gid);
+    if (!group) return false;
+    const max = Model.getDishGroupMax(group);
+    const cur = Model.dishModsGetCount(state, gid, mid);
+    const next = Math.max(0, cur + (dlt > 0 ? 1 : -1));
+    const curTotal = Model.dishModsGetGroupTotal(state, gid);
+    const nextTotal = curTotal + (next - cur);
+    if (nextTotal > max) return false;
+    state.counts[String(gid) + ':' + String(mid)] = next;
+    state.totals[String(gid)] = nextTotal;
+    return true;
+  }
+
+  function modelDishModsValidate(groups, state) {
+    const missing = [];
+    (groups || []).forEach((g) => {
+      const gid = Number(g && g.id ? g.id : 0) || 0;
+      if (!gid) return;
+      const min = Number(g && g.min != null ? g.min : 0) || 0;
+      const total = Model.dishModsGetGroupTotal(state, gid);
+      if (min > 0 && total < min) missing.push(String(g.name || '').trim() || String(gid));
+    });
+    return missing;
+  }
+
+  function modelDishModsBuildSelected(groups, state) {
+    const out = [];
+    (groups || []).forEach((g) => {
+      const gid = Number(g && g.id ? g.id : 0) || 0;
+      if (!gid) return;
+      (g.mods || []).forEach((m) => {
+        const mid = Number(m && m.id ? m.id : 0) || 0;
+        if (!mid) return;
+        const cnt = Model.dishModsGetCount(state, gid, mid);
+        if (cnt <= 0) return;
+        out.push({
+          id: mid,
+          count: cnt,
+          name: String(m && m.name ? m.name : ''),
+          price: Number(m && m.price != null ? m.price : 0) || 0,
+        });
+      });
+    });
+    return out;
+  }
+
+  function modelSetCartItem(item, price, delta, modificator, dishMods) {
+    const pid = String((item && item.id) ? item.id : '');
+    if (!pid) return;
+    const mid = Number(modificator && modificator.id ? modificator.id : 0) || 0;
+    const dishModsKey = Model.makeDishModsKey(dishMods);
+    const key = Model.makeFullCartKey(pid, mid, dishModsKey);
+    if (!key) return;
+    if (!Model.cart[key]) {
       if (delta <= 0) return;
-      Model.cart[id] = { item, price, count: delta, comment: '' };
+      const dishModsArr = Array.isArray(dishMods) ? dishMods : [];
+      Model.cart[key] = {
+        key,
+        item,
+        price,
+        count: delta,
+        comment: '',
+        modificator_id: mid > 0 ? mid : 0,
+        modificator_name: mid > 0 ? String(modificator && modificator.name ? modificator.name : '') : '',
+        dish_mods: dishModsArr,
+        modification: dishModsArr.map((m) => ({ id: Number(m.id || 0) || 0, count: Number(m.count || 0) || 0 })).filter((m) => m.id > 0 && m.count > 0),
+      };
     } else {
-      Model.cart[id].count = Number(Model.cart[id].count || 0) + delta;
-      if (Model.cart[id].count <= 0) delete Model.cart[id];
+      Model.cart[key].count = Number(Model.cart[key].count || 0) + delta;
+      if (Model.cart[key].count <= 0) delete Model.cart[key];
     }
   }
 
@@ -720,10 +1069,51 @@
           items: [],
         });
       }
+      const rawMods = Array.isArray(p.modifications) ? p.modifications : [];
+      const mods = rawMods
+        .filter((m) => m && typeof m === 'object')
+        .map((m) => {
+          const id = Number(m.modificator_id || m.id || 0) || 0;
+          if (!id) return null;
+          const name = String(m.modificator_name || m.name || '').trim();
+          const priceCents = Model.extractPriceCents(m);
+          const price = Number(priceCents || 0) / 100;
+          return { id, name, price };
+        })
+        .filter(Boolean);
+
+      const rawDishGroups = Array.isArray(p.group_modifications) ? p.group_modifications : [];
+      const dishGroups = rawDishGroups
+        .filter((g) => g && typeof g === 'object')
+        .filter((g) => String(g.is_deleted || g.delete || '0') !== '1')
+        .map((g) => {
+          const id = Number(g.dish_modification_group_id || g.id || 0) || 0;
+          if (!id) return null;
+          const name = String(g.name || '').trim() || String(id);
+          const min = Number(g.num_min != null ? g.num_min : 0) || 0;
+          const maxRaw = Number(g.num_max != null ? g.num_max : 0) || 0;
+          const max = maxRaw > 0 ? maxRaw : 999;
+          const raw = Array.isArray(g.modifications) ? g.modifications : [];
+          const mods = raw
+            .filter((m) => m && typeof m === 'object')
+            .map((m) => {
+              const mid = Number(m.dish_modification_id || m.id || 0) || 0;
+              if (!mid) return null;
+              const mname = String(m.name || '').trim() || String(mid);
+              const price = Number(m.price != null ? m.price : 0);
+              return { id: mid, name: mname, price: Number.isFinite(price) ? price : 0 };
+            })
+            .filter(Boolean);
+          return { id, name, min, max, mods };
+        })
+        .filter(Boolean)
+        .filter((g) => Array.isArray(g.mods) && g.mods.length);
       catMap.get(key).items.push({
         id: String(productId),
         name: productName,
         price_cents: Model.extractPriceCents(p),
+        modifications: mods,
+        dish_modification_groups: dishGroups,
       });
     });
     const groups = Array.from(catMap.values());
@@ -771,6 +1161,16 @@
     extractPriceCents: modelExtractPriceCents,
     buildGroups: modelBuildGroups,
     hashString: modelHashString,
+    makeCartKey: modelMakeCartKey,
+    makeDishModsKey: modelMakeDishModsKey,
+    makeFullCartKey: modelMakeFullCartKey,
+    getDishGroupMax: modelGetDishGroupMax,
+    initDishModsState: modelInitDishModsState,
+    dishModsGetCount: modelDishModsGetCount,
+    dishModsGetGroupTotal: modelDishModsGetGroupTotal,
+    dishModsApplyDelta: modelDishModsApplyDelta,
+    dishModsValidate: modelDishModsValidate,
+    dishModsBuildSelected: modelDishModsBuildSelected,
   };
 
   async function modelFetchOpenTransactions(spotId, tableId) {
@@ -826,6 +1226,7 @@
     Controller.bindCheckout();
     Controller.bindSpotTable();
     Controller.bindOpenChecksModal();
+    Controller.bindModifierModal();
     Controller.bindMenuToggle();
 
     const t = i18n[currentLang] || i18n.ru;
@@ -909,9 +1310,68 @@
   }
 
   function controllerAddToCart(item) {
-    const priceVal = Number(item && item.price_cents ? item.price_cents : 0) / 100;
-    Model.setCartItem(item, priceVal, 1);
     const t = i18n[currentLang] || i18n.ru;
+    const dishGroups = Array.isArray(item && item.dish_modification_groups ? item.dish_modification_groups : null) ? item.dish_modification_groups : [];
+    if (dishGroups.length) {
+      const state = Model.initDishModsState(dishGroups);
+      const groupsById = new Map();
+      dishGroups.forEach((g) => {
+        const gid = Number(g && g.id ? g.id : 0) || 0;
+        if (gid) groupsById.set(gid, g);
+      });
+      const handlers = {
+        getCount: (groupId, modId) => Model.dishModsGetCount(state, groupId, modId),
+        getGroupTotal: (groupId) => Model.dishModsGetGroupTotal(state, groupId),
+        getGroupMax: (groupId) => Model.getDishGroupMax(groupsById.get(Number(groupId || 0) || 0)),
+        onDelta: (groupId, modId, delta) => Model.dishModsApplyDelta(groupsById, state, groupId, modId, delta),
+        onConfirm: () => {
+          const missing = Model.dishModsValidate(dishGroups, state);
+          if (missing.length) {
+            View.showToast(t.chooseModsErrorPrefix + missing.join(', '), true);
+            return;
+          }
+          const selected = Model.dishModsBuildSelected(dishGroups, state);
+          const basePrice = Number(item && item.price_cents ? item.price_cents : 0) / 100;
+          const addPrice = selected.reduce((acc, m) => acc + ((Number(m.price || 0) || 0) * (Number(m.count || 0) || 0)), 0);
+          const priceVal = basePrice + addPrice;
+          Model.setCartItem(item, priceVal, 1, null, selected);
+          View.hideModifierModal();
+          View.renderCart(Model.cart, t);
+          View.renderCartBadge(Model.cart);
+          const selLabel = selected.map((m) => {
+            const name = String(m && m.name ? m.name : '').trim();
+            const cnt = Number(m && m.count != null ? m.count : 0) || 0;
+            if (!name) return '';
+            return cnt > 1 ? `${name}×${String(cnt)}` : name;
+          }).filter((x) => x !== '').join(', ');
+          const label = selLabel ? `${String(item.name || '')} + ${selLabel}` : String(item.name || '');
+          View.showToast(`${t.addedPrefix}${label}`);
+        }
+      };
+      View.showDishModsModal(item, dishGroups, handlers);
+      return;
+    }
+    const mods = Array.isArray(item && item.modifications ? item.modifications : null) ? item.modifications : [];
+    if (mods.length) {
+      const handlers = {
+        onSelect: (m) => {
+          View.hideModifierModal();
+          const modId = Number(m && m.id ? m.id : 0) || 0;
+          const basePrice = Number(item && item.price_cents ? item.price_cents : 0) / 100;
+          const modPrice = Number(m && m.price != null ? m.price : NaN);
+          const priceVal = modId > 0 && Number.isFinite(modPrice) ? modPrice : basePrice;
+          Model.setCartItem(item, priceVal, 1, { id: modId, name: String(m && m.name ? m.name : '') }, null);
+          View.renderCart(Model.cart, t);
+          View.renderCartBadge(Model.cart);
+          const label = modId > 0 ? `${String(item.name || '')} (${String(m && m.name ? m.name : '')})` : String(item.name || '');
+          View.showToast(`${t.addedPrefix}${label}`);
+        }
+      };
+      View.showModifierModal(item, mods, handlers);
+      return;
+    }
+    const priceVal = Number(item && item.price_cents ? item.price_cents : 0) / 100;
+    Model.setCartItem(item, priceVal, 1, null, null);
     View.renderCart(Model.cart, t);
     View.renderCartBadge(Model.cart);
     View.showToast(`${t.addedPrefix}${String((item && item.name) ? item.name : '')}`);
@@ -921,7 +1381,13 @@
     const id = String(itemId || '');
     const cur = Model.cart[id];
     if (!cur) return;
-    Model.setCartItem(cur.item, cur.price, delta);
+    Model.setCartItem(
+      cur.item,
+      cur.price,
+      delta,
+      { id: Number(cur.modificator_id || 0) || 0, name: String(cur.modificator_name || '') },
+      Array.isArray(cur.dish_mods) ? cur.dish_mods : null
+    );
     const t = i18n[currentLang] || i18n.ru;
     View.renderCart(Model.cart, t);
     View.renderCartBadge(Model.cart);
@@ -1061,11 +1527,17 @@
     const name = String(Dom.orderName ? Dom.orderName.value : '').trim();
     const comment = String(Dom.orderComment ? Dom.orderComment.value : '').trim();
     const serviceMode = 1;
-    const products = Object.values(Model.cart).map((c) => ({
-      product_id: Number((c.item && c.item.id) ? c.item.id : 0),
-      count: Number(c.count || 0),
-      comment: String(c.comment || '').trim(),
-    }));
+    const products = Object.values(Model.cart).map((c) => {
+      const row = {
+        product_id: Number((c.item && c.item.id) ? c.item.id : 0),
+        modificator_id: Number(c.modificator_id || 0) || 0,
+        count: Number(c.count || 0),
+        comment: String(c.comment || '').trim(),
+      };
+      const mods = Array.isArray(c.modification) ? c.modification : [];
+      if (mods.length) row.modification = mods;
+      return row;
+    });
     if (!products.length) {
       if (Dom.checkoutError) {
         Dom.checkoutError.textContent = t.emptyCart;
@@ -1132,9 +1604,21 @@
     checkOpenTransactions: controllerCheckOpenTransactions,
     bindOpenChecksModal: controllerBindOpenChecksModal,
     prefetchOpenChecksComments: controllerPrefetchOpenChecksComments,
+    bindModifierModal: controllerBindModifierModal,
     bindMenuToggle: controllerBindMenuToggle,
     submitOrder: controllerSubmitOrder,
   };
+
+  function controllerBindModifierModal() {
+    if (Dom.modifierClose) {
+      Dom.modifierClose.addEventListener('click', () => View.hideModifierModal());
+    }
+    if (Dom.modifierModal) {
+      Dom.modifierModal.addEventListener('click', (e) => {
+        if (e.target === Dom.modifierModal) View.hideModifierModal();
+      });
+    }
+  }
 
   async function controllerPrefetchOpenChecksComments(handlers) {
     const modal = Dom.openChecksModal;

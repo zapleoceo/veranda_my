@@ -316,11 +316,31 @@ if ($ajax === 'add_to_transaction') {
         foreach ($products as $p) {
             $i++;
             $pid = (int)($p['product_id'] ?? $p['id'] ?? 0);
+            $mid = (int)($p['modificator_id'] ?? $p['modificatorId'] ?? 0);
+            $dishMods = $p['modification'] ?? null;
             $cnt = $p['count'] ?? 1;
             if ($pid <= 0) continue;
             if (!is_numeric($cnt)) $cnt = 1;
             $cnt = (float)$cnt;
             if ($cnt <= 0) continue;
+
+            $modificationParam = '';
+            if (is_array($dishMods) && count($dishMods) > 0) {
+                $arr = [];
+                foreach ($dishMods as $dm) {
+                    if (!is_array($dm)) continue;
+                    $did = (int)($dm['id'] ?? $dm['m'] ?? 0);
+                    $dc = $dm['count'] ?? $dm['a'] ?? 1;
+                    if ($did <= 0) continue;
+                    if (!is_numeric($dc)) $dc = 1;
+                    $dc = (float)$dc;
+                    if ($dc <= 0) continue;
+                    $arr[] = ['m' => $did, 'a' => $dc];
+                }
+                if ($arr) {
+                    $modificationParam = json_encode($arr, JSON_UNESCAPED_UNICODE);
+                }
+            }
 
             $time = sprintf('%.6f', microtime(true) + ($i / 1000000));
             $params = [
@@ -331,19 +351,32 @@ if ($ajax === 'add_to_transaction') {
                 'num' => $cnt,
                 'time' => $time,
             ];
+            if ($mid > 0) {
+                $params['modificator_id'] = $mid;
+            }
+            if ($modificationParam !== '') {
+                $params['modification'] = $modificationParam;
+            }
 
             $posterApi->request('transactions.addTransactionProduct', $params, 'POST');
 
             $pc = trim((string)($p['comment'] ?? ''));
             if ($pc !== '') {
-                $posterApi->request('transactions.changeProductComment', [
+                $pccParams = [
                     'spot_id' => $spotIdReq,
                     'spot_tablet_id' => $tabletId,
                     'transaction_id' => $transactionId,
                     'product_id' => $pid,
                     'comment' => $pc,
                     'time' => $time,
-                ], 'POST');
+                ];
+                if ($mid > 0) {
+                    $pccParams['modificator_id'] = $mid;
+                }
+                if ($modificationParam !== '') {
+                    $pccParams['modification'] = $modificationParam;
+                }
+                $posterApi->request('transactions.changeProductComment', $pccParams, 'POST');
             }
             $added++;
         }
