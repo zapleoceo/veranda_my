@@ -282,6 +282,14 @@
       meta.textContent = `${t.sum}${String(tr.sum || '')}`;
       card.appendChild(meta);
 
+      const comment = String(tr.comment || '').trim();
+      if (comment !== '') {
+        const cmt = d.createElement('div');
+        cmt.className = 'check-comment';
+        cmt.textContent = `${t.comment}: ${comment}`;
+        card.appendChild(cmt);
+      }
+
       const items = d.createElement('div');
       items.className = 'check-items';
       (tr.items || []).forEach((it) => {
@@ -773,6 +781,21 @@
   Model.fetchOpenTransactions = modelFetchOpenTransactions;
   Model.addToTransaction = modelAddToTransaction;
 
+  async function modelFetchTransaction(transactionId) {
+    const txId = Number(transactionId || 0) || 0;
+    if (!txId) throw new Error('transaction_id required');
+    const res = await fetch(`/api/poster/neworder/index.php?ajax=get_transaction&transaction_id=${encodeURIComponent(String(txId))}`, {
+      headers: { 'Accept': 'application/json' },
+    });
+    const json = await res.json();
+    if (!json || !json.ok) throw new Error(String((json && json.error) ? json.error : 'Failed'));
+    const tx = json.transaction && typeof json.transaction === 'object' ? json.transaction : null;
+    if (!tx) throw new Error('Bad response');
+    return tx;
+  }
+
+  Model.fetchTransaction = modelFetchTransaction;
+
   function controllerInit() {
     Controller.bindLangMenu();
     Controller.bindSearch();
@@ -965,7 +988,7 @@
     if (Dom.openChecksBtn) {
       Dom.openChecksBtn.addEventListener('click', () => {
         if (!Array.isArray(Model.openTransactions) || !Model.openTransactions.length) return;
-        View.showOpenChecksModal(Model.openTransactions, {
+        const handlers = {
           onUseTransaction: (transactionId) => {
             Model.selectedTransactionId = Number(transactionId || 0) || 0;
             View.setOpenChecksButton(Model.openTransactions.length, Model.selectedTransactionId);
@@ -976,7 +999,10 @@
             View.setOpenChecksButton(Model.openTransactions.length, 0);
             View.hideOpenChecksModal();
           },
-        });
+        };
+
+        View.showOpenChecksModal(Model.openTransactions, handlers);
+        Controller.prefetchOpenChecksComments(handlers).catch(() => {});
       });
     }
     if (Dom.openChecksClose) {
@@ -1072,9 +1098,44 @@
     resetOpenTransactions: controllerResetOpenTransactions,
     checkOpenTransactions: controllerCheckOpenTransactions,
     bindOpenChecksModal: controllerBindOpenChecksModal,
+    prefetchOpenChecksComments: controllerPrefetchOpenChecksComments,
     bindMenuToggle: controllerBindMenuToggle,
     submitOrder: controllerSubmitOrder,
   };
+
+  async function controllerPrefetchOpenChecksComments(handlers) {
+    const modal = Dom.openChecksModal;
+    if (!modal || modal.hidden) return;
+    if (!Array.isArray(Model.openTransactions) || !Model.openTransactions.length) return;
+
+    const reqId = (Controller.openChecksDetailsReqId = (Number(Controller.openChecksDetailsReqId || 0) || 0) + 1);
+    const list = Model.openTransactions.slice(0);
+    const out = [];
+    for (const tr of list) {
+      const txId = Number(tr && tr.transaction_id ? tr.transaction_id : 0) || 0;
+      if (!txId) {
+        out.push(tr);
+        continue;
+      }
+      if (String(tr.comment || '').trim() !== '') {
+        out.push(tr);
+        continue;
+      }
+      try {
+        const tx = await Model.fetchTransaction(txId);
+        if (reqId !== Controller.openChecksDetailsReqId) return;
+        out.push(Object.assign({}, tr, { comment: String(tx.comment || '').trim() }));
+      } catch (e) {
+        if (reqId !== Controller.openChecksDetailsReqId) return;
+        out.push(tr);
+      }
+    }
+    if (reqId !== Controller.openChecksDetailsReqId) return;
+    if (!Dom.openChecksModal || Dom.openChecksModal.hidden) return;
+
+    Model.openTransactions = out;
+    View.showOpenChecksModal(Model.openTransactions, handlers);
+  }
 
   Controller.init();
 })();

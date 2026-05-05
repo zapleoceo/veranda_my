@@ -692,6 +692,13 @@ body.menu-only-cart .neworder-shell .cart-sidebar {
   margin-bottom: 8px;
 }
 
+.check-comment {
+  font-size: 12px;
+  color: rgba(255,255,255,0.82);
+  margin: -2px 0 8px 0;
+  word-break: break-word;
+}
+
 .check-items {
   display: grid;
   gap: 6px;
