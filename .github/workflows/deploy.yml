@@ -31,32 +31,61 @@ jobs:
           chmod 700 ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          if [ -n "${{ secrets.SSH_KNOWN_HOSTS }}" ]; then
+            echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          fi
+
+      - name: Check SSH connectivity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Checking TCP connectivity to ${{ secrets.SSH_HOST }}:${{ secrets.SSH_PORT }} ..."
+          timeout 5 bash -lc "cat < /dev/null > /dev/tcp/${{ secrets.SSH_HOST }}/${{ secrets.SSH_PORT }}"
+          echo "TCP OK"
 
       - name: Deploy files
         shell: bash
         run: |
-          rsync -az \
-            --exclude ".env" \
-            --exclude ".env.*" \
-            --exclude "*.log" \
-            --exclude "telegram.log" \
-            --exclude "prob_close_backfill.log" \
-            --exclude ".git/" \
-            --exclude ".github/" \
-            -e "ssh -p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes" \
-            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+
+          for i in 1 2 3; do
+            echo "rsync attempt ${i}/3"
+            rsync -az \
+              --exclude ".env" \
+              --exclude ".env.*" \
+              --exclude "*.log" \
+              --exclude "telegram.log" \
+              --exclude "prob_close_backfill.log" \
+              --exclude ".git/" \
+              --exclude ".github/" \
+              -e "ssh ${SSH_OPTS}" \
+              ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/ && break
+            sleep $((i * 3))
+          done
 
       - name: Remove debug files (server)
         shell: bash
         run: |
-          ssh -p "${{ secrets.SSH_PORT }}" -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "rm -f '${{ secrets.DEPLOY_PATH }}/mail.php' '${{ secrets.DEPLOY_PATH }}/access.php'"
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          for i in 1 2 3; do
+            echo "ssh attempt ${i}/3"
+            ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+              "rm -f '${{ secrets.DEPLOY_PATH }}/mail.php' '${{ secrets.DEPLOY_PATH }}/access.php'" && break
+            sleep $((i * 3))
+          done
 
       - name: Verify PHP syntax (server)
         shell: bash
         run: |
-          ssh -p "${{ secrets.SSH_PORT }}" -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=yes \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "cd '${{ secrets.DEPLOY_PATH }}' && php -l index.php && php -l login.php && php -l logout.php && php -l auth_callback.php && php -l dashboard.php && php -l rawdata.php && php -l rawdata_receipts_chunk.php && php -l kitchen_online.php && php -l admin.php && php -l logs.php && php -l cron.php && php -l telegram_alerts.php && php -l march.php && php -l roma/index.php && php -l banya/index.php && php -l employees/index.php && php -l reservations/index.php"
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          for i in 1 2 3; do
+            echo "ssh attempt ${i}/3"
+            ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+              "cd '${{ secrets.DEPLOY_PATH }}' && php -l index.php && php -l login.php && php -l logout.php && php -l auth_callback.php && php -l dashboard.php && php -l rawdata.php && php -l rawdata_receipts_chunk.php && php -l kitchen_online.php && php -l admin.php && php -l logs.php && php -l cron.php && php -l telegram_alerts.php && php -l march.php && php -l roma/index.php && php -l banya/index.php && php -l employees/index.php && php -l reservations/index.php" && break
+            sleep $((i * 3))
+          done
