@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0008';
+$assetVersion = '20260505_0009';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -219,6 +219,17 @@ $t = $i18n[$lang] ?? $i18n['ru'];
   </div>
 
   <div class="toast" id="toast" hidden></div>
+  <div class="modal-overlay" id="openChecksModal" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="openChecksTitle">Открытые чеки на столе</div>
+        <button type="button" class="btn modal-close" id="openChecksClose">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="checks-grid" id="openChecksList"></div>
+      </div>
+    </div>
+  </div>
 
   <script src="/neworder/assets/app.js?v=<?= $assetVersion ?>" defer></script>
 </body>

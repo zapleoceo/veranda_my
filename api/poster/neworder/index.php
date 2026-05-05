@@ -169,4 +169,105 @@ if ($ajax === 'create_order') {
     $respondOk(['order_id' => $orderId]);
 }
 
+if ($ajax === 'get_open_transactions') {
+    if (!$posterApi) {
+        $respondError(500, 'Poster API Token not set');
+    }
+
+    $spotIdReq = (int)($_GET['spot_id'] ?? $spotId);
+    if ($spotIdReq <= 0) $spotIdReq = $spotId;
+    $tableIdReq = (int)($_GET['table_id'] ?? 0);
+    if ($tableIdReq <= 0) $respondError(400, 'table_id required');
+
+    try {
+        $transactions = $posterApi->request('dash.getTransactions', [
+            'status' => 1,
+            'spot_id' => $spotIdReq,
+            'table_id' => $tableIdReq,
+            'service_mode' => 1,
+            'include_products' => 'false',
+            'include_history' => 'false',
+            'timezone' => 'client',
+        ], 'GET');
+
+        if (!is_array($transactions)) $transactions = [];
+
+        $out = [];
+        foreach ($transactions as $tr) {
+            $trId = (int)($tr['transaction_id'] ?? 0);
+            if ($trId <= 0) continue;
+
+            $products = $posterApi->request('dash.getTransactionProducts', [
+                'transaction_id' => $trId,
+            ], 'GET');
+            if (!is_array($products)) $products = [];
+
+            $items = [];
+            foreach ($products as $p) {
+                $items[] = [
+                    'product_name' => (string)($p['product_name'] ?? ''),
+                    'num' => (string)($p['num'] ?? '1'),
+                ];
+            }
+
+            $out[] = [
+                'transaction_id' => $trId,
+                'sum' => (string)($tr['sum'] ?? ($tr['payed_sum'] ?? '')),
+                'items' => $items,
+            ];
+        }
+    } catch (\Throwable $e) {
+        $respondError(500, 'Poster Error: ' . $e->getMessage());
+    }
+
+    $respondOk(['transactions' => $out]);
+}
+
+if ($ajax === 'add_to_transaction') {
+    if (!$posterApi) {
+        $respondError(500, 'Poster API Token not set');
+    }
+
+    $payloadJson = file_get_contents('php://input');
+    $payload = json_decode($payloadJson, true);
+    if (!is_array($payload)) $respondError(400, 'Bad request');
+
+    $spotIdReq = (int)($payload['spot_id'] ?? $spotId);
+    if ($spotIdReq <= 0) $spotIdReq = $spotId;
+    $tabletId = (int)($payload['spot_tablet_id'] ?? 0);
+    if ($tabletId <= 0) $respondError(400, 'spot_tablet_id required');
+    $transactionId = (int)($payload['transaction_id'] ?? 0);
+    if ($transactionId <= 0) $respondError(400, 'transaction_id required');
+
+    $products = $payload['products'] ?? [];
+    if (!is_array($products) || count($products) === 0) {
+        $respondError(400, 'Корзина пуста');
+    }
+
+    $added = 0;
+    try {
+        foreach ($products as $p) {
+            $pid = (int)($p['product_id'] ?? $p['id'] ?? 0);
+            $cnt = $p['count'] ?? 1;
+            if ($pid <= 0) continue;
+            if (!is_numeric($cnt)) $cnt = 1;
+            $cnt = (float)$cnt;
+            if ($cnt <= 0) continue;
+
+            $posterApi->request('transactions.addTransactionProduct', [
+                'spot_id' => $spotIdReq,
+                'spot_tablet_id' => $tabletId,
+                'transaction_id' => $transactionId,
+                'product_id' => $pid,
+                'num' => $cnt,
+            ], 'POST');
+            $added++;
+        }
+    } catch (\Throwable $e) {
+        $respondError(500, 'Poster Error: ' . $e->getMessage());
+    }
+
+    $respondOk(['added' => $added]);
+}
+
 $respondError(404, 'Unknown ajax action');

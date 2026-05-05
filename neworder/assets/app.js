@@ -29,6 +29,9 @@
     labelTable: d.getElementById('labelTable'),
     hallSelect: d.getElementById('hallIdSelect'),
     labelHall: d.getElementById('labelHall'),
+    openChecksModal: d.getElementById('openChecksModal'),
+    openChecksList: d.getElementById('openChecksList'),
+    openChecksClose: d.getElementById('openChecksClose'),
   };
 
   const fmtPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
@@ -122,6 +125,7 @@
   const Config = {
     waiterId: 10,
     clientId: 71,
+    spotTabletId: 1,
   };
 
   function viewSetActiveLangLink(lang) {
@@ -160,6 +164,70 @@
     Dom.toast.className = 'toast ' + (isError ? 'error' : '');
     Dom.toast.hidden = false;
     setTimeout(() => { Dom.toast.hidden = true; }, 3000);
+  }
+
+  function viewHideOpenChecksModal() {
+    if (Dom.openChecksModal) Dom.openChecksModal.hidden = true;
+    if (Dom.openChecksList) Dom.openChecksList.innerHTML = '';
+  }
+
+  function viewShowOpenChecksModal(transactions, handlers) {
+    if (!Dom.openChecksModal || !Dom.openChecksList) return;
+    Dom.openChecksList.innerHTML = '';
+    (transactions || []).forEach((tr) => {
+      const card = d.createElement('div');
+      card.className = 'check-card';
+      const h = d.createElement('h4');
+      h.textContent = `#${String(tr.transaction_id || '')}`;
+      card.appendChild(h);
+
+      const meta = d.createElement('div');
+      meta.className = 'check-meta';
+      meta.textContent = `Sum: ${String(tr.sum || '')}`;
+      card.appendChild(meta);
+
+      const items = d.createElement('div');
+      items.className = 'check-items';
+      (tr.items || []).forEach((it) => {
+        const row = d.createElement('div');
+        row.className = 'check-item';
+        const n = d.createElement('span');
+        n.textContent = String(it.product_name || '');
+        const c = d.createElement('span');
+        c.textContent = String(it.num || '1');
+        row.appendChild(n);
+        row.appendChild(c);
+        items.appendChild(row);
+      });
+      card.appendChild(items);
+
+      const actions = d.createElement('div');
+      actions.className = 'check-actions';
+      const useBtn = d.createElement('button');
+      useBtn.type = 'button';
+      useBtn.className = 'btn btn-primary';
+      useBtn.textContent = 'Использовать';
+      useBtn.addEventListener('click', () => {
+        if (handlers && typeof handlers.onUseTransaction === 'function') {
+          handlers.onUseTransaction(Number(tr.transaction_id || 0) || 0);
+        }
+      });
+      const newBtn = d.createElement('button');
+      newBtn.type = 'button';
+      newBtn.className = 'btn';
+      newBtn.textContent = 'Новый чек';
+      newBtn.addEventListener('click', () => {
+        if (handlers && typeof handlers.onCreateNew === 'function') {
+          handlers.onCreateNew();
+        }
+      });
+      actions.appendChild(useBtn);
+      actions.appendChild(newBtn);
+      card.appendChild(actions);
+
+      Dom.openChecksList.appendChild(card);
+    });
+    Dom.openChecksModal.hidden = false;
   }
 
   function viewRenderEmptyMenu(text) {
@@ -393,6 +461,8 @@
     applyLang: viewApplyLang,
     setActiveLangLink: viewSetActiveLangLink,
     showToast: viewShowToast,
+    showOpenChecksModal: viewShowOpenChecksModal,
+    hideOpenChecksModal: viewHideOpenChecksModal,
     renderEmptyMenu: viewRenderEmptyMenu,
     renderMenu: viewRenderMenu,
     setActiveCategory: viewSetActiveCategory,
@@ -603,6 +673,7 @@
     tables: [],
     tableId: 0,
     hallId: 0,
+    selectedTransactionId: 0,
     loadSelection: modelLoadSelection,
     saveSelection: modelSaveSelection,
     setQuery: modelSetQuery,
@@ -620,11 +691,43 @@
     hashString: modelHashString,
   };
 
+  async function modelFetchOpenTransactions(spotId, tableId) {
+    const sid = Number(spotId || Model.spotId || 1) || 1;
+    const tid = Number(tableId || 0) || 0;
+    if (!tid) return [];
+    const res = await fetch(`/api/poster/neworder/index.php?ajax=get_open_transactions&spot_id=${encodeURIComponent(String(sid))}&table_id=${encodeURIComponent(String(tid))}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    const json = await res.json();
+    if (!json || !json.ok) throw new Error(String((json && json.error) ? json.error : 'Failed'));
+    return Array.isArray(json.transactions) ? json.transactions : [];
+  }
+
+  async function modelAddToTransaction(transactionId, products) {
+    const res = await fetch('/api/poster/neworder/index.php?ajax=add_to_transaction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        spot_id: Number(Model.spotId || 0),
+        spot_tablet_id: Config.spotTabletId,
+        transaction_id: Number(transactionId || 0),
+        products: products || [],
+      }),
+    });
+    const json = await res.json();
+    if (!json || !json.ok) throw new Error(String((json && json.error) ? json.error : 'Failed'));
+    return Number(json.added || 0) || 0;
+  }
+
+  Model.fetchOpenTransactions = modelFetchOpenTransactions;
+  Model.addToTransaction = modelAddToTransaction;
+
   function controllerInit() {
     Controller.bindLangMenu();
     Controller.bindSearch();
     Controller.bindCheckout();
     Controller.bindSpotTable();
+    Controller.bindOpenChecksModal();
 
     const t = i18n[currentLang] || i18n.ru;
     View.applyLang(t);
@@ -843,8 +946,42 @@
       });
     }
     if (Dom.tableSelect) {
-      Dom.tableSelect.addEventListener('change', () => {
+      Dom.tableSelect.addEventListener('change', async () => {
         Model.tableId = Number(Dom.tableSelect.value || 0) || 0;
+        await Controller.checkOpenTransactions();
+      });
+    }
+  }
+
+  async function controllerCheckOpenTransactions() {
+    Model.selectedTransactionId = 0;
+    View.hideOpenChecksModal();
+    if (!Model.tableId) return;
+    try {
+      const list = await Model.fetchOpenTransactions(Model.spotId, Model.tableId);
+      if (!Array.isArray(list) || !list.length) return;
+      View.showOpenChecksModal(list, {
+        onUseTransaction: (transactionId) => {
+          Model.selectedTransactionId = Number(transactionId || 0) || 0;
+          View.hideOpenChecksModal();
+        },
+        onCreateNew: () => {
+          Model.selectedTransactionId = 0;
+          View.hideOpenChecksModal();
+        },
+      });
+    } catch (e) {
+      View.showToast(String((e && e.message) ? e.message : e), true);
+    }
+  }
+
+  function controllerBindOpenChecksModal() {
+    if (Dom.openChecksClose) {
+      Dom.openChecksClose.addEventListener('click', () => View.hideOpenChecksModal());
+    }
+    if (Dom.openChecksModal) {
+      Dom.openChecksModal.addEventListener('click', (e) => {
+        if (e.target === Dom.openChecksModal) View.hideOpenChecksModal();
       });
     }
   }
@@ -870,22 +1007,27 @@
     Dom.submitBtn.textContent = t.sending;
 
     try {
-      const res = await fetch('/api/poster/neworder/index.php?ajax=create_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          service_mode: serviceMode,
-          products,
-          waiter_id: Config.waiterId,
-          client_id: Config.clientId,
-          spot_id: Number(Model.spotId || 0),
-          table_id: Number(Model.tableId || 0),
-        }),
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(String(json.error || t.orderUnknown));
-      View.showToast(t.orderSuccessPrefix + String(json.order_id));
+      if (Number(Model.selectedTransactionId || 0) > 0) {
+        const added = await Model.addToTransaction(Model.selectedTransactionId, products);
+        View.showToast(`Добавлено в чек #${String(Model.selectedTransactionId)}: ${String(added)}`);
+      } else {
+        const res = await fetch('/api/poster/neworder/index.php?ajax=create_order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            service_mode: serviceMode,
+            products,
+            waiter_id: Config.waiterId,
+            client_id: Config.clientId,
+            spot_id: Number(Model.spotId || 0),
+            table_id: Number(Model.tableId || 0),
+          }),
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(String(json.error || t.orderUnknown));
+        View.showToast(t.orderSuccessPrefix + String(json.order_id));
+      }
       Model.clearCart();
       View.renderCart(Model.cart, t);
       View.renderCartBadge(Model.cart);
@@ -915,6 +1057,8 @@
     bindLangMenu: controllerBindLangMenu,
     bindCheckout: controllerBindCheckout,
     bindSpotTable: controllerBindSpotTable,
+    checkOpenTransactions: controllerCheckOpenTransactions,
+    bindOpenChecksModal: controllerBindOpenChecksModal,
     submitOrder: controllerSubmitOrder,
   };
 
