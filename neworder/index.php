@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0050';
+$assetVersion = '20260505_0060';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -172,7 +172,7 @@ $t = $i18n[$lang] ?? $i18n['ru'];
   <link rel="stylesheet" href="/neworder/assets/style.css?v=<?= $assetVersion ?>">
 </head>
 <body>
-  <div class="container">
+  <div class="container neworder-shell">
     <h1 class="page-title" id="pageTitle">
       <span><?= htmlspecialchars((string)($t['title'] ?? '')) ?></span>
       <button type="button" class="btn menu-title-toggle" id="menuToggleBtn" hidden></button>

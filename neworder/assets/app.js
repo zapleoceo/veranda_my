@@ -230,6 +230,8 @@
     const on = !!isCollapsed;
     d.body.classList.toggle('menu-only-cart', on);
     if (Dom.menuSections) Dom.menuSections.classList.toggle('is-collapsed', on);
+    if (Dom.searchBar) Dom.searchBar.hidden = on;
+    if (Dom.contentWrapper) Dom.contentWrapper.hidden = on;
 
     const t = i18n[currentLang] || i18n.ru;
     if (Dom.menuToggleBtn) {
