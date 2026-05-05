@@ -225,10 +225,6 @@ $t = $i18n[$lang] ?? $i18n['ru'];
                   <select id="hallIdSelect"></select>
                 </div>
                 <div class="form-group">
-                  <label id="labelSpot"><?= htmlspecialchars((string)($t['spot'] ?? 'Spot')) ?></label>
-                  <select id="spotIdSelect"></select>
-                </div>
-                <div class="form-group">
                   <label id="labelTable"><?= htmlspecialchars((string)($t['table'] ?? 'Table')) ?></label>
                   <div class="table-select-row">
                     <select id="tableIdSelect"></select>

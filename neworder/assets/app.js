@@ -25,9 +25,7 @@
     checkoutForm: d.getElementById('checkoutForm'),
     checkoutError: d.getElementById('checkoutError'),
     langMenu: d.getElementById('langMenu'),
-    spotSelect: d.getElementById('spotIdSelect'),
     tableSelect: d.getElementById('tableIdSelect'),
-    labelSpot: d.getElementById('labelSpot'),
     labelTable: d.getElementById('labelTable'),
     hallSelect: d.getElementById('hallIdSelect'),
     labelHall: d.getElementById('labelHall'),
@@ -41,7 +39,6 @@
   const fmtPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
 
   const lsProductsKey = 'neworder_poster_products_v1';
-  const lsSpotKey = 'neworder_spot_id_v1';
   const lsHallKey = 'neworder_hall_id_v1';
   const supportedLangs = ['ru', 'en', 'vi', 'ko'];
   let currentLang = (d.documentElement.getAttribute('lang') || 'ru').toLowerCase();
@@ -189,6 +186,7 @@
   const Config = {
     waiterId: 10,
     clientId: 71,
+    spotId: 1,
     spotTabletId: 1,
   };
 
@@ -219,7 +217,6 @@
     if (Dom.orderComment) Dom.orderComment.placeholder = t.commentPh;
     if (Dom.loadingState) Dom.loadingState.textContent = t.menuLoading;
     if (Dom.searchInput) Dom.searchInput.placeholder = t.searchPlaceholder;
-    if (Dom.labelSpot) Dom.labelSpot.textContent = t.spot;
     if (Dom.labelTable) Dom.labelTable.textContent = t.table;
     if (Dom.labelHall) Dom.labelHall.textContent = t.hall;
     viewSetActiveLangLink(currentLang);
@@ -496,21 +493,6 @@
     Dom.cartBadge.hidden = totalCount <= 0;
   }
 
-  function viewRenderSpotSelect(spots, selectedSpotId) {
-    if (!Dom.spotSelect) return;
-    Dom.spotSelect.innerHTML = '';
-    (spots || []).forEach((s) => {
-      const sid = Number(s && s.spot_id ? s.spot_id : 0) || 0;
-      if (!sid) return;
-      const name = String(s && s.name ? s.name : '').trim();
-      const opt = d.createElement('option');
-      opt.value = String(sid);
-      opt.textContent = name ? name : String(sid);
-      Dom.spotSelect.appendChild(opt);
-    });
-    Dom.spotSelect.value = String(Number(selectedSpotId || 0));
-  }
-
   function viewRenderTableSelect(tables, selectedId) {
     if (!Dom.tableSelect) return;
     Dom.tableSelect.innerHTML = '';
@@ -565,23 +547,19 @@
     setActiveCategory: viewSetActiveCategory,
     renderCart: viewRenderCart,
     renderCartBadge: viewRenderCartBadge,
-    renderSpotSelect: viewRenderSpotSelect,
     renderTableSelect: viewRenderTableSelect,
     renderHallSelect: viewRenderHallSelect,
   };
 
   function modelLoadSelection() {
     try {
-      const sid = Number(localStorage.getItem(lsSpotKey) || 0) || 0;
       const hid = Number(localStorage.getItem(lsHallKey) || 0) || 0;
-      if (sid > 0) Model.spotId = sid;
       if (hid > 0) Model.hallId = hid;
     } catch (e) {}
   }
 
   function modelSaveSelection() {
     try {
-      localStorage.setItem(lsSpotKey, String(Number(Model.spotId || 0) || 0));
       localStorage.setItem(lsHallKey, String(Number(Model.hallId || 0) || 0));
     } catch (e) {}
   }
@@ -761,7 +739,6 @@
 
   const Model = {
     spotId: 1,
-    spots: [],
     halls: [],
     posterProducts: [],
     groupsAll: [],
@@ -807,7 +784,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        spot_id: Number(Model.spotId || 0),
+        spot_id: Number(Config.spotId || 1) || 1,
         spot_tablet_id: Config.spotTabletId,
         transaction_id: Number(transactionId || 0),
         products: products || [],
@@ -831,8 +808,10 @@
 
     const t = i18n[currentLang] || i18n.ru;
     View.applyLang(t);
+    View.hideOpenChecksModal();
 
     Model.loadSelection();
+    Model.spotId = Number(Config.spotId || 1) || 1;
     View.setOpenChecksButton(0, 0);
     if (Model.loadCache()) {
       Controller.refreshMenu();
@@ -847,14 +826,7 @@
     const t = i18n[currentLang] || i18n.ru;
     try {
       await Model.fetchProducts();
-
-      await Model.fetchSpots();
-      if (Array.isArray(Model.spots) && Model.spots.length) {
-        const okSpot = Model.spots.some((s) => Number(s && s.spot_id ? s.spot_id : 0) === Number(Model.spotId || 0));
-        if (!okSpot) Model.spotId = Number(Model.spots[0].spot_id || 1) || 1;
-      }
-      Model.saveSelection();
-      View.renderSpotSelect(Model.spots, Model.spotId);
+      Model.spotId = Number(Config.spotId || 1) || 1;
 
       await Model.fetchHalls(Model.spotId);
       if (Array.isArray(Model.halls) && Model.halls.length) {
@@ -1005,37 +977,6 @@
   }
 
   function controllerBindSpotTable() {
-    if (Dom.spotSelect) {
-      Dom.spotSelect.addEventListener('change', async () => {
-        Controller.resetOpenTransactions();
-        const sid = Number(Dom.spotSelect.value || 0) || Model.spotId || 1;
-        Model.spotId = sid;
-        Model.saveSelection();
-        try {
-          await Model.fetchHalls(sid);
-          if (Array.isArray(Model.halls) && Model.halls.length) {
-            Model.hallId = Number(Model.halls[0].hall_id || 0) || 0;
-          } else {
-            Model.hallId = 0;
-          }
-          Model.tableId = 0;
-          Model.saveSelection();
-          View.renderHallSelect(Model.halls, Model.hallId);
-
-          Model.groupsAll = Model.buildGroups(Model.posterProducts);
-          Controller.refreshMenu();
-
-          await Model.fetchTables(sid, Model.hallId);
-          View.renderTableSelect(Model.tables, 0);
-        } catch (e) {
-          Model.hallId = 0;
-          Model.tableId = 0;
-          Model.saveSelection();
-          View.renderHallSelect([], 0);
-          View.renderTableSelect([], 0);
-        }
-      });
-    }
     if (Dom.hallSelect) {
       Dom.hallSelect.addEventListener('change', async () => {
         Controller.resetOpenTransactions();
@@ -1149,7 +1090,7 @@
             products,
             waiter_id: Config.waiterId,
             client_id: Config.clientId,
-            spot_id: Number(Model.spotId || 0),
+            spot_id: Number(Config.spotId || 1) || 1,
             table_id: Number(Model.tableId || 0),
           }),
         });
