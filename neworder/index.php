@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0405';
+$assetVersion = '20260505_0435';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -267,6 +267,7 @@ $t = $i18n[$lang] ?? $i18n['ru'];
     </div>
   </div>
 
+  <script src="/neworder/assets/i18n.js?v=<?= $assetVersion ?>" defer></script>
   <script src="/neworder/assets/app.js?v=<?= $assetVersion ?>" defer></script>
 </body>
 </html>
