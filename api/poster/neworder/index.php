@@ -225,6 +225,55 @@ if ($ajax === 'get_open_transactions') {
     $respondOk(['transactions' => $out]);
 }
 
+if ($ajax === 'get_transaction') {
+    if (!$posterApi) {
+        $respondError(500, 'Poster API Token not set');
+    }
+
+    $transactionId = (int)($_GET['transaction_id'] ?? 0);
+    if ($transactionId <= 0) {
+        $respondError(400, 'transaction_id required');
+    }
+
+    try {
+        $res = $posterApi->request('dash.getTransaction', [
+            'transaction_id' => $transactionId,
+            'include_history' => 0,
+            'include_products' => 1,
+        ], 'GET');
+        $tx = (is_array($res) && isset($res[0]) && is_array($res[0])) ? $res[0] : (is_array($res) ? $res : []);
+
+        $products = [];
+        $txProducts = $tx['products'] ?? [];
+        if (is_array($txProducts)) {
+            foreach ($txProducts as $p) {
+                if (!is_array($p)) continue;
+                $products[] = [
+                    'id' => (int)($p['id'] ?? 0),
+                    'product_id' => (int)($p['product_id'] ?? 0),
+                    'product_name' => (string)($p['product_name'] ?? ''),
+                    'count' => $p['count'] ?? ($p['num'] ?? null),
+                    'comment' => (string)($p['comment'] ?? ''),
+                ];
+            }
+        }
+
+        $out = [
+            'transaction_id' => (int)($tx['transaction_id'] ?? $transactionId),
+            'spot_id' => (int)($tx['spot_id'] ?? 0),
+            'table_id' => (int)($tx['table_id'] ?? 0),
+            'service_mode' => (int)($tx['service_mode'] ?? 0),
+            'sum' => (string)($tx['sum'] ?? ''),
+            'comment' => (string)($tx['comment'] ?? ''),
+            'products' => $products,
+        ];
+    } catch (\Throwable $e) {
+        $respondError(500, 'Poster Error: ' . $e->getMessage());
+    }
+
+    $respondOk(['transaction' => $out]);
+}
+
 if ($ajax === 'add_to_transaction') {
     if (!$posterApi) {
         $respondError(500, 'Poster API Token not set');
@@ -249,7 +298,25 @@ if ($ajax === 'add_to_transaction') {
     $comment = trim((string)($payload['comment'] ?? ''));
 
     $added = 0;
+    $commentUpdated = false;
+    $commentMethod = '';
     try {
+        if ($comment !== '') {
+            $methods = ['transactions.changeTransaction', 'transactions.editTransaction', 'transactions.setTransactionComment'];
+            foreach ($methods as $m) {
+                try {
+                    $posterApi->request($m, [
+                        'transaction_id' => $transactionId,
+                        'comment' => $comment,
+                    ], 'POST');
+                    $commentUpdated = true;
+                    $commentMethod = $m;
+                    break;
+                } catch (\Throwable $e) {
+                }
+            }
+        }
+
         foreach ($products as $p) {
             $pid = (int)($p['product_id'] ?? $p['id'] ?? 0);
             $cnt = $p['count'] ?? 1;
@@ -265,9 +332,6 @@ if ($ajax === 'add_to_transaction') {
                 'product_id' => $pid,
                 'num' => $cnt,
             ];
-            if ($comment !== '') {
-                $params['comment'] = $comment;
-            }
 
             $posterApi->request('transactions.addTransactionProduct', $params, 'POST');
             $added++;
@@ -276,7 +340,7 @@ if ($ajax === 'add_to_transaction') {
         $respondError(500, 'Poster Error: ' . $e->getMessage());
     }
 
-    $respondOk(['added' => $added]);
+    $respondOk(['added' => $added, 'comment_updated' => $commentUpdated, 'comment_method' => $commentMethod]);
 }
 
 $respondError(404, 'Unknown ajax action');
