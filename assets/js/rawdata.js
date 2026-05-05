@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let currentSort = { field: 'receipt', order: 'asc' };
             let userSorted = false;
-            const state = { offset: 0, limit: 20, loading: false, done: false, total: null };
+            const state = { offset: 0, limit: 20, loading: false, done: false, total: null, error: '' };
 
             const baseParams = new URLSearchParams(window.location.search);
             baseParams.delete('ajax');
@@ -64,6 +64,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const updateStatus = () => {
                 if (!statusEl) return;
+                if (state.error) {
+                    statusEl.textContent = state.error;
+                    statusEl.style.height = '18px';
+                    statusEl.style.margin = '16px 0';
+                    return;
+                }
                 if (state.loading) {
                     statusEl.textContent = 'Загрузка…';
                     statusEl.style.height = '18px';
@@ -84,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const loadNext = async () => {
                 if (state.loading || state.done) return;
                 state.loading = true;
+                state.error = '';
                 updateStatus();
                 try {
                     const params = new URLSearchParams(baseParams);
@@ -91,10 +98,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     params.set('offset', String(state.offset));
                     params.set('limit', String(state.limit));
 
-                    const res = await fetch(`/api/sql/rawdata/index.php?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-                    if (!res.ok) throw new Error('load failed');
-                    const data = await res.json();
-                    if (!data || !data.ok) throw new Error('bad response');
+                    const res = await fetch(`/api/sql/rawdata/index.php?${params.toString()}`, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin'
+                    });
+                    if (!res.ok) {
+                        state.error = 'Ошибка загрузки (' + res.status + ')';
+                        if (res.status === 401 || res.status === 403) state.error = 'Нет доступа / сессия истекла';
+                        throw new Error('load failed');
+                    }
+                    let data = null;
+                    try {
+                        data = await res.json();
+                    } catch (e) {
+                        state.error = 'Ошибка загрузки (не JSON)';
+                        throw e;
+                    }
+                    if (!data || !data.ok) {
+                        state.error = (data && data.error) ? String(data.error) : 'Ошибка загрузки';
+                        throw new Error('bad response');
+                    }
 
                     state.total = typeof data.total_receipts === 'number' ? data.total_receipts : state.total;
                     if (data.html) {
@@ -108,10 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     state.done = !data.has_more;
                 } catch (e) {
                     state.done = true;
-                    if (statusEl) {
-                        statusEl.textContent = 'Ошибка загрузки';
-                        statusEl.style.display = 'block';
-                    }
+                    if (!state.error) state.error = 'Ошибка загрузки';
                 } finally {
                     state.loading = false;
                     updateStatus();
