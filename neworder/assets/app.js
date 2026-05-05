@@ -2,7 +2,10 @@
   const d = document;
 
   const Dom = {
+    categoriesWrap: d.getElementById('categoriesWrap'),
     categories: d.getElementById('categoriesSidebar'),
+    menuCollapseBtn: d.getElementById('menuCollapseBtn'),
+    menuExpandBtn: d.getElementById('menuExpandBtn'),
     menuSections: d.getElementById('menuSections'),
     cartBadge: d.getElementById('cartBadge'),
     cartItems: d.getElementById('cartItems'),
@@ -219,7 +222,19 @@
     if (Dom.searchInput) Dom.searchInput.placeholder = t.searchPlaceholder;
     if (Dom.labelTable) Dom.labelTable.textContent = t.table;
     if (Dom.labelHall) Dom.labelHall.textContent = t.hall;
+    if (Dom.menuCollapseBtn) Dom.menuCollapseBtn.textContent = t.collapseAll;
+    if (Dom.menuExpandBtn) Dom.menuExpandBtn.textContent = t.expandAll;
     viewSetActiveLangLink(currentLang);
+  }
+
+  function viewSetMenuCollapsed(isCollapsed) {
+    const on = !!isCollapsed;
+    d.body.classList.toggle('menu-only-cart', on);
+    if (Dom.menuSections) Dom.menuSections.classList.toggle('is-collapsed', on);
+
+    const isMobile = window.innerWidth <= 800;
+    if (Dom.menuCollapseBtn) Dom.menuCollapseBtn.hidden = on || !isMobile;
+    if (Dom.menuExpandBtn) Dom.menuExpandBtn.hidden = !on || !isMobile;
   }
 
   function viewShowToast(msg, isError) {
@@ -321,16 +336,6 @@
 
     const sections = [];
     const linksById = new Map();
-
-    const t = i18n[currentLang] || i18n.ru;
-    const spoilerBtn = d.createElement('button');
-    spoilerBtn.type = 'button';
-    spoilerBtn.className = 'btn menu-spoiler-toggle';
-    spoilerBtn.textContent = Model.menuCollapsed ? t.expandAll : t.collapseAll;
-    spoilerBtn.addEventListener('click', () => {
-      if (handlers && typeof handlers.onToggleMenuSections === 'function') handlers.onToggleMenuSections();
-    });
-    Dom.categories.appendChild(spoilerBtn);
 
     (groups || []).forEach((group, idx) => {
       const link = d.createElement('a');
@@ -538,6 +543,7 @@
     showOpenChecksModal: viewShowOpenChecksModal,
     hideOpenChecksModal: viewHideOpenChecksModal,
     setOpenChecksButton: viewSetOpenChecksButton,
+    setMenuCollapsed: viewSetMenuCollapsed,
     renderEmptyMenu: viewRenderEmptyMenu,
     renderMenu: viewRenderMenu,
     setActiveCategory: viewSetActiveCategory,
@@ -801,10 +807,12 @@
     Controller.bindCheckout();
     Controller.bindSpotTable();
     Controller.bindOpenChecksModal();
+    Controller.bindMenuToggle();
 
     const t = i18n[currentLang] || i18n.ru;
     View.applyLang(t);
     View.hideOpenChecksModal();
+    View.setMenuCollapsed(Model.menuCollapsed);
 
     Model.loadSelection();
     Model.spotId = Number(Config.spotId || 1) || 1;
@@ -856,7 +864,6 @@
     const rendered = View.renderMenu(groups, {
       onCategoryClick: (catId) => Controller.onCategoryClick(catId),
       onProductClick: (item) => Controller.addToCart(item),
-      onToggleMenuSections: () => Controller.toggleMenuSections(),
     });
     Controller.viewState.sections = rendered.sections;
     Controller.viewState.linksById = rendered.linksById;
@@ -868,6 +875,7 @@
     const id = String(catId || '');
     if (Model.menuCollapsed) {
       Model.menuCollapsed = false;
+      View.setMenuCollapsed(false);
       Controller.refreshMenu();
     }
     const section = d.getElementById(`cat-${id}`);
@@ -1053,6 +1061,22 @@
     }
   }
 
+  function controllerBindMenuToggle() {
+    if (Dom.menuCollapseBtn) {
+      Dom.menuCollapseBtn.addEventListener('click', () => {
+        Model.menuCollapsed = true;
+        View.setMenuCollapsed(true);
+      });
+    }
+    if (Dom.menuExpandBtn) {
+      Dom.menuExpandBtn.addEventListener('click', () => {
+        Model.menuCollapsed = false;
+        View.setMenuCollapsed(false);
+      });
+    }
+    window.addEventListener('resize', () => View.setMenuCollapsed(Model.menuCollapsed), { passive: true });
+  }
+
   async function controllerSubmitOrder(e) {
     e.preventDefault();
     const t = i18n[currentLang] || i18n.ru;
@@ -1118,10 +1142,6 @@
     init: controllerInit,
     loadProducts: controllerLoadProducts,
     refreshMenu: controllerRefreshMenu,
-    toggleMenuSections: () => {
-      Model.menuCollapsed = !Model.menuCollapsed;
-      Controller.refreshMenu();
-    },
     onCategoryClick: controllerOnCategoryClick,
     updateActiveByScroll: controllerUpdateActiveByScroll,
     bindSearch: controllerBindSearch,
@@ -1134,6 +1154,7 @@
     resetOpenTransactions: controllerResetOpenTransactions,
     checkOpenTransactions: controllerCheckOpenTransactions,
     bindOpenChecksModal: controllerBindOpenChecksModal,
+    bindMenuToggle: controllerBindMenuToggle,
     submitOrder: controllerSubmitOrder,
   };
 

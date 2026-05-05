@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0030';
+$assetVersion = '20260505_0040';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -194,8 +194,11 @@ $t = $i18n[$lang] ?? $i18n['ru'];
     </div>
 
     <div class="content-wrapper">
-      <div class="categories-sidebar" id="categoriesSidebar">
-        <!-- Categories injected here -->
+      <div class="categories-wrap" id="categoriesWrap">
+        <button type="button" class="btn menu-spoiler-toggle menu-collapse-btn" id="menuCollapseBtn" hidden></button>
+        <div class="categories-sidebar" id="categoriesSidebar">
+          <!-- Categories injected here -->
+        </div>
       </div>
       <div class="menu-main" id="menuMain">
         <div class="menu-sections" id="menuSections">
@@ -210,6 +213,7 @@ $t = $i18n[$lang] ?? $i18n['ru'];
           <h2>
             <span id="cartTitle"><?= htmlspecialchars((string)($t['cart'] ?? '')) ?></span>
             <span class="cart-badge" id="cartBadge" hidden>0</span>
+            <button type="button" class="btn menu-spoiler-toggle menu-expand-btn" id="menuExpandBtn" hidden></button>
           </h2>
           <div class="empty-cart" id="emptyCart"><?= htmlspecialchars((string)($t['empty_cart'] ?? '')) ?></div>
           <div class="cart-items" id="cartItems"></div>

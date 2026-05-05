@@ -214,7 +214,7 @@ body {
   gap: 30px;
 }
 
-.categories-sidebar {
+.categories-wrap {
   position: sticky;
   top: 84px;
   align-self: start;
@@ -224,7 +224,7 @@ body {
   .content-wrapper {
     display: block;
   }
-  .categories-sidebar {
+  .categories-wrap {
     display: flex;
     overflow-x: auto;
     padding: 10px 0;
@@ -236,6 +236,13 @@ body {
     top: 64px;
     background: var(--bg);
     z-index: 100;
+  }
+  .categories-sidebar {
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+    white-space: nowrap;
+    flex: 1;
   }
   .category-link {
     border: 1px solid var(--border);
@@ -257,6 +264,13 @@ body {
 
   .toast {
     bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  }
+
+  body.menu-only-cart .page-title,
+  body.menu-only-cart .search-bar,
+  body.menu-only-cart .categories-wrap,
+  body.menu-only-cart .menu-main {
+    display: none !important;
   }
 }
 
