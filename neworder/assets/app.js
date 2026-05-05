@@ -788,7 +788,6 @@
           Dom.checkoutError.textContent = t.emptyCart;
           Dom.checkoutError.hidden = false;
         }
-        }
         return;
       }
 
