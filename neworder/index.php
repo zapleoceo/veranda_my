@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0020';
+$assetVersion = '20260505_0030';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
