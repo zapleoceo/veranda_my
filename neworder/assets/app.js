@@ -2,10 +2,10 @@
   const d = document;
 
   const Dom = {
-    categoriesWrap: d.getElementById('categoriesWrap'),
     categories: d.getElementById('categoriesSidebar'),
-    menuCollapseBtn: d.getElementById('menuCollapseBtn'),
-    menuExpandBtn: d.getElementById('menuExpandBtn'),
+    menuToggleBtn: d.getElementById('menuToggleBtn'),
+    contentWrapper: d.getElementById('contentWrapper'),
+    searchBar: d.getElementById('searchBar'),
     menuSections: d.getElementById('menuSections'),
     cartBadge: d.getElementById('cartBadge'),
     cartItems: d.getElementById('cartItems'),
@@ -222,8 +222,7 @@
     if (Dom.searchInput) Dom.searchInput.placeholder = t.searchPlaceholder;
     if (Dom.labelTable) Dom.labelTable.textContent = t.table;
     if (Dom.labelHall) Dom.labelHall.textContent = t.hall;
-    if (Dom.menuCollapseBtn) Dom.menuCollapseBtn.textContent = t.collapseAll;
-    if (Dom.menuExpandBtn) Dom.menuExpandBtn.textContent = t.expandAll;
+    if (Dom.menuToggleBtn) Dom.menuToggleBtn.textContent = Model.menuCollapsed ? t.expandAll : t.collapseAll;
     viewSetActiveLangLink(currentLang);
   }
 
@@ -232,9 +231,11 @@
     d.body.classList.toggle('menu-only-cart', on);
     if (Dom.menuSections) Dom.menuSections.classList.toggle('is-collapsed', on);
 
-    const isMobile = window.innerWidth <= 800;
-    if (Dom.menuCollapseBtn) Dom.menuCollapseBtn.hidden = on || !isMobile;
-    if (Dom.menuExpandBtn) Dom.menuExpandBtn.hidden = !on || !isMobile;
+    const t = i18n[currentLang] || i18n.ru;
+    if (Dom.menuToggleBtn) {
+      Dom.menuToggleBtn.hidden = false;
+      Dom.menuToggleBtn.textContent = on ? t.expandAll : t.collapseAll;
+    }
   }
 
   function viewShowToast(msg, isError) {
@@ -1062,19 +1063,12 @@
   }
 
   function controllerBindMenuToggle() {
-    if (Dom.menuCollapseBtn) {
-      Dom.menuCollapseBtn.addEventListener('click', () => {
-        Model.menuCollapsed = true;
-        View.setMenuCollapsed(true);
+    if (Dom.menuToggleBtn) {
+      Dom.menuToggleBtn.addEventListener('click', () => {
+        Model.menuCollapsed = !Model.menuCollapsed;
+        View.setMenuCollapsed(Model.menuCollapsed);
       });
     }
-    if (Dom.menuExpandBtn) {
-      Dom.menuExpandBtn.addEventListener('click', () => {
-        Model.menuCollapsed = false;
-        View.setMenuCollapsed(false);
-      });
-    }
-    window.addEventListener('resize', () => View.setMenuCollapsed(Model.menuCollapsed), { passive: true });
   }
 
   async function controllerSubmitOrder(e) {

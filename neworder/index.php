@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0040';
+$assetVersion = '20260505_0050';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -173,7 +173,10 @@ $t = $i18n[$lang] ?? $i18n['ru'];
 </head>
 <body>
   <div class="container">
-    <h1 class="page-title" id="pageTitle"><?= htmlspecialchars((string)($t['title'] ?? '')) ?></h1>
+    <h1 class="page-title" id="pageTitle">
+      <span><?= htmlspecialchars((string)($t['title'] ?? '')) ?></span>
+      <button type="button" class="btn menu-title-toggle" id="menuToggleBtn" hidden></button>
+    </h1>
 
     <div class="search-bar" id="searchBar">
       <div class="search-input-wrap">
@@ -193,12 +196,9 @@ $t = $i18n[$lang] ?? $i18n['ru'];
       </details>
     </div>
 
-    <div class="content-wrapper">
-      <div class="categories-wrap" id="categoriesWrap">
-        <button type="button" class="btn menu-spoiler-toggle menu-collapse-btn" id="menuCollapseBtn" hidden></button>
-        <div class="categories-sidebar" id="categoriesSidebar">
-          <!-- Categories injected here -->
-        </div>
+    <div class="content-wrapper" id="contentWrapper">
+      <div class="categories-sidebar" id="categoriesSidebar">
+        <!-- Categories injected here -->
       </div>
       <div class="menu-main" id="menuMain">
         <div class="menu-sections" id="menuSections">
@@ -206,47 +206,45 @@ $t = $i18n[$lang] ?? $i18n['ru'];
           <div class="loading-state" id="loadingState"><?= htmlspecialchars((string)($t['menu_loading'] ?? '')) ?></div>
         </div>
       </div>
-      
-      <!-- Right Panel: Cart & Checkout -->
-      <div class="cart-sidebar" id="cartSidebar">
-        <div class="cart-panel">
-          <h2>
-            <span id="cartTitle"><?= htmlspecialchars((string)($t['cart'] ?? '')) ?></span>
-            <span class="cart-badge" id="cartBadge" hidden>0</span>
-            <button type="button" class="btn menu-spoiler-toggle menu-expand-btn" id="menuExpandBtn" hidden></button>
-          </h2>
-          <div class="empty-cart" id="emptyCart"><?= htmlspecialchars((string)($t['empty_cart'] ?? '')) ?></div>
-          <div class="cart-items" id="cartItems"></div>
+    </div>
+
+    <div class="cart-sidebar" id="cartSidebar">
+      <div class="cart-panel">
+        <h2>
+          <span id="cartTitle"><?= htmlspecialchars((string)($t['cart'] ?? '')) ?></span>
+          <span class="cart-badge" id="cartBadge" hidden>0</span>
+        </h2>
+        <div class="empty-cart" id="emptyCart"><?= htmlspecialchars((string)($t['empty_cart'] ?? '')) ?></div>
+        <div class="cart-items" id="cartItems"></div>
+        
+        <div class="cart-footer" id="cartFooter" hidden>
+          <div class="cart-total"><span id="cartTotalLabel"><?= htmlspecialchars((string)($t['total'] ?? '')) ?></span> <span id="cartTotalSum">0</span></div>
           
-          <div class="cart-footer" id="cartFooter" hidden>
-            <div class="cart-total"><span id="cartTotalLabel"><?= htmlspecialchars((string)($t['total'] ?? '')) ?></span> <span id="cartTotalSum">0</span></div>
-            
-            <div class="checkout-form-container">
-              <h3 id="checkoutTitle"><?= htmlspecialchars((string)($t['checkout'] ?? '')) ?></h3>
-              <form id="checkoutForm">
-                <div class="form-group">
-                  <label id="labelHall"><?= htmlspecialchars((string)($t['hall'] ?? 'Hall')) ?></label>
-                  <select id="hallIdSelect"></select>
+          <div class="checkout-form-container">
+            <h3 id="checkoutTitle"><?= htmlspecialchars((string)($t['checkout'] ?? '')) ?></h3>
+            <form id="checkoutForm">
+              <div class="form-group">
+                <label id="labelHall"><?= htmlspecialchars((string)($t['hall'] ?? 'Hall')) ?></label>
+                <select id="hallIdSelect"></select>
+              </div>
+              <div class="form-group">
+                <label id="labelTable"><?= htmlspecialchars((string)($t['table'] ?? 'Table')) ?></label>
+                <div class="table-select-row">
+                  <select id="tableIdSelect"></select>
+                  <button type="button" class="btn btn-danger btn-open-checks" id="openChecksBtn" hidden><?= htmlspecialchars((string)($t['open_checks'] ?? 'Открытые чеки')) ?></button>
                 </div>
-                <div class="form-group">
-                  <label id="labelTable"><?= htmlspecialchars((string)($t['table'] ?? 'Table')) ?></label>
-                  <div class="table-select-row">
-                    <select id="tableIdSelect"></select>
-                    <button type="button" class="btn btn-danger btn-open-checks" id="openChecksBtn" hidden><?= htmlspecialchars((string)($t['open_checks'] ?? 'Открытые чеки')) ?></button>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label id="labelName"><?= htmlspecialchars((string)($t['name'] ?? '')) ?></label>
-                  <input type="text" id="orderName" required placeholder="<?= htmlspecialchars((string)($t['name_ph'] ?? '')) ?>">
-                </div>
-                <div class="form-group">
-                  <label id="labelComment"><?= htmlspecialchars((string)($t['comment'] ?? 'Комментарий')) ?></label>
-                  <textarea id="orderComment" rows="2" placeholder="<?= htmlspecialchars((string)($t['comment_ph'] ?? 'Комментарий к заказу')) ?>"></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary btn-block" id="submitBtn"><?= htmlspecialchars((string)($t['submit'] ?? '')) ?></button>
-                <div id="checkoutError" class="error-msg" hidden></div>
-              </form>
-            </div>
+              </div>
+              <div class="form-group">
+                <label id="labelName"><?= htmlspecialchars((string)($t['name'] ?? '')) ?></label>
+                <input type="text" id="orderName" required placeholder="<?= htmlspecialchars((string)($t['name_ph'] ?? '')) ?>">
+              </div>
+              <div class="form-group">
+                <label id="labelComment"><?= htmlspecialchars((string)($t['comment'] ?? 'Комментарий')) ?></label>
+                <textarea id="orderComment" rows="2" placeholder="<?= htmlspecialchars((string)($t['comment_ph'] ?? 'Комментарий к заказу')) ?>"></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block" id="submitBtn"><?= htmlspecialchars((string)($t['submit'] ?? '')) ?></button>
+              <div id="checkoutError" class="error-msg" hidden></div>
+            </form>
           </div>
         </div>
       </div>
