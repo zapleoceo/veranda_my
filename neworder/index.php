@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0060';
+$assetVersion = '20260505_0070';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -175,7 +175,7 @@ $t = $i18n[$lang] ?? $i18n['ru'];
   <div class="container neworder-shell">
     <h1 class="page-title" id="pageTitle">
       <span><?= htmlspecialchars((string)($t['title'] ?? '')) ?></span>
-      <button type="button" class="btn menu-title-toggle" id="menuToggleBtn" hidden></button>
+      <button type="button" class="btn menu-title-toggle" id="menuToggleBtn"></button>
     </h1>
 
     <div class="search-bar" id="searchBar">
@@ -197,14 +197,8 @@ $t = $i18n[$lang] ?? $i18n['ru'];
     </div>
 
     <div class="content-wrapper" id="contentWrapper">
-      <div class="categories-sidebar" id="categoriesSidebar">
-        <!-- Categories injected here -->
-      </div>
-      <div class="menu-main" id="menuMain">
-        <div class="menu-sections" id="menuSections">
-          <!-- Menu injected here -->
-          <div class="loading-state" id="loadingState"><?= htmlspecialchars((string)($t['menu_loading'] ?? '')) ?></div>
-        </div>
+      <div class="menu-sections" id="menuSections">
+        <div class="loading-state" id="loadingState"><?= htmlspecialchars((string)($t['menu_loading'] ?? '')) ?></div>
       </div>
     </div>
 

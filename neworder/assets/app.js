@@ -2,7 +2,7 @@
   const d = document;
 
   const Dom = {
-    categories: d.getElementById('categoriesSidebar'),
+    pageTitleText: d.querySelector('#pageTitle span'),
     menuToggleBtn: d.getElementById('menuToggleBtn'),
     contentWrapper: d.getElementById('contentWrapper'),
     searchBar: d.getElementById('searchBar'),
@@ -207,7 +207,7 @@
   function viewApplyLang(t) {
     d.documentElement.setAttribute('lang', currentLang);
     d.title = t.title;
-    if (Dom.pageTitle) Dom.pageTitle.textContent = t.title;
+    if (Dom.pageTitleText) Dom.pageTitleText.textContent = t.title;
     if (Dom.cartTitle) Dom.cartTitle.textContent = t.cart;
     if (Dom.emptyCart) Dom.emptyCart.textContent = t.emptyCart;
     if (Dom.cartTotalLabel) Dom.cartTotalLabel.textContent = t.total;
@@ -329,33 +329,13 @@
   function viewRenderEmptyMenu(text) {
     if (!Dom.menuSections) return;
     Dom.menuSections.innerHTML = `<div class="loading-state">${text}</div>`;
-    if (Dom.categories) Dom.categories.innerHTML = '';
   }
 
   function viewRenderMenu(groups, handlers) {
-    if (!Dom.menuSections || !Dom.categories) return { sections: [], linksById: new Map() };
+    if (!Dom.menuSections) return;
     Dom.menuSections.innerHTML = '';
-    Dom.categories.innerHTML = '';
-
-    const sections = [];
-    const linksById = new Map();
 
     (groups || []).forEach((group, idx) => {
-      const link = d.createElement('a');
-      link.className = 'category-link';
-      link.textContent = group.title;
-      link.href = `#cat-${group.id}`;
-      link.dataset.catId = String(group.id);
-      if (idx === 0) link.classList.add('active');
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (handlers && typeof handlers.onCategoryClick === 'function') {
-          handlers.onCategoryClick(String(group.id));
-        }
-      });
-      Dom.categories.appendChild(link);
-      linksById.set(String(group.id), link);
-
       const section = d.createElement('section');
       section.className = 'menu-section';
       section.id = `cat-${group.id}`;
@@ -408,21 +388,9 @@
 
       section.appendChild(grid);
       Dom.menuSections.appendChild(section);
-      sections.push(section);
     });
 
     Dom.menuSections.classList.toggle('is-collapsed', !!Model.menuCollapsed);
-    return { sections, linksById };
-  }
-
-  function viewSetActiveCategory(linksById, catId) {
-    const id = String(catId || '');
-    for (const a of linksById.values()) a.classList.remove('active');
-    const el = linksById.get(id);
-    if (el) el.classList.add('active');
-    if (el && window.innerWidth <= 800) {
-      el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    }
   }
 
   function viewRenderCart(cart) {
@@ -549,7 +517,6 @@
     setMenuCollapsed: viewSetMenuCollapsed,
     renderEmptyMenu: viewRenderEmptyMenu,
     renderMenu: viewRenderMenu,
-    setActiveCategory: viewSetActiveCategory,
     renderCart: viewRenderCart,
     renderCartBadge: viewRenderCartBadge,
     renderTableSelect: viewRenderTableSelect,
@@ -860,51 +827,10 @@
     if (!groups.length) {
       const q = String(Model.query || '').trim();
       View.renderEmptyMenu(q.length >= 2 ? t.searchEmpty : t.menuEmpty);
-      Controller.viewState.sections = [];
-      Controller.viewState.linksById = new Map();
       return;
     }
-    const rendered = View.renderMenu(groups, {
-      onCategoryClick: (catId) => Controller.onCategoryClick(catId),
+    View.renderMenu(groups, {
       onProductClick: (item) => Controller.addToCart(item),
-    });
-    Controller.viewState.sections = rendered.sections;
-    Controller.viewState.linksById = rendered.linksById;
-    Controller.viewState.lastActive = '';
-    Controller.updateActiveByScroll();
-  }
-
-  function controllerOnCategoryClick(catId) {
-    const id = String(catId || '');
-    if (Model.menuCollapsed) {
-      Model.menuCollapsed = false;
-      View.setMenuCollapsed(false);
-      Controller.refreshMenu();
-    }
-    const section = d.getElementById(`cat-${id}`);
-    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    View.setActiveCategory(Controller.viewState.linksById, id);
-  }
-
-  function controllerUpdateActiveByScroll() {
-    if (Controller.viewState.scrollRaf) return;
-    Controller.viewState.scrollRaf = requestAnimationFrame(() => {
-      Controller.viewState.scrollRaf = 0;
-      const sections = Controller.viewState.sections || [];
-      if (!sections.length) return;
-
-      const offset = 90;
-      let active = sections[0];
-      for (const s of sections) {
-        const top = s.getBoundingClientRect().top;
-        if (top - offset <= 0) active = s;
-        else break;
-      }
-      const id = String((active && active.dataset && active.dataset.catId) ? active.dataset.catId : '');
-      if (id && id !== Controller.viewState.lastActive) {
-        Controller.viewState.lastActive = id;
-        View.setActiveCategory(Controller.viewState.linksById, id);
-      }
     });
   }
 
@@ -916,9 +842,6 @@
       Controller.onSearchInput(true);
       Dom.searchInput.focus();
     });
-
-    window.addEventListener('scroll', () => Controller.updateActiveByScroll(), { passive: true });
-    window.addEventListener('resize', () => Controller.updateActiveByScroll(), { passive: true });
   }
 
   function controllerOnSearchInput(force) {
@@ -1132,14 +1055,11 @@
   }
 
   const Controller = {
-    viewState: { sections: [], linksById: new Map(), scrollRaf: 0, lastActive: '' },
     searchTimer: 0,
     openTransactionsReqId: 0,
     init: controllerInit,
     loadProducts: controllerLoadProducts,
     refreshMenu: controllerRefreshMenu,
-    onCategoryClick: controllerOnCategoryClick,
-    updateActiveByScroll: controllerUpdateActiveByScroll,
     bindSearch: controllerBindSearch,
     onSearchInput: controllerOnSearchInput,
     addToCart: controllerAddToCart,
