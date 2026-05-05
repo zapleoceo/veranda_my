@@ -386,7 +386,7 @@
             let idx = 0;
 
             const runOne = async (date) => {
-                const url = new URL(location.href);
+                const url = new URL('/api/poster/zapara/index.php', location.origin);
                 url.searchParams.set('ajax', 'day');
                 url.searchParams.set('date', date);
                 const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });

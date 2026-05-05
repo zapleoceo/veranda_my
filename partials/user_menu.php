@@ -32,10 +32,10 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
             <?php if ($canKitchen || $canDashboard || $canRaw || $canZapara): ?>
                 <details class="ud-details">
                     <summary class="ud-summary">Кухня</summary>
-                    <?php if ($canKitchen): ?><a class="ud-link ud-l2" href="/kitchen_online.php">Онлайн</a><?php endif; ?>
-                    <?php if ($canDashboard): ?><a class="ud-link ud-l2" href="/dashboard.php<?= $dashboardQuery !== '' ? ('?' . htmlspecialchars($dashboardQuery)) : '' ?>">Дашборд</a><?php endif; ?>
-                    <?php if ($canZapara): ?><a class="ud-link ud-l2" href="/zapara.php">Zapara</a><?php endif; ?>
-                    <?php if ($canRaw): ?><a class="ud-link ud-l2" href="/rawdata.php<?= $rawDataQuery !== '' ? ('?' . htmlspecialchars($rawDataQuery)) : '' ?>">Таблица</a><?php endif; ?>
+                    <?php if ($canKitchen): ?><a class="ud-link ud-l2" href="/kitchen_online/">Онлайн</a><?php endif; ?>
+                    <?php if ($canDashboard): ?><a class="ud-link ud-l2" href="/dashboard/<?= $dashboardQuery !== '' ? ('?' . htmlspecialchars($dashboardQuery)) : '' ?>">Дашборд</a><?php endif; ?>
+                    <?php if ($canZapara): ?><a class="ud-link ud-l2" href="/zapara/">Zapara</a><?php endif; ?>
+                    <?php if ($canRaw): ?><a class="ud-link ud-l2" href="/rawdata/<?= $rawDataQuery !== '' ? ('?' . htmlspecialchars($rawDataQuery)) : '' ?>">Таблица</a><?php endif; ?>
                 </details>
             <?php endif; ?>
 

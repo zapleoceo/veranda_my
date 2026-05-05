@@ -87,11 +87,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateStatus();
                 try {
                     const params = new URLSearchParams(baseParams);
-                    params.set('ajax', '1');
+                    params.set('ajax', 'list');
                     params.set('offset', String(state.offset));
                     params.set('limit', String(state.limit));
 
-                    const res = await fetch(`rawdata.php?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    const res = await fetch(`/api/sql/rawdata/index.php?${params.toString()}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                     if (!res.ok) throw new Error('load failed');
                     const data = await res.json();
                     if (!data || !data.ok) throw new Error('bad response');
@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 checkbox.disabled = true;
                 try {
-                    const response = await fetch('rawdata.php', {
+                    const response = await fetch('/api/sql/rawdata/index.php', {
                         method: 'POST',
                         headers: { 'X-Requested-With': 'XMLHttpRequest' },
                         body: payload
