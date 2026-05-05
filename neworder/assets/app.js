@@ -202,7 +202,9 @@
         if (idx === 0) link.classList.add('active');
         link.addEventListener('click', (e) => {
           e.preventDefault();
-          handlers?.onCategoryClick?.(String(group.id));
+          if (handlers && typeof handlers.onCategoryClick === 'function') {
+            handlers.onCategoryClick(String(group.id));
+          }
         });
         Dom.categories.appendChild(link);
         linksById.set(String(group.id), link);
@@ -226,11 +228,17 @@
           card.className = 'product-card';
           card.tabIndex = 0;
           card.setAttribute('role', 'button');
-          card.addEventListener('click', () => handlers?.onProductClick?.(item));
+          card.addEventListener('click', () => {
+            if (handlers && typeof handlers.onProductClick === 'function') {
+              handlers.onProductClick(item);
+            }
+          });
           card.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              handlers?.onProductClick?.(item);
+              if (handlers && typeof handlers.onProductClick === 'function') {
+                handlers.onProductClick(item);
+              }
             }
           });
 
@@ -291,7 +299,7 @@
 
         const n = d.createElement('div');
         n.className = 'cart-item-name';
-        n.textContent = String(c.item?.name || '');
+        n.textContent = String((c.item && c.item.name) ? c.item.name : '');
 
         const p = d.createElement('div');
         p.className = 'cart-item-price';
@@ -307,7 +315,7 @@
         minus.className = 'qty-btn';
         minus.type = 'button';
         minus.textContent = '−';
-        minus.addEventListener('click', () => Controller.updateCart(String(c.item?.id || ''), -1));
+        minus.addEventListener('click', () => Controller.updateCart(String((c.item && c.item.id) ? c.item.id : ''), -1));
 
         const count = d.createElement('div');
         count.style.fontWeight = 'bold';
@@ -317,7 +325,7 @@
         plus.className = 'qty-btn';
         plus.type = 'button';
         plus.textContent = '+';
-        plus.addEventListener('click', () => Controller.updateCart(String(c.item?.id || ''), 1));
+        plus.addEventListener('click', () => Controller.updateCart(String((c.item && c.item.id) ? c.item.id : ''), 1));
 
         controls.appendChild(minus);
         controls.appendChild(count);
@@ -408,7 +416,7 @@
     },
 
     setCartItem(item, price, delta) {
-      const id = String(item?.id || '');
+      const id = String((item && item.id) ? item.id : '');
       if (!id) return;
       if (!Model.cart[id]) {
         if (delta <= 0) return;
@@ -428,7 +436,7 @@
       if (q.length < 2) return Model.groupsAll;
       const out = [];
       for (const g of Model.groupsAll || []) {
-        const items = (g.items || []).filter((it) => String(it?.name || '').toLowerCase().includes(q));
+        const items = (g.items || []).filter((it) => String((it && it.name) ? it.name : '').toLowerCase().includes(q));
         if (!items.length) continue;
         out.push({ id: g.id, title: g.title, items });
       }
@@ -462,7 +470,7 @@
       const res = await fetch('/api/poster/neworder/index.php?ajax=get_products', { headers: { 'Accept': 'application/json' } });
       const json = await res.json();
       if (!json || !json.ok) {
-        throw new Error(String(json?.error || 'Failed'));
+        throw new Error(String((json && json.error) ? json.error : 'Failed'));
       }
       const products = Array.isArray(json.products) ? json.products : [];
       const spotId = Number(json.spot_id || 1) || 1;
@@ -479,7 +487,7 @@
       });
       const json = await res.json();
       if (!json || !json.ok) {
-        throw new Error(String(json?.error || 'Failed'));
+        throw new Error(String((json && json.error) ? json.error : 'Failed'));
       }
       const tables = Array.isArray(json.tables) ? json.tables : [];
       Model.tables = tables;
@@ -555,8 +563,8 @@
         });
       });
       const groups = Array.from(catMap.values());
-      groups.forEach((g) => g.items.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { sensitivity: 'base' })));
-      groups.sort((a, b) => String(a?.title || '').localeCompare(String(b?.title || ''), undefined, { sensitivity: 'base' }));
+      groups.forEach((g) => g.items.sort((a, b) => String((a && a.name) ? a.name : '').localeCompare(String((b && b.name) ? b.name : ''), undefined, { sensitivity: 'base' })));
+      groups.sort((a, b) => String((a && a.title) ? a.title : '').localeCompare(String((b && b.title) ? b.title : ''), undefined, { sensitivity: 'base' }));
       return groups;
     },
 
@@ -603,7 +611,7 @@
         View.renderTableSelect(Model.getTablesForSelectedHall(), Model.tableId);
         Controller.refreshMenu();
       } catch (err) {
-        View.renderEmptyMenu(`${t.loadMenuFailPrefix}${String(err?.message || err)}`);
+        View.renderEmptyMenu(`${t.loadMenuFailPrefix}${String((err && err.message) ? err.message : err)}`);
       }
     },
 
@@ -648,7 +656,7 @@
           if (top - offset <= 0) active = s;
           else break;
         }
-        const id = String(active?.dataset?.catId || '');
+        const id = String((active && active.dataset && active.dataset.catId) ? active.dataset.catId : '');
         if (id && id !== Controller.viewState.lastActive) {
           Controller.viewState.lastActive = id;
           View.setActiveCategory(Controller.viewState.linksById, id);
@@ -670,7 +678,7 @@
     },
 
     onSearchInput(force = false) {
-      const q = String(Dom.searchInput?.value || '').trim();
+      const q = String(Dom.searchInput ? Dom.searchInput.value : '').trim();
       Dom.searchClear.hidden = q === '';
       if (Controller.searchTimer) clearTimeout(Controller.searchTimer);
       if (force || q.length < 2) {
@@ -685,12 +693,12 @@
     },
 
     addToCart(item) {
-      const priceVal = Number(item?.price_cents || 0) / 100;
+      const priceVal = Number(item && item.price_cents ? item.price_cents : 0) / 100;
       Model.setCartItem(item, priceVal, 1);
       const t = i18n[currentLang] || i18n.ru;
       View.renderCart(Model.cart, t);
       View.renderCartBadge(Model.cart);
-      View.showToast(`${t.addedPrefix}${String(item?.name || '')}`);
+      View.showToast(`${t.addedPrefix}${String((item && item.name) ? item.name : '')}`);
     },
 
     updateCart(itemId, delta) {
@@ -771,10 +779,10 @@
       if (Dom.checkoutError) Dom.checkoutError.hidden = true;
       if (!Dom.submitBtn) return;
 
-      const name = String(Dom.orderName?.value || '').trim();
+      const name = String(Dom.orderName ? Dom.orderName.value : '').trim();
       const smEl = d.querySelector('input[name="service_mode"]:checked');
-      const serviceMode = Number(smEl?.value || 2);
-      const products = Object.values(Model.cart).map((c) => ({ product_id: Number(c.item?.id || 0), count: Number(c.count || 0) }));
+      const serviceMode = Number(smEl ? smEl.value : 2);
+      const products = Object.values(Model.cart).map((c) => ({ product_id: Number((c.item && c.item.id) ? c.item.id : 0), count: Number(c.count || 0) }));
       if (!products.length) {
         if (Dom.checkoutError) {
           Dom.checkoutError.textContent = t.emptyCart;
@@ -809,7 +817,7 @@
         View.renderCartBadge(Model.cart);
       } catch (err) {
         if (Dom.checkoutError) {
-          Dom.checkoutError.textContent = String(err?.message || err);
+          Dom.checkoutError.textContent = String((err && err.message) ? err.message : err);
           Dom.checkoutError.hidden = false;
         }
       } finally {
