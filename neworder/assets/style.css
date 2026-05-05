@@ -748,6 +748,11 @@ body.menu-only-cart .neworder-shell .cart-sidebar {
   background: rgba(255,255,255,0.07);
 }
 
+.modifier-item.is-selected {
+  border-color: rgba(184,135,70,0.55);
+  background: rgba(184,135,70,0.16);
+}
+
 .modifier-name {
   font-size: 13px;
   font-weight: 700;
@@ -851,6 +856,13 @@ body.menu-only-cart .neworder-shell .cart-sidebar {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.modal-save {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 10px;
+  white-space: nowrap;
 }
 
 .check-items {

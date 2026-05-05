@@ -73,7 +73,7 @@
     commentPh: 'Комментарий к заказу',
     dishCommentPh: 'Комм',
     noModifier: 'Без модификатора',
-    add: 'Добавить',
+    save: 'Сохранить',
     chooseModsErrorPrefix: 'Нужно выбрать модификаторы: ',
     openChecksTitle: 'Открытые чеки на столе',
     openChecksBtn: 'Открытые чеки',
@@ -111,7 +111,7 @@
     commentPh: 'Order comment',
     dishCommentPh: 'Cmt',
     noModifier: 'No modifier',
-    add: 'Add',
+    save: 'Save',
     chooseModsErrorPrefix: 'Select modifiers: ',
     openChecksTitle: 'Open checks for table',
     openChecksBtn: 'Open checks',
@@ -148,7 +148,7 @@
     comment: 'Ghi chú',
     commentPh: 'Ghi chú cho đơn',
     noModifier: 'Không chọn',
-    add: 'Thêm',
+    save: 'Lưu',
     chooseModsErrorPrefix: 'Chọn modifier: ',
     openChecksTitle: 'Hóa đơn đang mở theo bàn',
     openChecksBtn: 'Hóa đơn mở',
@@ -185,7 +185,7 @@
     comment: '메모',
     commentPh: '주문 메모',
     noModifier: '없음',
-    add: '추가',
+    save: '저장',
     chooseModsErrorPrefix: '모디파이어 선택: ',
     openChecksTitle: '테이블의 열린 체크',
     openChecksBtn: '열린 체크',
@@ -275,11 +275,40 @@
     if (Dom.modifierModal) Dom.modifierModal.hidden = true;
     if (Dom.modifierList) Dom.modifierList.innerHTML = '';
     if (Dom.modifierTitle) Dom.modifierTitle.textContent = '';
+    if (Dom.modifierModal) {
+      const header = Dom.modifierModal.querySelector('.modal-header');
+      if (header) {
+        const saveBtn = header.querySelector('#modifierSaveBtn');
+        if (saveBtn) saveBtn.remove();
+      }
+    }
+  }
+
+  function viewSetModifierHeaderActions(handlers) {
+    if (!Dom.modifierModal) return;
+    const header = Dom.modifierModal.querySelector('.modal-header');
+    if (!header) return;
+    const existing = header.querySelector('#modifierSaveBtn');
+    if (existing) existing.remove();
+    if (!handlers || typeof handlers.onConfirm !== 'function') return;
+    const t = i18n[currentLang] || i18n.ru;
+    const btn = d.createElement('button');
+    btn.type = 'button';
+    btn.id = 'modifierSaveBtn';
+    btn.className = 'btn btn-primary modal-save';
+    btn.textContent = t.save || 'Save';
+    btn.addEventListener('click', () => handlers.onConfirm());
+    if (Dom.modifierClose && Dom.modifierClose.parentElement === header) {
+      header.insertBefore(btn, Dom.modifierClose);
+    } else {
+      header.appendChild(btn);
+    }
   }
 
   function viewShowModifierModal(item, modifications, handlers) {
     if (!Dom.modifierModal || !Dom.modifierList || !Dom.modifierTitle) return;
     const t = i18n[currentLang] || i18n.ru;
+    viewSetModifierHeaderActions(handlers);
     Dom.modifierTitle.textContent = String((item && item.name) ? item.name : '');
     Dom.modifierList.innerHTML = '';
 
@@ -287,14 +316,18 @@
     baseBtn.type = 'button';
     baseBtn.className = 'modifier-item';
     baseBtn.addEventListener('click', () => {
-      if (handlers && typeof handlers.onSelect === 'function') {
-        handlers.onSelect({ id: 0, name: t.noModifier, price: null });
-      }
+      if (handlers && typeof handlers.onSelect === 'function') handlers.onSelect({ id: 0, name: t.noModifier, price: null });
+      const all = Array.from(Dom.modifierList.querySelectorAll('.modifier-item'));
+      all.forEach((x) => x.classList.remove('is-selected'));
+      baseBtn.classList.add('is-selected');
     });
     const baseName = d.createElement('div');
     baseName.className = 'modifier-name';
     baseName.textContent = t.noModifier;
     baseBtn.appendChild(baseName);
+    if (handlers && typeof handlers.getSelectedId === 'function' && Number(handlers.getSelectedId() || 0) === 0) {
+      baseBtn.classList.add('is-selected');
+    }
     Dom.modifierList.appendChild(baseBtn);
 
     (modifications || []).forEach((m) => {
@@ -302,9 +335,10 @@
       btn.type = 'button';
       btn.className = 'modifier-item';
       btn.addEventListener('click', () => {
-        if (handlers && typeof handlers.onSelect === 'function') {
-          handlers.onSelect(m);
-        }
+        if (handlers && typeof handlers.onSelect === 'function') handlers.onSelect(m);
+        const all = Array.from(Dom.modifierList.querySelectorAll('.modifier-item'));
+        all.forEach((x) => x.classList.remove('is-selected'));
+        btn.classList.add('is-selected');
       });
 
       const name = d.createElement('div');
@@ -321,6 +355,10 @@
         btn.appendChild(price);
       }
 
+      const mid = Number(m && m.id ? m.id : 0) || 0;
+      if (handlers && typeof handlers.getSelectedId === 'function' && Number(handlers.getSelectedId() || 0) === mid) {
+        btn.classList.add('is-selected');
+      }
       Dom.modifierList.appendChild(btn);
     });
 
@@ -330,6 +368,7 @@
   function viewShowDishModsModal(item, groups, handlers) {
     if (!Dom.modifierModal || !Dom.modifierList || !Dom.modifierTitle) return;
     const t = i18n[currentLang] || i18n.ru;
+    viewSetModifierHeaderActions(handlers);
     Dom.modifierTitle.textContent = String((item && item.name) ? item.name : '');
     Dom.modifierList.innerHTML = '';
 
@@ -441,18 +480,6 @@
         ui.plus.disabled = groupMax > 0 && groupTotal >= groupMax;
       });
     });
-
-    const actions = d.createElement('div');
-    actions.className = 'modifier-actions';
-    const addBtn = d.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'btn btn-primary';
-    addBtn.textContent = t.add;
-    addBtn.addEventListener('click', () => {
-      if (handlers && typeof handlers.onConfirm === 'function') handlers.onConfirm();
-    });
-    actions.appendChild(addBtn);
-    Dom.modifierList.appendChild(actions);
 
     Dom.modifierModal.hidden = false;
   }
@@ -1353,19 +1380,26 @@
     }
     const mods = Array.isArray(item && item.modifications ? item.modifications : null) ? item.modifications : [];
     if (mods.length) {
+      const selected = { id: 0, name: t.noModifier, price: null };
       const handlers = {
+        getSelectedId: () => Number(selected.id || 0) || 0,
         onSelect: (m) => {
-          View.hideModifierModal();
-          const modId = Number(m && m.id ? m.id : 0) || 0;
+          selected.id = Number(m && m.id ? m.id : 0) || 0;
+          selected.name = String(m && m.name ? m.name : '');
+          selected.price = (m && m.price != null) ? m.price : null;
+        },
+        onConfirm: () => {
+          const modId = Number(selected.id || 0) || 0;
           const basePrice = Number(item && item.price_cents ? item.price_cents : 0) / 100;
-          const modPrice = Number(m && m.price != null ? m.price : NaN);
+          const modPrice = Number(selected.price != null ? selected.price : NaN);
           const priceVal = modId > 0 && Number.isFinite(modPrice) ? modPrice : basePrice;
-          Model.setCartItem(item, priceVal, 1, { id: modId, name: String(m && m.name ? m.name : '') }, null);
+          Model.setCartItem(item, priceVal, 1, { id: modId, name: String(selected.name || '') }, null);
+          View.hideModifierModal();
           View.renderCart(Model.cart, t);
           View.renderCartBadge(Model.cart);
-          const label = modId > 0 ? `${String(item.name || '')} (${String(m && m.name ? m.name : '')})` : String(item.name || '');
+          const label = modId > 0 ? `${String(item.name || '')} (${String(selected.name || '')})` : String(item.name || '');
           View.showToast(`${t.addedPrefix}${label}`);
-        }
+        },
       };
       View.showModifierModal(item, mods, handlers);
       return;
