@@ -302,19 +302,14 @@ if ($ajax === 'add_to_transaction') {
     $commentMethod = '';
     try {
         if ($comment !== '') {
-            $methods = ['transactions.changeTransaction', 'transactions.editTransaction', 'transactions.setTransactionComment'];
-            foreach ($methods as $m) {
-                try {
-                    $posterApi->request($m, [
-                        'transaction_id' => $transactionId,
-                        'comment' => $comment,
-                    ], 'POST');
-                    $commentUpdated = true;
-                    $commentMethod = $m;
-                    break;
-                } catch (\Throwable $e) {
-                }
-            }
+            $posterApi->request('transactions.changeComment', [
+                'spot_id' => $spotIdReq,
+                'spot_tablet_id' => $tabletId,
+                'transaction_id' => $transactionId,
+                'comment' => $comment,
+            ], 'POST');
+            $commentUpdated = true;
+            $commentMethod = 'transactions.changeComment';
         }
 
         foreach ($products as $p) {
