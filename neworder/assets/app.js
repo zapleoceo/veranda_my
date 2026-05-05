@@ -1449,7 +1449,6 @@
     if (Dom.checkoutError) Dom.checkoutError.hidden = true;
     if (!Dom.submitBtn) return;
 
-    const name = String(Dom.orderName ? Dom.orderName.value : '').trim();
     const comment = String(Dom.orderComment ? Dom.orderComment.value : '').trim();
     const serviceMode = 1;
     const products = Object.values(Model.cart).map((c) => {
@@ -1483,7 +1482,6 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name,
             comment,
             service_mode: serviceMode,
             products,

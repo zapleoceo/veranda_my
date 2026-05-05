@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0435';
+$assetVersion = '20260505_0455';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -224,10 +224,6 @@ $t = $i18n[$lang] ?? $i18n['ru'];
                   <select id="tableIdSelect"></select>
                   <button type="button" class="btn btn-danger btn-open-checks" id="openChecksBtn" hidden><?= htmlspecialchars((string)($t['open_checks'] ?? 'Открытые чеки')) ?></button>
                 </div>
-              </div>
-              <div class="form-group">
-                <label id="labelName"><?= htmlspecialchars((string)($t['name'] ?? '')) ?></label>
-                <input type="text" id="orderName" required placeholder="<?= htmlspecialchars((string)($t['name_ph'] ?? '')) ?>">
               </div>
               <div class="form-group">
                 <label id="labelComment"><?= htmlspecialchars((string)($t['comment'] ?? 'Комментарий')) ?></label>

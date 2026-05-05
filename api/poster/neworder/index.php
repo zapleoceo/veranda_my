@@ -137,7 +137,6 @@ if ($ajax === 'create_order') {
     if (!is_array($payload)) $respondError(400, 'Bad request');
 
     $name = trim((string)($payload['name'] ?? ''));
-    if ($name === '') $respondError(400, 'Введите имя');
 
     $comment = trim((string)($payload['comment'] ?? ''));
 
