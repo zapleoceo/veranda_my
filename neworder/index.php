@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0009';
+$assetVersion = '20260505_0010';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -202,7 +202,10 @@ $t = $i18n[$lang] ?? $i18n['ru'];
                 </div>
                 <div class="form-group">
                   <label id="labelTable">Table</label>
-                  <select id="tableIdSelect"></select>
+                  <div class="table-select-row">
+                    <select id="tableIdSelect"></select>
+                    <button type="button" class="btn btn-danger btn-open-checks" id="openChecksBtn" hidden>Открытые чеки</button>
+                  </div>
                 </div>
                 <div class="form-group">
                   <label id="labelName"><?= htmlspecialchars((string)($t['name'] ?? '')) ?></label>

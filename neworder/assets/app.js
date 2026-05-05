@@ -29,6 +29,7 @@
     labelTable: d.getElementById('labelTable'),
     hallSelect: d.getElementById('hallIdSelect'),
     labelHall: d.getElementById('labelHall'),
+    openChecksBtn: d.getElementById('openChecksBtn'),
     openChecksModal: d.getElementById('openChecksModal'),
     openChecksList: d.getElementById('openChecksList'),
     openChecksClose: d.getElementById('openChecksClose'),
@@ -169,6 +170,13 @@
   function viewHideOpenChecksModal() {
     if (Dom.openChecksModal) Dom.openChecksModal.hidden = true;
     if (Dom.openChecksList) Dom.openChecksList.innerHTML = '';
+  }
+
+  function viewSetOpenChecksButton(openCount) {
+    if (!Dom.openChecksBtn) return;
+    const n = Number(openCount || 0) || 0;
+    Dom.openChecksBtn.hidden = n <= 0;
+    if (n > 0) Dom.openChecksBtn.textContent = `Открытые чеки: ${String(n)}`;
   }
 
   function viewShowOpenChecksModal(transactions, handlers) {
@@ -463,6 +471,7 @@
     showToast: viewShowToast,
     showOpenChecksModal: viewShowOpenChecksModal,
     hideOpenChecksModal: viewHideOpenChecksModal,
+    setOpenChecksButton: viewSetOpenChecksButton,
     renderEmptyMenu: viewRenderEmptyMenu,
     renderMenu: viewRenderMenu,
     setActiveCategory: viewSetActiveCategory,
@@ -674,6 +683,7 @@
     tableId: 0,
     hallId: 0,
     selectedTransactionId: 0,
+    openTransactions: [],
     loadSelection: modelLoadSelection,
     saveSelection: modelSaveSelection,
     setQuery: modelSetQuery,
@@ -733,6 +743,7 @@
     View.applyLang(t);
 
     Model.loadSelection();
+    View.setOpenChecksButton(0);
     if (Model.loadCache()) {
       Controller.refreshMenu();
     }
@@ -955,27 +966,36 @@
 
   async function controllerCheckOpenTransactions() {
     Model.selectedTransactionId = 0;
-    View.hideOpenChecksModal();
+    Model.openTransactions = [];
+    View.setOpenChecksButton(0);
     if (!Model.tableId) return;
     try {
       const list = await Model.fetchOpenTransactions(Model.spotId, Model.tableId);
       if (!Array.isArray(list) || !list.length) return;
-      View.showOpenChecksModal(list, {
-        onUseTransaction: (transactionId) => {
-          Model.selectedTransactionId = Number(transactionId || 0) || 0;
-          View.hideOpenChecksModal();
-        },
-        onCreateNew: () => {
-          Model.selectedTransactionId = 0;
-          View.hideOpenChecksModal();
-        },
-      });
+      Model.openTransactions = list;
+      View.setOpenChecksButton(list.length);
     } catch (e) {
-      View.showToast(String((e && e.message) ? e.message : e), true);
+      Model.openTransactions = [];
+      View.setOpenChecksButton(0);
     }
   }
 
   function controllerBindOpenChecksModal() {
+    if (Dom.openChecksBtn) {
+      Dom.openChecksBtn.addEventListener('click', () => {
+        if (!Array.isArray(Model.openTransactions) || !Model.openTransactions.length) return;
+        View.showOpenChecksModal(Model.openTransactions, {
+          onUseTransaction: (transactionId) => {
+            Model.selectedTransactionId = Number(transactionId || 0) || 0;
+            View.hideOpenChecksModal();
+          },
+          onCreateNew: () => {
+            Model.selectedTransactionId = 0;
+            View.hideOpenChecksModal();
+          },
+        });
+      });
+    }
     if (Dom.openChecksClose) {
       Dom.openChecksClose.addEventListener('click', () => View.hideOpenChecksModal());
     }

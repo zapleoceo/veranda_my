@@ -487,6 +487,32 @@ body {
   background-size: 18px 18px;
 }
 
+.table-select-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.table-select-row select {
+  flex: 1;
+}
+
+.btn-danger {
+  background: #b71c1c;
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #fff;
+}
+
+.btn-danger:active {
+  transform: translateY(1px);
+}
+
+.btn-open-checks {
+  white-space: nowrap;
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+
 .form-group select option {
   background-color: #0f0f0f;
   color: #f0f0f0;
