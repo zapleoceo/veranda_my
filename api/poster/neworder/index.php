@@ -144,8 +144,7 @@ if ($ajax === 'create_order') {
         $respondError(400, 'Корзина пуста');
     }
 
-    $serviceMode = (int)($payload['service_mode'] ?? 2);
-    if (!in_array($serviceMode, [1, 2, 3], true)) $serviceMode = 2;
+    $serviceMode = 1;
 
     $spotIdReq = (int)($payload['spot_id'] ?? $spotId);
     if ($spotIdReq <= 0) $spotIdReq = $spotId;

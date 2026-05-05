@@ -17,9 +17,6 @@
     cartTotalLabel: d.getElementById('cartTotalLabel'),
     checkoutTitle: d.getElementById('checkoutTitle'),
     labelName: d.getElementById('labelName'),
-    labelServiceMode: d.getElementById('labelServiceMode'),
-    serviceInPlaceLabel: d.getElementById('serviceInPlaceLabel'),
-    serviceTakeawayLabel: d.getElementById('serviceTakeawayLabel'),
     orderName: d.getElementById('orderName'),
     submitBtn: d.getElementById('submitBtn'),
     loadingState: d.getElementById('loadingState'),
@@ -58,9 +55,6 @@
     checkout: 'Оформление заказа',
     name: 'Имя',
     namePh: 'Как к вам обращаться?',
-    orderType: 'Тип заказа',
-    inPlace: 'В заведении',
-    takeaway: 'С собой',
     submit: 'Подтвердить заказ',
     sending: 'Отправка...',
     orderUnknown: 'Неизвестная ошибка',
@@ -80,9 +74,6 @@
     checkout: 'Checkout',
     name: 'Name',
     namePh: 'Your name',
-    orderType: 'Order type',
-    inPlace: 'Dine in',
-    takeaway: 'Takeaway',
     submit: 'Place order',
     sending: 'Sending...',
     orderUnknown: 'Unknown error',
@@ -102,9 +93,6 @@
     checkout: 'Xác nhận đơn',
     name: 'Tên',
     namePh: 'Bạn tên gì?',
-    orderType: 'Loại đơn',
-    inPlace: 'Dùng tại chỗ',
-    takeaway: 'Mang đi',
     submit: 'Đặt hàng',
     sending: 'Đang gửi...',
     orderUnknown: 'Lỗi không xác định',
@@ -124,9 +112,6 @@
     checkout: '주문하기',
     name: '이름',
     namePh: '이름을 입력하세요',
-    orderType: '주문 방식',
-    inPlace: '매장 식사',
-    takeaway: '포장',
     submit: '주문 확정',
     sending: '전송 중...',
     orderUnknown: '알 수 없는 오류',
@@ -159,9 +144,6 @@
     if (Dom.cartTotalLabel) Dom.cartTotalLabel.textContent = t.total;
     if (Dom.checkoutTitle) Dom.checkoutTitle.textContent = t.checkout;
     if (Dom.labelName) Dom.labelName.textContent = t.name;
-    if (Dom.labelServiceMode) Dom.labelServiceMode.textContent = t.orderType;
-    if (Dom.serviceInPlaceLabel) Dom.serviceInPlaceLabel.textContent = t.inPlace;
-    if (Dom.serviceTakeawayLabel) Dom.serviceTakeawayLabel.textContent = t.takeaway;
     if (Dom.submitBtn && !Dom.submitBtn.disabled) Dom.submitBtn.textContent = t.submit;
     if (Dom.orderName) Dom.orderName.placeholder = t.namePh;
     if (Dom.loadingState) Dom.loadingState.textContent = t.menuLoading;
@@ -874,8 +856,7 @@
     if (!Dom.submitBtn) return;
 
     const name = String(Dom.orderName ? Dom.orderName.value : '').trim();
-    const smEl = d.querySelector('input[name="service_mode"]:checked');
-    const serviceMode = Number(smEl ? smEl.value : 2);
+    const serviceMode = 1;
     const products = Object.values(Model.cart).map((c) => ({ product_id: Number((c.item && c.item.id) ? c.item.id : 0), count: Number(c.count || 0) }));
     if (!products.length) {
       if (Dom.checkoutError) {

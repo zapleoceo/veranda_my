@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0007';
+$assetVersion = '20260505_0008';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -207,19 +207,6 @@ $t = $i18n[$lang] ?? $i18n['ru'];
                 <div class="form-group">
                   <label id="labelName"><?= htmlspecialchars((string)($t['name'] ?? '')) ?></label>
                   <input type="text" id="orderName" required placeholder="<?= htmlspecialchars((string)($t['name_ph'] ?? '')) ?>">
-                </div>
-                <div class="form-group">
-                  <label id="labelServiceMode"><?= htmlspecialchars((string)($t['order_type'] ?? '')) ?></label>
-                  <div class="service-mode-toggle">
-                    <label class="sm-label">
-                      <input type="radio" name="service_mode" value="3" checked>
-                      <span id="serviceInPlaceLabel"><?= htmlspecialchars((string)($t['in_place'] ?? '')) ?></span>
-                    </label>
-                    <label class="sm-label">
-                      <input type="radio" name="service_mode" value="2">
-                      <span id="serviceTakeawayLabel"><?= htmlspecialchars((string)($t['takeaway'] ?? '')) ?></span>
-                    </label>
-                  </div>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block" id="submitBtn"><?= htmlspecialchars((string)($t['submit'] ?? '')) ?></button>
                 <div id="checkoutError" class="error-msg" hidden></div>
