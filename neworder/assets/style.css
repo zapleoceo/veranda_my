@@ -278,10 +278,6 @@ body {
   color: var(--accent);
 }
 
-.menu-section.is-collapsed .products-grid {
-  display: none;
-}
-
 .menu-spoiler-toggle {
   display: none;
   white-space: nowrap;
@@ -299,10 +295,11 @@ body {
     align-items: center;
     justify-content: center;
   }
+}
 
-  .menu-section-title {
-    cursor: pointer;
-    user-select: none;
+@media (max-width: 800px) {
+  .menu-sections.is-collapsed {
+    display: none;
   }
 }
 

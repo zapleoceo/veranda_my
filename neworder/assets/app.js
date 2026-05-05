@@ -326,9 +326,9 @@
     const spoilerBtn = d.createElement('button');
     spoilerBtn.type = 'button';
     spoilerBtn.className = 'btn menu-spoiler-toggle';
-    spoilerBtn.textContent = Model.menuSpoiler ? t.expandAll : t.collapseAll;
+    spoilerBtn.textContent = Model.menuCollapsed ? t.expandAll : t.collapseAll;
     spoilerBtn.addEventListener('click', () => {
-      if (handlers && typeof handlers.onToggleSpoiler === 'function') handlers.onToggleSpoiler();
+      if (handlers && typeof handlers.onToggleMenuSections === 'function') handlers.onToggleMenuSections();
     });
     Dom.categories.appendChild(spoilerBtn);
 
@@ -356,10 +356,6 @@
       const title = d.createElement('div');
       title.className = 'menu-section-title';
       title.textContent = group.title;
-      title.addEventListener('click', () => {
-        if (!Model.menuSpoiler) return;
-        section.classList.toggle('is-collapsed');
-      });
       section.appendChild(title);
 
       const grid = d.createElement('div');
@@ -403,11 +399,11 @@
       });
 
       section.appendChild(grid);
-      if (Model.menuSpoiler) section.classList.add('is-collapsed');
       Dom.menuSections.appendChild(section);
       sections.push(section);
     });
 
+    Dom.menuSections.classList.toggle('is-collapsed', !!Model.menuCollapsed);
     return { sections, linksById };
   }
 
@@ -747,7 +743,7 @@
     tables: [],
     tableId: 0,
     hallId: 0,
-    menuSpoiler: false,
+    menuCollapsed: false,
     selectedTransactionId: 0,
     openTransactions: [],
     loadSelection: modelLoadSelection,
@@ -860,7 +856,7 @@
     const rendered = View.renderMenu(groups, {
       onCategoryClick: (catId) => Controller.onCategoryClick(catId),
       onProductClick: (item) => Controller.addToCart(item),
-      onToggleSpoiler: () => Controller.toggleMenuSpoiler(),
+      onToggleMenuSections: () => Controller.toggleMenuSections(),
     });
     Controller.viewState.sections = rendered.sections;
     Controller.viewState.linksById = rendered.linksById;
@@ -870,8 +866,11 @@
 
   function controllerOnCategoryClick(catId) {
     const id = String(catId || '');
+    if (Model.menuCollapsed) {
+      Model.menuCollapsed = false;
+      Controller.refreshMenu();
+    }
     const section = d.getElementById(`cat-${id}`);
-    if (section && Model.menuSpoiler) section.classList.remove('is-collapsed');
     if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     View.setActiveCategory(Controller.viewState.linksById, id);
   }
@@ -1119,8 +1118,8 @@
     init: controllerInit,
     loadProducts: controllerLoadProducts,
     refreshMenu: controllerRefreshMenu,
-    toggleMenuSpoiler: () => {
-      Model.menuSpoiler = !Model.menuSpoiler;
+    toggleMenuSections: () => {
+      Model.menuCollapsed = !Model.menuCollapsed;
       Controller.refreshMenu();
     },
     onCategoryClick: controllerOnCategoryClick,
