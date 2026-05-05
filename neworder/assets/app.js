@@ -583,6 +583,27 @@
       const title = d.createElement('div');
       title.className = 'menu-section-title';
       title.textContent = group.title;
+      title.tabIndex = 0;
+      title.setAttribute('role', 'button');
+      const isExpanded = handlers && typeof handlers.isCategoryExpanded === 'function'
+        ? !!handlers.isCategoryExpanded(group.id)
+        : false;
+      section.classList.toggle('is-folded', !isExpanded);
+      title.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+      const toggle = () => {
+        const foldedNow = section.classList.toggle('is-folded');
+        title.setAttribute('aria-expanded', foldedNow ? 'false' : 'true');
+        if (handlers && typeof handlers.onCategoryToggle === 'function') {
+          handlers.onCategoryToggle(group.id, !foldedNow);
+        }
+      };
+      title.addEventListener('click', toggle);
+      title.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggle();
+        }
+      });
       section.appendChild(title);
 
       const grid = d.createElement('div');
@@ -1170,6 +1191,7 @@
     tableId: 0,
     hallId: 0,
     menuCollapsed: false,
+    categoryExpanded: {},
     selectedTransactionId: 0,
     openTransactions: [],
     loadSelection: modelLoadSelection,
@@ -1199,6 +1221,22 @@
     dishModsValidate: modelDishModsValidate,
     dishModsBuildSelected: modelDishModsBuildSelected,
   };
+
+  function modelIsCategoryExpanded(catId) {
+    const key = String(Number(catId || 0) || catId || '');
+    if (!key) return false;
+    return !!Model.categoryExpanded[key];
+  }
+
+  function modelSetCategoryExpanded(catId, expanded) {
+    const key = String(Number(catId || 0) || catId || '');
+    if (!key) return;
+    if (expanded) Model.categoryExpanded[key] = true;
+    else delete Model.categoryExpanded[key];
+  }
+
+  Model.isCategoryExpanded = modelIsCategoryExpanded;
+  Model.setCategoryExpanded = modelSetCategoryExpanded;
 
   async function modelFetchOpenTransactions(spotId, tableId) {
     const sid = Number(spotId || Model.spotId || 1) || 1;
@@ -1308,6 +1346,8 @@
     }
     View.renderMenu(groups, {
       onProductClick: (item) => Controller.addToCart(item),
+      isCategoryExpanded: (catId) => Model.isCategoryExpanded(catId),
+      onCategoryToggle: (catId, expanded) => Model.setCategoryExpanded(catId, expanded),
     });
   }
 

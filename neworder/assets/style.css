@@ -301,6 +301,35 @@ body.menu-only-cart .neworder-shell .cart-sidebar {
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
   color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.menu-section-title:focus-visible {
+  outline: 2px solid rgba(184,135,70,0.55);
+  outline-offset: 3px;
+  border-radius: 10px;
+}
+
+.menu-section-title::after {
+  content: '▾';
+  color: rgba(255,255,255,0.55);
+  font-size: 16px;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 160ms ease;
+}
+
+.menu-section.is-folded .menu-section-title::after {
+  transform: rotate(-90deg);
+}
+
+.menu-section.is-folded .products-grid {
+  display: none;
 }
 
 .products-grid {
