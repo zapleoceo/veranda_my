@@ -340,10 +340,17 @@ class KitchenAnalytics {
             $sendList = $sendTimesById[$pId] ?? [];
             $finishList = $finishTimesById[$pId] ?? [];
             $fallbackSent = $firstSendById[$pId] ?? null;
+            $fallbackReady = null;
+            for ($j = count($finishList) - 1; $j >= 0; $j--) {
+                if (!empty($finishList[$j])) {
+                    $fallbackReady = $finishList[$j];
+                    break;
+                }
+            }
             for ($i = 0; $i < $qty; $i++) {
                 $instances[$pId][] = [
                     'sent' => $sendList[$i] ?? $fallbackSent,
-                    'ready' => $finishList[$i] ?? null,
+                    'ready' => $finishList[$i] ?? $fallbackReady,
                     'was_deleted' => false
                 ];
             }

@@ -125,10 +125,12 @@ class Database {
                 station = VALUES(station),
                 exclude_from_dashboard = CASE
                     WHEN (VALUES(dish_category_id) = 47 OR VALUES(dish_sub_category_id) = 47) THEN 1
+                    WHEN exclude_auto = 1 AND VALUES(ready_pressed_at) IS NOT NULL THEN 0
                     ELSE exclude_from_dashboard
                 END,
                 exclude_auto = CASE
                     WHEN (VALUES(dish_category_id) = 47 OR VALUES(dish_sub_category_id) = 47) THEN 1
+                    WHEN exclude_auto = 1 AND VALUES(ready_pressed_at) IS NOT NULL THEN 0
                     ELSE exclude_auto
                 END;";
         

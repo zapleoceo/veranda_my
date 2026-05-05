@@ -424,7 +424,6 @@ try {
                    AND status = 1
                    AND ready_pressed_at IS NULL
                    AND ticket_sent_at IS NOT NULL
-                   AND COALESCE(exclude_from_dashboard, 0) = 0
                    AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)"
                 : "SELECT id, dish_id, was_deleted, ticket_sent_at
                  FROM {$ks}
@@ -433,7 +432,6 @@ try {
                    AND status = 1
                    AND ready_pressed_at IS NULL
                    AND ticket_sent_at IS NOT NULL
-                   AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0)
                    AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)";
             $items = $db->query($itemSql, [$today, $txId])->fetchAll();
 
@@ -450,7 +448,14 @@ try {
                     }
                 }
                 if ($readyTime !== null) {
-                    $db->query("UPDATE {$ks} SET ready_pressed_at = ? WHERE id = ?", [$readyTime, $id]);
+                    $db->query(
+                        "UPDATE {$ks}
+                         SET ready_pressed_at = ?,
+                             exclude_from_dashboard = CASE WHEN exclude_auto = 1 THEN 0 ELSE exclude_from_dashboard END,
+                             exclude_auto = CASE WHEN exclude_auto = 1 THEN 0 ELSE exclude_auto END
+                         WHERE id = ?",
+                        [$readyTime, $id]
+                    );
                     continue;
                 }
 
@@ -566,4 +571,3 @@ try {
     }
     echo json_encode(['ok' => false, 'error' => 'error'], JSON_UNESCAPED_UNICODE);
 }
-
