@@ -468,9 +468,10 @@
   function viewRenderTableSelect(tables, selectedId) {
     if (!Dom.tableSelect) return;
     Dom.tableSelect.innerHTML = '';
+    const t = i18n[currentLang] || i18n.ru;
     const empty = d.createElement('option');
     empty.value = '0';
-    empty.textContent = '—';
+    empty.textContent = t.table;
     Dom.tableSelect.appendChild(empty);
 
     (tables || []).forEach((x) => {
@@ -491,9 +492,10 @@
   function viewRenderHallSelect(halls, selectedId) {
     if (!Dom.hallSelect) return;
     Dom.hallSelect.innerHTML = '';
+    const t = i18n[currentLang] || i18n.ru;
     const any = d.createElement('option');
     any.value = '0';
-    any.textContent = '—';
+    any.textContent = t.hall;
     Dom.hallSelect.appendChild(any);
     (halls || []).forEach((h) => {
       const v = Number(h && h.hall_id ? h.hall_id : 0) || 0;

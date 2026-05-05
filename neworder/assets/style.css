@@ -369,7 +369,7 @@ body.menu-only-cart .neworder-shell .cart-sidebar {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 20px;
+  padding: 5px;
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 40px);
@@ -380,33 +380,27 @@ body.menu-only-cart .neworder-shell .cart-sidebar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 0 0 15px 0;
+  margin: 0 0 8px 0;
   font-size: 18px;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 15px;
+  padding-bottom: 8px;
 }
 
 .cart-footer {
-  margin-top: 20px;
+  margin-top: 10px;
   border-top: 1px solid var(--border);
-  padding-top: 20px;
+  padding-top: 10px;
 }
 
 .checkout-form-container {
-  margin-top: 20px;
-}
-
-.checkout-form-container h3 {
-  margin: 0 0 15px 0;
-  font-size: 16px;
-  color: var(--accent);
+  margin-top: 10px;
 }
 
 .cart-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
+  padding: 5px 0;
   border-bottom: 1px solid var(--border);
 }
 

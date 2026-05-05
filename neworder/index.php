@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0070';
+$assetVersion = '20260505_0080';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -215,14 +215,11 @@ $t = $i18n[$lang] ?? $i18n['ru'];
           <div class="cart-total"><span id="cartTotalLabel"><?= htmlspecialchars((string)($t['total'] ?? '')) ?></span> <span id="cartTotalSum">0</span></div>
           
           <div class="checkout-form-container">
-            <h3 id="checkoutTitle"><?= htmlspecialchars((string)($t['checkout'] ?? '')) ?></h3>
             <form id="checkoutForm">
               <div class="form-group">
-                <label id="labelHall"><?= htmlspecialchars((string)($t['hall'] ?? 'Hall')) ?></label>
                 <select id="hallIdSelect"></select>
               </div>
               <div class="form-group">
-                <label id="labelTable"><?= htmlspecialchars((string)($t['table'] ?? 'Table')) ?></label>
                 <div class="table-select-row">
                   <select id="tableIdSelect"></select>
                   <button type="button" class="btn btn-danger btn-open-checks" id="openChecksBtn" hidden><?= htmlspecialchars((string)($t['open_checks'] ?? 'Открытые чеки')) ?></button>
