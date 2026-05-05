@@ -312,6 +312,27 @@ if ($ajax === 'add_to_transaction') {
             $commentMethod = 'transactions.changeComment';
         }
 
+        $txStartMs = 0;
+        try {
+            $txRes = $posterApi->request('dash.getTransaction', [
+                'transaction_id' => $transactionId,
+                'include_history' => 'false',
+                'include_products' => 'false',
+                'include_delivery' => 'false',
+            ], 'GET');
+            $tx = (is_array($txRes) && isset($txRes[0]) && is_array($txRes[0])) ? $txRes[0] : (is_array($txRes) ? $txRes : []);
+            $dsNew = (int)($tx['date_start_new'] ?? 0);
+            $ds = (int)($tx['date_start'] ?? 0);
+            $txStartMs = $dsNew > 0 ? $dsNew : $ds;
+        } catch (\Throwable $e) {
+            $txStartMs = 0;
+        }
+
+        $baseTimeMs = (int)round(microtime(true) * 1000);
+        if ($txStartMs > 0 && $baseTimeMs <= $txStartMs) {
+            $baseTimeMs = $txStartMs + 1;
+        }
+
         $i = 0;
         foreach ($products as $p) {
             $i++;
@@ -342,7 +363,7 @@ if ($ajax === 'add_to_transaction') {
                 }
             }
 
-            $time = sprintf('%.6f', microtime(true) + ($i / 1000000));
+            $time = (string)($baseTimeMs + $i);
             $params = [
                 'spot_id' => $spotIdReq,
                 'spot_tablet_id' => $tabletId,
