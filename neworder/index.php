@@ -60,6 +60,8 @@ $i18n = [
         'checkout' => 'Оформление заказа',
         'name' => 'Имя',
         'name_ph' => 'Как к вам обращаться?',
+        'comment' => 'Комментарий',
+        'comment_ph' => 'Комментарий к заказу',
         'phone' => 'Телефон',
         'phone_ph' => 'Ваш номер телефона',
         'order_type' => 'Тип заказа',
@@ -80,6 +82,8 @@ $i18n = [
         'checkout' => 'Checkout',
         'name' => 'Name',
         'name_ph' => 'Your name',
+        'comment' => 'Comment',
+        'comment_ph' => 'Order comment',
         'phone' => 'Phone',
         'phone_ph' => 'Your phone number',
         'order_type' => 'Order type',
@@ -100,6 +104,8 @@ $i18n = [
         'checkout' => 'Xác nhận đơn',
         'name' => 'Tên',
         'name_ph' => 'Bạn tên gì?',
+        'comment' => 'Ghi chú',
+        'comment_ph' => 'Ghi chú cho đơn',
         'phone' => 'Số điện thoại',
         'phone_ph' => 'Số điện thoại của bạn',
         'order_type' => 'Loại đơn',
@@ -120,6 +126,8 @@ $i18n = [
         'checkout' => '주문하기',
         'name' => '이름',
         'name_ph' => '이름을 입력하세요',
+        'comment' => '메모',
+        'comment_ph' => '주문 메모',
         'phone' => '전화번호',
         'phone_ph' => '전화번호를 입력하세요',
         'order_type' => '주문 방식',
@@ -210,6 +218,10 @@ $t = $i18n[$lang] ?? $i18n['ru'];
                 <div class="form-group">
                   <label id="labelName"><?= htmlspecialchars((string)($t['name'] ?? '')) ?></label>
                   <input type="text" id="orderName" required placeholder="<?= htmlspecialchars((string)($t['name_ph'] ?? '')) ?>">
+                </div>
+                <div class="form-group">
+                  <label id="labelComment"><?= htmlspecialchars((string)($t['comment'] ?? 'Комментарий')) ?></label>
+                  <textarea id="orderComment" rows="2" placeholder="<?= htmlspecialchars((string)($t['comment_ph'] ?? 'Комментарий к заказу')) ?>"></textarea>
                 </div>
                 <button type="submit" class="btn btn-primary btn-block" id="submitBtn"><?= htmlspecialchars((string)($t['submit'] ?? '')) ?></button>
                 <div id="checkoutError" class="error-msg" hidden></div>

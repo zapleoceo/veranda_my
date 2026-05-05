@@ -18,6 +18,8 @@
     checkoutTitle: d.getElementById('checkoutTitle'),
     labelName: d.getElementById('labelName'),
     orderName: d.getElementById('orderName'),
+    labelComment: d.getElementById('labelComment'),
+    orderComment: d.getElementById('orderComment'),
     submitBtn: d.getElementById('submitBtn'),
     loadingState: d.getElementById('loadingState'),
     checkoutForm: d.getElementById('checkoutForm'),
@@ -59,6 +61,8 @@
     checkout: 'Оформление заказа',
     name: 'Имя',
     namePh: 'Как к вам обращаться?',
+    comment: 'Комментарий',
+    commentPh: 'Комментарий к заказу',
     submit: 'Подтвердить заказ',
     sending: 'Отправка...',
     orderUnknown: 'Неизвестная ошибка',
@@ -78,6 +82,8 @@
     checkout: 'Checkout',
     name: 'Name',
     namePh: 'Your name',
+    comment: 'Comment',
+    commentPh: 'Order comment',
     submit: 'Place order',
     sending: 'Sending...',
     orderUnknown: 'Unknown error',
@@ -97,6 +103,8 @@
     checkout: 'Xác nhận đơn',
     name: 'Tên',
     namePh: 'Bạn tên gì?',
+    comment: 'Ghi chú',
+    commentPh: 'Ghi chú cho đơn',
     submit: 'Đặt hàng',
     sending: 'Đang gửi...',
     orderUnknown: 'Lỗi không xác định',
@@ -116,6 +124,8 @@
     checkout: '주문하기',
     name: '이름',
     namePh: '이름을 입력하세요',
+    comment: '메모',
+    commentPh: '주문 메모',
     submit: '주문 확정',
     sending: '전송 중...',
     orderUnknown: '알 수 없는 오류',
@@ -149,8 +159,10 @@
     if (Dom.cartTotalLabel) Dom.cartTotalLabel.textContent = t.total;
     if (Dom.checkoutTitle) Dom.checkoutTitle.textContent = t.checkout;
     if (Dom.labelName) Dom.labelName.textContent = t.name;
+    if (Dom.labelComment) Dom.labelComment.textContent = t.comment;
     if (Dom.submitBtn && !Dom.submitBtn.disabled) Dom.submitBtn.textContent = t.submit;
     if (Dom.orderName) Dom.orderName.placeholder = t.namePh;
+    if (Dom.orderComment) Dom.orderComment.placeholder = t.commentPh;
     if (Dom.loadingState) Dom.loadingState.textContent = t.menuLoading;
     if (Dom.searchInput) Dom.searchInput.placeholder = t.searchPlaceholder;
     if (Dom.labelSpot) Dom.labelSpot.textContent = 'Spot';
@@ -713,7 +725,7 @@
     return Array.isArray(json.transactions) ? json.transactions : [];
   }
 
-  async function modelAddToTransaction(transactionId, products) {
+  async function modelAddToTransaction(transactionId, products, comment) {
     const res = await fetch('/api/poster/neworder/index.php?ajax=add_to_transaction', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -722,6 +734,7 @@
         spot_tablet_id: Config.spotTabletId,
         transaction_id: Number(transactionId || 0),
         products: products || [],
+        comment: String(comment || '').trim(),
       }),
     });
     const json = await res.json();
@@ -1026,6 +1039,7 @@
     if (!Dom.submitBtn) return;
 
     const name = String(Dom.orderName ? Dom.orderName.value : '').trim();
+    const comment = String(Dom.orderComment ? Dom.orderComment.value : '').trim();
     const serviceMode = 1;
     const products = Object.values(Model.cart).map((c) => ({ product_id: Number((c.item && c.item.id) ? c.item.id : 0), count: Number(c.count || 0) }));
     if (!products.length) {
@@ -1041,7 +1055,7 @@
 
     try {
       if (Number(Model.selectedTransactionId || 0) > 0) {
-        const added = await Model.addToTransaction(Model.selectedTransactionId, products);
+        const added = await Model.addToTransaction(Model.selectedTransactionId, products, comment);
         View.showToast(`Добавлено в чек #${String(Model.selectedTransactionId)}: ${String(added)}`);
       } else {
         const res = await fetch('/api/poster/neworder/index.php?ajax=create_order', {
@@ -1049,6 +1063,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name,
+            comment,
             service_mode: serviceMode,
             products,
             waiter_id: Config.waiterId,

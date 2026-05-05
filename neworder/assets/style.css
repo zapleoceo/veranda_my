@@ -460,6 +460,7 @@ body {
 
 .form-group input[type="text"],
 .form-group input[type="tel"],
+.form-group textarea,
 .form-group select {
   width: 100%;
   padding: 12px;
@@ -472,7 +473,18 @@ body {
   box-sizing: border-box;
 }
 
+.form-group textarea {
+  padding-right: 12px;
+  resize: vertical;
+  min-height: 44px;
+}
+
 .form-group input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.form-group textarea:focus {
   outline: none;
   border-color: var(--accent);
 }

@@ -139,6 +139,8 @@ if ($ajax === 'create_order') {
     $name = trim((string)($payload['name'] ?? ''));
     if ($name === '') $respondError(400, 'Введите имя');
 
+    $comment = trim((string)($payload['comment'] ?? ''));
+
     $products = $payload['products'] ?? [];
     if (!is_array($products) || count($products) === 0) {
         $respondError(400, 'Корзина пуста');
@@ -156,7 +158,7 @@ if ($ajax === 'create_order') {
     if ($clientId < 0) $clientId = 0;
 
     try {
-        $resp = $model->createOrder($spotIdReq, $tableId, $waiterId, $clientId, $serviceMode, $name, $products);
+        $resp = $model->createOrder($spotIdReq, $tableId, $waiterId, $clientId, $serviceMode, $name, $comment, $products);
     } catch (\Throwable $e) {
         $respondError(500, 'Poster Error: ' . $e->getMessage());
     }
@@ -244,6 +246,8 @@ if ($ajax === 'add_to_transaction') {
         $respondError(400, 'Корзина пуста');
     }
 
+    $comment = trim((string)($payload['comment'] ?? ''));
+
     $added = 0;
     try {
         foreach ($products as $p) {
@@ -254,13 +258,18 @@ if ($ajax === 'add_to_transaction') {
             $cnt = (float)$cnt;
             if ($cnt <= 0) continue;
 
-            $posterApi->request('transactions.addTransactionProduct', [
+            $params = [
                 'spot_id' => $spotIdReq,
                 'spot_tablet_id' => $tabletId,
                 'transaction_id' => $transactionId,
                 'product_id' => $pid,
                 'num' => $cnt,
-            ], 'POST');
+            ];
+            if ($comment !== '') {
+                $params['comment'] = $comment;
+            }
+
+            $posterApi->request('transactions.addTransactionProduct', $params, 'POST');
             $added++;
         }
     } catch (\Throwable $e) {
