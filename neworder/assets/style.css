@@ -591,6 +591,10 @@ body {
   padding: 18px;
 }
 
+.modal-overlay[hidden] {
+  display: none;
+}
+
 .modal {
   width: min(900px, 100%);
   max-height: min(80vh, 720px);
