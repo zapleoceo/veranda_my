@@ -458,7 +458,8 @@ body {
 }
 
 .form-group input[type="text"],
-.form-group input[type="tel"] {
+.form-group input[type="tel"],
+.form-group select {
   width: 100%;
   padding: 12px;
   border-radius: 8px;

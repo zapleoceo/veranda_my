@@ -28,6 +28,10 @@
     checkoutForm: d.getElementById('checkoutForm'),
     checkoutError: d.getElementById('checkoutError'),
     langMenu: d.getElementById('langMenu'),
+    spotSelect: d.getElementById('spotIdSelect'),
+    tableSelect: d.getElementById('tableIdSelect'),
+    labelSpot: d.getElementById('labelSpot'),
+    labelTable: d.getElementById('labelTable'),
   };
 
   const fmtPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
@@ -140,6 +144,10 @@
   }
   };
 
+  const Config = {
+    waiterId: 10,
+  };
+
   const View = {
     applyLang(t) {
       d.documentElement.setAttribute('lang', currentLang);
@@ -159,6 +167,8 @@
       if (Dom.orderPhone) Dom.orderPhone.placeholder = t.phonePh;
       if (Dom.loadingState) Dom.loadingState.textContent = t.menuLoading;
       if (Dom.searchInput) Dom.searchInput.placeholder = t.searchPlaceholder;
+      if (Dom.labelSpot) Dom.labelSpot.textContent = 'Spot';
+      if (Dom.labelTable) Dom.labelTable.textContent = 'Table';
       View.setActiveLangLink(currentLang);
     },
 
@@ -342,6 +352,39 @@
       Dom.cartBadge.textContent = String(totalCount);
       Dom.cartBadge.hidden = totalCount <= 0;
     },
+
+    renderSpotSelect(spotId) {
+      if (!Dom.spotSelect) return;
+      Dom.spotSelect.innerHTML = '';
+      const opt = d.createElement('option');
+      opt.value = String(spotId || 1);
+      opt.textContent = String(spotId || 1);
+      Dom.spotSelect.appendChild(opt);
+      Dom.spotSelect.value = String(spotId || 1);
+    },
+
+    renderTableSelect(tables, selectedId = 0) {
+      if (!Dom.tableSelect) return;
+      Dom.tableSelect.innerHTML = '';
+      const empty = d.createElement('option');
+      empty.value = '0';
+      empty.textContent = '—';
+      Dom.tableSelect.appendChild(empty);
+
+      (tables || []).forEach((x) => {
+        const id = Number(x.table_id || x.id || 0) || 0;
+        if (!id) return;
+        const num = String(x.table_num || x.num || '').trim();
+        const title = String(x.table_title || x.title || '').trim();
+        const label = title ? (num ? `${num}. ${title}` : title) : (num ? num : String(id));
+        const opt = d.createElement('option');
+        opt.value = String(id);
+        opt.textContent = label;
+        Dom.tableSelect.appendChild(opt);
+      });
+
+      Dom.tableSelect.value = String(Number(selectedId || 0));
+    },
   };
 
   const Model = {
@@ -350,6 +393,8 @@
     groupsAll: [],
     query: '',
     cart: {},
+    tables: [],
+    tableId: 0,
 
     setQuery(q) {
       Model.query = String(q || '').trim();
@@ -418,6 +463,23 @@
       Model.spotId = spotId;
       Model.groupsAll = Model.buildGroups(products);
       Model.saveCache();
+    },
+
+    async fetchTables(spotId) {
+      const sid = Number(spotId || Model.spotId || 1) || 1;
+      const res = await fetch(`/api/poster/neworder/index.php?ajax=get_tables&spot_id=${encodeURIComponent(String(sid))}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      const json = await res.json();
+      if (!json || !json.ok) {
+        throw new Error(String(json?.error || 'Failed'));
+      }
+      const tables = Array.isArray(json.tables) ? json.tables : [];
+      Model.tables = tables;
+      if (Model.tableId > 0) {
+        const ok = tables.some((t) => Number(t.table_id || 0) === Number(Model.tableId));
+        if (!ok) Model.tableId = 0;
+      }
     },
 
     extractPriceCents(p) {
@@ -495,6 +557,7 @@
       Controller.bindLangMenu();
       Controller.bindSearch();
       Controller.bindCheckout();
+      Controller.bindSpotTable();
 
       const t = i18n[currentLang] || i18n.ru;
       View.applyLang(t);
@@ -512,6 +575,9 @@
       const t = i18n[currentLang] || i18n.ru;
       try {
         await Model.fetchProducts();
+        View.renderSpotSelect(Model.spotId);
+        await Model.fetchTables(Model.spotId);
+        View.renderTableSelect(Model.tables, Model.tableId);
         Controller.refreshMenu();
       } catch (err) {
         View.renderEmptyMenu(`${t.loadMenuFailPrefix}${String(err?.message || err)}`);
@@ -645,6 +711,26 @@
       Dom.checkoutForm.addEventListener('submit', (e) => Controller.submitOrder(e));
     },
 
+    bindSpotTable() {
+      if (Dom.spotSelect) {
+        Dom.spotSelect.addEventListener('change', async () => {
+          const sid = Number(Dom.spotSelect.value || 0) || Model.spotId || 1;
+          Model.spotId = sid;
+          try {
+            await Model.fetchTables(sid);
+            View.renderTableSelect(Model.tables, Model.tableId);
+          } catch (e) {
+            View.renderTableSelect([], 0);
+          }
+        });
+      }
+      if (Dom.tableSelect) {
+        Dom.tableSelect.addEventListener('change', () => {
+          Model.tableId = Number(Dom.tableSelect.value || 0) || 0;
+        });
+      }
+    },
+
     phoneDigits(raw) {
       return String(raw || '').replace(/\D+/g, '').slice(0, 15);
     },
@@ -706,7 +792,15 @@
         const res = await fetch('/api/poster/neworder/index.php?ajax=create_order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, phone: phoneE164, service_mode: serviceMode, products }),
+          body: JSON.stringify({
+            name,
+            phone: phoneE164,
+            service_mode: serviceMode,
+            products,
+            waiter_id: Config.waiterId,
+            spot_id: Number(Model.spotId || 0),
+            table_id: Number(Model.tableId || 0),
+          }),
         });
         const json = await res.json();
         if (!json.ok) throw new Error(String(json.error || t.orderUnknown));

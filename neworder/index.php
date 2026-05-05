@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260505_0001';
+$assetVersion = '20260505_0002';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -193,6 +193,14 @@ $t = $i18n[$lang] ?? $i18n['ru'];
             <div class="checkout-form-container">
               <h3 id="checkoutTitle"><?= htmlspecialchars((string)($t['checkout'] ?? '')) ?></h3>
               <form id="checkoutForm">
+                <div class="form-group">
+                  <label id="labelSpot">Spot</label>
+                  <select id="spotIdSelect"></select>
+                </div>
+                <div class="form-group">
+                  <label id="labelTable">Table</label>
+                  <select id="tableIdSelect"></select>
+                </div>
                 <div class="form-group">
                   <label id="labelName"><?= htmlspecialchars((string)($t['name'] ?? '')) ?></label>
                   <input type="text" id="orderName" required placeholder="<?= htmlspecialchars((string)($t['name_ph'] ?? '')) ?>">

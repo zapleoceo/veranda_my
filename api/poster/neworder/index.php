@@ -47,7 +47,7 @@ if ($spotId <= 0) {
 
 $apiToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? (getenv('POSTER_API_TOKEN') !== false ? getenv('POSTER_API_TOKEN') : '')));
 $posterApi = $apiToken !== '' ? new \App\Classes\PosterAPI($apiToken) : null;
-$model = new ApiPosterNewOrderModel($posterApi, $spotId);
+$model = new ApiPosterNewOrderModel($posterApi, $spotId, $apiToken);
 
 if ($ajax === 'get_products') {
     if (!$posterApi) {
@@ -59,6 +59,20 @@ if ($ajax === 'get_products') {
         $respondError(500, 'Poster Error: ' . $e->getMessage());
     }
     $respondOk(['products' => $products, 'spot_id' => $spotId]);
+}
+
+if ($ajax === 'get_tables') {
+    if (!$posterApi) {
+        $respondError(500, 'Poster API Token not set');
+    }
+    $spotIdReq = (int)($_GET['spot_id'] ?? $spotId);
+    $hallIdReq = (int)($_GET['hall_id'] ?? 0);
+    try {
+        $tables = $model->getTables($spotIdReq, $hallIdReq);
+    } catch (\Throwable $e) {
+        $respondError(500, 'Poster Error: ' . $e->getMessage());
+    }
+    $respondOk(['tables' => $tables]);
 }
 
 if ($ajax === 'create_order') {
@@ -84,16 +98,15 @@ if ($ajax === 'create_order') {
     $serviceMode = (int)($payload['service_mode'] ?? 2);
     if (!in_array($serviceMode, [1, 2, 3], true)) $serviceMode = 2;
 
-    $orderProducts = [];
-    foreach ($products as $p) {
-        $orderProducts[] = [
-            'product_id' => (int)($p['product_id'] ?? 0),
-            'count' => (int)($p['count'] ?? 1)
-        ];
-    }
+    $spotIdReq = (int)($payload['spot_id'] ?? $spotId);
+    if ($spotIdReq <= 0) $spotIdReq = $spotId;
+    $tableId = (int)($payload['table_id'] ?? 0);
+    if ($tableId < 0) $tableId = 0;
+    $waiterId = (int)($payload['waiter_id'] ?? 0);
+    if ($waiterId < 0) $waiterId = 0;
 
     try {
-        $resp = $model->createIncomingOrder($phoneNorm, $name, $serviceMode, $orderProducts);
+        $resp = $model->createOrder($spotIdReq, $tableId, $waiterId, $serviceMode, $phoneNorm, $name, $products);
     } catch (\Throwable $e) {
         $respondError(500, 'Poster Error: ' . $e->getMessage());
     }
