@@ -1,5 +1,5 @@
 <?php
-$assetVersion = '20260417_001';
+$assetVersion = '20260505_0001';
 header('X-Robots-Tag: noindex, nofollow', true);
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
@@ -145,34 +145,25 @@ $t = $i18n[$lang] ?? $i18n['ru'];
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </head>
 <body>
-  <?php require $_SERVER['DOCUMENT_ROOT'] . '/partials/user_menu.php'; ?>
-  
   <div class="container">
-    <div class="top-header">
-      <div class="header-left">
-        <h1 class="page-title" id="pageTitle"><?= htmlspecialchars((string)($t['title'] ?? '')) ?></h1>
-      </div>
-      <div class="header-right">
-        <details class="lang-menu" id="langMenu">
-          <summary aria-label="Language">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm7.93 9h-3.2a15.7 15.7 0 0 0-1.47-5 8.05 8.05 0 0 1 4.67 5ZM12 4c1.1 0 2.7 2.2 3.4 7H8.6C9.3 6.2 10.9 4 12 4ZM4.07 11a8.05 8.05 0 0 1 4.67-5 15.7 15.7 0 0 0-1.47 5Zm0 2h3.2a15.7 15.7 0 0 0 1.47 5 8.05 8.05 0 0 1-4.67-5ZM12 20c-1.1 0-2.7-2.2-3.4-7h6.8c-.7 4.8-2.3 7-3.4 7Zm3.26-2a15.7 15.7 0 0 0 1.47-5h3.2a8.05 8.05 0 0 1-4.67 5Z"/></svg>
-          </summary>
-          <div class="lang-panel">
-            <a href="?lang=ru" class="<?= $lang === 'ru' ? 'active' : '' ?>" aria-label="Русский">Русский</a>
-            <a href="?lang=en" class="<?= $lang === 'en' ? 'active' : '' ?>" aria-label="English">English</a>
-            <a href="?lang=vi" class="<?= $lang === 'vi' ? 'active' : '' ?>" aria-label="Tiếng Việt">Tiếng Việt</a>
-            <a href="?lang=ko" class="<?= $lang === 'ko' ? 'active' : '' ?>" aria-label="한국어">한국어</a>
-          </div>
-        </details>
-        <button class="btn btn-cart" id="cartBtn" onclick="toggleCartModal()">
-          <span id="cartBtnLabel"><?= htmlspecialchars((string)($t['cart'] ?? '')) ?></span> <span class="cart-badge" id="cartBadge" hidden>0</span>
-        </button>
-      </div>
-    </div>
+    <h1 class="page-title" id="pageTitle"><?= htmlspecialchars((string)($t['title'] ?? '')) ?></h1>
 
-    <div class="search-bar">
-      <input type="search" id="productSearchInput" class="search-input" placeholder="<?= htmlspecialchars((string)($t['search_placeholder'] ?? '')) ?>" autocomplete="off">
-      <button type="button" class="btn search-clear" id="productSearchClear" hidden>×</button>
+    <div class="search-bar" id="searchBar">
+      <div class="search-input-wrap">
+        <input type="search" id="productSearchInput" class="search-input" placeholder="<?= htmlspecialchars((string)($t['search_placeholder'] ?? '')) ?>" autocomplete="off">
+        <button type="button" class="search-clear-in" id="productSearchClear" hidden>×</button>
+      </div>
+      <details class="lang-menu" id="langMenu">
+        <summary aria-label="Language">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm7.93 9h-3.2a15.7 15.7 0 0 0-1.47-5 8.05 8.05 0 0 1 4.67 5ZM12 4c1.1 0 2.7 2.2 3.4 7H8.6C9.3 6.2 10.9 4 12 4ZM4.07 11a8.05 8.05 0 0 1 4.67-5 15.7 15.7 0 0 0-1.47 5Zm0 2h3.2a15.7 15.7 0 0 0 1.47 5 8.05 8.05 0 0 1-4.67-5ZM12 20c-1.1 0-2.7-2.2-3.4-7h6.8c-.7 4.8-2.3 7-3.4 7Zm3.26-2a15.7 15.7 0 0 0 1.47-5h3.2a8.05 8.05 0 0 1-4.67 5Z"/></svg>
+        </summary>
+        <div class="lang-panel">
+          <a href="?lang=ru" class="<?= $lang === 'ru' ? 'active' : '' ?>" aria-label="Русский">Русский</a>
+          <a href="?lang=en" class="<?= $lang === 'en' ? 'active' : '' ?>" aria-label="English">English</a>
+          <a href="?lang=vi" class="<?= $lang === 'vi' ? 'active' : '' ?>" aria-label="Tiếng Việt">Tiếng Việt</a>
+          <a href="?lang=ko" class="<?= $lang === 'ko' ? 'active' : '' ?>" aria-label="한국어">한국어</a>
+        </div>
+      </details>
     </div>
 
     <div class="content-wrapper">
@@ -180,12 +171,6 @@ $t = $i18n[$lang] ?? $i18n['ru'];
         <!-- Categories injected here -->
       </div>
       <div class="menu-main" id="menuMain">
-        <div class="search-section" id="searchSection" hidden>
-          <div class="menu-section-title" id="searchTitle"><?= htmlspecialchars((string)($t['search_results'] ?? '')) ?></div>
-          <div class="loading-state" id="searchLoading" hidden><?= htmlspecialchars((string)($t['search_loading'] ?? '')) ?></div>
-          <div class="loading-state" id="searchEmpty" hidden><?= htmlspecialchars((string)($t['search_empty'] ?? '')) ?></div>
-          <div class="products-grid" id="searchGrid"></div>
-        </div>
         <div class="menu-sections" id="menuSections">
           <!-- Menu injected here -->
           <div class="loading-state" id="loadingState"><?= htmlspecialchars((string)($t['menu_loading'] ?? '')) ?></div>
@@ -197,7 +182,7 @@ $t = $i18n[$lang] ?? $i18n['ru'];
         <div class="cart-panel">
           <h2>
             <span id="cartTitle"><?= htmlspecialchars((string)($t['cart'] ?? '')) ?></span>
-            <button class="close-cart-btn" onclick="closeCheckoutModal()">×</button>
+            <span class="cart-badge" id="cartBadge" hidden>0</span>
           </h2>
           <div class="empty-cart" id="emptyCart"><?= htmlspecialchars((string)($t['empty_cart'] ?? '')) ?></div>
           <div class="cart-items" id="cartItems"></div>
@@ -207,7 +192,7 @@ $t = $i18n[$lang] ?? $i18n['ru'];
             
             <div class="checkout-form-container">
               <h3 id="checkoutTitle"><?= htmlspecialchars((string)($t['checkout'] ?? '')) ?></h3>
-              <form id="checkoutForm" onsubmit="submitOrder(event)">
+              <form id="checkoutForm">
                 <div class="form-group">
                   <label id="labelName"><?= htmlspecialchars((string)($t['name'] ?? '')) ?></label>
                   <input type="text" id="orderName" required placeholder="<?= htmlspecialchars((string)($t['name_ph'] ?? '')) ?>">
@@ -241,7 +226,6 @@ $t = $i18n[$lang] ?? $i18n['ru'];
 
   <div class="toast" id="toast" hidden></div>
 
-  <script src="/assets/user_menu.js?v=<?= $assetVersion ?>" defer></script>
   <script src="/neworder/assets/app.js?v=<?= $assetVersion ?>" defer></script>
 </body>
 </html>

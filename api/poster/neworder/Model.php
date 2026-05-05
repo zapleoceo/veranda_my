@@ -19,7 +19,7 @@ class ApiPosterNewOrderModel
             throw new \RuntimeException('Poster API Token not set');
         }
 
-        $resp = $this->posterApi->request('menu.getProducts', [], 'GET');
+        $resp = $this->posterApi->request('menu.getProducts', ['hidden' => 0], 'GET');
         return is_array($resp) ? $resp : [];
     }
 
