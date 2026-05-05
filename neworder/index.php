@@ -58,10 +58,15 @@ $i18n = [
         'empty_cart' => 'Корзина пуста',
         'total' => 'Итого:',
         'checkout' => 'Оформление заказа',
+        'hall' => 'Зал',
+        'spot' => 'Заведение',
+        'table' => 'Стол',
         'name' => 'Имя',
         'name_ph' => 'Как к вам обращаться?',
         'comment' => 'Комментарий',
         'comment_ph' => 'Комментарий к заказу',
+        'open_checks' => 'Открытые чеки',
+        'open_checks_title' => 'Открытые чеки на столе',
         'phone' => 'Телефон',
         'phone_ph' => 'Ваш номер телефона',
         'order_type' => 'Тип заказа',
@@ -80,10 +85,15 @@ $i18n = [
         'empty_cart' => 'Cart is empty',
         'total' => 'Total:',
         'checkout' => 'Checkout',
+        'hall' => 'Hall',
+        'spot' => 'Spot',
+        'table' => 'Table',
         'name' => 'Name',
         'name_ph' => 'Your name',
         'comment' => 'Comment',
         'comment_ph' => 'Order comment',
+        'open_checks' => 'Open checks',
+        'open_checks_title' => 'Open checks for table',
         'phone' => 'Phone',
         'phone_ph' => 'Your phone number',
         'order_type' => 'Order type',
@@ -102,10 +112,15 @@ $i18n = [
         'empty_cart' => 'Giỏ hàng trống',
         'total' => 'Tổng:',
         'checkout' => 'Xác nhận đơn',
+        'hall' => 'Sảnh',
+        'spot' => 'Cơ sở',
+        'table' => 'Bàn',
         'name' => 'Tên',
         'name_ph' => 'Bạn tên gì?',
         'comment' => 'Ghi chú',
         'comment_ph' => 'Ghi chú cho đơn',
+        'open_checks' => 'Hóa đơn mở',
+        'open_checks_title' => 'Hóa đơn đang mở theo bàn',
         'phone' => 'Số điện thoại',
         'phone_ph' => 'Số điện thoại của bạn',
         'order_type' => 'Loại đơn',
@@ -124,10 +139,15 @@ $i18n = [
         'empty_cart' => '장바구니가 비어있습니다',
         'total' => '합계:',
         'checkout' => '주문하기',
+        'hall' => '홀',
+        'spot' => '매장',
+        'table' => '테이블',
         'name' => '이름',
         'name_ph' => '이름을 입력하세요',
         'comment' => '메모',
         'comment_ph' => '주문 메모',
+        'open_checks' => '열린 체크',
+        'open_checks_title' => '테이블의 열린 체크',
         'phone' => '전화번호',
         'phone_ph' => '전화번호를 입력하세요',
         'order_type' => '주문 방식',
@@ -201,18 +221,18 @@ $t = $i18n[$lang] ?? $i18n['ru'];
               <h3 id="checkoutTitle"><?= htmlspecialchars((string)($t['checkout'] ?? '')) ?></h3>
               <form id="checkoutForm">
                 <div class="form-group">
-                  <label id="labelHall">Hall</label>
+                  <label id="labelHall"><?= htmlspecialchars((string)($t['hall'] ?? 'Hall')) ?></label>
                   <select id="hallIdSelect"></select>
                 </div>
                 <div class="form-group">
-                  <label id="labelSpot">Spot</label>
+                  <label id="labelSpot"><?= htmlspecialchars((string)($t['spot'] ?? 'Spot')) ?></label>
                   <select id="spotIdSelect"></select>
                 </div>
                 <div class="form-group">
-                  <label id="labelTable">Table</label>
+                  <label id="labelTable"><?= htmlspecialchars((string)($t['table'] ?? 'Table')) ?></label>
                   <div class="table-select-row">
                     <select id="tableIdSelect"></select>
-                    <button type="button" class="btn btn-danger btn-open-checks" id="openChecksBtn" hidden>Открытые чеки</button>
+                    <button type="button" class="btn btn-danger btn-open-checks" id="openChecksBtn" hidden><?= htmlspecialchars((string)($t['open_checks'] ?? 'Открытые чеки')) ?></button>
                   </div>
                 </div>
                 <div class="form-group">
@@ -237,7 +257,7 @@ $t = $i18n[$lang] ?? $i18n['ru'];
   <div class="modal-overlay" id="openChecksModal" hidden>
     <div class="modal">
       <div class="modal-header">
-        <div class="modal-title" id="openChecksTitle">Открытые чеки на столе</div>
+        <div class="modal-title" id="openChecksTitle"><?= htmlspecialchars((string)($t['open_checks_title'] ?? 'Открытые чеки на столе')) ?></div>
         <button type="button" class="btn modal-close" id="openChecksClose">×</button>
       </div>
       <div class="modal-body">

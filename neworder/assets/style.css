@@ -278,6 +278,34 @@ body {
   color: var(--accent);
 }
 
+.menu-section.is-collapsed .products-grid {
+  display: none;
+}
+
+.menu-spoiler-toggle {
+  display: none;
+  white-space: nowrap;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-weight: 700;
+}
+
+@media (max-width: 800px) {
+  .menu-spoiler-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .menu-section-title {
+    cursor: pointer;
+    user-select: none;
+  }
+}
+
 .menu-section {
   margin-bottom: 40px;
   scroll-margin-top: 90px;

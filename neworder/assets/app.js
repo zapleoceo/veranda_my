@@ -35,6 +35,7 @@
     openChecksModal: d.getElementById('openChecksModal'),
     openChecksList: d.getElementById('openChecksList'),
     openChecksClose: d.getElementById('openChecksClose'),
+    openChecksTitle: d.getElementById('openChecksTitle'),
   };
 
   const fmtPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + ' đ';
@@ -59,14 +60,27 @@
     emptyCart: 'Корзина пуста',
     total: 'Итого:',
     checkout: 'Оформление заказа',
+    hall: 'Зал',
+    spot: 'Заведение',
+    table: 'Стол',
     name: 'Имя',
     namePh: 'Как к вам обращаться?',
     comment: 'Комментарий',
     commentPh: 'Комментарий к заказу',
+    openChecksTitle: 'Открытые чеки на столе',
+    openChecksBtn: 'Открытые чеки',
+    openChecksBtnCount: 'Открытые чеки: ',
+    openChecksBtnSelected: 'Чек #',
+    usePrevCheck: 'Использовать',
+    newCheck: 'Новый чек',
+    sum: 'Сумма: ',
+    collapseAll: 'Свернуть меню',
+    expandAll: 'Развернуть меню',
     submit: 'Подтвердить заказ',
     sending: 'Отправка...',
     orderUnknown: 'Неизвестная ошибка',
     orderSuccessPrefix: 'Заказ успешно создан! ID: ',
+    addedToCheckPrefix: 'Добавлено в чек #',
   },
   en: {
     title: 'New order',
@@ -80,14 +94,27 @@
     emptyCart: 'Cart is empty',
     total: 'Total:',
     checkout: 'Checkout',
+    hall: 'Hall',
+    spot: 'Spot',
+    table: 'Table',
     name: 'Name',
     namePh: 'Your name',
     comment: 'Comment',
     commentPh: 'Order comment',
+    openChecksTitle: 'Open checks for table',
+    openChecksBtn: 'Open checks',
+    openChecksBtnCount: 'Open checks: ',
+    openChecksBtnSelected: 'Check #',
+    usePrevCheck: 'Use',
+    newCheck: 'New check',
+    sum: 'Sum: ',
+    collapseAll: 'Collapse menu',
+    expandAll: 'Expand menu',
     submit: 'Place order',
     sending: 'Sending...',
     orderUnknown: 'Unknown error',
     orderSuccessPrefix: 'Order created! ID: ',
+    addedToCheckPrefix: 'Added to check #',
   },
   vi: {
     title: 'Đơn mới',
@@ -101,14 +128,27 @@
     emptyCart: 'Giỏ hàng trống',
     total: 'Tổng:',
     checkout: 'Xác nhận đơn',
+    hall: 'Sảnh',
+    spot: 'Cơ sở',
+    table: 'Bàn',
     name: 'Tên',
     namePh: 'Bạn tên gì?',
     comment: 'Ghi chú',
     commentPh: 'Ghi chú cho đơn',
+    openChecksTitle: 'Hóa đơn đang mở theo bàn',
+    openChecksBtn: 'Hóa đơn mở',
+    openChecksBtnCount: 'Hóa đơn mở: ',
+    openChecksBtnSelected: 'Hóa đơn #',
+    usePrevCheck: 'Dùng',
+    newCheck: 'Hóa đơn mới',
+    sum: 'Tổng: ',
+    collapseAll: 'Thu gọn menu',
+    expandAll: 'Mở rộng menu',
     submit: 'Đặt hàng',
     sending: 'Đang gửi...',
     orderUnknown: 'Lỗi không xác định',
     orderSuccessPrefix: 'Đã tạo đơn! ID: ',
+    addedToCheckPrefix: 'Đã thêm vào hóa đơn #',
   },
   ko: {
     title: '새 주문',
@@ -122,14 +162,27 @@
     emptyCart: '장바구니가 비어있습니다',
     total: '합계:',
     checkout: '주문하기',
+    hall: '홀',
+    spot: '매장',
+    table: '테이블',
     name: '이름',
     namePh: '이름을 입력하세요',
     comment: '메모',
     commentPh: '주문 메모',
+    openChecksTitle: '테이블의 열린 체크',
+    openChecksBtn: '열린 체크',
+    openChecksBtnCount: '열린 체크: ',
+    openChecksBtnSelected: '체크 #',
+    usePrevCheck: '사용',
+    newCheck: '새 체크',
+    sum: '합계: ',
+    collapseAll: '메뉴 접기',
+    expandAll: '메뉴 펼치기',
     submit: '주문 확정',
     sending: '전송 중...',
     orderUnknown: '알 수 없는 오류',
     orderSuccessPrefix: '주문 생성됨! ID: ',
+    addedToCheckPrefix: '체크에 추가됨 #',
   }
   };
 
@@ -160,14 +213,15 @@
     if (Dom.checkoutTitle) Dom.checkoutTitle.textContent = t.checkout;
     if (Dom.labelName) Dom.labelName.textContent = t.name;
     if (Dom.labelComment) Dom.labelComment.textContent = t.comment;
+    if (Dom.openChecksTitle) Dom.openChecksTitle.textContent = t.openChecksTitle;
     if (Dom.submitBtn && !Dom.submitBtn.disabled) Dom.submitBtn.textContent = t.submit;
     if (Dom.orderName) Dom.orderName.placeholder = t.namePh;
     if (Dom.orderComment) Dom.orderComment.placeholder = t.commentPh;
     if (Dom.loadingState) Dom.loadingState.textContent = t.menuLoading;
     if (Dom.searchInput) Dom.searchInput.placeholder = t.searchPlaceholder;
-    if (Dom.labelSpot) Dom.labelSpot.textContent = 'Spot';
-    if (Dom.labelTable) Dom.labelTable.textContent = 'Table';
-    if (Dom.labelHall) Dom.labelHall.textContent = 'Hall';
+    if (Dom.labelSpot) Dom.labelSpot.textContent = t.spot;
+    if (Dom.labelTable) Dom.labelTable.textContent = t.table;
+    if (Dom.labelHall) Dom.labelHall.textContent = t.hall;
     viewSetActiveLangLink(currentLang);
   }
 
@@ -184,15 +238,22 @@
     if (Dom.openChecksList) Dom.openChecksList.innerHTML = '';
   }
 
-  function viewSetOpenChecksButton(openCount) {
+  function viewSetOpenChecksButton(openCount, selectedTransactionId) {
     if (!Dom.openChecksBtn) return;
     const n = Number(openCount || 0) || 0;
-    Dom.openChecksBtn.hidden = n <= 0;
-    if (n > 0) Dom.openChecksBtn.textContent = `Открытые чеки: ${String(n)}`;
+    const selId = Number(selectedTransactionId || 0) || 0;
+    const t = i18n[currentLang] || i18n.ru;
+    Dom.openChecksBtn.hidden = n <= 0 && selId <= 0;
+    if (selId > 0) {
+      Dom.openChecksBtn.textContent = `${t.openChecksBtnSelected}${String(selId)}`;
+      return;
+    }
+    if (n > 0) Dom.openChecksBtn.textContent = `${t.openChecksBtnCount}${String(n)}`;
   }
 
   function viewShowOpenChecksModal(transactions, handlers) {
     if (!Dom.openChecksModal || !Dom.openChecksList) return;
+    const t = i18n[currentLang] || i18n.ru;
     Dom.openChecksList.innerHTML = '';
     (transactions || []).forEach((tr) => {
       const card = d.createElement('div');
@@ -203,7 +264,7 @@
 
       const meta = d.createElement('div');
       meta.className = 'check-meta';
-      meta.textContent = `Sum: ${String(tr.sum || '')}`;
+      meta.textContent = `${t.sum}${String(tr.sum || '')}`;
       card.appendChild(meta);
 
       const items = d.createElement('div');
@@ -226,7 +287,7 @@
       const useBtn = d.createElement('button');
       useBtn.type = 'button';
       useBtn.className = 'btn btn-primary';
-      useBtn.textContent = 'Использовать';
+      useBtn.textContent = t.usePrevCheck;
       useBtn.addEventListener('click', () => {
         if (handlers && typeof handlers.onUseTransaction === 'function') {
           handlers.onUseTransaction(Number(tr.transaction_id || 0) || 0);
@@ -235,7 +296,7 @@
       const newBtn = d.createElement('button');
       newBtn.type = 'button';
       newBtn.className = 'btn';
-      newBtn.textContent = 'Новый чек';
+      newBtn.textContent = t.newCheck;
       newBtn.addEventListener('click', () => {
         if (handlers && typeof handlers.onCreateNew === 'function') {
           handlers.onCreateNew();
@@ -264,6 +325,16 @@
     const sections = [];
     const linksById = new Map();
 
+    const t = i18n[currentLang] || i18n.ru;
+    const spoilerBtn = d.createElement('button');
+    spoilerBtn.type = 'button';
+    spoilerBtn.className = 'btn menu-spoiler-toggle';
+    spoilerBtn.textContent = Model.menuSpoiler ? t.expandAll : t.collapseAll;
+    spoilerBtn.addEventListener('click', () => {
+      if (handlers && typeof handlers.onToggleSpoiler === 'function') handlers.onToggleSpoiler();
+    });
+    Dom.categories.appendChild(spoilerBtn);
+
     (groups || []).forEach((group, idx) => {
       const link = d.createElement('a');
       link.className = 'category-link';
@@ -288,6 +359,10 @@
       const title = d.createElement('div');
       title.className = 'menu-section-title';
       title.textContent = group.title;
+      title.addEventListener('click', () => {
+        if (!Model.menuSpoiler) return;
+        section.classList.toggle('is-collapsed');
+      });
       section.appendChild(title);
 
       const grid = d.createElement('div');
@@ -331,6 +406,7 @@
       });
 
       section.appendChild(grid);
+      if (Model.menuSpoiler) section.classList.add('is-collapsed');
       Dom.menuSections.appendChild(section);
       sections.push(section);
     });
@@ -694,6 +770,7 @@
     tables: [],
     tableId: 0,
     hallId: 0,
+    menuSpoiler: false,
     selectedTransactionId: 0,
     openTransactions: [],
     loadSelection: modelLoadSelection,
@@ -756,7 +833,7 @@
     View.applyLang(t);
 
     Model.loadSelection();
-    View.setOpenChecksButton(0);
+    View.setOpenChecksButton(0, 0);
     if (Model.loadCache()) {
       Controller.refreshMenu();
     }
@@ -811,6 +888,7 @@
     const rendered = View.renderMenu(groups, {
       onCategoryClick: (catId) => Controller.onCategoryClick(catId),
       onProductClick: (item) => Controller.addToCart(item),
+      onToggleSpoiler: () => Controller.toggleMenuSpoiler(),
     });
     Controller.viewState.sections = rendered.sections;
     Controller.viewState.linksById = rendered.linksById;
@@ -821,6 +899,7 @@
   function controllerOnCategoryClick(catId) {
     const id = String(catId || '');
     const section = d.getElementById(`cat-${id}`);
+    if (section && Model.menuSpoiler) section.classList.remove('is-collapsed');
     if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     View.setActiveCategory(Controller.viewState.linksById, id);
   }
@@ -984,7 +1063,7 @@
     Model.selectedTransactionId = 0;
     Model.openTransactions = [];
     View.hideOpenChecksModal();
-    View.setOpenChecksButton(0);
+    View.setOpenChecksButton(0, 0);
   }
 
   async function controllerCheckOpenTransactions() {
@@ -999,7 +1078,7 @@
       if (tableId !== (Number(Model.tableId || 0) || 0)) return;
       if (!Array.isArray(list) || !list.length) return;
       Model.openTransactions = list;
-      View.setOpenChecksButton(list.length);
+      View.setOpenChecksButton(list.length, Model.selectedTransactionId);
     } catch (e) {
       if (reqId !== Controller.openTransactionsReqId) return;
       Controller.resetOpenTransactions();
@@ -1013,10 +1092,12 @@
         View.showOpenChecksModal(Model.openTransactions, {
           onUseTransaction: (transactionId) => {
             Model.selectedTransactionId = Number(transactionId || 0) || 0;
+            View.setOpenChecksButton(Model.openTransactions.length, Model.selectedTransactionId);
             View.hideOpenChecksModal();
           },
           onCreateNew: () => {
             Model.selectedTransactionId = 0;
+            View.setOpenChecksButton(Model.openTransactions.length, 0);
             View.hideOpenChecksModal();
           },
         });
@@ -1056,7 +1137,7 @@
     try {
       if (Number(Model.selectedTransactionId || 0) > 0) {
         const added = await Model.addToTransaction(Model.selectedTransactionId, products, comment);
-        View.showToast(`Добавлено в чек #${String(Model.selectedTransactionId)}: ${String(added)}`);
+        View.showToast(`${t.addedToCheckPrefix}${String(Model.selectedTransactionId)}: ${String(added)}`);
       } else {
         const res = await fetch('/api/poster/neworder/index.php?ajax=create_order', {
           method: 'POST',
@@ -1097,6 +1178,10 @@
     init: controllerInit,
     loadProducts: controllerLoadProducts,
     refreshMenu: controllerRefreshMenu,
+    toggleMenuSpoiler: () => {
+      Model.menuSpoiler = !Model.menuSpoiler;
+      Controller.refreshMenu();
+    },
     onCategoryClick: controllerOnCategoryClick,
     updateActiveByScroll: controllerUpdateActiveByScroll,
     bindSearch: controllerBindSearch,
