@@ -44,6 +44,8 @@ let posterSpotId = 1;
 const lsProductsKey = 'neworder_poster_products_v1';
 const lsProductsTsKey = 'neworder_poster_products_ts_v1';
 
+let menuAllData = [];
+
 const supportedLangs = ['ru', 'en', 'vi', 'ko'];
 let currentLang = (document.documentElement.getAttribute('lang') || 'ru').toLowerCase();
 if (!supportedLangs.includes(currentLang)) currentLang = 'ru';
@@ -306,6 +308,7 @@ async function loadProducts() {
     } catch (e) {}
 
     menuData = buildMenuFromPosterProducts(posterProducts);
+    menuAllData = menuData;
     renderMenu();
   } catch (err) {
     const t = i18n[currentLang] || i18n.ru;
@@ -313,17 +316,19 @@ async function loadProducts() {
   }
 }
 
-function renderMenu() {
-  if (!menuData.length) {
+function renderMenu(groups = null) {
+  const data = Array.isArray(groups) ? groups : (Array.isArray(menuData) ? menuData : []);
+  if (!data.length) {
     const t = i18n[currentLang] || i18n.ru;
     elMenuSections.innerHTML = `<div class="loading-state">${t.menuEmpty}</div>`;
+    elCategories.innerHTML = '';
     return;
   }
   
   elCategories.innerHTML = '';
   elMenuSections.innerHTML = '';
 
-  menuData.forEach((group, idx) => {
+  data.forEach((group, idx) => {
     // Category Link
     const a = d.createElement('a');
     a.className = 'category-link';
@@ -355,6 +360,15 @@ function renderMenu() {
       
       const card = d.createElement('div');
       card.className = 'product-card';
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.onclick = () => addToCart(item, priceVal);
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          addToCart(item, priceVal);
+        }
+      });
       
       const name = d.createElement('h3');
       name.className = 'product-name';
@@ -371,13 +385,7 @@ function renderMenu() {
       price.className = 'product-price';
       price.textContent = fmtPrice(priceVal);
 
-      const addBtn = d.createElement('button');
-      addBtn.className = 'product-add';
-      addBtn.textContent = '+';
-      addBtn.onclick = () => addToCart(item, priceVal);
-
       footer.appendChild(price);
-      footer.appendChild(addBtn);
 
       card.appendChild(name);
       card.appendChild(desc);
@@ -513,92 +521,34 @@ function showToast(msg, isError = false) {
 
 let searchTimer = null;
 
-function setSearchActive(active) {
+function filterMenuByQuery(query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (q.length < 2) return menuAllData;
+  const out = [];
+  for (const g of menuAllData || []) {
+    if (!g || typeof g !== 'object') continue;
+    const items = (g.items || []).filter((it) => String(it && it.name ? it.name : '').toLowerCase().includes(q));
+    if (!items.length) continue;
+    out.push({ id: g.id, title: g.title, items: items });
+  }
+  return out;
+}
+
+function renderSearchState(query, filteredGroups) {
+  const t = i18n[currentLang] || i18n.ru;
+  const q = String(query || '').trim();
+  const active = q.length >= 2;
   elSearchSection.hidden = !active;
-  elMenuSections.hidden = active;
-  elCategories.hidden = active;
-  if (!active) {
-    elSearchGrid.innerHTML = '';
+  if (active) {
+    elSearchTitle.textContent = `${t.searchResultsPrefix}: ${q}`;
+    elSearchGrid.hidden = true;
+    elSearchLoading.hidden = true;
+    elSearchEmpty.hidden = (filteredGroups || []).length > 0;
+  } else {
+    elSearchGrid.hidden = true;
     elSearchLoading.hidden = true;
     elSearchEmpty.hidden = true;
   }
-}
-
-function renderSearchResults(query, products) {
-  const t = i18n[currentLang] || i18n.ru;
-  elSearchTitle.textContent = `${t.searchResultsPrefix}: ${query}`;
-  elSearchGrid.innerHTML = '';
-
-  (products || []).forEach(item => {
-    const priceVal = Number(item.price || 0) / 100;
-
-    const card = d.createElement('div');
-    card.className = 'product-card';
-
-    const name = d.createElement('h3');
-    name.className = 'product-name';
-    name.textContent = item.name;
-
-    const desc = d.createElement('p');
-    desc.className = 'product-desc';
-    desc.textContent = item.desc || '';
-
-    const footer = d.createElement('div');
-    footer.className = 'product-footer';
-
-    const price = d.createElement('div');
-    price.className = 'product-price';
-    price.textContent = fmtPrice(priceVal);
-
-    const addBtn = d.createElement('button');
-    addBtn.className = 'product-add';
-    addBtn.textContent = '+';
-    addBtn.onclick = () => addToCart(item, priceVal);
-
-    footer.appendChild(price);
-    footer.appendChild(addBtn);
-
-    card.appendChild(name);
-    card.appendChild(desc);
-    card.appendChild(footer);
-    elSearchGrid.appendChild(card);
-  });
-
-  elSearchLoading.hidden = true;
-  elSearchEmpty.hidden = (products || []).length > 0;
-}
-
-function doSearch(query) {
-  elSearchLoading.hidden = false;
-  elSearchEmpty.hidden = true;
-  elSearchGrid.innerHTML = '';
-
-  const q = String(query || '').trim().toLowerCase();
-  const out = [];
-  for (const p of posterProducts || []) {
-    if (!p || typeof p !== 'object') continue;
-    if (String(p.hidden || '0') === '1') continue;
-    const name = String(p.product_name || '').trim();
-    if (!name) continue;
-    if (!name.toLowerCase().includes(q)) continue;
-
-    const categoryName = String(p.category_name || '').trim();
-    const productId = Number(p.product_id || 0) || 0;
-    if (!productId) continue;
-
-    out.push({
-      id: productId,
-      product_id: productId,
-      product_name: name,
-      name: name,
-      desc: categoryName,
-      price: extractPosterPriceCents(p),
-    });
-
-    if (out.length >= 30) break;
-  }
-
-  renderSearchResults(query, out);
 }
 
 function handleSearchInput() {
@@ -608,12 +558,24 @@ function handleSearchInput() {
   if (searchTimer) clearTimeout(searchTimer);
 
   if (q.length < 2) {
-    setSearchActive(false);
+    renderSearchState('', []);
+    const base = (menuAllData && menuAllData.length) ? menuAllData : menuData;
+    menuData = base;
+    renderMenu(base);
     return;
   }
 
-  setSearchActive(true);
-  searchTimer = setTimeout(() => doSearch(q), 250);
+  elSearchSection.hidden = false;
+  elSearchGrid.hidden = true;
+  elSearchLoading.hidden = false;
+  elSearchEmpty.hidden = true;
+
+  searchTimer = setTimeout(() => {
+    const filtered = filterMenuByQuery(q);
+    menuData = filtered;
+    renderMenu(menuData);
+    renderSearchState(q, filtered);
+  }, 250);
 }
 
 if (elSearchInput && elSearchClear) {
@@ -748,6 +710,7 @@ try {
       posterProducts = p;
       posterSpotId = sid;
       menuData = buildMenuFromPosterProducts(posterProducts);
+      menuAllData = menuData;
       renderMenu();
     }
   }
