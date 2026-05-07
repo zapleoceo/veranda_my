@@ -5,6 +5,12 @@ const elFrom = document.getElementById('dateFrom');
     const byDishesModal = document.getElementById('byDishesModal');
     const byDishesClose = document.getElementById('byDishesClose');
     const byDishesLoader = document.getElementById('byDishesLoader');
+    const byDishesProg = document.getElementById('byDishesProg');
+    const byDishesProgBar = document.getElementById('byDishesProgBar');
+    const byDishesProgLabel = document.getElementById('byDishesProgLabel');
+    const byDishesProgDesc = document.getElementById('byDishesProgDesc');
+    const byDishesSearch = document.getElementById('byDishesSearch');
+    const byDishesClear = document.getElementById('byDishesClear');
     const byDishesTbody = document.getElementById('byDishesTbody');
     const loader = document.getElementById('loader');
     const prog = document.getElementById('prog');
@@ -543,18 +549,30 @@ const elFrom = document.getElementById('dateFrom');
     const byDishesState = {
         key: '',
         rows: null,
+        query: '',
         loading: false,
     };
 
     const byDishesSetLoading = (on) => {
         byDishesState.loading = !!on;
         if (byDishesLoader) byDishesLoader.style.display = on ? 'inline-flex' : 'none';
+        if (byDishesProg) byDishesProg.style.display = on ? 'grid' : 'none';
         if (byDishesBtn) byDishesBtn.disabled = on;
+    };
+
+    const byDishesSetProgress = (done, total, hint) => {
+        const t = Math.max(0, Number(total || 0) || 0);
+        const d = Math.max(0, Math.min(t, Number(done || 0) || 0));
+        const pct = t > 0 ? Math.round((d / t) * 100) : 0;
+        if (byDishesProgBar) byDishesProgBar.style.width = pct + '%';
+        if (byDishesProgLabel) byDishesProgLabel.textContent = pct + '%';
+        if (byDishesProgDesc) byDishesProgDesc.textContent = t > 0 ? `${d}/${t}${hint ? ` · ${hint}` : ''}` : '';
     };
 
     const byDishesShow = () => {
         if (!byDishesModal) return;
         byDishesModal.hidden = false;
+        if (byDishesSearch) byDishesSearch.focus();
     };
 
     const byDishesHide = () => {
@@ -562,9 +580,13 @@ const elFrom = document.getElementById('dateFrom');
         byDishesModal.hidden = true;
     };
 
-    const byDishesRender = (rows) => {
+    const byDishesRender = (rows, query) => {
         if (!byDishesTbody) return;
-        const list = Array.isArray(rows) ? rows : [];
+        const q = String(query || '').trim().toLowerCase();
+        const listAll = Array.isArray(rows) ? rows : [];
+        const list = q
+            ? listAll.filter((r) => String(r && r.name ? r.name : '').toLowerCase().includes(q))
+            : listAll;
         byDishesTbody.innerHTML = list.map((r) => {
             const name = esc(r && r.name ? r.name : '');
             const qty = esc(fmtQty(r && r.qty != null ? r.qty : 0));
@@ -581,13 +603,20 @@ const elFrom = document.getElementById('dateFrom');
         return `${String(elFrom.value || '')}|${String(elTo.value || '')}|${String(ids.length)}|${String(max)}|${String(sum)}`;
     };
 
-    const computeByDishes = async () => {
+    const computeByDishes = async (onProgress) => {
         if (!Array.isArray(dataItems) || !dataItems.length) return [];
         const ids = dataItems.map((it) => Number(it && it.transaction_id ? it.transaction_id : 0)).filter((x) => x > 0);
         const uniq = Array.from(new Set(ids));
         const agg = new Map();
         const concurrency = 6;
         let idx = 0;
+        let done = 0;
+        let raf = 0;
+        let lastHint = '';
+        const emit = () => {
+            raf = 0;
+            if (typeof onProgress === 'function') onProgress(done, uniq.length, lastHint);
+        };
         const workers = new Array(Math.min(concurrency, uniq.length)).fill(0).map(async () => {
             while (idx < uniq.length) {
                 const txId = uniq[idx++];
@@ -602,9 +631,17 @@ const elFrom = document.getElementById('dateFrom');
                     cur.qty += qty;
                     cur.sum_minor += sumMinor;
                 });
+                done++;
+                lastHint = `чек #${txId}`;
+                if (!raf) raf = requestAnimationFrame(emit);
             }
         });
         await Promise.all(workers);
+        if (raf) {
+            cancelAnimationFrame(raf);
+            raf = 0;
+        }
+        if (typeof onProgress === 'function') onProgress(uniq.length, uniq.length, '');
         return Array.from(agg.values()).sort((a, b) => (Number(b.sum_minor || 0) - Number(a.sum_minor || 0)));
     };
 
@@ -614,16 +651,17 @@ const elFrom = document.getElementById('dateFrom');
         byDishesShow();
         const key = buildByDishesKey();
         if (byDishesState.key === key && Array.isArray(byDishesState.rows)) {
-            byDishesRender(byDishesState.rows);
+            byDishesRender(byDishesState.rows, byDishesState.query);
             return;
         }
         byDishesSetLoading(true);
+        byDishesSetProgress(0, 0, '');
         if (byDishesTbody) byDishesTbody.innerHTML = '';
         try {
-            const rows = await computeByDishes();
+            const rows = await computeByDishes((done, total, hint) => byDishesSetProgress(done, total, hint));
             byDishesState.key = key;
             byDishesState.rows = rows;
-            byDishesRender(rows);
+            byDishesRender(rows, byDishesState.query);
         } catch (e) {
             byDishesState.key = '';
             byDishesState.rows = null;
@@ -729,6 +767,22 @@ const elFrom = document.getElementById('dateFrom');
     if (byDishesModal) {
         byDishesModal.addEventListener('click', (e) => {
             if (e.target === byDishesModal) byDishesHide();
+        });
+    }
+    if (byDishesSearch) {
+        byDishesSearch.addEventListener('input', () => {
+            byDishesState.query = String(byDishesSearch.value || '');
+            if (byDishesClear) byDishesClear.hidden = String(byDishesState.query).trim() === '';
+            if (Array.isArray(byDishesState.rows)) byDishesRender(byDishesState.rows, byDishesState.query);
+        });
+    }
+    if (byDishesClear) {
+        byDishesClear.addEventListener('click', () => {
+            byDishesState.query = '';
+            if (byDishesSearch) byDishesSearch.value = '';
+            byDishesClear.hidden = true;
+            if (Array.isArray(byDishesState.rows)) byDishesRender(byDishesState.rows, '');
+            if (byDishesSearch) byDishesSearch.focus();
         });
     }
     document.addEventListener('keydown', (e) => {

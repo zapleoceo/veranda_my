@@ -9,7 +9,7 @@
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
     <link rel="stylesheet" href="/assets/css/banya.css?v=20260425_0001">
-    <link rel="stylesheet" href="/banya/style.css?v=20260507_0001">
+    <link rel="stylesheet" href="/banya/style.css?v=20260507_0015">
 </head>
 <body>
 <div class="container banya-container">
@@ -112,7 +112,20 @@
             <button type="button" class="secondary" id="byDishesClose">×</button>
         </div>
         <div class="banya-modal-body">
-            <div class="banya-modal-loader" id="byDishesLoader" style="display:none;"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
+            <div class="banya-modal-top">
+                <div class="banya-modal-search">
+                    <input type="search" id="byDishesSearch" placeholder="Поиск блюда..." autocomplete="off">
+                    <button type="button" class="secondary" id="byDishesClear" aria-label="Очистить поиск" title="Очистить" hidden>×</button>
+                </div>
+                <div class="banya-modal-progress" id="byDishesProg" style="display:none;">
+                    <div class="banya-modal-progress-bar"><span id="byDishesProgBar"></span></div>
+                    <div class="banya-modal-progress-meta">
+                        <div class="banya-modal-progress-label" id="byDishesProgLabel">0%</div>
+                        <div class="banya-modal-progress-desc" id="byDishesProgDesc"></div>
+                    </div>
+                </div>
+                <div class="banya-modal-loader" id="byDishesLoader" style="display:none;"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
+            </div>
             <div class="banya-modal-table-wrap">
                 <table class="banya-modal-table">
                     <thead>
@@ -129,7 +142,7 @@
     </div>
 </div>
 
-<script src="/assets/js/banya.js?v=20260507_0001"></script>
+<script src="/assets/js/banya.js?v=20260507_0015"></script>
 <script src="/assets/user_menu.js" defer></script>
 <script src="/banya/script.js"></script>
 </body>
