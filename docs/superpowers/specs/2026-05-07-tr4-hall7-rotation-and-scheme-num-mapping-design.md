@@ -1,23 +1,25 @@
-# TR4: scheme_num mapping + rotate_180 per hall
+# TR4: Poster table_id booking + rotate_180 per hall + decor fixes
 
 ## Контекст
 
 - В Poster у столов есть `table_id` (внутренний ID Poster) и текстовые поля `table_num/table_title`.
-- В legacy TR3 логика бронирования и доступности оперирует “номером стола на схеме” (далее `scheme_num`) и исторически вытаскивала его только если `table_title` или `table_num` — чисто цифровые.
+- В legacy TR3 UI/доступность оперируют “номером стола на схеме” (далее `scheme_num`) и исторически вытаскивали его только если `table_title` или `table_num` — чисто цифровые.
+- При реальном создании брони в Poster используется **`table_id`** (Poster table_id). Сейчас он вычисляется по `table_num`, что ломается для столов с нецифровыми названиями.
 - В новой БД таблице `reservation_table_settings` мы уже храним:
   - `poster_table_id` = Poster `table_id` (стабильный ключ)
-  - `scheme_num` (число для бронирования/схемы)
+  - `scheme_num` (номер на схеме, опционально)
   - `display_name`, `capacity`, `show_on_canvas`, `bookable`
 
 ## Проблемы
 
 1. **`scheme_num` ≠ `table_id`**
-   - `table_id` — идентификатор Poster.
-   - `scheme_num` — номер, который используется клиентом и legacy-логикой для доступности/брони.
+   - `table_id` — идентификатор Poster, именно он участвует в запросе `incomingOrders.createReservation`.
+   - `scheme_num` — номер на схеме (для UI/надписей/legacy-совместимости).
    - Они могут совпадать случайно, но смысл разный.
 
 2. **Столы типа “Room”**
-   - Если в Poster `table_num/table_title` не цифровые, старая логика не может вычислить `scheme_num`, и стол становится “небронируемым”, даже если в админке выставлены флаги/ёмкость.
+   - Сейчас `PosterReservationHelper` ищет `table_id` через совпадение текстового `table_num`/`table_title`. Для `Room` это не срабатывает, поэтому бронь не может корректно уйти в Poster.
+   - Для TR4 клиентской доступности/цветов мы тоже не должны требовать “цифровой” `scheme_num`, если есть `poster_table_id` и `bookable=1`.
 
 3. **Поворот схемы для hall_id=7**
    - В админке есть кнопка “Rotate”, но флаг поворота не сохраняется и не применяется в TR4.
@@ -25,28 +27,33 @@
 
 ## Цели
 
-- Сделать бронирование независимым от того, “цифровой” ли `table_title/table_num` в Poster.
+- Сделать бронирование независимым от того, “цифровой” ли `table_title/table_num` в Poster: использовать `poster_table_id` как ключ бронирования.
 - Сохранить UX TR3: при превышении ёмкости — только предупреждение в форме, не блокировка и без модалки подтверждения.
 - Сделать поворот схемы сохраняемым в админке и применяемым в TR4, в т.ч. для hall_id=7.
+- Исправить декор: круглый фонтан, правильное положение фонтана, “трава” по ширине канваса и прижатая к низу.
 
 ## Дизайн решений
 
-### A. Маппинг по poster_table_id → scheme_num (Рекомендуется)
+### A. Ключ бронирования = poster_table_id (Рекомендуется)
 
 1. Источник истины:
-   - `poster_table_id` берём из Poster (как сейчас).
-   - `scheme_num` берём из `reservation_table_settings.scheme_num`.
-2. В TR4 API:
-   - `free_tables`: строит `scheme_num` через `tableSettingsByHall[hall_id][poster_table_id].scheme_num`, а не через “цифровой title/num”.
-   - `reservations`: аналогично маппит `row.table_id` (Poster) → `scheme_num`.
-   - `cap_check`: получает `hall_id` и ищет `capacity` по `scheme_num` в настройках зала.
-3. В TR4 фронте:
-   - Остаётся договор: `data-table` на DOM = `scheme_num`.
-   - “Room” становится bookable, если задан `scheme_num` и `bookable=1`.
+   - `poster_table_id` используется для бронирования и для статусов free/busy.
+   - `scheme_num` остаётся опциональным: для отображения “цифры стола”, сортировки и legacy-меты.
+2. Изменение модели брони в нашей БД:
+   - В таблицу `reservations` добавить колонку `poster_table_id INT NULL`.
+   - TR4 submit сохраняет и `table_num` (для совместимости и читаемости), и `poster_table_id`.
+3. Создание брони в Poster:
+   - Если в нашей брони есть `poster_table_id`, то `PosterReservationHelper` отправляет его напрямую в `incomingOrders.createReservation` как `table_id`, без lookup по `table_title/table_num`.
+4. Доступность/цвета в TR4:
+   - `free_tables` и `reservations` возвращают `free_table_ids`/`occupied_now_table_ids`/`soon_booking_table_ids` на базе Poster `table_id`.
+   - TR4 клиент хранит наборы по `poster_table_id` и раскрашивает/блокирует столы по ним.
+   - Для UI используется `display_name`, а для подписи “номер” используется `scheme_num` если задан, иначе `display_name`.
+5. Предупреждение по ёмкости:
+   - `cap_check` принимает `poster_table_id` и `hall_id`, возвращает warn, если guests > capacity для этого `poster_table_id` в `reservation_table_settings`.
 
 Плюсы:
 - Работает для любых имён (`Room`, `VIP`, и т.д.) без требований к Poster.
-- Не ломает существующие цифровые столы.
+- Убирает зависимость от “цифровых” `table_num/table_title` для брони в Poster.
 
 ### B. Rotate_180 как часть настроек зала
 
@@ -67,8 +74,18 @@
 - Единый источник истины: и админка, и TR4 используют один флаг.
 - Без хардкода hall_id=7 в коде (можно включить в БД).
 
+### C. Декор hall_id=2 (Veranda): фонтан + трава
+
+1. Фонтан должен быть круглым вне зависимости от aspect ratio world bounds:
+   - Если декор `fountain` задан в режиме `rel`, то размер считается от `min(boxW, boxH)` (изотропно), а не отдельно от `boxW` и `boxH`.
+2. Позиция фонтана:
+   - Разместить справа, но чуть выше столика `scheme_num=13` (если существует) через вычисление в world координатах на базе таблиц (без ручного подбора пикселей).
+3. Трава:
+   - Декор “трава/растения” должен занимать всю ширину канваса и быть прижатым низом к низу канваса (anchor bottom), чтобы не “висел” при смене bounds.
+
 ## Изменения UI админки (/reservations)
 
+- В модалке редактирования стола показывать `poster_table_id` (read-only).
 - В модалке редактирования стола добавить поле ввода `scheme_num` (число).
   - Валидация: пусто или int в диапазоне 1..500.
   - Сохранять через существующий `res_table_update` (уже поддерживает `scheme_num`).
@@ -81,20 +98,34 @@
 - `app.js`:
   - Использует `hallSettingsByHall` при рендере схемы (поворот на 180°).
 - `api_poster.php`:
-  - `tr3_api_free_tables` и `tr3_api_reservations` маппят `poster_table_id` → `scheme_num` через `$ctx['tableSettingsByHall']`.
-  - `tr3_api_cap_check` работает по `hall_id` и настройкам зала.
+  - `tr3_api_free_tables` и `tr3_api_reservations` работают через `poster_table_id` и возвращают списки `*_table_ids`.
+  - `tr3_api_cap_check` работает по `poster_table_id` + `hall_id` и настройкам зала.
+
+## Изменения в бронированиях (наша БД → Poster)
+
+- `reservations` таблица:
+  - добавить `poster_table_id INT NULL`
+- `tr4/api_booking.php`:
+  - принимать `poster_table_id` из payload и сохранять в таблицу брони
+- `PosterReservationHelper`:
+  - если `poster_table_id` задан, использовать его как `table_id` для `incomingOrders.createReservation` без поиска по `table_num/table_title`
 
 ## Миграции
 
 - Добавить новую миграцию:
   - `reservations/migrations/002_create_hall_settings.php` (создаёт `reservation_hall_settings`)
+  - `reservations/migrations/003_add_poster_table_id_to_reservations.php` (добавляет `poster_table_id` в `reservations`)
 
 ## Проверка (Acceptance)
 
-- Для стола с нецифровым именем (`Room`) при заданном `scheme_num` + `bookable=1`:
+- Для стола с нецифровым именем (`Room`) при `bookable=1` и наличии `poster_table_id`:
   - стол становится кликабельным в TR4
-  - `free_tables`/`reservations` корректно учитывают его занятость
+  - бронь корректно уходит в Poster (используется `table_id = poster_table_id`)
+  - `free_tables`/`reservations` корректно учитывают его занятость по `poster_table_id`
 - Для hall_id=7 при `rotate_180=1`:
   - схема в TR4 визуально разворачивается на 180°
   - совпадает с тем, что видно при включённом rotate в админке
-
+- Для декора hall_id=2:
+  - фонтан остаётся круглым при любых bounds
+  - фонтан расположен справа-чуть-выше столика 13
+  - трава занимает всю ширину и прижата низом к низу канваса
