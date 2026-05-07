@@ -95,7 +95,7 @@ return [
       'increase_guests' => 'Увеличить кол-во гостей',
       'table_unavailable' => 'Этот столик не доступен',
       'reason' => 'Причина: ',
-      'reason_disabled' => 'отключено в настройках',
+      'reason_disabled' => 'это нельзя забронировать',
       'reason_booking' => 'есть бронь',
       'booking_tag' => 'Бронь',
       'booking_until_prefix' => 'до',

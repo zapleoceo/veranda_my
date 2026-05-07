@@ -2474,7 +2474,7 @@
         if (!capEl) return;
         if (String(t.dataset.bookable || '') !== '1') { capEl.textContent = ''; return; }
         const cap = t.dataset.cap != null && String(t.dataset.cap).trim() !== '' ? Number(t.dataset.cap) : null;
-        capEl.textContent = (cap != null && isFinite(cap)) ? (String(Math.max(0, Math.floor(cap))) + ' 👤') : '';
+        capEl.textContent = (cap != null && isFinite(cap)) ? ('👥 ' + String(Math.max(0, Math.floor(cap)))) : '';
       });
     };
 

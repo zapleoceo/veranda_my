@@ -437,21 +437,25 @@
     .table.is-circle { border-radius: 999px !important; }
 
     .table.is-dyn .num {
-      top: 7px;
-      left: 8px;
-      font-size: 0.95rem;
-    }
-
-    .table.is-dyn.disabled .num {
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 1.15rem;
+      position: static;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.05;
       text-align: center;
       max-width: calc(100% - 16px);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .table.is-dyn .cap {
+      position: static;
+      margin-top: 4px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      font-family: var(--font-body);
+      color: rgba(255,250,244,0.92);
+      text-shadow: 0 1px 0 rgba(0,0,0,0.22);
     }
 
     .dt-btn.tab-toggle { white-space: nowrap; }
