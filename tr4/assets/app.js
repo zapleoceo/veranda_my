@@ -199,9 +199,18 @@
     let activeCanvas = 'main';
     let activeHallId = 2;
     let cinemaLayoutLoaded = false;
+    let cinemaLayoutLoading = false;
     let requestReload = null;
     let requestInvalidate = null;
     let requestBindTables = null;
+
+    const syncCanvasToggleBusy = () => {
+      if (!cinemaTabBtn) return;
+      const busy = !!(isLoading || cinemaLayoutLoading);
+      cinemaTabBtn.disabled = busy;
+      cinemaTabBtn.setAttribute('aria-disabled', busy ? 'true' : 'false');
+      cinemaTabBtn.classList.toggle('is-disabled', busy);
+    };
 
     const getActiveCanvasEl = () => (activeCanvas === 'cinema' ? canvasCinema : canvasMain);
     const getTables = () => {
@@ -2386,6 +2395,7 @@
       const dateStr = String(dt).slice(0, 10);
 
       isLoading = true;
+      syncCanvasToggleBusy();
       if (statusLine) statusLine.textContent = t('checking');
       setBusyLabel(dateStr);
       setBusyLoader(true);
@@ -2471,6 +2481,7 @@
         if (!silent) setOutput(t('try_ok_again'));
       } finally {
         isLoading = false;
+        syncCanvasToggleBusy();
         setStatus(selectedTableNum);
         setBusyLoader(false);
       }
@@ -2557,6 +2568,8 @@
       if (cinemaLayoutLoaded) return;
       if (!canvasCinema) return;
       try {
+        cinemaLayoutLoading = true;
+        syncCanvasToggleBusy();
         const url = apiUrl();
         url.searchParams.set('ajax', 'hall_tables');
         url.searchParams.set('spot_id', '1');
@@ -2567,10 +2580,14 @@
         renderCinemaTables(j.tables || []);
         cinemaLayoutLoaded = true;
       } catch (_) {
+      } finally {
+        cinemaLayoutLoading = false;
+        syncCanvasToggleBusy();
       }
     };
 
     const setActiveCanvas = async (next) => {
+      if (isLoading || cinemaLayoutLoading) return;
       const n = (next === 'cinema') ? 'cinema' : 'main';
       activeCanvas = n;
       activeHallId = n === 'cinema' ? 7 : 2;
@@ -2586,6 +2603,7 @@
 
     if (cinemaTabBtn) {
       cinemaTabBtn.addEventListener('click', () => {
+        if (isLoading || cinemaLayoutLoading) return;
         setActiveCanvas(activeCanvas === 'cinema' ? 'main' : 'cinema').catch(() => null);
       });
     }
