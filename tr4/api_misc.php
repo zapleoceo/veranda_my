@@ -24,6 +24,7 @@ function tr3_api_bootstrap(array $ctx): void {
     'tableCapsByNum' => $ctx['tableCapsByNum'] ?? [],
     'tableSettingsByHall' => $ctx['tableSettingsByHall'] ?? [],
     'decorByHall' => $ctx['decorByHall'] ?? [],
+    'hallSettingsByHall' => $ctx['hallSettingsByHall'] ?? [],
     'soonBookingHours' => $ctx['soonBookingHours'] ?? 0,
     'latestWorkday' => $ctx['latestWorkday'] ?? '21:00',
     'latestWeekend' => $ctx['latestWeekend'] ?? '22:00',

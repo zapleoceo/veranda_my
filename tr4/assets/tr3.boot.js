@@ -27,12 +27,13 @@
         tableCapsByNum: j.tableCapsByNum,
         tableSettingsByHall: j.tableSettingsByHall,
         decorByHall: j.decorByHall,
+        hallSettingsByHall: j.hallSettingsByHall,
         soonBookingHours: j.soonBookingHours,
         latestWorkday: j.latestWorkday,
         latestWeekend: j.latestWeekend,
         apiBase: j.apiBase,
       };
-      return loadScript('/tr4/assets/app.js?v=20260507_1559');
+      return loadScript('/tr4/assets/app.js?v=20260507_1705');
     })
     .catch((e) => {
       const msg = document.createElement('div');

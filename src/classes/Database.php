@@ -593,6 +593,7 @@ class Database {
             start_time DATETIME NOT NULL,
             guests INT NOT NULL,
             table_num VARCHAR(32) NOT NULL,
+            poster_table_id INT NULL,
             name VARCHAR(128) NOT NULL,
             phone VARCHAR(64) NOT NULL,
             whatsapp_phone VARCHAR(64) NULL,
@@ -651,6 +652,9 @@ class Database {
             }
             if (empty($cols['duration'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN duration INT DEFAULT 120");
+            }
+            if (empty($cols['poster_table_id'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN poster_table_id INT NULL AFTER table_num");
             }
         } catch (\Throwable $e) {
         }

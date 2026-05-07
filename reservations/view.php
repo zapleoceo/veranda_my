@@ -52,6 +52,7 @@
                              'spot_id' => (int)$resSpotId,
                              'hall_id' => (int)$resHallId,
                              'soon_hours' => (int)$resSoonHours,
+                             'rotate_180' => (int)($resRotate180 ?? 0),
                          ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
                         <div class="res-hall-head">
                             <div>
@@ -85,6 +86,10 @@
                             <div class="res-modal-grid">
                                 <div class="res-modal-k">Номер</div>
                                 <div class="res-modal-v" id="resHallModalNum">—</div>
+                                <div class="res-modal-k">Poster table_id</div>
+                                <div class="res-modal-v" id="resHallModalPosterId">—</div>
+                                <div class="res-modal-k">scheme_num</div>
+                                <div class="res-modal-v"><input id="resHallModalSchemeNum" type="number" min="1" max="500" inputmode="numeric"></div>
                                 <div class="res-modal-k">Название</div>
                                 <div class="res-modal-v"><input id="resHallModalName" type="text" maxlength="80"></div>
                                 <div class="res-modal-k">Вместимость</div>

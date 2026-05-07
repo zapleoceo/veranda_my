@@ -58,6 +58,10 @@ class PosterReservationHelper {
 
             $tableId = null;
             $rowNum = trim((string)($row['table_num'] ?? ''));
+            $rowPosterTableId = (int)($row['poster_table_id'] ?? 0);
+            if ($rowPosterTableId > 0) {
+                $tableId = $rowPosterTableId;
+            }
 
             // Helper to fetch tables for a specific hall
             $getTables = function (array $params) use ($api) {
@@ -90,7 +94,7 @@ class PosterReservationHelper {
             } catch (\Throwable $e) {}
 
             $allTablesFound = [];
-            if (is_array($halls)) {
+            if (!$tableId && is_array($halls)) {
                 foreach ($halls as $hall) {
                     $hallId = (int)($hall['hall_id'] ?? 0);
                     if ($hallId <= 0) continue;
@@ -105,7 +109,7 @@ class PosterReservationHelper {
             }
 
             // 2. If halls fetching failed or returned empty, try fallback without hall_id
-            if (empty($allTablesFound)) {
+            if (!$tableId && empty($allTablesFound)) {
                 try {
                     $fallback = $getTables(['spot_id' => $spotIdInt, 'without_deleted' => 1]);
                     if (is_array($fallback)) {
@@ -115,14 +119,14 @@ class PosterReservationHelper {
             }
 
             // 3. Search in gathered tables
-            foreach ($allTablesFound as $t) {
-                $tTitle = trim((string)($t['table_title'] ?? ''));
-                $tNum = trim((string)($t['table_num'] ?? ''));
-                
-                // User explicitly requested to match by table_title
-                if (strcasecmp($tTitle, $rowNum) === 0 || $tTitle === $rowNum) {
-                    $tableId = (int)$t['table_id'];
-                    break;
+            if (!$tableId) {
+                foreach ($allTablesFound as $t) {
+                    $tTitle = trim((string)($t['table_title'] ?? ''));
+                    $tNum = trim((string)($t['table_num'] ?? ''));
+                    if (strcasecmp($tTitle, $rowNum) === 0 || $tTitle === $rowNum) {
+                        $tableId = (int)$t['table_id'];
+                        break;
+                    }
                 }
             }
 

@@ -17,6 +17,8 @@ function tr3_api_submit_booking(array $ctx): void {
 
   $tableNum = trim((string)($payload['table_num'] ?? ''));
   if ($tableNum === '') $tableNum = trim((string)($payload['table_num_manual'] ?? ''));
+  $posterTableId = isset($payload['poster_table_id']) ? (int)$payload['poster_table_id'] : 0;
+  if ($posterTableId < 0) $posterTableId = 0;
   $name = trim((string)($payload['name'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
   $waPhone = trim((string)($payload['whatsapp_phone'] ?? ''));
@@ -36,7 +38,8 @@ function tr3_api_submit_booking(array $ctx): void {
     }
   }
 
-  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) api_error(400, 'Некорректный номер стола');
+  if ($tableNum === '') api_error(400, 'Некорректный номер стола');
+  if ($posterTableId <= 0 && !preg_match('/^\d+$/', $tableNum)) api_error(400, 'Некорректный номер стола');
   if ($guests <= 0 || $guests > 99) api_error(400, 'Некорректное кол-во гостей');
   if ($name === '' || mb_strlen($name) > 80) api_error(400, 'Некорректное имя');
 
@@ -105,6 +108,7 @@ function tr3_api_submit_booking(array $ctx): void {
          AND duration = ?
          AND guests = ?
          AND table_num = ?
+         AND (poster_table_id <=> ?)
          AND phone = ?
          AND name = ?
        ORDER BY id DESC
@@ -114,6 +118,7 @@ function tr3_api_submit_booking(array $ctx): void {
         $duration_m,
         $guests,
         $tableNum,
+        $posterTableId > 0 ? $posterTableId : null,
         $phoneNorm,
         $name,
       ]
@@ -144,13 +149,14 @@ function tr3_api_submit_booking(array $ctx): void {
     }
 
     $db->query("INSERT INTO {$resTable} (
-      created_at, start_time, duration, guests, table_num, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+      created_at, start_time, duration, guests, table_num, poster_table_id, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
       (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
       $startDt->format('Y-m-d H:i:s'),
       $duration_m,
       $guests,
       $tableNum,
+      $posterTableId > 0 ? $posterTableId : null,
       $name,
       $phoneNorm,
       $waPhoneNorm !== '' ? $waPhoneNorm : null,
@@ -173,6 +179,7 @@ function tr3_api_submit_booking(array $ctx): void {
     'duration' => $duration_m,
     'guests' => $guests,
     'table_num' => $tableNum,
+    'poster_table_id' => $posterTableId,
     'name' => $name,
     'phone' => $phoneNorm,
     'whatsapp_phone' => $waPhoneNorm !== '' ? $waPhoneNorm : '',

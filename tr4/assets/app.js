@@ -98,7 +98,7 @@
     animateI18n = true;
     applyI18n();
     window.setTimeout(() => { animateI18n = false; }, 350);
-    if (typeof setStatus === 'function') setStatus(selectedTableNum);
+    if (typeof setStatus === 'function') setStatus(selectedTableId, selectedTableLabel);
     if (typeof renderSelectedTable === 'function') renderSelectedTable();
     if (typeof updatePreorderUi === 'function') updatePreorderUi();
     if (typeof renderPreorderBox === 'function') renderPreorderBox();
@@ -190,6 +190,7 @@
     const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
     const tableSettingsByHall = (cfg.tableSettingsByHall && typeof cfg.tableSettingsByHall === 'object') ? cfg.tableSettingsByHall : {};
     const decorByHall = (cfg.decorByHall && typeof cfg.decorByHall === 'object') ? cfg.decorByHall : {};
+    const hallSettingsByHall = (cfg.hallSettingsByHall && typeof cfg.hallSettingsByHall === 'object') ? cfg.hallSettingsByHall : {};
 
     const cinemaTabBtn = document.getElementById('cinemaTabBtn');
     const canvasMain = document.getElementById('mapCanvasMain');
@@ -257,8 +258,8 @@
     };
 
     let lastReservationsByTable = {};
-    let occupiedNowNums = new Set();
-    let soonBookingNums = new Set();
+    let occupiedNowIds = new Set();
+    let soonBookingIds = new Set();
     let soonBookingNextByTable = {};
     const applyReservationsItemsToTables = (items, dateStr, dtValue) => {
       const list = Array.isArray(items) ? items : [];
@@ -286,18 +287,18 @@
       const byTableEntries = {};
       list.forEach((it) => {
         if (!it || typeof it !== 'object') return;
-        const tableTitle = String(it.table_title ?? '').trim();
+        const tableId = String(it.table_id ?? '').trim();
         const s = String(it.date_start ?? '').trim();
         const e = String(it.date_end ?? '').trim();
         const name = String(it.guest_name ?? '').trim();
         const guests = String(it.guests_count ?? '').trim();
-        if (!tableTitle || !s || !e) return;
+        if (!tableId || !s || !e) return;
         if (s.slice(0, 10) !== day) return;
         const sm = Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
         const em = Number(e.slice(11, 13)) * 60 + Number(e.slice(14, 16));
         if (!isFinite(sm) || !isFinite(em)) return;
-        if (!byTableEntries[tableTitle]) byTableEntries[tableTitle] = [];
-        byTableEntries[tableTitle].push({ sm, em, name, guests });
+        if (!byTableEntries[tableId]) byTableEntries[tableId] = [];
+        byTableEntries[tableId].push({ sm, em, name, guests });
       });
 
       const byTable = {};
@@ -331,7 +332,7 @@
 
       lastReservationsByTable = byTable;
 
-      soonBookingNums = new Set();
+      soonBookingIds = new Set();
       soonBookingNextByTable = {};
       if (isToday && nowMin != null && SOON_BOOK_MIN > 0) {
         Object.keys(byTableEntries).forEach((n) => {
@@ -340,14 +341,14 @@
           if (!nextStarts.length) return;
           const nextStart = Math.min(...nextStarts);
           if ((nextStart - nowMin) <= SOON_BOOK_MIN) {
-            soonBookingNums.add(String(n));
+            soonBookingIds.add(String(n));
             soonBookingNextByTable[String(n)] = nextStart;
           }
         });
       }
 
       getTables().forEach((tableEl) => {
-        const n = String(tableEl.dataset.table || '');
+        const n = String(tableEl.dataset.posterTableId || '');
         const entries0 = Array.isArray(byTableEntries[n]) ? byTableEntries[n] : [];
         const entries = entries0;
         const ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
@@ -357,8 +358,8 @@
           : false;
         if (overlapsSel) tableEl.dataset.resBusy = '1';
         else delete tableEl.dataset.resBusy;
-        const isOccNow = isToday && occupiedNowNums && occupiedNowNums.has(n);
-        const isSoon = isToday && soonBookingNums && soonBookingNums.has(n);
+        const isOccNow = isToday && occupiedNowIds && occupiedNowIds.has(n);
+        const isSoon = isToday && soonBookingIds && soonBookingIds.has(n);
         let txt = entries.length
           ? entries.slice(0, 2).map((r) => {
             const g = fmtGuest(r.name);
@@ -417,6 +418,7 @@
     const reqDuration = document.getElementById('reqDuration');
     const reqEndTime = document.getElementById('reqEndTime');
     const reqTableNumInput = document.getElementById('reqTableNum');
+    const reqPosterTableIdInput = document.getElementById('reqPosterTableId');
     const reqStartIsoInput = document.getElementById('reqStartIso');
     const reqHint = document.getElementById('reqHint');
     const preorderPanel = document.getElementById('preorderPanel');
@@ -441,9 +443,10 @@
     const dtpOk = document.getElementById('dtpOk');
 
     let last = null;
-    let freeNums = new Set();
+    let freeIds = new Set();
     let lastKey = '';
-    let selectedTableNum = '';
+    let selectedTableId = '';
+    let selectedTableLabel = '';
     let isLoading = false;
     let capConfirmResolve = null;
     let toastTimer = null;
@@ -1336,7 +1339,7 @@
         reqSubmit.setAttribute('aria-disabled', canSubmit ? 'false' : 'true');
         reqSubmit.disabled = !!submitBusy;
       };
-    const openRequestForm = ({ tableNum, guests, start, name, phone, comment, preorder, keepFields }) => {
+    const openRequestForm = ({ tableNum, posterTableId, guests, start, name, phone, comment, preorder, keepFields }) => {
       if (reqHint) {
         reqHint.hidden = true;
         reqHint.textContent = '';
@@ -1344,9 +1347,10 @@
       }
 
 
-      pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
+      pendingBooking = { tableNum: String(tableNum || ''), posterTableId: String(posterTableId || ''), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
       if (reqTableNumInput) reqTableNumInput.value = String(tableNum || '');
+      if (reqPosterTableIdInput) reqPosterTableIdInput.value = String(posterTableId || '');
       if (reqGuests) {
         reqGuests.value = String(guests);
         updateReqGuestsHint().catch(() => null);
@@ -1623,6 +1627,7 @@
       }
 
       const tableNum = String(pendingBooking.tableNum || '');
+      const posterTableId = String(pendingBooking.posterTableId || '');
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
@@ -1645,7 +1650,7 @@
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, source_page: sourcePage }),
+          body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, source_page: sourcePage }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -1704,6 +1709,7 @@
       };
       
       const tableNum = String(pendingBooking.tableNum || '');
+      const posterTableId = String(pendingBooking.posterTableId || '');
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
@@ -1731,7 +1737,7 @@
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, scroll_y: scrollY, source_page: sourcePage }),
+            body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, scroll_y: scrollY, source_page: sourcePage }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -1769,11 +1775,11 @@
 
     async function updateReqGuestsHint() {
       if (!reqHint) return;
-      const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
+      const posterTableId = pendingBooking ? String(pendingBooking.posterTableId || '') : '';
       const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
 
 
-      if (!tableNum || !isFinite(guests) || guests <= 0) {
+      if (!posterTableId || !isFinite(guests) || guests <= 0) {
         reqHint.hidden = true;
         reqHint.textContent = '';
         reqHint.classList.remove('warn');
@@ -1782,7 +1788,7 @@
       try {
         const url = apiUrl();
         url.searchParams.set('ajax', 'cap_check');
-        url.searchParams.set('table_num', tableNum);
+        url.searchParams.set('poster_table_id', posterTableId);
         url.searchParams.set('guests', String(Math.floor(guests)));
         url.searchParams.set('hall_id', String(activeHallId));
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
@@ -1974,12 +1980,13 @@
           return;
         }
         try {
+          const posterTableId = pendingBooking ? String(pendingBooking.posterTableId || '') : '';
           const url = apiUrl();
           url.searchParams.set('ajax', 'submit_booking');
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, duration_m, name, phone, whatsapp_phone: messengerLinked.whatsapp ? linkedWaPhone : null, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
+            body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, guests, start, duration_m, name, phone, whatsapp_phone: messengerLinked.whatsapp ? linkedWaPhone : null, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -2098,13 +2105,14 @@
       toastTimer = setTimeout(hideToast, 2000);
     };
 
-    const getUnavailableReason = (tableNum, current) => {
-      const tEl = getTables().find((x) => String(x.dataset.table || '') === String(tableNum));
-      if (!tEl) return null;
+    const getUnavailableReason = (tEl, current) => {
+      if (!tEl || !tEl.classList) return null;
+      const tableId = String(tEl.dataset.posterTableId || '');
+      if (!tableId) return null;
       if (tEl.classList.contains('disabled')) return { reason: t('reason_disabled') || 'отключено в настройках', detail: '' };
       if (!last || !current) return null;
       const ps = parseSel(current.dtRaw);
-      const ranges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
+      const ranges = Array.isArray(lastReservationsByTable[String(tableId)]) ? lastReservationsByTable[String(tableId)] : [];
       if (ps && ranges.length) {
         const selEnd = ps.selMin + Math.floor(current.durationSec / 60);
         const overlaps = ranges.some(([s, e]) => s < selEnd && e > ps.selMin);
@@ -2127,15 +2135,15 @@
       const now = new Date();
       const nowMin = now.getHours() * 60 + now.getMinutes();
 
-      if (isToday && soonBookingNums && soonBookingNums.has(String(tableNum))) {
-        const nextStart = soonBookingNextByTable ? Number(soonBookingNextByTable[String(tableNum)]) : NaN;
+      if (isToday && soonBookingIds && soonBookingIds.has(String(tableId))) {
+        const nextStart = soonBookingNextByTable ? Number(soonBookingNextByTable[String(tableId)]) : NaN;
         if (isFinite(nextStart) && (nextStart - nowMin) <= SOON_BOOK_MIN && ps && ps.selMin < nextStart) {
           const pref = t('at_prefix') || 'at';
           return { reason: t('reason_soon_booking') || 'скоро бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
         }
       }
 
-      if (!freeNums.has(String(tableNum))) {
+      if (!freeIds.has(String(tableId))) {
         if (isToday) return { reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
         return { reason: t('reason_time') || 'недоступен на это время', detail: '' };
       }
@@ -2180,9 +2188,9 @@
       return lines.join('\n');
     };
 
-    const setStatus = (tableNum) => {
-      if (selectedTableEl) selectedTableEl.textContent = tableNum ? String(tableNum) : '—';
-      if (!tableNum) {
+    const setStatus = (tableId, label) => {
+      if (selectedTableEl) selectedTableEl.textContent = label ? String(label) : '—';
+      if (!tableId) {
         if (statusLine) statusLine.textContent = '—';
         return;
       }
@@ -2194,21 +2202,21 @@
         if (statusLine) statusLine.textContent = t('press_ok');
         return;
       }
-      const el = getTables().find((x) => String(x.dataset.table || '') === String(tableNum)) || null;
+      const el = getTables().find((x) => String(x.dataset.posterTableId || '') === String(tableId)) || null;
       const isDisabled = !!(el && el.classList && el.classList.contains('disabled'));
-      const isFree = !isDisabled && freeNums.has(String(tableNum)) && !(soonBookingNums && soonBookingNums.has(String(tableNum)));
+      const isFree = !isDisabled && freeIds.has(String(tableId)) && !(soonBookingIds && soonBookingIds.has(String(tableId)));
       if (statusLine) statusLine.textContent = isFree ? t('status_free') : t('status_busy');
     };
 
     const applyAvailabilityStyles = () => {
       getTables().forEach((t) => {
-        const n = String(t.dataset.table || '');
+        const n = String(t.dataset.posterTableId || '');
         t.classList.remove('free', 'busy');
         if (t.classList.contains('disabled')) return;
         if (!last) return;
         if (t.dataset.resBusy === '1') { t.classList.add('busy'); return; }
-        if (soonBookingNums && soonBookingNums.has(n)) { t.classList.add('busy'); return; }
-        if (freeNums.has(n)) t.classList.add('free');
+        if (soonBookingIds && soonBookingIds.has(n)) { t.classList.add('busy'); return; }
+        if (freeIds.has(n)) t.classList.add('free');
         else t.classList.add('busy');
       });
     };
@@ -2238,7 +2246,10 @@
 
     const invalidateLast = () => {
       last = null;
-      freeNums = new Set();
+      freeIds = new Set();
+      occupiedNowIds = new Set();
+      soonBookingIds = new Set();
+      soonBookingNextByTable = {};
       lastKey = '';
       applyAvailabilityStyles();
       clearReservationsOnTables();
@@ -2246,8 +2257,8 @@
     };
 
     const renderSelectedTable = () => {
-      setStatus(selectedTableNum);
-      if (!selectedTableNum) return;
+      setStatus(selectedTableId, selectedTableLabel);
+      if (!selectedTableId) return;
       if (!last) {
         setOutput(t('press_ok'));
         return;
@@ -2261,9 +2272,8 @@
         table.dataset.tr4Bound = '1';
 
         table.addEventListener('mouseenter', () => {
-          const id = String(table.dataset.table || '');
           const current = getCurrentRequest();
-          const un = getUnavailableReason(id, current);
+          const un = getUnavailableReason(table, current);
           if (un) showToast(table, un.reason, un.detail);
         });
         table.addEventListener('mouseleave', () => {
@@ -2272,7 +2282,8 @@
         });
 
         table.addEventListener('click', async () => {
-          const id = String(table.dataset.table || '');
+          const id = String(table.dataset.posterTableId || '');
+          const label = String((table.querySelector('.num') && table.querySelector('.num').textContent) ? table.querySelector('.num').textContent : '').trim();
           const current = getCurrentRequest();
 
           const now = new Date();
@@ -2285,7 +2296,7 @@
 
           if (!current) {
             if (!resDate || !String(resDate.value || '').trim()) {
-              setStatus(id);
+              setStatus(id, label);
               setOutput({ ok: false, error: t('select_date_time') });
               return;
             }
@@ -2293,14 +2304,16 @@
             return;
           }
 
-          const preUn = getUnavailableReason(id, current);
+          const preUn = getUnavailableReason(table, current);
           if (preUn && String(preUn.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят')) {
-            selectedTableNum = '';
+            selectedTableId = '';
+            selectedTableLabel = '';
             showBusyToast(table);
             return;
           }
           if (preUn) {
-            selectedTableNum = '';
+            selectedTableId = '';
+            selectedTableLabel = '';
             showToast(table, preUn.reason, preUn.detail || '');
             return;
           }
@@ -2315,26 +2328,30 @@
             }
           }
 
-          const un = getUnavailableReason(id, current);
+          const un = getUnavailableReason(table, current);
           if (un && String(un.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят')) {
-            selectedTableNum = '';
+            selectedTableId = '';
+            selectedTableLabel = '';
             showBusyToast(table);
             return;
           }
           if (un) {
-            selectedTableNum = '';
+            selectedTableId = '';
+            selectedTableLabel = '';
             showToast(table, un.reason, un.detail || '');
             return;
           }
 
           if (table.classList.contains('disabled')) {
-            selectedTableNum = '';
+            selectedTableId = '';
+            selectedTableLabel = '';
             showToast(table, t('reason_disabled') || 'отключено в настройках', '');
             return;
           }
 
-          selectedTableNum = id;
-          openRequestForm({ tableNum: id, guests: current.guests, start: current.dtRaw });
+          selectedTableId = id;
+          selectedTableLabel = label || id;
+          openRequestForm({ tableNum: (label || id), posterTableId: id, guests: current.guests, start: current.dtRaw });
         });
       });
     };
@@ -2426,7 +2443,7 @@
         const j = x.json;
         if (!res.ok || !j || !j.ok) {
           last = null;
-          freeNums = new Set();
+          freeIds = new Set();
           lastKey = '';
           applyAvailabilityStyles();
           setOutput(j && typeof j === 'object' ? fmtJson(j) : t('try_ok_again'));
@@ -2436,8 +2453,8 @@
 
         last = j;
         lastKey = key;
-        freeNums = new Set(Array.isArray(j.free_table_nums) ? j.free_table_nums.map(String) : []);
-        occupiedNowNums = new Set(Array.isArray(j.occupied_now_nums) ? j.occupied_now_nums.map(String) : []);
+        freeIds = new Set(Array.isArray(j.free_table_ids) ? j.free_table_ids.map(String) : []);
+        occupiedNowIds = new Set(Array.isArray(j.occupied_now_table_ids) ? j.occupied_now_table_ids.map(String) : []);
         applyAvailabilityStyles();
         const r = await loadReservations().catch(() => null);
         if (r) {
@@ -2454,14 +2471,14 @@
         renderSelectedTable();
       } catch (_) {
         last = null;
-        freeNums = new Set();
+        freeIds = new Set();
         lastKey = '';
         applyAvailabilityStyles();
         if (!silent) setOutput(t('try_ok_again'));
       } finally {
         isLoading = false;
         syncCanvasToggleBusy();
-        setStatus(selectedTableNum);
+        setStatus(selectedTableId, selectedTableLabel);
         setBusyLoader(false);
       }
     };
@@ -2501,7 +2518,7 @@
       let decorItems = (decorByHall && typeof decorByHall === 'object' && Array.isArray(decorByHall[hallKey])) ? decorByHall[hallKey] : [];
       if (!decorItems.length && hallId === 2) {
         decorItems = [
-          { decor_type: 'grass-corner-1-7', x: -0.05, y: -0.35, w: 1.10, h: 1.45, z: 1, props_json: '{"mode":"rel"}' },
+          { decor_type: 'grass-corner-1-7', x: 0, y: 0, w: 1, h: 0.62, z: 1, props_json: '{"mode":"canvas_bottom"}' },
           { decor_type: 'fountain', x: 0.62, y: 0.47, w: 0.12, h: 0.12, z: 2, props_json: '{"mode":"rel"}' },
           { decor_type: 'bar_row', x: 0.0, y: -0.02, w: 1.0, h: 0.09, z: 3, props_json: '{"mode":"rel"}' },
         ];
@@ -2526,12 +2543,11 @@
         const label = s && s.display_name != null && String(s.display_name).trim() !== '' ? String(s.display_name).trim() : (schemeNum || String(numRaw || title || ('#' + String(posterId || ''))));
         const showOnCanvas = s && s.show_on_canvas != null ? !!Number(s.show_on_canvas) : true;
         const rawBookable = s && s.bookable != null ? !!Number(s.bookable) : false;
-        const bookable = rawBookable && !!schemeNum;
+        const bookable = rawBookable;
         const cap = s && s.capacity != null ? Math.max(0, Number(s.capacity) || 0) : 0;
-        const dataNum = schemeNum;
         return {
           posterId: isFinite(posterId) ? Math.floor(posterId) : 0,
-          dataNum,
+          schemeNum,
           label,
           cap,
           bookable,
@@ -2566,6 +2582,21 @@
       if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return;
       const boxW = Math.max(1, maxX - minX);
       const boxH = Math.max(1, maxY - minY);
+      const hallCfg = (hallSettingsByHall && typeof hallSettingsByHall === 'object') ? (hallSettingsByHall[hallKey] || hallSettingsByHall[String(hallId)] || null) : null;
+      const rotate180 = !!(hallCfg && typeof hallCfg === 'object' && Number(hallCfg.rotate_180 || 0) === 1);
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const rotBox = (wx, wy, ww, wh) => {
+        const rx = minX + boxW - (wx + ww);
+        const ry = minY + boxH - (wy + wh);
+        return { x: rx, y: ry };
+      };
+      if (rotate180) {
+        visible.forEach((it) => {
+          const r = rotBox(it.x, it.y, Math.max(0, it.w), Math.max(0, it.h));
+          it.x = r.x;
+          it.y = r.y;
+        });
+      }
       const scale = Math.min((MAP_W - PAD * 2) / boxW, (MAP_H - PAD * 2) / boxH);
       const offX = PAD - (minX * scale);
       const offY = PAD - (minY * scale);
@@ -2629,6 +2660,7 @@
       };
 
       if (decorEl && decorItems.length) {
+        const table13 = hallId === 2 ? visible.find((it) => String(it.schemeNum || '').trim() === '13' || String(it.label || '').trim() === '13') : null;
         decorItems.forEach((d) => {
           const typeRaw = String(d && d.decor_type ? d.decor_type : '').trim();
           const type = typeRaw.replace(/_/g, '-');
@@ -2642,11 +2674,51 @@
           let wy = Number(d && d.y != null ? d.y : 0);
           let ww = Number(d && d.w != null ? d.w : 0);
           let wh = Number(d && d.h != null ? d.h : 0);
-          if (mode === 'rel') {
+          const forceGrassBottom = (hallId === 2 && type === 'grass-corner-1-7');
+          const effMode = forceGrassBottom ? 'canvas_bottom' : mode;
+          if (effMode === 'canvas_bottom') {
+            if (forceGrassBottom) { wx = 0; wy = 0; ww = 1; wh = 0.62; }
+            const left = Math.round((wx || 0) * MAP_W);
+            const w = Math.round(Math.max(0, ww) * MAP_W);
+            const h = Math.round(Math.max(0, wh) * MAP_H);
+            const top = Math.round(MAP_H - h + ((wy || 0) * MAP_H));
+            const el = createDecorEl(type);
+            el.style.left = left + 'px';
+            el.style.top = top + 'px';
+            el.style.width = w + 'px';
+            el.style.height = h + 'px';
+            if (d && d.z != null) el.style.zIndex = String(d.z);
+            decorEl.appendChild(el);
+            return;
+          }
+          if (effMode === 'rel') {
             wx = minX + (wx * boxW);
             wy = minY + (wy * boxH);
             ww = ww * boxW;
             wh = wh * boxH;
+          }
+          if (hallId === 2 && type === 'fountain' && table13) {
+            const size = Math.max(1, Math.min(boxW, boxH) * 0.10);
+            ww = size;
+            wh = size;
+            const x0 = table13.x + Math.max(0, table13.w) + size * 0.20;
+            const y0 = table13.y - size * 0.30;
+            wx = clamp(x0, minX, (minX + boxW - size));
+            wy = clamp(y0, minY, (minY + boxH - size));
+          }
+          if (type === 'fountain') {
+            const size = Math.min(Math.max(1, ww), Math.max(1, wh));
+            const cx = wx + ww / 2;
+            const cy = wy + wh / 2;
+            ww = size;
+            wh = size;
+            wx = cx - size / 2;
+            wy = cy - size / 2;
+          }
+          if (rotate180) {
+            const r = rotBox(wx, wy, ww, wh);
+            wx = r.x;
+            wy = r.y;
           }
           const el = createDecorEl(type);
           place(el, wx, wy, ww, wh, d && d.z != null ? Number(d.z) : null);
@@ -2658,7 +2730,6 @@
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'table is-dyn' + (String(it.shape) === 'circle' ? ' is-circle' : '') + (it.bookable ? '' : ' disabled');
-        if (it.dataNum) b.dataset.table = it.dataNum;
         b.dataset.bookable = it.bookable ? '1' : '0';
         b.dataset.cap = it.bookable ? String(it.cap || 0) : '';
         b.dataset.posterTableId = String(it.posterId);
@@ -2731,7 +2802,8 @@
       if (canvasMain) canvasMain.hidden = n !== 'main';
       if (canvasCinema) canvasCinema.hidden = n !== 'cinema';
       if (cinemaTabBtn) cinemaTabBtn.textContent = n === 'cinema' ? 'Veranda tables' : 'Cinema tables';
-      selectedTableNum = '';
+      selectedTableId = '';
+      selectedTableLabel = '';
       if (n === 'cinema') await loadCinemaLayout();
       else await loadMainLayout();
       if (requestInvalidate) requestInvalidate();
@@ -2770,6 +2842,7 @@
           setTimeout(() => { loadFree(true).catch(() => null); }, 0);
         }
         const tableNum = String(p.table_num || '').trim();
+        const posterTableIdRaw = String(p.poster_table_id || '').trim();
         const guests = Number(p.guests || 0) || 0;
         const start = String(p.start || '').trim();
         const name = String(p.name || '');
@@ -2779,7 +2852,10 @@
         const preorderRu = String(p.preorder_ru || '');
         const tg = j.tg && typeof j.tg === 'object' ? j.tg : null;
         if (tableNum && guests > 0 && start) {
-          selectedTableNum = tableNum;
+          const fallbackEl = getTables().find((x) => (String(x.querySelector('.num') && x.querySelector('.num').textContent ? x.querySelector('.num').textContent : '').trim() === tableNum));
+          const pid = posterTableIdRaw || String(fallbackEl && fallbackEl.dataset ? (fallbackEl.dataset.posterTableId || '') : '');
+          selectedTableId = pid;
+          selectedTableLabel = tableNum;
           messengerLinked.whatsapp = false;
           linkedWaPhone = null;
           try { localStorage.removeItem('veranda_linked_wa'); } catch (_) {}
@@ -2790,11 +2866,11 @@
             try { localStorage.setItem('veranda_linked_tg', JSON.stringify(linkedTg)); } catch(e) {}
           }
           
-          if (!last || !freeNums || !freeNums.size) {
+          if (!last || !freeIds || !freeIds.size) {
             await loadFree(true).catch(() => null);
           }
 
-          openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
+          openRequestForm({ tableNum, posterTableId: pid, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
           setMsgrHint('');
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);
@@ -2830,6 +2906,7 @@
           setTimeout(() => { loadFree(true).catch(() => null); }, 0);
         }
         const tableNum = String(p.table_num || '').trim();
+        const posterTableIdRaw = String(p.poster_table_id || '').trim();
         const guests = Number(p.guests || 0) || 0;
         const start = String(p.start || '').trim();
         const name = String(p.name || '');
@@ -2839,7 +2916,10 @@
         const preorderRu = String(p.preorder_ru || '');
         const waPhone = String(j.phone || p.whatsapp_phone || phone || '').trim();
         if (tableNum && guests > 0 && start) {
-          selectedTableNum = tableNum;
+          const fallbackEl = getTables().find((x) => (String(x.querySelector('.num') && x.querySelector('.num').textContent ? x.querySelector('.num').textContent : '').trim() === tableNum));
+          const pid = posterTableIdRaw || String(fallbackEl && fallbackEl.dataset ? (fallbackEl.dataset.posterTableId || '') : '');
+          selectedTableId = pid;
+          selectedTableLabel = tableNum;
           messengerLinked.telegram = false;
           linkedTg = null;
           try { localStorage.removeItem('veranda_linked_tg'); } catch (_) {}
@@ -2849,10 +2929,10 @@
             try { localStorage.setItem('veranda_linked_wa', linkedWaPhone); } catch (_) {}
           }
 
-          if (!last || !freeNums || !freeNums.size) {
+          if (!last || !freeIds || !freeIds.size) {
             await loadFree(true).catch(() => null);
           }
-          openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
+          openRequestForm({ tableNum, posterTableId: pid, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
           setMsgrHint('');
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);

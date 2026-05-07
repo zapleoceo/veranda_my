@@ -141,6 +141,7 @@ $soonBookingHours = 2;
 $tableCapsByNum = [];
 $tableSettingsByHall = [];
 $decorByHall = [];
+$hallSettingsByHall = [];
 
 $db = null;
 $metaRepo = null;
@@ -260,6 +261,22 @@ try {
         'props_json' => (string)($r['props_json'] ?? ''),
       ];
     }
+
+    $hallSettingsTbl = $db->t('reservation_hall_settings');
+    $rows = $db->query(
+      "SELECT hall_id, rotate_180
+       FROM {$hallSettingsTbl}
+       WHERE spot_id = ?",
+      [$spotIdForSettings]
+    )->fetchAll();
+    $rows = is_array($rows) ? $rows : [];
+    foreach ($rows as $r) {
+      $hallId = (int)($r['hall_id'] ?? 0);
+      if ($hallId <= 0) continue;
+      $hallSettingsByHall[$hallId] = [
+        'rotate_180' => (int)($r['rotate_180'] ?? 0) ? 1 : 0,
+      ];
+    }
   }
 } catch (\Throwable $e) {
   $allowedSchemeNums = null;
@@ -279,6 +296,7 @@ return [
   'tableCapsByNum' => $tableCapsByNum,
   'tableSettingsByHall' => $tableSettingsByHall,
   'decorByHall' => $decorByHall,
+  'hallSettingsByHall' => $hallSettingsByHall,
   'latestWorkday' => $latestWorkday,
   'latestWeekend' => $latestWeekend,
   'db' => $db,

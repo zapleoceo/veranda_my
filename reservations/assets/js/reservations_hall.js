@@ -32,6 +32,8 @@
 
     const modal = q('#resHallModal');
     const mNum = q('#resHallModalNum');
+    const mPosterId = q('#resHallModalPosterId');
+    const mScheme = q('#resHallModalSchemeNum');
     const mName = q('#resHallModalName');
     const mCap = q('#resHallModalCap');
     const mShow = q('#resHallModalShow');
@@ -53,7 +55,7 @@
     const state = (() => {
       const data = parseInlineData() || {};
       return {
-        rot: false,
+        rot: !!Number(data.rotate_180 || 0),
         active: null,
         tables: Array.isArray(data.tables) ? data.tables.slice() : [],
         spotId: Number(data.spot_id || 1) || 1,
@@ -186,6 +188,8 @@
         el.addEventListener('click', () => {
           state.active = t;
           if (mNum) mNum.textContent = t.scheme_num ? String(t.scheme_num) : (t.table_num ? String(t.table_num) : ('#' + String(t.table_id || '')));
+          if (mPosterId) mPosterId.textContent = String(t.poster_table_id || t.table_id || '—');
+          if (mScheme) mScheme.value = (t.scheme_num != null && String(t.scheme_num).trim() !== '') ? String(t.scheme_num) : '';
           if (mName) mName.value = String(t.display_name || '');
           if (mCap) mCap.value = String(t.cap || 0);
           if (mShow) mShow.checked = !!t.show_on_canvas;
@@ -208,6 +212,7 @@
       state.tables = Array.isArray(j.tables) ? j.tables.slice() : [];
       state.spotId = Number(j.spot_id || spotId) || spotId;
       state.hallId = Number(j.hall_id || hallId) || hallId;
+      state.rot = !!Number(j.rotate_180 || 0);
       if (spotIdInput) spotIdInput.value = String(state.spotId);
       if (hallIdInput) hallIdInput.value = String(state.hallId);
       if (soonInput) soonInput.value = String(Number(j.soon_hours || 2) || 2);
@@ -225,7 +230,13 @@
       const h = hallIdInput ? (Number(hallIdInput.value || 2) || 2) : state.hallId;
       await loadHall(s, h);
     });
-    if (btnRotate) btnRotate.addEventListener('click', () => { state.rot = !state.rot; render(); });
+    if (btnRotate) btnRotate.addEventListener('click', async () => {
+      state.rot = !state.rot;
+      try {
+        await postForm(endpoint + '?ajax=res_hall_rotate', { hall_id: state.hallId, spot_id: state.spotId, rotate_180: state.rot ? 1 : 0 });
+      } catch (_) {}
+      render();
+    });
 
     if (btnAll) btnAll.addEventListener('click', async () => {
       const todo = state.tables.filter((t) => !t.bookable);
@@ -248,10 +259,12 @@
       if (!state.active) return;
       const t = state.active;
       const cap = mCap ? (Number(mCap.value || 0) || 0) : 0;
+      const schemeNum = mScheme ? String(mScheme.value || '').trim() : '';
       const name = mName ? String(mName.value || '').trim() : '';
       const show = mShow ? !!mShow.checked : true;
       const bookable = mBookable ? !!mBookable.checked : false;
       t.cap = cap;
+      t.scheme_num = schemeNum;
       t.display_name = name;
       t.show_on_canvas = show ? 1 : 0;
       t.bookable = bookable ? 1 : 0;

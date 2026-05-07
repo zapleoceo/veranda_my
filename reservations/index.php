@@ -75,11 +75,13 @@ $resCapsByNum = [];
 $resHallTables = [];
 
 require_once __DIR__ . '/Repositories/TableSettingsRepository.php';
+require_once __DIR__ . '/Repositories/HallSettingsRepository.php';
 require_once __DIR__ . '/Services/PosterTablesService.php';
 require_once __DIR__ . '/Controllers/TablesController.php';
 require_once __DIR__ . '/legacy_meta_sync.php';
 $metaRepo = new \App\Classes\MetaRepository($db);
 $tableSettingsRepo = new \Reservations\Repositories\TableSettingsRepository($db);
+$hallSettingsRepo = new \Reservations\Repositories\HallSettingsRepository($db);
 $posterTablesService = null;
 if (!empty($_ENV['POSTER_API_TOKEN'])) {
     $posterTablesService = new \Reservations\Services\PosterTablesService(new \App\Classes\PosterAPI((string)$_ENV['POSTER_API_TOKEN']));
@@ -634,6 +636,26 @@ if ($ajax === 'res_preorder_min_per_guest') {
     exit;
 }
 
+if ($ajax === 'res_hall_rotate') {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (!$canManageTables) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $hallId = max(1, (int)($_POST['hall_id'] ?? $resHallId));
+    $spotId = max(1, (int)($_POST['spot_id'] ?? $resSpotId));
+    $rot = (int)($_POST['rotate_180'] ?? 0) === 1 ? 1 : 0;
+    $hallSettingsRepo->upsertRotate180($spotId, $hallId, $rot);
+    echo json_encode(['ok' => true, 'spot_id' => $spotId, 'hall_id' => $hallId, 'rotate_180' => $rot], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if ($ajax === 'res_hall_data') {
     header('Content-Type: application/json; charset=utf-8');
     if (!$canManageTables) {
@@ -649,6 +671,7 @@ if ($ajax === 'res_hall_data') {
     $minStored = array_key_exists($resMinPreorderKey, $saved) ? trim((string)$saved[$resMinPreorderKey]) : '';
     $minPerGuest = ($minStored !== '' && is_numeric($minStored)) ? max(0, (int)$minStored) : 100000;
 
+    $rotate180 = $hallSettingsRepo->getRotate180($spotId, $hallId);
     $tables = [];
     if ($tablesController) {
         foreach ($tablesController->hallData($spotId, $hallId) as $t) {
@@ -673,7 +696,7 @@ if ($ajax === 'res_hall_data') {
             ];
         }
     }
-    echo json_encode(['ok' => true, 'spot_id' => $spotId, 'hall_id' => $hallId, 'soon_hours' => $soonHours, 'min_preorder_per_guest' => $minPerGuest, 'tables' => $tables], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => true, 'spot_id' => $spotId, 'hall_id' => $hallId, 'rotate_180' => $rotate180, 'soon_hours' => $soonHours, 'min_preorder_per_guest' => $minPerGuest, 'tables' => $tables], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -918,5 +941,7 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
     if ($order === 'asc') return $va <=> $vb;
     return $vb <=> $va;
 });
+
+$resRotate180 = $hallSettingsRepo->getRotate180($resSpotId, $resHallId);
 
 require __DIR__ . '/view.php';

@@ -13,7 +13,10 @@ function tr3_api_free_tables(array $ctx): void {
   $spotId = (int)($_GET['spot_id'] ?? 1);
   $hallId = (int)($_GET['hall_id'] ?? 2);
   if ($hallId <= 0) $hallId = 2;
-  $allowed = ($hallId === 2 && is_array($ctx['allowedSchemeNums'] ?? null)) ? $ctx['allowedSchemeNums'] : null;
+  $settingsByHall = is_array($ctx['tableSettingsByHall'] ?? null) ? $ctx['tableSettingsByHall'] : [];
+  $settingsMap = isset($settingsByHall[(string)$hallId]) && is_array($settingsByHall[(string)$hallId]) ? $settingsByHall[(string)$hallId] : [];
+  $settingsByHall = is_array($ctx['tableSettingsByHall'] ?? null) ? $ctx['tableSettingsByHall'] : [];
+  $settingsMap = isset($settingsByHall[(string)$hallId]) && is_array($settingsByHall[(string)$hallId]) ? $settingsByHall[(string)$hallId] : [];
 
   $displayTzName = (string)($ctx['displayTzName'] ?? 'Asia/Ho_Chi_Minh');
   $displayTz = new DateTimeZone($displayTzName);
@@ -40,23 +43,17 @@ function tr3_api_free_tables(array $ctx): void {
       'without_deleted' => 1,
     ], 'GET');
     $tablesResp = is_array($tablesResp) ? $tablesResp : [];
-    $allowedSet = is_array($allowed) ? array_fill_keys(array_map('strval', $allowed), true) : null;
-    $schemeById = [];
-    $allAllowedNums = [];
+    $bookableTableIds = [];
     foreach ($tablesResp as $trRow) {
       if (!is_array($trRow)) continue;
-      $id = trim((string)($trRow['table_id'] ?? ''));
-      if ($id === '') continue;
-      $num = trim((string)($trRow['table_num'] ?? ''));
-      $title = trim((string)($trRow['table_title'] ?? ''));
-      $scheme = '';
-      if (preg_match('/^\d+$/', $title)) $scheme = $title;
-      elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
-      if ($scheme === '') continue;
-      $sStr = (string)$scheme;
-      if (is_array($allowedSet) && !isset($allowedSet[$sStr])) continue;
-      $schemeById[$id] = $sStr;
-      $allAllowedNums[$sStr] = true;
+      $id = (int)($trRow['table_id'] ?? 0);
+      if ($id <= 0) continue;
+      $cfg = isset($settingsMap[(string)$id]) && is_array($settingsMap[(string)$id]) ? $settingsMap[(string)$id] : null;
+      if (!$cfg) continue;
+      $show = (int)($cfg['show_on_canvas'] ?? 1);
+      $book = (int)($cfg['bookable'] ?? 0);
+      if ($show !== 1 || $book !== 1) continue;
+      $bookableTableIds[(string)$id] = true;
     }
 
     $busyTableIds = [];
@@ -95,28 +92,18 @@ function tr3_api_free_tables(array $ctx): void {
     if ($busyTableIds) {
       foreach (array_keys($busyTableIds) as $tId) {
         $k = (string)$tId;
-        if (isset($schemeById[$k])) $occupiedNowNums[$schemeById[$k]] = true;
+        if (isset($bookableTableIds[$k])) $occupiedNowNums[$k] = true;
       }
       $occupiedNowNums = array_values(array_keys($occupiedNowNums));
-      usort($occupiedNowNums, fn($a, $b) => (int)$a <=> (int)$b);
+      sort($occupiedNowNums, SORT_NUMERIC);
     } else {
       $occupiedNowNums = [];
     }
 
-    $nums = [];
-    foreach (array_keys($allAllowedNums) as $n) {
-      if ($isToday && in_array($n, $occupiedNowNums, true)) continue;
-      $nums[$n] = true;
-    }
-
-    $filtered = [];
-    foreach ($tablesResp as $trRow) {
-      if (!is_array($trRow)) continue;
-      $id = trim((string)($trRow['table_id'] ?? ''));
-      if ($id === '') continue;
-      $scheme = isset($schemeById[$id]) ? $schemeById[$id] : '';
-      if ($scheme === '' || !isset($nums[$scheme])) continue;
-      $filtered[] = $trRow;
+    $freeIds = [];
+    foreach (array_keys($bookableTableIds) as $id) {
+      if ($isToday && in_array((string)$id, $occupiedNowNums, true)) continue;
+      $freeIds[(string)$id] = true;
     }
 
     $busyReasons = [];
@@ -138,10 +125,10 @@ function tr3_api_free_tables(array $ctx): void {
         'guests_count' => $guests,
         'hall_id' => $hallId,
       ],
-      'free_table_nums' => array_values(array_keys($nums)),
-      'occupied_now_nums' => $occupiedNowNums,
+      'free_table_ids' => array_values(array_keys($freeIds)),
+      'occupied_now_table_ids' => $occupiedNowNums,
       'busy_reasons' => $busyReasons,
-      'free_tables' => $filtered,
+      'free_tables' => null,
       'raw' => null,
     ], 200);
   } catch (\Throwable $e) {
@@ -199,25 +186,20 @@ function tr3_api_reservations(array $ctx): void {
       'timezone' => 'client',
     ], 'GET');
 
-    $tablesResp = $api->request('spots.getTableHallTables', [
-      'spot_id' => $spotId,
-      'hall_id' => $hallId,
-      'without_deleted' => 1,
-    ], 'GET');
-
-    $tableRows = is_array($tablesResp) ? $tablesResp : [];
     $tableNameById = [];
-    foreach ($tableRows as $trRow) {
-      if (!is_array($trRow)) continue;
-      $id = trim((string)($trRow['table_id'] ?? ''));
-      if ($id === '') continue;
-      $num = trim((string)($trRow['table_num'] ?? ''));
-      $title = trim((string)($trRow['table_title'] ?? ''));
-      $scheme = '';
-      if (preg_match('/^\d+$/', $title)) $scheme = $title;
-      elseif (preg_match('/^\d+$/', $num)) $scheme = $num;
-      if ($scheme === '') continue;
-      $tableNameById[$id] = (string)$scheme;
+    foreach ($settingsMap as $pid => $cfg) {
+      if (!is_array($cfg)) continue;
+      $pidInt = (int)$pid;
+      if ($pidInt <= 0) continue;
+      $show = (int)($cfg['show_on_canvas'] ?? 1);
+      if ($show !== 1) continue;
+      $label = trim((string)($cfg['display_name'] ?? ''));
+      if ($label === '') {
+        $scheme = $cfg['scheme_num'] ?? null;
+        $label = ($scheme !== null && $scheme !== '') ? (string)$scheme : '';
+      }
+      if ($label === '') $label = '#' . (string)$pidInt;
+      $tableNameById[(string)$pidInt] = $label;
     }
 
     $rows = is_array($respAll) ? $respAll : [];
@@ -327,24 +309,18 @@ function tr3_api_reservations(array $ctx): void {
 function tr3_api_cap_check(array $ctx): void {
   api_json_headers(true);
 
-  $tableNum = trim((string)($_GET['table_num'] ?? ''));
+  $posterTableId = (int)($_GET['poster_table_id'] ?? 0);
   $guests = (int)($_GET['guests'] ?? 0);
   $hallId = (int)($_GET['hall_id'] ?? 2);
   if ($hallId <= 0) $hallId = 2;
-  if ($tableNum === '') api_error(400, 'Некорректный номер стола');
+  if ($posterTableId <= 0) api_error(400, 'Некорректный номер стола');
   if ($guests <= 0 || $guests > 99) api_error(400, 'Некорректное кол-во гостей');
 
   $cap = null;
   $byHall = $ctx['tableSettingsByHall'] ?? null;
   if (is_array($byHall) && isset($byHall[(string)$hallId]) && is_array($byHall[(string)$hallId])) {
-    foreach ($byHall[(string)$hallId] as $row) {
-      if (!is_array($row)) continue;
-      $scheme = $row['scheme_num'] ?? null;
-      if ($scheme === null || $scheme === '') continue;
-      if ((string)$scheme !== (string)$tableNum) continue;
-      $cap = isset($row['capacity']) ? (int)$row['capacity'] : null;
-      break;
-    }
+    $cfg = $byHall[(string)$hallId][(string)$posterTableId] ?? null;
+    if (is_array($cfg)) $cap = isset($cfg['capacity']) ? (int)$cfg['capacity'] : null;
   }
   if ($cap !== null && $cap > 0 && $guests > $cap) {
     api_send_json([
