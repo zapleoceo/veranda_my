@@ -25,12 +25,14 @@
         defaultResDateLocal: j.defaultResDateLocal,
         allowedTableNums: j.allowedTableNums,
         tableCapsByNum: j.tableCapsByNum,
+        tableSettingsByHall: j.tableSettingsByHall,
+        decorByHall: j.decorByHall,
         soonBookingHours: j.soonBookingHours,
         latestWorkday: j.latestWorkday,
         latestWeekend: j.latestWeekend,
         apiBase: j.apiBase,
       };
-      return loadScript('/tr4/assets/app.js?v=20260507_1508');
+      return loadScript('/tr4/assets/app.js?v=20260507_1528');
     })
     .catch((e) => {
       const msg = document.createElement('div');
