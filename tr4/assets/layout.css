@@ -569,6 +569,16 @@
       border-color: rgba(213,156,90,0.55);
       box-shadow: 0 0 0 4px rgba(213,156,90,0.12);
     }
+    .dt-btn:disabled,
+    .dt-btn.is-disabled {
+      opacity: 0.35;
+      cursor: default;
+      transform: none;
+    }
+    .dt-btn:disabled.attn::before,
+    .dt-btn.is-disabled.attn::before {
+      animation: none;
+    }
 
     .dtp {
       position: fixed;

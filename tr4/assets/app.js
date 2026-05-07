@@ -2504,13 +2504,23 @@
       const list = Array.isArray(rows) ? rows : [];
       canvasCinema.innerHTML = '';
 
+      const extractNum = (raw) => {
+        const s = String(raw ?? '').trim();
+        if (!s) return '';
+        const m = s.match(/(\d+)/);
+        return m ? String(m[1]) : '';
+      };
+
       const items = list.map((r) => {
         const x = Number(r && r.table_x != null ? r.table_x : 0);
         const y = Number(r && r.table_y != null ? r.table_y : 0);
         const w = Number(r && r.table_width != null ? r.table_width : 0);
         const h = Number(r && r.table_height != null ? r.table_height : 0);
+        const title = r && r.table_title != null ? r.table_title : '';
+        const numRaw = r && r.table_num != null ? r.table_num : '';
+        const num = extractNum(title) || extractNum(numRaw);
         return {
-          num: String((r && r.table_title && /^\d+$/.test(String(r.table_title).trim())) ? String(r.table_title).trim() : String(r && r.table_num ? r.table_num : '').trim()),
+          num,
           shape: String(r && r.table_shape ? r.table_shape : ''),
           x: isFinite(x) ? x : 0,
           y: isFinite(y) ? y : 0,
