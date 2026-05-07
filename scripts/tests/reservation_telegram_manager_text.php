@@ -12,14 +12,15 @@ $payload = [
     'guests' => 2,
     'table_num' => 'Room',
     'poster_table_id' => 777,
+    'hall_name' => 'Veranda Hall',
     'name' => 'Test',
     'phone' => '+10000000000',
 ];
 
 $text = ReservationTelegram::buildManagerText($payload);
 
-if (strpos($text, '777') === false) {
-    fwrite(STDERR, "FAIL: manager text must include poster table_id\n");
+if (strpos($text, 'Veranda Hall') === false || strpos($text, '777') === false) {
+    fwrite(STDERR, "FAIL: manager text must include hall_name and poster table_id\n");
     exit(1);
 }
 if (strpos($text, 'Номер стола') !== false) {
@@ -28,4 +29,3 @@ if (strpos($text, 'Номер стола') !== false) {
 }
 
 fwrite(STDOUT, "OK\n");
-

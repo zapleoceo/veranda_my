@@ -10,50 +10,62 @@ switch ($ajax) {
   case 'bootstrap':
     require_once __DIR__ . '/api_misc.php';
     tr3_api_bootstrap($ctx);
+    break;
 
   case 'log_js':
     require_once __DIR__ . '/api_misc.php';
     tr3_api_log_js($ctx);
+    break;
 
   case 'free_tables':
     require_once __DIR__ . '/api_poster.php';
     tr3_api_free_tables($ctx);
+    break;
 
   case 'reservations':
     require_once __DIR__ . '/api_poster.php';
     tr3_api_reservations($ctx);
+    break;
 
   case 'cap_check':
     require_once __DIR__ . '/api_poster.php';
     tr3_api_cap_check($ctx);
+    break;
 
   case 'hall_tables':
     require_once __DIR__ . '/api_poster.php';
     tr3_api_hall_tables($ctx);
+    break;
 
   case 'submit_booking':
     require_once __DIR__ . '/api_booking.php';
     tr3_api_submit_booking($ctx);
+    break;
 
   case 'tg_state_create':
     require_once __DIR__ . '/api_states.php';
     tr3_api_tg_state_create($ctx);
+    break;
 
   case 'wa_state_create':
     require_once __DIR__ . '/api_states.php';
     tr3_api_wa_state_create($ctx);
+    break;
 
   case 'tg_state_get':
     require_once __DIR__ . '/api_states.php';
     tr3_api_tg_state_get($ctx);
+    break;
 
   case 'wa_state_get':
     require_once __DIR__ . '/api_states.php';
     tr3_api_wa_state_get($ctx);
+    break;
 
   case 'menu_preorder':
     require_once __DIR__ . '/api_menu.php';
     tr3_api_menu_preorder($ctx);
+    break;
 }
 
 api_json_headers(false);

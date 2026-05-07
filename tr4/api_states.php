@@ -11,9 +11,11 @@ function tr3_api_tg_state_create(array $ctx): void {
   $payload = api_read_payload();
 
   $tableNum = trim((string)($payload['table_num'] ?? ''));
+  $posterTableId = isset($payload['poster_table_id']) ? (int)$payload['poster_table_id'] : 0;
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
-  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) api_error(400, 'Некорректный номер стола');
+  if ($tableNum === '') api_error(400, 'Некорректный номер стола');
+  if ($posterTableId <= 0 && !preg_match('/^\d+$/', $tableNum)) api_error(400, 'Некорректный номер стола');
   if ($guests <= 0 || $guests > 99) api_error(400, 'Некорректное кол-во гостей');
 
   $scriptBase = basename((string)($_SERVER['SCRIPT_NAME'] ?? 'api.php'));
@@ -94,13 +96,15 @@ function tr3_api_wa_state_create(array $ctx): void {
   if ($waSecret === '') api_error(500, $trFor('err_wa_not_configured'));
 
   $tableNum = trim((string)($payload['table_num'] ?? ''));
+  $posterTableId = isset($payload['poster_table_id']) ? (int)$payload['poster_table_id'] : 0;
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
   $scriptBase = basename((string)($_SERVER['SCRIPT_NAME'] ?? 'api.php'));
   $sourcePage = trim((string)($payload['source_page'] ?? $scriptBase));
 
-  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) api_error(400, 'Некорректный номер стола');
+  if ($tableNum === '') api_error(400, 'Некорректный номер стола');
+  if ($posterTableId <= 0 && !preg_match('/^\d+$/', $tableNum)) api_error(400, 'Некорректный номер стола');
   if ($guests <= 0 || $guests > 99) api_error(400, 'Некорректное кол-во гостей');
   if ($start === '' || mb_strlen($start) > 40) api_error(400, 'Некорректное время');
 

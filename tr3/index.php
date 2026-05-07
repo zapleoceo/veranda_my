@@ -1,5 +1,10 @@
 <?php
 
+  $qs = (string)($_SERVER['QUERY_STRING'] ?? '');
+  $to = '/tr4/' . ($qs !== '' ? ('?' . $qs) : '');
+  header('Location: ' . $to, true, 302);
+  exit;
+
 /*
 TR3 (Booking) — Developer Note
 

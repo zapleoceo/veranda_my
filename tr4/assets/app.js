@@ -225,6 +225,11 @@
       const el = getActiveTablesRoot();
       return el ? Array.from(el.querySelectorAll('.table')) : [];
     };
+    const getTableLabelText = (tEl) => {
+      if (!tEl || !tEl.querySelector) return '';
+      const el = tEl.querySelector('.num');
+      return el ? String(el.textContent || '').trim() : '';
+    };
     const applyAllowedToMain = () => {
       if (allowedSet === null || allowedSet.size <= 0) return;
       if (!tablesMain) return;
@@ -1339,7 +1344,7 @@
         reqSubmit.setAttribute('aria-disabled', canSubmit ? 'false' : 'true');
         reqSubmit.disabled = !!submitBusy;
       };
-    const openRequestForm = ({ tableNum, posterTableId, guests, start, name, phone, comment, preorder, keepFields }) => {
+    const openRequestForm = ({ tableNum, posterTableId, spotId, hallId, guests, start, name, phone, comment, preorder, keepFields }) => {
       if (reqHint) {
         reqHint.hidden = true;
         reqHint.textContent = '';
@@ -1347,7 +1352,7 @@
       }
 
 
-      pendingBooking = { tableNum: String(tableNum || ''), posterTableId: String(posterTableId || ''), guests: Number(guests || 0), start: String(start || '') };
+      pendingBooking = { tableNum: String(tableNum || ''), posterTableId: String(posterTableId || ''), spotId: Number(spotId || 1) || 1, hallId: Number(hallId || activeHallId || 0) || (activeHallId || 0), guests: Number(guests || 0), start: String(start || '') };
       if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
       if (reqTableNumInput) reqTableNumInput.value = String(tableNum || '');
       if (reqPosterTableIdInput) reqPosterTableIdInput.value = String(posterTableId || '');
@@ -1628,6 +1633,8 @@
 
       const tableNum = String(pendingBooking.tableNum || '');
       const posterTableId = String(pendingBooking.posterTableId || '');
+      const spotId = Number(pendingBooking.spotId || 1) || 1;
+      const hallId = Number(pendingBooking.hallId || activeHallId || 0) || (activeHallId || 0);
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
@@ -1650,7 +1657,7 @@
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, source_page: sourcePage }),
+          body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, source_page: sourcePage }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -1710,6 +1717,8 @@
       
       const tableNum = String(pendingBooking.tableNum || '');
       const posterTableId = String(pendingBooking.posterTableId || '');
+      const spotId = Number(pendingBooking.spotId || 1) || 1;
+      const hallId = Number(pendingBooking.hallId || activeHallId || 0) || (activeHallId || 0);
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
@@ -1737,7 +1746,7 @@
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, scroll_y: scrollY, source_page: sourcePage }),
+            body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, scroll_y: scrollY, source_page: sourcePage }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -1981,12 +1990,14 @@
         }
         try {
           const posterTableId = pendingBooking ? String(pendingBooking.posterTableId || '') : '';
+          const spotId = pendingBooking ? (Number(pendingBooking.spotId || 1) || 1) : 1;
+          const hallId = pendingBooking ? (Number(pendingBooking.hallId || activeHallId || 0) || (activeHallId || 0)) : (activeHallId || 0);
           const url = apiUrl();
           url.searchParams.set('ajax', 'submit_booking');
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, guests, start, duration_m, name, phone, whatsapp_phone: messengerLinked.whatsapp ? linkedWaPhone : null, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
+            body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, duration_m, name, phone, whatsapp_phone: messengerLinked.whatsapp ? linkedWaPhone : null, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -2283,7 +2294,7 @@
 
         table.addEventListener('click', async () => {
           const id = String(table.dataset.posterTableId || '');
-          const label = String((table.querySelector('.num') && table.querySelector('.num').textContent) ? table.querySelector('.num').textContent : '').trim();
+          const label = getTableLabelText(table);
           const current = getCurrentRequest();
 
           const now = new Date();
@@ -2351,7 +2362,7 @@
 
           selectedTableId = id;
           selectedTableLabel = label || id;
-          openRequestForm({ tableNum: (label || id), posterTableId: id, guests: current.guests, start: current.dtRaw });
+          openRequestForm({ tableNum: (label || id), posterTableId: id, spotId: 1, hallId: activeHallId, guests: current.guests, start: current.dtRaw });
         });
       });
     };
@@ -2630,7 +2641,7 @@
                   <stop offset="1" stop-color="rgba(0,0,0,0.35)"/>
                 </linearGradient>
               </defs>
-              <circle cx="32" cy="44" r="16" fill="rgba(35,110,180,0.20)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+              <circle cx="32" cy="44" r="17.6" fill="rgba(35,110,180,0.20)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
               <path d="M18 44c4-6 24-6 28 0" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round"/>
               <path d="M22 44c3-4 17-4 20 0" stroke="rgba(90,180,255,0.30)" stroke-width="2" stroke-linecap="round"/>
               <path class="water-fall" d="M32 18c0 10-6 12-6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
@@ -2691,7 +2702,8 @@
           if (hallId === 2 && type === 'fountain' && table10Px) {
             const sizePx = Math.max(28, Math.round(Math.min(MAP_W, MAP_H) * 0.075));
             const left = Math.round(clamp(table10Px.left + table10Px.w + sizePx * 0.15, PAD, MAP_W - PAD - sizePx));
-            const top = Math.round(clamp(table10Px.top - sizePx * 0.35, PAD, MAP_H - PAD - sizePx));
+            const radiusPx = Math.round(sizePx / 2);
+            const top = Math.round(clamp(table10Px.top - sizePx * 0.35 - radiusPx, PAD, MAP_H - PAD - sizePx));
             const el = createDecorEl(type);
             el.style.left = left + 'px';
             el.style.top = top + 'px';
@@ -2757,7 +2769,7 @@
         b.style.top = top + 'px';
         b.style.width = w + 'px';
         b.style.height = h + 'px';
-        b.innerHTML = `<span class="num">${esc(it.label)}</span><span class="cap"></span>`;
+        b.innerHTML = `<span class="table-badge"><span class="num">${esc(it.label)}</span><span class="cap"></span></span>`;
         tablesEl.appendChild(b);
       });
 
@@ -2868,7 +2880,7 @@
         const preorderRu = String(p.preorder_ru || '');
         const tg = j.tg && typeof j.tg === 'object' ? j.tg : null;
         if (tableNum && guests > 0 && start) {
-          const fallbackEl = getTables().find((x) => (String(x.querySelector('.num') && x.querySelector('.num').textContent ? x.querySelector('.num').textContent : '').trim() === tableNum));
+          const fallbackEl = getTables().find((x) => (getTableLabelText(x) === tableNum));
           const pid = posterTableIdRaw || String(fallbackEl && fallbackEl.dataset ? (fallbackEl.dataset.posterTableId || '') : '');
           selectedTableId = pid;
           selectedTableLabel = tableNum;
@@ -2886,7 +2898,7 @@
             await loadFree(true).catch(() => null);
           }
 
-          openRequestForm({ tableNum, posterTableId: pid, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
+          openRequestForm({ tableNum, posterTableId: pid, spotId: Number(p.spot_id || 1) || 1, hallId: Number(p.hall_id || activeHallId) || activeHallId, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
           setMsgrHint('');
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);
@@ -2932,7 +2944,7 @@
         const preorderRu = String(p.preorder_ru || '');
         const waPhone = String(j.phone || p.whatsapp_phone || phone || '').trim();
         if (tableNum && guests > 0 && start) {
-          const fallbackEl = getTables().find((x) => (String(x.querySelector('.num') && x.querySelector('.num').textContent ? x.querySelector('.num').textContent : '').trim() === tableNum));
+          const fallbackEl = getTables().find((x) => (getTableLabelText(x) === tableNum));
           const pid = posterTableIdRaw || String(fallbackEl && fallbackEl.dataset ? (fallbackEl.dataset.posterTableId || '') : '');
           selectedTableId = pid;
           selectedTableLabel = tableNum;
@@ -2948,7 +2960,7 @@
           if (!last || !freeIds || !freeIds.size) {
             await loadFree(true).catch(() => null);
           }
-          openRequestForm({ tableNum, posterTableId: pid, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
+          openRequestForm({ tableNum, posterTableId: pid, spotId: Number(p.spot_id || 1) || 1, hallId: Number(p.hall_id || activeHallId) || activeHallId, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
           setMsgrHint('');
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);

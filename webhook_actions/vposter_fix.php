@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../src/classes/ReservationTelegram.php';
 require_once __DIR__ . '/../src/classes/PosterReservationHelper.php';
+require_once __DIR__ . '/../src/classes/PosterSpotHallsService.php';
 
 $row = $db->query("SELECT * FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
 if (!$row) {
@@ -16,6 +17,16 @@ if (!empty($row['deleted_at'])) {
 if (empty($_ENV['POSTER_API_TOKEN'])) {
     $postJson('answerCallbackQuery', ['callback_query_id' => $callbackId, 'text' => 'Poster API не настроен', 'show_alert' => true]);
     exit;
+}
+
+$spotIdRow = (int)($row['spot_id'] ?? 0);
+if ($spotIdRow <= 0) $spotIdRow = (int)($_ENV['POSTER_SPOT_ID'] ?? 1);
+if ($spotIdRow <= 0) $spotIdRow = 1;
+$hallIdRow = (int)($row['hall_id'] ?? 0);
+if ($hallIdRow > 0) {
+    $hallName = \App\Classes\PosterSpotHallsService::getHallName($db, trim((string)$_ENV['POSTER_API_TOKEN']), $spotIdRow, $hallIdRow);
+    if ($hallName === '') $hallName = 'hall_id=' . (string)$hallIdRow;
+    $row['hall_name'] = $hallName;
 }
 
 $spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
@@ -79,7 +90,9 @@ $spotId = (string)($_ENV['POSTER_SPOT_ID'] ?? '1');
 $res = \App\Classes\PosterReservationHelper::pushToPoster($db, $_ENV['POSTER_API_TOKEN'], $id, $spotId, $ackBy);
 
 $row2 = $db->query("SELECT * FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
-$baseText2 = \App\Classes\ReservationTelegram::buildManagerText($row2 ?: []);
+$row2 = is_array($row2) ? $row2 : [];
+if (!empty($row['hall_name'])) $row2['hall_name'] = $row['hall_name'];
+$baseText2 = \App\Classes\ReservationTelegram::buildManagerText($row2);
 $baseText2 = preg_replace('/\n?\s*@Ollushka90\s+@ce_akh1\s+свяжитесь\s+с\s+гостем\s*\n?/u', "\n", $baseText2);
 
 if (!$res['ok']) {

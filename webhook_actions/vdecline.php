@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../src/classes/ReservationTelegram.php';
+require_once __DIR__ . '/../src/classes/PosterSpotHallsService.php';
 
 $row = $db->query("SELECT * FROM {$resTable} WHERE id = ? LIMIT 1", [$id])->fetch();
 if (!$row) {
@@ -22,6 +23,16 @@ $db->query("UPDATE {$resTable} SET deleted_at = NOW(), deleted_by = ? WHERE id =
     $id
 ]);
 
+$row = is_array($row) ? $row : [];
+$spotIdRow = (int)($row['spot_id'] ?? 0);
+if ($spotIdRow <= 0) $spotIdRow = (int)($_ENV['POSTER_SPOT_ID'] ?? 1);
+if ($spotIdRow <= 0) $spotIdRow = 1;
+$hallIdRow = (int)($row['hall_id'] ?? 0);
+if ($hallIdRow > 0) {
+    $hallName = \App\Classes\PosterSpotHallsService::getHallName($db, trim((string)($_ENV['POSTER_API_TOKEN'] ?? '')), $spotIdRow, $hallIdRow);
+    if ($hallName === '') $hallName = 'hall_id=' . (string)$hallIdRow;
+    $row['hall_name'] = $hallName;
+}
 $baseText = \App\Classes\ReservationTelegram::buildManagerText($row);
 $newText = trim($baseText) . "\n\n❌ <b>Бронь отказана</b> менеджером " . htmlspecialchars($who) . ' · ' . htmlspecialchars($at);
 
@@ -34,4 +45,3 @@ $postJson('editMessageText', [
     'reply_markup' => ['inline_keyboard' => \App\Classes\ReservationTelegram::keyboardDeclined($id)],
 ]);
 exit;
-

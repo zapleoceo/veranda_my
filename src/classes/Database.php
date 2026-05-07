@@ -589,6 +589,8 @@ class Database {
         $t = $this->t('reservations');
         $this->pdo->exec("CREATE TABLE IF NOT EXISTS {$t} (
             id INT AUTO_INCREMENT PRIMARY KEY,
+            spot_id INT NULL,
+            hall_id INT NULL,
             created_at DATETIME NOT NULL,
             start_time DATETIME NOT NULL,
             guests INT NOT NULL,
@@ -611,6 +613,7 @@ class Database {
             qr_code VARCHAR(64) NULL,
             deleted_at DATETIME NULL,
             deleted_by VARCHAR(255) NULL,
+            KEY idx_spot_hall (spot_id, hall_id),
             KEY idx_start_time (start_time)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
@@ -655,6 +658,12 @@ class Database {
             }
             if (empty($cols['poster_table_id'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN poster_table_id INT NULL AFTER table_num");
+            }
+            if (empty($cols['spot_id'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN spot_id INT NULL AFTER id");
+            }
+            if (empty($cols['hall_id'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN hall_id INT NULL AFTER spot_id");
             }
         } catch (\Throwable $e) {
         }
