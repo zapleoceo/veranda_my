@@ -397,6 +397,8 @@
     const capModalText = document.getElementById('capModalText');
     const capModalYes = document.getElementById('capModalYes');
     const capModalNo = document.getElementById('capModalNo');
+    const capModalYesDefaultText = capModalYes ? String(capModalYes.textContent || '') : '';
+    const capModalNoDefaultText = capModalNo ? String(capModalNo.textContent || '') : '';
     const reqModal = document.getElementById('reqModal');
     const reqModalCard = document.getElementById('reqModalCard');
     const reqForm = document.getElementById('reqForm');
@@ -776,10 +778,23 @@
 
     const confirmModal = (text) => new Promise((resolve) => {
       capConfirmResolve = resolve;
+      if (capModalNo) {
+        capModalNo.style.display = '';
+        capModalNo.textContent = capModalNoDefaultText;
+      }
+      if (capModalYes) capModalYes.textContent = capModalYesDefaultText;
       if (capModalText) capModalText.textContent = String(text || '');
       setModal(capModal, true);
     });
     const confirmCapacity = (maxCap, guests) => confirmModal(fmtVars(t('confirm_capacity'), { max: maxCap, guests }));
+
+    const showSystemModal = (text) => {
+      if (capModalNo) capModalNo.style.display = 'none';
+      if (capModalYes) capModalYes.textContent = t('ok') || 'OK';
+      if (capModalText) capModalText.textContent = String(text || '');
+      capConfirmResolve = null;
+      setModal(capModal, true);
+    };
 
     if (capModalYes) {
       capModalYes.addEventListener('click', () => {
@@ -2178,7 +2193,9 @@
         if (statusLine) statusLine.textContent = t('press_ok');
         return;
       }
-      const isFree = freeNums.has(String(tableNum)) && !(soonBookingNums && soonBookingNums.has(String(tableNum)));
+      const el = getTables().find((x) => String(x.dataset.table || '') === String(tableNum)) || null;
+      const isDisabled = !!(el && el.classList && el.classList.contains('disabled'));
+      const isFree = !isDisabled && freeNums.has(String(tableNum)) && !(soonBookingNums && soonBookingNums.has(String(tableNum)));
       if (statusLine) statusLine.textContent = isFree ? t('status_free') : t('status_busy');
     };
 
@@ -2186,6 +2203,7 @@
       getTables().forEach((t) => {
         const n = String(t.dataset.table || '');
         t.classList.remove('free', 'busy');
+        if (t.classList.contains('disabled')) return;
         if (!last) return;
         if (t.dataset.resBusy === '1') { t.classList.add('busy'); return; }
         if (soonBookingNums && soonBookingNums.has(n)) { t.classList.add('busy'); return; }
@@ -2314,7 +2332,7 @@
             return;
           }
 
-          const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[id] != null ? Number(tableCapsByNum[id]) : null;
+          const cap = table.dataset.cap != null && String(table.dataset.cap).trim() !== '' ? Number(table.dataset.cap) : null;
           if (cap != null && isFinite(cap) && current.guests > cap) {
             const ok = await confirmCapacity(Math.max(1, Math.floor(cap)), current.guests);
             if (!ok) {
@@ -2464,8 +2482,7 @@
         const n = String(t.dataset.table || '');
         const capEl = t.querySelector('.cap');
         if (!capEl) return;
-        const fromAttr = t.dataset.cap != null && String(t.dataset.cap).trim() !== '' ? Number(t.dataset.cap) : null;
-        const cap = (fromAttr != null && isFinite(fromAttr)) ? fromAttr : (tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[n] != null ? Number(tableCapsByNum[n]) : null);
+        const cap = t.dataset.cap != null && String(t.dataset.cap).trim() !== '' ? Number(t.dataset.cap) : null;
         capEl.textContent = (cap != null && isFinite(cap)) ? (String(Math.max(0, Math.floor(cap))) + ' 👤') : '';
       });
     };
@@ -2498,6 +2515,10 @@
           { decor_type: 'bar_row', x: 0.0, y: -0.02, w: 1.0, h: 0.09, z: 3, props_json: '{"mode":"rel"}' },
         ];
       }
+      if (!settingsMap || (typeof settingsMap === 'object' && Object.keys(settingsMap).length === 0)) {
+        showSystemModal('Сейчас недоступны настройки столов. Открой /reservations и проверь, что таблица настроек загружается.');
+        return;
+      }
 
       const items = list.map((r) => {
         const posterId = Number(r && r.table_id != null ? r.table_id : 0);
@@ -2509,12 +2530,14 @@
         const numRaw = r && r.table_num != null ? r.table_num : '';
         const fallbackNum = extractNum(title) || extractNum(numRaw);
         const s = (posterId && isFinite(posterId)) ? getSettings(posterId) : null;
+        if (!s) return null;
         const schemeNum = s && s.scheme_num != null && String(s.scheme_num).trim() !== '' ? String(s.scheme_num).trim() : '';
-        const label = s && s.display_name != null && String(s.display_name).trim() !== '' ? String(s.display_name).trim() : (schemeNum || fallbackNum || String(numRaw || title || ('#' + String(posterId || ''))));
+        const label = s && s.display_name != null && String(s.display_name).trim() !== '' ? String(s.display_name).trim() : (schemeNum || String(numRaw || title || ('#' + String(posterId || ''))));
         const showOnCanvas = s && s.show_on_canvas != null ? !!Number(s.show_on_canvas) : true;
-        const bookable = s && s.bookable != null ? !!Number(s.bookable) : false;
+        const rawBookable = s && s.bookable != null ? !!Number(s.bookable) : false;
+        const bookable = rawBookable && !!schemeNum;
         const cap = s && s.capacity != null ? Math.max(0, Number(s.capacity) || 0) : 0;
-        const dataNum = schemeNum || fallbackNum;
+        const dataNum = schemeNum;
         return {
           posterId: isFinite(posterId) ? Math.floor(posterId) : 0,
           dataNum,
@@ -2528,7 +2551,7 @@
           w: isFinite(w) ? w : 0,
           h: isFinite(h) ? h : 0,
         };
-      }).filter((it) => it.posterId > 0);
+      }).filter((it) => it && it.posterId > 0);
 
       const visible = items.filter((it) => it.showOnCanvas);
       if (!visible.length) return;

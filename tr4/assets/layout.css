@@ -442,6 +442,18 @@
       font-size: 0.95rem;
     }
 
+    .table.is-dyn.disabled .num {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.15rem;
+      text-align: center;
+      max-width: calc(100% - 16px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .dt-btn.tab-toggle { white-space: nowrap; }
 
     .bar-row {
