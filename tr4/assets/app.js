@@ -196,8 +196,12 @@
     const cinemaTabBtn = document.getElementById('cinemaTabBtn');
     const canvasMain = document.getElementById('mapCanvasMain');
     const canvasCinema = document.getElementById('mapCanvasCinema');
+    const tablesMain = document.getElementById('mapTablesMain');
+    const tablesCinema = document.getElementById('mapTablesCinema');
     let activeCanvas = 'main';
     let activeHallId = 2;
+    let mainLayoutLoaded = false;
+    let mainLayoutLoading = false;
     let cinemaLayoutLoaded = false;
     let cinemaLayoutLoading = false;
     let requestReload = null;
@@ -206,62 +210,28 @@
 
     const syncCanvasToggleBusy = () => {
       if (!cinemaTabBtn) return;
-      const busy = !!(isLoading || cinemaLayoutLoading);
+      const busy = !!(isLoading || cinemaLayoutLoading || mainLayoutLoading);
       cinemaTabBtn.disabled = busy;
       cinemaTabBtn.setAttribute('aria-disabled', busy ? 'true' : 'false');
       cinemaTabBtn.classList.toggle('is-disabled', busy);
     };
 
-    const getActiveCanvasEl = () => (activeCanvas === 'cinema' ? canvasCinema : canvasMain);
+    const getActiveTablesRoot = () => {
+      if (activeCanvas === 'cinema') return tablesCinema || canvasCinema;
+      return tablesMain || canvasMain;
+    };
     const getTables = () => {
-      const el = getActiveCanvasEl();
+      const el = getActiveTablesRoot();
       return el ? Array.from(el.querySelectorAll('.table')) : [];
     };
-    const mainTables = canvasMain ? Array.from(canvasMain.querySelectorAll('.table')) : [];
-
-    const shiftTablesUp = (px) => {
-      mainTables.forEach((t) => {
+    const applyAllowedToMain = () => {
+      if (allowedSet === null || allowedSet.size <= 0) return;
+      if (!tablesMain) return;
+      Array.from(tablesMain.querySelectorAll('.table')).forEach((t) => {
         const n = String(t.dataset.table || '');
-        const num = parseInt(n, 10);
-        if (!isFinite(num) || num < 1 || num > 500) return;
-        const topStr = String(t.style.top || '').trim();
-        const m = topStr.match(/^(-?\d+(?:\.\d+)?)px$/);
-        if (!m) return;
-        const cur = Number(m[1]);
-        if (!isFinite(cur)) return;
-        t.style.top = String(cur - px) + 'px';
+        if (n && !allowedSet.has(n)) t.classList.add('disabled');
       });
     };
-    const shiftTablesRight = (fromNum, toNum, px) => {
-      mainTables.forEach((t) => {
-        const n = String(t.dataset.table || '');
-        const num = Number(n);
-        if (!isFinite(num) || num < fromNum || num > toNum) return;
-        const leftStr = String(t.style.left || '').trim();
-        const m = leftStr.match(/^(-?\d+(?:\.\d+)?)px$/);
-        if (!m) return;
-        const cur = Number(m[1]);
-        if (!isFinite(cur)) return;
-        t.style.left = String(cur + px) + 'px';
-      });
-    };
-    shiftTablesUp(56);
-    shiftTablesRight(17, 21, 28);
-    if (allowedSet !== null && allowedSet.size > 0) {
-      mainTables.forEach((t) => {
-        const n = String(t.dataset.table || '');
-        if (!allowedSet.has(n)) {
-          t.classList.add('disabled');
-        }
-      });
-    }
-
-    mainTables.forEach((t) => {
-      const n = String(t.dataset.table || '');
-      const capEl = t.querySelector('.cap');
-      const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[n] != null ? Number(tableCapsByNum[n]) : null;
-      if (capEl) capEl.textContent = (cap != null && isFinite(cap)) ? (String(Math.max(0, Math.floor(cap))) + ' 👤') : '';
-    });
 
     const setBusyLabel = (dateStr) => {
       const busyDateLabel = document.getElementById('busyDateLabel');
@@ -2499,10 +2469,10 @@
       });
     };
 
-    const renderCinemaTables = (rows) => {
-      if (!canvasCinema) return;
+    const renderHallTables = (targetEl, rows, opts) => {
+      if (!targetEl) return;
       const list = Array.isArray(rows) ? rows : [];
-      canvasCinema.innerHTML = '';
+      targetEl.innerHTML = '';
 
       const extractNum = (raw) => {
         const s = String(raw ?? '').trim();
@@ -2549,7 +2519,8 @@
 
       const boxW = Math.max(1, maxX - minX);
       const boxH = Math.max(1, maxY - minY);
-      const scale = Math.min((MAP_W - PAD * 2) / boxW, (MAP_H - PAD * 2) / boxH);
+      const fits = boxW <= (MAP_W - PAD * 2) && boxH <= (MAP_H - PAD * 2);
+      const scale = fits ? 1 : Math.min((MAP_W - PAD * 2) / boxW, (MAP_H - PAD * 2) / boxH);
       const offX = PAD - (minX * scale);
       const offY = PAD - (minY * scale);
 
@@ -2567,8 +2538,10 @@
         b.style.width = w + 'px';
         b.style.height = h + 'px';
         b.innerHTML = `<span class="num">${esc(it.num)}</span><span class="cap"></span>`;
-        canvasCinema.appendChild(b);
+        targetEl.appendChild(b);
       });
+
+      if (opts && opts.applyAllowed) opts.applyAllowed();
       applyCapsToActiveTables();
       if (requestBindTables) requestBindTables();
       applyAvailabilityStyles();
@@ -2576,7 +2549,7 @@
 
     const loadCinemaLayout = async () => {
       if (cinemaLayoutLoaded) return;
-      if (!canvasCinema) return;
+      if (!tablesCinema) return;
       try {
         cinemaLayoutLoading = true;
         syncCanvasToggleBusy();
@@ -2587,7 +2560,7 @@
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error('tables_load_failed');
-        renderCinemaTables(j.tables || []);
+        renderHallTables(tablesCinema, j.tables || []);
         cinemaLayoutLoaded = true;
       } catch (_) {
       } finally {
@@ -2596,8 +2569,30 @@
       }
     };
 
+    const loadMainLayout = async () => {
+      if (mainLayoutLoaded) return;
+      if (!tablesMain) return;
+      try {
+        mainLayoutLoading = true;
+        syncCanvasToggleBusy();
+        const url = apiUrl();
+        url.searchParams.set('ajax', 'hall_tables');
+        url.searchParams.set('spot_id', '1');
+        url.searchParams.set('hall_id', '2');
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok) throw new Error('tables_load_failed');
+        renderHallTables(tablesMain, j.tables || [], { applyAllowed: applyAllowedToMain });
+        mainLayoutLoaded = true;
+      } catch (_) {
+      } finally {
+        mainLayoutLoading = false;
+        syncCanvasToggleBusy();
+      }
+    };
+
     const setActiveCanvas = async (next) => {
-      if (isLoading || cinemaLayoutLoading) return;
+      if (isLoading || cinemaLayoutLoading || mainLayoutLoading) return;
       const n = (next === 'cinema') ? 'cinema' : 'main';
       activeCanvas = n;
       activeHallId = n === 'cinema' ? 7 : 2;
@@ -2606,6 +2601,7 @@
       if (cinemaTabBtn) cinemaTabBtn.textContent = n === 'cinema' ? 'Veranda tables' : 'Cinema tables';
       selectedTableNum = '';
       if (n === 'cinema') await loadCinemaLayout();
+      else await loadMainLayout();
       if (requestInvalidate) requestInvalidate();
       if (requestBindTables) requestBindTables();
       if (requestReload) requestReload(true);
@@ -2613,13 +2609,13 @@
 
     if (cinemaTabBtn) {
       cinemaTabBtn.addEventListener('click', () => {
-        if (isLoading || cinemaLayoutLoading) return;
+        if (isLoading || cinemaLayoutLoading || mainLayoutLoading) return;
         setActiveCanvas(activeCanvas === 'cinema' ? 'main' : 'cinema').catch(() => null);
       });
     }
 
     initDate();
-    setTimeout(() => { loadFree(true).catch(() => null); }, 0);
+    setTimeout(() => { loadMainLayout().then(() => loadFree(true)).catch(() => null); }, 0);
     const restoreFromTgState = async () => {
       const params = new URLSearchParams(location.search);
       const code = String(params.get('tg_state') || '').trim();

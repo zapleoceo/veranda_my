@@ -73,7 +73,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr4/assets/tr3.css?v=20260507_1336">
+  <link rel="stylesheet" href="/tr4/assets/tr3.css?v=20260507_1346">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -128,19 +128,7 @@ $mk = function (string $l) use ($self, $baseQs) {
               <div class="map" aria-label="Схема столов ресторана">
             <div class="map-canvas" id="mapCanvasMain" data-hall="2">
             <div class="grass-corner-1-7" aria-hidden="true"></div>
-            <button class="table large" style="left: 712px; top: 276px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
-            <button class="table large" style="left: 712px; top: 402px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
-            <button class="table large" style="left: 712px; top: 528px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
-  
-            <button class="table small-vertical wide-1" style="left: 580px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 460px; top: 500px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 340px; top: 528px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 220px; top: 500px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 110px; top: 528px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
-            <button class="table large" style="left: -30px; top: 512px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
-  
-            <button class="table wide" style="left: 422px; top: 420px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
-            <button class="table wide" style="left: 310px; top: 420px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
+            <div class="tables-layer" id="mapTablesMain"></div>
             <div class="fountain" style="left: 532px; top: 316px;" aria-hidden="true" id="fountainEl">
               <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
@@ -165,19 +153,6 @@ $mk = function (string $l) use ($self, $baseQs) {
               <div class="koi koi-1"></div>
               <div class="koi koi-2"></div>
             </div>
-            <button class="table wide" style="left: 102px; top: 420px;" data-table="12"><span class="num">12</span><span class="cap"></span></button>
-            <button class="table wide" style="left: -10px; top: 420px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
-  
-            <button class="table" style="left: 402px; top: 304px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
-            <button class="table" style="left: 274px; top: 304px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
-            <button class="table" style="left: 162px; top: 304px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
-  
-            <button class="table small-vertical" style="left: 532px; top: 192px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 417px; top: 192px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 306px; top: 192px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 194px; top: 192px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 82px; top: 192px;" data-table="21"><span class="num">21</span><span class="cap"></span></button>
-            <button class="table large" style="left: -31px; top: 254px;" data-table="22"><span class="num">22</span><span class="cap"></span></button>
   
             <div class="bar-row">
               <div class="station-wrap">
@@ -189,7 +164,7 @@ $mk = function (string $l) use ($self, $baseQs) {
               </div>
             </div>
             </div>
-            <div class="map-canvas" id="mapCanvasCinema" data-hall="7" hidden></div>
+            <div class="map-canvas" id="mapCanvasCinema" data-hall="7" hidden><div class="tables-layer" id="mapTablesCinema"></div></div>
               </div>
             </div>
           </div>
@@ -418,7 +393,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr4/assets/tr3.boot.js?v=20260507_0100" defer></script>
+  <script src="/tr4/assets/tr3.boot.js?v=20260507_1346" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>
