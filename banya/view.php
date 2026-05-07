@@ -9,7 +9,7 @@
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
     <link rel="stylesheet" href="/assets/css/banya.css?v=20260425_0001">
-    <link rel="stylesheet" href="/banya/style.css">
+    <link rel="stylesheet" href="/banya/style.css?v=20260507_0001">
 </head>
 <body>
 <div class="container banya-container">
@@ -39,6 +39,7 @@
             </div>
             <div class="controls">
                 <button id="loadBtn" type="button">ЗАГРУЗИТЬ</button>
+                <button id="byDishesBtn" type="button" class="secondary" style="display:none;">By dishes</button>
                 <div class="progress banya-progress" id="prog" style="display:none;">
                     <div class="bar banya-bar">
                         <span id="progBar" class="banya-prog-bar"></span>
@@ -104,7 +105,31 @@
     </div>
 </div>
 
-<script src="/assets/js/banya.js"></script>
+<div class="banya-modal-overlay" id="byDishesModal" hidden>
+    <div class="banya-modal">
+        <div class="banya-modal-header">
+            <div class="banya-modal-title">By dishes</div>
+            <button type="button" class="secondary" id="byDishesClose">×</button>
+        </div>
+        <div class="banya-modal-body">
+            <div class="banya-modal-loader" id="byDishesLoader" style="display:none;"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
+            <div class="banya-modal-table-wrap">
+                <table class="banya-modal-table">
+                    <thead>
+                        <tr>
+                            <th>Блюдо</th>
+                            <th class="num">Кол-во</th>
+                            <th class="num">Сумма</th>
+                        </tr>
+                    </thead>
+                    <tbody id="byDishesTbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/assets/js/banya.js?v=20260507_0001"></script>
 <script src="/assets/user_menu.js" defer></script>
 <script src="/banya/script.js"></script>
 </body>

@@ -1,6 +1,11 @@
 const elFrom = document.getElementById('dateFrom');
     const elTo = document.getElementById('dateTo');
     const btn = document.getElementById('loadBtn');
+    const byDishesBtn = document.getElementById('byDishesBtn');
+    const byDishesModal = document.getElementById('byDishesModal');
+    const byDishesClose = document.getElementById('byDishesClose');
+    const byDishesLoader = document.getElementById('byDishesLoader');
+    const byDishesTbody = document.getElementById('byDishesTbody');
     const loader = document.getElementById('loader');
     const prog = document.getElementById('prog');
     const progBar = document.getElementById('progBar');
@@ -140,6 +145,13 @@ const elFrom = document.getElementById('dateFrom');
     const fmtVnd = (minor) => {
         const vnd = Math.round(Number(minor || 0) / 100);
         return String(vnd).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    };
+
+    const fmtQty = (n) => {
+        const v = Number(n || 0);
+        if (!isFinite(v)) return '0';
+        if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+        return String(v.toFixed(3)).replace(/\.?0+$/, '');
     };
 
     const rebuildTableFilter = () => {
@@ -528,6 +540,100 @@ const elFrom = document.getElementById('dateFrom');
         return j.lines || [];
     };
 
+    const byDishesState = {
+        key: '',
+        rows: null,
+        loading: false,
+    };
+
+    const byDishesSetLoading = (on) => {
+        byDishesState.loading = !!on;
+        if (byDishesLoader) byDishesLoader.style.display = on ? 'inline-flex' : 'none';
+        if (byDishesBtn) byDishesBtn.disabled = on;
+    };
+
+    const byDishesShow = () => {
+        if (!byDishesModal) return;
+        byDishesModal.hidden = false;
+    };
+
+    const byDishesHide = () => {
+        if (!byDishesModal) return;
+        byDishesModal.hidden = true;
+    };
+
+    const byDishesRender = (rows) => {
+        if (!byDishesTbody) return;
+        const list = Array.isArray(rows) ? rows : [];
+        byDishesTbody.innerHTML = list.map((r) => {
+            const name = esc(r && r.name ? r.name : '');
+            const qty = esc(fmtQty(r && r.qty != null ? r.qty : 0));
+            const sum = esc(fmtVnd(r && r.sum_minor != null ? r.sum_minor : 0));
+            return `<tr><td>${name}</td><td class="num">${qty}</td><td class="num">${sum}</td></tr>`;
+        }).join('');
+    };
+
+    const buildByDishesKey = () => {
+        const ids = dataItems.map((it) => Number(it && it.transaction_id ? it.transaction_id : 0)).filter((x) => x > 0);
+        let sum = 0;
+        let max = 0;
+        ids.forEach((id) => { sum += id; if (id > max) max = id; });
+        return `${String(elFrom.value || '')}|${String(elTo.value || '')}|${String(ids.length)}|${String(max)}|${String(sum)}`;
+    };
+
+    const computeByDishes = async () => {
+        if (!Array.isArray(dataItems) || !dataItems.length) return [];
+        const ids = dataItems.map((it) => Number(it && it.transaction_id ? it.transaction_id : 0)).filter((x) => x > 0);
+        const uniq = Array.from(new Set(ids));
+        const agg = new Map();
+        const concurrency = 6;
+        let idx = 0;
+        const workers = new Array(Math.min(concurrency, uniq.length)).fill(0).map(async () => {
+            while (idx < uniq.length) {
+                const txId = uniq[idx++];
+                const lines = await loadDetails(txId);
+                lines.forEach((ln) => {
+                    const name = String(ln && ln.name ? ln.name : '').trim();
+                    if (!name) return;
+                    const qty = isFinite(Number(ln.qty)) ? Number(ln.qty) : 0;
+                    const sumMinor = isFinite(Number(ln.sum_minor)) ? Number(ln.sum_minor) : 0;
+                    if (!agg.has(name)) agg.set(name, { name, qty: 0, sum_minor: 0 });
+                    const cur = agg.get(name);
+                    cur.qty += qty;
+                    cur.sum_minor += sumMinor;
+                });
+            }
+        });
+        await Promise.all(workers);
+        return Array.from(agg.values()).sort((a, b) => (Number(b.sum_minor || 0) - Number(a.sum_minor || 0)));
+    };
+
+    const openByDishes = async () => {
+        if (byDishesState.loading) return;
+        if (!Array.isArray(dataItems) || !dataItems.length) return;
+        byDishesShow();
+        const key = buildByDishesKey();
+        if (byDishesState.key === key && Array.isArray(byDishesState.rows)) {
+            byDishesRender(byDishesState.rows);
+            return;
+        }
+        byDishesSetLoading(true);
+        if (byDishesTbody) byDishesTbody.innerHTML = '';
+        try {
+            const rows = await computeByDishes();
+            byDishesState.key = key;
+            byDishesState.rows = rows;
+            byDishesRender(rows);
+        } catch (e) {
+            byDishesState.key = '';
+            byDishesState.rows = null;
+            if (byDishesTbody) byDishesTbody.innerHTML = '';
+            setError(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            byDishesSetLoading(false);
+        }
+    };
+
     const load = async () => {
         setError('');
         setLoading(true);
@@ -537,6 +643,9 @@ const elFrom = document.getElementById('dateFrom');
         totSum.textContent = 'Итого сумма: 0';
         totHookah.textContent = 'Сумма кальянов: 0';
         totWithout.textContent = 'Сумма без кальянов: 0';
+        if (byDishesBtn) byDishesBtn.style.display = 'none';
+        byDishesState.key = '';
+        byDishesState.rows = null;
         try {
             const from = String(elFrom.value || '');
             const to = String(elTo.value || '');
@@ -602,6 +711,10 @@ const elFrom = document.getElementById('dateFrom');
             page = 1;
             renderTable();
             persistPrefsFromUi();
+            if (byDishesBtn && Array.isArray(dataItems) && dataItems.length) {
+                byDishesBtn.style.display = '';
+                byDishesBtn.disabled = false;
+            }
         } catch (e) {
             setError(e && e.message ? e.message : 'Ошибка');
         } finally {
@@ -611,5 +724,15 @@ const elFrom = document.getElementById('dateFrom');
     };
 
     btn.addEventListener('click', load);
+    if (byDishesBtn) byDishesBtn.addEventListener('click', openByDishes);
+    if (byDishesClose) byDishesClose.addEventListener('click', byDishesHide);
+    if (byDishesModal) {
+        byDishesModal.addEventListener('click', (e) => {
+            if (e.target === byDishesModal) byDishesHide();
+        });
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') byDishesHide();
+    });
     applyPrefsToUi();
     persistPrefsFromUi();
