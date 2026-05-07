@@ -73,7 +73,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr4/assets/tr3.css?v=20260507_1834">
+  <link rel="stylesheet" href="/tr4/assets/tr3.css?v=20260507_1856">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -91,12 +91,15 @@ $mk = function (string $l) use ($self, $baseQs) {
           <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
           <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
         </div>
-        <div class="date-wrap">
-          <span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span>
-          <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button>
-          <span class="mini-loader" id="busyDateLoader" hidden></span>
+        <div class="center-controls">
+          <div class="date-wrap">
+            <span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span>
+            <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button>
+            <span class="mini-loader" id="busyDateLoader" hidden></span>
+          </div>
+          <button type="button" class="dt-btn tab-toggle" id="cinemaTabBtn" data-i18n="cinema_tables"><?= htmlspecialchars(tr('cinema_tables')) ?></button>
         </div>
-        <button type="button" class="dt-btn tab-toggle" id="cinemaTabBtn">Cinema tables</button>
+        <div class="right-spacer" aria-hidden="true"></div>
         <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
@@ -125,7 +128,7 @@ $mk = function (string $l) use ($self, $baseQs) {
           <div class="tile-layer" aria-hidden="true"></div>
             <div class="map-zoom-box" id="mapZoomBox">
               <div class="map-zoom-inner" id="mapZoomInner">
-              <div class="map" aria-label="Схема столов ресторана">
+              <div class="map" aria-label="<?= htmlspecialchars(tr('map_aria')) ?>">
             <div class="map-canvas" id="mapCanvasMain" data-hall="2">
             <div class="decor-layer" id="mapDecorMain" aria-hidden="true"></div>
             <div class="tables-layer" id="mapTablesMain"></div>
@@ -144,9 +147,9 @@ $mk = function (string $l) use ($self, $baseQs) {
       <div class="dtp-title" id="dtpTitle" data-i18n="dtp_title"><?= htmlspecialchars(tr('dtp_title')) ?></div>
       <div class="cal">
         <div class="cal-head">
-          <button type="button" class="cal-nav" id="dtpPrev" aria-label="Prev month">‹</button>
+          <button type="button" class="cal-nav" id="dtpPrev" aria-label="<?= htmlspecialchars(tr('prev_month')) ?>">‹</button>
           <div class="cal-month" id="dtpMonthLabel"></div>
-          <button type="button" class="cal-nav" id="dtpNext" aria-label="Next month">›</button>
+          <button type="button" class="cal-nav" id="dtpNext" aria-label="<?= htmlspecialchars(tr('next_month')) ?>">›</button>
         </div>
         <div class="cal-week" id="dtpWeek"></div>
         <div class="cal-grid" id="dtpCalGrid"></div>
@@ -360,7 +363,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr4/assets/tr3.boot.js?v=20260507_1834" defer></script>
+  <script src="/tr4/assets/tr3.boot.js?v=20260507_1856" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>

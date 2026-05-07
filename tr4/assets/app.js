@@ -2535,7 +2535,7 @@
         ];
       }
       if (!settingsMap || (typeof settingsMap === 'object' && Object.keys(settingsMap).length === 0)) {
-        showSystemModal('Сейчас недоступны настройки столов. Открой /reservations и проверь, что таблица настроек загружается.');
+        showSystemModal(t('settings_unavailable'));
         return;
       }
 
@@ -2641,7 +2641,7 @@
                   <stop offset="1" stop-color="rgba(0,0,0,0.35)"/>
                 </linearGradient>
               </defs>
-              <circle cx="32" cy="44" r="17.6" fill="rgba(35,110,180,0.20)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+              <circle cx="32" cy="44" r="20" fill="rgba(35,110,180,0.20)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
               <path d="M18 44c4-6 24-6 28 0" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round"/>
               <path d="M22 44c3-4 17-4 20 0" stroke="rgba(90,180,255,0.30)" stroke-width="2" stroke-linecap="round"/>
               <path class="water-fall" d="M32 18c0 10-6 12-6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
@@ -2769,7 +2769,9 @@
         b.style.top = top + 'px';
         b.style.width = w + 'px';
         b.style.height = h + 'px';
-        b.innerHTML = `<span class="table-badge"><span class="num">${esc(it.label)}</span><span class="cap"></span></span>`;
+        b.innerHTML = it.bookable
+          ? `<span class="table-badge"><span class="num">${esc(it.label)}</span><span class="cap"></span></span>`
+          : `<span class="num">${esc(it.label)}</span>`;
         tablesEl.appendChild(b);
       });
 
@@ -2829,7 +2831,7 @@
       activeHallId = n === 'cinema' ? 7 : 2;
       if (canvasMain) canvasMain.hidden = n !== 'main';
       if (canvasCinema) canvasCinema.hidden = n !== 'cinema';
-      if (cinemaTabBtn) cinemaTabBtn.textContent = n === 'cinema' ? 'Veranda tables' : 'Cinema tables';
+      if (cinemaTabBtn) cinemaTabBtn.textContent = n === 'cinema' ? t('veranda_tables') : t('cinema_tables');
       selectedTableId = '';
       selectedTableLabel = '';
       if (n === 'cinema') await loadCinemaLayout();
