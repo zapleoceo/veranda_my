@@ -329,11 +329,23 @@ function tr3_api_cap_check(array $ctx): void {
 
   $tableNum = trim((string)($_GET['table_num'] ?? ''));
   $guests = (int)($_GET['guests'] ?? 0);
+  $hallId = (int)($_GET['hall_id'] ?? 2);
+  if ($hallId <= 0) $hallId = 2;
   if ($tableNum === '') api_error(400, 'Некорректный номер стола');
   if ($guests <= 0 || $guests > 99) api_error(400, 'Некорректное кол-во гостей');
 
-  $caps = is_array($ctx['tableCapsByNum'] ?? null) ? $ctx['tableCapsByNum'] : [];
-  $cap = isset($caps[$tableNum]) ? (int)$caps[$tableNum] : null;
+  $cap = null;
+  $byHall = $ctx['tableSettingsByHall'] ?? null;
+  if (is_array($byHall) && isset($byHall[(string)$hallId]) && is_array($byHall[(string)$hallId])) {
+    foreach ($byHall[(string)$hallId] as $row) {
+      if (!is_array($row)) continue;
+      $scheme = $row['scheme_num'] ?? null;
+      if ($scheme === null || $scheme === '') continue;
+      if ((string)$scheme !== (string)$tableNum) continue;
+      $cap = isset($row['capacity']) ? (int)$row['capacity'] : null;
+      break;
+    }
+  }
   if ($cap !== null && $cap > 0 && $guests > $cap) {
     api_send_json([
       'ok' => true,

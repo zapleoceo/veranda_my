@@ -1784,6 +1784,7 @@
         url.searchParams.set('ajax', 'cap_check');
         url.searchParams.set('table_num', tableNum);
         url.searchParams.set('guests', String(Math.floor(guests)));
+        url.searchParams.set('hall_id', String(activeHallId));
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -2332,16 +2333,6 @@
             return;
           }
 
-          const cap = table.dataset.cap != null && String(table.dataset.cap).trim() !== '' ? Number(table.dataset.cap) : null;
-          if (cap != null && isFinite(cap) && current.guests > cap) {
-            const ok = await confirmCapacity(Math.max(1, Math.floor(cap)), current.guests);
-            if (!ok) {
-              selectedTableNum = '';
-              setOutput(t('fix_guests_table') || 'Исправь кол-во гостей и выбери столик снова.');
-              return;
-            }
-          }
-
           selectedTableNum = id;
           openRequestForm({ tableNum: id, guests: current.guests, start: current.dtRaw });
         });
@@ -2479,9 +2470,9 @@
 
     const applyCapsToActiveTables = () => {
       getTables().forEach((t) => {
-        const n = String(t.dataset.table || '');
         const capEl = t.querySelector('.cap');
         if (!capEl) return;
+        if (String(t.dataset.bookable || '') !== '1') { capEl.textContent = ''; return; }
         const cap = t.dataset.cap != null && String(t.dataset.cap).trim() !== '' ? Number(t.dataset.cap) : null;
         capEl.textContent = (cap != null && isFinite(cap)) ? (String(Math.max(0, Math.floor(cap))) + ' 👤') : '';
       });
@@ -2668,7 +2659,8 @@
         b.type = 'button';
         b.className = 'table is-dyn' + (String(it.shape) === 'circle' ? ' is-circle' : '') + (it.bookable ? '' : ' disabled');
         if (it.dataNum) b.dataset.table = it.dataNum;
-        b.dataset.cap = String(it.cap || 0);
+        b.dataset.bookable = it.bookable ? '1' : '0';
+        b.dataset.cap = it.bookable ? String(it.cap || 0) : '';
         b.dataset.posterTableId = String(it.posterId);
         const left = Math.round(it.x * scale + offX);
         const top = Math.round(it.y * scale + offY);
