@@ -470,8 +470,13 @@ if ($ajax) {
                     $lineMinor = (int)($p['product_price'] ?? 0);
                 }
                 $name = (string)($productMap[$pid]['name'] ?? ('#' . $pid));
+                $cat2 = trim((string)($productMap[$pid]['sub_category_name'] ?? ''));
+                $cat1 = trim((string)($productMap[$pid]['category_name'] ?? ''));
+                $category = $cat2 !== '' ? $cat2 : $cat1;
                 $lines[] = [
+                    'product_id' => $pid,
                     'name' => $name,
+                    'category' => $category,
                     'qty' => $num,
                     'sum' => $model->fmtVnd($lineMinor),
                     'sum_minor' => $lineMinor,

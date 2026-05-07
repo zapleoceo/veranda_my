@@ -12,6 +12,9 @@ const elFrom = document.getElementById('dateFrom');
     const byDishesSearch = document.getElementById('byDishesSearch');
     const byDishesClear = document.getElementById('byDishesClear');
     const byDishesTbody = document.getElementById('byDishesTbody');
+    const byDishesTotalQty = document.getElementById('byDishesTotalQty');
+    const byDishesTotalSum = document.getElementById('byDishesTotalSum');
+    const byDishesThs = Array.from(document.querySelectorAll('#byDishesModal th[data-sort]'));
     const loader = document.getElementById('loader');
     const prog = document.getElementById('prog');
     const progBar = document.getElementById('progBar');
@@ -85,7 +88,7 @@ const elFrom = document.getElementById('dateFrom');
     const groupByDayCb = document.getElementById('groupByDay');
     const tableFilterBtn = document.getElementById('tableFilterBtn');
     const tableFilterPop = document.getElementById('tableFilterPop');
-    const ths = Array.from(document.querySelectorAll('th[data-sort]'));
+    const ths = Array.from(document.querySelectorAll('.banya-table-wrap th[data-sort]'));
     let dataItems = [];
     let sortBy = 'date';
     let sortDir = 'asc';
@@ -550,6 +553,8 @@ const elFrom = document.getElementById('dateFrom');
         key: '',
         rows: null,
         query: '',
+        sortBy: 'sum_minor',
+        sortDir: 'desc',
         loading: false,
     };
 
@@ -580,18 +585,58 @@ const elFrom = document.getElementById('dateFrom');
         byDishesModal.hidden = true;
     };
 
+    const byDishesUpdateSortIndicators = () => {
+        byDishesThs.forEach((th) => {
+            const arrow = th.querySelector('.sort-arrow');
+            if (!arrow) return;
+            const k = th.getAttribute('data-sort') || '';
+            if (!k || k !== byDishesState.sortBy) {
+                arrow.textContent = '';
+                return;
+            }
+            arrow.textContent = (byDishesState.sortDir === 'asc') ? '▲' : '▼';
+        });
+    };
+
+    const byDishesApplySort = (arr) => {
+        const coll = new Intl.Collator('ru', {numeric:true, sensitivity:'base'});
+        const dir = byDishesState.sortDir === 'desc' ? -1 : 1;
+        const k = String(byDishesState.sortBy || '');
+        return arr.slice().sort((a, b) => {
+            const av = a && Object.prototype.hasOwnProperty.call(a, k) ? a[k] : '';
+            const bv = b && Object.prototype.hasOwnProperty.call(b, k) ? b[k] : '';
+            if (k === 'qty' || k === 'sum_minor') {
+                const an = Number(av || 0), bn = Number(bv || 0);
+                if (an === bn) return 0;
+                return an < bn ? -1*dir : 1*dir;
+            }
+            return coll.compare(String(av || ''), String(bv || '')) * dir;
+        });
+    };
+
     const byDishesRender = (rows, query) => {
         if (!byDishesTbody) return;
         const q = String(query || '').trim().toLowerCase();
         const listAll = Array.isArray(rows) ? rows : [];
-        const list = q
+        const filtered = q
             ? listAll.filter((r) => String(r && r.name ? r.name : '').toLowerCase().includes(q))
             : listAll;
+        const list = byDishesApplySort(filtered);
+        let totalQty = 0;
+        let totalSumMinor = 0;
+        list.forEach((r) => {
+            totalQty += Number(r && r.qty != null ? r.qty : 0) || 0;
+            totalSumMinor += Number(r && r.sum_minor != null ? r.sum_minor : 0) || 0;
+        });
+        if (byDishesTotalQty) byDishesTotalQty.textContent = fmtQty(totalQty);
+        if (byDishesTotalSum) byDishesTotalSum.textContent = fmtVnd(totalSumMinor);
+        byDishesUpdateSortIndicators();
         byDishesTbody.innerHTML = list.map((r) => {
             const name = esc(r && r.name ? r.name : '');
+            const category = esc(r && r.category ? r.category : '');
             const qty = esc(fmtQty(r && r.qty != null ? r.qty : 0));
             const sum = esc(fmtVnd(r && r.sum_minor != null ? r.sum_minor : 0));
-            return `<tr><td>${name}</td><td class="num">${qty}</td><td class="num">${sum}</td></tr>`;
+            return `<tr><td>${name}</td><td>${category}</td><td class="num">${qty}</td><td class="num">${sum}</td></tr>`;
         }).join('');
     };
 
@@ -622,12 +667,16 @@ const elFrom = document.getElementById('dateFrom');
                 const txId = uniq[idx++];
                 const lines = await loadDetails(txId);
                 lines.forEach((ln) => {
+                    const pid = isFinite(Number(ln && ln.product_id != null ? ln.product_id : 0)) ? Number(ln.product_id) : 0;
                     const name = String(ln && ln.name ? ln.name : '').trim();
                     if (!name) return;
+                    const category = String(ln && ln.category ? ln.category : '').trim();
                     const qty = isFinite(Number(ln.qty)) ? Number(ln.qty) : 0;
                     const sumMinor = isFinite(Number(ln.sum_minor)) ? Number(ln.sum_minor) : 0;
-                    if (!agg.has(name)) agg.set(name, { name, qty: 0, sum_minor: 0 });
-                    const cur = agg.get(name);
+                    const key = pid > 0 ? ('p' + String(pid)) : name;
+                    if (!agg.has(key)) agg.set(key, { product_id: pid, name, category, qty: 0, sum_minor: 0 });
+                    const cur = agg.get(key);
+                    if (!cur.category && category) cur.category = category;
                     cur.qty += qty;
                     cur.sum_minor += sumMinor;
                 });
@@ -642,7 +691,7 @@ const elFrom = document.getElementById('dateFrom');
             raf = 0;
         }
         if (typeof onProgress === 'function') onProgress(uniq.length, uniq.length, '');
-        return Array.from(agg.values()).sort((a, b) => (Number(b.sum_minor || 0) - Number(a.sum_minor || 0)));
+        return Array.from(agg.values());
     };
 
     const openByDishes = async () => {
@@ -657,6 +706,8 @@ const elFrom = document.getElementById('dateFrom');
         byDishesSetLoading(true);
         byDishesSetProgress(0, 0, '');
         if (byDishesTbody) byDishesTbody.innerHTML = '';
+        if (byDishesTotalQty) byDishesTotalQty.textContent = '0';
+        if (byDishesTotalSum) byDishesTotalSum.textContent = '0';
         try {
             const rows = await computeByDishes((done, total, hint) => byDishesSetProgress(done, total, hint));
             byDishesState.key = key;
@@ -785,6 +836,19 @@ const elFrom = document.getElementById('dateFrom');
             if (byDishesSearch) byDishesSearch.focus();
         });
     }
+    byDishesThs.forEach((th) => {
+        th.addEventListener('click', () => {
+            const k = String(th.getAttribute('data-sort') || '');
+            if (!k) return;
+            if (byDishesState.sortBy === k) {
+                byDishesState.sortDir = byDishesState.sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                byDishesState.sortBy = k;
+                byDishesState.sortDir = (k === 'qty' || k === 'sum_minor') ? 'desc' : 'asc';
+            }
+            if (Array.isArray(byDishesState.rows)) byDishesRender(byDishesState.rows, byDishesState.query);
+        });
+    });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') byDishesHide();
     });

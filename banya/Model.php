@@ -33,6 +33,8 @@ class Model {
                 'category_id' => (int)($p['category_id'] ?? $p['menu_category_id'] ?? $p['main_category_id'] ?? 0),
                 'menu_category_id' => (int)($p['menu_category_id'] ?? $p['category_id'] ?? $p['main_category_id'] ?? 0),
                 'sub_category_id' => (int)($p['sub_category_id'] ?? $p['menu_category_id2'] ?? $p['category2_id'] ?? 0),
+                'category_name' => (string)($p['category_name'] ?? $p['main_category_name'] ?? ''),
+                'sub_category_name' => (string)($p['sub_category_name'] ?? $p['category2_name'] ?? ''),
             ];
         }
         return $map;

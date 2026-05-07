@@ -164,7 +164,9 @@
 
 .banya-modal-body {
     padding: 12px;
-    overflow: auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .banya-modal-top {
@@ -249,6 +251,7 @@
 }
 
 .banya-modal-table-wrap {
+    flex: 1 1 auto;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
 }
@@ -264,4 +267,27 @@
     top: 0;
     background: var(--card);
     z-index: 1;
+}
+
+.banya-sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.banya-sortable .sort-arrow {
+    margin-left: 6px;
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+.banya-modal-table tfoot td {
+    position: sticky;
+    bottom: 0;
+    background: var(--card2);
+    border-top: 1px solid var(--border);
+    z-index: 1;
+}
+
+.banya-modal-total td {
+    font-weight: 900;
 }

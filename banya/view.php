@@ -9,7 +9,7 @@
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
     <link rel="stylesheet" href="/assets/css/banya.css?v=20260425_0001">
-    <link rel="stylesheet" href="/banya/style.css?v=20260507_0015">
+    <link rel="stylesheet" href="/banya/style.css?v=20260507_0030">
 </head>
 <body>
 <div class="container banya-container">
@@ -130,19 +130,27 @@
                 <table class="banya-modal-table">
                     <thead>
                         <tr>
-                            <th>Блюдо</th>
-                            <th class="num">Кол-во</th>
-                            <th class="num">Сумма</th>
+                            <th data-sort="name" class="banya-sortable">Блюдо<span class="sort-arrow"></span></th>
+                            <th data-sort="category" class="banya-sortable">Категория<span class="sort-arrow"></span></th>
+                            <th data-sort="qty" class="num banya-sortable">Кол-во<span class="sort-arrow"></span></th>
+                            <th data-sort="sum_minor" class="num banya-sortable">Сумма<span class="sort-arrow"></span></th>
                         </tr>
                     </thead>
                     <tbody id="byDishesTbody"></tbody>
+                    <tfoot>
+                        <tr class="banya-modal-total">
+                            <td colspan="2">Итого</td>
+                            <td class="num" id="byDishesTotalQty">0</td>
+                            <td class="num" id="byDishesTotalSum">0</td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>
     </div>
 </div>
 
-<script src="/assets/js/banya.js?v=20260507_0015"></script>
+<script src="/assets/js/banya.js?v=20260507_0030"></script>
 <script src="/assets/user_menu.js" defer></script>
 <script src="/banya/script.js"></script>
 </body>
