@@ -37,4 +37,16 @@ class MetaRepository {
         }
         return $out;
     }
+
+    public function set(string $key, string $value): void {
+        $k = trim($key);
+        if ($k === '') return;
+        $meta = $this->db->t('system_meta');
+        $this->db->query(
+            "INSERT INTO {$meta} (meta_key, meta_value)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+            [$k, $value]
+        );
+    }
 }

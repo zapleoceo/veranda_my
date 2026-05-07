@@ -32,8 +32,10 @@
 
     const modal = q('#resHallModal');
     const mNum = q('#resHallModalNum');
+    const mName = q('#resHallModalName');
     const mCap = q('#resHallModalCap');
-    const mAllowed = q('#resHallModalAllowed');
+    const mShow = q('#resHallModalShow');
+    const mBookable = q('#resHallModalBookable');
     const mCancel = q('#resHallModalCancel');
     const mSave = q('#resHallModalSave');
 
@@ -95,6 +97,19 @@
       return { W, H, pad, minX, minY, scale };
     };
 
+    const saveTable = async (t) => {
+      await postForm(endpoint + '?ajax=res_table_update', {
+        hall_id: state.hallId,
+        spot_id: state.spotId,
+        poster_table_id: t.poster_table_id || t.table_id || 0,
+        scheme_num: t.scheme_num || '',
+        display_name: t.display_name || '',
+        show_on_canvas: t.show_on_canvas ? 1 : 0,
+        bookable: t.bookable ? 1 : 0,
+        capacity: t.cap || 0,
+      });
+    };
+
     const render = () => {
       const { W, H, pad, minX, minY, scale } = computeLayout();
       board.style.width = W + 'px';
@@ -121,7 +136,7 @@
         }
 
         const el = document.createElement('div');
-        el.className = 'res-hall-tbl' + (String(t.shape || '') === 'circle' ? ' circle' : '') + (!t.scheme_num ? ' disabled' : '');
+        el.className = 'res-hall-tbl' + (String(t.shape || '') === 'circle' ? ' circle' : '') + (!t.show_on_canvas ? ' disabled' : '');
         el.style.left = left + 'px';
         el.style.top = top + 'px';
         el.style.width = w + 'px';
@@ -131,25 +146,36 @@
         row.className = 'row';
         const num = document.createElement('div');
         num.className = 'num';
-        num.textContent = t.scheme_num ? String(t.scheme_num) : (t.table_num ? String(t.table_num) : ('#' + String(t.table_id || '')));
+        num.textContent = t.display_name ? String(t.display_name) : (t.scheme_num ? String(t.scheme_num) : (t.table_num ? String(t.table_num) : ('#' + String(t.table_id || ''))));
         const cap = document.createElement('div');
         cap.className = 'cap';
-        cap.textContent = t.scheme_num ? ('👤' + String(t.cap || 0)) : '—';
-        const cb = document.createElement('input');
-        cb.className = 'chk';
-        cb.type = 'checkbox';
-        cb.checked = !!t.is_allowed;
-        cb.disabled = !t.scheme_num;
-        cb.addEventListener('click', (e) => e.stopPropagation());
-        cb.addEventListener('change', async () => {
-          if (!t.scheme_num) return;
-          t.is_allowed = cb.checked ? 1 : 0;
-          await postForm(endpoint + '?ajax=res_table_update', { hall_id: state.hallId, spot_id: state.spotId, scheme_num: t.scheme_num, allowed: cb.checked ? 1 : 0, cap: t.cap || 0 });
+        cap.textContent = '👤' + String(t.cap || 0);
+        const cbShow = document.createElement('input');
+        cbShow.className = 'chk';
+        cbShow.type = 'checkbox';
+        cbShow.title = 'Показывать';
+        cbShow.checked = !!t.show_on_canvas;
+        cbShow.addEventListener('click', (e) => e.stopPropagation());
+        cbShow.addEventListener('change', async () => {
+          t.show_on_canvas = cbShow.checked ? 1 : 0;
+          await saveTable(t);
+          render();
+        });
+        const cbBook = document.createElement('input');
+        cbBook.className = 'chk';
+        cbBook.type = 'checkbox';
+        cbBook.title = 'Доступен';
+        cbBook.checked = !!t.bookable;
+        cbBook.addEventListener('click', (e) => e.stopPropagation());
+        cbBook.addEventListener('change', async () => {
+          t.bookable = cbBook.checked ? 1 : 0;
+          await saveTable(t);
         });
 
         row.appendChild(num);
         row.appendChild(cap);
-        row.appendChild(cb);
+        row.appendChild(cbShow);
+        row.appendChild(cbBook);
         el.appendChild(row);
 
         const title = document.createElement('div');
@@ -158,11 +184,12 @@
         el.appendChild(title);
 
         el.addEventListener('click', () => {
-          if (!t.scheme_num) return;
           state.active = t;
-          if (mNum) mNum.textContent = String(t.scheme_num);
+          if (mNum) mNum.textContent = t.scheme_num ? String(t.scheme_num) : (t.table_num ? String(t.table_num) : ('#' + String(t.table_id || '')));
+          if (mName) mName.value = String(t.display_name || '');
           if (mCap) mCap.value = String(t.cap || 0);
-          if (mAllowed) mAllowed.checked = !!t.is_allowed;
+          if (mShow) mShow.checked = !!t.show_on_canvas;
+          if (mBookable) mBookable.checked = !!t.bookable;
           if (modal) modal.hidden = false;
         });
 
@@ -201,18 +228,18 @@
     if (btnRotate) btnRotate.addEventListener('click', () => { state.rot = !state.rot; render(); });
 
     if (btnAll) btnAll.addEventListener('click', async () => {
-      const todo = state.tables.filter((t) => t.scheme_num && !t.is_allowed);
+      const todo = state.tables.filter((t) => !t.bookable);
       for (const t of todo) {
-        t.is_allowed = 1;
-        await postForm(endpoint + '?ajax=res_table_update', { hall_id: state.hallId, spot_id: state.spotId, scheme_num: t.scheme_num, allowed: 1, cap: t.cap || 0 });
+        t.bookable = 1;
+        await saveTable(t);
       }
       render();
     });
     if (btnNone) btnNone.addEventListener('click', async () => {
-      const todo = state.tables.filter((t) => t.scheme_num && t.is_allowed);
+      const todo = state.tables.filter((t) => t.bookable);
       for (const t of todo) {
-        t.is_allowed = 0;
-        await postForm(endpoint + '?ajax=res_table_update', { hall_id: state.hallId, spot_id: state.spotId, scheme_num: t.scheme_num, allowed: 0, cap: t.cap || 0 });
+        t.bookable = 0;
+        await saveTable(t);
       }
       render();
     });
@@ -221,10 +248,14 @@
       if (!state.active) return;
       const t = state.active;
       const cap = mCap ? (Number(mCap.value || 0) || 0) : 0;
-      const allowed = mAllowed ? !!mAllowed.checked : false;
+      const name = mName ? String(mName.value || '').trim() : '';
+      const show = mShow ? !!mShow.checked : true;
+      const bookable = mBookable ? !!mBookable.checked : false;
       t.cap = cap;
-      t.is_allowed = allowed ? 1 : 0;
-      await postForm(endpoint + '?ajax=res_table_update', { hall_id: state.hallId, spot_id: state.spotId, scheme_num: t.scheme_num, allowed: allowed ? 1 : 0, cap });
+      t.display_name = name;
+      t.show_on_canvas = show ? 1 : 0;
+      t.bookable = bookable ? 1 : 0;
+      await saveTable(t);
       closeModal();
       render();
     });
@@ -243,11 +274,8 @@
     render();
     window.addEventListener('resize', () => render());
 
-    if (!state.tables.length) {
-      loadHall(state.spotId, state.hallId).catch((e) => setEmpty(String(e && e.message ? e.message : e)));
-    }
+    loadHall(state.spotId, state.hallId).catch((e) => setEmpty(String(e && e.message ? e.message : e)));
   };
 
   bindHall();
 })();
-

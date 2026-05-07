@@ -52,7 +52,6 @@
                              'spot_id' => (int)$resSpotId,
                              'hall_id' => (int)$resHallId,
                              'soon_hours' => (int)$resSoonHours,
-                             'tables' => $resHallTables,
                          ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
                         <div class="res-hall-head">
                             <div>
@@ -86,10 +85,14 @@
                             <div class="res-modal-grid">
                                 <div class="res-modal-k">Номер</div>
                                 <div class="res-modal-v" id="resHallModalNum">—</div>
+                                <div class="res-modal-k">Название</div>
+                                <div class="res-modal-v"><input id="resHallModalName" type="text" maxlength="80"></div>
                                 <div class="res-modal-k">Вместимость</div>
                                 <div class="res-modal-v"><input id="resHallModalCap" type="number" min="0" max="999"></div>
+                                <div class="res-modal-k">Показывать</div>
+                                <div class="res-modal-v"><input id="resHallModalShow" type="checkbox"></div>
                                 <div class="res-modal-k">Доступен</div>
-                                <div class="res-modal-v"><input id="resHallModalAllowed" type="checkbox"></div>
+                                <div class="res-modal-v"><input id="resHallModalBookable" type="checkbox"></div>
                             </div>
                         </div>
                         <div class="res-modal-actions">

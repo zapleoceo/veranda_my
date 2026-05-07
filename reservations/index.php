@@ -51,16 +51,9 @@ $db = new \App\Classes\Database(
     (string)($_ENV['DB_TABLE_SUFFIX'] ?? '')
 );
 $db->createReservationsTable();
+require_once __DIR__ . '/migrations/run.php';
+reservations_run_migrations($db);
 $resTable = $db->t('reservations');
-try {
-    $db->pdo->exec("ALTER TABLE {$resTable} ADD COLUMN poster_id INT NULL");
-} catch (\Throwable $e) {}
-try {
-    $db->pdo->exec("ALTER TABLE {$resTable} ADD COLUMN is_poster_pushed TINYINT(1) DEFAULT 0");
-} catch (\Throwable $e) {}
-try {
-    $db->pdo->exec("ALTER TABLE {$resTable} ADD COLUMN tg_message_id BIGINT NULL");
-} catch (\Throwable $e) {}
 
 $model = new \Reservations\Model($db);
 
@@ -80,6 +73,18 @@ $resMinPreorderPerGuest = 100000;
 $resAllowedNums = [];
 $resCapsByNum = [];
 $resHallTables = [];
+
+require_once __DIR__ . '/Repositories/TableSettingsRepository.php';
+require_once __DIR__ . '/Services/PosterTablesService.php';
+require_once __DIR__ . '/Controllers/TablesController.php';
+require_once __DIR__ . '/legacy_meta_sync.php';
+$metaRepo = new \App\Classes\MetaRepository($db);
+$tableSettingsRepo = new \Reservations\Repositories\TableSettingsRepository($db);
+$posterTablesService = null;
+if (!empty($_ENV['POSTER_API_TOKEN'])) {
+    $posterTablesService = new \Reservations\Services\PosterTablesService(new \App\Classes\PosterAPI((string)$_ENV['POSTER_API_TOKEN']));
+}
+$tablesController = $posterTablesService ? new \Reservations\Controllers\TablesController($metaRepo, $tableSettingsRepo, $posterTablesService) : null;
 
 $ajax = $_GET['ajax'] ?? '';
 
@@ -558,69 +563,34 @@ if ($ajax === 'res_table_update') {
         echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    $hallId = max(1, (int)($_POST['hall_id'] ?? $resHallId));
-    $spotId = max(1, (int)($_POST['spot_id'] ?? $resSpotId));
-    $schemeNum = (int)($_POST['scheme_num'] ?? 0);
-    $allowed = (int)($_POST['allowed'] ?? 0) === 1;
-    $cap = (int)($_POST['cap'] ?? 0);
-    if ($schemeNum < 1 || $schemeNum > 500) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Bad scheme_num'], JSON_UNESCAPED_UNICODE);
+    if (!$tablesController) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Poster disabled'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    if ($cap < 0) $cap = 0;
-    if ($cap > 999) $cap = 999;
-
-    $metaRepo = new \App\Classes\MetaRepository($db);
-    $mk = 'reservations_allowed_scheme_nums_hall_' . $hallId;
-    $ck = 'reservations_table_caps_hall_' . $hallId;
-    $saved = $metaRepo->getMany([$mk, $ck]);
-
-    $nums = [];
-    $stored = array_key_exists($mk, $saved) ? trim((string)$saved[$mk]) : '';
-    if ($stored !== '') {
-        $decoded = json_decode($stored, true);
-        if (is_array($decoded)) {
-            foreach ($decoded as $v) {
-                $n = (int)$v;
-                if ($n >= 1 && $n <= 500) $nums[(string)$n] = true;
-            }
-        } else {
-            foreach (explode(',', $stored) as $part) {
-                $part = trim($part);
-                if ($part === '' || !preg_match('/^\d+$/', $part)) continue;
-                $n = (int)$part;
-                if ($n >= 1 && $n <= 500) $nums[(string)$n] = true;
-            }
-        }
+    $hallId = max(1, (int)($_POST['hall_id'] ?? $resHallId));
+    $spotId = max(1, (int)($_POST['spot_id'] ?? $resSpotId));
+    $posterTableId = (int)($_POST['poster_table_id'] ?? 0);
+    if ($posterTableId <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Bad poster_table_id'], JSON_UNESCAPED_UNICODE);
+        exit;
     }
-    if ($allowed) $nums[(string)$schemeNum] = true;
-    else unset($nums[(string)$schemeNum]);
-    $numsList = array_values(array_map('intval', array_keys($nums)));
-    sort($numsList);
 
-    $caps = [];
-    $capsStored = array_key_exists($ck, $saved) ? trim((string)$saved[$ck]) : '';
-    $capsDecoded = $capsStored !== '' ? json_decode($capsStored, true) : null;
-    if (is_array($capsDecoded)) {
-        foreach ($capsDecoded as $k => $v) {
-            $k = trim((string)$k);
-            if (!preg_match('/^\d+$/', $k)) continue;
-            $n = (int)$k;
-            if ($n < 1 || $n > 500) continue;
-            $c = (int)$v;
-            if ($c < 0) $c = 0;
-            if ($c > 999) $c = 999;
-            $caps[(string)$n] = $c;
-        }
+    $payload = [
+        'scheme_num' => $_POST['scheme_num'] ?? null,
+        'display_name' => $_POST['display_name'] ?? '',
+        'show_on_canvas' => (int)($_POST['show_on_canvas'] ?? 0) === 1,
+        'bookable' => (int)($_POST['bookable'] ?? 0) === 1,
+        'capacity' => $_POST['capacity'] ?? 0,
+    ];
+    $tablesController->updateTable($spotId, $hallId, $posterTableId, $payload);
+
+    if (function_exists('reservations_sync_legacy_meta')) {
+        reservations_sync_legacy_meta($db, $spotId, $hallId);
     }
-    $caps[(string)$schemeNum] = $cap;
-    ksort($caps, SORT_NATURAL);
 
-    $model->updateMeta($mk, json_encode($numsList, JSON_UNESCAPED_UNICODE));
-    $model->updateMeta($ck, json_encode($caps, JSON_UNESCAPED_UNICODE));
-
-    echo json_encode(['ok' => true, 'hall_id' => $hallId, 'spot_id' => $spotId], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => true, 'hall_id' => $hallId, 'spot_id' => $spotId, 'poster_table_id' => $posterTableId], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -673,76 +643,34 @@ if ($ajax === 'res_hall_data') {
     }
     $hallId = max(1, (int)($_GET['hall_id'] ?? $resHallId));
     $spotId = max(1, (int)($_GET['spot_id'] ?? $resSpotId));
-    $metaRepo = new \App\Classes\MetaRepository($db);
-    $mk = 'reservations_allowed_scheme_nums_hall_' . $hallId;
-    $ck = 'reservations_table_caps_hall_' . $hallId;
-    $saved = $metaRepo->getMany([$mk, $ck, $resSoonKey, $resMinPreorderKey]);
-
-    $allowed = [];
-    $stored = array_key_exists($mk, $saved) ? trim((string)$saved[$mk]) : '';
-    if ($stored !== '') {
-        $decoded = json_decode($stored, true);
-        if (is_array($decoded)) {
-            foreach ($decoded as $v) {
-                $n = (int)$v;
-                if ($n >= 1 && $n <= 500) $allowed[(string)$n] = true;
-            }
-        }
-    }
-    $caps = [];
-    $capsStored = array_key_exists($ck, $saved) ? trim((string)$saved[$ck]) : '';
-    $capsDecoded = $capsStored !== '' ? json_decode($capsStored, true) : null;
-    if (is_array($capsDecoded)) {
-        foreach ($capsDecoded as $k => $v) {
-            $k = trim((string)$k);
-            if (!preg_match('/^\d+$/', $k)) continue;
-            $n = (int)$k;
-            if ($n < 1 || $n > 500) continue;
-            $c = (int)$v;
-            if ($c < 0) $c = 0;
-            if ($c > 999) $c = 999;
-            $caps[(string)$n] = $c;
-        }
-    }
+    $saved = $metaRepo->getMany([$resSoonKey, $resMinPreorderKey]);
     $soonStored = array_key_exists($resSoonKey, $saved) ? trim((string)$saved[$resSoonKey]) : '';
     $soonHours = ($soonStored !== '' && is_numeric($soonStored)) ? max(0, min(24, (int)$soonStored)) : 2;
     $minStored = array_key_exists($resMinPreorderKey, $saved) ? trim((string)$saved[$resMinPreorderKey]) : '';
     $minPerGuest = ($minStored !== '' && is_numeric($minStored)) ? max(0, (int)$minStored) : 100000;
 
     $tables = [];
-    if (!empty($_ENV['POSTER_API_TOKEN'])) {
-        try {
-            $apiTables = new \App\Classes\PosterAPI((string)$_ENV['POSTER_API_TOKEN']);
-            $rowsTables = $apiTables->request('spots.getTableHallTables', [
-                'spot_id' => $spotId,
-                'hall_id' => $hallId,
-                'without_deleted' => 1,
-            ], 'GET');
-            $rowsTables = is_array($rowsTables) ? $rowsTables : [];
-            foreach ($rowsTables as $t) {
-                if (!is_array($t)) continue;
-                $tableId = (int)($t['table_id'] ?? 0);
-                $tableNum = trim((string)($t['table_num'] ?? ''));
-                $tableTitle = trim((string)($t['table_title'] ?? ''));
-                $scheme = null;
-                if (preg_match('/^\d+$/', $tableTitle)) $scheme = (int)$tableTitle;
-                elseif (preg_match('/^\d+$/', $tableNum)) $scheme = (int)$tableNum;
-                $schemeStr = $scheme !== null ? (string)$scheme : '';
-                $tables[] = [
-                    'table_id' => $tableId,
-                    'table_num' => $tableNum,
-                    'table_title' => $tableTitle,
-                    'scheme_num' => $schemeStr,
-                    'shape' => (string)($t['table_shape'] ?? ''),
-                    'x' => (float)($t['table_x'] ?? 0),
-                    'y' => (float)($t['table_y'] ?? 0),
-                    'w' => (float)($t['table_width'] ?? 0),
-                    'h' => (float)($t['table_height'] ?? 0),
-                    'is_allowed' => ($schemeStr !== '' && isset($allowed[$schemeStr])) ? 1 : 0,
-                    'cap' => ($schemeStr !== '') ? (int)($caps[$schemeStr] ?? 0) : 0,
-                ];
-            }
-        } catch (\Throwable $e_tbl2) {
+    if ($tablesController) {
+        foreach ($tablesController->hallData($spotId, $hallId) as $t) {
+            $scheme = $t['scheme_num'];
+            $schemeStr = ($scheme !== null && $scheme !== '') ? (string)$scheme : '';
+            $tables[] = [
+                'poster_table_id' => (int)($t['table_id'] ?? 0),
+                'table_id' => (int)($t['table_id'] ?? 0),
+                'table_num' => (string)($t['table_num'] ?? ''),
+                'table_title' => (string)($t['table_title'] ?? ''),
+                'scheme_num' => $schemeStr,
+                'display_name' => (string)($t['display_name'] ?? ''),
+                'shape' => (string)($t['table_shape'] ?? ''),
+                'x' => (float)($t['table_x'] ?? 0),
+                'y' => (float)($t['table_y'] ?? 0),
+                'w' => (float)($t['table_width'] ?? 0),
+                'h' => (float)($t['table_height'] ?? 0),
+                'show_on_canvas' => (int)($t['show_on_canvas'] ?? 1),
+                'bookable' => (int)($t['bookable'] ?? 0),
+                'is_allowed' => (int)($t['bookable'] ?? 0),
+                'cap' => (int)($t['capacity'] ?? 0),
+            ];
         }
     }
     echo json_encode(['ok' => true, 'spot_id' => $spotId, 'hall_id' => $hallId, 'soon_hours' => $soonHours, 'min_preorder_per_guest' => $minPerGuest, 'tables' => $tables], JSON_UNESCAPED_UNICODE);
@@ -763,16 +691,6 @@ $validSorts = ['id', 'qr_code', 'created_at', 'start_time', 'table_num', 'guests
 if (!in_array($sort, $validSorts, true)) $sort = 'start_time';
 
 $rows = $model->getReservationsList($dateFrom, $dateTo, $showDeleted, $sort, $order);
-
-$defaultCaps = [
-    '1' => 8, '2' => 8, '3' => 8,
-    '4' => 5, '5' => 5, '6' => 5, '7' => 5, '8' => 5,
-    '9' => 8,
-    '10' => 2, '11' => 2, '12' => 2, '13' => 2,
-    '14' => 3, '15' => 3, '16' => 3,
-    '17' => 5, '18' => 5, '19' => 5, '20' => 5, '21' => 5,
-    '22' => 15,
-];
 
 try {
     $metaRepo = new \App\Classes\MetaRepository($db);
@@ -810,7 +728,7 @@ try {
             $resCapsByNum[(string)$n] = $c;
         }
     } else {
-        $resCapsByNum = $defaultCaps;
+        $resCapsByNum = [];
     }
 
     $soonStored = array_key_exists($resSoonKey, $saved) ? trim((string)$saved[$resSoonKey]) : '';
@@ -822,43 +740,6 @@ try {
         $resMinPreorderPerGuest = max(0, (int)$minStored);
     }
 } catch (\Throwable $e_meta) {
-}
-
-if (!empty($_ENV['POSTER_API_TOKEN'])) {
-    try {
-        $apiTables = new \App\Classes\PosterAPI((string)$_ENV['POSTER_API_TOKEN']);
-        $rowsTables = $apiTables->request('spots.getTableHallTables', [
-            'spot_id' => $resSpotId,
-            'hall_id' => $resHallId,
-            'without_deleted' => 1,
-        ], 'GET');
-        $rowsTables = is_array($rowsTables) ? $rowsTables : [];
-        foreach ($rowsTables as $t) {
-            if (!is_array($t)) continue;
-            $tableId = (int)($t['table_id'] ?? 0);
-            $tableNum = trim((string)($t['table_num'] ?? ''));
-            $tableTitle = trim((string)($t['table_title'] ?? ''));
-            $scheme = null;
-            if (preg_match('/^\d+$/', $tableTitle)) $scheme = (int)$tableTitle;
-            elseif (preg_match('/^\d+$/', $tableNum)) $scheme = (int)$tableNum;
-            $schemeStr = $scheme !== null ? (string)$scheme : '';
-
-            $resHallTables[] = [
-                'table_id' => $tableId,
-                'table_num' => $tableNum,
-                'table_title' => $tableTitle,
-                'scheme_num' => $schemeStr,
-                'shape' => (string)($t['table_shape'] ?? ''),
-                'x' => (float)($t['table_x'] ?? 0),
-                'y' => (float)($t['table_y'] ?? 0),
-                'w' => (float)($t['table_width'] ?? 0),
-                'h' => (float)($t['table_height'] ?? 0),
-                'is_allowed' => ($schemeStr !== '' && isset($resAllowedNums[$schemeStr])) ? 1 : 0,
-                'cap' => ($schemeStr !== '') ? (int)($resCapsByNum[$schemeStr] ?? ($defaultCaps[$schemeStr] ?? 0)) : 0,
-            ];
-        }
-    } catch (\Throwable $e_tbl) {
-    }
 }
 
 // FETCH FROM POSTER

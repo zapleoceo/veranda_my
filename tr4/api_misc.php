@@ -22,6 +22,8 @@ function tr3_api_bootstrap(array $ctx): void {
     'defaultResDateLocal' => $ctx['defaultResDateLocal'] ?? null,
     'allowedTableNums' => $ctx['allowedSchemeNums'] ?? null,
     'tableCapsByNum' => $ctx['tableCapsByNum'] ?? [],
+    'tableSettingsByHall' => $ctx['tableSettingsByHall'] ?? [],
+    'decorByHall' => $ctx['decorByHall'] ?? [],
     'soonBookingHours' => $ctx['soonBookingHours'] ?? 0,
     'latestWorkday' => $ctx['latestWorkday'] ?? '21:00',
     'latestWeekend' => $ctx['latestWeekend'] ?? '22:00',

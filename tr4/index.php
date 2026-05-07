@@ -73,7 +73,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr4/assets/tr3.css?v=20260507_1346">
+  <link rel="stylesheet" href="/tr4/assets/tr3.css?v=20260507_1445">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -127,44 +127,10 @@ $mk = function (string $l) use ($self, $baseQs) {
               <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="Схема столов ресторана">
             <div class="map-canvas" id="mapCanvasMain" data-hall="2">
-            <div class="grass-corner-1-7" aria-hidden="true"></div>
+            <div class="decor-layer" id="mapDecorMain" aria-hidden="true"></div>
             <div class="tables-layer" id="mapTablesMain"></div>
-            <div class="fountain" style="left: 532px; top: 316px;" aria-hidden="true" id="fountainEl">
-              <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <defs>
-                  <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stop-color="rgba(255,255,255,0.85)"/>
-                    <stop offset="1" stop-color="rgba(90,180,255,0.10)"/>
-                  </linearGradient>
-                  <linearGradient id="fBowl" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stop-color="rgba(255,255,255,0.35)"/>
-                    <stop offset="1" stop-color="rgba(0,0,0,0.35)"/>
-                  </linearGradient>
-                </defs>
-                <circle cx="32" cy="44" r="16" fill="rgba(35,110,180,0.20)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
-                <path d="M18 44c4-6 24-6 28 0" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round"/>
-                <path d="M22 44c3-4 17-4 20 0" stroke="rgba(90,180,255,0.30)" stroke-width="2" stroke-linecap="round"/>
-                <path class="water-fall" d="M32 18c0 10-6 12-6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
-                <path class="water-fall" d="M32 18c0 10 6 12 6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
-                <path class="water-fall-center" d="M32 14c0 10 0 14 0 24" stroke="rgba(255,255,255,0.78)" stroke-width="3" stroke-linecap="round"/>
-                <circle cx="32" cy="14" r="3" fill="rgba(255,255,255,0.75)"/>
-                <path d="M24 40h16c0 0 2 0 2 2s-2 2-2 2H24c0 0-2 0-2-2s2-2 2-2Z" fill="url(#fBowl)" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
-              </svg>
-              <div class="koi koi-1"></div>
-              <div class="koi koi-2"></div>
             </div>
-  
-            <div class="bar-row">
-              <div class="station-wrap">
-                <div class="side-station" data-i18n="musicians"><?= htmlspecialchars(tr('musicians')) ?></div>
-              </div>
-              <div class="bar" data-i18n="bar"><?= htmlspecialchars(tr('bar')) ?></div>
-              <div class="station-wrap cash">
-                <div class="side-station" data-i18n="cashier"><?= htmlspecialchars(tr('cashier')) ?></div>
-              </div>
-            </div>
-            </div>
-            <div class="map-canvas" id="mapCanvasCinema" data-hall="7" hidden><div class="tables-layer" id="mapTablesCinema"></div></div>
+            <div class="map-canvas" id="mapCanvasCinema" data-hall="7" hidden><div class="decor-layer" id="mapDecorCinema" aria-hidden="true"></div><div class="tables-layer" id="mapTablesCinema"></div></div>
               </div>
             </div>
           </div>
@@ -393,7 +359,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr4/assets/tr3.boot.js?v=20260507_1346" defer></script>
+  <script src="/tr4/assets/tr3.boot.js?v=20260507_1445" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>

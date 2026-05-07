@@ -103,10 +103,6 @@
     if (typeof updatePreorderUi === 'function') updatePreorderUi();
     if (typeof renderPreorderBox === 'function') renderPreorderBox();
 
-    const fountainEl = document.getElementById('fountainEl');
-    if (fountainEl) {
-        fountainEl.title = t('fountain_tooltip') || '';
-    }
   };
   (() => {
     const details = document.querySelector('.lang-menu');
@@ -192,10 +188,14 @@
     const allowedTableNums = cfg.allowedTableNums ?? null;
     const tableCapsByNum = cfg.tableCapsByNum ?? null;
     const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
+    const tableSettingsByHall = (cfg.tableSettingsByHall && typeof cfg.tableSettingsByHall === 'object') ? cfg.tableSettingsByHall : {};
+    const decorByHall = (cfg.decorByHall && typeof cfg.decorByHall === 'object') ? cfg.decorByHall : {};
 
     const cinemaTabBtn = document.getElementById('cinemaTabBtn');
     const canvasMain = document.getElementById('mapCanvasMain');
     const canvasCinema = document.getElementById('mapCanvasCinema');
+    const decorMain = document.getElementById('mapDecorMain');
+    const decorCinema = document.getElementById('mapDecorCinema');
     const tablesMain = document.getElementById('mapTablesMain');
     const tablesCinema = document.getElementById('mapTablesCinema');
     let activeCanvas = 'main';
@@ -2464,15 +2464,17 @@
         const n = String(t.dataset.table || '');
         const capEl = t.querySelector('.cap');
         if (!capEl) return;
-        const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[n] != null ? Number(tableCapsByNum[n]) : null;
+        const fromAttr = t.dataset.cap != null && String(t.dataset.cap).trim() !== '' ? Number(t.dataset.cap) : null;
+        const cap = (fromAttr != null && isFinite(fromAttr)) ? fromAttr : (tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[n] != null ? Number(tableCapsByNum[n]) : null);
         capEl.textContent = (cap != null && isFinite(cap)) ? (String(Math.max(0, Math.floor(cap))) + ' 👤') : '';
       });
     };
 
-    const renderHallTables = (targetEl, rows, opts) => {
-      if (!targetEl) return;
+    const renderHallTables = (tablesEl, decorEl, hallId, rows) => {
+      if (!tablesEl) return;
       const list = Array.isArray(rows) ? rows : [];
-      targetEl.innerHTML = '';
+      tablesEl.innerHTML = '';
+      if (decorEl) decorEl.innerHTML = '';
 
       const extractNum = (raw) => {
         const s = String(raw ?? '').trim();
@@ -2481,31 +2483,63 @@
         return m ? String(m[1]) : '';
       };
 
+      const hallKey = String(hallId);
+      const settingsMap = (tableSettingsByHall && typeof tableSettingsByHall === 'object' && tableSettingsByHall[hallKey] && typeof tableSettingsByHall[hallKey] === 'object') ? tableSettingsByHall[hallKey] : {};
+      const getSettings = (posterId) => {
+        if (!settingsMap) return null;
+        const k = String(posterId);
+        return (settingsMap[k] && typeof settingsMap[k] === 'object') ? settingsMap[k] : (settingsMap[posterId] && typeof settingsMap[posterId] === 'object' ? settingsMap[posterId] : null);
+      };
+      let decorItems = (decorByHall && typeof decorByHall === 'object' && Array.isArray(decorByHall[hallKey])) ? decorByHall[hallKey] : [];
+      if (!decorItems.length && hallId === 2) {
+        decorItems = [
+          { decor_type: 'grass-corner-1-7', x: -0.05, y: -0.35, w: 1.10, h: 1.45, z: 1, props_json: '{"mode":"rel"}' },
+          { decor_type: 'fountain', x: 0.62, y: 0.47, w: 0.12, h: 0.12, z: 2, props_json: '{"mode":"rel"}' },
+          { decor_type: 'bar_row', x: 0.0, y: -0.02, w: 1.0, h: 0.09, z: 3, props_json: '{"mode":"rel"}' },
+        ];
+      }
+
       const items = list.map((r) => {
+        const posterId = Number(r && r.table_id != null ? r.table_id : 0);
         const x = Number(r && r.table_x != null ? r.table_x : 0);
         const y = Number(r && r.table_y != null ? r.table_y : 0);
         const w = Number(r && r.table_width != null ? r.table_width : 0);
         const h = Number(r && r.table_height != null ? r.table_height : 0);
         const title = r && r.table_title != null ? r.table_title : '';
         const numRaw = r && r.table_num != null ? r.table_num : '';
-        const num = extractNum(title) || extractNum(numRaw);
+        const fallbackNum = extractNum(title) || extractNum(numRaw);
+        const s = (posterId && isFinite(posterId)) ? getSettings(posterId) : null;
+        const schemeNum = s && s.scheme_num != null && String(s.scheme_num).trim() !== '' ? String(s.scheme_num).trim() : '';
+        const label = s && s.display_name != null && String(s.display_name).trim() !== '' ? String(s.display_name).trim() : (schemeNum || fallbackNum || String(numRaw || title || ('#' + String(posterId || ''))));
+        const showOnCanvas = s && s.show_on_canvas != null ? !!Number(s.show_on_canvas) : true;
+        const bookable = s && s.bookable != null ? !!Number(s.bookable) : false;
+        const cap = s && s.capacity != null ? Math.max(0, Number(s.capacity) || 0) : 0;
+        const dataNum = schemeNum || fallbackNum;
         return {
-          num,
+          posterId: isFinite(posterId) ? Math.floor(posterId) : 0,
+          dataNum,
+          label,
+          cap,
+          bookable,
+          showOnCanvas,
           shape: String(r && r.table_shape ? r.table_shape : ''),
           x: isFinite(x) ? x : 0,
           y: isFinite(y) ? y : 0,
           w: isFinite(w) ? w : 0,
           h: isFinite(h) ? h : 0,
         };
-      }).filter((it) => it.num && /^\d+$/.test(it.num));
+      }).filter((it) => it.posterId > 0);
 
-      if (!items.length) return;
+      const visible = items.filter((it) => it.showOnCanvas);
+      if (!visible.length) return;
 
-      const MAP_W = 820;
-      const MAP_H = 620;
+      const canvasEl = tablesEl.closest ? tablesEl.closest('.map-canvas') : null;
+      const MAP_W = canvasEl ? (canvasEl.clientWidth || 820) : 820;
+      const MAP_H = canvasEl ? (canvasEl.clientHeight || 620) : 620;
       const PAD = 28;
+
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      items.forEach((it) => {
+      visible.forEach((it) => {
         const x1 = it.x;
         const y1 = it.y;
         const x2 = it.x + Math.max(0, it.w);
@@ -2516,19 +2550,103 @@
         if (y2 > maxY) maxY = y2;
       });
       if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return;
-
       const boxW = Math.max(1, maxX - minX);
       const boxH = Math.max(1, maxY - minY);
-      const fits = boxW <= (MAP_W - PAD * 2) && boxH <= (MAP_H - PAD * 2);
-      const scale = fits ? 1 : Math.min((MAP_W - PAD * 2) / boxW, (MAP_H - PAD * 2) / boxH);
+      const scale = Math.min((MAP_W - PAD * 2) / boxW, (MAP_H - PAD * 2) / boxH);
       const offX = PAD - (minX * scale);
       const offY = PAD - (minY * scale);
 
-      items.forEach((it) => {
+      const place = (el, wx, wy, ww, wh, z) => {
+        const left = Math.round(wx * scale + offX);
+        const top = Math.round(wy * scale + offY);
+        const w = Math.max(1, Math.round(Math.max(0, ww) * scale));
+        const h = Math.max(1, Math.round(Math.max(0, wh) * scale));
+        el.style.left = left + 'px';
+        el.style.top = top + 'px';
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+        if (z != null) el.style.zIndex = String(z);
+      };
+
+      const createDecorEl = (type) => {
+        if (type === 'fountain') {
+          const el = document.createElement('div');
+          el.className = 'fountain';
+          el.title = t('fountain_tooltip') || '';
+          el.innerHTML = `
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <defs>
+                <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="rgba(255,255,255,0.85)"/>
+                  <stop offset="1" stop-color="rgba(90,180,255,0.10)"/>
+                </linearGradient>
+                <linearGradient id="fBowl" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="rgba(255,255,255,0.35)"/>
+                  <stop offset="1" stop-color="rgba(0,0,0,0.35)"/>
+                </linearGradient>
+              </defs>
+              <circle cx="32" cy="44" r="16" fill="rgba(35,110,180,0.20)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+              <path d="M18 44c4-6 24-6 28 0" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round"/>
+              <path d="M22 44c3-4 17-4 20 0" stroke="rgba(90,180,255,0.30)" stroke-width="2" stroke-linecap="round"/>
+              <path class="water-fall" d="M32 18c0 10-6 12-6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
+              <path class="water-fall" d="M32 18c0 10 6 12 6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
+              <path class="water-fall-center" d="M32 14c0 10 0 14 0 24" stroke="rgba(255,255,255,0.78)" stroke-width="3" stroke-linecap="round"/>
+              <circle cx="32" cy="14" r="3" fill="rgba(255,255,255,0.75)"/>
+              <path d="M24 40h16c0 0 2 0 2 2s-2 2-2 2H24c0 0-2 0-2-2s2-2 2-2Z" fill="url(#fBowl)" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
+            </svg>
+            <div class="koi koi-1"></div>
+            <div class="koi koi-2"></div>
+          `;
+          return el;
+        }
+        if (type === 'bar_row') {
+          const el = document.createElement('div');
+          el.className = 'bar-row';
+          el.innerHTML = `
+            <div class="station-wrap"><div class="side-station">${esc(t('musicians'))}</div></div>
+            <div class="bar">${esc(t('bar'))}</div>
+            <div class="station-wrap cash"><div class="side-station">${esc(t('cashier'))}</div></div>
+          `;
+          return el;
+        }
+        const el = document.createElement('div');
+        el.className = String(type || '');
+        return el;
+      };
+
+      if (decorEl && decorItems.length) {
+        decorItems.forEach((d) => {
+          const typeRaw = String(d && d.decor_type ? d.decor_type : '').trim();
+          const type = typeRaw.replace(/_/g, '-');
+          if (!type) return;
+          const propsRaw = String(d && d.props_json ? d.props_json : '').trim();
+          let props = null;
+          if (propsRaw) props = (() => { try { return JSON.parse(propsRaw); } catch (_) { return null; } })();
+          const mode = props && typeof props === 'object' ? String(props.mode || '') : '';
+
+          let wx = Number(d && d.x != null ? d.x : 0);
+          let wy = Number(d && d.y != null ? d.y : 0);
+          let ww = Number(d && d.w != null ? d.w : 0);
+          let wh = Number(d && d.h != null ? d.h : 0);
+          if (mode === 'rel') {
+            wx = minX + (wx * boxW);
+            wy = minY + (wy * boxH);
+            ww = ww * boxW;
+            wh = wh * boxH;
+          }
+          const el = createDecorEl(type);
+          place(el, wx, wy, ww, wh, d && d.z != null ? Number(d.z) : null);
+          decorEl.appendChild(el);
+        });
+      }
+
+      visible.forEach((it) => {
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'table is-dyn' + (String(it.shape) === 'circle' ? ' is-circle' : '');
-        b.dataset.table = it.num;
+        b.className = 'table is-dyn' + (String(it.shape) === 'circle' ? ' is-circle' : '') + (it.bookable ? '' : ' disabled');
+        if (it.dataNum) b.dataset.table = it.dataNum;
+        b.dataset.cap = String(it.cap || 0);
+        b.dataset.posterTableId = String(it.posterId);
         const left = Math.round(it.x * scale + offX);
         const top = Math.round(it.y * scale + offY);
         const w = Math.max(34, Math.round(Math.max(0, it.w) * scale));
@@ -2537,11 +2655,10 @@
         b.style.top = top + 'px';
         b.style.width = w + 'px';
         b.style.height = h + 'px';
-        b.innerHTML = `<span class="num">${esc(it.num)}</span><span class="cap"></span>`;
-        targetEl.appendChild(b);
+        b.innerHTML = `<span class="num">${esc(it.label)}</span><span class="cap"></span>`;
+        tablesEl.appendChild(b);
       });
 
-      if (opts && opts.applyAllowed) opts.applyAllowed();
       applyCapsToActiveTables();
       if (requestBindTables) requestBindTables();
       applyAvailabilityStyles();
@@ -2560,7 +2677,7 @@
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error('tables_load_failed');
-        renderHallTables(tablesCinema, j.tables || []);
+        renderHallTables(tablesCinema, decorCinema, 7, j.tables || []);
         cinemaLayoutLoaded = true;
       } catch (_) {
       } finally {
@@ -2582,7 +2699,7 @@
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error('tables_load_failed');
-        renderHallTables(tablesMain, j.tables || [], { applyAllowed: applyAllowedToMain });
+        renderHallTables(tablesMain, decorMain, 2, j.tables || []);
         mainLayoutLoaded = true;
       } catch (_) {
       } finally {
