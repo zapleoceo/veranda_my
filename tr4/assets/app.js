@@ -2518,7 +2518,7 @@
       let decorItems = (decorByHall && typeof decorByHall === 'object' && Array.isArray(decorByHall[hallKey])) ? decorByHall[hallKey] : [];
       if (!decorItems.length && hallId === 2) {
         decorItems = [
-          { decor_type: 'grass-corner-1-7', x: 0, y: 0, w: 1, h: 0.62, z: 1, props_json: '{"mode":"canvas_bottom"}' },
+          { decor_type: 'grass-corner-1-7', x: 0, y: 0, w: 1, h: 0.55, z: 1, props_json: '{"mode":"canvas_bottom"}' },
           { decor_type: 'fountain', x: 0.62, y: 0.47, w: 0.12, h: 0.12, z: 2, props_json: '{"mode":"rel"}' },
           { decor_type: 'bar_row', x: 0.0, y: -0.02, w: 1.0, h: 0.09, z: 3, props_json: '{"mode":"rel"}' },
         ];
@@ -2660,7 +2660,7 @@
       };
 
       if (decorEl && decorItems.length) {
-        const table13 = hallId === 2 ? visible.find((it) => String(it.schemeNum || '').trim() === '13' || String(it.label || '').trim() === '13') : null;
+        const table10 = hallId === 2 ? visible.find((it) => String(it.schemeNum || '').trim() === '10' || String(it.label || '').trim() === '10') : null;
         decorItems.forEach((d) => {
           const typeRaw = String(d && d.decor_type ? d.decor_type : '').trim();
           const type = typeRaw.replace(/_/g, '-');
@@ -2677,7 +2677,7 @@
           const forceGrassBottom = (hallId === 2 && type === 'grass-corner-1-7');
           const effMode = forceGrassBottom ? 'canvas_bottom' : mode;
           if (effMode === 'canvas_bottom') {
-            if (forceGrassBottom) { wx = 0; wy = 0; ww = 1; wh = 0.62; }
+            if (forceGrassBottom) { wx = 0; wy = 0; ww = 1; wh = 0.55; }
             const left = Math.round((wx || 0) * MAP_W);
             const w = Math.round(Math.max(0, ww) * MAP_W);
             const h = Math.round(Math.max(0, wh) * MAP_H);
@@ -2697,12 +2697,12 @@
             ww = ww * boxW;
             wh = wh * boxH;
           }
-          if (hallId === 2 && type === 'fountain' && table13) {
+          if (hallId === 2 && type === 'fountain' && table10) {
             const size = Math.max(1, Math.min(boxW, boxH) * 0.10);
             ww = size;
             wh = size;
-            const x0 = table13.x + Math.max(0, table13.w) + size * 0.20;
-            const y0 = table13.y - size * 0.30;
+            const x0 = table10.x + Math.max(0, table10.w) + size * 0.20;
+            const y0 = table10.y - size * 0.30;
             wx = clamp(x0, minX, (minX + boxW - size));
             wy = clamp(y0, minY, (minY + boxH - size));
           }
