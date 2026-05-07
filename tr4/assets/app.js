@@ -2586,8 +2586,8 @@
       const rotate180 = !!(hallCfg && typeof hallCfg === 'object' && Number(hallCfg.rotate_180 || 0) === 1);
       const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
       const rotBox = (wx, wy, ww, wh) => {
-        const rx = minX + boxW - (wx + ww);
-        const ry = minY + boxH - (wy + wh);
+        const rx = (minX + minX + boxW) - (wx + ww);
+        const ry = (minY + minY + boxH) - (wy + wh);
         return { x: rx, y: ry };
       };
       if (rotate180) {
