@@ -2692,7 +2692,7 @@
           const effMode = forceGrassBottom ? 'canvas_bottom' : mode;
           if (hallId === 2 && type === 'fountain' && table10Px) {
             const sizePx = Math.max(28, Math.round(Math.min(MAP_W, MAP_H) * 0.075));
-            const left = Math.round(clamp(table10Px.left + table10Px.w + sizePx * 0.15, PAD, MAP_W - PAD - sizePx));
+            const left = Math.round(clamp(table10Px.left - 5 - sizePx, PAD, MAP_W - PAD - sizePx));
             const radiusPx = Math.round(sizePx / 2);
             const top = Math.round(clamp(table10Px.top - sizePx * 0.35 - radiusPx, PAD, MAP_H - PAD - sizePx));
             const el = createDecorEl(type);
