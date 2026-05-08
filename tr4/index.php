@@ -73,7 +73,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr4/assets/tr3.css?v=20260508_1333">
+  <link rel="stylesheet" href="/tr4/assets/tr3.css?v=20260508_1344">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
