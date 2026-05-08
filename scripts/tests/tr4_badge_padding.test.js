@@ -13,4 +13,7 @@ const m = css.match(/\.table\.is-dyn\s+\.table-badge\s*\{([\s\S]*?)\}/m)
 assert(!!m, 'table badge rule must exist')
 assert(!String(m[1] || '').includes('box-shadow'), 'table badge must not have box-shadow')
 
+assert(/\.table\s*\{[\s\S]*?border-radius:\s*5px;[\s\S]*?\}/m.test(css), 'square tables must have border-radius 5px')
+assert(/\.table\.is-circle\s*\{[\s\S]*?border-radius:\s*999px/m.test(css), 'circle tables must keep full rounding')
+
 process.stdout.write('OK\n')

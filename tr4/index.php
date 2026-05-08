@@ -73,7 +73,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr4/assets/tr3.css?v=20260507_1856">
+  <link rel="stylesheet" href="/tr4/assets/tr3.css?v=20260508_0440">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -363,7 +363,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr4/assets/tr3.boot.js?v=20260507_1856" defer></script>
+  <script src="/tr4/assets/tr3.boot.js?v=20260508_0440" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>
