@@ -331,7 +331,7 @@
     .tile-layer {
       position: absolute;
       inset: 0;
-      background: url("/tr4/assets/gray-tiles-texture.jpg?v=20260407_1928") 0 0 / 260px auto repeat;
+      background: rgba(255,255,255,0.03);
       pointer-events: none;
       z-index: 0;
       opacity: 0.92;
