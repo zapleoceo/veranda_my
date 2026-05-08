@@ -972,8 +972,8 @@
     .table.occupied-now::after {
       content: "🚫";
       position: absolute;
-      top: 5px;
-      right: 5px;
+      top: 2px;
+      right: 2px;
       font-size: 0.76rem;
       width: 1em;
       height: 1em;
