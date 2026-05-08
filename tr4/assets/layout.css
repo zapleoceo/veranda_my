@@ -662,8 +662,7 @@
         rgba(184,135,70,0.96),
         rgba(184,135,70,0.06)
       );
-      transform-origin: 50% 50%;
-      animation: cinemaGlow 1.85s linear infinite;
+      animation: cinemaGlow 1.55s ease-in-out infinite;
       -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
       -webkit-mask-composite: xor;
       mask-composite: exclude;
@@ -688,8 +687,8 @@
     }
     #cinemaTabBtn:not(:disabled):active { transform: translateY(0); }
     @keyframes cinemaGlow {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+      0%, 100% { opacity: 0.55; filter: saturate(1.05) brightness(1.02); }
+      50% { opacity: 1; filter: saturate(1.22) brightness(1.10); }
     }
     @keyframes cinemaPulse {
       0%, 100% { opacity: 0.55; transform: scale(1); }
