@@ -963,6 +963,11 @@
       filter: grayscale(1) brightness(0.75);
       cursor: not-allowed;
     }
+    .table.occupied-now {
+      background: linear-gradient(180deg, rgba(120, 120, 120, 0.78), rgba(55, 55, 55, 0.86));
+      filter: grayscale(1) brightness(0.75);
+      cursor: not-allowed;
+    }
 
     .table.busy { cursor: not-allowed; }
 

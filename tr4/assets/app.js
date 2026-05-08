@@ -1278,18 +1278,15 @@
       const busyTag = document.getElementById('reqModalBusy');
       if (un) {
         modalTableBusy = true;
-        const isSitting = String(un.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят');
-        const isBooking = String(un.reason || '') === String(t('reason_booking') || 'есть бронь');
-        const isSoon = String(un.reason || '') === String(t('reason_soon_booking') || 'скоро бронь');
         if (busyTag) {
-          if (isSitting) {
+          if (un.code === 'sitting') {
             busyTag.textContent = String(un.reason || '');
             busyTag.hidden = false;
-          } else if (isBooking) {
+          } else if (un.code === 'booking') {
             const d = String(un.detail || '').trim();
             busyTag.textContent = String(t('booking_tag') || 'Бронь') + (d ? (' ' + d) : '');
             busyTag.hidden = false;
-          } else if (isSoon) {
+          } else if (un.code === 'soon_booking') {
             const d = String(un.detail || '').trim();
             busyTag.textContent = String(t('busy_soon_booking') || 'Скоро бронь') + (d ? (' ' + d) : '');
             busyTag.hidden = false;
@@ -2117,10 +2114,10 @@
     };
 
     const getUnavailableReason = (tEl, current) => {
-      if (!tEl || !tEl.classList) return null;
-      const tableId = String(tEl.dataset.posterTableId || '');
+      const tableEl = (tEl && tEl.classList) ? tEl : (getTables().find((x) => String(x.dataset.posterTableId || '') === String(tEl || '')) || null);
+      const tableId = tableEl ? String(tableEl.dataset.posterTableId || '') : String(tEl || '');
       if (!tableId) return null;
-      if (tEl.classList.contains('disabled')) return { reason: t('reason_disabled') || 'отключено в настройках', detail: '' };
+      if (tableEl && tableEl.classList.contains('disabled')) return { code: 'disabled', reason: t('reason_disabled') || 'отключено в настройках', detail: '' };
       if (!last || !current) return null;
       const ps = parseSel(current.dtRaw);
       const ranges = Array.isArray(lastReservationsByTable[String(tableId)]) ? lastReservationsByTable[String(tableId)] : [];
@@ -2129,7 +2126,7 @@
         const overlaps = ranges.some(([s, e]) => s < selEnd && e > ps.selMin);
         if (overlaps) {
           const txt = ranges.slice(0, 2).map(([s, e]) => fmtMin(s) + '-' + fmtMin(e)).join(' · ');
-          return { reason: t('reason_booking') || 'есть бронь', detail: txt };
+          return { code: 'booking', reason: t('reason_booking') || 'есть бронь', detail: txt };
         }
         const nextStarts = ranges.map(([s]) => Number(s)).filter((s) => isFinite(s) && s >= ps.selMin);
         const nextStart = nextStarts.length ? Math.min(...nextStarts) : null;
@@ -2137,7 +2134,7 @@
           const mustEndAt = nextStart - 60;
           if (selEnd > mustEndAt) {
             const pref = t('booking_until_prefix') || 'до';
-            return { reason: t('reason_booking') || 'есть бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
+            return { code: 'booking', reason: t('reason_booking') || 'есть бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
           }
         }
       }
@@ -2146,17 +2143,20 @@
       const now = new Date();
       const nowMin = now.getHours() * 60 + now.getMinutes();
 
+      if (isToday && occupiedNowIds && occupiedNowIds.has(String(tableId))) {
+        return { code: 'sitting', reason: t('table_busy_no_booking') || 'Тут сейчас сидят гости и мы не знаем, когда столик освободится', detail: '' };
+      }
       if (isToday && soonBookingIds && soonBookingIds.has(String(tableId))) {
         const nextStart = soonBookingNextByTable ? Number(soonBookingNextByTable[String(tableId)]) : NaN;
         if (isFinite(nextStart) && (nextStart - nowMin) <= SOON_BOOK_MIN && ps && ps.selMin < nextStart) {
           const pref = t('at_prefix') || 'at';
-          return { reason: t('reason_soon_booking') || 'скоро бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
+          return { code: 'soon_booking', reason: t('reason_soon_booking') || 'скоро бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
         }
       }
 
       if (!freeIds.has(String(tableId))) {
-        if (isToday) return { reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
-        return { reason: t('reason_time') || 'недоступен на это время', detail: '' };
+        if (isToday) return { code: 'sitting', reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
+        return { code: 'time', reason: t('reason_time') || 'недоступен на это время', detail: '' };
       }
       return null;
     };
@@ -2215,18 +2215,20 @@
       }
       const el = getTables().find((x) => String(x.dataset.posterTableId || '') === String(tableId)) || null;
       const isDisabled = !!(el && el.classList && el.classList.contains('disabled'));
-      const isFree = !isDisabled && freeIds.has(String(tableId)) && !(soonBookingIds && soonBookingIds.has(String(tableId)));
+      const isOccNow = !!(occupiedNowIds && occupiedNowIds.has(String(tableId)));
+      const isFree = !isDisabled && !isOccNow && freeIds.has(String(tableId)) && !(soonBookingIds && soonBookingIds.has(String(tableId)));
       if (statusLine) statusLine.textContent = isFree ? t('status_free') : t('status_busy');
     };
 
     const applyAvailabilityStyles = () => {
       getTables().forEach((t) => {
         const n = String(t.dataset.posterTableId || '');
-        t.classList.remove('free', 'busy');
+        t.classList.remove('free', 'busy', 'occupied-now');
         if (t.classList.contains('disabled')) return;
         if (!last) return;
         if (t.dataset.resBusy === '1') { t.classList.add('busy'); return; }
         if (soonBookingIds && soonBookingIds.has(n)) { t.classList.add('busy'); return; }
+        if (occupiedNowIds && occupiedNowIds.has(n)) { t.classList.add('busy', 'occupied-now'); return; }
         if (freeIds.has(n)) t.classList.add('free');
         else t.classList.add('busy');
       });
@@ -2316,12 +2318,6 @@
           }
 
           const preUn = getUnavailableReason(table, current);
-          if (preUn && String(preUn.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят')) {
-            selectedTableId = '';
-            selectedTableLabel = '';
-            showBusyToast(table);
-            return;
-          }
           if (preUn) {
             selectedTableId = '';
             selectedTableLabel = '';
@@ -2340,12 +2336,6 @@
           }
 
           const un = getUnavailableReason(table, current);
-          if (un && String(un.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят')) {
-            selectedTableId = '';
-            selectedTableLabel = '';
-            showBusyToast(table);
-            return;
-          }
           if (un) {
             selectedTableId = '';
             selectedTableLabel = '';
