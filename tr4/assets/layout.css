@@ -655,7 +655,14 @@
       inset: -2px;
       border-radius: 14px;
       padding: 2px;
-      background: conic-gradient(from 90deg, rgba(255,255,255,0.12), rgba(255,210,140,0.98), rgba(184,135,70,0.95), rgba(160,255,235,0.85), rgba(255,255,255,0.12));
+      background: conic-gradient(from 90deg,
+        rgba(184,135,70,0.06),
+        rgba(184,135,70,0.96),
+        rgba(184,135,70,0.14),
+        rgba(184,135,70,0.96),
+        rgba(184,135,70,0.06)
+      );
+      transform-origin: 50% 50%;
       animation: cinemaGlow 1.85s linear infinite;
       -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
       -webkit-mask-composite: xor;
@@ -668,7 +675,7 @@
       position: absolute;
       inset: -9px;
       border-radius: 18px;
-      background: radial-gradient(circle at 50% 50%, rgba(255,210,140,0.40), rgba(184,135,70,0.00) 62%);
+      background: radial-gradient(circle at 50% 50%, rgba(184,135,70,0.38), rgba(184,135,70,0.00) 62%);
       filter: blur(10px);
       opacity: 0.6;
       animation: cinemaPulse 1.55s ease-in-out infinite;
@@ -681,8 +688,8 @@
     }
     #cinemaTabBtn:not(:disabled):active { transform: translateY(0); }
     @keyframes cinemaGlow {
-      from { filter: saturate(1.15) hue-rotate(0deg); }
-      to { filter: saturate(1.15) hue-rotate(360deg); }
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
     @keyframes cinemaPulse {
       0%, 100% { opacity: 0.55; transform: scale(1); }
