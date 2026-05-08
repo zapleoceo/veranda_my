@@ -2669,7 +2669,7 @@
         return { left, top, w, h };
       };
 
-      const table10Px = (hallId === 2 || hallId === 7) ? (() => {
+      const table10Px = hallId === 2 ? (() => {
         const it = visible.find((x) => String(x.schemeNum || '').trim() === '10' || String(x.label || '').trim() === '10');
         return it ? getPxBox(it) : null;
       })() : null;
@@ -2690,7 +2690,7 @@
           let wh = Number(d && d.h != null ? d.h : 0);
           const forceGrassBottom = (hallId === 2 && type === 'grass-corner-1-7');
           const effMode = forceGrassBottom ? 'canvas_bottom' : mode;
-          if ((hallId === 2 || hallId === 7) && type === 'fountain' && table10Px) {
+          if (hallId === 2 && type === 'fountain' && table10Px) {
             const sizePx = Math.max(28, Math.round(Math.min(MAP_W, MAP_H) * 0.075));
             const left = Math.round(clamp(table10Px.left - 5 - sizePx, PAD, MAP_W - PAD - sizePx));
             const radiusPx = Math.round(sizePx / 2);
