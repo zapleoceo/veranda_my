@@ -450,6 +450,8 @@
     .table.is-dyn {
       --tbl-min: 56px;
       font-size: calc(var(--tbl-min) * 0.22);
+      border-radius: calc(var(--tbl-min) * 0.18);
+      padding: calc(var(--tbl-min) * 0.14) calc(var(--tbl-min) * 0.10) calc(var(--tbl-min) * 0.18);
     }
     .table.is-dyn .table-badge {
       position: absolute;
