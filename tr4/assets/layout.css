@@ -462,6 +462,11 @@
       max-width: calc(100% - 4px);
       pointer-events: none;
     }
+    .table.is-dyn .table-badge.is-center {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
 
     .table.is-dyn .table-badge .num {
       position: static;
@@ -903,7 +908,7 @@
       width: 74px;
       height: 74px;
       border: 1px solid rgba(255,255,255,.24);
-      border-radius: 5px;
+      border-radius: 10px;
       background: linear-gradient(180deg, #b58a63, #8b5e3b);
       color: #fffaf4;
       box-shadow: 0 14px 24px rgba(84, 49, 20, .22);

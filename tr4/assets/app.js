@@ -2771,7 +2771,7 @@
         b.style.height = h + 'px';
         b.innerHTML = it.bookable
           ? `<span class="table-badge"><span class="num">${esc(it.label)}</span><span class="cap"></span></span>`
-          : `<span class="num">${esc(it.label)}</span>`;
+          : `<span class="table-badge is-center"><span class="num">${esc(it.label)}</span></span>`;
         tablesEl.appendChild(b);
       });
 
