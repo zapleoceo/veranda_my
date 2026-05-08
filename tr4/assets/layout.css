@@ -972,15 +972,14 @@
     .table.occupied-now::after {
       content: "🚫";
       position: absolute;
-      top: 0;
-      right: 0;
-      font-size: 0.95rem;
+      top: 5px;
+      right: 5px;
+      font-size: 0.76rem;
       width: 1em;
       height: 1em;
       display: grid;
       place-items: center;
       line-height: 1;
-      transform: translate(18%, -18%);
       pointer-events: none;
       filter: drop-shadow(0 1px 0 rgba(0,0,0,0.24));
     }
