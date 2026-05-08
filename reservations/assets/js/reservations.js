@@ -750,7 +750,79 @@
     const form = q('#editResForm');
     const btnCancel = q('#editResCancel');
     const btnSave = q('#editResSave');
+    const spotIdInput = q('#editResSpotId');
+    const hallSel = q('#editResHallId');
+    const tableSel = q('#editResTableNum');
     if (!modal || !form || !btnCancel || !btnSave) return;
+
+    const urlParams = new URLSearchParams(location.search || '');
+    const urlSpotId = Number(urlParams.get('spot_id') || 0) || 0;
+    const urlHallId = Number(urlParams.get('hall_id') || 0) || 0;
+
+    let hallsCache = null;
+    const loadHalls = async (spotId) => {
+      if (hallsCache && hallsCache.spotId === spotId && Array.isArray(hallsCache.halls)) return hallsCache.halls;
+      const res = await fetch(`?ajax=res_halls_list&spot_id=${encodeURIComponent(String(spotId))}`, { credentials: 'same-origin' });
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? String(j.error) : 'halls_load_failed');
+      const halls = Array.isArray(j.halls) ? j.halls.slice() : [];
+      hallsCache = { spotId, halls };
+      return halls;
+    };
+
+    const tablesCache = new Map();
+    const loadTables = async (spotId, hallId) => {
+      const key = `${spotId}:${hallId}`;
+      if (tablesCache.has(key)) return tablesCache.get(key);
+      const res = await fetch(`?ajax=res_hall_tables_list&spot_id=${encodeURIComponent(String(spotId))}&hall_id=${encodeURIComponent(String(hallId))}`, { credentials: 'same-origin' });
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? String(j.error) : 'tables_load_failed');
+      const tables = Array.isArray(j.tables) ? j.tables.slice() : [];
+      tablesCache.set(key, tables);
+      return tables;
+    };
+
+    const renderHalls = (halls, selectedHallId) => {
+      if (!hallSel) return;
+      hallSel.textContent = '';
+      const list = Array.isArray(halls) ? halls : [];
+      for (const h of list) {
+        if (!h || typeof h !== 'object') continue;
+        const id = Number(h.hall_id || 0) || 0;
+        if (id <= 0) continue;
+        const name = String(h.hall_name || '').trim();
+        const opt = document.createElement('option');
+        opt.value = String(id);
+        opt.textContent = name ? (String(id) + ' — ' + name) : String(id);
+        hallSel.appendChild(opt);
+      }
+      if (selectedHallId > 0) hallSel.value = String(selectedHallId);
+      if (!hallSel.value && hallSel.options && hallSel.options.length) hallSel.value = String(hallSel.options[0].value || '');
+    };
+
+    const renderTables = (tables, selectedPosterTableId, fallbackLabel) => {
+      if (!tableSel) return;
+      tableSel.textContent = '';
+      const list = Array.isArray(tables) ? tables : [];
+      for (const t of list) {
+        if (!t || typeof t !== 'object') continue;
+        const pid = Number(t.poster_table_id || 0) || 0;
+        if (pid <= 0) continue;
+        const opt = document.createElement('option');
+        opt.value = String(pid);
+        opt.textContent = String(t.label || ('#' + String(pid)));
+        tableSel.appendChild(opt);
+      }
+      if (selectedPosterTableId > 0) tableSel.value = String(selectedPosterTableId);
+      if ((!tableSel.value || tableSel.value === '0') && fallbackLabel) {
+        const lbl = String(fallbackLabel || '').trim();
+        if (lbl) {
+          const hit = Array.from(tableSel.options).find((o) => String(o.textContent || '').trim() === lbl);
+          if (hit) tableSel.value = String(hit.value || '');
+        }
+      }
+      if (!tableSel.value && tableSel.options && tableSel.options.length) tableSel.value = String(tableSel.options[0].value || '');
+    };
 
     document.addEventListener('click', async (e) => {
       const btn = e.target.closest('.btn-edit');
@@ -770,11 +842,46 @@
         q('#editResStartTime').value = d.start_time || '';
         q('#editResGuests').value = d.guests || '';
         q('#editResDuration').value = d.duration || 120;
-        q('#editResTableNum').value = d.table_num || '';
+        if (spotIdInput) spotIdInput.value = String(d.spot_id || urlSpotId || 1);
         q('#editResName').value = d.name || '';
         q('#editResPhone').value = d.phone || '';
         q('#editResQRCode').value = d.qr_code || '';
         q('#editResComment').value = d.comment || '';
+
+        const spotId = Number(d.spot_id || urlSpotId || 1) || 1;
+        const hallId = Number(d.hall_id || urlHallId || 0) || 0;
+        const posterTableId = Number(d.poster_table_id || 0) || 0;
+        const tableLabel = String(d.table_num || '').trim();
+
+        if (hallSel) {
+          hallSel.disabled = true;
+          hallSel.textContent = '';
+        }
+        if (tableSel) {
+          tableSel.disabled = true;
+          tableSel.textContent = '';
+        }
+        try {
+          const halls = await loadHalls(spotId);
+          renderHalls(halls, hallId);
+          if (hallSel) {
+            hallSel.disabled = false;
+            const activeHall = Number(hallSel.value || 0) || hallId || 0;
+            const tables = await loadTables(spotId, activeHall > 0 ? activeHall : (halls[0] ? Number(halls[0].hall_id || 0) : 0));
+            renderTables(tables, posterTableId, tableLabel);
+            if (tableSel) tableSel.disabled = false;
+          }
+        } catch (_) {
+          if (hallSel) hallSel.disabled = true;
+          if (tableSel) {
+            tableSel.disabled = true;
+            tableSel.textContent = '';
+            const opt = document.createElement('option');
+            opt.value = '0';
+            opt.textContent = tableLabel || '—';
+            tableSel.appendChild(opt);
+          }
+        }
 
         modal.hidden = false;
       } catch (err) {
@@ -783,6 +890,22 @@
         btn.disabled = false;
       }
     });
+
+    if (hallSel) {
+      hallSel.addEventListener('change', async () => {
+        const spotId = spotIdInput ? (Number(spotIdInput.value || urlSpotId || 1) || 1) : (urlSpotId || 1);
+        const hallId = Number(hallSel.value || 0) || 0;
+        if (!tableSel || hallId <= 0) return;
+        tableSel.disabled = true;
+        try {
+          const tables = await loadTables(spotId, hallId);
+          renderTables(tables, 0, '');
+          tableSel.disabled = false;
+        } catch (_) {
+          tableSel.disabled = true;
+        }
+      });
+    }
 
     const close = () => { modal.hidden = true; };
     btnCancel.addEventListener('click', close);

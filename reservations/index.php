@@ -114,22 +114,66 @@ if ($ajax === 'save_res') {
         exit;
     }
     $fields = [
-        'start_time', 'guests', 'table_num', 'name', 'phone', 
+        'start_time', 'guests', 'table_num', 'name', 'phone',
         'whatsapp_phone', 'comment', 'preorder_text', 'preorder_ru',
         'tg_user_id', 'tg_username', 'zalo_user_id', 'zalo_phone',
-        'lang', 'total_amount', 'qr_url', 'qr_code', 'duration'
+        'lang', 'total_amount', 'qr_url', 'qr_code', 'duration',
+        'spot_id', 'hall_id', 'poster_table_id',
     ];
-    $sets = [];
-    $params = [];
+    $updates = [];
     foreach ($fields as $f) {
         if (isset($_POST[$f])) {
-            $sets[] = "{$f} = ?";
-            $params[] = $_POST[$f] === '' ? null : $_POST[$f];
+            $updates[$f] = $_POST[$f] === '' ? null : $_POST[$f];
         }
     }
-    if (empty($sets)) {
+
+    $posterTableId = isset($_POST['poster_table_id']) ? (int)$_POST['poster_table_id'] : 0;
+    if ($posterTableId > 0) {
+        if (!$hasPosterAccess && !$canManageTables) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $spotId = isset($_POST['spot_id']) ? max(1, (int)$_POST['spot_id']) : $resSpotId;
+        $hallId = isset($_POST['hall_id']) ? max(1, (int)$_POST['hall_id']) : $resHallId;
+        if (!$tablesController) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => 'Poster disabled'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $tables = $tablesController->hallData($spotId, $hallId);
+        $picked = null;
+        foreach ($tables as $t) {
+            if (!is_array($t)) continue;
+            if ((int)($t['table_id'] ?? 0) === $posterTableId) { $picked = $t; break; }
+        }
+        if (!$picked) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Bad poster_table_id'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $display = trim((string)($picked['display_name'] ?? ''));
+        $scheme = trim((string)($picked['scheme_num'] ?? ''));
+        $title = trim((string)($picked['table_title'] ?? ''));
+        $num = trim((string)($picked['table_num'] ?? ''));
+        $label = $display !== '' ? $display : ($scheme !== '' ? $scheme : ($title !== '' ? $title : ($num !== '' ? $num : ('#' . (string)$posterTableId))));
+        $updates['spot_id'] = $spotId;
+        $updates['hall_id'] = $hallId;
+        $updates['poster_table_id'] = $posterTableId;
+        $updates['table_num'] = $label;
+    } else {
+        unset($updates['spot_id'], $updates['hall_id'], $updates['poster_table_id']);
+    }
+
+    if (empty($updates)) {
         echo json_encode(['ok' => false, 'error' => 'No fields to update']);
         exit;
+    }
+    $sets = [];
+    $params = [];
+    foreach ($updates as $k => $v) {
+        $sets[] = "{$k} = ?";
+        $params[] = $v;
     }
     try {
         $model->updateReservation($id, $sets, $params);
@@ -137,6 +181,70 @@ if ($ajax === 'save_res') {
     } catch (\Throwable $e) {
         echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
     }
+    exit;
+}
+
+if ($ajax === 'res_halls_list') {
+    header('Content-Type: application/json; charset=utf-8');
+    if (!$hasPosterAccess && !$canManageTables) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $spotId = max(1, (int)($_GET['spot_id'] ?? $resSpotId));
+    $posterToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
+    if ($posterToken === '') {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Poster API not configured'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    require_once dirname(__DIR__) . '/src/classes/PosterSpotHallsService.php';
+    $map = \App\Classes\PosterSpotHallsService::getHallsMap($db, $posterToken, $spotId);
+    ksort($map);
+    $rows = [];
+    foreach ($map as $id => $name) {
+        $rows[] = ['hall_id' => (int)$id, 'hall_name' => (string)$name];
+    }
+    echo json_encode(['ok' => true, 'spot_id' => $spotId, 'halls' => $rows], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($ajax === 'res_hall_tables_list') {
+    header('Content-Type: application/json; charset=utf-8');
+    if (!$hasPosterAccess && !$canManageTables) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $spotId = max(1, (int)($_GET['spot_id'] ?? $resSpotId));
+    $hallId = max(1, (int)($_GET['hall_id'] ?? $resHallId));
+    if (!$tablesController) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Poster disabled'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $list = $tablesController->hallData($spotId, $hallId);
+    $out = [];
+    foreach ($list as $t) {
+        if (!is_array($t)) continue;
+        $pid = (int)($t['table_id'] ?? 0);
+        if ($pid <= 0) continue;
+        $display = trim((string)($t['display_name'] ?? ''));
+        $scheme = trim((string)($t['scheme_num'] ?? ''));
+        $title = trim((string)($t['table_title'] ?? ''));
+        $num = trim((string)($t['table_num'] ?? ''));
+        $label = $display !== '' ? $display : ($scheme !== '' ? $scheme : ($title !== '' ? $title : ($num !== '' ? $num : ('#' . (string)$pid))));
+        $out[] = [
+            'poster_table_id' => $pid,
+            'label' => $label,
+            'scheme_num' => $scheme,
+            'display_name' => $display,
+            'table_title' => $title,
+            'table_num' => $num,
+            'bookable' => (int)($t['bookable'] ?? 0),
+        ];
+    }
+    echo json_encode(['ok' => true, 'spot_id' => $spotId, 'hall_id' => $hallId, 'tables' => $out], JSON_UNESCAPED_UNICODE);
     exit;
 }
 

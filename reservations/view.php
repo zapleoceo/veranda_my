@@ -351,6 +351,7 @@
             <div class="res-modal-body">
                 <form id="editResForm" class="res-modal-grid res-modal-grid-2col">
                     <input type="hidden" name="id" id="editResId">
+                    <input type="hidden" name="spot_id" id="editResSpotId">
                     
                     <div class="form-group">
                         <label class="res-modal-k">Имя гостя (First Name + Last Name)</label>
@@ -373,8 +374,12 @@
                         <input type="number" name="duration" id="editResDuration" class="res-input">
                     </div>
                     <div class="form-group">
+                        <label class="res-modal-k">Hall</label>
+                        <select name="hall_id" id="editResHallId" class="res-input"></select>
+                    </div>
+                    <div class="form-group">
                         <label class="res-modal-k">Номер стола (как в Poster)</label>
-                        <input type="text" name="table_num" id="editResTableNum" class="res-input">
+                        <select name="poster_table_id" id="editResTableNum" class="res-input"></select>
                     </div>
                     <div class="form-group">
                         <label class="res-modal-k">Код брони (QR Code / Marker)</label>
