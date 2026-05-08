@@ -130,6 +130,7 @@
     const mapZoomPlus = document.getElementById('mapZoomPlus');
     const mapZoomRange = document.getElementById('mapZoomRange');
     const mapZoomBox = document.getElementById('mapZoomBox');
+    let zoomWasManual = false;
     const syncTileLayerSize = () => {
       if (!mapShell || !tileLayer) return;
       tileLayer.style.width = String(Math.max(mapShell.scrollWidth, mapShell.clientWidth)) + 'px';
@@ -174,16 +175,19 @@
     };
     applyMapZoom(getInitialZoomPct(), false);
     if (typeof window.addEventListener === 'function') {
-      window.addEventListener('resize', () => { syncTileLayerSize(); });
+      window.addEventListener('resize', () => {
+        syncTileLayerSize();
+        if (!zoomWasManual) applyMapZoom(getInitialZoomPct(), false);
+      });
     }
     const getCurrentZoomPct = () => {
       if (!mapShell) return 100;
       const cur = Number(getComputedStyle(mapShell).getPropertyValue('--map-scale')) || 1;
       return Math.round(cur * 100);
     };
-    if (mapZoomMinus) mapZoomMinus.addEventListener('click', () => applyMapZoom(getCurrentZoomPct() - 5, true));
-    if (mapZoomPlus) mapZoomPlus.addEventListener('click', () => applyMapZoom(Math.min(100, getCurrentZoomPct() + 5), true));
-    if (mapZoomRange) mapZoomRange.addEventListener('input', () => applyMapZoom(mapZoomRange.value, true));
+    if (mapZoomMinus) mapZoomMinus.addEventListener('click', () => { zoomWasManual = true; applyMapZoom(getCurrentZoomPct() - 5, true); });
+    if (mapZoomPlus) mapZoomPlus.addEventListener('click', () => { zoomWasManual = true; applyMapZoom(Math.min(100, getCurrentZoomPct() + 5), true); });
+    if (mapZoomRange) mapZoomRange.addEventListener('input', () => { zoomWasManual = true; applyMapZoom(mapZoomRange.value, true); });
     const defaultResDateLocal = String(cfg.defaultResDateLocal || "");
     const allowedTableNums = cfg.allowedTableNums ?? null;
     const tableCapsByNum = cfg.tableCapsByNum ?? null;

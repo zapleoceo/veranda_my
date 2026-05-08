@@ -132,6 +132,7 @@
       .lang-menu--fixed { top: 5px; right: 5px; }
       .controls { justify-self: stretch; justify-content: center; }
       .map-invite { margin-top: 5px; }
+      .map-shell { padding: 0; }
     }
     @media (max-width: 352px) {
       #reqModal .req-layout { overflow-x: auto; overflow-y: auto; }
