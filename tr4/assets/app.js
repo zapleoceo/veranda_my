@@ -161,7 +161,12 @@
     const getInitialZoomPct = () => {
       if (!mapShell) return 100;
       if (!window.matchMedia || !window.matchMedia('(max-width: 640px)').matches) return 100;
-      return 100;
+      const baseW = 820;
+      const baseH = 620;
+      const boxW = mapZoomBox ? (mapZoomBox.clientWidth || baseW) : (mapShell.clientWidth || baseW);
+      const boxH = mapZoomBox ? (mapZoomBox.clientHeight || baseH) : (mapShell.clientHeight || baseH);
+      const cover = Math.max(boxW / baseW, boxH / baseH);
+      return Math.max(10, Math.min(100, Math.round(cover * 100)));
     };
     applyMapZoom(getInitialZoomPct(), false);
     if (typeof window.addEventListener === 'function') {
