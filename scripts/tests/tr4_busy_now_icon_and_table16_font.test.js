@@ -9,8 +9,8 @@ const fs = require('fs')
 const css = fs.readFileSync('/workspace/tr4/assets/layout.css', 'utf8')
 const js = fs.readFileSync('/workspace/tr4/assets/app.js', 'utf8')
 
-assert(css.includes('#mapTablesMain > button:nth-child(16) > span > span.num') && /font-size:\s*0\.7rem;/.test(css), 'table 16 num must be 0.7rem')
-assert(css.includes('#mapTablesMain > button:nth-child(16) > span > span.cap') && /font-size:\s*0\.6rem;/.test(css), 'table 16 cap must be 0.6rem')
+assert(!css.includes('#mapTablesMain > button:nth-child(16) > span > span.num'), 'table 16 font-size nth-child hack must be removed')
+assert(!css.includes('#mapTablesMain > button:nth-child(16) > span > span.cap'), 'table 16 cap font-size nth-child hack must be removed')
 
 const iconRule = css.match(/\.table\.occupied-now::after\s*\{([\s\S]*?)\}/m)
 assert(!!iconRule, 'occupied-now ::after rule must exist')

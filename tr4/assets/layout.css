@@ -447,6 +447,10 @@
 
     .table.is-circle { border-radius: 999px !important; }
 
+    .table.is-dyn {
+      --tbl-min: 56px;
+      font-size: calc(var(--tbl-min) * 0.22);
+    }
     .table.is-dyn .table-badge {
       position: absolute;
       top: 2px;
@@ -455,8 +459,8 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 2px;
-      padding: 2px 2px;
-      border-radius: 5px;
+      padding: 0.18em 0.18em;
+      border-radius: 0.42em;
       background: linear-gradient(180deg, #b58a63, #8b5e3b);
       border: 1px solid rgba(255,255,255,0.16);
       width: max-content;
@@ -471,7 +475,7 @@
 
     .table.is-dyn .table-badge .num {
       position: static;
-      font-size: 1.02rem;
+      font-size: 1em;
       font-weight: 800;
       line-height: 1.05;
       font-family: var(--font-display);
@@ -481,17 +485,19 @@
       text-overflow: ellipsis;
       color: rgba(255,255,255,0.96);
       text-shadow: none;
+      letter-spacing: -0.02em;
     }
 
     .table.is-dyn .table-badge .cap {
       position: static;
       margin: 0;
-      font-size: 0.78rem;
+      font-size: 0.76em;
       font-weight: 800;
       font-family: var(--font-body);
       color: rgba(255,250,244,0.92);
       text-shadow: none;
       white-space: nowrap;
+      line-height: 1.05;
     }
 
     .dt-btn.tab-toggle { white-space: nowrap; }
@@ -1042,8 +1048,6 @@
       filter: drop-shadow(0 1px 0 rgba(0,0,0,0.24));
     }
 
-    #mapTablesMain > button:nth-child(16) > span > span.num { font-size: 0.7rem; }
-    #mapTablesMain > button:nth-child(16) > span > span.cap { font-size: 0.6rem; }
 
     .table.busy { cursor: not-allowed; }
 

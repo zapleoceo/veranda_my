@@ -124,18 +124,12 @@
   })();
   const root = document.documentElement;
     const mapShell = document.querySelector('.map-shell');
-    const tileLayer = mapShell ? mapShell.querySelector(':scope > .tile-layer') : null;
     const mapZoomVal = document.getElementById('mapZoomVal');
     const mapZoomMinus = document.getElementById('mapZoomMinus');
     const mapZoomPlus = document.getElementById('mapZoomPlus');
     const mapZoomRange = document.getElementById('mapZoomRange');
     const mapZoomBox = document.getElementById('mapZoomBox');
     let zoomWasManual = false;
-    const syncTileLayerSize = () => {
-      if (!mapShell || !tileLayer) return;
-      tileLayer.style.width = String(Math.max(mapShell.scrollWidth, mapShell.clientWidth)) + 'px';
-      tileLayer.style.height = String(Math.max(mapShell.scrollHeight, mapShell.clientHeight)) + 'px';
-    };
 
     const applyMapZoom = (pct, keepAnchor) => {
       if (!mapShell) return;
@@ -156,7 +150,6 @@
 
       mapShell.style.setProperty('--map-scale', String(scale));
       mapShell.style.setProperty('--inv-map-scale', String(1 / scale));
-      syncTileLayerSize();
 
       if (keepAnchor) {
         const rect = mapShell.getBoundingClientRect();
@@ -168,15 +161,11 @@
     const getInitialZoomPct = () => {
       if (!mapShell) return 100;
       if (!window.matchMedia || !window.matchMedia('(max-width: 640px)').matches) return 100;
-      const pad = 32;
-      const baseW = mapZoomBox ? (mapZoomBox.offsetWidth || 820) : 820;
-      const fit = Math.floor(((mapShell.clientWidth || baseW) - pad) / baseW * 100);
-      return Math.max(10, Math.min(100, fit));
+      return 100;
     };
     applyMapZoom(getInitialZoomPct(), false);
     if (typeof window.addEventListener === 'function') {
       window.addEventListener('resize', () => {
-        syncTileLayerSize();
         if (!zoomWasManual) applyMapZoom(getInitialZoomPct(), false);
       });
     }
@@ -2766,6 +2755,7 @@
         b.style.top = top + 'px';
         b.style.width = w + 'px';
         b.style.height = h + 'px';
+      b.style.setProperty('--tbl-min', String(Math.max(1, Math.round(Math.min(w, h)))) + 'px');
         b.innerHTML = it.bookable
           ? `<span class="table-badge"><span class="num">${esc(it.label)}</span><span class="cap"></span></span>`
           : `<span class="table-badge is-center"><span class="num">${esc(it.label)}</span></span>`;
