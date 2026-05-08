@@ -376,10 +376,7 @@
             return fmt(r.sm) + '-' + fmt(r.em) + (g ? (' ' + g) : '') + (cnt ? (' (' + cnt + ')') : '');
           }).join(' · ')
           : '';
-        if (isOccNow) {
-          const occ = t('busy_now');
-          txt = txt ? (occ + '\n' + txt) : occ;
-        } else if (isSoon) {
+        if (isSoon) {
           const soon = t('busy_soon_booking') || 'Скоро бронь';
           txt = txt ? (soon + '\n' + txt) : soon;
         }

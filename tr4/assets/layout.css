@@ -969,6 +969,19 @@
       filter: grayscale(1) brightness(0.75);
       cursor: not-allowed;
     }
+    .table.occupied-now::after {
+      content: "🚫";
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      font-size: 0.95rem;
+      line-height: 1;
+      pointer-events: none;
+      filter: drop-shadow(0 1px 0 rgba(0,0,0,0.24));
+    }
+
+    #mapTablesMain > button:nth-child(16) > span > span.num { font-size: 0.7rem; }
+    #mapTablesMain > button:nth-child(16) > span > span.cap { font-size: 0.6rem; }
 
     .table.busy { cursor: not-allowed; }
 
