@@ -1262,21 +1262,27 @@
     };
 
     const checkModalAvailability = () => {
+      const busyTag = document.getElementById('reqModalBusy');
       if (!pendingBooking || !pendingBooking.tableNum || !reqStart || !reqStart.value || !reqDuration) {
         modalTableBusy = true;
+        if (busyTag) { busyTag.hidden = true; busyTag.textContent = ''; }
         syncSubmitState();
         return;
       }
 
       const tableNum = String(pendingBooking.tableNum);
+      const posterTableId = String(pendingBooking.posterTableId || '');
       const current = getCurrentRequest();
-      if (!current) return;
+      if (!current) {
+        modalTableBusy = true;
+        if (busyTag) { busyTag.hidden = true; busyTag.textContent = ''; }
+        syncSubmitState();
+        return;
+      }
       
-      const un = getUnavailableReason(tableNum, current);
+      const un = getUnavailableReason(posterTableId || tableNum, current);
       
-      logJs('checkModalAvailability: start', { tableNum, current, un, modalTableBusy });
-
-      const busyTag = document.getElementById('reqModalBusy');
+      logJs('checkModalAvailability: start', { tableNum, posterTableId, current, un, modalTableBusy });
       if (un) {
         modalTableBusy = true;
         if (busyTag) {
