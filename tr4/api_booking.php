@@ -23,6 +23,27 @@ function tr3_api_submit_booking(array $ctx): void {
   if ($spotId <= 0) $spotId = 1;
   $hallId = isset($payload['hall_id']) ? (int)$payload['hall_id'] : 0;
   if ($hallId < 0) $hallId = 0;
+
+  if ($posterTableId > 0) {
+    $settingsByHall = $ctx['tableSettingsByHall'] ?? null;
+    $s = null;
+    if (is_array($settingsByHall)) {
+      if ($hallId > 0 && isset($settingsByHall[$hallId]) && is_array($settingsByHall[$hallId]) && isset($settingsByHall[$hallId][$posterTableId])) {
+        $s = $settingsByHall[$hallId][$posterTableId];
+      } else {
+        foreach ($settingsByHall as $h => $tables) {
+          if (!is_array($tables)) continue;
+          if (isset($tables[$posterTableId])) { $s = $tables[$posterTableId]; break; }
+        }
+      }
+    }
+    if (is_array($s)) {
+      $schemeNum = (int)($s['scheme_num'] ?? 0);
+      $displayName = trim((string)($s['display_name'] ?? ''));
+      if ($schemeNum > 0) $tableNum = (string)$schemeNum;
+      elseif ($displayName !== '' && preg_match('/^\d+$/', $displayName)) $tableNum = $displayName;
+    }
+  }
   $name = trim((string)($payload['name'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
   $waPhone = trim((string)($payload['whatsapp_phone'] ?? ''));

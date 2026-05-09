@@ -14,6 +14,23 @@ function tr3_api_tg_state_create(array $ctx): void {
   $posterTableId = isset($payload['poster_table_id']) ? (int)$payload['poster_table_id'] : 0;
   $guests = (int)($payload['guests'] ?? 0);
   $start = trim((string)($payload['start'] ?? ''));
+  if ($posterTableId > 0) {
+    $settingsByHall = $ctx['tableSettingsByHall'] ?? null;
+    $s = null;
+    if (is_array($settingsByHall)) {
+      foreach ($settingsByHall as $h => $tables) {
+        if (!is_array($tables)) continue;
+        if (isset($tables[$posterTableId])) { $s = $tables[$posterTableId]; break; }
+      }
+    }
+    if (is_array($s)) {
+      $schemeNum = (int)($s['scheme_num'] ?? 0);
+      $displayName = trim((string)($s['display_name'] ?? ''));
+      if ($schemeNum > 0) $payload['table_num'] = (string)$schemeNum;
+      elseif ($displayName !== '' && preg_match('/^\d+$/', $displayName)) $payload['table_num'] = $displayName;
+      $tableNum = trim((string)($payload['table_num'] ?? $tableNum));
+    }
+  }
   if ($tableNum === '') api_error(400, 'Некорректный номер стола');
   if ($posterTableId <= 0 && !preg_match('/^\d+$/', $tableNum)) api_error(400, 'Некорректный номер стола');
   if ($guests <= 0 || $guests > 99) api_error(400, 'Некорректное кол-во гостей');
