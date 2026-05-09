@@ -584,10 +584,10 @@
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 2px;
+      gap: 0px;
       min-width: var(--badge-size);
       min-height: calc(var(--badge-size) * 0.92);
-      padding: calc(var(--badge-size) * 0.12) calc(var(--badge-size) * 0.12);
+      padding: 0.06em 0.06em;
       border-radius: calc(var(--badge-size) * 0.34);
       background: linear-gradient(180deg, #b58a63, #8b5e3b);
       border: 1px solid rgba(255,255,255,0.16);
@@ -626,6 +626,10 @@
       text-shadow: none;
       white-space: nowrap;
       line-height: 1.05;
+    }
+
+    #mapTablesMain > button:nth-child(12) .table-badge {
+      padding: 0.03em 0.03em;
     }
 
     .dt-btn.tab-toggle { white-space: nowrap; }
