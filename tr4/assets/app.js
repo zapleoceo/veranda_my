@@ -2297,7 +2297,7 @@
 
         table.addEventListener('click', async () => {
           const id = String(table.dataset.posterTableId || '');
-          const label = getTableLabelText(table);
+          const label = String(table.dataset.tableNum || getTableLabelText(table) || '').trim();
           const current = getCurrentRequest();
 
           const now = new Date();
@@ -2731,6 +2731,7 @@
         b.dataset.bookable = it.bookable ? '1' : '0';
         b.dataset.cap = it.bookable ? String(it.cap || 0) : '';
         b.dataset.posterTableId = String(it.posterId);
+        b.dataset.tableNum = String(it.schemeNum || it.label || '').trim();
         const left = Math.round(it.x * scale + offX);
         const top = Math.round(it.y * scale + offY);
         const w = Math.max(34, Math.round(Math.max(0, it.w) * scale));
