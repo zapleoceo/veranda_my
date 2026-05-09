@@ -736,6 +736,13 @@
       pointer-events: none;
       z-index: 1;
     }
+
+    #fountainEl {
+      left: 570px;
+      top: 331px;
+      width: 60px;
+      height: 60px;
+    }
     .fountain svg {
       position: absolute;
       inset: 0;

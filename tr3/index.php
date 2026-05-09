@@ -78,7 +78,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260504_0001">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260509_0223">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -144,7 +144,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   
             <button class="table wide" style="left: 422px; top: 420px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
             <button class="table wide" style="left: 310px; top: 420px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
-            <div class="fountain" style="left: 532px; top: 316px;" aria-hidden="true" id="fountainEl">
+            <div class="fountain" aria-hidden="true" id="fountainEl">
               <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
                   <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
@@ -419,7 +419,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr3/assets/tr3.boot.js?v=20260504_0001" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260509_0223" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>
