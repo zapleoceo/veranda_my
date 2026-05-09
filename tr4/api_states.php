@@ -26,8 +26,8 @@ function tr3_api_tg_state_create(array $ctx): void {
     if (is_array($s)) {
       $schemeNum = (int)($s['scheme_num'] ?? 0);
       $displayName = trim((string)($s['display_name'] ?? ''));
-      if ($schemeNum > 0) $payload['table_num'] = (string)$schemeNum;
-      elseif ($displayName !== '' && preg_match('/^\d+$/', $displayName)) $payload['table_num'] = $displayName;
+      if ($displayName !== '') $payload['table_num'] = $displayName;
+      elseif ($schemeNum > 0) $payload['table_num'] = (string)$schemeNum;
       $tableNum = trim((string)($payload['table_num'] ?? $tableNum));
     }
   }

@@ -40,8 +40,8 @@ function tr3_api_submit_booking(array $ctx): void {
     if (is_array($s)) {
       $schemeNum = (int)($s['scheme_num'] ?? 0);
       $displayName = trim((string)($s['display_name'] ?? ''));
-      if ($schemeNum > 0) $tableNum = (string)$schemeNum;
-      elseif ($displayName !== '' && preg_match('/^\d+$/', $displayName)) $tableNum = $displayName;
+      if ($displayName !== '') $tableNum = $displayName;
+      elseif ($schemeNum > 0) $tableNum = (string)$schemeNum;
     }
   }
   $name = trim((string)($payload['name'] ?? ''));
