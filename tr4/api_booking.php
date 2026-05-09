@@ -150,31 +150,63 @@ function tr3_api_submit_booking(array $ctx): void {
       $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES{$qrCode}");
     }
 
-    $db->query("INSERT INTO {$resTable} (
-      spot_id, hall_id, created_at, start_time, duration, guests, table_num, poster_table_id, table_label, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-      $spotId,
-      $hallId > 0 ? $hallId : null,
-      (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
-      $startDt->format('Y-m-d H:i:s'),
-      $duration_m,
-      $guests,
-      $tableNum,
-      $posterTableId,
-      $tableLabel !== '' ? $tableLabel : null,
-      $name,
-      $phoneNorm,
-      $waPhoneNorm !== '' ? $waPhoneNorm : null,
-      $comment,
-      $preorder,
-      $preorderRu,
-      $tgUid > 0 ? $tgUid : null,
-      $tgUn !== '' ? $tgUn : null,
-      $userLang,
-      $totalAmount,
-      $qrUrl,
-      $qrCode,
-    ]);
+    try {
+      $db->query("INSERT INTO {$resTable} (
+        spot_id, hall_id, created_at, start_time, duration, guests, table_num, poster_table_id, table_label, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+        $spotId,
+        $hallId > 0 ? $hallId : null,
+        (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
+        $startDt->format('Y-m-d H:i:s'),
+        $duration_m,
+        $guests,
+        $tableNum,
+        $posterTableId,
+        $tableLabel !== '' ? $tableLabel : null,
+        $name,
+        $phoneNorm,
+        $waPhoneNorm !== '' ? $waPhoneNorm : null,
+        $comment,
+        $preorder,
+        $preorderRu,
+        $tgUid > 0 ? $tgUid : null,
+        $tgUn !== '' ? $tgUn : null,
+        $userLang,
+        $totalAmount,
+        $qrUrl,
+        $qrCode,
+      ]);
+    } catch (\Throwable $e) {
+      if (stripos((string)$e->getMessage(), "Unknown column 'table_label'") !== false || stripos((string)$e->getMessage(), 'Unknown column "table_label"') !== false) {
+        $tableNum = $tableLabel !== '' ? $tableLabel : $tableNum;
+        $db->query("INSERT INTO {$resTable} (
+          spot_id, hall_id, created_at, start_time, duration, guests, table_num, poster_table_id, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+          $spotId,
+          $hallId > 0 ? $hallId : null,
+          (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
+          $startDt->format('Y-m-d H:i:s'),
+          $duration_m,
+          $guests,
+          $tableNum,
+          $posterTableId,
+          $name,
+          $phoneNorm,
+          $waPhoneNorm !== '' ? $waPhoneNorm : null,
+          $comment,
+          $preorder,
+          $preorderRu,
+          $tgUid > 0 ? $tgUid : null,
+          $tgUn !== '' ? $tgUn : null,
+          $userLang,
+          $totalAmount,
+          $qrUrl,
+          $qrCode,
+        ]);
+      } else {
+        throw $e;
+      }
+    }
     $resId = (int)$db->getPdo()->lastInsertId();
   }
 
