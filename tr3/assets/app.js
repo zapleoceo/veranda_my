@@ -133,27 +133,84 @@
 
     (() => {
       if (!mapShell || reduced) return;
-      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-      let raf = 0;
-      let nextX = 60;
-      let nextY = 32;
-      const apply = () => {
-        raf = 0;
-        mapShell.style.setProperty('--mx', String(clamp(nextX, 0, 100)) + '%');
-        mapShell.style.setProperty('--my', String(clamp(nextY, 0, 100)) + '%');
+      let rect = mapShell.getBoundingClientRect();
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+      let x = rect.width * 0.62;
+      let y = rect.height * 0.28;
+      let targetX = x;
+      let targetY = y;
+      let baseX = x;
+      let baseY = y;
+
+      let lastMoveTs = performance.now();
+      let idle = false;
+      let autoT = 0;
+      let autoPhi = 0;
+      let prevTs = performance.now();
+
+      const setTargetFromClient = (clientX, clientY) => {
+        rect = mapShell.getBoundingClientRect();
+        targetX = clamp(clientX - rect.left, 0, rect.width);
+        targetY = clamp(clientY - rect.top, 0, rect.height);
+        baseX = targetX;
+        baseY = targetY;
+        lastMoveTs = performance.now();
       };
-      const onMove = (e) => {
-        const rect = mapShell.getBoundingClientRect();
-        if (!rect.width || !rect.height) return;
-        nextX = ((e.clientX - rect.left) / rect.width) * 100;
-        nextY = ((e.clientY - rect.top) / rect.height) * 100;
-        if (!raf) raf = requestAnimationFrame(apply);
-      };
-      mapShell.addEventListener('pointermove', onMove, { passive: true });
-      mapShell.addEventListener('pointerleave', () => {
-        mapShell.style.removeProperty('--mx');
-        mapShell.style.removeProperty('--my');
+
+      mapShell.addEventListener('pointermove', (e) => setTargetFromClient(e.clientX, e.clientY), { passive: true });
+      mapShell.addEventListener('pointerdown', (e) => setTargetFromClient(e.clientX, e.clientY), { passive: true });
+      mapShell.addEventListener('pointerleave', () => { lastMoveTs = 0; }, { passive: true });
+
+      window.addEventListener('resize', () => {
+        rect = mapShell.getBoundingClientRect();
+        x = clamp(x, 0, rect.width);
+        y = clamp(y, 0, rect.height);
+        targetX = clamp(targetX, 0, rect.width);
+        targetY = clamp(targetY, 0, rect.height);
+        baseX = clamp(baseX, 0, rect.width);
+        baseY = clamp(baseY, 0, rect.height);
       }, { passive: true });
+
+      const tick = (ts) => {
+        const dt = ts - prevTs;
+        prevTs = ts;
+
+        const idleDelay = 900;
+        const idleNow = (ts - lastMoveTs) > idleDelay;
+
+        if (idleNow) {
+          if (!idle) {
+            idle = true;
+            rect = mapShell.getBoundingClientRect();
+            const ux = clamp((baseX / Math.max(1, rect.width)) * 2 - 1, -1, 1);
+            const uy = clamp((baseY / Math.max(1, rect.height)) * 2 - 1, -1, 1);
+            const t0 = Math.asin(ux);
+            const phi0 = Math.asin(uy) - t0 * 0.73;
+            autoT = Number.isFinite(t0) ? t0 : 0;
+            autoPhi = Number.isFinite(phi0) ? phi0 : 0;
+          }
+
+          rect = mapShell.getBoundingClientRect();
+          autoT += dt * 0.00045;
+          x = ((Math.sin(autoT) + 1) / 2) * rect.width;
+          y = ((Math.sin(autoT * 0.73 + autoPhi) + 1) / 2) * rect.height;
+        } else {
+          idle = false;
+          x += (targetX - x) * 0.22;
+          y += (targetY - y) * 0.22;
+        }
+
+        x = clamp(x, 0, rect.width);
+        y = clamp(y, 0, rect.height);
+        mapShell.style.setProperty('--mx', `${x}px`);
+        mapShell.style.setProperty('--my', `${y}px`);
+        requestAnimationFrame(tick);
+      };
+
+      mapShell.style.setProperty('--mx', `${x}px`);
+      mapShell.style.setProperty('--my', `${y}px`);
+      requestAnimationFrame(tick);
     })();
 
     const applyMapZoom = (pct, keepAnchor) => {
@@ -2709,7 +2766,7 @@
             return;
           }
           if (effMode === 'canvas_bottom') {
-            if (forceGrassBottom) { wx = 0; wy = 0; ww = 1; wh = 0.528; }
+            if (forceGrassBottom) { wx = 0; wy = 0; ww = 1; wh = 0.581; }
             const left = Math.round((wx || 0) * MAP_W);
             const w = Math.round(Math.max(0, ww) * MAP_W);
             const h = Math.round(Math.max(0, wh) * MAP_H);
