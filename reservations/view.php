@@ -84,7 +84,7 @@
                         <div class="res-modal-title">Стол</div>
                         <div class="res-modal-body">
                             <div class="res-modal-grid">
-                                <div class="res-modal-k">Номер</div>
+                                <div class="res-modal-k">Метка (Poster)</div>
                                 <div class="res-modal-v" id="resHallModalNum">—</div>
                                 <div class="res-modal-k">Poster table_id</div>
                                 <div class="res-modal-v" id="resHallModalPosterId">—</div>
