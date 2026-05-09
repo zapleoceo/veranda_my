@@ -22,6 +22,9 @@ function tr3_api_bootstrap(array $ctx): void {
     'defaultResDateLocal' => $ctx['defaultResDateLocal'] ?? null,
     'allowedTableNums' => $ctx['allowedSchemeNums'] ?? null,
     'tableCapsByNum' => $ctx['tableCapsByNum'] ?? [],
+    'tableSettingsByHall' => $ctx['tableSettingsByHall'] ?? [],
+    'decorByHall' => $ctx['decorByHall'] ?? [],
+    'hallSettingsByHall' => $ctx['hallSettingsByHall'] ?? [],
     'soonBookingHours' => $ctx['soonBookingHours'] ?? 0,
     'latestWorkday' => $ctx['latestWorkday'] ?? '21:00',
     'latestWeekend' => $ctx['latestWeekend'] ?? '22:00',
@@ -32,7 +35,7 @@ function tr3_api_bootstrap(array $ctx): void {
 
 function tr3_api_log_js(array $ctx): void {
   api_json_headers(false);
-  $dbg = trim((string)($_ENV['DEBUG'] ?? $_ENV['TR3_DEBUG'] ?? ''));
+  $dbg = trim((string)($_ENV['DEBUG'] ?? $_ENV['TR4_DEBUG'] ?? $_ENV['TR3_DEBUG'] ?? ''));
   if ($dbg !== '1') api_ok();
 
   $j = api_read_payload();
@@ -50,4 +53,3 @@ function tr3_api_log_js(array $ctx): void {
 
   api_ok();
 }
-

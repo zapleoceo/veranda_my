@@ -98,15 +98,11 @@
     animateI18n = true;
     applyI18n();
     window.setTimeout(() => { animateI18n = false; }, 350);
-    if (typeof setStatus === 'function') setStatus(selectedTableNum);
+    if (typeof setStatus === 'function') setStatus(selectedTableId, selectedTableLabel);
     if (typeof renderSelectedTable === 'function') renderSelectedTable();
     if (typeof updatePreorderUi === 'function') updatePreorderUi();
     if (typeof renderPreorderBox === 'function') renderPreorderBox();
 
-    const fountainEl = document.getElementById('fountainEl');
-    if (fountainEl) {
-        fountainEl.title = t('fountain_tooltip') || '';
-    }
   };
   (() => {
     const details = document.querySelector('.lang-menu');
@@ -128,17 +124,12 @@
   })();
   const root = document.documentElement;
     const mapShell = document.querySelector('.map-shell');
-    const tileLayer = mapShell ? mapShell.querySelector(':scope > .tile-layer') : null;
     const mapZoomVal = document.getElementById('mapZoomVal');
     const mapZoomMinus = document.getElementById('mapZoomMinus');
     const mapZoomPlus = document.getElementById('mapZoomPlus');
     const mapZoomRange = document.getElementById('mapZoomRange');
     const mapZoomBox = document.getElementById('mapZoomBox');
-    const syncTileLayerSize = () => {
-      if (!mapShell || !tileLayer) return;
-      tileLayer.style.width = String(Math.max(mapShell.scrollWidth, mapShell.clientWidth)) + 'px';
-      tileLayer.style.height = String(Math.max(mapShell.scrollHeight, mapShell.clientHeight)) + 'px';
-    };
+    let zoomWasManual = false;
 
     const applyMapZoom = (pct, keepAnchor) => {
       if (!mapShell) return;
@@ -159,7 +150,6 @@
 
       mapShell.style.setProperty('--map-scale', String(scale));
       mapShell.style.setProperty('--inv-map-scale', String(1 / scale));
-      syncTileLayerSize();
 
       if (keepAnchor) {
         const rect = mapShell.getBoundingClientRect();
@@ -171,72 +161,81 @@
     const getInitialZoomPct = () => {
       if (!mapShell) return 100;
       if (!window.matchMedia || !window.matchMedia('(max-width: 640px)').matches) return 100;
-      const pad = 32;
-      const baseW = mapZoomBox ? (mapZoomBox.offsetWidth || 820) : 820;
-      const fit = Math.floor(((mapShell.clientWidth || baseW) - pad) / baseW * 100);
-      return Math.max(10, Math.min(100, fit));
+      const baseW = 820;
+      const baseH = 620;
+      const boxW = mapZoomBox ? (mapZoomBox.clientWidth || baseW) : (mapShell.clientWidth || baseW);
+      const boxH = mapZoomBox ? (mapZoomBox.clientHeight || baseH) : (mapShell.clientHeight || baseH);
+      const cover = Math.max(boxW / baseW, boxH / baseH);
+      return Math.max(10, Math.min(100, Math.round(cover * 100)));
     };
     applyMapZoom(getInitialZoomPct(), false);
     if (typeof window.addEventListener === 'function') {
-      window.addEventListener('resize', () => { syncTileLayerSize(); });
+      window.addEventListener('resize', () => {
+        if (!zoomWasManual) applyMapZoom(getInitialZoomPct(), false);
+      });
     }
     const getCurrentZoomPct = () => {
       if (!mapShell) return 100;
       const cur = Number(getComputedStyle(mapShell).getPropertyValue('--map-scale')) || 1;
       return Math.round(cur * 100);
     };
-    if (mapZoomMinus) mapZoomMinus.addEventListener('click', () => applyMapZoom(getCurrentZoomPct() - 5, true));
-    if (mapZoomPlus) mapZoomPlus.addEventListener('click', () => applyMapZoom(Math.min(100, getCurrentZoomPct() + 5), true));
-    if (mapZoomRange) mapZoomRange.addEventListener('input', () => applyMapZoom(mapZoomRange.value, true));
+    if (mapZoomMinus) mapZoomMinus.addEventListener('click', () => { zoomWasManual = true; applyMapZoom(getCurrentZoomPct() - 5, true); });
+    if (mapZoomPlus) mapZoomPlus.addEventListener('click', () => { zoomWasManual = true; applyMapZoom(Math.min(100, getCurrentZoomPct() + 5), true); });
+    if (mapZoomRange) mapZoomRange.addEventListener('input', () => { zoomWasManual = true; applyMapZoom(mapZoomRange.value, true); });
     const defaultResDateLocal = String(cfg.defaultResDateLocal || "");
     const allowedTableNums = cfg.allowedTableNums ?? null;
     const tableCapsByNum = cfg.tableCapsByNum ?? null;
     const allowedSet = Array.isArray(allowedTableNums) ? new Set(allowedTableNums.map((x) => String(x))) : null;
+    const tableSettingsByHall = (cfg.tableSettingsByHall && typeof cfg.tableSettingsByHall === 'object') ? cfg.tableSettingsByHall : {};
+    const decorByHall = (cfg.decorByHall && typeof cfg.decorByHall === 'object') ? cfg.decorByHall : {};
+    const hallSettingsByHall = (cfg.hallSettingsByHall && typeof cfg.hallSettingsByHall === 'object') ? cfg.hallSettingsByHall : {};
 
-    const tables = Array.from(document.querySelectorAll('.table'));
-    const shiftTablesUp = (px) => {
-      tables.forEach((t) => {
+    const cinemaTabBtn = document.getElementById('cinemaTabBtn');
+    const canvasMain = document.getElementById('mapCanvasMain');
+    const canvasCinema = document.getElementById('mapCanvasCinema');
+    const decorMain = document.getElementById('mapDecorMain');
+    const decorCinema = document.getElementById('mapDecorCinema');
+    const tablesMain = document.getElementById('mapTablesMain');
+    const tablesCinema = document.getElementById('mapTablesCinema');
+    let activeCanvas = 'main';
+    let activeHallId = 2;
+    let mainLayoutLoaded = false;
+    let mainLayoutLoading = false;
+    let cinemaLayoutLoaded = false;
+    let cinemaLayoutLoading = false;
+    let requestReload = null;
+    let requestInvalidate = null;
+    let requestBindTables = null;
+
+    const syncCanvasToggleBusy = () => {
+      if (!cinemaTabBtn) return;
+      const busy = !!(isLoading || cinemaLayoutLoading || mainLayoutLoading);
+      cinemaTabBtn.disabled = busy;
+      cinemaTabBtn.setAttribute('aria-disabled', busy ? 'true' : 'false');
+      cinemaTabBtn.classList.toggle('is-disabled', busy);
+    };
+
+    const getActiveTablesRoot = () => {
+      if (activeCanvas === 'cinema') return tablesCinema || canvasCinema;
+      return tablesMain || canvasMain;
+    };
+    const getTables = () => {
+      const el = getActiveTablesRoot();
+      return el ? Array.from(el.querySelectorAll('.table')) : [];
+    };
+    const getTableLabelText = (tEl) => {
+      if (!tEl || !tEl.querySelector) return '';
+      const el = tEl.querySelector('.num');
+      return el ? String(el.textContent || '').trim() : '';
+    };
+    const applyAllowedToMain = () => {
+      if (allowedSet === null || allowedSet.size <= 0) return;
+      if (!tablesMain) return;
+      Array.from(tablesMain.querySelectorAll('.table')).forEach((t) => {
         const n = String(t.dataset.table || '');
-        const num = parseInt(n, 10);
-        if (!isFinite(num) || num < 1 || num > 500) return;
-        const topStr = String(t.style.top || '').trim();
-        const m = topStr.match(/^(-?\d+(?:\.\d+)?)px$/);
-        if (!m) return;
-        const cur = Number(m[1]);
-        if (!isFinite(cur)) return;
-        t.style.top = String(cur - px) + 'px';
+        if (n && !allowedSet.has(n)) t.classList.add('disabled');
       });
     };
-    const shiftTablesRight = (fromNum, toNum, px) => {
-      tables.forEach((t) => {
-        const n = String(t.dataset.table || '');
-        const num = Number(n);
-        if (!isFinite(num) || num < fromNum || num > toNum) return;
-        const leftStr = String(t.style.left || '').trim();
-        const m = leftStr.match(/^(-?\d+(?:\.\d+)?)px$/);
-        if (!m) return;
-        const cur = Number(m[1]);
-        if (!isFinite(cur)) return;
-        t.style.left = String(cur + px) + 'px';
-      });
-    };
-    shiftTablesUp(56);
-    shiftTablesRight(17, 21, 28);
-    if (allowedSet !== null && allowedSet.size > 0) {
-      tables.forEach((t) => {
-        const n = String(t.dataset.table || '');
-        if (!allowedSet.has(n)) {
-          t.classList.add('disabled');
-        }
-      });
-    }
-
-    tables.forEach((t) => {
-      const n = String(t.dataset.table || '');
-      const capEl = t.querySelector('.cap');
-      const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[n] != null ? Number(tableCapsByNum[n]) : null;
-      if (capEl) capEl.textContent = (cap != null && isFinite(cap)) ? (String(Math.max(0, Math.floor(cap))) + ' 👤') : '';
-    });
 
     const setBusyLabel = (dateStr) => {
       const busyDateLabel = document.getElementById('busyDateLabel');
@@ -255,21 +254,21 @@
     };
 
     const clearReservationsOnTables = () => {
-      tables.forEach((t) => {
+      getTables().forEach((t) => {
         const el = t.querySelector('.res-time');
         if (el) el.remove();
       });
     };
 
     let lastReservationsByTable = {};
-    let occupiedNowNums = new Set();
-    let soonBookingNums = new Set();
+    let occupiedNowIds = new Set();
+    let soonBookingIds = new Set();
     let soonBookingNextByTable = {};
     const applyReservationsItemsToTables = (items, dateStr, dtValue) => {
       const list = Array.isArray(items) ? items : [];
       const day = String(dateStr || '').slice(0, 10);
       if (!day) {
-        tables.forEach((t) => { delete t.dataset.resBusy; });
+        getTables().forEach((t) => { delete t.dataset.resBusy; });
         return;
       }
 
@@ -291,18 +290,18 @@
       const byTableEntries = {};
       list.forEach((it) => {
         if (!it || typeof it !== 'object') return;
-        const tableTitle = String(it.table_title ?? '').trim();
+        const tableId = String(it.table_id ?? '').trim();
         const s = String(it.date_start ?? '').trim();
         const e = String(it.date_end ?? '').trim();
         const name = String(it.guest_name ?? '').trim();
         const guests = String(it.guests_count ?? '').trim();
-        if (!tableTitle || !s || !e) return;
+        if (!tableId || !s || !e) return;
         if (s.slice(0, 10) !== day) return;
         const sm = Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
         const em = Number(e.slice(11, 13)) * 60 + Number(e.slice(14, 16));
         if (!isFinite(sm) || !isFinite(em)) return;
-        if (!byTableEntries[tableTitle]) byTableEntries[tableTitle] = [];
-        byTableEntries[tableTitle].push({ sm, em, name, guests });
+        if (!byTableEntries[tableId]) byTableEntries[tableId] = [];
+        byTableEntries[tableId].push({ sm, em, name, guests });
       });
 
       const byTable = {};
@@ -336,7 +335,7 @@
 
       lastReservationsByTable = byTable;
 
-      soonBookingNums = new Set();
+      soonBookingIds = new Set();
       soonBookingNextByTable = {};
       if (isToday && nowMin != null && SOON_BOOK_MIN > 0) {
         Object.keys(byTableEntries).forEach((n) => {
@@ -345,14 +344,14 @@
           if (!nextStarts.length) return;
           const nextStart = Math.min(...nextStarts);
           if ((nextStart - nowMin) <= SOON_BOOK_MIN) {
-            soonBookingNums.add(String(n));
+            soonBookingIds.add(String(n));
             soonBookingNextByTable[String(n)] = nextStart;
           }
         });
       }
 
-      tables.forEach((tableEl) => {
-        const n = String(tableEl.dataset.table || '');
+      getTables().forEach((tableEl) => {
+        const n = String(tableEl.dataset.posterTableId || '');
         const entries0 = Array.isArray(byTableEntries[n]) ? byTableEntries[n] : [];
         const entries = entries0;
         const ranges = Array.isArray(byTable[n]) ? byTable[n] : [];
@@ -362,8 +361,8 @@
           : false;
         if (overlapsSel) tableEl.dataset.resBusy = '1';
         else delete tableEl.dataset.resBusy;
-        const isOccNow = isToday && occupiedNowNums && occupiedNowNums.has(n);
-        const isSoon = isToday && soonBookingNums && soonBookingNums.has(n);
+        const isOccNow = isToday && occupiedNowIds && occupiedNowIds.has(n);
+        const isSoon = isToday && soonBookingIds && soonBookingIds.has(n);
         let txt = entries.length
           ? entries.slice(0, 2).map((r) => {
             const g = fmtGuest(r.name);
@@ -371,10 +370,7 @@
             return fmt(r.sm) + '-' + fmt(r.em) + (g ? (' ' + g) : '') + (cnt ? (' (' + cnt + ')') : '');
           }).join(' · ')
           : '';
-        if (isOccNow) {
-          const occ = t('busy_now');
-          txt = txt ? (occ + '\n' + txt) : occ;
-        } else if (isSoon) {
+        if (isSoon) {
           const soon = t('busy_soon_booking') || 'Скоро бронь';
           txt = txt ? (soon + '\n' + txt) : soon;
         }
@@ -402,6 +398,8 @@
     const capModalText = document.getElementById('capModalText');
     const capModalYes = document.getElementById('capModalYes');
     const capModalNo = document.getElementById('capModalNo');
+    const capModalYesDefaultText = capModalYes ? String(capModalYes.textContent || '') : '';
+    const capModalNoDefaultText = capModalNo ? String(capModalNo.textContent || '') : '';
     const reqModal = document.getElementById('reqModal');
     const reqModalCard = document.getElementById('reqModalCard');
     const reqForm = document.getElementById('reqForm');
@@ -420,6 +418,7 @@
     const reqDuration = document.getElementById('reqDuration');
     const reqEndTime = document.getElementById('reqEndTime');
     const reqTableNumInput = document.getElementById('reqTableNum');
+    const reqPosterTableIdInput = document.getElementById('reqPosterTableId');
     const reqStartIsoInput = document.getElementById('reqStartIso');
     const reqHint = document.getElementById('reqHint');
     const preorderPanel = document.getElementById('preorderPanel');
@@ -444,9 +443,10 @@
     const dtpOk = document.getElementById('dtpOk');
 
     let last = null;
-    let freeNums = new Set();
+    let freeIds = new Set();
     let lastKey = '';
-    let selectedTableNum = '';
+    let selectedTableId = '';
+    let selectedTableLabel = '';
     let isLoading = false;
     let capConfirmResolve = null;
     let toastTimer = null;
@@ -781,10 +781,23 @@
 
     const confirmModal = (text) => new Promise((resolve) => {
       capConfirmResolve = resolve;
+      if (capModalNo) {
+        capModalNo.style.display = '';
+        capModalNo.textContent = capModalNoDefaultText;
+      }
+      if (capModalYes) capModalYes.textContent = capModalYesDefaultText;
       if (capModalText) capModalText.textContent = String(text || '');
       setModal(capModal, true);
     });
     const confirmCapacity = (maxCap, guests) => confirmModal(fmtVars(t('confirm_capacity'), { max: maxCap, guests }));
+
+    const showSystemModal = (text) => {
+      if (capModalNo) capModalNo.style.display = 'none';
+      if (capModalYes) capModalYes.textContent = t('ok') || 'OK';
+      if (capModalText) capModalText.textContent = String(text || '');
+      capConfirmResolve = null;
+      setModal(capModal, true);
+    };
 
     if (capModalYes) {
       capModalYes.addEventListener('click', () => {
@@ -1243,35 +1256,38 @@
     };
 
     const checkModalAvailability = () => {
-      if (!pendingBooking || !pendingBooking.tableNum || !reqStart || !reqStart.value || !reqDuration) {
+      const busyTag = document.getElementById('reqModalBusy');
+      if (!pendingBooking || !pendingBooking.tableLabel || !reqStart || !reqStart.value || !reqDuration) {
         modalTableBusy = true;
+        if (busyTag) { busyTag.hidden = true; busyTag.textContent = ''; }
         syncSubmitState();
         return;
       }
 
-      const tableNum = String(pendingBooking.tableNum);
+      const tableLabel = String(pendingBooking.tableLabel);
+      const posterTableId = String(pendingBooking.posterTableId || '');
       const current = getCurrentRequest();
-      if (!current) return;
+      if (!current) {
+        modalTableBusy = true;
+        if (busyTag) { busyTag.hidden = true; busyTag.textContent = ''; }
+        syncSubmitState();
+        return;
+      }
       
-      const un = getUnavailableReason(tableNum, current);
+      const un = getUnavailableReason(posterTableId || tableLabel, current);
       
-      logJs('checkModalAvailability: start', { tableNum, current, un, modalTableBusy });
-
-      const busyTag = document.getElementById('reqModalBusy');
+      logJs('checkModalAvailability: start', { tableLabel, posterTableId, current, un, modalTableBusy });
       if (un) {
         modalTableBusy = true;
-        const isSitting = String(un.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят');
-        const isBooking = String(un.reason || '') === String(t('reason_booking') || 'есть бронь');
-        const isSoon = String(un.reason || '') === String(t('reason_soon_booking') || 'скоро бронь');
         if (busyTag) {
-          if (isSitting) {
+          if (un.code === 'sitting') {
             busyTag.textContent = String(un.reason || '');
             busyTag.hidden = false;
-          } else if (isBooking) {
+          } else if (un.code === 'booking') {
             const d = String(un.detail || '').trim();
             busyTag.textContent = String(t('booking_tag') || 'Бронь') + (d ? (' ' + d) : '');
             busyTag.hidden = false;
-          } else if (isSoon) {
+          } else if (un.code === 'soon_booking') {
             const d = String(un.detail || '').trim();
             busyTag.textContent = String(t('busy_soon_booking') || 'Скоро бронь') + (d ? (' ' + d) : '');
             busyTag.hidden = false;
@@ -1326,7 +1342,7 @@
         reqSubmit.setAttribute('aria-disabled', canSubmit ? 'false' : 'true');
         reqSubmit.disabled = !!submitBusy;
       };
-    const openRequestForm = ({ tableNum, guests, start, name, phone, comment, preorder, keepFields }) => {
+    const openRequestForm = ({ tableLabel, posterTableId, spotId, hallId, guests, start, name, phone, comment, preorder, keepFields }) => {
       if (reqHint) {
         reqHint.hidden = true;
         reqHint.textContent = '';
@@ -1334,9 +1350,10 @@
       }
 
 
-      pendingBooking = { tableNum: String(tableNum || ''), guests: Number(guests || 0), start: String(start || '') };
-      if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
-      if (reqTableNumInput) reqTableNumInput.value = String(tableNum || '');
+      pendingBooking = { tableLabel: String(tableLabel || ''), posterTableId: String(posterTableId || ''), spotId: Number(spotId || 1) || 1, hallId: Number(hallId || activeHallId || 0) || (activeHallId || 0), guests: Number(guests || 0), start: String(start || '') };
+      if (reqModalTable) reqModalTable.textContent = String(tableLabel || '');
+      if (reqTableNumInput) reqTableNumInput.value = String(tableLabel || '');
+      if (reqPosterTableIdInput) reqPosterTableIdInput.value = String(posterTableId || '');
       if (reqGuests) {
         reqGuests.value = String(guests);
         updateReqGuestsHint().catch(() => null);
@@ -1612,7 +1629,10 @@
         return;
       }
 
-      const tableNum = String(pendingBooking.tableNum || '');
+      const tableLabel = String(pendingBooking.tableLabel || '');
+      const posterTableId = String(pendingBooking.posterTableId || '');
+      const spotId = Number(pendingBooking.spotId || 1) || 1;
+      const hallId = Number(pendingBooking.hallId || activeHallId || 0) || (activeHallId || 0);
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
@@ -1635,7 +1655,7 @@
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, source_page: sourcePage }),
+          body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, source_page: sourcePage }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -1693,7 +1713,10 @@
         return Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
       };
       
-      const tableNum = String(pendingBooking.tableNum || '');
+      const tableLabel = String(pendingBooking.tableLabel || '');
+      const posterTableId = String(pendingBooking.posterTableId || '');
+      const spotId = Number(pendingBooking.spotId || 1) || 1;
+      const hallId = Number(pendingBooking.hallId || activeHallId || 0) || (activeHallId || 0);
       const guests = reqGuests ? Number(reqGuests.value || pendingBooking.guests || 0) : Number(pendingBooking.guests || 0);
       const start = reqStart ? String(reqStart.dataset.iso || reqStart.value || pendingBooking.start || '').trim() : String(pendingBooking.start || '').trim();
       const name = reqName ? String(reqName.value || '').trim() : '';
@@ -1721,7 +1744,7 @@
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, scroll_y: scrollY, source_page: sourcePage }),
+            body: JSON.stringify({ table_label: tableLabel, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, scroll_y: scrollY, source_page: sourcePage }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -1759,11 +1782,11 @@
 
     async function updateReqGuestsHint() {
       if (!reqHint) return;
-      const tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
+      const posterTableId = pendingBooking ? String(pendingBooking.posterTableId || '') : '';
       const guests = reqGuests ? Number(reqGuests.value || 0) : 0;
 
 
-      if (!tableNum || !isFinite(guests) || guests <= 0) {
+      if (!posterTableId || !isFinite(guests) || guests <= 0) {
         reqHint.hidden = true;
         reqHint.textContent = '';
         reqHint.classList.remove('warn');
@@ -1772,8 +1795,9 @@
       try {
         const url = apiUrl();
         url.searchParams.set('ajax', 'cap_check');
-        url.searchParams.set('table_num', tableNum);
+        url.searchParams.set('poster_table_id', posterTableId);
         url.searchParams.set('guests', String(Math.floor(guests)));
+        url.searchParams.set('hall_id', String(activeHallId));
         const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -1877,7 +1901,7 @@
         let comment = '';
         let preorder = '';
         let preorderRu = '';
-        let tableNum = '';
+        let tableLabel = '';
 
         const getTotalPreorderAmount = () => {
           const counts = normalizePreorder(preorderCounts);
@@ -1928,9 +1952,9 @@
           if (reqPreorderRuHidden) reqPreorderRuHidden.value = preorderRu;
           logJs('submit trace 2', { preorder, preorderRu }).catch(() => null);
           
-          tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
+          tableLabel = pendingBooking ? String(pendingBooking.tableLabel || '') : '';
           const missing = [];
-          if (!tableNum) missing.push(t('missing_table'));
+          if (!tableLabel) missing.push(t('missing_table'));
           if (!start) missing.push(t('missing_start'));
           if (!isFinite(guests) || guests <= 0) missing.push(t('missing_guests'));
           const countsNow = normalizePreorder(preorderCounts);
@@ -1963,12 +1987,15 @@
           return;
         }
         try {
+          const posterTableId = pendingBooking ? String(pendingBooking.posterTableId || '') : '';
+          const spotId = pendingBooking ? (Number(pendingBooking.spotId || 1) || 1) : 1;
+          const hallId = pendingBooking ? (Number(pendingBooking.hallId || activeHallId || 0) || (activeHallId || 0)) : (activeHallId || 0);
           const url = apiUrl();
           url.searchParams.set('ajax', 'submit_booking');
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, guests, start, duration_m, name, phone, whatsapp_phone: messengerLinked.whatsapp ? linkedWaPhone : null, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
+            body: JSON.stringify({ table_label: tableLabel, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, duration_m, name, phone, whatsapp_phone: messengerLinked.whatsapp ? linkedWaPhone : null, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -1990,7 +2017,7 @@
             setModal(preorderOkModal, true);
             preorderOkBtn.onclick = () => setModal(preorderOkModal, false);
           } else {
-            setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableNum, guests: String(guests), name, phone }));
+            setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableLabel, guests: String(guests), name, phone }));
           }
         } catch (err) {
           const errMsg = String(err && err.message ? err.message : err);
@@ -2087,19 +2114,20 @@
       toastTimer = setTimeout(hideToast, 2000);
     };
 
-    const getUnavailableReason = (tableNum, current) => {
-      const tEl = tables.find((x) => String(x.dataset.table || '') === String(tableNum));
-      if (!tEl) return null;
-      if (tEl.classList.contains('disabled')) return { reason: t('reason_disabled') || 'отключено в настройках', detail: '' };
+    const getUnavailableReason = (tEl, current) => {
+      const tableEl = (tEl && tEl.classList) ? tEl : (getTables().find((x) => String(x.dataset.posterTableId || '') === String(tEl || '')) || null);
+      const tableId = tableEl ? String(tableEl.dataset.posterTableId || '') : String(tEl || '');
+      if (!tableId) return null;
+      if (tableEl && tableEl.classList.contains('disabled')) return { code: 'disabled', reason: t('reason_disabled') || 'отключено в настройках', detail: '' };
       if (!last || !current) return null;
       const ps = parseSel(current.dtRaw);
-      const ranges = Array.isArray(lastReservationsByTable[String(tableNum)]) ? lastReservationsByTable[String(tableNum)] : [];
+      const ranges = Array.isArray(lastReservationsByTable[String(tableId)]) ? lastReservationsByTable[String(tableId)] : [];
       if (ps && ranges.length) {
         const selEnd = ps.selMin + Math.floor(current.durationSec / 60);
         const overlaps = ranges.some(([s, e]) => s < selEnd && e > ps.selMin);
         if (overlaps) {
           const txt = ranges.slice(0, 2).map(([s, e]) => fmtMin(s) + '-' + fmtMin(e)).join(' · ');
-          return { reason: t('reason_booking') || 'есть бронь', detail: txt };
+          return { code: 'booking', reason: t('reason_booking') || 'есть бронь', detail: txt };
         }
         const nextStarts = ranges.map(([s]) => Number(s)).filter((s) => isFinite(s) && s >= ps.selMin);
         const nextStart = nextStarts.length ? Math.min(...nextStarts) : null;
@@ -2107,7 +2135,7 @@
           const mustEndAt = nextStart - 60;
           if (selEnd > mustEndAt) {
             const pref = t('booking_until_prefix') || 'до';
-            return { reason: t('reason_booking') || 'есть бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
+            return { code: 'booking', reason: t('reason_booking') || 'есть бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
           }
         }
       }
@@ -2116,17 +2144,20 @@
       const now = new Date();
       const nowMin = now.getHours() * 60 + now.getMinutes();
 
-      if (isToday && soonBookingNums && soonBookingNums.has(String(tableNum))) {
-        const nextStart = soonBookingNextByTable ? Number(soonBookingNextByTable[String(tableNum)]) : NaN;
+      if (isToday && occupiedNowIds && occupiedNowIds.has(String(tableId))) {
+        return { code: 'sitting', reason: t('table_busy_no_booking') || 'Тут сейчас сидят гости и мы не знаем, когда столик освободится', detail: '' };
+      }
+      if (isToday && soonBookingIds && soonBookingIds.has(String(tableId))) {
+        const nextStart = soonBookingNextByTable ? Number(soonBookingNextByTable[String(tableId)]) : NaN;
         if (isFinite(nextStart) && (nextStart - nowMin) <= SOON_BOOK_MIN && ps && ps.selMin < nextStart) {
           const pref = t('at_prefix') || 'at';
-          return { reason: t('reason_soon_booking') || 'скоро бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
+          return { code: 'soon_booking', reason: t('reason_soon_booking') || 'скоро бронь', detail: String(pref) + ' ' + fmtMin(nextStart) };
         }
       }
 
-      if (!freeNums.has(String(tableNum))) {
-        if (isToday) return { reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
-        return { reason: t('reason_time') || 'недоступен на это время', detail: '' };
+      if (!freeIds.has(String(tableId))) {
+        if (isToday) return { code: 'sitting', reason: t('reason_sitting') || 'гости сейчас сидят', detail: '' };
+        return { code: 'time', reason: t('reason_time') || 'недоступен на это время', detail: '' };
       }
       return null;
     };
@@ -2169,9 +2200,9 @@
       return lines.join('\n');
     };
 
-    const setStatus = (tableNum) => {
-      if (selectedTableEl) selectedTableEl.textContent = tableNum ? String(tableNum) : '—';
-      if (!tableNum) {
+    const setStatus = (tableId, label) => {
+      if (selectedTableEl) selectedTableEl.textContent = label ? String(label) : '—';
+      if (!tableId) {
         if (statusLine) statusLine.textContent = '—';
         return;
       }
@@ -2183,18 +2214,23 @@
         if (statusLine) statusLine.textContent = t('press_ok');
         return;
       }
-      const isFree = freeNums.has(String(tableNum)) && !(soonBookingNums && soonBookingNums.has(String(tableNum)));
+      const el = getTables().find((x) => String(x.dataset.posterTableId || '') === String(tableId)) || null;
+      const isDisabled = !!(el && el.classList && el.classList.contains('disabled'));
+      const isOccNow = !!(occupiedNowIds && occupiedNowIds.has(String(tableId)));
+      const isFree = !isDisabled && !isOccNow && freeIds.has(String(tableId)) && !(soonBookingIds && soonBookingIds.has(String(tableId)));
       if (statusLine) statusLine.textContent = isFree ? t('status_free') : t('status_busy');
     };
 
     const applyAvailabilityStyles = () => {
-      tables.forEach((t) => {
-        const n = String(t.dataset.table || '');
-        t.classList.remove('free', 'busy');
+      getTables().forEach((t) => {
+        const n = String(t.dataset.posterTableId || '');
+        t.classList.remove('free', 'busy', 'occupied-now');
+        if (t.classList.contains('disabled')) return;
         if (!last) return;
         if (t.dataset.resBusy === '1') { t.classList.add('busy'); return; }
-        if (soonBookingNums && soonBookingNums.has(n)) { t.classList.add('busy'); return; }
-        if (freeNums.has(n)) t.classList.add('free');
+        if (soonBookingIds && soonBookingIds.has(n)) { t.classList.add('busy'); return; }
+        if (occupiedNowIds && occupiedNowIds.has(n)) { t.classList.add('busy', 'occupied-now'); return; }
+        if (freeIds.has(n)) t.classList.add('free');
         else t.classList.add('busy');
       });
     };
@@ -2224,7 +2260,10 @@
 
     const invalidateLast = () => {
       last = null;
-      freeNums = new Set();
+      freeIds = new Set();
+      occupiedNowIds = new Set();
+      soonBookingIds = new Set();
+      soonBookingNextByTable = {};
       lastKey = '';
       applyAvailabilityStyles();
       clearReservationsOnTables();
@@ -2232,8 +2271,8 @@
     };
 
     const renderSelectedTable = () => {
-      setStatus(selectedTableNum);
-      if (!selectedTableNum) return;
+      setStatus(selectedTableId, selectedTableLabel);
+      if (!selectedTableId) return;
       if (!last) {
         setOutput(t('press_ok'));
         return;
@@ -2241,95 +2280,86 @@
       setOutput(formatReservationsOnlyText(last.reservations_items, last.reservations_request));
     };
   
-    tables.forEach(table => {
-      table.addEventListener('mouseenter', () => {
-        const id = String(table.dataset.table || '');
-        const current = getCurrentRequest();
-        const un = getUnavailableReason(id, current);
-        if (un) showToast(table, un.reason, un.detail);
-      });
-      table.addEventListener('mouseleave', () => {
-        if (toastHideTimer) clearTimeout(toastHideTimer);
-        toastHideTimer = setTimeout(hideToast, 180);
-      });
+    const bindTableEvents = () => {
+      getTables().forEach((table) => {
+        if (table.dataset.tr4Bound === '1') return;
+        table.dataset.tr4Bound = '1';
 
-      table.addEventListener('click', async () => {
-        const id = String(table.dataset.table || '');
-        const current = getCurrentRequest();
+        table.addEventListener('mouseenter', () => {
+          const current = getCurrentRequest();
+          const un = getUnavailableReason(table, current);
+          if (un) showToast(table, un.reason, un.detail);
+        });
+        table.addEventListener('mouseleave', () => {
+          if (toastHideTimer) clearTimeout(toastHideTimer);
+          toastHideTimer = setTimeout(hideToast, 180);
+        });
 
-        // New limit check:
-        const now = new Date();
-        const todayLimit = getLatestTimeLimit(now);
-        const nowMin = now.getHours() * 60 + now.getMinutes();
-        if (current && current.dt === isoDate(now) && nowMin > todayLimit.min) {
-            alert('Извините, мы скоро закрываемся, забронировать столик на сегодня уже нельзя, выберите другой день');
-            return;
-        }
+        table.addEventListener('click', async () => {
+          const id = String(table.dataset.posterTableId || '');
+          const label = String(table.dataset.tableLabel || getTableLabelText(table) || '').trim();
+          const current = getCurrentRequest();
 
-        if (!current) {
-          if (!resDate || !String(resDate.value || '').trim()) {
-            setStatus(id);
+          const now = new Date();
+          const todayLimit = getLatestTimeLimit(now);
+          const nowMin = now.getHours() * 60 + now.getMinutes();
+          if (current && current.dt === isoDate(now) && nowMin > todayLimit.min) {
+              alert('Извините, мы скоро закрываемся, забронировать столик на сегодня уже нельзя, выберите другой день');
+              return;
+          }
+
+          if (!current) {
+            if (!resDate || !String(resDate.value || '').trim()) {
+              setStatus(id, label);
+              setOutput({ ok: false, error: t('select_date_time') });
+              return;
+            }
             setOutput({ ok: false, error: t('select_date_time') });
             return;
           }
-          setOutput({ ok: false, error: t('select_date_time') });
-          return;
-        }
 
-        const preUn = getUnavailableReason(id, current);
-        if (preUn && String(preUn.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят')) {
-          selectedTableNum = '';
-          showBusyToast(table);
-          return;
-        }
-        if (preUn) {
-          selectedTableNum = '';
-          showToast(table, preUn.reason, preUn.detail || '');
-          return;
-        }
-
-        const key = current.dt + '|' + String(current.guests);
-        if ((!last || lastKey !== key) && !isLoading) {
-          try {
-            await loadFree(true);
-          } catch (e) {
-            setOutput({ ok: false, error: String(e && e.message ? e.message : e) });
+          const preUn = getUnavailableReason(table, current);
+          if (preUn) {
+            selectedTableId = '';
+            selectedTableLabel = '';
+            showToast(table, preUn.reason, preUn.detail || '');
             return;
           }
-        }
 
-        const un = getUnavailableReason(id, current);
-        if (un && String(un.reason || '') === String(t('reason_sitting') || 'гости сейчас сидят')) {
-          selectedTableNum = '';
-          showBusyToast(table);
-          return;
-        }
-        if (un) {
-          selectedTableNum = '';
-          showToast(table, un.reason, un.detail || '');
-          return;
-        }
+          const key = current.dt + '|' + String(current.guests);
+          if ((!last || lastKey !== key) && !isLoading) {
+            try {
+              await loadFree(true);
+            } catch (e) {
+              setOutput({ ok: false, error: String(e && e.message ? e.message : e) });
+              return;
+            }
+          }
 
-        if (table.classList.contains('disabled')) {
-          selectedTableNum = '';
-          showToast(table, t('reason_disabled') || 'отключено в настройках', '');
-          return;
-        }
-
-        const cap = tableCapsByNum && typeof tableCapsByNum === 'object' && tableCapsByNum[id] != null ? Number(tableCapsByNum[id]) : null;
-        if (cap != null && isFinite(cap) && current.guests > cap) {
-          const ok = await confirmCapacity(Math.max(1, Math.floor(cap)), current.guests);
-          if (!ok) {
-            selectedTableNum = '';
-            setOutput(t('fix_guests_table') || 'Исправь кол-во гостей и выбери столик снова.');
+          const un = getUnavailableReason(table, current);
+          if (un) {
+            selectedTableId = '';
+            selectedTableLabel = '';
+            showToast(table, un.reason, un.detail || '');
             return;
           }
-        }
 
-        selectedTableNum = id;
-        openRequestForm({ tableNum: id, guests: current.guests, start: current.dtRaw });
+          if (table.classList.contains('disabled')) {
+            selectedTableId = '';
+            selectedTableLabel = '';
+            showToast(table, t('reason_disabled') || 'отключено в настройках', '');
+            return;
+          }
+
+          selectedTableId = id;
+          selectedTableLabel = label || id;
+          openRequestForm({ tableLabel: (label || id), posterTableId: id, spotId: 1, hallId: activeHallId, guests: current.guests, start: current.dtRaw });
+        });
       });
-    });
+    };
+    requestBindTables = bindTableEvents;
+    requestInvalidate = invalidateLast;
+    bindTableEvents();
 
     const initDate = () => {
       if (!resDate) return;
@@ -2363,6 +2393,7 @@
       const dateStr = String(dt).slice(0, 10);
 
       isLoading = true;
+      syncCanvasToggleBusy();
       if (statusLine) statusLine.textContent = t('checking');
       setBusyLabel(dateStr);
       setBusyLoader(true);
@@ -2372,6 +2403,7 @@
       url.searchParams.set('date_reservation', dt);
       url.searchParams.set('duration', String(current.durationSec || 7200));
       url.searchParams.set('spot_id', '1');
+      url.searchParams.set('hall_id', String(activeHallId || 2));
       url.searchParams.set('guests_count', String(guests));
 
       const fetchJson = async (u) => {
@@ -2399,6 +2431,7 @@
         rUrl.searchParams.set('date_reservation', (day ? (day + ' 00:00:00') : dt));
         rUrl.searchParams.set('duration', String(86400));
         rUrl.searchParams.set('spot_id', '1');
+        rUrl.searchParams.set('hall_id', String(activeHallId || 2));
         const rX = await fetchJson(rUrl.toString());
         const rRes = rX.res;
         const rJ = rX.json;
@@ -2412,7 +2445,7 @@
         const j = x.json;
         if (!res.ok || !j || !j.ok) {
           last = null;
-          freeNums = new Set();
+          freeIds = new Set();
           lastKey = '';
           applyAvailabilityStyles();
           setOutput(j && typeof j === 'object' ? fmtJson(j) : t('try_ok_again'));
@@ -2422,8 +2455,8 @@
 
         last = j;
         lastKey = key;
-        freeNums = new Set(Array.isArray(j.free_table_nums) ? j.free_table_nums.map(String) : []);
-        occupiedNowNums = new Set(Array.isArray(j.occupied_now_nums) ? j.occupied_now_nums.map(String) : []);
+        freeIds = new Set(Array.isArray(j.free_table_ids) ? j.free_table_ids.map(String) : []);
+        occupiedNowIds = new Set(Array.isArray(j.occupied_now_table_ids) ? j.occupied_now_table_ids.map(String) : []);
         applyAvailabilityStyles();
         const r = await loadReservations().catch(() => null);
         if (r) {
@@ -2440,19 +2473,355 @@
         renderSelectedTable();
       } catch (_) {
         last = null;
-        freeNums = new Set();
+        freeIds = new Set();
         lastKey = '';
         applyAvailabilityStyles();
         if (!silent) setOutput(t('try_ok_again'));
       } finally {
         isLoading = false;
-        setStatus(selectedTableNum);
+        syncCanvasToggleBusy();
+        setStatus(selectedTableId, selectedTableLabel);
         setBusyLoader(false);
       }
     };
 
+    requestReload = (silent) => loadFree(!!silent);
+
+    const applyCapsToActiveTables = () => {
+      getTables().forEach((t) => {
+        const capEl = t.querySelector('.cap');
+        if (!capEl) return;
+        if (String(t.dataset.bookable || '') !== '1') { capEl.textContent = ''; return; }
+        const cap = t.dataset.cap != null && String(t.dataset.cap).trim() !== '' ? Number(t.dataset.cap) : null;
+        capEl.textContent = (cap != null && isFinite(cap)) ? ('👥 ' + String(Math.max(0, Math.floor(cap)))) : '';
+      });
+    };
+
+    const renderHallTables = (tablesEl, decorEl, hallId, rows) => {
+      if (!tablesEl) return;
+      const list = Array.isArray(rows) ? rows : [];
+      tablesEl.innerHTML = '';
+      if (decorEl) decorEl.innerHTML = '';
+
+      const extractNum = (raw) => {
+        const s = String(raw ?? '').trim();
+        if (!s) return '';
+        const m = s.match(/(\d+)/);
+        return m ? String(m[1]) : '';
+      };
+
+      const hallKey = String(hallId);
+      const settingsMap = (tableSettingsByHall && typeof tableSettingsByHall === 'object' && tableSettingsByHall[hallKey] && typeof tableSettingsByHall[hallKey] === 'object') ? tableSettingsByHall[hallKey] : {};
+      const getSettings = (posterId) => {
+        if (!settingsMap) return null;
+        const k = String(posterId);
+        return (settingsMap[k] && typeof settingsMap[k] === 'object') ? settingsMap[k] : (settingsMap[posterId] && typeof settingsMap[posterId] === 'object' ? settingsMap[posterId] : null);
+      };
+      let decorItems = (decorByHall && typeof decorByHall === 'object' && Array.isArray(decorByHall[hallKey])) ? decorByHall[hallKey] : [];
+      if (!decorItems.length && hallId === 2) {
+        decorItems = [
+          { decor_type: 'grass-corner-1-7', x: 0, y: 0, w: 1, h: 0.48, z: 1, props_json: '{"mode":"canvas_bottom"}' },
+          { decor_type: 'fountain', x: 0.62, y: 0.47, w: 0.12, h: 0.12, z: 2, props_json: '{"mode":"rel"}' },
+          { decor_type: 'bar_row', x: 0.0, y: -0.02, w: 1.0, h: 0.09, z: 3, props_json: '{"mode":"rel"}' },
+        ];
+      }
+      if (!settingsMap || (typeof settingsMap === 'object' && Object.keys(settingsMap).length === 0)) {
+        showSystemModal(t('settings_unavailable'));
+        return;
+      }
+
+      const items = list.map((r) => {
+        const posterId = Number(r && r.table_id != null ? r.table_id : 0);
+        const x = Number(r && r.table_x != null ? r.table_x : 0);
+        const y = Number(r && r.table_y != null ? r.table_y : 0);
+        const w = Number(r && r.table_width != null ? r.table_width : 0);
+        const h = Number(r && r.table_height != null ? r.table_height : 0);
+        const title = r && r.table_title != null ? r.table_title : '';
+        const numRaw = r && r.table_num != null ? r.table_num : '';
+        const fallbackNum = extractNum(title) || extractNum(numRaw);
+        const s = (posterId && isFinite(posterId)) ? getSettings(posterId) : null;
+        if (!s) return null;
+        const schemeNum = s && s.scheme_num != null && String(s.scheme_num).trim() !== '' ? String(s.scheme_num).trim() : '';
+        const label = s && s.display_name != null && String(s.display_name).trim() !== '' ? String(s.display_name).trim() : (schemeNum || String(numRaw || title || ('#' + String(posterId || ''))));
+        const showOnCanvas = s && s.show_on_canvas != null ? !!Number(s.show_on_canvas) : true;
+        const rawBookable = s && s.bookable != null ? !!Number(s.bookable) : false;
+        const bookable = rawBookable;
+        const cap = s && s.capacity != null ? Math.max(0, Number(s.capacity) || 0) : 0;
+        return {
+          posterId: isFinite(posterId) ? Math.floor(posterId) : 0,
+          schemeNum,
+          label,
+          cap,
+          bookable,
+          showOnCanvas,
+          shape: String(r && r.table_shape ? r.table_shape : ''),
+          x: isFinite(x) ? x : 0,
+          y: isFinite(y) ? y : 0,
+          w: isFinite(w) ? w : 0,
+          h: isFinite(h) ? h : 0,
+        };
+      }).filter((it) => it && it.posterId > 0);
+
+      const visible = items.filter((it) => it.showOnCanvas);
+      if (!visible.length) return;
+
+      const canvasEl = tablesEl.closest ? tablesEl.closest('.map-canvas') : null;
+      const MAP_W = canvasEl ? (canvasEl.clientWidth || 820) : 820;
+      const MAP_H = canvasEl ? (canvasEl.clientHeight || 620) : 620;
+      const PAD = 28;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      visible.forEach((it) => {
+        const x1 = it.x;
+        const y1 = it.y;
+        const x2 = it.x + Math.max(0, it.w);
+        const y2 = it.y + Math.max(0, it.h);
+        if (x1 < minX) minX = x1;
+        if (y1 < minY) minY = y1;
+        if (x2 > maxX) maxX = x2;
+        if (y2 > maxY) maxY = y2;
+      });
+      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return;
+      const boxW = Math.max(1, maxX - minX);
+      const boxH = Math.max(1, maxY - minY);
+      const hallCfg = (hallSettingsByHall && typeof hallSettingsByHall === 'object') ? (hallSettingsByHall[hallKey] || hallSettingsByHall[String(hallId)] || null) : null;
+      const rotate180 = !!(hallCfg && typeof hallCfg === 'object' && Number(hallCfg.rotate_180 || 0) === 1);
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const rotBox = (wx, wy, ww, wh) => {
+        const rx = (minX + minX + boxW) - (wx + ww);
+        const ry = (minY + minY + boxH) - (wy + wh);
+        return { x: rx, y: ry };
+      };
+      if (rotate180) {
+        visible.forEach((it) => {
+          const r = rotBox(it.x, it.y, Math.max(0, it.w), Math.max(0, it.h));
+          it.x = r.x;
+          it.y = r.y;
+        });
+      }
+      const scale = Math.min((MAP_W - PAD * 2) / boxW, (MAP_H - PAD * 2) / boxH);
+      const offX = PAD - (minX * scale);
+      const offY = PAD - (minY * scale);
+
+      const place = (el, wx, wy, ww, wh, z) => {
+        const left = Math.round(wx * scale + offX);
+        const top = Math.round(wy * scale + offY);
+        const w = Math.max(1, Math.round(Math.max(0, ww) * scale));
+        const h = Math.max(1, Math.round(Math.max(0, wh) * scale));
+        el.style.left = left + 'px';
+        el.style.top = top + 'px';
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+        if (z != null) el.style.zIndex = String(z);
+      };
+
+      const createDecorEl = (type) => {
+        if (type === 'fountain') {
+          const el = document.createElement('div');
+          el.className = 'fountain';
+          el.title = t('fountain_tooltip') || '';
+          el.innerHTML = `
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <defs>
+                <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="rgba(255,255,255,0.85)"/>
+                  <stop offset="1" stop-color="rgba(90,180,255,0.10)"/>
+                </linearGradient>
+                <linearGradient id="fBowl" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="rgba(255,255,255,0.35)"/>
+                  <stop offset="1" stop-color="rgba(0,0,0,0.35)"/>
+                </linearGradient>
+              </defs>
+              <circle cx="32" cy="44" r="35" fill="rgba(35,110,180,0.20)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+              <path d="M18 44c4-6 24-6 28 0" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round"/>
+              <path d="M22 44c3-4 17-4 20 0" stroke="rgba(90,180,255,0.30)" stroke-width="2" stroke-linecap="round"/>
+              <path class="water-fall" d="M32 18c0 10-6 12-6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
+              <path class="water-fall" d="M32 18c0 10 6 12 6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
+              <path class="water-fall-center" d="M32 14c0 10 0 14 0 24" stroke="rgba(255,255,255,0.78)" stroke-width="3" stroke-linecap="round"/>
+              <circle cx="32" cy="14" r="3" fill="rgba(255,255,255,0.75)"/>
+              <path d="M24 40h16c0 0 2 0 2 2s-2 2-2 2H24c0 0-2 0-2-2s2-2 2-2Z" fill="url(#fBowl)" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
+            </svg>
+            <div class="koi koi-1"></div>
+            <div class="koi koi-2"></div>
+          `;
+          return el;
+        }
+        if (type === 'bar_row') {
+          const el = document.createElement('div');
+          el.className = 'bar-row';
+          el.innerHTML = `
+            <div class="station-wrap"><div class="side-station">${esc(t('musicians'))}</div></div>
+            <div class="bar">${esc(t('bar'))}</div>
+            <div class="station-wrap cash"><div class="side-station">${esc(t('cashier'))}</div></div>
+          `;
+          return el;
+        }
+        const el = document.createElement('div');
+        el.className = String(type || '');
+        return el;
+      };
+
+      if (decorEl && decorItems.length) {
+        decorItems.forEach((d) => {
+          const typeRaw = String(d && d.decor_type ? d.decor_type : '').trim();
+          const type = typeRaw.replace(/_/g, '-');
+          if (!type) return;
+          const propsRaw = String(d && d.props_json ? d.props_json : '').trim();
+          let props = null;
+          if (propsRaw) props = (() => { try { return JSON.parse(propsRaw); } catch (_) { return null; } })();
+          const mode = props && typeof props === 'object' ? String(props.mode || '') : '';
+
+          let wx = Number(d && d.x != null ? d.x : 0);
+          let wy = Number(d && d.y != null ? d.y : 0);
+          let ww = Number(d && d.w != null ? d.w : 0);
+          let wh = Number(d && d.h != null ? d.h : 0);
+          const forceGrassBottom = (hallId === 2 && type === 'grass-corner-1-7');
+          const effMode = forceGrassBottom ? 'canvas_bottom' : mode;
+          if (hallId === 2 && type === 'fountain') {
+            const el = createDecorEl(type);
+            el.id = 'fountainEl';
+            decorEl.appendChild(el);
+            return;
+          }
+          if (effMode === 'canvas_bottom') {
+            if (forceGrassBottom) { wx = 0; wy = 0; ww = 1; wh = 0.528; }
+            const left = Math.round((wx || 0) * MAP_W);
+            const w = Math.round(Math.max(0, ww) * MAP_W);
+            const h = Math.round(Math.max(0, wh) * MAP_H);
+            const top = Math.round(MAP_H - h + ((wy || 0) * MAP_H));
+            const el = createDecorEl(type);
+            el.style.left = left + 'px';
+            el.style.top = top + 'px';
+            el.style.width = w + 'px';
+            el.style.height = h + 'px';
+            if (d && d.z != null) el.style.zIndex = String(d.z);
+            decorEl.appendChild(el);
+            return;
+          }
+          if (effMode === 'rel') {
+            wx = minX + (wx * boxW);
+            wy = minY + (wy * boxH);
+            ww = ww * boxW;
+            wh = wh * boxH;
+          }
+          if (type === 'fountain') {
+            const size = Math.min(Math.max(1, ww), Math.max(1, wh));
+            const cx = wx + ww / 2;
+            const cy = wy + wh / 2;
+            ww = size;
+            wh = size;
+            wx = cx - size / 2;
+            wy = cy - size / 2;
+          }
+          if (rotate180) {
+            const r = rotBox(wx, wy, ww, wh);
+            wx = r.x;
+            wy = r.y;
+          }
+          const el = createDecorEl(type);
+          place(el, wx, wy, ww, wh, d && d.z != null ? Number(d.z) : null);
+          decorEl.appendChild(el);
+        });
+      }
+
+      visible.forEach((it) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'table is-dyn' + (String(it.shape) === 'circle' ? ' is-circle' : '') + (it.bookable ? '' : ' disabled');
+        b.dataset.bookable = it.bookable ? '1' : '0';
+        b.dataset.cap = it.bookable ? String(it.cap || 0) : '';
+        b.dataset.posterTableId = String(it.posterId);
+        b.dataset.tableLabel = String(it.label || it.schemeNum || '').trim();
+        const left = Math.round(it.x * scale + offX);
+        const top = Math.round(it.y * scale + offY);
+        const w = Math.max(34, Math.round(Math.max(0, it.w) * scale));
+        const h = Math.max(28, Math.round(Math.max(0, it.h) * scale));
+        b.style.left = left + 'px';
+        b.style.top = top + 'px';
+        b.style.width = w + 'px';
+        b.style.height = h + 'px';
+      b.style.setProperty('--tbl-min', String(Math.max(1, Math.round(Math.min(w, h)))) + 'px');
+        b.innerHTML = it.bookable
+          ? `<span class="table-badge"><span class="num">${esc(it.label)}</span><span class="cap"></span></span>`
+          : `<span class="table-badge is-center"><span class="num">${esc(it.label)}</span></span>`;
+        tablesEl.appendChild(b);
+      });
+
+      applyCapsToActiveTables();
+      if (requestBindTables) requestBindTables();
+      applyAvailabilityStyles();
+    };
+
+    const loadCinemaLayout = async () => {
+      if (cinemaLayoutLoaded) return;
+      if (!tablesCinema) return;
+      try {
+        cinemaLayoutLoading = true;
+        syncCanvasToggleBusy();
+        const url = apiUrl();
+        url.searchParams.set('ajax', 'hall_tables');
+        url.searchParams.set('spot_id', '1');
+        url.searchParams.set('hall_id', '7');
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok) throw new Error('tables_load_failed');
+        renderHallTables(tablesCinema, decorCinema, 7, j.tables || []);
+        cinemaLayoutLoaded = true;
+      } catch (_) {
+      } finally {
+        cinemaLayoutLoading = false;
+        syncCanvasToggleBusy();
+      }
+    };
+
+    const loadMainLayout = async () => {
+      if (mainLayoutLoaded) return;
+      if (!tablesMain) return;
+      try {
+        mainLayoutLoading = true;
+        syncCanvasToggleBusy();
+        const url = apiUrl();
+        url.searchParams.set('ajax', 'hall_tables');
+        url.searchParams.set('spot_id', '1');
+        url.searchParams.set('hall_id', '2');
+        const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j || !j.ok) throw new Error('tables_load_failed');
+        renderHallTables(tablesMain, decorMain, 2, j.tables || []);
+        mainLayoutLoaded = true;
+      } catch (_) {
+      } finally {
+        mainLayoutLoading = false;
+        syncCanvasToggleBusy();
+      }
+    };
+
+    const setActiveCanvas = async (next) => {
+      if (isLoading || cinemaLayoutLoading || mainLayoutLoading) return;
+      const n = (next === 'cinema') ? 'cinema' : 'main';
+      activeCanvas = n;
+      activeHallId = n === 'cinema' ? 7 : 2;
+      if (canvasMain) canvasMain.hidden = n !== 'main';
+      if (canvasCinema) canvasCinema.hidden = n !== 'cinema';
+      if (cinemaTabBtn) cinemaTabBtn.textContent = n === 'cinema' ? t('veranda_tables') : t('cinema_tables');
+      selectedTableId = '';
+      selectedTableLabel = '';
+      if (n === 'cinema') await loadCinemaLayout();
+      else await loadMainLayout();
+      if (requestInvalidate) requestInvalidate();
+      if (requestBindTables) requestBindTables();
+      if (requestReload) requestReload(true);
+    };
+
+    if (cinemaTabBtn) {
+      cinemaTabBtn.addEventListener('click', () => {
+        if (isLoading || cinemaLayoutLoading || mainLayoutLoading) return;
+        setActiveCanvas(activeCanvas === 'cinema' ? 'main' : 'cinema').catch(() => null);
+      });
+    }
+
     initDate();
-    setTimeout(() => { loadFree(true).catch(() => null); }, 0);
+    setTimeout(() => { loadMainLayout().then(() => loadFree(true)).catch(() => null); }, 0);
     const restoreFromTgState = async () => {
       const params = new URLSearchParams(location.search);
       const code = String(params.get('tg_state') || '').trim();
@@ -2474,7 +2843,8 @@
           invalidateLast();
           setTimeout(() => { loadFree(true).catch(() => null); }, 0);
         }
-        const tableNum = String(p.table_num || '').trim();
+        const tableLabel = String(p.table_label || p.table_num || '').trim();
+        const posterTableIdRaw = String(p.poster_table_id || '').trim();
         const guests = Number(p.guests || 0) || 0;
         const start = String(p.start || '').trim();
         const name = String(p.name || '');
@@ -2483,8 +2853,11 @@
         const preorder = String(p.preorder || '');
         const preorderRu = String(p.preorder_ru || '');
         const tg = j.tg && typeof j.tg === 'object' ? j.tg : null;
-        if (tableNum && guests > 0 && start) {
-          selectedTableNum = tableNum;
+        if (tableLabel && guests > 0 && start) {
+          const fallbackEl = getTables().find((x) => (getTableLabelText(x) === tableLabel));
+          const pid = posterTableIdRaw || String(fallbackEl && fallbackEl.dataset ? (fallbackEl.dataset.posterTableId || '') : '');
+          selectedTableId = pid;
+          selectedTableLabel = tableLabel;
           messengerLinked.whatsapp = false;
           linkedWaPhone = null;
           try { localStorage.removeItem('veranda_linked_wa'); } catch (_) {}
@@ -2495,11 +2868,11 @@
             try { localStorage.setItem('veranda_linked_tg', JSON.stringify(linkedTg)); } catch(e) {}
           }
           
-          if (!last || !freeNums || !freeNums.size) {
+          if (!last || !freeIds || !freeIds.size) {
             await loadFree(true).catch(() => null);
           }
 
-          openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
+          openRequestForm({ tableLabel, posterTableId: pid, spotId: Number(p.spot_id || 1) || 1, hallId: Number(p.hall_id || activeHallId) || activeHallId, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
           setMsgrHint('');
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);
@@ -2534,7 +2907,8 @@
           invalidateLast();
           setTimeout(() => { loadFree(true).catch(() => null); }, 0);
         }
-        const tableNum = String(p.table_num || '').trim();
+        const tableLabel = String(p.table_label || p.table_num || '').trim();
+        const posterTableIdRaw = String(p.poster_table_id || '').trim();
         const guests = Number(p.guests || 0) || 0;
         const start = String(p.start || '').trim();
         const name = String(p.name || '');
@@ -2543,8 +2917,11 @@
         const preorder = String(p.preorder || '');
         const preorderRu = String(p.preorder_ru || '');
         const waPhone = String(j.phone || p.whatsapp_phone || phone || '').trim();
-        if (tableNum && guests > 0 && start) {
-          selectedTableNum = tableNum;
+        if (tableLabel && guests > 0 && start) {
+          const fallbackEl = getTables().find((x) => (getTableLabelText(x) === tableLabel));
+          const pid = posterTableIdRaw || String(fallbackEl && fallbackEl.dataset ? (fallbackEl.dataset.posterTableId || '') : '');
+          selectedTableId = pid;
+          selectedTableLabel = tableLabel;
           messengerLinked.telegram = false;
           linkedTg = null;
           try { localStorage.removeItem('veranda_linked_tg'); } catch (_) {}
@@ -2554,10 +2931,10 @@
             try { localStorage.setItem('veranda_linked_wa', linkedWaPhone); } catch (_) {}
           }
 
-          if (!last || !freeNums || !freeNums.size) {
+          if (!last || !freeIds || !freeIds.size) {
             await loadFree(true).catch(() => null);
           }
-          openRequestForm({ tableNum, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
+          openRequestForm({ tableLabel, posterTableId: pid, spotId: Number(p.spot_id || 1) || 1, hallId: Number(p.hall_id || activeHallId) || activeHallId, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
           setMsgrHint('');
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);

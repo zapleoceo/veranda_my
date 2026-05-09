@@ -6,7 +6,7 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const src = fs.readFileSync('/workspace/tr4/assets/app.js', 'utf8')
+const src = fs.readFileSync('/workspace/tr3/assets/app.js', 'utf8')
 
 assert(src.includes('const getUnavailableReason'), 'getUnavailableReason must exist')
 assert(src.includes('code:'), 'getUnavailableReason must return structured code')

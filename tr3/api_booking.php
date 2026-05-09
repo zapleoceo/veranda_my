@@ -15,8 +15,15 @@ function tr3_api_submit_booking(array $ctx): void {
     return isset($I18N[$userLang][$key]) ? (string)$I18N[$userLang][$key] : $key;
   };
 
+  $posterTableId = isset($payload['poster_table_id']) ? (int)$payload['poster_table_id'] : 0;
+  if ($posterTableId < 0) $posterTableId = 0;
+  $spotId = isset($payload['spot_id']) ? (int)$payload['spot_id'] : 1;
+  if ($spotId <= 0) $spotId = 1;
+  $hallId = isset($payload['hall_id']) ? (int)$payload['hall_id'] : 0;
+  if ($hallId < 0) $hallId = 0;
+  $tableLabel = api_resolve_table_label($ctx, $hallId, $posterTableId);
   $tableNum = trim((string)($payload['table_num'] ?? ''));
-  if ($tableNum === '') $tableNum = trim((string)($payload['table_num_manual'] ?? ''));
+  if ($tableNum === '') $tableNum = $tableLabel !== '' ? $tableLabel : (string)$posterTableId;
   $name = trim((string)($payload['name'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
   $waPhone = trim((string)($payload['whatsapp_phone'] ?? ''));
@@ -36,7 +43,7 @@ function tr3_api_submit_booking(array $ctx): void {
     }
   }
 
-  if ($tableNum === '' || !preg_match('/^\d+$/', $tableNum)) api_error(400, 'Некорректный номер стола');
+  if ($posterTableId <= 0) api_error(400, 'Некорректный стол');
   if ($guests <= 0 || $guests > 99) api_error(400, 'Некорректное кол-во гостей');
   if ($name === '' || mb_strlen($name) > 80) api_error(400, 'Некорректное имя');
 
@@ -104,7 +111,7 @@ function tr3_api_submit_booking(array $ctx): void {
        WHERE start_time = ?
          AND duration = ?
          AND guests = ?
-         AND table_num = ?
+         AND poster_table_id = ?
          AND phone = ?
          AND name = ?
        ORDER BY id DESC
@@ -113,7 +120,7 @@ function tr3_api_submit_booking(array $ctx): void {
         $startDt->format('Y-m-d H:i:s'),
         $duration_m,
         $guests,
-        $tableNum,
+        $posterTableId,
         $phoneNorm,
         $name,
       ]
@@ -143,28 +150,72 @@ function tr3_api_submit_booking(array $ctx): void {
       $qrUrl = "https://qr.sepay.vn/img?acc=96247Y294A&bank=BIDV&amount={$totalAmount}&des=" . urlencode("RES{$qrCode}");
     }
 
-    $db->query("INSERT INTO {$resTable} (
-      created_at, start_time, duration, guests, table_num, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
-      (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
-      $startDt->format('Y-m-d H:i:s'),
-      $duration_m,
-      $guests,
-      $tableNum,
-      $name,
-      $phoneNorm,
-      $waPhoneNorm !== '' ? $waPhoneNorm : null,
-      $comment,
-      $preorder,
-      $preorderRu,
-      $tgUid > 0 ? $tgUid : null,
-      $tgUn !== '' ? $tgUn : null,
-      $userLang,
-      $totalAmount,
-      $qrUrl,
-      $qrCode,
-    ]);
+    try {
+      $db->query("INSERT INTO {$resTable} (
+        spot_id, hall_id, created_at, start_time, duration, guests, table_num, poster_table_id, table_label, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+        $spotId,
+        $hallId > 0 ? $hallId : null,
+        (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
+        $startDt->format('Y-m-d H:i:s'),
+        $duration_m,
+        $guests,
+        $tableNum,
+        $posterTableId,
+        $tableLabel !== '' ? $tableLabel : null,
+        $name,
+        $phoneNorm,
+        $waPhoneNorm !== '' ? $waPhoneNorm : null,
+        $comment,
+        $preorder,
+        $preorderRu,
+        $tgUid > 0 ? $tgUid : null,
+        $tgUn !== '' ? $tgUn : null,
+        $userLang,
+        $totalAmount,
+        $qrUrl,
+        $qrCode,
+      ]);
+    } catch (\Throwable $e) {
+      if (stripos((string)$e->getMessage(), "Unknown column 'table_label'") !== false || stripos((string)$e->getMessage(), 'Unknown column "table_label"') !== false) {
+        $tableNum = $tableLabel !== '' ? $tableLabel : $tableNum;
+        $db->query("INSERT INTO {$resTable} (
+          spot_id, hall_id, created_at, start_time, duration, guests, table_num, poster_table_id, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+          $spotId,
+          $hallId > 0 ? $hallId : null,
+          (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
+          $startDt->format('Y-m-d H:i:s'),
+          $duration_m,
+          $guests,
+          $tableNum,
+          $posterTableId,
+          $name,
+          $phoneNorm,
+          $waPhoneNorm !== '' ? $waPhoneNorm : null,
+          $comment,
+          $preorder,
+          $preorderRu,
+          $tgUid > 0 ? $tgUid : null,
+          $tgUn !== '' ? $tgUn : null,
+          $userLang,
+          $totalAmount,
+          $qrUrl,
+          $qrCode,
+        ]);
+      } else {
+        throw $e;
+      }
+    }
     $resId = (int)$db->getPdo()->lastInsertId();
+  }
+
+  $posterToken = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
+  $hallName = '';
+  if ($hallId > 0) {
+    require_once __DIR__ . '/../src/classes/PosterSpotHallsService.php';
+    $hallName = \App\Classes\PosterSpotHallsService::getHallName($db, $posterToken, $spotId, $hallId);
+    if ($hallName === '') $hallName = 'hall_id=' . (string)$hallId;
   }
 
   $mgrPayload = [
@@ -173,6 +224,11 @@ function tr3_api_submit_booking(array $ctx): void {
     'duration' => $duration_m,
     'guests' => $guests,
     'table_num' => $tableNum,
+    'poster_table_id' => $posterTableId,
+    'table_label' => $tableLabel,
+    'spot_id' => $spotId,
+    'hall_id' => $hallId > 0 ? $hallId : null,
+    'hall_name' => $hallName,
     'name' => $name,
     'phone' => $phoneNorm,
     'whatsapp_phone' => $waPhoneNorm !== '' ? $waPhoneNorm : '',
@@ -210,7 +266,7 @@ function tr3_api_submit_booking(array $ctx): void {
     $waText .= $trFor('tg_date') . ': ' . $startDt->format('Y-m-d') . "\n";
     $waText .= $trFor('tg_time') . ': ' . $startDt->format('H:i') . "\n";
     $waText .= $trFor('tg_guests') . ': ' . $guests . "\n";
-    $waText .= $trFor('tg_table') . ': ' . $tableNum . "\n";
+    $waText .= $trFor('tg_table') . ': ' . ($tableLabel !== '' ? $tableLabel : $tableNum) . "\n";
     $waText .= $trFor('tg_name') . ': ' . $name . "\n";
     $waText .= $trFor('tg_phone') . ': ' . $phoneNorm;
     if ($comment !== '') $waText .= "\n\n" . $trFor('tg_comment') . ":\n" . $comment;
@@ -226,6 +282,8 @@ function tr3_api_submit_booking(array $ctx): void {
   $mgrPhone = '+84396314266';
   $mgrWaLink = 'https://wa.me/84396314266';
 
+  $tableLabelOut = $tableLabel !== '' ? $tableLabel : $tableNum;
+
   $userText = '<b>' . htmlspecialchars($trFor('tg_thanks_title')) . '</b> ' . htmlspecialchars($trFor('tg_thanks_body')) . "\n\n";
   if ($qrUrl !== '') {
     $userText .= '<b>' . htmlspecialchars($trFor('qr_payment_title') ?? 'Оплата предзаказа') . '</b>' . "\n";
@@ -236,7 +294,7 @@ function tr3_api_submit_booking(array $ctx): void {
   $userText .= htmlspecialchars($trFor('tg_date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_guests')) . ': <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
-  $userText .= htmlspecialchars($trFor('tg_table')) . ': <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
+  $userText .= htmlspecialchars($trFor('tg_table')) . ': <b>' . htmlspecialchars($tableLabelOut) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_name')) . ': <b>' . htmlspecialchars($name) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_phone')) . ': <b>' . htmlspecialchars($phoneNorm) . '</b>';
   if ($comment !== '') {

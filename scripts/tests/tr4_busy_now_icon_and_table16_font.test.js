@@ -6,8 +6,8 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const css = fs.readFileSync('/workspace/tr4/assets/layout.css', 'utf8')
-const js = fs.readFileSync('/workspace/tr4/assets/app.js', 'utf8')
+const css = fs.readFileSync('/workspace/tr3/assets/layout.css', 'utf8')
+const js = fs.readFileSync('/workspace/tr3/assets/app.js', 'utf8')
 
 assert(!css.includes('#mapTablesMain > button:nth-child(16) > span > span.num'), 'table 16 font-size nth-child hack must be removed')
 assert(!css.includes('#mapTablesMain > button:nth-child(16) > span > span.cap'), 'table 16 cap font-size nth-child hack must be removed')

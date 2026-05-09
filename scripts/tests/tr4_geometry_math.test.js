@@ -16,7 +16,7 @@ const computeFit = ({ mapW, mapH, pad, minX, minY, maxX, maxY }) => {
 
 {
   const fs = require('fs')
-  const src = fs.readFileSync('/workspace/tr4/assets/app.js', 'utf8')
+  const src = fs.readFileSync('/workspace/tr3/assets/app.js', 'utf8')
   const hasX = /2\s*\*\s*minX|minX\s*\+\s*minX/.test(src)
   const hasY = /2\s*\*\s*minY|minY\s*\+\s*minY/.test(src)
   assert(hasX && hasY, 'rotate_180 must use 2*minX / 2*minY world transform to stay within bounds')

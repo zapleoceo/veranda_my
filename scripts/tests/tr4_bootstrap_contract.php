@@ -2,8 +2,8 @@
 declare(strict_types=1);
 
 $urls = [
-    'http://127.0.0.1:8001/tr4/api.php?ajax=bootstrap&lang=ru',
-    'https://veranda.my/tr4/api.php?ajax=bootstrap&lang=ru',
+    'http://127.0.0.1:8001/tr3/api.php?ajax=bootstrap&lang=ru',
+    'https://veranda.my/tr3/api.php?ajax=bootstrap&lang=ru',
 ];
 $ctx = stream_context_create([
     'http' => [

@@ -6,7 +6,7 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const src = fs.readFileSync('/workspace/tr4/api_booking.php', 'utf8')
+const src = fs.readFileSync('/workspace/tr3/api_booking.php', 'utf8')
 
 assert(/poster_table_id/.test(src), 'submit_booking must accept poster_table_id')
 assert(/api_resolve_table_label/.test(src), 'submit_booking must resolve table_label via api_resolve_table_label')

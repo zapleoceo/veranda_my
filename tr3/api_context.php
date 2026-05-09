@@ -133,18 +133,15 @@ $add = (15 - ($m % 15)) % 15;
 if ($add > 0) $roundedNow = $roundedNow->modify('+' . $add . ' minutes');
 $defaultResDateLocal = $roundedNow->format('Y-m-d\TH:i');
 
-$hallIdForSettings = 2;
+$spotIdForSettings = (int)($_ENV['POSTER_SPOT_ID'] ?? 1);
+if ($spotIdForSettings <= 0) $spotIdForSettings = 1;
+$hallIdForLegacyMeta = 2;
 $allowedSchemeNums = null;
 $soonBookingHours = 2;
-$tableCapsByNum = [
-  '1' => 8, '2' => 8, '3' => 8,
-  '4' => 5, '5' => 5, '6' => 5, '7' => 5, '8' => 5,
-  '9' => 8,
-  '10' => 2, '11' => 2, '12' => 2, '13' => 2,
-  '14' => 3, '15' => 3, '16' => 3,
-  '17' => 5, '18' => 5, '19' => 5, '20' => 5, '21' => 5,
-  '22' => 15,
-];
+$tableCapsByNum = [];
+$tableSettingsByHall = [];
+$decorByHall = [];
+$hallSettingsByHall = [];
 
 $db = null;
 $metaRepo = null;
@@ -163,8 +160,8 @@ try {
     require_once __DIR__ . '/../src/classes/MetaRepository.php';
     $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $dbSuffix);
     $metaRepo = new \App\Classes\MetaRepository($db);
-    $key = 'reservations_allowed_scheme_nums_hall_' . $hallIdForSettings;
-    $capsKey = 'reservations_table_caps_hall_' . $hallIdForSettings;
+    $key = 'reservations_allowed_scheme_nums_hall_' . $hallIdForLegacyMeta;
+    $capsKey = 'reservations_table_caps_hall_' . $hallIdForLegacyMeta;
     $soonKey = 'reservations_soon_booking_hours';
     $workdayKey = 'reservations_latest_workday';
     $weekendKey = 'reservations_latest_weekend';
@@ -218,6 +215,68 @@ try {
         }
       }
     }
+
+    $settingsTbl = $db->t('reservation_table_settings');
+    $rows = $db->query(
+      "SELECT hall_id, poster_table_id, scheme_num, display_name, show_on_canvas, bookable, capacity
+       FROM {$settingsTbl}
+       WHERE spot_id = ?",
+      [$spotIdForSettings]
+    )->fetchAll();
+    $rows = is_array($rows) ? $rows : [];
+    foreach ($rows as $r) {
+      $hallId = (int)($r['hall_id'] ?? 0);
+      $posterId = (int)($r['poster_table_id'] ?? 0);
+      if ($hallId <= 0 || $posterId <= 0) continue;
+      if (!array_key_exists($hallId, $tableSettingsByHall)) $tableSettingsByHall[$hallId] = [];
+      $tableSettingsByHall[$hallId][$posterId] = [
+        'poster_table_id' => $posterId,
+        'scheme_num' => $r['scheme_num'] ?? null,
+        'display_name' => (string)($r['display_name'] ?? ''),
+        'show_on_canvas' => (int)($r['show_on_canvas'] ?? 1),
+        'bookable' => (int)($r['bookable'] ?? 0),
+        'capacity' => (int)($r['capacity'] ?? 0),
+      ];
+    }
+
+    $decorTbl = $db->t('reservation_hall_decor_items');
+    $rows = $db->query(
+      "SELECT hall_id, decor_type, x, y, w, h, z, props_json
+       FROM {$decorTbl}
+       WHERE spot_id = ?",
+      [$spotIdForSettings]
+    )->fetchAll();
+    $rows = is_array($rows) ? $rows : [];
+    foreach ($rows as $r) {
+      $hallId = (int)($r['hall_id'] ?? 0);
+      if ($hallId <= 0) continue;
+      if (!array_key_exists($hallId, $decorByHall)) $decorByHall[$hallId] = [];
+      $decorByHall[$hallId][] = [
+        'decor_type' => (string)($r['decor_type'] ?? ''),
+        'x' => (float)($r['x'] ?? 0),
+        'y' => (float)($r['y'] ?? 0),
+        'w' => (float)($r['w'] ?? 0),
+        'h' => (float)($r['h'] ?? 0),
+        'z' => (int)($r['z'] ?? 1),
+        'props_json' => (string)($r['props_json'] ?? ''),
+      ];
+    }
+
+    $hallSettingsTbl = $db->t('reservation_hall_settings');
+    $rows = $db->query(
+      "SELECT hall_id, rotate_180
+       FROM {$hallSettingsTbl}
+       WHERE spot_id = ?",
+      [$spotIdForSettings]
+    )->fetchAll();
+    $rows = is_array($rows) ? $rows : [];
+    foreach ($rows as $r) {
+      $hallId = (int)($r['hall_id'] ?? 0);
+      if ($hallId <= 0) continue;
+      $hallSettingsByHall[$hallId] = [
+        'rotate_180' => (int)($r['rotate_180'] ?? 0) ? 1 : 0,
+      ];
+    }
   }
 } catch (\Throwable $e) {
   $allowedSchemeNums = null;
@@ -235,6 +294,9 @@ return [
   'allowedSchemeNums' => $allowedSchemeNums,
   'soonBookingHours' => $soonBookingHours,
   'tableCapsByNum' => $tableCapsByNum,
+  'tableSettingsByHall' => $tableSettingsByHall,
+  'decorByHall' => $decorByHall,
+  'hallSettingsByHall' => $hallSettingsByHall,
   'latestWorkday' => $latestWorkday,
   'latestWeekend' => $latestWeekend,
   'db' => $db,

@@ -6,8 +6,8 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const app = fs.readFileSync('/workspace/tr4/assets/app.js', 'utf8')
-const index = fs.readFileSync('/workspace/tr4/index.php', 'utf8')
+const app = fs.readFileSync('/workspace/tr3/assets/app.js', 'utf8')
+const index = fs.readFileSync('/workspace/tr3/index.php', 'utf8')
 
 assert(!app.includes('Cinema tables') && !app.includes('Veranda tables'), 'app.js must not contain hardcoded hall toggle labels')
 assert(!app.includes('Сейчас недоступны настройки столов'), 'app.js must not contain hardcoded RU system modal text')

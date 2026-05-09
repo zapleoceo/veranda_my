@@ -6,7 +6,7 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const src = fs.readFileSync('/workspace/tr4/api_booking.php', 'utf8')
+const src = fs.readFileSync('/workspace/tr3/api_booking.php', 'utf8')
 
 assert(/table_label/.test(src), 'submit_booking must attempt to store table_label')
 assert(/Unknown column 'table_label'/.test(src) || /Unknown column \"table_label\"/.test(src), 'submit_booking must fallback if table_label column is missing')

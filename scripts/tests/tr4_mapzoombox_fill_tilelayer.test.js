@@ -6,7 +6,7 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const css = fs.readFileSync('/workspace/tr4/assets/layout.css', 'utf8')
+const css = fs.readFileSync('/workspace/tr3/assets/layout.css', 'utf8')
 
 assert(/#mapZoomBox\s*\{[\s\S]*position:\s*absolute\s*;[\s\S]*inset:\s*0\s*;[\s\S]*width:\s*100%\s*;[\s\S]*height:\s*100%\s*;/m.test(css), '#mapZoomBox must fill map-shell (absolute inset 0, 100% x 100%)')
 assert(/#mapZoomInner\s*\{[\s\S]*position:\s*absolute\s*;[\s\S]*inset:\s*0\s*;/m.test(css), '#mapZoomInner must fill #mapZoomBox (absolute inset 0)')

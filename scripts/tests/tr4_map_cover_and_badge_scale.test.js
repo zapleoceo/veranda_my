@@ -6,8 +6,8 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const js = fs.readFileSync('/workspace/tr4/assets/app.js', 'utf8')
-const css = fs.readFileSync('/workspace/tr4/assets/layout.css', 'utf8')
+const js = fs.readFileSync('/workspace/tr3/assets/app.js', 'utf8')
+const css = fs.readFileSync('/workspace/tr3/assets/layout.css', 'utf8')
 
 assert(!/syncTileLayerSize\s*=\s*\(\)\s*=>/.test(js), 'syncTileLayerSize helper must be removed (no JS sizing hacks)')
 const m = js.match(/const\s+getInitialZoomPct\s*=\s*\(\)\s*=>\s*\{([\s\S]*?)\n\s*\};/m)

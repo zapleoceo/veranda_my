@@ -6,7 +6,7 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const css = fs.readFileSync('/workspace/tr4/assets/layout.css', 'utf8')
+const css = fs.readFileSync('/workspace/tr3/assets/layout.css', 'utf8')
 
 const m = css.match(/\.fountain svg\s*\{([\s\S]*?)\}/m)
 assert(!!m, '.fountain svg rule must exist')

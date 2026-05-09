@@ -6,8 +6,8 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const css = fs.readFileSync('/workspace/tr4/assets/layout.css', 'utf8')
-const js = fs.readFileSync('/workspace/tr4/assets/app.js', 'utf8')
+const css = fs.readFileSync('/workspace/tr3/assets/layout.css', 'utf8')
+const js = fs.readFileSync('/workspace/tr3/assets/app.js', 'utf8')
 
 const m = css.match(/#mapDecorMain\s*>\s*#fountainEl\s*\{([\s\S]*?)\}/m)
 assert(!!m, '#mapDecorMain > #fountainEl rule must exist')

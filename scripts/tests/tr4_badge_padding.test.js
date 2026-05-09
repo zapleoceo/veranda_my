@@ -6,7 +6,7 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const css = fs.readFileSync('/workspace/tr4/assets/layout.css', 'utf8')
+const css = fs.readFileSync('/workspace/tr3/assets/layout.css', 'utf8')
 
 assert(/\.table\.is-dyn\s+\.table-badge\s*\{[\s\S]*?top:\s*2px;[\s\S]*?left:\s*2px;[\s\S]*?padding:\s*0\.18em\s+0\.18em;[\s\S]*?border-radius:\s*0\.42em;[\s\S]*?\}/m.test(css), 'table badge must have top/left 2px, padding 0.18em, radius 0.42em')
 const m = css.match(/\.table\.is-dyn\s+\.table-badge\s*\{([\s\S]*?)\}/m)

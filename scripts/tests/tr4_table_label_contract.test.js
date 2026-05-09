@@ -14,7 +14,7 @@ assert(/table_label/.test(db), 'reservations table must include table_label colu
 const tg = fs.readFileSync('/workspace/reservations/ReservationTelegram.php', 'utf8')
 assert(/table_label/.test(tg), 'ReservationTelegram must read table_label')
 
-const api = fs.readFileSync('/workspace/tr4/api_poster.php', 'utf8')
+const api = fs.readFileSync('/workspace/tr3/api_poster.php', 'utf8')
 assert(/function\s+tr3_api_hall_tables/.test(api), 'TR4 must define hall_tables')
 assert(/table_label/.test(api), 'hall_tables must return table_label')
 

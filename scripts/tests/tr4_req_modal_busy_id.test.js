@@ -6,7 +6,7 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const js = fs.readFileSync('/workspace/tr4/assets/app.js', 'utf8')
+const js = fs.readFileSync('/workspace/tr3/assets/app.js', 'utf8')
 
 const m = js.match(/const checkModalAvailability\s*=\s*\(\)\s*=>\s*\{([\s\S]*?)\n\s*\};/m)
 assert(!!m, 'checkModalAvailability must exist')

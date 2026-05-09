@@ -6,7 +6,7 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const src = fs.readFileSync('/workspace/tr4/assets/app.js', 'utf8')
+const src = fs.readFileSync('/workspace/tr3/assets/app.js', 'utf8')
 
 assert(/dataset\.posterTableId\s*=/.test(src), 'tables must keep dataset.posterTableId (Poster table_id)')
 assert(/dataset\.tableLabel\s*=/.test(src), 'tables must store human label in dataset.tableLabel')

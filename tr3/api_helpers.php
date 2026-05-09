@@ -61,3 +61,24 @@ function api_parse_datetime_local(string $value, DateTimeZone $tz): ?DateTimeImm
   }
 }
 
+function api_resolve_table_label(array $ctx, int $hallId, int $posterTableId): string {
+  if ($posterTableId <= 0) return '';
+  $settingsByHall = $ctx['tableSettingsByHall'] ?? null;
+  $s = null;
+  if (is_array($settingsByHall)) {
+    if ($hallId > 0 && isset($settingsByHall[$hallId]) && is_array($settingsByHall[$hallId]) && isset($settingsByHall[$hallId][$posterTableId])) {
+      $s = $settingsByHall[$hallId][$posterTableId];
+    } else {
+      foreach ($settingsByHall as $h => $tables) {
+        if (!is_array($tables)) continue;
+        if (isset($tables[$posterTableId])) { $s = $tables[$posterTableId]; break; }
+      }
+    }
+  }
+  if (!is_array($s)) return '#' . (string)$posterTableId;
+  $displayName = trim((string)($s['display_name'] ?? ''));
+  if ($displayName !== '') return $displayName;
+  $schemeNum = (int)($s['scheme_num'] ?? 0);
+  if ($schemeNum > 0) return (string)$schemeNum;
+  return '#' . (string)$posterTableId;
+}

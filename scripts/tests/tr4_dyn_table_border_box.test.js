@@ -6,7 +6,7 @@ const assert = (cond, msg) => {
 }
 
 const fs = require('fs')
-const css = fs.readFileSync('/workspace/tr4/assets/layout.css', 'utf8')
+const css = fs.readFileSync('/workspace/tr3/assets/layout.css', 'utf8')
 
 const dyn = css.match(/\.table\.is-dyn\s*\{([\s\S]*?)\}/m)
 assert(!!dyn, '.table.is-dyn rule must exist')

@@ -1,10 +1,5 @@
 <?php
 
-  $qs = (string)($_SERVER['QUERY_STRING'] ?? '');
-  $to = '/tr4/' . ($qs !== '' ? ('?' . $qs) : '');
-  header('Location: ' . $to, true, 302);
-  exit;
-
 /*
 TR3 (Booking) — Developer Note
 
@@ -17,7 +12,7 @@ MVC / Separation of Responsibility:
 
 Rules:
 - No cross-layer leaks (Views never talk to DB; Models don’t know UI).
-- No coupling with previous versions (do not import/require old pages; do not reuse legacy names like “tr2” in TR3 assets).
+- No coupling with previous versions (do not import/require old pages).
 - TR3 assets must live in /tr3/assets with neutral names (app.js, base.css, layout.css, tr3.css, etc.).
 */
 
@@ -78,7 +73,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260509_0223">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260509_1035">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -96,11 +91,15 @@ $mk = function (string $l) use ($self, $baseQs) {
           <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
           <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
         </div>
-        <div class="date-wrap">
-          <span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span>
-          <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button>
-          <span class="mini-loader" id="busyDateLoader" hidden></span>
+        <div class="center-controls">
+          <div class="date-wrap">
+            <span id="busyDateLabel" data-i18n="data_on"><?= htmlspecialchars(tr('data_on')) ?></span>
+            <button type="button" class="dt-btn attn" id="resDateBtn" data-i18n="pick_date"><?= htmlspecialchars(tr('pick_date')) ?></button>
+            <span class="mini-loader" id="busyDateLoader" hidden></span>
+          </div>
+          <button type="button" class="dt-btn tab-toggle" id="cinemaTabBtn" data-i18n="cinema_tables"><?= htmlspecialchars(tr('cinema_tables')) ?></button>
         </div>
+        <div class="right-spacer" aria-hidden="true"></div>
         <div class="map-invite" data-i18n="tap_table_to_book"><?= htmlspecialchars(tr('tap_table_to_book')) ?></div>
         <div class="busy-progress" id="busyProgress" hidden></div>
         <div class="controls">
@@ -129,68 +128,12 @@ $mk = function (string $l) use ($self, $baseQs) {
           <div class="tile-layer" aria-hidden="true"></div>
             <div class="map-zoom-box" id="mapZoomBox">
               <div class="map-zoom-inner" id="mapZoomInner">
-              <div class="map" aria-label="Схема столов ресторана">
-            <div class="grass-corner-1-7" aria-hidden="true"></div>
-            <button class="table large" style="left: 712px; top: 276px;" data-table="1"><span class="num">1</span><span class="cap"></span></button>
-            <button class="table large" style="left: 712px; top: 402px;" data-table="2"><span class="num">2</span><span class="cap"></span></button>
-            <button class="table large" style="left: 712px; top: 528px;" data-table="3"><span class="num">3</span><span class="cap"></span></button>
-  
-            <button class="table small-vertical wide-1" style="left: 580px; top: 528px;" data-table="4"><span class="num">4</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 460px; top: 500px;" data-table="5"><span class="num">5</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 340px; top: 528px;" data-table="6"><span class="num">6</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 220px; top: 500px;" data-table="7"><span class="num">7</span><span class="cap"></span></button>
-            <button class="table small-vertical wide-1" style="left: 110px; top: 528px;" data-table="8"><span class="num">8</span><span class="cap"></span></button>
-            <button class="table large" style="left: -30px; top: 512px;" data-table="9"><span class="num">9</span><span class="cap"></span></button>
-  
-            <button class="table wide" style="left: 422px; top: 420px;" data-table="10"><span class="num">10</span><span class="cap"></span></button>
-            <button class="table wide" style="left: 310px; top: 420px;" data-table="11"><span class="num">11</span><span class="cap"></span></button>
-            <div class="fountain" aria-hidden="true" id="fountainEl">
-              <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <defs>
-                  <linearGradient id="fWat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stop-color="rgba(255,255,255,0.85)"/>
-                    <stop offset="1" stop-color="rgba(90,180,255,0.10)"/>
-                  </linearGradient>
-                  <linearGradient id="fBowl" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0" stop-color="rgba(255,255,255,0.35)"/>
-                    <stop offset="1" stop-color="rgba(0,0,0,0.35)"/>
-                  </linearGradient>
-                </defs>
-                <circle cx="32" cy="44" r="16" fill="rgba(35,110,180,0.20)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
-                <path d="M18 44c4-6 24-6 28 0" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round"/>
-                <path d="M22 44c3-4 17-4 20 0" stroke="rgba(90,180,255,0.30)" stroke-width="2" stroke-linecap="round"/>
-                <path class="water-fall" d="M32 18c0 10-6 12-6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
-                <path class="water-fall" d="M32 18c0 10 6 12 6 20" stroke="url(#fWat)" stroke-width="3" stroke-linecap="round"/>
-                <path class="water-fall-center" d="M32 14c0 10 0 14 0 24" stroke="rgba(255,255,255,0.78)" stroke-width="3" stroke-linecap="round"/>
-                <circle cx="32" cy="14" r="3" fill="rgba(255,255,255,0.75)"/>
-                <path d="M24 40h16c0 0 2 0 2 2s-2 2-2 2H24c0 0-2 0-2-2s2-2 2-2Z" fill="url(#fBowl)" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
-              </svg>
-              <div class="koi koi-1"></div>
-              <div class="koi koi-2"></div>
+              <div class="map" aria-label="<?= htmlspecialchars(tr('map_aria')) ?>">
+            <div class="map-canvas" id="mapCanvasMain" data-hall="2">
+            <div class="decor-layer" id="mapDecorMain" aria-hidden="true"></div>
+            <div class="tables-layer" id="mapTablesMain"></div>
             </div>
-            <button class="table wide" style="left: 102px; top: 420px;" data-table="12"><span class="num">12</span><span class="cap"></span></button>
-            <button class="table wide" style="left: -10px; top: 420px;" data-table="13"><span class="num">13</span><span class="cap"></span></button>
-  
-            <button class="table" style="left: 402px; top: 304px;" data-table="14"><span class="num">14</span><span class="cap"></span></button>
-            <button class="table" style="left: 274px; top: 304px;" data-table="15"><span class="num">15</span><span class="cap"></span></button>
-            <button class="table" style="left: 162px; top: 304px;" data-table="16"><span class="num">16</span><span class="cap"></span></button>
-  
-            <button class="table small-vertical" style="left: 532px; top: 192px;" data-table="17"><span class="num">17</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 417px; top: 192px;" data-table="18"><span class="num">18</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 306px; top: 192px;" data-table="19"><span class="num">19</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 194px; top: 192px;" data-table="20"><span class="num">20</span><span class="cap"></span></button>
-            <button class="table small-vertical" style="left: 82px; top: 192px;" data-table="21"><span class="num">21</span><span class="cap"></span></button>
-            <button class="table large" style="left: -31px; top: 254px;" data-table="22"><span class="num">22</span><span class="cap"></span></button>
-  
-            <div class="bar-row">
-              <div class="station-wrap">
-                <div class="side-station" data-i18n="musicians"><?= htmlspecialchars(tr('musicians')) ?></div>
-              </div>
-              <div class="bar" data-i18n="bar"><?= htmlspecialchars(tr('bar')) ?></div>
-              <div class="station-wrap cash">
-                <div class="side-station" data-i18n="cashier"><?= htmlspecialchars(tr('cashier')) ?></div>
-              </div>
-            </div>
+            <div class="map-canvas" id="mapCanvasCinema" data-hall="7" hidden><div class="decor-layer" id="mapDecorCinema" aria-hidden="true"></div><div class="tables-layer" id="mapTablesCinema"></div></div>
               </div>
             </div>
           </div>
@@ -204,9 +147,9 @@ $mk = function (string $l) use ($self, $baseQs) {
       <div class="dtp-title" id="dtpTitle" data-i18n="dtp_title"><?= htmlspecialchars(tr('dtp_title')) ?></div>
       <div class="cal">
         <div class="cal-head">
-          <button type="button" class="cal-nav" id="dtpPrev" aria-label="Prev month">‹</button>
+          <button type="button" class="cal-nav" id="dtpPrev" aria-label="<?= htmlspecialchars(tr('prev_month')) ?>">‹</button>
           <div class="cal-month" id="dtpMonthLabel"></div>
-          <button type="button" class="cal-nav" id="dtpNext" aria-label="Next month">›</button>
+          <button type="button" class="cal-nav" id="dtpNext" aria-label="<?= htmlspecialchars(tr('next_month')) ?>">›</button>
         </div>
         <div class="cal-week" id="dtpWeek"></div>
         <div class="cal-grid" id="dtpCalGrid"></div>
@@ -257,6 +200,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       </div>
       <form id="reqForm" method="post" action="/tr3/api.php?ajax=submit_booking" accept-charset="utf-8" novalidate>
         <input type="hidden" id="reqTableNum" name="table_num" value="">
+        <input type="hidden" id="reqPosterTableId" name="poster_table_id" value="">
         <input type="hidden" id="reqStartIso" name="start" value="">
         <div class="req-layout">
           <div class="req-left" id="reqLeft">
@@ -419,7 +363,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr3/assets/tr3.boot.js?v=20260509_0223" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260509_1035" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>
