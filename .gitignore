@@ -9,6 +9,7 @@ telegram.log
 # Temp/cache
 tmp/
 cache/
+.cache/
 .DS_Store
 
 # IDE/OS
@@ -27,3 +28,6 @@ Thumbs.db
 !/docs/superpowers/specs/
 !/docs/superpowers/specs/**
 /ops/
+
+# testai runtime cache
+/testai/cache/

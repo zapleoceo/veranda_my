@@ -3,9 +3,9 @@
 Сделать изолированную подсистему `/testai`:
 
 - Telegram webhook принимает сообщения из чатов/групп.
-- Gemini Flash 2.5 классифицирует каждое сообщение: это “анонс события” или нет, и на какую дату анонс.
-- В БД хранится одна таблица только с релевантными “анонс-сообщениями” (минимум данных, но достаточно для повторной генерации).
-- Страница `/testai` показывает HTML-анонс на выбранную дату, генерируя его вручную по запросу (и кешируя результат).
+- В БД хранится “сырое” хранилище сообщений за последние ~3 месяца (с источником: chat/message id, автор, время), плюс распознанный текст медиа (аудио/картинка) без хранения самого файла.
+- Раз в день делается саммари дня (и структурированное извлечение событий) из накопленных сообщений.
+- Страница `/testai` показывает HTML-анонс на выбранную дату, генерируя его вручную по запросу через Gemini Flash 2.5 (и кешируя результат).
 
 ## Нельзя
 
@@ -27,18 +27,26 @@
 
 ## Хранилище
 
-### Таблица `testai_tg_announces`
+### Таблица `testai_tg_messages_raw`
 
-Одна таблица, только для сообщений, которые Gemini посчитал анонсами:
+Основная таблица: хранит все сообщения (и результаты распознавания медиа) за последние ~3 месяца.
 
 - `id` BIGINT auto_increment
 - `tg_chat_id` BIGINT NOT NULL
+- `tg_chat_type` VARCHAR(16) NOT NULL
+- `tg_chat_title` VARCHAR(255) NULL
 - `tg_message_id` BIGINT NOT NULL
 - `tg_user_id` BIGINT NULL
+- `tg_username` VARCHAR(64) NULL
+- `tg_name` VARCHAR(128) NULL
 - `received_at` DATETIME NOT NULL
 - `text` TEXT NOT NULL
-- `announce_date` DATE NOT NULL
-- `confidence` INT NOT NULL
+- `media_type` VARCHAR(16) NULL
+- `media_file_id` VARCHAR(255) NULL
+- `media_file_unique_id` VARCHAR(255) NULL
+- `media_mime` VARCHAR(128) NULL
+- `media_duration_sec` INT NULL
+- `media_text` TEXT NULL
 - `meta_json` TEXT NULL
 
 Уникальность:
@@ -47,30 +55,66 @@
 
 Очистка:
 
-- по cron можно удалять записи старше N дней (опционально, вне текущего MVP).
+- по cron удалять записи старше 90 дней.
 
-## Контракты Gemini
+### Таблица `testai_daily_summaries`
 
-### 1) Классификация входящего сообщения (webhook)
+Хранит результаты “сжатия” за день (чтобы не гонять Gemini по всем сообщениям каждый раз).
 
-Вход: текст сообщения + контекст (chat title/type, user, timestamp).
+- `day` DATE PRIMARY KEY
+- `summary_text` TEXT NOT NULL
+- `events_json` TEXT NOT NULL
+- `created_at` DATETIME NOT NULL
+
+Очистка:
+
+### 1) Распознавание медиа (webhook, при наличии)
+
+Триггеры:
+
+- фото → OCR (вытянуть текст с афиши/картинки)
+- голос/аудио → transcript
+
+Вход: контент медиа (скачанный из Telegram по `file_id`) + минимальный контекст.
 
 Выход (строгий JSON):
 
-- `is_announce`: boolean
-- `announce_date`: string `YYYY-MM-DD` или пусто
+- `text`: string
+- `lang`: string или пусто
 - `confidence`: number 0..100
-- `reason`: string (кратко)
 
-Правило записи в БД:
+Правило хранения:
 
-- если `is_announce=true` и дата валидна → пишем строку в таблицу.
+- в `testai_tg_messages_raw.media_text` сохраняется распознанный текст, файл не сохраняется.
+
+Примечание по “ссылке на файл”:
+
+- постоянную ссылку на Telegram файл хранить нельзя безопасно (она содержит bot token и зависит от файлового пути).
+- вместо этого храним `media_file_id`/`media_file_unique_id`, чтобы при необходимости скачивать заново.
+
+### 2) Классификация/извлечение событий для daily summary
+
+Вход: все сообщения за день (text + media_text) и минимальный контекст.
+
+### 1) Классификация входящего сообщения (webhook)
+
+- `summary_text`: string
+- `events`: array объектов:
+  - `announce_date`: `YYYY-MM-DD`
+  - `title`: string
+  - `facts`: array[string] (время, место, условия)
+  - `confidence`: number 0..100
+  - `sources`: array объектов `{ tg_chat_id, tg_message_id }`
+- `is_announce`: boolean
+Правило записи:
+- `confidence`: number 0..100
+- ежедневно формируется строка в `testai_daily_summaries` за предыдущий день.
+
+### 3) Генерация HTML анонса на дату (ручной запрос со страницы)
+
+Вход: выбранная дата + `events_json` за последние N дней. Если уверенности недостаточно или в summary нет данных по дате — дополнительно подмешиваются сырые сообщения за “сегодня” и/или дни-кандидаты.
 
 ### 2) Генерация HTML анонса на дату (ручной запрос со страницы)
-
-Вход: выбранная дата + список всех записей из `testai_tg_announces` (или только релевантных по окну дат, если будет нужно).
-
-Выход: HTML (строка) для вставки в страницу.
 
 ## Безопасность HTML
 
@@ -98,9 +142,15 @@ AJAX endpoints:
 
 - Принимает Telegram updates.
 - Фильтрует чаты, если задан `TESTAI_ALLOWED_CHAT_IDS`.
-- Для каждого текстового сообщения вызывает Gemini классификацию.
-- При `is_announce=true` сохраняет строку в таблицу.
+- Сохраняет сообщение в `testai_tg_messages_raw`.
+- Если есть медиа (аудио/картинка) — скачивает по `file_id`, вызывает распознавание и сохраняет `media_text`.
 - Всегда отвечает `ok` (чтобы Telegram не ретраил бесконечно).
+
+### `/testai/daily.php` (cron)
+
+- Запускается 1 раз в день.
+- Берёт сообщения за вчера, вызывает Gemini: `summary_text + events`.
+- Сохраняет в `testai_daily_summaries`.
 
 ## Кеш
 
@@ -117,4 +167,3 @@ AJAX endpoints:
 
 - В `/testai` свой webhook и свои env-ключи, не пересекающиеся с существующим `telegram_webhook.php`.
 - Логика Gemini и санитайзер не должны менять поведение остального проекта.
-
