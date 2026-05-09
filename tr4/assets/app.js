@@ -2684,7 +2684,7 @@
             return;
           }
           if (effMode === 'canvas_bottom') {
-            if (forceGrassBottom) { wx = 0; wy = 0; ww = 1; wh = 0.48; }
+            if (forceGrassBottom) { wx = 0; wy = 0; ww = 1; wh = 0.528; }
             const left = Math.round((wx || 0) * MAP_W);
             const w = Math.round(Math.max(0, ww) * MAP_W);
             const h = Math.round(Math.max(0, wh) * MAP_H);
