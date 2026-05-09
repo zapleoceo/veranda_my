@@ -148,6 +148,12 @@
       let autoT = 0;
       let autoPhi = 0;
       let prevTs = performance.now();
+      let lastPaintTs = 0;
+      const FRAME_MS = 33;
+      let rafId = 0;
+      let paused = false;
+      let prevMx = null;
+      let prevMy = null;
 
       const setTargetFromClient = (clientX, clientY) => {
         rect = mapShell.getBoundingClientRect();
@@ -172,17 +178,45 @@
         baseY = clamp(baseY, 0, rect.height);
       }, { passive: true });
 
+      const stop = () => {
+        if (paused) return;
+        paused = true;
+        mapShell.classList.add('is-paused');
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = 0;
+      };
+
+      const start = () => {
+        if (!paused) return;
+        paused = false;
+        mapShell.classList.remove('is-paused');
+        prevTs = performance.now();
+        lastPaintTs = 0;
+        rafId = requestAnimationFrame(tick);
+      };
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) stop();
+        else start();
+      }, { passive: true });
+
       const tick = (ts) => {
+        if (paused) return;
         const dt = ts - prevTs;
         prevTs = ts;
 
         const idleDelay = 900;
         const idleNow = (ts - lastMoveTs) > idleDelay;
 
+        if (lastPaintTs && (ts - lastPaintTs) < FRAME_MS) {
+          rafId = requestAnimationFrame(tick);
+          return;
+        }
+        lastPaintTs = ts;
+
         if (idleNow) {
           if (!idle) {
             idle = true;
-            rect = mapShell.getBoundingClientRect();
             const ux = clamp((baseX / Math.max(1, rect.width)) * 2 - 1, -1, 1);
             const uy = clamp((baseY / Math.max(1, rect.height)) * 2 - 1, -1, 1);
             const t0 = Math.asin(ux);
@@ -191,7 +225,6 @@
             autoPhi = Number.isFinite(phi0) ? phi0 : 0;
           }
 
-          rect = mapShell.getBoundingClientRect();
           autoT += dt * 0.00045;
           x = ((Math.sin(autoT) + 1) / 2) * rect.width;
           y = ((Math.sin(autoT * 0.73 + autoPhi) + 1) / 2) * rect.height;
@@ -203,14 +236,22 @@
 
         x = clamp(x, 0, rect.width);
         y = clamp(y, 0, rect.height);
-        mapShell.style.setProperty('--mx', `${x}px`);
-        mapShell.style.setProperty('--my', `${y}px`);
-        requestAnimationFrame(tick);
+        if (prevMx == null || Math.abs(x - prevMx) > 0.5) {
+          prevMx = x;
+          mapShell.style.setProperty('--mx', `${x}px`);
+        }
+        if (prevMy == null || Math.abs(y - prevMy) > 0.5) {
+          prevMy = y;
+          mapShell.style.setProperty('--my', `${y}px`);
+        }
+        rafId = requestAnimationFrame(tick);
       };
 
       mapShell.style.setProperty('--mx', `${x}px`);
       mapShell.style.setProperty('--my', `${y}px`);
-      requestAnimationFrame(tick);
+      paused = document.hidden;
+      if (paused) mapShell.classList.add('is-paused');
+      rafId = requestAnimationFrame(tick);
     })();
 
     const applyMapZoom = (pct, keepAnchor) => {

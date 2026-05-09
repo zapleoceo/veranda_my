@@ -357,7 +357,7 @@
     .map-shell__mesh .blob {
       position: absolute;
       border-radius: 999px;
-      filter: blur(80px);
+      filter: blur(72px);
       opacity: 0.16;
       background: rgba(184,135,70,0.35);
       animation: tr3-blob-a 12s ease-in-out infinite;
@@ -426,6 +426,14 @@
 
     @media (prefers-reduced-motion: reduce) {
       .map-shell__mesh .blob { animation: none; }
+    }
+
+    .map-shell.is-paused .map-shell__mesh .blob {
+      animation-play-state: paused;
+    }
+
+    @media (max-width: 640px) {
+      .map-shell__mesh .blob { filter: blur(56px); }
     }
 
     #mapZoomBox { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
