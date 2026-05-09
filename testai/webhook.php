@@ -4,9 +4,11 @@ declare(strict_types=1);
 $ctx = require __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/gemini.php';
 require_once __DIR__ . '/tg.php';
+require_once __DIR__ . '/html_sanitize.php';
 
 $db = $ctx['db'];
 $tRaw = $ctx['tRaw'];
+$tSettings = $ctx['tSettings'] ?? null;
 $tgToken = (string)$ctx['tgToken'];
 $geminiKey = (string)$ctx['geminiKey'];
 $geminiModel = (string)$ctx['geminiModel'];
@@ -44,6 +46,17 @@ $text = trim((string)($msg['text'] ?? ''));
 $caption = trim((string)($msg['caption'] ?? ''));
 if ($text === '' && $caption !== '') $text = $caption;
 if ($text === '') $text = '';
+
+$needReply = false;
+$queryText = $text;
+if ($chatType === 'private') {
+  $needReply = $queryText !== '';
+} else {
+  if (preg_match('/^\/(?:ai|ask)(?:@\w+)?\s+([\s\S]+)$/u', $queryText, $m)) {
+    $needReply = true;
+    $queryText = trim((string)($m[1] ?? ''));
+  }
+}
 
 $mediaType = null;
 $mediaFileId = null;
@@ -167,3 +180,66 @@ if ($mediaText !== null && trim($mediaText) !== '') {
 }
 
 echo 'ok';
+
+if (!$needReply || $queryText === '' || $geminiKey === '') exit;
+
+$botPrompt = '';
+if (is_string($tSettings) && $tSettings !== '') {
+  try {
+    $row = $db->query("SELECT v FROM {$tSettings} WHERE k = ? LIMIT 1", ['bot_prompt'])->fetch();
+    if (is_array($row)) $botPrompt = (string)($row['v'] ?? '');
+  } catch (\Throwable $e) {}
+}
+
+$ctxMsgs = [];
+try {
+  $rows = $db->query(
+    "SELECT received_at, tg_username, tg_name, text, media_text
+     FROM {$tRaw}
+     WHERE tg_chat_id = ?
+     ORDER BY received_at DESC
+     LIMIT 30",
+    [$chatId]
+  )->fetchAll();
+  foreach (is_array($rows) ? array_reverse($rows) : [] as $r) {
+    if (!is_array($r)) continue;
+    $u = trim((string)($r['tg_username'] ?? ''));
+    if ($u === '') $u = trim((string)($r['tg_name'] ?? ''));
+    $t = trim((string)($r['text'] ?? ''));
+    $mt = trim((string)($r['media_text'] ?? ''));
+    $combined = trim($t . "\n" . ($mt !== '' ? ('[media]\n' . $mt) : ''));
+    if ($combined === '') continue;
+    if (mb_strlen($combined) > 1200) $combined = mb_substr($combined, 0, 1200) . '…';
+    $ctxMsgs[] = ['at' => (string)($r['received_at'] ?? ''), 'from' => $u, 'text' => $combined];
+  }
+} catch (\Throwable $e) {}
+
+$system = trim($botPrompt);
+if ($system !== '') $system .= "\n\n";
+$system .= "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a,br. Keep it concise.";
+
+$payload = [
+  'chat_id' => $chatId,
+  'chat_type' => $chatType,
+  'chat_title' => $chatTitle,
+  'user' => [
+    'id' => $userId,
+    'username' => $username,
+    'name' => $name,
+  ],
+  'message_id' => $messageId,
+  'question' => $queryText,
+  'context' => $ctxMsgs,
+];
+
+$resp = testai_gemini_generate(
+  $geminiKey,
+  $geminiModel,
+  [['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
+  ['system' => $system, 'temperature' => 0.35, 'maxOutputTokens' => 1200]
+);
+
+$html = testai_gemini_text($resp);
+$html = testai_sanitize_telegram_html($html);
+if ($html === '') $html = 'Не получилось сформировать ответ.';
+testai_tg_send_message($tgToken, $chatId, $html, $messageId);

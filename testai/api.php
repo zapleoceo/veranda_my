@@ -8,6 +8,7 @@ require_once __DIR__ . '/html_sanitize.php';
 $db = $ctx['db'];
 $tRaw = $ctx['tRaw'];
 $tDaily = $ctx['tDaily'];
+$tSettings = $ctx['tSettings'] ?? null;
 $tgToken = (string)($ctx['tgToken'] ?? '');
 $geminiKey = (string)$ctx['geminiKey'];
 $geminiModel = (string)$ctx['geminiModel'];
@@ -85,6 +86,46 @@ if ($ajax === 'health') {
     'daily_total' => $dailyTotal,
     'webhook' => $hook,
   ]);
+  exit;
+}
+
+if ($ajax === 'get_prompt') {
+  $v = '';
+  $updatedAt = '';
+  if (is_string($tSettings) && $tSettings !== '') {
+    try {
+      $row = $db->query("SELECT v, updated_at FROM {$tSettings} WHERE k = ? LIMIT 1", ['bot_prompt'])->fetch();
+      if (is_array($row)) {
+        $v = (string)($row['v'] ?? '');
+        $updatedAt = (string)($row['updated_at'] ?? '');
+      }
+    } catch (\Throwable $e) {}
+  }
+  $ok(['prompt' => $v, 'updated_at' => $updatedAt]);
+  exit;
+}
+
+if ($ajax === 'set_prompt') {
+  if ($adminKey !== '' && (string)($_GET['key'] ?? '') !== $adminKey) {
+    $bad('forbidden');
+    exit;
+  }
+  $prompt = (string)($_POST['prompt'] ?? '');
+  $prompt = trim($prompt);
+  if (mb_strlen($prompt) > 20000) $prompt = mb_substr($prompt, 0, 20000);
+  if (!is_string($tSettings) || $tSettings === '') {
+    $bad('settings_table_missing');
+    exit;
+  }
+  try {
+    $db->query(
+      "INSERT INTO {$tSettings} (k, v, updated_at)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE v = VALUES(v), updated_at = VALUES(updated_at)",
+      ['bot_prompt', $prompt, date('Y-m-d H:i:s')]
+    );
+  } catch (\Throwable $e) {}
+  $ok(['saved' => true]);
   exit;
 }
 

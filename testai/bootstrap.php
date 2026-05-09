@@ -35,6 +35,7 @@ $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix
 
 $tRaw = $db->t('testai_tg_messages_raw');
 $tDaily = $db->t('testai_daily_summaries');
+$tSettings = $db->t('testai_settings');
 
 try {
   $pdo = $db->getPdo();
@@ -68,6 +69,12 @@ try {
     created_at DATETIME NOT NULL,
     KEY idx_created_at (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS {$tSettings} (
+    k VARCHAR(64) NOT NULL PRIMARY KEY,
+    v TEXT NOT NULL,
+    updated_at DATETIME NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 } catch (\Throwable $e) {}
 
 $allowedChatIds = null;
@@ -81,10 +88,10 @@ return [
   'db' => $db,
   'tRaw' => $tRaw,
   'tDaily' => $tDaily,
+  'tSettings' => $tSettings,
   'tgToken' => $testaiTgToken,
   'geminiKey' => $geminiKey,
   'geminiModel' => $geminiModel,
   'allowedChatIds' => $allowedChatIds,
   'adminKey' => $adminKey,
 ];
-

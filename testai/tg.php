@@ -37,3 +37,14 @@ function testai_fetch_bytes(string $url, int $timeout = 25): ?string {
   return $resp;
 }
 
+function testai_tg_send_message(string $token, string $chatId, string $html, ?int $replyToMessageId = null): bool {
+  $payload = [
+    'chat_id' => $chatId,
+    'text' => $html,
+    'parse_mode' => 'HTML',
+    'disable_web_page_preview' => true,
+  ];
+  if ($replyToMessageId !== null && $replyToMessageId > 0) $payload['reply_to_message_id'] = $replyToMessageId;
+  $r = testai_tg_post_json($token, 'sendMessage', $payload);
+  return is_array($r) && !empty($r['ok']);
+}

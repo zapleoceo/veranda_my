@@ -26,6 +26,8 @@ $key = trim((string)($_GET['key'] ?? ''));
     .hint { margin-top: 4px; color: rgba(255,255,255,0.55); font-size: 12px; }
     .out a { color: rgba(184,135,70,0.95); }
     .out h2, .out h3 { margin: 0.6em 0 0.2em; }
+    textarea { width: 100%; min-height: 110px; resize: vertical; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); color: rgba(255,255,255,0.92); padding: 12px; border-radius: 12px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   </style>
 </head>
 <body>
@@ -39,6 +41,14 @@ $key = trim((string)($_GET['key'] ?? ''));
     </div>
     <div class="status" id="status"></div>
     <div class="hint" id="stats"></div>
+    <div class="box">
+      <div class="row" style="justify-content: space-between;">
+        <div style="font-weight: 900;">Промт бота</div>
+        <button class="btn secondary" id="btnSavePrompt" type="button" title="Сохранить промт бота в БД. Он будет прикрепляться к каждому ответу в Telegram.">Сохранить промт</button>
+      </div>
+      <div class="hint">Используется для ответов Telegram-бота. Для сохранения может потребоваться ключ.</div>
+      <textarea id="prompt" placeholder="Например: Ты SMM ресторана. Отвечай кратко. Формат: HTML для Telegram."></textarea>
+    </div>
     <div class="box out" id="out"></div>
   </div>
 
@@ -48,6 +58,7 @@ $key = trim((string)($_GET['key'] ?? ''));
     const statusEl = qs('status')
     const statsEl = qs('stats')
     const dateEl = qs('date')
+    const promptEl = qs('prompt')
     const adminKey = <?= json_encode($adminKey, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     const initialKey = <?= json_encode($key, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     const mkUrl = (ajax, date) => {
@@ -61,6 +72,30 @@ $key = trim((string)($_GET['key'] ?? ''));
     const setStatus = (t) => { statusEl.textContent = t || '' }
     const render = (html) => { out.innerHTML = html || '<div>Нет данных</div>' }
     const setStats = (t) => { statsEl.textContent = t || '' }
+
+    const loadPrompt = async () => {
+      const d = dateEl.value || ''
+      const res = await fetch(mkUrl('get_prompt', d), { headers: { 'Accept': 'application/json' } }).catch(() => null)
+      const j = res ? await res.json().catch(() => null) : null
+      if (!j || !j.ok) return
+      promptEl.value = String(j.prompt || '')
+    }
+
+    const savePrompt = async () => {
+      setStatus('Сохранение промта…')
+      const u = new URL(location.href)
+      u.pathname = '/testai/api.php'
+      u.searchParams.set('ajax', 'set_prompt')
+      u.searchParams.set('date', dateEl.value || '')
+      if (adminKey && initialKey) u.searchParams.set('key', initialKey)
+      const fd = new FormData()
+      fd.set('prompt', promptEl.value || '')
+      const res = await fetch(u.toString(), { method: 'POST', body: fd, headers: { 'Accept': 'application/json' } }).catch(() => null)
+      const j = res ? await res.json().catch(() => null) : null
+      if (!j || !j.ok) { setStatus('Не удалось сохранить'); return }
+      setStatus('Промт сохранён')
+      setTimeout(() => setStatus(''), 1200)
+    }
 
     const refreshStats = async () => {
       const d = dateEl.value || ''
@@ -114,10 +149,12 @@ $key = trim((string)($_GET['key'] ?? ''));
     qs('btnGet').addEventListener('click', load)
     qs('btnGen').addEventListener('click', gen)
     qs('btnDaily').addEventListener('click', daily)
+    qs('btnSavePrompt').addEventListener('click', savePrompt)
 
     dateEl.addEventListener('change', () => { refreshStats(); load() })
     refreshStats()
     load()
+    loadPrompt()
   </script>
 </body>
 </html>
