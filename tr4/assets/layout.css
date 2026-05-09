@@ -907,9 +907,10 @@
     }
     .fountain svg {
       position: absolute;
-      inset: 0;
+      left: 0;
+      top: 0;
       width: 100%;
-      height: 100%;
+      height: 58%;
       opacity: 0.92;
       filter: drop-shadow(0 8px 16px rgba(0,0,0,0.22));
       pointer-events: none;
