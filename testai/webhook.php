@@ -20,6 +20,8 @@ if ($tgToken === '') { echo 'ok'; exit; }
 $msg = null;
 if (!empty($update['message']) && is_array($update['message'])) $msg = $update['message'];
 if (!$msg && !empty($update['edited_message']) && is_array($update['edited_message'])) $msg = $update['edited_message'];
+if (!$msg && !empty($update['channel_post']) && is_array($update['channel_post'])) $msg = $update['channel_post'];
+if (!$msg && !empty($update['edited_channel_post']) && is_array($update['edited_channel_post'])) $msg = $update['edited_channel_post'];
 if (!$msg) { echo 'ok'; exit; }
 
 $chat = is_array($msg['chat'] ?? null) ? $msg['chat'] : [];
@@ -79,27 +81,6 @@ if (!empty($msg['voice']) && is_array($msg['voice'])) {
 }
 
 $mediaText = null;
-if ($geminiKey !== '' && $mediaType && $mediaFileId) {
-  $fileInfo = testai_tg_get_file_url($tgToken, $mediaFileId);
-  $fileSize = is_array($fileInfo) ? (int)($fileInfo['file_size'] ?? 0) : 0;
-  if (is_array($fileInfo) && !empty($fileInfo['url']) && $fileSize > 0 && $fileSize <= 15_000_000) {
-    $bytes = testai_fetch_bytes((string)$fileInfo['url'], 25);
-    if (is_string($bytes) && $bytes !== '') {
-      $b64 = base64_encode($bytes);
-      $system = 'Return strict JSON only: {"text":"...","lang":"","confidence":0}';
-      $prompt = 'Transcribe audio or extract visible text from the media. Return only JSON.';
-      $resp = testai_gemini_generate($geminiKey, $geminiModel, [
-        ['text' => $prompt],
-        ['inline_data' => ['mime_type' => $mediaMime ?: 'application/octet-stream', 'data' => $b64]],
-      ], ['system' => $system, 'temperature' => 0.2, 'maxOutputTokens' => 1000, 'responseMimeType' => 'application/json']);
-      $j = testai_gemini_json($resp);
-      if (is_array($j) && isset($j['text'])) {
-        $mt = trim((string)$j['text']);
-        if ($mt !== '') $mediaText = $mt;
-      }
-    }
-  }
-}
 
 $meta = [
   'has_media' => $mediaType ? 1 : 0,
@@ -128,7 +109,7 @@ try {
       media_file_unique_id = VALUES(media_file_unique_id),
       media_mime = VALUES(media_mime),
       media_duration_sec = VALUES(media_duration_sec),
-      media_text = VALUES(media_text),
+      media_text = IF(VALUES(media_text) IS NULL OR VALUES(media_text) = '', media_text, VALUES(media_text)),
       meta_json = VALUES(meta_json)",
     [
       $chatId,
@@ -151,5 +132,38 @@ try {
   );
 } catch (\Throwable $e) {}
 
-echo 'ok';
+if ($geminiKey !== '' && $mediaType && $mediaFileId) {
+  $fileInfo = testai_tg_get_file_url($tgToken, $mediaFileId);
+  $fileSize = is_array($fileInfo) ? (int)($fileInfo['file_size'] ?? 0) : 0;
+  if (is_array($fileInfo) && !empty($fileInfo['url']) && $fileSize > 0 && $fileSize <= 15_000_000) {
+    $bytes = testai_fetch_bytes((string)$fileInfo['url'], 25);
+    if (is_string($bytes) && $bytes !== '') {
+      $b64 = base64_encode($bytes);
+      $system = 'Return strict JSON only: {"text":"...","lang":"","confidence":0}';
+      $prompt = 'Transcribe audio or extract visible text from the media. Return only JSON.';
+      $resp = testai_gemini_generate($geminiKey, $geminiModel, [
+        ['text' => $prompt],
+        ['inline_data' => ['mime_type' => $mediaMime ?: 'application/octet-stream', 'data' => $b64]],
+      ], ['system' => $system, 'temperature' => 0.2, 'maxOutputTokens' => 1000, 'responseMimeType' => 'application/json']);
+      $j = testai_gemini_json($resp);
+      if (is_array($j) && isset($j['text'])) {
+        $mt = trim((string)$j['text']);
+        if ($mt !== '') $mediaText = $mt;
+      }
+    }
+  }
+}
 
+if ($mediaText !== null && trim($mediaText) !== '') {
+  try {
+    $db->query(
+      "UPDATE {$tRaw}
+       SET media_text = ?
+       WHERE tg_chat_id = ? AND tg_message_id = ?
+       LIMIT 1",
+      [$mediaText, $chatId, $messageId]
+    );
+  } catch (\Throwable $e) {}
+}
+
+echo 'ok';

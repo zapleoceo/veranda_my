@@ -8,9 +8,13 @@ require_once __DIR__ . '/html_sanitize.php';
 $db = $ctx['db'];
 $tRaw = $ctx['tRaw'];
 $tDaily = $ctx['tDaily'];
+$tgToken = (string)($ctx['tgToken'] ?? '');
 $geminiKey = (string)$ctx['geminiKey'];
 $geminiModel = (string)$ctx['geminiModel'];
 $adminKey = (string)$ctx['adminKey'];
+$allowed = $ctx['allowedChatIds'] ?? null;
+
+require_once __DIR__ . '/tg.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -31,6 +35,56 @@ if ($ajax === 'get') {
     $html = (string)file_get_contents($cacheFile);
   }
   $ok(['date' => $date, 'html' => $html]);
+  exit;
+}
+
+if ($ajax === 'health') {
+  $dbOk = false;
+  $rawTotal = 0;
+  $rawLast = '';
+  $dailyTotal = 0;
+  try {
+    $row = $db->query("SELECT 1 AS ok")->fetch();
+    $dbOk = is_array($row) && (int)($row['ok'] ?? 0) === 1;
+  } catch (\Throwable $e) {}
+  try {
+    $row = $db->query("SELECT COUNT(*) AS c, MAX(received_at) AS m FROM {$tRaw}")->fetch();
+    if (is_array($row)) {
+      $rawTotal = (int)($row['c'] ?? 0);
+      $rawLast = (string)($row['m'] ?? '');
+    }
+  } catch (\Throwable $e) {}
+  try {
+    $row = $db->query("SELECT COUNT(*) AS c FROM {$tDaily}")->fetch();
+    if (is_array($row)) $dailyTotal = (int)($row['c'] ?? 0);
+  } catch (\Throwable $e) {}
+
+  $hook = null;
+  if ($tgToken !== '') {
+    $info = testai_tg_post_json($tgToken, 'getWebhookInfo', []);
+    if (is_array($info) && isset($info['result']) && is_array($info['result'])) {
+      $r = $info['result'];
+      $hook = [
+        'url' => (string)($r['url'] ?? ''),
+        'pending_update_count' => (int)($r['pending_update_count'] ?? 0),
+        'last_error_date' => (int)($r['last_error_date'] ?? 0),
+        'last_error_message' => (string)($r['last_error_message'] ?? ''),
+      ];
+    }
+  }
+
+  $ok([
+    'db_ok' => $dbOk,
+    'has_ai_tg_bot' => $tgToken !== '',
+    'has_gemini_key' => $geminiKey !== '',
+    'gemini_model' => $geminiModel,
+    'allowed_chats_configured' => is_array($allowed),
+    'allowed_chats_count' => is_array($allowed) ? count($allowed) : 0,
+    'raw_total' => $rawTotal,
+    'raw_last_received_at' => $rawLast,
+    'daily_total' => $dailyTotal,
+    'webhook' => $hook,
+  ]);
   exit;
 }
 
@@ -79,6 +133,47 @@ if ($ajax === 'summary') {
     }
   } catch (\Throwable $e) {}
   $ok(['date' => $date, 'exists' => $exists, 'summary_text' => $summary, 'events_json' => $eventsJson]);
+  exit;
+}
+
+if ($ajax === 'last') {
+  if ($adminKey !== '' && (string)($_GET['key'] ?? '') !== $adminKey) {
+    $bad('forbidden');
+    exit;
+  }
+  $limit = (int)($_GET['limit'] ?? 20);
+  $limit = max(1, min(50, $limit));
+  $from = $date . ' 00:00:00';
+  $to = $date . ' 23:59:59';
+  $items = [];
+  try {
+    $rows = $db->query(
+      "SELECT tg_chat_id, tg_message_id, tg_chat_title, tg_username, tg_name, received_at, text, media_type, media_text
+       FROM {$tRaw}
+       WHERE received_at BETWEEN ? AND ?
+       ORDER BY received_at DESC
+       LIMIT {$limit}",
+      [$from, $to]
+    )->fetchAll();
+    foreach (is_array($rows) ? $rows : [] as $r) {
+      if (!is_array($r)) continue;
+      $txt = trim((string)($r['text'] ?? ''));
+      if (mb_strlen($txt) > 300) $txt = mb_substr($txt, 0, 300) . '…';
+      $mt = trim((string)($r['media_text'] ?? ''));
+      if (mb_strlen($mt) > 300) $mt = mb_substr($mt, 0, 300) . '…';
+      $items[] = [
+        'tg_chat_id' => (string)($r['tg_chat_id'] ?? ''),
+        'tg_message_id' => (string)($r['tg_message_id'] ?? ''),
+        'received_at' => (string)($r['received_at'] ?? ''),
+        'chat_title' => (string)($r['tg_chat_title'] ?? ''),
+        'from' => (string)($r['tg_username'] ?? $r['tg_name'] ?? ''),
+        'media_type' => (string)($r['media_type'] ?? ''),
+        'text' => $txt,
+        'media_text' => $mt,
+      ];
+    }
+  } catch (\Throwable $e) {}
+  $ok(['date' => $date, 'items' => $items]);
   exit;
 }
 
