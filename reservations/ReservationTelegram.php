@@ -46,7 +46,7 @@ class ReservationTelegram {
             $text .= 'Продолжительность: <b>' . htmlspecialchars($durStr) . '</b>' . "\n";
         }
         $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
-        $text .= 'Номер стола: <b>' . htmlspecialchars($tableNum) . '</b>' . "\n";
+        $text .= 'Стол: <b>Veranda · ' . htmlspecialchars($tableNum) . '</b>' . "\n";
         $text .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
         $text .= 'Номер телефона: <b>' . htmlspecialchars($phone) . '</b>';
 

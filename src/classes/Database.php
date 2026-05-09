@@ -591,6 +591,7 @@ class Database {
             start_time DATETIME NOT NULL,
             guests INT NOT NULL,
             table_num VARCHAR(32) NOT NULL,
+            poster_table_id BIGINT NULL,
             name VARCHAR(128) NOT NULL,
             phone VARCHAR(64) NOT NULL,
             whatsapp_phone VARCHAR(64) NULL,
@@ -616,6 +617,9 @@ class Database {
             foreach ($this->pdo->query("SHOW COLUMNS FROM {$t}") as $c) {
                 $f = strtolower((string)($c['Field'] ?? ''));
                 if ($f !== '') $cols[$f] = true;
+            }
+            if (empty($cols['poster_table_id'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN poster_table_id BIGINT NULL AFTER table_num");
             }
             if (empty($cols['deleted_at'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN deleted_at DATETIME NULL");

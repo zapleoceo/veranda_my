@@ -17,6 +17,8 @@ function tr3_api_submit_booking(array $ctx): void {
 
   $tableNum = trim((string)($payload['table_num'] ?? ''));
   if ($tableNum === '') $tableNum = trim((string)($payload['table_num_manual'] ?? ''));
+  $posterTableIdRaw = (int)($payload['poster_table_id'] ?? 0);
+  $posterTableId = $posterTableIdRaw > 0 ? $posterTableIdRaw : null;
   $name = trim((string)($payload['name'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
   $waPhone = trim((string)($payload['whatsapp_phone'] ?? ''));
@@ -144,13 +146,14 @@ function tr3_api_submit_booking(array $ctx): void {
     }
 
     $db->query("INSERT INTO {$resTable} (
-      created_at, start_time, duration, guests, table_num, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+      created_at, start_time, duration, guests, table_num, poster_table_id, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
       (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
       $startDt->format('Y-m-d H:i:s'),
       $duration_m,
       $guests,
       $tableNum,
+      $posterTableId,
       $name,
       $phoneNorm,
       $waPhoneNorm !== '' ? $waPhoneNorm : null,
