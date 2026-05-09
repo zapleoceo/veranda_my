@@ -312,6 +312,7 @@
       --inv-map-scale: 1;
       --mx: 60%;
       --my: 32%;
+      --badge-size: 25px;
       position: relative;
       aspect-ratio: 820 / 620;
       max-height: 80vh;
@@ -573,7 +574,6 @@
     .table.is-dyn {
       --tbl-min: 56px;
       box-sizing: border-box;
-      font-size: calc(var(--tbl-min) * 0.31);
       border-radius: calc(var(--tbl-min) * 0.135);
       padding: calc(var(--tbl-min) * 0.081) calc(var(--tbl-min) * 0.054) calc(var(--tbl-min) * 0.108);
     }
@@ -585,13 +585,16 @@
       flex-direction: column;
       align-items: flex-start;
       gap: 2px;
-      padding: 0.18em 0.18em;
-      border-radius: 0.42em;
+      min-width: var(--badge-size);
+      min-height: calc(var(--badge-size) * 0.92);
+      padding: calc(var(--badge-size) * 0.12) calc(var(--badge-size) * 0.12);
+      border-radius: calc(var(--badge-size) * 0.34);
       background: linear-gradient(180deg, #b58a63, #8b5e3b);
       border: 1px solid rgba(255,255,255,0.16);
       width: max-content;
       max-width: calc(100% - 4px);
       pointer-events: none;
+      font-size: calc(var(--badge-size) * 0.56);
     }
     .table.is-dyn .table-badge.is-center {
       top: 50%;
@@ -601,7 +604,6 @@
 
     .table.is-dyn .table-badge .num {
       position: static;
-      font-size: 1em;
       font-weight: 800;
       line-height: 1.05;
       font-family: var(--font-display);
@@ -617,7 +619,7 @@
     .table.is-dyn .table-badge .cap {
       position: static;
       margin: 0;
-      font-size: 0.76em;
+      font-size: 0.72em;
       font-weight: 800;
       font-family: var(--font-body);
       color: rgba(255,250,244,0.92);

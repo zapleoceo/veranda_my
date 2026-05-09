@@ -130,6 +130,27 @@
     const mapZoomRange = document.getElementById('mapZoomRange');
     const mapZoomBox = document.getElementById('mapZoomBox');
     let zoomWasManual = false;
+    (() => {
+      if (!mapShell) return;
+      const BASE_W = 820;
+      const BASE_H = 620;
+      const BASE_BADGE = 25;
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      let raf = 0;
+      const apply = () => {
+        raf = 0;
+        const w = mapZoomBox ? (mapZoomBox.clientWidth || mapShell.clientWidth || BASE_W) : (mapShell.clientWidth || BASE_W);
+        const h = mapZoomBox ? (mapZoomBox.clientHeight || mapShell.clientHeight || BASE_H) : (mapShell.clientHeight || BASE_H);
+        const fit = Math.min(w / BASE_W, h / BASE_H);
+        const scale = clamp(Math.min(1, fit), 0.6, 1);
+        const px = Math.round(BASE_BADGE * scale);
+        mapShell.style.setProperty('--badge-size', `${px}px`);
+      };
+      apply();
+      window.addEventListener('resize', () => {
+        if (!raf) raf = requestAnimationFrame(apply);
+      }, { passive: true });
+    })();
 
     (() => {
       if (!mapShell || reduced) return;

@@ -8,7 +8,7 @@ const assert = (cond, msg) => {
 const fs = require('fs')
 const css = fs.readFileSync('/workspace/tr3/assets/layout.css', 'utf8')
 
-assert(/\.table\.is-dyn\s+\.table-badge\s*\{[\s\S]*?top:\s*2px;[\s\S]*?left:\s*2px;[\s\S]*?padding:\s*0\.18em\s+0\.18em;[\s\S]*?border-radius:\s*0\.42em;[\s\S]*?\}/m.test(css), 'table badge must have top/left 2px, padding 0.18em, radius 0.42em')
+assert(/\.table\.is-dyn\s+\.table-badge\s*\{[\s\S]*?top:\s*2px;[\s\S]*?left:\s*2px;[\s\S]*?min-width:\s*var\(--badge-size\);[\s\S]*?border-radius:\s*calc\(var\(--badge-size\)\s*\*\s*0\.34\);[\s\S]*?font-size:\s*calc\(var\(--badge-size\)\s*\*\s*0\.56\);[\s\S]*?\}/m.test(css), 'table badge must be based on --badge-size (min-width, radius, font-size)')
 const m = css.match(/\.table\.is-dyn\s+\.table-badge\s*\{([\s\S]*?)\}/m)
 assert(!!m, 'table badge rule must exist')
 assert(!String(m[1] || '').includes('box-shadow'), 'table badge must not have box-shadow')
