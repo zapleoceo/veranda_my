@@ -73,7 +73,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260509_1035">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260509_1130">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -125,6 +125,14 @@ $mk = function (string $l) use ($self, $baseQs) {
   
       <section class="layout">
         <div class="map-shell">
+          <div class="map-shell__bg" aria-hidden="true">
+            <div class="map-shell__mesh" aria-hidden="true">
+              <div class="blob b1"></div>
+              <div class="blob b2"></div>
+              <div class="blob b3"></div>
+            </div>
+            <div class="map-shell__spotlight" aria-hidden="true"></div>
+          </div>
           <div class="tile-layer" aria-hidden="true"></div>
             <div class="map-zoom-box" id="mapZoomBox">
               <div class="map-zoom-inner" id="mapZoomInner">
@@ -363,7 +371,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr3/assets/tr3.boot.js?v=20260509_1035" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260509_1130" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>

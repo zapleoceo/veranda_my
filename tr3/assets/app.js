@@ -131,6 +131,31 @@
     const mapZoomBox = document.getElementById('mapZoomBox');
     let zoomWasManual = false;
 
+    (() => {
+      if (!mapShell || reduced) return;
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      let raf = 0;
+      let nextX = 60;
+      let nextY = 32;
+      const apply = () => {
+        raf = 0;
+        mapShell.style.setProperty('--mx', String(clamp(nextX, 0, 100)) + '%');
+        mapShell.style.setProperty('--my', String(clamp(nextY, 0, 100)) + '%');
+      };
+      const onMove = (e) => {
+        const rect = mapShell.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        nextX = ((e.clientX - rect.left) / rect.width) * 100;
+        nextY = ((e.clientY - rect.top) / rect.height) * 100;
+        if (!raf) raf = requestAnimationFrame(apply);
+      };
+      mapShell.addEventListener('pointermove', onMove, { passive: true });
+      mapShell.addEventListener('pointerleave', () => {
+        mapShell.style.removeProperty('--mx');
+        mapShell.style.removeProperty('--my');
+      }, { passive: true });
+    })();
+
     const applyMapZoom = (pct, keepAnchor) => {
       if (!mapShell) return;
       const raw = Math.round(Number(pct || 100) || 100);
