@@ -25,9 +25,9 @@ class ReservationTelegram {
         if ($duration <= 0) $duration = 0;
 
         $guests = (int)($r['guests'] ?? 0);
-        $tableNum = (string)($r['table_num'] ?? '');
-        $posterTableId = (int)($r['poster_table_id'] ?? 0);
-        $hallName = trim((string)($r['hall_name'] ?? ''));
+        $tableLabel = trim((string)($r['table_label'] ?? ''));
+        if ($tableLabel === '') $tableLabel = trim((string)($r['table_num'] ?? ''));
+        if ($tableLabel === '') $tableLabel = trim((string)($r['poster_table_id'] ?? ''));
         $name = (string)($r['name'] ?? '');
         $phone = (string)($r['phone'] ?? '');
         $waPhone = (string)($r['whatsapp_phone'] ?? '');
@@ -48,9 +48,7 @@ class ReservationTelegram {
             $text .= 'Продолжительность: <b>' . htmlspecialchars($durStr) . '</b>' . "\n";
         }
         $text .= 'Кол-во человек: <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
-        $tableIdStr = $posterTableId > 0 ? (string)$posterTableId : $tableNum;
-        $hallPrefix = $hallName !== '' ? ($hallName . ' · ') : '';
-        $text .= 'Стол: <b>' . htmlspecialchars($hallPrefix . $tableIdStr) . '</b>' . "\n";
+        $text .= 'Стол: <b>Veranda · ' . htmlspecialchars($tableLabel) . '</b>' . "\n";
         $text .= 'Имя: <b>' . htmlspecialchars($name) . '</b>' . "\n";
         $text .= 'Номер телефона: <b>' . htmlspecialchars($phone) . '</b>';
 

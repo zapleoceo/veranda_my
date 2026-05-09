@@ -363,10 +363,13 @@ function tr3_api_hall_tables(array $ctx): void {
       if (!is_array($r)) continue;
       $tid = (int)($r['table_id'] ?? 0);
       if ($tid <= 0) continue;
+    $label = api_resolve_table_label($ctx, $hallId, $tid);
       $out[] = [
-        'table_id' => $tid,
+      'table_id' => $tid,
+      'poster_table_id' => $tid,
         'table_num' => (string)($r['table_num'] ?? ''),
         'table_title' => (string)($r['table_title'] ?? ''),
+      'table_label' => $label,
         'spot_id' => (int)($r['spot_id'] ?? $spotId),
         'hall_id' => (int)($r['hall_id'] ?? $hallId),
         'table_shape' => (string)($r['table_shape'] ?? ''),

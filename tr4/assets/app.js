@@ -1257,14 +1257,14 @@
 
     const checkModalAvailability = () => {
       const busyTag = document.getElementById('reqModalBusy');
-      if (!pendingBooking || !pendingBooking.tableNum || !reqStart || !reqStart.value || !reqDuration) {
+      if (!pendingBooking || !pendingBooking.tableLabel || !reqStart || !reqStart.value || !reqDuration) {
         modalTableBusy = true;
         if (busyTag) { busyTag.hidden = true; busyTag.textContent = ''; }
         syncSubmitState();
         return;
       }
 
-      const tableNum = String(pendingBooking.tableNum);
+      const tableLabel = String(pendingBooking.tableLabel);
       const posterTableId = String(pendingBooking.posterTableId || '');
       const current = getCurrentRequest();
       if (!current) {
@@ -1274,9 +1274,9 @@
         return;
       }
       
-      const un = getUnavailableReason(posterTableId || tableNum, current);
+      const un = getUnavailableReason(posterTableId || tableLabel, current);
       
-      logJs('checkModalAvailability: start', { tableNum, posterTableId, current, un, modalTableBusy });
+      logJs('checkModalAvailability: start', { tableLabel, posterTableId, current, un, modalTableBusy });
       if (un) {
         modalTableBusy = true;
         if (busyTag) {
@@ -1342,7 +1342,7 @@
         reqSubmit.setAttribute('aria-disabled', canSubmit ? 'false' : 'true');
         reqSubmit.disabled = !!submitBusy;
       };
-    const openRequestForm = ({ tableNum, posterTableId, spotId, hallId, guests, start, name, phone, comment, preorder, keepFields }) => {
+    const openRequestForm = ({ tableLabel, posterTableId, spotId, hallId, guests, start, name, phone, comment, preorder, keepFields }) => {
       if (reqHint) {
         reqHint.hidden = true;
         reqHint.textContent = '';
@@ -1350,9 +1350,9 @@
       }
 
 
-      pendingBooking = { tableNum: String(tableNum || ''), posterTableId: String(posterTableId || ''), spotId: Number(spotId || 1) || 1, hallId: Number(hallId || activeHallId || 0) || (activeHallId || 0), guests: Number(guests || 0), start: String(start || '') };
-      if (reqModalTable) reqModalTable.textContent = String(tableNum || '');
-      if (reqTableNumInput) reqTableNumInput.value = String(tableNum || '');
+      pendingBooking = { tableLabel: String(tableLabel || ''), posterTableId: String(posterTableId || ''), spotId: Number(spotId || 1) || 1, hallId: Number(hallId || activeHallId || 0) || (activeHallId || 0), guests: Number(guests || 0), start: String(start || '') };
+      if (reqModalTable) reqModalTable.textContent = String(tableLabel || '');
+      if (reqTableNumInput) reqTableNumInput.value = String(tableLabel || '');
       if (reqPosterTableIdInput) reqPosterTableIdInput.value = String(posterTableId || '');
       if (reqGuests) {
         reqGuests.value = String(guests);
@@ -1629,7 +1629,7 @@
         return;
       }
 
-      const tableNum = String(pendingBooking.tableNum || '');
+      const tableLabel = String(pendingBooking.tableLabel || '');
       const posterTableId = String(pendingBooking.posterTableId || '');
       const spotId = Number(pendingBooking.spotId || 1) || 1;
       const hallId = Number(pendingBooking.hallId || activeHallId || 0) || (activeHallId || 0);
@@ -1713,7 +1713,7 @@
         return Object.keys(counts).reduce((acc, key) => acc + (getPreorderPrice(key) * counts[key]), 0);
       };
       
-      const tableNum = String(pendingBooking.tableNum || '');
+      const tableLabel = String(pendingBooking.tableLabel || '');
       const posterTableId = String(pendingBooking.posterTableId || '');
       const spotId = Number(pendingBooking.spotId || 1) || 1;
       const hallId = Number(pendingBooking.hallId || activeHallId || 0) || (activeHallId || 0);
@@ -1744,7 +1744,7 @@
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, scroll_y: scrollY, source_page: sourcePage }),
+            body: JSON.stringify({ table_label: tableLabel, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, scroll_y: scrollY, source_page: sourcePage }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -1901,7 +1901,7 @@
         let comment = '';
         let preorder = '';
         let preorderRu = '';
-        let tableNum = '';
+        let tableLabel = '';
 
         const getTotalPreorderAmount = () => {
           const counts = normalizePreorder(preorderCounts);
@@ -1952,9 +1952,9 @@
           if (reqPreorderRuHidden) reqPreorderRuHidden.value = preorderRu;
           logJs('submit trace 2', { preorder, preorderRu }).catch(() => null);
           
-          tableNum = pendingBooking ? String(pendingBooking.tableNum || '') : '';
+          tableLabel = pendingBooking ? String(pendingBooking.tableLabel || '') : '';
           const missing = [];
-          if (!tableNum) missing.push(t('missing_table'));
+          if (!tableLabel) missing.push(t('missing_table'));
           if (!start) missing.push(t('missing_start'));
           if (!isFinite(guests) || guests <= 0) missing.push(t('missing_guests'));
           const countsNow = normalizePreorder(preorderCounts);
@@ -1995,7 +1995,7 @@
           const res = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, duration_m, name, phone, whatsapp_phone: messengerLinked.whatsapp ? linkedWaPhone : null, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
+            body: JSON.stringify({ table_label: tableLabel, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, duration_m, name, phone, whatsapp_phone: messengerLinked.whatsapp ? linkedWaPhone : null, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, tg: linkedTg }),
           });
           const j = await res.json().catch(() => null);
           if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
@@ -2017,7 +2017,7 @@
             setModal(preorderOkModal, true);
             preorderOkBtn.onclick = () => setModal(preorderOkModal, false);
           } else {
-            setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableNum, guests: String(guests), name, phone }));
+            setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableLabel, guests: String(guests), name, phone }));
           }
         } catch (err) {
           const errMsg = String(err && err.message ? err.message : err);
@@ -2297,7 +2297,7 @@
 
         table.addEventListener('click', async () => {
           const id = String(table.dataset.posterTableId || '');
-          const label = String(table.dataset.tableNum || getTableLabelText(table) || '').trim();
+          const label = String(table.dataset.tableLabel || getTableLabelText(table) || '').trim();
           const current = getCurrentRequest();
 
           const now = new Date();
@@ -2353,7 +2353,7 @@
 
           selectedTableId = id;
           selectedTableLabel = label || id;
-          openRequestForm({ tableNum: (label || id), posterTableId: id, spotId: 1, hallId: activeHallId, guests: current.guests, start: current.dtRaw });
+          openRequestForm({ tableLabel: (label || id), posterTableId: id, spotId: 1, hallId: activeHallId, guests: current.guests, start: current.dtRaw });
         });
       });
     };
@@ -2731,7 +2731,7 @@
         b.dataset.bookable = it.bookable ? '1' : '0';
         b.dataset.cap = it.bookable ? String(it.cap || 0) : '';
         b.dataset.posterTableId = String(it.posterId);
-        b.dataset.tableNum = String(it.schemeNum || it.label || '').trim();
+        b.dataset.tableLabel = String(it.label || it.schemeNum || '').trim();
         const left = Math.round(it.x * scale + offX);
         const top = Math.round(it.y * scale + offY);
         const w = Math.max(34, Math.round(Math.max(0, it.w) * scale));
@@ -2843,7 +2843,7 @@
           invalidateLast();
           setTimeout(() => { loadFree(true).catch(() => null); }, 0);
         }
-        const tableNum = String(p.table_num || '').trim();
+        const tableLabel = String(p.table_label || p.table_num || '').trim();
         const posterTableIdRaw = String(p.poster_table_id || '').trim();
         const guests = Number(p.guests || 0) || 0;
         const start = String(p.start || '').trim();
@@ -2853,11 +2853,11 @@
         const preorder = String(p.preorder || '');
         const preorderRu = String(p.preorder_ru || '');
         const tg = j.tg && typeof j.tg === 'object' ? j.tg : null;
-        if (tableNum && guests > 0 && start) {
-          const fallbackEl = getTables().find((x) => (getTableLabelText(x) === tableNum));
+        if (tableLabel && guests > 0 && start) {
+          const fallbackEl = getTables().find((x) => (getTableLabelText(x) === tableLabel));
           const pid = posterTableIdRaw || String(fallbackEl && fallbackEl.dataset ? (fallbackEl.dataset.posterTableId || '') : '');
           selectedTableId = pid;
-          selectedTableLabel = tableNum;
+          selectedTableLabel = tableLabel;
           messengerLinked.whatsapp = false;
           linkedWaPhone = null;
           try { localStorage.removeItem('veranda_linked_wa'); } catch (_) {}
@@ -2872,7 +2872,7 @@
             await loadFree(true).catch(() => null);
           }
 
-          openRequestForm({ tableNum, posterTableId: pid, spotId: Number(p.spot_id || 1) || 1, hallId: Number(p.hall_id || activeHallId) || activeHallId, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
+          openRequestForm({ tableLabel, posterTableId: pid, spotId: Number(p.spot_id || 1) || 1, hallId: Number(p.hall_id || activeHallId) || activeHallId, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
           setMsgrHint('');
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);
@@ -2907,7 +2907,7 @@
           invalidateLast();
           setTimeout(() => { loadFree(true).catch(() => null); }, 0);
         }
-        const tableNum = String(p.table_num || '').trim();
+        const tableLabel = String(p.table_label || p.table_num || '').trim();
         const posterTableIdRaw = String(p.poster_table_id || '').trim();
         const guests = Number(p.guests || 0) || 0;
         const start = String(p.start || '').trim();
@@ -2917,11 +2917,11 @@
         const preorder = String(p.preorder || '');
         const preorderRu = String(p.preorder_ru || '');
         const waPhone = String(j.phone || p.whatsapp_phone || phone || '').trim();
-        if (tableNum && guests > 0 && start) {
-          const fallbackEl = getTables().find((x) => (getTableLabelText(x) === tableNum));
+        if (tableLabel && guests > 0 && start) {
+          const fallbackEl = getTables().find((x) => (getTableLabelText(x) === tableLabel));
           const pid = posterTableIdRaw || String(fallbackEl && fallbackEl.dataset ? (fallbackEl.dataset.posterTableId || '') : '');
           selectedTableId = pid;
-          selectedTableLabel = tableNum;
+          selectedTableLabel = tableLabel;
           messengerLinked.telegram = false;
           linkedTg = null;
           try { localStorage.removeItem('veranda_linked_tg'); } catch (_) {}
@@ -2934,7 +2934,7 @@
           if (!last || !freeIds || !freeIds.size) {
             await loadFree(true).catch(() => null);
           }
-          openRequestForm({ tableNum, posterTableId: pid, spotId: Number(p.spot_id || 1) || 1, hallId: Number(p.hall_id || activeHallId) || activeHallId, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
+          openRequestForm({ tableLabel, posterTableId: pid, spotId: Number(p.spot_id || 1) || 1, hallId: Number(p.hall_id || activeHallId) || activeHallId, guests, start, name, phone, comment, preorder: preorderRu || preorder, keepFields: true });
           setMsgrHint('');
           syncSubmitState();
           updateReqGuestsHint().catch(() => null);

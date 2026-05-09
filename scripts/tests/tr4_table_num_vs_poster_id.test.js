@@ -9,8 +9,7 @@ const fs = require('fs')
 const src = fs.readFileSync('/workspace/tr4/assets/app.js', 'utf8')
 
 assert(/dataset\.posterTableId\s*=/.test(src), 'tables must keep dataset.posterTableId (Poster table_id)')
-assert(/dataset\.tableNum\s*=/.test(src) || /dataset\.schemeNum\s*=/.test(src), 'tables must store human table number in dataset.tableNum')
-assert(/openRequestForm\(\{\s*tableNum:\s*String\(table\.dataset\.tableNum/.test(src) || /table\.dataset\.tableNum/.test(src), 'openRequestForm must use dataset.tableNum (scheme/display num), not posterTableId')
+assert(/dataset\.tableLabel\s*=/.test(src), 'tables must store human label in dataset.tableLabel')
+assert(/table\.dataset\.tableLabel/.test(src), 'click flow must read dataset.tableLabel')
 
 process.stdout.write('OK\n')
-

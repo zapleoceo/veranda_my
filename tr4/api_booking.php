@@ -15,35 +15,15 @@ function tr3_api_submit_booking(array $ctx): void {
     return isset($I18N[$userLang][$key]) ? (string)$I18N[$userLang][$key] : $key;
   };
 
-  $tableNum = trim((string)($payload['table_num'] ?? ''));
-  if ($tableNum === '') $tableNum = trim((string)($payload['table_num_manual'] ?? ''));
   $posterTableId = isset($payload['poster_table_id']) ? (int)$payload['poster_table_id'] : 0;
   if ($posterTableId < 0) $posterTableId = 0;
   $spotId = isset($payload['spot_id']) ? (int)$payload['spot_id'] : 1;
   if ($spotId <= 0) $spotId = 1;
   $hallId = isset($payload['hall_id']) ? (int)$payload['hall_id'] : 0;
   if ($hallId < 0) $hallId = 0;
-
-  if ($posterTableId > 0) {
-    $settingsByHall = $ctx['tableSettingsByHall'] ?? null;
-    $s = null;
-    if (is_array($settingsByHall)) {
-      if ($hallId > 0 && isset($settingsByHall[$hallId]) && is_array($settingsByHall[$hallId]) && isset($settingsByHall[$hallId][$posterTableId])) {
-        $s = $settingsByHall[$hallId][$posterTableId];
-      } else {
-        foreach ($settingsByHall as $h => $tables) {
-          if (!is_array($tables)) continue;
-          if (isset($tables[$posterTableId])) { $s = $tables[$posterTableId]; break; }
-        }
-      }
-    }
-    if (is_array($s)) {
-      $schemeNum = (int)($s['scheme_num'] ?? 0);
-      $displayName = trim((string)($s['display_name'] ?? ''));
-      if ($displayName !== '') $tableNum = $displayName;
-      elseif ($schemeNum > 0) $tableNum = (string)$schemeNum;
-    }
-  }
+  $tableLabel = api_resolve_table_label($ctx, $hallId, $posterTableId);
+  $tableNum = trim((string)($payload['table_num'] ?? ''));
+  if ($tableNum === '') $tableNum = $tableLabel !== '' ? $tableLabel : (string)$posterTableId;
   $name = trim((string)($payload['name'] ?? ''));
   $phone = trim((string)($payload['phone'] ?? ''));
   $waPhone = trim((string)($payload['whatsapp_phone'] ?? ''));
@@ -63,8 +43,7 @@ function tr3_api_submit_booking(array $ctx): void {
     }
   }
 
-  if ($tableNum === '') api_error(400, 'Некорректный номер стола');
-  if ($posterTableId <= 0 && !preg_match('/^\d+$/', $tableNum)) api_error(400, 'Некорректный номер стола');
+  if ($posterTableId <= 0) api_error(400, 'Некорректный стол');
   if ($guests <= 0 || $guests > 99) api_error(400, 'Некорректное кол-во гостей');
   if ($name === '' || mb_strlen($name) > 80) api_error(400, 'Некорректное имя');
 
@@ -132,8 +111,7 @@ function tr3_api_submit_booking(array $ctx): void {
        WHERE start_time = ?
          AND duration = ?
          AND guests = ?
-         AND table_num = ?
-         AND (poster_table_id <=> ?)
+         AND poster_table_id = ?
          AND phone = ?
          AND name = ?
        ORDER BY id DESC
@@ -142,8 +120,7 @@ function tr3_api_submit_booking(array $ctx): void {
         $startDt->format('Y-m-d H:i:s'),
         $duration_m,
         $guests,
-        $tableNum,
-        $posterTableId > 0 ? $posterTableId : null,
+        $posterTableId,
         $phoneNorm,
         $name,
       ]
@@ -174,7 +151,7 @@ function tr3_api_submit_booking(array $ctx): void {
     }
 
     $db->query("INSERT INTO {$resTable} (
-      spot_id, hall_id, created_at, start_time, duration, guests, table_num, poster_table_id, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
+      spot_id, hall_id, created_at, start_time, duration, guests, table_num, poster_table_id, table_label, name, phone, whatsapp_phone, comment, preorder_text, preorder_ru, tg_user_id, tg_username, lang, total_amount, qr_url, qr_code
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
       $spotId,
       $hallId > 0 ? $hallId : null,
@@ -183,7 +160,8 @@ function tr3_api_submit_booking(array $ctx): void {
       $duration_m,
       $guests,
       $tableNum,
-      $posterTableId > 0 ? $posterTableId : null,
+      $posterTableId,
+      $tableLabel !== '' ? $tableLabel : null,
       $name,
       $phoneNorm,
       $waPhoneNorm !== '' ? $waPhoneNorm : null,
@@ -215,6 +193,7 @@ function tr3_api_submit_booking(array $ctx): void {
     'guests' => $guests,
     'table_num' => $tableNum,
     'poster_table_id' => $posterTableId,
+    'table_label' => $tableLabel,
     'spot_id' => $spotId,
     'hall_id' => $hallId > 0 ? $hallId : null,
     'hall_name' => $hallName,

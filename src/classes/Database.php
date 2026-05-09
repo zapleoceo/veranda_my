@@ -596,6 +596,7 @@ class Database {
             guests INT NOT NULL,
             table_num VARCHAR(32) NOT NULL,
             poster_table_id INT NULL,
+            table_label VARCHAR(64) NULL,
             name VARCHAR(128) NOT NULL,
             phone VARCHAR(64) NOT NULL,
             whatsapp_phone VARCHAR(64) NULL,
@@ -658,6 +659,9 @@ class Database {
             }
             if (empty($cols['poster_table_id'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN poster_table_id INT NULL AFTER table_num");
+            }
+            if (empty($cols['table_label'])) {
+                $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN table_label VARCHAR(64) NULL AFTER poster_table_id");
             }
             if (empty($cols['spot_id'])) {
                 $this->pdo->exec("ALTER TABLE {$t} ADD COLUMN spot_id INT NULL AFTER id");
