@@ -216,7 +216,7 @@ try {
 
 $system = trim($botPrompt);
 if ($system !== '') $system .= "\n\n";
-$system .= "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a,br. Keep it concise.";
+$system .= "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a,br. Do not use div/p/ul/ol/li/h1-h6 tags. Keep it concise.";
 
 $payload = [
   'chat_id' => $chatId,
@@ -241,5 +241,22 @@ $resp = testai_gemini_generate(
 
 $html = testai_gemini_text($resp);
 $html = testai_sanitize_telegram_html($html);
-if ($html === '') $html = 'Не получилось сформировать ответ.';
+if ($html === '') {
+  $err = '';
+  if (is_array($resp['error'] ?? null)) {
+    $err = trim((string)($resp['error']['message'] ?? ''));
+  }
+  $plain = testai_gemini_text($resp);
+  $plain = trim(strip_tags($plain));
+  if ($plain !== '') {
+    if (mb_strlen($plain) > 3500) $plain = mb_substr($plain, 0, 3500) . '…';
+    $html = htmlspecialchars($plain, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+  } elseif ($err !== '') {
+    if (mb_strlen($err) > 900) $err = mb_substr($err, 0, 900) . '…';
+    $html = 'Gemini error: ' . htmlspecialchars($err, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+  } else {
+    $code = (int)($resp['_http_code'] ?? 0);
+    $html = $code ? ("Gemini пустой ответ (HTTP {$code}).") : 'Не получилось сформировать ответ.';
+  }
+}
 testai_tg_send_message($tgToken, $chatId, $html, $messageId);

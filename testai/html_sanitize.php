@@ -56,6 +56,16 @@ function testai_sanitize_telegram_html(string $html): string {
   if ($html === '') return '';
   if (mb_strlen($html) > 50000) $html = mb_substr($html, 0, 50000);
 
+  $html = str_ireplace(
+    ['</p>', '</div>', '</li>', '</h2>', '</h3>', '<br>', '<br/>', '<br />'],
+    ["\n", "\n", "\n", "\n", "\n", "\n", "\n", "\n"],
+    $html
+  );
+  $html = preg_replace('/<\s*(p|div|ul|ol|li|h2|h3)\b[^>]*>/i', "\n", $html);
+  if ($html === null) $html = '';
+  $html = preg_replace("/\n{3,}/", "\n\n", $html);
+  if ($html === null) $html = '';
+
   $allowedTags = ['b','strong','i','em','u','ins','s','strike','del','code','pre','a','br'];
   $allowed = '<' . implode('><', $allowedTags) . '>';
   $html = strip_tags($html, $allowed);
