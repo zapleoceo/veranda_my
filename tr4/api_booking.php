@@ -266,7 +266,7 @@ function tr3_api_submit_booking(array $ctx): void {
     $waText .= $trFor('tg_date') . ': ' . $startDt->format('Y-m-d') . "\n";
     $waText .= $trFor('tg_time') . ': ' . $startDt->format('H:i') . "\n";
     $waText .= $trFor('tg_guests') . ': ' . $guests . "\n";
-    $waText .= $trFor('tg_table') . ': ' . $tableNum . "\n";
+    $waText .= $trFor('tg_table') . ': ' . ($tableLabel !== '' ? $tableLabel : $tableNum) . "\n";
     $waText .= $trFor('tg_name') . ': ' . $name . "\n";
     $waText .= $trFor('tg_phone') . ': ' . $phoneNorm;
     if ($comment !== '') $waText .= "\n\n" . $trFor('tg_comment') . ":\n" . $comment;
@@ -282,8 +282,7 @@ function tr3_api_submit_booking(array $ctx): void {
   $mgrPhone = '+84396314266';
   $mgrWaLink = 'https://wa.me/84396314266';
 
-  $tableIdStr = $posterTableId > 0 ? (string)$posterTableId : $tableNum;
-  $hallPrefix = $hallName !== '' ? ($hallName . ' · ') : '';
+  $tableLabelOut = $tableLabel !== '' ? $tableLabel : $tableNum;
 
   $userText = '<b>' . htmlspecialchars($trFor('tg_thanks_title')) . '</b> ' . htmlspecialchars($trFor('tg_thanks_body')) . "\n\n";
   if ($qrUrl !== '') {
@@ -295,7 +294,7 @@ function tr3_api_submit_booking(array $ctx): void {
   $userText .= htmlspecialchars($trFor('tg_date')) . ': <b>' . htmlspecialchars($startDt->format('Y-m-d')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_time')) . ': <b>' . htmlspecialchars($startDt->format('H:i')) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_guests')) . ': <b>' . htmlspecialchars((string)$guests) . '</b>' . "\n";
-  $userText .= htmlspecialchars($trFor('tg_table')) . ': <b>' . htmlspecialchars($hallPrefix . $tableIdStr) . '</b>' . "\n";
+  $userText .= htmlspecialchars($trFor('tg_table')) . ': <b>' . htmlspecialchars($tableLabelOut) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_name')) . ': <b>' . htmlspecialchars($name) . '</b>' . "\n";
   $userText .= htmlspecialchars($trFor('tg_phone')) . ': <b>' . htmlspecialchars($phoneNorm) . '</b>';
   if ($comment !== '') {
