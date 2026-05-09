@@ -4,12 +4,17 @@ declare(strict_types=1);
 $root = dirname(__DIR__);
 require_once $root . '/src/classes/Database.php';
 
-if (file_exists($root . '/.env')) {
-  $lines = file($root . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+$envFile = $root . '/.env';
+$envLoadedKeys = [];
+
+if (file_exists($envFile)) {
+  $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
   foreach ($lines as $line) {
     if (strpos(trim($line), '#') === 0 || strpos($line, '=') === false) continue;
     [$name, $value] = explode('=', $line, 2);
-    $_ENV[trim($name)] = trim($value);
+    $k = trim($name);
+    $_ENV[$k] = trim($value);
+    $envLoadedKeys[$k] = true;
   }
 }
 
@@ -85,6 +90,8 @@ if (trim($allowedChatsRaw) !== '') {
 
 return [
   'root' => $root,
+  'envFile' => $envFile,
+  'envLoadedKeys' => $envLoadedKeys,
   'db' => $db,
   'tRaw' => $tRaw,
   'tDaily' => $tDaily,

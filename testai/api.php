@@ -14,6 +14,8 @@ $geminiKey = (string)$ctx['geminiKey'];
 $geminiModel = (string)$ctx['geminiModel'];
 $adminKey = (string)$ctx['adminKey'];
 $allowed = $ctx['allowedChatIds'] ?? null;
+$envFile = (string)($ctx['envFile'] ?? '');
+$envLoadedKeys = is_array($ctx['envLoadedKeys'] ?? null) ? array_keys($ctx['envLoadedKeys']) : [];
 
 require_once __DIR__ . '/tg.php';
 
@@ -79,6 +81,8 @@ if ($ajax === 'health') {
     'has_ai_tg_bot' => $tgToken !== '',
     'has_gemini_key' => $geminiKey !== '',
     'gemini_model' => $geminiModel,
+    'env_file_exists' => $envFile !== '' ? file_exists($envFile) : false,
+    'env_keys_loaded' => array_values(array_slice($envLoadedKeys, 0, 50)),
     'allowed_chats_configured' => is_array($allowed),
     'allowed_chats_count' => is_array($allowed) ? count($allowed) : 0,
     'raw_total' => $rawTotal,
