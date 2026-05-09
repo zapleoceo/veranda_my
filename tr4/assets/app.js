@@ -2661,19 +2661,6 @@
         return el;
       };
 
-      const getPxBox = (it) => {
-        const left = Math.round(it.x * scale + offX);
-        const top = Math.round(it.y * scale + offY);
-        const w = Math.max(34, Math.round(Math.max(0, it.w) * scale));
-        const h = Math.max(28, Math.round(Math.max(0, it.h) * scale));
-        return { left, top, w, h };
-      };
-
-      const table10Px = hallId === 2 ? (() => {
-        const it = visible.find((x) => String(x.schemeNum || '').trim() === '10' || String(x.label || '').trim() === '10');
-        return it ? getPxBox(it) : null;
-      })() : null;
-
       if (decorEl && decorItems.length) {
         decorItems.forEach((d) => {
           const typeRaw = String(d && d.decor_type ? d.decor_type : '').trim();
@@ -2690,17 +2677,9 @@
           let wh = Number(d && d.h != null ? d.h : 0);
           const forceGrassBottom = (hallId === 2 && type === 'grass-corner-1-7');
           const effMode = forceGrassBottom ? 'canvas_bottom' : mode;
-          if (hallId === 2 && type === 'fountain' && table10Px) {
-            const sizePx = Math.max(28, Math.round(Math.min(MAP_W, MAP_H) * 0.075));
-            const left = Math.round(clamp(table10Px.left - 5 - sizePx, PAD, MAP_W - PAD - sizePx));
-            const radiusPx = Math.round(sizePx / 2);
-            const top = Math.round(clamp(table10Px.top - sizePx * 0.35 - radiusPx, PAD, MAP_H - PAD - sizePx));
+          if (hallId === 2 && type === 'fountain') {
             const el = createDecorEl(type);
-            el.style.left = left + 'px';
-            el.style.top = top + 'px';
-            el.style.width = sizePx + 'px';
-            el.style.height = sizePx + 'px';
-            if (d && d.z != null) el.style.zIndex = String(d.z);
+            el.id = 'fountainEl';
             decorEl.appendChild(el);
             return;
           }
