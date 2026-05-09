@@ -323,11 +323,8 @@
     #mapZoomBox { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
     #mapZoomInner {
       position: absolute;
-      left: 50%;
-      top: 50%;
-      width: var(--map-base-w, 820px);
-      height: var(--map-base-h, 620px);
-      transform: translate(-50%, -50%) scale(var(--map-scale));
+      inset: 0;
+      transform: scale(var(--map-scale));
       transform-origin: center;
     }
     .map {
