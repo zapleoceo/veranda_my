@@ -23,6 +23,7 @@ $key = trim((string)($_GET['key'] ?? ''));
     .btn.secondary { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.92); border: 1px solid rgba(255,255,255,0.16); }
     .box { margin-top: 18px; padding: 16px; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; background: rgba(255,255,255,0.04); }
     .status { margin-top: 10px; color: rgba(255,255,255,0.65); font-size: 13px; }
+    .hint { margin-top: 4px; color: rgba(255,255,255,0.55); font-size: 12px; }
     .out a { color: rgba(184,135,70,0.95); }
     .out h2, .out h3 { margin: 0.6em 0 0.2em; }
   </style>
@@ -32,10 +33,12 @@ $key = trim((string)($_GET['key'] ?? ''));
     <h1 style="margin:0 0 12px; font-size: 22px;">TestAI</h1>
     <div class="top">
       <input id="date" type="date" value="<?= htmlspecialchars($date) ?>">
-      <button class="btn" id="btnGet" type="button">Показать</button>
-      <button class="btn secondary" id="btnGen" type="button">Сгенерировать</button>
+      <button class="btn" id="btnGet" type="button" title="Показать кешированный HTML-анонс для выбранной даты (если он уже был сгенерирован).">Показать анонс (кеш)</button>
+      <button class="btn secondary" id="btnGen" type="button" title="Сгенерировать новый HTML-анонс через Gemini и сохранить его в кеш.">Сгенерировать анонс</button>
+      <button class="btn secondary" id="btnDaily" type="button" title="Показать саммари дня (если оно уже было сформировано daily.php).">Саммари дня</button>
     </div>
     <div class="status" id="status"></div>
+    <div class="hint" id="stats"></div>
     <div class="box out" id="out"></div>
   </div>
 
@@ -43,6 +46,7 @@ $key = trim((string)($_GET['key'] ?? ''));
     const qs = (k) => document.getElementById(k)
     const out = qs('out')
     const statusEl = qs('status')
+    const statsEl = qs('stats')
     const dateEl = qs('date')
     const adminKey = <?= json_encode($adminKey, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     const initialKey = <?= json_encode($key, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
@@ -56,10 +60,24 @@ $key = trim((string)($_GET['key'] ?? ''));
     }
     const setStatus = (t) => { statusEl.textContent = t || '' }
     const render = (html) => { out.innerHTML = html || '<div>Нет данных</div>' }
+    const setStats = (t) => { statsEl.textContent = t || '' }
+
+    const refreshStats = async () => {
+      const d = dateEl.value || ''
+      const res = await fetch(mkUrl('stats', d), { headers: { 'Accept': 'application/json' } }).catch(() => null)
+      const j = res ? await res.json().catch(() => null) : null
+      if (!j || !j.ok) { setStats(''); return }
+      const parts = []
+      parts.push(`Записей за день: ${Number(j.count || 0)}`)
+      const wm = Number(j.with_media || 0)
+      const wmt = Number(j.with_media_text || 0)
+      if (wm || wmt) parts.push(`медиа: ${wm}, распознано: ${wmt}`)
+      setStats(parts.join(' · '))
+    }
 
     const load = async () => {
       const d = dateEl.value || ''
-      setStatus('Загрузка…')
+      setStatus('Загрузка кеша…')
       const res = await fetch(mkUrl('get', d), { headers: { 'Accept': 'application/json' } }).catch(() => null)
       const j = res ? await res.json().catch(() => null) : null
       if (!j || !j.ok) { setStatus('Ошибка'); render(''); return }
@@ -77,10 +95,29 @@ $key = trim((string)($_GET['key'] ?? ''));
       render(j.html || '')
     }
 
+    const daily = async () => {
+      const d = dateEl.value || ''
+      setStatus('Чтение саммари…')
+      const res = await fetch(mkUrl('summary', d), { headers: { 'Accept': 'application/json' } }).catch(() => null)
+      const j = res ? await res.json().catch(() => null) : null
+      if (!j || !j.ok) { setStatus('Ошибка'); render(''); return }
+      setStatus('')
+      if (!j.exists) { render('<div>Саммари за этот день ещё нет. Запусти /testai/daily?day=' + d + '</div>'); return }
+      let html = ''
+      const st = String(j.summary_text || '').trim()
+      const ev = String(j.events_json || '').trim()
+      if (st) html += '<h2>Саммари</h2><div>' + st.replaceAll('\n', '<br>') + '</div>'
+      if (ev && ev !== '[]') html += '<h3>Events JSON</h3><pre style="white-space:pre-wrap; margin:0; font-size:12px; color:rgba(255,255,255,0.78)">' + ev.replaceAll('<','&lt;') + '</pre>'
+      render(html || '<div>Саммари пустое</div>')
+    }
+
     qs('btnGet').addEventListener('click', load)
     qs('btnGen').addEventListener('click', gen)
+    qs('btnDaily').addEventListener('click', daily)
+
+    dateEl.addEventListener('change', () => { refreshStats(); load() })
+    refreshStats()
     load()
   </script>
 </body>
 </html>
-

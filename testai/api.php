@@ -34,6 +34,54 @@ if ($ajax === 'get') {
   exit;
 }
 
+if ($ajax === 'stats') {
+  $from = $date . ' 00:00:00';
+  $to = $date . ' 23:59:59';
+  $cnt = 0;
+  $withMedia = 0;
+  $withMediaText = 0;
+  try {
+    $row = $db->query(
+      "SELECT
+         COUNT(*) AS cnt,
+         SUM(CASE WHEN media_type IS NOT NULL AND media_type <> '' THEN 1 ELSE 0 END) AS with_media,
+         SUM(CASE WHEN media_text IS NOT NULL AND media_text <> '' THEN 1 ELSE 0 END) AS with_media_text
+       FROM {$tRaw}
+       WHERE received_at BETWEEN ? AND ?",
+      [$from, $to]
+    )->fetch();
+    if (is_array($row)) {
+      $cnt = (int)($row['cnt'] ?? 0);
+      $withMedia = (int)($row['with_media'] ?? 0);
+      $withMediaText = (int)($row['with_media_text'] ?? 0);
+    }
+  } catch (\Throwable $e) {}
+  $ok(['date' => $date, 'count' => $cnt, 'with_media' => $withMedia, 'with_media_text' => $withMediaText]);
+  exit;
+}
+
+if ($ajax === 'summary') {
+  $summary = '';
+  $eventsJson = '[]';
+  $exists = false;
+  try {
+    $row = $db->query(
+      "SELECT summary_text, events_json, created_at
+       FROM {$tDaily}
+       WHERE day = ?
+       LIMIT 1",
+      [$date]
+    )->fetch();
+    if (is_array($row)) {
+      $exists = true;
+      $summary = (string)($row['summary_text'] ?? '');
+      $eventsJson = (string)($row['events_json'] ?? '[]');
+    }
+  } catch (\Throwable $e) {}
+  $ok(['date' => $date, 'exists' => $exists, 'summary_text' => $summary, 'events_json' => $eventsJson]);
+  exit;
+}
+
 if ($ajax !== 'generate') {
   $bad('bad_request');
   exit;
@@ -124,4 +172,3 @@ if ($html !== '') {
 }
 
 $ok(['date' => $date, 'html' => $html]);
-
