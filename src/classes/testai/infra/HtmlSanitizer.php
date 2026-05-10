@@ -53,49 +53,29 @@ class HtmlSanitizer {
         if ($html === '') return '';
         if (mb_strlen($html) > 50000) $html = mb_substr($html, 0, 50000);
 
+        // Convert block tags to newlines before stripping
         $html = preg_replace('/<\s*br\s*\/?\s*>/i', "\n", $html) ?? $html;
-        $html = str_ireplace(['</p>', '</div>', '</li>', '</h2>', '</h3>'], "\n", $html);
-        $html = preg_replace('/<\s*(p|div|ul|ol|li|h2|h3)\b[^>]*>/i', "\n", $html) ?? $html;
-        $html = preg_replace("/\n{3,}/", "\n\n", $html) ?? $html;
+        $html = str_ireplace(['</p>', '</div>', '</li>', '</h2>', '</h3>', '</h1>', '</h4>'], "\n", $html);
+        $html = preg_replace('/<\s*(p|div|ul|ol|li|h[1-4])\b[^>]*>/i', "\n", $html) ?? $html;
 
+        // Strip all tags except the ones Telegram supports
         $allowed = '<b><strong><i><em><u><ins><s><strike><del><code><pre><a>';
         $html = strip_tags($html, $allowed);
-        $html = str_replace(["\r\n", "\r"], "\n", $html);
 
-        $token = '___TG_NL___';
-        $html  = str_replace("\n", $token, $html);
-
-        $doc = new \DOMDocument('1.0', 'UTF-8');
-        libxml_use_internal_errors(true);
-        $doc->loadHTML('<?xml encoding="utf-8" ?>' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        libxml_clear_errors();
-
-        foreach ((new \DOMXPath($doc))->query('//*') as $el) {
-            if (!$el instanceof \DOMElement) continue;
-            $tag  = strtolower($el->tagName);
-            $drop = [];
-            foreach ($el->attributes as $attr) {
-                $name = strtolower($attr->name);
-                $val  = (string)$attr->value;
-                if (str_starts_with($name, 'on')) { $drop[] = $attr->name; continue; }
-                if ($tag === 'a') {
-                    if ($name !== 'href') { $drop[] = $attr->name; continue; }
-                    if (trim($val) === '' || preg_match('/^\s*javascript:/i', $val)) { $drop[] = $attr->name; continue; }
-                } else {
-                    $drop[] = $attr->name;
-                }
+        // Keep only href on <a>, remove all other attributes; drop javascript: hrefs
+        $html = preg_replace_callback('/<a\b([^>]*)>/i', static function (array $m): string {
+            if (preg_match('/\bhref\s*=\s*"([^"]*)"/i', $m[1], $hm) ||
+                preg_match("/\\bhref\\s*=\\s*'([^']*)'/i", $m[1], $hm) ||
+                preg_match('/\bhref\s*=\s*(\S+)/i', $m[1], $hm)) {
+                $href = $hm[1];
+                if (preg_match('/^\s*javascript:/i', $href)) return '';
+                return '<a href="' . htmlspecialchars($href, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">';
             }
-            foreach ($drop as $n) $el->removeAttribute($n);
-        }
+            return '';
+        }, $html) ?? $html;
 
-        $out = $doc->saveHTML() ?? '';
-        $out = trim($out);
-        $out = preg_replace('/^\s*<\?xml[^>]*\?>\s*/i', '', $out) ?? $out;
-        $out = preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/i', '', $out) ?? $out;
-        $out = preg_replace('/^\s*<html\b[^>]*>\s*<body\b[^>]*>\s*/i', '', $out) ?? $out;
-        $out = preg_replace('/\s*<\/body>\s*<\/html>\s*$/i', '', $out) ?? $out;
-        $out = str_replace($token, "\n", $out);
-        $out = preg_replace("/\n{3,}/", "\n\n", $out) ?? $out;
-        return trim($out);
+        $html = str_replace(["\r\n", "\r"], "\n", $html);
+        $html = preg_replace("/\n{3,}/", "\n\n", $html) ?? $html;
+        return trim($html);
     }
 }
