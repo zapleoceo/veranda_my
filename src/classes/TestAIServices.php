@@ -282,6 +282,20 @@ class TestAIWebhookService {
             return;
         }
 
+        $block = $this->settingsRepo->getKey('gemini_block_until');
+        $blockUntil = strtotime((string)($block['v'] ?? ''));
+        if (is_int($blockUntil) && $blockUntil > time()) {
+            $sec = $blockUntil - time();
+            $msg = 'Лимит запросов к AI исчерпан. Попробуйте через ' . (int)ceil($sec) . ' сек.';
+            $ok = $this->tg->sendMessage($chatId, $msg, null);
+            $this->log->info('telegram_send_result', [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'ok' => $ok ? 1 : 0,
+            ]);
+            return;
+        }
+
         $botPrompt = '';
         $p = $this->settingsRepo->getBotPrompt();
         $botPrompt = is_array($p) ? (string)($p['prompt'] ?? '') : '';
@@ -317,6 +331,15 @@ class TestAIWebhookService {
 
         $err = '';
         if (is_array($resp['error'] ?? null)) $err = (string)($resp['error']['message'] ?? '');
+        if ((int)($resp['_http_code'] ?? 0) === 429 && $err !== '') {
+            if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) {
+                $sec = (float)($m[1] ?? 0);
+                if ($sec > 0) {
+                    $until = time() + (int)ceil($sec);
+                    $this->settingsRepo->setKey('gemini_block_until', gmdate('c', $until), date('Y-m-d H:i:s'));
+                }
+            }
+        }
         $this->log->info('gemini_reply_ready', [
             'chat_id' => $chatId,
             'message_id' => $messageId,

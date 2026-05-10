@@ -285,5 +285,33 @@ class TestAISettingsRepository {
         } catch (\Throwable $e) {
         }
     }
-}
 
+    public function getKey(string $key): array {
+        $v = '';
+        $updatedAt = '';
+        try {
+            $row = $this->db->query(
+                "SELECT v, updated_at FROM {$this->tSettings} WHERE k = ? LIMIT 1",
+                [$key]
+            )->fetch();
+            if (is_array($row)) {
+                $v = (string)($row['v'] ?? '');
+                $updatedAt = (string)($row['updated_at'] ?? '');
+            }
+        } catch (\Throwable $e) {
+        }
+        return ['v' => $v, 'updated_at' => $updatedAt];
+    }
+
+    public function setKey(string $key, string $value, string $updatedAt): void {
+        try {
+            $this->db->query(
+                "INSERT INTO {$this->tSettings} (k, v, updated_at)
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE v = VALUES(v), updated_at = VALUES(updated_at)",
+                [$key, $value, $updatedAt]
+            );
+        } catch (\Throwable $e) {
+        }
+    }
+}
