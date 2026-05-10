@@ -271,12 +271,10 @@ class TestAIWebhookService {
 
         $this->rawRepo->upsert($m);
 
-        if ($chatType === 'private') {
-            $cmdDay = $this->parseSummaryCommand($text);
-            if ($cmdDay !== null) {
-                $this->handleSummaryCommand($chatId, $messageId, $cmdDay);
-                return;
-            }
+        $cmdDay = $this->parseSummaryCommand($text);
+        if ($cmdDay !== null) {
+            $this->handleSummaryCommand($chatId, $messageId, $cmdDay);
+            return;
         }
 
         if ($this->gemini->canCall() && $m->mediaType && $m->mediaFileId && ($needReply || $chatType === 'private')) {
