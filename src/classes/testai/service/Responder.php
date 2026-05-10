@@ -95,7 +95,7 @@ class Responder {
         $html = $this->gemini->text($resp);
         if ($html === '') {
             $this->storeRateLimitBlock($resp);
-            $html = $this->errorText($resp, $lang);
+            $html = $this->errorText($resp, $lang, $this->waitSecFromSettings());
         }
 
         $html = $this->sanitizer->sanitizeTelegramHtml($html);
@@ -175,12 +175,14 @@ class Responder {
         return $out;
     }
 
-    private function errorText(array $resp, string $lang): string {
+    private function errorText(array $resp, string $lang, int $waitSec = 0): string {
         $err = '';
         if (is_array($resp['error'] ?? null)) $err = trim((string)($resp['error']['message'] ?? ''));
         if ($err !== '' && preg_match('/quota|rate.?limit/i', $err)) {
             $retry = '';
-            if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) {
+            if ($waitSec > 0) {
+                $retry = ($lang === 'ru' ? ' Попробуйте через ' : ' Try again in ') . (int)ceil($waitSec) . ' сек.';
+            } elseif (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) {
                 $retry = ($lang === 'ru' ? ' Попробуйте через ' : ' Try again in ') . (int)ceil((float)$m[1]) . ' сек.';
             }
             return $lang === 'ru'
@@ -214,9 +216,18 @@ class Responder {
         if ($err === '' || !preg_match('/quota|rate.?limit/i', $err)) return;
         $retry = 60;
         if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) $retry = (int)ceil((float)($m[1] ?? 0));
-        $until = time() + max(30, $retry);
+        $until = time() + max(90, $retry + 10);
         $ts = gmdate('c', $until);
         $this->settings->set('gemini_block_until', $ts);
         $this->settings->set('gemini_next_allowed_until', $ts);
+    }
+
+    private function waitSecFromSettings(): int {
+        $now  = time();
+        $b    = strtotime((string)$this->settings->get('gemini_block_until'));
+        $n    = strtotime((string)$this->settings->get('gemini_next_allowed_until'));
+        $bRem = (is_int($b) && $b > $now) ? ($b - $now) : 0;
+        $nRem = (is_int($n) && $n > $now) ? ($n - $now) : 0;
+        return max($bRem, $nRem);
     }
 }
