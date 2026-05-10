@@ -26,6 +26,10 @@
   const behaviorJson = $('behaviorJson')
   const behaviorMeta = $('behaviorMeta')
 
+  const agentQuestion = $('agentQuestion')
+  const agentChatId = $('agentChatId')
+  const agentMeta = $('agentMeta')
+
   const ctxQuestion = $('ctxQuestion')
   const ctxMode = $('ctxMode')
   const ctxChatId = $('ctxChatId')
@@ -187,12 +191,33 @@
     try {
       if (raw.trim() !== '') JSON.parse(raw)
     } catch (e) {
-      outText.value = 'Ошибка JSON: ' + String(e && e.message ? e.message : e)
+      renderText('Ошибка JSON: ' + String(e && e.message ? e.message : e))
       return
     }
     const ok = await settingSave('bot_behavior_json', raw)
     if (!ok) return
     await state()
+  }
+
+  const agentAsk = async () => {
+    const q = (agentQuestion && agentQuestion.value ? agentQuestion.value : '').trim()
+    if (!q) return
+    if (agentMeta) agentMeta.textContent = 'Запрос…'
+    outMeta.textContent = 'Ответ'
+    const fd = new FormData()
+    fd.set('question', q)
+    const cid = (agentChatId && agentChatId.value ? agentChatId.value : '').trim()
+    if (cid) fd.set('chat_id', cid)
+    const j = await fetchJson(apiUrl('agent_test'), { method: 'POST', body: fd })
+    if (!j.ok) {
+      if (agentMeta) agentMeta.textContent = ''
+      return renderText(j.error || 'Ошибка')
+    }
+    if (agentMeta) agentMeta.textContent = `lang=${String(j.lang || '')} · system_len=${Number(j.system_len || 0)}`
+    const esc = (s) => String(s || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    const trace = j.trace ? esc(JSON.stringify(j.trace, null, 2)) : ''
+    const traceBox = trace ? `<details style="margin-top:10px;"><summary style="cursor:pointer; font-weight:800;">Trace</summary><pre style="margin:0; white-space:pre-wrap;">${trace}</pre></details>` : ''
+    outBox.innerHTML = `<div>${j.html || ''}</div>${traceBox}`
   }
 
   const mapSave = async () => {
@@ -330,26 +355,29 @@
     if (j.id) await kbLoad(j.id)
   }
 
-  $('btnState').addEventListener('click', state)
-  $('btnAnnounceGet').addEventListener('click', announceGet)
-  $('btnAnnounceGen').addEventListener('click', announceGen)
-  $('btnDailyGet').addEventListener('click', dailyGet)
-  $('btnDailyRun').addEventListener('click', dailyRun)
-  $('btnPromptSave').addEventListener('click', promptSave)
-  $('btnBaseSave').addEventListener('click', baseSave)
-  $('btnChatSave').addEventListener('click', chatSave)
-  $('btnDailySysSave').addEventListener('click', dailySysSave)
-  $('btnAnnounceSysSave').addEventListener('click', announceSysSave)
-  $('btnMapSave').addEventListener('click', mapSave)
-  $('btnBehaviorSave').addEventListener('click', behaviorSave)
-  $('btnCtxPreview').addEventListener('click', ctxPreview)
-  $('btnLogTail').addEventListener('click', logTail)
+  const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn) }
 
-  $('btnKbNew').addEventListener('click', kbNew)
-  $('btnKbRefresh').addEventListener('click', kbRefresh)
-  $('btnKbSave').addEventListener('click', kbSave)
-  $('btnKbCancel').addEventListener('click', () => kbSetEditorVisible(false))
-  $('btnKbImport').addEventListener('click', kbImport)
+  on('btnState', 'click', state)
+  on('btnLogTail', 'click', logTail)
+  on('btnAnnounceGet', 'click', announceGet)
+  on('btnAnnounceGen', 'click', announceGen)
+  on('btnDailyGet', 'click', dailyGet)
+  on('btnDailyRun', 'click', dailyRun)
+  on('btnPromptSave', 'click', promptSave)
+  on('btnBaseSave', 'click', baseSave)
+  on('btnChatSave', 'click', chatSave)
+  on('btnDailySysSave', 'click', dailySysSave)
+  on('btnAnnounceSysSave', 'click', announceSysSave)
+  on('btnMapSave', 'click', mapSave)
+  on('btnBehaviorSave', 'click', behaviorSave)
+  on('btnAgentAsk', 'click', agentAsk)
+  on('btnCtxPreview', 'click', ctxPreview)
+
+  on('btnKbNew', 'click', kbNew)
+  on('btnKbRefresh', 'click', kbRefresh)
+  on('btnKbSave', 'click', kbSave)
+  on('btnKbCancel', 'click', () => kbSetEditorVisible(false))
+  on('btnKbImport', 'click', kbImport)
 
   kbTbody.addEventListener('click', (e) => {
     const btn = e.target && e.target.closest ? e.target.closest('button[data-act]') : null
@@ -362,10 +390,12 @@
     if (act === 'del') kbDelete(id)
   })
 
-  dateEl.addEventListener('change', async () => {
-    await state()
-    await announceGet()
-  })
+  if (dateEl) {
+    dateEl.addEventListener('change', async () => {
+      await state()
+      await announceGet()
+    })
+  }
 
   kbSetEditorVisible(false)
   state()

@@ -344,6 +344,7 @@ class TestAIWebhookService {
     private TestAISettingsRepository $settingsRepo;
     private TestAIKnowledgeService $knowledgeSvc;
     private TestAIMenuService $menuSvc;
+    private TestAIChatAgentService $agentSvc;
     private TestAILogger $log;
     private ?array $behaviorCache;
 
@@ -358,6 +359,7 @@ class TestAIWebhookService {
         TestAISettingsRepository $settingsRepo,
         TestAIKnowledgeService $knowledgeSvc,
         TestAIMenuService $menuSvc,
+        TestAIChatAgentService $agentSvc,
         TestAILogger $log
     ) {
         $this->cfg = $cfg;
@@ -370,6 +372,7 @@ class TestAIWebhookService {
         $this->settingsRepo = $settingsRepo;
         $this->knowledgeSvc = $knowledgeSvc;
         $this->menuSvc = $menuSvc;
+        $this->agentSvc = $agentSvc;
         $this->log = $log;
         $this->behaviorCache = null;
     }
@@ -435,17 +438,6 @@ class TestAIWebhookService {
             $this->log->info('summary_command', ['chat_id' => $chatId, 'message_id' => $messageId, 'day' => $cmdDay]);
             $this->handleSummaryCommand($chatId, $messageId, $cmdDay);
             return;
-        }
-
-        if ($needReply && trim($queryText) !== '') {
-            $menuAnswer = $this->menuSvc->tryAnswer($queryText);
-            if ($menuAnswer !== '') {
-                $replyTo = $chatType === 'private' ? null : $messageId;
-                $safe = htmlspecialchars($menuAnswer, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-                $ok = $this->tg->sendMessage($chatId, $safe, $replyTo);
-                $this->log->info('telegram_send_result', ['chat_id' => $chatId, 'message_id' => $messageId, 'ok' => $ok ? 1 : 0, 'via' => 'menu_service']);
-                return;
-            }
         }
 
         if ($this->gemini->canCall() && $m->mediaType && $m->mediaFileId && ($needReply || $chatType === 'private')) {
@@ -517,55 +509,6 @@ class TestAIWebhookService {
         $system = trim(implode("\n\n", $parts));
         if ($system !== '') $system .= "\n\n";
         $system .= "Reply in " . strtoupper($lang) . ". If the user asks in a different language, prefer the user's language.";
-        $beh = $this->loadBehavior();
-        $kbCfg = is_array($beh['kb'] ?? null) ? $beh['kb'] : [];
-        $chatCfg = is_array($beh['chat'] ?? null) ? $beh['chat'] : [];
-        $announceCfg = is_array($beh['announce'] ?? null) ? $beh['announce'] : [];
-        $kbEnabled = !empty($kbCfg['enable']);
-
-        $systemAppend = trim((string)($chatCfg['system_append'] ?? ''));
-        if ($systemAppend !== '') $system .= "\n\n" . $systemAppend;
-
-        $searchText = $queryText;
-        if ($this->isKbCheckRequest($queryText, $kbCfg)) {
-            $prev = $this->lastQuestionFromContext($ctxMsgs, $kbCfg);
-            if ($prev !== '') $searchText = $prev;
-        }
-
-        $knowledgeDocs = [];
-        if ($kbEnabled) {
-            $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($searchText, 5);
-            if (!$knowledgeDocs && $this->isMenuQuestion($searchText, $beh)) {
-                $prefix = trim((string)($kbCfg['force_prefix_menu'] ?? ''));
-                if ($prefix !== '') $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($prefix . ' ' . $searchText, 5);
-            }
-            if (!$knowledgeDocs && $this->isAnnouncementQuestion($searchText, $beh)) {
-                $prefix = trim((string)($kbCfg['force_prefix_announce'] ?? ''));
-                if ($prefix !== '') $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($prefix . ' ' . $searchText, 5);
-            }
-        }
-
-        $dailyForAnnouncements = null;
-        $wantDaily = $this->isAnnouncementQuestion($searchText, $beh) && !empty($announceCfg['inject_daily']);
-        if ($wantDaily) {
-            $day = date('Y-m-d');
-            if (preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $searchText, $m)) $day = (string)($m[1] ?? $day);
-            $row = $this->dailyRepo->getByDay($day);
-            if ($row === null && !empty($announceCfg['daily_autogen']) && $waitSec <= 0 && $this->gemini->canCall()) {
-                $okRun = $this->dailySvc->runDay($day);
-                $this->log->info('daily_summary_run', ['day' => $day, 'ok' => $okRun ? 1 : 0, 'via' => 'chat_announce']);
-                $row = $this->dailyRepo->getByDay($day);
-            }
-            if (is_array($row)) {
-                $ej = json_decode((string)($row['events_json'] ?? '[]'), true);
-                if (!is_array($ej)) $ej = [];
-                $dailyForAnnouncements = [
-                    'day' => $day,
-                    'updated_at' => (string)($row['updated_at'] ?? ''),
-                    'events' => $ej,
-                ];
-            }
-        }
         $payload = [
             'chat_id' => $chatId,
             'chat_type' => $chatType,
@@ -580,40 +523,12 @@ class TestAIWebhookService {
             'question' => $queryText,
             'context' => $ctxMsgs,
         ];
-        if ($knowledgeDocs) $payload['knowledge_docs'] = $knowledgeDocs;
-        if (is_array($dailyForAnnouncements)) $payload['daily_for_announcements'] = $dailyForAnnouncements;
+        $agent = $this->agentSvc->answerChat($system, $payload);
+        $html = $this->sanitizer->sanitizeTelegramHtml((string)($agent['html'] ?? ''));
+        if ($html === '') $html = 'Не получилось сформировать ответ.';
 
         $minIntervalSec = 4;
         $this->settingsRepo->setKey('gemini_next_allowed_until', gmdate('c', time() + $minIntervalSec), date('Y-m-d H:i:s'));
-        $resp = $this->gemini->generate(
-            $this->cfg->geminiModel,
-            [['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
-            ['system' => $system, 'temperature' => 0.35, 'maxOutputTokens' => 1200, 'tag' => 'chat_reply']
-        );
-
-        $html = $this->gemini->text($resp);
-        $html = $this->sanitizer->sanitizeTelegramHtml($html);
-        if ($html === '') $html = $this->fallbackTelegramHtml($resp);
-
-        $err = '';
-        if (is_array($resp['error'] ?? null)) $err = (string)($resp['error']['message'] ?? '');
-        if ((int)($resp['_http_code'] ?? 0) === 429 && $err !== '') {
-            if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) {
-                $sec = (float)($m[1] ?? 0);
-                if ($sec > 0) {
-                    $until = time() + (int)ceil($sec);
-                    $this->settingsRepo->setKey('gemini_block_until', gmdate('c', $until), date('Y-m-d H:i:s'));
-                    $this->settingsRepo->setKey('gemini_next_allowed_until', gmdate('c', $until), date('Y-m-d H:i:s'));
-                }
-            }
-        }
-        $this->log->info('gemini_reply_ready', [
-            'chat_id' => $chatId,
-            'message_id' => $messageId,
-            'http_code' => (int)($resp['_http_code'] ?? 0),
-            'has_error' => $err !== '' ? 1 : 0,
-            'html_len' => mb_strlen($html),
-        ]);
 
         $replyTo = $chatType === 'private' ? null : $messageId;
         $ok = $this->tg->sendMessage($chatId, $html, $replyTo);
@@ -1142,52 +1057,37 @@ class TestAIMenuService {
         $this->settingsRepo = $settingsRepo;
     }
 
-    public function tryAnswer(string $question): string {
-        $q = mb_strtolower(trim($question));
-        if ($q === '') return '';
-
-        $beh = $this->loadBehavior();
-        $cfg = is_array($beh['menu_service'] ?? null) ? $beh['menu_service'] : [];
-        if (empty($cfg['enable'])) return '';
-
-        $detectKeywords = $this->normalizeStrList($cfg['detect_keywords'] ?? []);
-        if (!$this->matchesAny($q, $detectKeywords)) return '';
-
-        $needBreakfast = $this->matchesAny($q, $this->normalizeStrList($cfg['intent_breakfast'] ?? []));
-        $needCount = $this->matchesAny($q, $this->normalizeStrList($cfg['intent_count'] ?? []));
-        $needMostExpensive = $this->matchesAny($q, $this->normalizeStrList($cfg['intent_most_expensive'] ?? []));
-        if (!$needMostExpensive && !$needBreakfast && !$needCount) return '';
-
-        $url = trim((string)($cfg['menu_url'] ?? ''));
-        if ($url === '') return '';
-        $maxLen = (int)($cfg['max_len'] ?? 60000);
-        $maxLen = max(5000, min(60000, $maxLen));
-        $text = $this->knowledgeSvc->fetchLiveTextForUrl($url, $maxLen);
-        if ($text === '') return '';
-
-        $menu = $this->parseMenuText($text);
-        if (!$menu['items']) return '';
-
-        if ($needBreakfast) {
-            $items = $this->itemsBySection($menu['items'], 'Кухня', 'Завтраки');
-            if (!$items) return 'Завтраки в меню не найдены.';
-            $lines = [];
-            foreach (array_slice($items, 0, 20) as $it) $lines[] = $it['name'] . ' — ' . $this->fmtPrice($it['price'], $it['currency']);
-            return "Завтраки (до 15:00):\n" . implode("\n", $lines);
+    public function getBreakfastsText(int $limit = 20): string {
+        $limit = max(1, min(50, $limit));
+        $items = $this->getMenuItems();
+        if (!$items) return '';
+        $breakfasts = $this->itemsBySection($items, 'Кухня', 'Завтраки');
+        if (!$breakfasts) return '';
+        $lines = [];
+        foreach (array_slice($breakfasts, 0, $limit) as $it) {
+            $lines[] = (string)($it['name'] ?? '') . ' — ' . $this->fmtPrice((int)($it['price'] ?? 0), (string)($it['currency'] ?? '₫'));
         }
+        $txt = trim(implode("\n", array_filter($lines, fn($x) => trim((string)$x) !== '')));
+        return $txt !== '' ? ("Завтраки (до 15:00):\n" . $txt) : '';
+    }
 
-        if ($needMostExpensive) {
-            $max = $this->maxItem($menu['items'], 'Кухня');
-            if (!$max) return '';
-            return 'Самое дорогое блюдо: ' . $max['name'] . ' — ' . $this->fmtPrice($max['price'], $max['currency']) . '.';
-        }
+    public function getMostExpensiveKitchenText(): string {
+        $items = $this->getMenuItems();
+        if (!$items) return '';
+        $max = $this->maxItem($items, 'Кухня');
+        if (!$max) return '';
+        $name = trim((string)($max['name'] ?? ''));
+        $price = (int)($max['price'] ?? 0);
+        $cur = (string)($max['currency'] ?? '₫');
+        if ($name === '' || $price <= 0) return '';
+        return 'Самое дорогое блюдо: ' . $name . ' — ' . $this->fmtPrice($price, $cur) . '.';
+    }
 
-        if ($needCount) {
-            $count = $this->countKitchenDishes($menu['items']);
-            return 'В меню кухни сейчас ' . $count . ' блюд (без доп. позиций и бара).';
-        }
-
-        return '';
+    public function getKitchenDishCountText(): string {
+        $items = $this->getMenuItems();
+        if (!$items) return '';
+        $count = $this->countKitchenDishes($items);
+        return $count > 0 ? ('В меню кухни сейчас ' . $count . ' блюд (без доп. позиций и бара).') : '';
     }
 
     private function parseMenuText(string $text): array {
@@ -1276,28 +1176,336 @@ class TestAIMenuService {
         return $s . ' ' . $cur;
     }
 
+    private function getMenuItems(): array {
+        $behRow = $this->settingsRepo->getKey('bot_behavior_json');
+        $beh = json_decode((string)($behRow['v'] ?? ''), true);
+        if (!is_array($beh)) $beh = [];
+        $cfg = is_array($beh['menu_service'] ?? null) ? $beh['menu_service'] : [];
+        if (empty($cfg['enable'])) return [];
+
+        $url = trim((string)($cfg['menu_url'] ?? ''));
+        if ($url === '') return [];
+        $maxLen = (int)($cfg['max_len'] ?? 60000);
+        $maxLen = max(5000, min(60000, $maxLen));
+        $text = $this->knowledgeSvc->fetchLiveTextForUrl($url, $maxLen);
+        if ($text === '') return [];
+        $menu = $this->parseMenuText($text);
+        return is_array($menu['items'] ?? null) ? $menu['items'] : [];
+    }
+}
+
+class TestAIChatAgentService {
+    private TestAIConfig $cfg;
+    private TestAIGeminiClient $gemini;
+    private TestAIHtmlSanitizer $sanitizer;
+    private TestAISettingsRepository $settingsRepo;
+    private TestAIKnowledgeService $knowledgeSvc;
+    private TestAIMenuService $menuSvc;
+    private TestAIDailySummariesRepository $dailyRepo;
+    private TestAIDailySummaryService $dailySvc;
+    private ?TestAILogger $log;
+
+    public function __construct(
+        TestAIConfig $cfg,
+        TestAIGeminiClient $gemini,
+        TestAIHtmlSanitizer $sanitizer,
+        TestAISettingsRepository $settingsRepo,
+        TestAIKnowledgeService $knowledgeSvc,
+        TestAIMenuService $menuSvc,
+        TestAIDailySummariesRepository $dailyRepo,
+        TestAIDailySummaryService $dailySvc,
+        ?TestAILogger $log = null
+    ) {
+        $this->cfg = $cfg;
+        $this->gemini = $gemini;
+        $this->sanitizer = $sanitizer;
+        $this->settingsRepo = $settingsRepo;
+        $this->knowledgeSvc = $knowledgeSvc;
+        $this->menuSvc = $menuSvc;
+        $this->dailyRepo = $dailyRepo;
+        $this->dailySvc = $dailySvc;
+        $this->log = $log;
+    }
+
+    public function answerChat(string $system, array $payload): array {
+        $q = trim((string)($payload['question'] ?? ''));
+        if ($q === '') return ['html' => '', 'trace' => ['error' => 'missing_question']];
+
+        $beh = $this->loadBehavior();
+        $agentCfg = is_array($beh['agent'] ?? null) ? $beh['agent'] : [];
+        $chatCfg = is_array($beh['chat'] ?? null) ? $beh['chat'] : [];
+        $append = trim((string)($chatCfg['system_append'] ?? ''));
+        if ($append !== '') $system = rtrim($system) . "\n\n" . $append;
+        if (isset($agentCfg['enable']) && empty($agentCfg['enable'])) {
+            return $this->fallbackSingleCall($system, $payload, ['disabled' => 1]);
+        }
+
+        $tools = $this->getTools($beh);
+        $trace = [];
+
+        $plan = $this->plan($q, $payload, $tools, $agentCfg);
+        $trace['plan'] = $plan;
+        if (!is_array($plan)) return $this->fallbackSingleCall($system, $payload, ['plan_failed' => 1]);
+
+        $direct = trim((string)($plan['direct_answer_html'] ?? ''));
+        $calls = $plan['calls'] ?? [];
+        if ($direct !== '' && (!is_array($calls) || !$calls)) {
+            $direct = $this->sanitizer->sanitizeTelegramHtml($direct);
+            return ['html' => $direct, 'trace' => $trace];
+        }
+
+        $toolResults = $this->executeCalls(is_array($calls) ? $calls : [], $tools, $agentCfg);
+        $trace['tool_results'] = $toolResults;
+
+        $final = $this->finalize($system, $payload, $toolResults, $agentCfg);
+        $trace['final'] = [
+            'http_code' => (int)($final['_http_code'] ?? 0),
+            'has_error' => !empty($final['error']) ? 1 : 0,
+        ];
+
+        $html = $this->gemini->text($final);
+        $html = $this->sanitizer->sanitizeTelegramHtml($html);
+        if ($html === '') $html = $this->fallbackTextFromError($final);
+        return ['html' => $html, 'trace' => $trace];
+    }
+
+    private function fallbackSingleCall(string $system, array $payload, array $trace): array {
+        $resp = $this->gemini->generate(
+            $this->cfg->geminiModel,
+            [['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
+            ['system' => $system, 'temperature' => 0.35, 'maxOutputTokens' => 1200, 'tag' => 'chat_reply_fallback']
+        );
+        $this->handleRateLimit($resp);
+        $html = $this->gemini->text($resp);
+        $html = $this->sanitizer->sanitizeTelegramHtml($html);
+        if ($html === '') $html = $this->fallbackTextFromError($resp);
+        return ['html' => $html, 'trace' => $trace];
+    }
+
+    private function plan(string $question, array $payload, array $tools, array $agentCfg): ?array {
+        $maxCalls = (int)($agentCfg['max_calls'] ?? 3);
+        $maxCalls = max(0, min(6, $maxCalls));
+        $planTemp = (float)($agentCfg['plan_temp'] ?? 0.1);
+
+        $toolLines = [];
+        foreach ($tools as $t) {
+            if (!is_array($t)) continue;
+            if (empty($t['enabled'])) continue;
+            $name = (string)($t['name'] ?? '');
+            $desc = (string)($t['desc'] ?? '');
+            if ($name === '') continue;
+            $toolLines[] = '- ' . $name . ': ' . $desc;
+        }
+        $toolText = $toolLines ? implode("\n", $toolLines) : '- (no tools)';
+
+        $system = "You are a tool router. Decide which tools to call to answer the user's question.\n\nAvailable tools:\n{$toolText}\n\nReturn strict JSON only:\n{\n  \"direct_answer_html\": \"\",\n  \"calls\": [\n    {\"tool\":\"...\",\"args\":{}}\n  ]\n}\n\nRules:\n- Choose 0..{$maxCalls} calls.\n- If tools are needed, do not answer directly; leave direct_answer_html empty.\n- If no tools are needed, put the final Telegram-HTML answer into direct_answer_html and leave calls empty.\n- Never invent data. Prefer calling tools when asked about menu, prices, announcements, bookings, contacts, or facts.\n";
+
+        $p = [
+            'mode' => 'chat',
+            'question' => $question,
+            'lang' => (string)($payload['lang'] ?? ''),
+            'context' => $payload['context'] ?? [],
+            'now_date' => date('Y-m-d'),
+        ];
+
+        $resp = $this->gemini->generate(
+            $this->cfg->geminiModel,
+            [['text' => json_encode($p, JSON_UNESCAPED_UNICODE)]],
+            ['system' => $system, 'temperature' => $planTemp, 'maxOutputTokens' => 700, 'responseMimeType' => 'application/json', 'tag' => 'agent_plan']
+        );
+        $this->handleRateLimit($resp);
+        $j = $this->gemini->json($resp);
+        if (!is_array($j)) return null;
+
+        $calls = $j['calls'] ?? [];
+        if (!is_array($calls)) $calls = [];
+        $outCalls = [];
+        foreach ($calls as $c) {
+            if (!is_array($c)) continue;
+            $tool = trim((string)($c['tool'] ?? ''));
+            if ($tool === '') continue;
+            if (!$this->isToolEnabled($tools, $tool)) continue;
+            $args = is_array($c['args'] ?? null) ? $c['args'] : [];
+            $outCalls[] = ['tool' => $tool, 'args' => $args];
+            if (count($outCalls) >= $maxCalls) break;
+        }
+
+        return [
+            'direct_answer_html' => (string)($j['direct_answer_html'] ?? ''),
+            'calls' => $outCalls,
+        ];
+    }
+
+    private function executeCalls(array $calls, array $tools, array $agentCfg): array {
+        $allowDailyGenerate = !empty($agentCfg['allow_daily_generate']);
+        $out = [];
+        foreach ($calls as $c) {
+            if (!is_array($c)) continue;
+            $tool = trim((string)($c['tool'] ?? ''));
+            $args = is_array($c['args'] ?? null) ? $c['args'] : [];
+            if ($tool === '' || !$this->isToolEnabled($tools, $tool)) continue;
+
+            if ($tool === 'kb_search') {
+                $query = trim((string)($args['query'] ?? ''));
+                $limit = (int)($args['limit'] ?? 5);
+                $limit = max(1, min(8, $limit));
+                $docs = $query !== '' ? $this->knowledgeSvc->selectForQuestion($query, $limit) : [];
+                $out[] = ['tool' => $tool, 'ok' => true, 'data' => ['query' => $query, 'docs' => $docs]];
+                continue;
+            }
+
+            if ($tool === 'kb_fetch_url') {
+                $url = trim((string)($args['url'] ?? ''));
+                $maxLen = (int)($args['max_len'] ?? 60000);
+                $maxLen = max(500, min(60000, $maxLen));
+                $txt = $url !== '' ? $this->knowledgeSvc->fetchLiveTextForUrl($url, $maxLen) : '';
+                $out[] = ['tool' => $tool, 'ok' => $txt !== '', 'data' => ['url' => $url, 'text' => $txt]];
+                continue;
+            }
+
+            if ($tool === 'daily_get') {
+                $day = trim((string)($args['day'] ?? date('Y-m-d')));
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $day)) $day = date('Y-m-d');
+                $row = $this->dailyRepo->getByDay($day);
+                $ej = is_array($row) ? json_decode((string)($row['events_json'] ?? '[]'), true) : null;
+                if (!is_array($ej)) $ej = [];
+                $out[] = [
+                    'tool' => $tool,
+                    'ok' => is_array($row) ? true : false,
+                    'data' => [
+                        'day' => $day,
+                        'exists' => is_array($row) ? 1 : 0,
+                        'updated_at' => is_array($row) ? (string)($row['updated_at'] ?? '') : '',
+                        'summary_text' => is_array($row) ? (string)($row['summary_text'] ?? '') : '',
+                        'events' => $ej,
+                    ],
+                ];
+                continue;
+            }
+
+            if ($tool === 'daily_generate') {
+                if (!$allowDailyGenerate) {
+                    $out[] = ['tool' => $tool, 'ok' => false, 'error' => 'disabled'];
+                    continue;
+                }
+                $day = trim((string)($args['day'] ?? date('Y-m-d')));
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $day)) $day = date('Y-m-d');
+                $ok = $this->dailySvc->runDay($day);
+                $row = $this->dailyRepo->getByDay($day);
+                $out[] = ['tool' => $tool, 'ok' => $ok ? true : false, 'data' => ['day' => $day, 'exists' => is_array($row) ? 1 : 0]];
+                continue;
+            }
+
+            if ($tool === 'menu_breakfasts') {
+                $limit = (int)($args['limit'] ?? 20);
+                $txt = $this->menuSvc->getBreakfastsText($limit);
+                $out[] = ['tool' => $tool, 'ok' => $txt !== '', 'data' => ['text' => $txt]];
+                continue;
+            }
+
+            if ($tool === 'menu_most_expensive') {
+                $txt = $this->menuSvc->getMostExpensiveKitchenText();
+                $out[] = ['tool' => $tool, 'ok' => $txt !== '', 'data' => ['text' => $txt]];
+                continue;
+            }
+
+            if ($tool === 'menu_count_kitchen') {
+                $txt = $this->menuSvc->getKitchenDishCountText();
+                $out[] = ['tool' => $tool, 'ok' => $txt !== '', 'data' => ['text' => $txt]];
+                continue;
+            }
+        }
+        return $out;
+    }
+
+    private function finalize(string $system, array $payload, array $toolResults, array $agentCfg): array {
+        $finalTemp = (float)($agentCfg['final_temp'] ?? 0.35);
+        $finalMax = (int)($agentCfg['final_max_tokens'] ?? 1200);
+        $finalMax = max(200, min(2500, $finalMax));
+
+        $sys = rtrim($system) . "\n\nUse payload.tool_results. If data is missing, say you don't have it. Do not invent.\n";
+        $p = $payload;
+        $p['tool_results'] = $toolResults;
+
+        $resp = $this->gemini->generate(
+            $this->cfg->geminiModel,
+            [['text' => json_encode($p, JSON_UNESCAPED_UNICODE)]],
+            ['system' => $sys, 'temperature' => $finalTemp, 'maxOutputTokens' => $finalMax, 'tag' => 'agent_final']
+        );
+        $this->handleRateLimit($resp);
+        return $resp;
+    }
+
+    private function getTools(array $beh): array {
+        $tools = [];
+        if (is_array($beh['tools'] ?? null)) {
+            foreach ($beh['tools'] as $t) {
+                if (!is_array($t)) continue;
+                $name = trim((string)($t['name'] ?? ''));
+                if ($name === '') continue;
+                $tools[] = [
+                    'name' => $name,
+                    'enabled' => !empty($t['enabled']) ? 1 : 0,
+                    'desc' => trim((string)($t['desc'] ?? '')),
+                ];
+            }
+        }
+        if ($tools) return $tools;
+        return [
+            ['name' => 'kb_search', 'enabled' => 1, 'desc' => 'Search knowledge base by query. args: {query,limit}'],
+            ['name' => 'kb_fetch_url', 'enabled' => 1, 'desc' => 'Fetch veranda.my URL and extract text. args: {url,max_len}'],
+            ['name' => 'daily_get', 'enabled' => 1, 'desc' => 'Get daily summary and events for day from DB. args: {day}'],
+            ['name' => 'daily_generate', 'enabled' => 0, 'desc' => 'Generate daily summary for day (costly). args: {day}'],
+            ['name' => 'menu_breakfasts', 'enabled' => 1, 'desc' => 'List breakfasts from menu. args: {limit}'],
+            ['name' => 'menu_most_expensive', 'enabled' => 1, 'desc' => 'Most expensive kitchen dish. args: {}'],
+            ['name' => 'menu_count_kitchen', 'enabled' => 1, 'desc' => 'Count kitchen dishes. args: {}'],
+        ];
+    }
+
+    private function isToolEnabled(array $tools, string $name): bool {
+        foreach ($tools as $t) {
+            if (!is_array($t)) continue;
+            if ((string)($t['name'] ?? '') !== $name) continue;
+            return !empty($t['enabled']);
+        }
+        return false;
+    }
+
     private function loadBehavior(): array {
         $row = $this->settingsRepo->getKey('bot_behavior_json');
         $decoded = json_decode((string)($row['v'] ?? ''), true);
         return is_array($decoded) ? $decoded : [];
     }
 
-    private function normalizeStrList($v): array {
-        $out = [];
-        if (!is_array($v)) return [];
-        foreach ($v as $it) {
-            $s = mb_strtolower(trim((string)$it));
-            if ($s === '') continue;
-            $out[] = $s;
+    private function handleRateLimit(array $resp): void {
+        $err = '';
+        if (is_array($resp['error'] ?? null)) $err = (string)($resp['error']['message'] ?? '');
+        if ((int)($resp['_http_code'] ?? 0) === 429 && $err !== '') {
+            if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) {
+                $sec = (float)($m[1] ?? 0);
+                if ($sec > 0) {
+                    $until = time() + (int)ceil($sec);
+                    $this->settingsRepo->setKey('gemini_block_until', gmdate('c', $until), date('Y-m-d H:i:s'));
+                    $this->settingsRepo->setKey('gemini_next_allowed_until', gmdate('c', $until), date('Y-m-d H:i:s'));
+                }
+            }
         }
-        return array_values(array_unique($out));
     }
 
-    private function matchesAny(string $haystackLower, array $needlesLower): bool {
-        foreach ($needlesLower as $n) {
-            if ($n === '') continue;
-            if (mb_stripos($haystackLower, $n) !== false) return true;
+    private function fallbackTextFromError(array $resp): string {
+        $err = '';
+        if (is_array($resp['error'] ?? null)) $err = trim((string)($resp['error']['message'] ?? ''));
+        $plain = $this->gemini->text($resp);
+        $plain = trim(strip_tags($plain));
+        if ($plain !== '') {
+            if (mb_strlen($plain) > 3500) $plain = mb_substr($plain, 0, 3500) . '…';
+            return htmlspecialchars($plain, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
-        return false;
+        if ($err !== '') {
+            if (mb_strlen($err) > 900) $err = mb_substr($err, 0, 900) . '…';
+            return 'Gemini error: ' . htmlspecialchars($err, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        }
+        $code = (int)($resp['_http_code'] ?? 0);
+        return $code ? ("Gemini пустой ответ (HTTP {$code}).") : 'Не получилось сформировать ответ.';
     }
 }

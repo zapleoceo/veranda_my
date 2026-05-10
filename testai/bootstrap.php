@@ -41,34 +41,37 @@ $defaults = [
     'announce' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 0, 'system_announce' => 1],
   ], JSON_UNESCAPED_UNICODE),
   'bot_behavior_json' => json_encode([
+    'agent' => [
+      'enable' => 1,
+      'max_calls' => 3,
+      'plan_temp' => 0.1,
+      'final_temp' => 0.35,
+      'final_max_tokens' => 1200,
+      'allow_daily_generate' => 0,
+    ],
+    'tools' => [
+      ['name' => 'kb_search', 'enabled' => 1, 'desc' => 'Search knowledge base by query. args: {query,limit}'],
+      ['name' => 'kb_fetch_url', 'enabled' => 1, 'desc' => 'Fetch veranda.my URL and extract text. args: {url,max_len}'],
+      ['name' => 'daily_get', 'enabled' => 1, 'desc' => 'Get daily summary and events for day from DB. args: {day}'],
+      ['name' => 'daily_generate', 'enabled' => 0, 'desc' => 'Generate daily summary for day (costly). args: {day}'],
+      ['name' => 'menu_breakfasts', 'enabled' => 1, 'desc' => 'List breakfasts from menu. args: {limit}'],
+      ['name' => 'menu_most_expensive', 'enabled' => 1, 'desc' => 'Most expensive kitchen dish. args: {}'],
+      ['name' => 'menu_count_kitchen', 'enabled' => 1, 'desc' => 'Count kitchen dishes. args: {}'],
+    ],
     'kb' => [
       'enable' => 1,
       'check_triggers' => ['посмотри в базе знаний', 'проверь в базе знаний', 'база знаний', 'kb', 'knowledge base'],
       'live_fetch_enable' => 1,
       'live_fetch_max_docs' => 2,
       'live_fetch_max_len' => 60000,
-      'force_prefix_menu' => 'меню',
-      'force_prefix_announce' => 'анонс афиша событие',
-    ],
-    'detectors' => [
-      'menu_keywords' => ['меню', 'блюд', 'позици', 'завтрак', 'бар', 'пиво', 'вино', 'цена', 'бургер', 'панкейк', 'вафл', 'breakfast'],
-      'announce_keywords' => ['анонс', 'афиш', 'событи', 'мероприят', 'концерт', 'музык', 'live', 'dj', 'дуэт', 'duo', 'bibi'],
     ],
     'chat' => [
-      'system_append' => "Use payload.knowledge_docs as the knowledge base: if provided, answer using it. If the user asks to check the knowledge base, do not refuse; use knowledge_docs or say that no relevant info was found. If payload.daily_for_announcements is provided, use its events when answering about announcements.",
-    ],
-    'announce' => [
-      'inject_daily' => 1,
-      'daily_autogen' => 1,
+      'system_append' => "Use payload.tool_results. Do not invent. Prefer using tool results for menu, prices, announcements, and facts. If tool results are empty, say you don't have that info.",
     ],
     'menu_service' => [
       'enable' => 1,
       'menu_url' => 'https://veranda.my/links/menu.php',
       'max_len' => 60000,
-      'detect_keywords' => ['меню', 'завтрак', 'завтраки', 'блюдо', 'блюда', 'позиции', 'бар', 'пиво', 'вино', 'цена', 'сколько', 'дорог', 'breakfast'],
-      'intent_breakfast' => ['завтрак', 'завтраки', 'breakfast'],
-      'intent_count' => ['сколько блюд', 'сколько позиций', 'сколько в меню'],
-      'intent_most_expensive' => ['самое дорогое', 'самый дорогой', 'дороже всего', 'most expensive'],
     ],
   ], JSON_UNESCAPED_UNICODE),
 ];
@@ -87,7 +90,8 @@ $menuSvc = new \App\Classes\TestAIMenuService($knowledgeSvc, $settingsRepo);
 
 $announcementSvc = new \App\Classes\TestAIAnnouncementService($cfg, $gemini, $sanitizer, $dailyRepo, $rawRepo, $settingsRepo, __DIR__ . '/cache');
 $dailySvc = new \App\Classes\TestAIDailySummaryService($cfg, $gemini, $rawRepo, $dailyRepo, $settingsRepo);
-$webhookSvc = new \App\Classes\TestAIWebhookService($cfg, $gemini, $tg, $sanitizer, $rawRepo, $dailyRepo, $dailySvc, $settingsRepo, $knowledgeSvc, $menuSvc, $log);
+$agentSvc = new \App\Classes\TestAIChatAgentService($cfg, $gemini, $sanitizer, $settingsRepo, $knowledgeSvc, $menuSvc, $dailyRepo, $dailySvc, $log);
+$webhookSvc = new \App\Classes\TestAIWebhookService($cfg, $gemini, $tg, $sanitizer, $rawRepo, $dailyRepo, $dailySvc, $settingsRepo, $knowledgeSvc, $menuSvc, $agentSvc, $log);
 
 return [
   'cfg' => $cfg,
@@ -109,6 +113,7 @@ return [
   'sanitizer' => $sanitizer,
   'knowledgeSvc' => $knowledgeSvc,
   'menuSvc' => $menuSvc,
+  'agentSvc' => $agentSvc,
   'announcementSvc' => $announcementSvc,
   'dailySvc' => $dailySvc,
   'webhookSvc' => $webhookSvc,

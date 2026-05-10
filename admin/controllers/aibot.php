@@ -9,6 +9,7 @@ $dailySvc = $ctx['dailySvc'];
 $settingsRepo = $ctx['settingsRepo'];
 $kbRepo = $ctx['kbRepo'];
 $knowledgeSvc = $ctx['knowledgeSvc'];
+$agentSvc = $ctx['agentSvc'] ?? null;
 $gemini = $ctx['gemini'];
 $announcementSvc = $ctx['announcementSvc'];
 $sanitizer = $ctx['sanitizer'];
@@ -296,6 +297,90 @@ if ($ajax !== '') {
             'knowledge_docs_count' => count($docs),
             'knowledge_docs' => $docs,
             'payload' => $payload,
+        ]);
+    }
+
+    if ($ajax === 'agent_test') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') $respondJson(['ok' => false, 'error' => 'method_not_allowed'], 405);
+        if (!$agentSvc instanceof \App\Classes\TestAIChatAgentService) $respondJson(['ok' => false, 'error' => 'agent_missing'], 500);
+        $q = trim((string)($_POST['question'] ?? ''));
+        if ($q === '') $respondJson(['ok' => false, 'error' => 'missing_question'], 400);
+
+        $chatId = trim((string)($_POST['chat_id'] ?? ''));
+        $ctxMsgs = [];
+        if ($chatId !== '') {
+            $rows = $rawRepo->fetchRecentByChat($chatId, 30);
+            $rows = array_reverse(is_array($rows) ? $rows : []);
+            foreach ($rows as $r) {
+                if (!is_array($r)) continue;
+                $u = trim((string)($r['tg_username'] ?? ''));
+                if ($u === '') $u = trim((string)($r['tg_name'] ?? ''));
+                $t = trim((string)($r['text'] ?? ''));
+                $mt = trim((string)($r['media_text'] ?? ''));
+                $combined = trim($t . "\n" . ($mt !== '' ? ('[media]' . "\n" . $mt) : ''));
+                if ($combined === '') continue;
+                if (mb_strlen($combined) > 900) $combined = mb_substr($combined, 0, 900) . '…';
+                $ctxMsgs[] = [
+                    'at' => (string)($r['received_at'] ?? ''),
+                    'from' => $u,
+                    'text' => $combined,
+                ];
+            }
+        }
+
+        $mode = 'chat';
+        $mapRow = $settingsRepo->getKey('bot_instr_map');
+        $decoded = json_decode((string)($mapRow['v'] ?? ''), true);
+        if (!is_array($decoded)) $decoded = [];
+        $fallback = [
+            'chat' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 1, 'system_daily' => 0, 'system_announce' => 0],
+            'daily' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 1, 'system_announce' => 0],
+            'announce' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 0, 'system_announce' => 1],
+        ];
+        $map = $fallback;
+        foreach (['chat', 'daily', 'announce'] as $m) {
+            if (!is_array($decoded[$m] ?? null)) continue;
+            foreach ($map[$m] as $k => $v) $map[$m][$k] = !empty($decoded[$m][$k]) ? 1 : 0;
+        }
+
+        $common = trim((string)($settingsRepo->getBotPrompt()['prompt'] ?? ''));
+        $base = trim((string)($settingsRepo->getKey('bot_system_base')['v'] ?? ''));
+        $chatSys = trim((string)($settingsRepo->getKey('bot_system_chat')['v'] ?? ''));
+        $systemParts = [];
+        if (!empty($map[$mode]['common_prompt']) && $common !== '') $systemParts[] = $common;
+        if (!empty($map[$mode]['system_base']) && $base !== '') $systemParts[] = $base;
+        if (!empty($map[$mode]['system_chat']) && $chatSys !== '') $systemParts[] = $chatSys;
+        if (!$systemParts && $chatSys !== '') $systemParts[] = $chatSys;
+        $system = trim(implode("\n\n", $systemParts));
+
+        $langVal = strtolower(trim((string)($settingsRepo->getKey('bot_lang_chat')['v'] ?? 'auto')));
+        if (!in_array($langVal, ['ru', 'en'], true)) {
+            $langVal = preg_match('/\p{Cyrillic}/u', $q) ? 'ru' : (preg_match('/[A-Za-z]/', $q) ? 'en' : 'ru');
+        }
+        if ($system !== '') $system .= "\n\n";
+        $system .= "Reply in " . strtoupper($langVal) . ".";
+
+        $payload = [
+            'chat_id' => $chatId !== '' ? $chatId : 'admin_test',
+            'chat_type' => 'admin',
+            'chat_title' => 'admin',
+            'user' => ['id' => null, 'username' => 'admin', 'name' => 'admin'],
+            'message_id' => 0,
+            'lang' => $langVal,
+            'question' => $q,
+            'context' => $ctxMsgs,
+        ];
+
+        $r = $agentSvc->answerChat($system, $payload);
+        $html = $sanitizer->sanitizeTelegramHtml((string)($r['html'] ?? ''));
+        $respondJson([
+            'ok' => true,
+            'question' => $q,
+            'chat_id' => $chatId,
+            'lang' => $langVal,
+            'system_len' => mb_strlen($system),
+            'html' => $html,
+            'trace' => $r['trace'] ?? null,
         ]);
     }
 

@@ -6,12 +6,19 @@
     </div>
     <div style="display:flex; gap:10px; flex-wrap:wrap;">
       <button class="btn" type="button" id="btnState">Статус</button>
+      <button class="btn" type="button" id="btnLogTail">Логи</button>
+    </div>
+  </div>
+
+  <details style="margin-top:12px;">
+    <summary style="cursor:pointer; font-weight:800;">Операции (кеш)</summary>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
       <button class="btn" type="button" id="btnAnnounceGet">Анонс (кеш)</button>
       <button class="btn" type="button" id="btnAnnounceGen">Сгенерировать анонс</button>
       <button class="btn" type="button" id="btnDailyGet">Саммари (кеш)</button>
       <button class="btn" type="button" id="btnDailyRun">Сгенерировать саммари</button>
     </div>
-  </div>
+  </details>
 
   <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; align-items:center;">
     <span class="pill" id="pillDb">DB</span>
@@ -269,32 +276,45 @@
 
     <div class="card" style="padding:18px;">
       <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
-        <div style="font-weight:900;">Проверка контекста</div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn" type="button" id="btnCtxPreview">Показать контекст</button>
-          <button class="btn" type="button" id="btnLogTail">Логи</button>
-        </div>
+        <div style="font-weight:900;">Тест бота</div>
+        <button class="btn" type="button" id="btnAgentAsk">Спросить</button>
       </div>
       <div class="small-muted" style="margin-top:6px;">
-        Показывает, какие документы (и какие live URL) попадут в запрос к модели для заданного вопроса.
+        Показывает ответ и trace: какие источники были вызваны и что вернули.
       </div>
       <div class="form-group" style="margin-top:10px;">
-        <label for="ctxQuestion">Вопрос</label>
-        <input id="ctxQuestion" type="text" placeholder="Например: какое сегодня меню?">
+        <label for="agentQuestion">Вопрос</label>
+        <input id="agentQuestion" type="text" placeholder="Например: дай анонс на сегодня">
       </div>
       <div class="form-group" style="margin-top:10px;">
-        <label for="ctxMode">Режим</label>
-        <select id="ctxMode">
-          <option value="chat">chat</option>
-          <option value="daily">daily</option>
-          <option value="announce">announce</option>
-        </select>
+        <label for="agentChatId">Chat ID (необязательно, чтобы подтянуть историю)</label>
+        <input id="agentChatId" type="text" placeholder="169510539">
       </div>
-      <div class="form-group" style="margin-top:10px;">
-        <label for="ctxChatId">Chat ID (необязательно, чтобы увидеть историю)</label>
-        <input id="ctxChatId" type="text" placeholder="169510539">
-      </div>
-      <div class="small-muted" id="ctxMeta" style="margin-top:8px;"></div>
+      <div class="small-muted" id="agentMeta" style="margin-top:8px;"></div>
+
+      <details style="margin-top:12px;">
+        <summary style="cursor:pointer; font-weight:800;">Отладка: показать контекст</summary>
+        <div class="form-group" style="margin-top:10px;">
+          <label for="ctxQuestion">Вопрос</label>
+          <input id="ctxQuestion" type="text" placeholder="Например: какое сегодня меню?">
+        </div>
+        <div class="form-group" style="margin-top:10px;">
+          <label for="ctxMode">Режим</label>
+          <select id="ctxMode">
+            <option value="chat">chat</option>
+            <option value="daily">daily</option>
+            <option value="announce">announce</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-top:10px;">
+          <label for="ctxChatId">Chat ID (необязательно, чтобы увидеть историю)</label>
+          <input id="ctxChatId" type="text" placeholder="169510539">
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+          <button class="btn" type="button" id="btnCtxPreview">Показать контекст</button>
+        </div>
+        <div class="small-muted" id="ctxMeta" style="margin-top:8px;"></div>
+      </details>
     </div>
 
     <div class="card" style="padding:18px;">
