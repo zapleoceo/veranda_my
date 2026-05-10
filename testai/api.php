@@ -154,6 +154,10 @@ if ($ajax === 'gemini_usage') {
   $blockUntilStr = is_array($block) ? (string)($block['v'] ?? '') : '';
   $blockUntilTs = $blockUntilStr !== '' ? strtotime($blockUntilStr) : false;
   $blockRemainingSec = is_int($blockUntilTs) && $blockUntilTs > time() ? ($blockUntilTs - time()) : 0;
+  $next = is_object($settingsRepo) ? $settingsRepo->getKey('gemini_next_allowed_until') : ['v' => '', 'updated_at' => ''];
+  $nextUntilStr = is_array($next) ? (string)($next['v'] ?? '') : '';
+  $nextUntilTs = $nextUntilStr !== '' ? strtotime($nextUntilStr) : false;
+  $nextRemainingSec = is_int($nextUntilTs) && $nextUntilTs > time() ? ($nextUntilTs - time()) : 0;
 
   $maxBytes = (int)($_GET['max_bytes'] ?? 700000);
   $maxBytes = max(50000, min(2500000, $maxBytes));
@@ -270,6 +274,8 @@ if ($ajax === 'gemini_usage') {
     'cooldown' => [
       'block_until' => $blockUntilStr,
       'remaining_sec' => $blockRemainingSec,
+      'next_allowed_until' => $nextUntilStr,
+      'next_remaining_sec' => $nextRemainingSec,
     ],
     'assumed_limit_per_minute' => $assumedLimitPerMin,
     'assumed_remaining_this_minute' => $remaining,

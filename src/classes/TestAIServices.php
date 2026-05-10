@@ -282,18 +282,35 @@ class TestAIWebhookService {
             return;
         }
 
+        $now = time();
         $block = $this->settingsRepo->getKey('gemini_block_until');
         $blockUntil = strtotime((string)($block['v'] ?? ''));
-        if (is_int($blockUntil) && $blockUntil > time()) {
-            $sec = $blockUntil - time();
-            $msg = 'Лимит запросов к AI исчерпан. Попробуйте через ' . (int)ceil($sec) . ' сек.';
-            $ok = $this->tg->sendMessage($chatId, $msg, null);
-            $this->log->info('telegram_send_result', [
+        $blockRem = is_int($blockUntil) && $blockUntil > $now ? ($blockUntil - $now) : 0;
+        $next = $this->settingsRepo->getKey('gemini_next_allowed_until');
+        $nextUntil = strtotime((string)($next['v'] ?? ''));
+        $nextRem = is_int($nextUntil) && $nextUntil > $now ? ($nextUntil - $now) : 0;
+        $waitSec = max($blockRem, $nextRem);
+        if ($waitSec > 0) {
+            $this->log->info('gemini_wait', [
                 'chat_id' => $chatId,
+                'chat_type' => $chatType,
                 'message_id' => $messageId,
-                'ok' => $ok ? 1 : 0,
+                'block_rem_sec' => $blockRem,
+                'next_rem_sec' => $nextRem,
+                'wait_sec' => $waitSec,
             ]);
-            return;
+            if ($chatType === 'private' && $waitSec <= 70) {
+                sleep((int)$waitSec);
+            } else {
+                $msg = 'Лимит запросов к AI исчерпан. Попробуйте через ' . (int)ceil($waitSec) . ' сек.';
+                $ok = $this->tg->sendMessage($chatId, $msg, null);
+                $this->log->info('telegram_send_result', [
+                    'chat_id' => $chatId,
+                    'message_id' => $messageId,
+                    'ok' => $ok ? 1 : 0,
+                ]);
+                return;
+            }
         }
 
         $botPrompt = '';
@@ -319,6 +336,8 @@ class TestAIWebhookService {
             'context' => $ctxMsgs,
         ];
 
+        $minIntervalSec = 4;
+        $this->settingsRepo->setKey('gemini_next_allowed_until', gmdate('c', time() + $minIntervalSec), date('Y-m-d H:i:s'));
         $resp = $this->gemini->generate(
             $this->cfg->geminiModel,
             [['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
@@ -337,6 +356,7 @@ class TestAIWebhookService {
                 if ($sec > 0) {
                     $until = time() + (int)ceil($sec);
                     $this->settingsRepo->setKey('gemini_block_until', gmdate('c', $until), date('Y-m-d H:i:s'));
+                    $this->settingsRepo->setKey('gemini_next_allowed_until', gmdate('c', $until), date('Y-m-d H:i:s'));
                 }
             }
         }
