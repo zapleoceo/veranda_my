@@ -49,6 +49,8 @@ class TestAIDbSchema {
 
 class TestAITelegramClient {
     private string $token;
+    private int $lastHttpCode = 0;
+    private string $lastRaw = '';
 
     public function __construct(string $token) {
         $this->token = trim($token);
@@ -56,6 +58,14 @@ class TestAITelegramClient {
 
     public function hasToken(): bool {
         return $this->token !== '';
+    }
+
+    public function lastHttpCode(): int {
+        return $this->lastHttpCode;
+    }
+
+    public function lastRaw(): string {
+        return $this->lastRaw;
     }
 
     public function postJson(string $method, array $payload): ?array {
@@ -68,7 +78,10 @@ class TestAITelegramClient {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 20);
         $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
+        $this->lastHttpCode = (int)$code;
+        $this->lastRaw = is_string($resp) ? $resp : '';
         if (!is_string($resp) || $resp === '') return null;
         $data = json_decode($resp, true);
         return is_array($data) ? $data : null;
@@ -112,7 +125,17 @@ class TestAITelegramClient {
         ];
         if ($replyToMessageId !== null && $replyToMessageId > 0) $payload['reply_to_message_id'] = $replyToMessageId;
         $r = $this->postJson('sendMessage', $payload);
-        return is_array($r) && !empty($r['ok']);
+        $ok = is_array($r) && !empty($r['ok']);
+        if (!$ok) {
+            $desc = is_array($r) ? (string)($r['description'] ?? '') : '';
+            $err = is_array($r) ? (string)($r['error_code'] ?? '') : '';
+            error_log('testai telegram sendMessage failed: ' . json_encode([
+                'http_code' => $this->lastHttpCode,
+                'error_code' => $err,
+                'description' => $desc,
+            ], JSON_UNESCAPED_UNICODE));
+        }
+        return $ok;
     }
 }
 
