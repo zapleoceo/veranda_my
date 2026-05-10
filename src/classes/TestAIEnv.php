@@ -78,8 +78,8 @@ class TestAIConfig {
 
         $cfg->appUrl = rtrim((string)($_ENV['APP_URL'] ?? ''), '/');
         $cfg->geminiProxyUrl = rtrim((string)($_ENV['GEMINI_PROXY_URL'] ?? ''), '/');
-        $cfg->geminiProxyKey = (string)($_ENV['GEMINI_PROXY_KEY'] ?? '');
-        if ($cfg->geminiProxyKey === '') $cfg->geminiProxyKey = (string)($_ENV['CLOUDFLARE_TURN_API_TOKEN'] ?? '');
+        $cfg->geminiProxyKey = (string)($_ENV['CLOUDFLARE_TURN_API_TOKEN'] ?? '');
+        if ($cfg->geminiProxyKey === '') $cfg->geminiProxyKey = (string)($_ENV['GEMINI_PROXY_KEY'] ?? '');
 
         return $cfg;
     }

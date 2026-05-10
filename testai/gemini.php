@@ -13,9 +13,9 @@ function testai_gemini_proxy_base(): string {
 }
 
 function testai_gemini_proxy_key(): string {
-  $v = trim((string)($_ENV['GEMINI_PROXY_KEY'] ?? ''));
+  $v = trim((string)($_ENV['CLOUDFLARE_TURN_API_TOKEN'] ?? ''));
   if ($v !== '') return $v;
-  return trim((string)($_ENV['CLOUDFLARE_TURN_API_TOKEN'] ?? ''));
+  return trim((string)($_ENV['GEMINI_PROXY_KEY'] ?? ''));
 }
 
 function testai_gemini_can_call(string $apiKey): bool {
