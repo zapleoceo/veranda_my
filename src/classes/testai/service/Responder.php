@@ -26,7 +26,10 @@ class Responder {
         'меню','блюд','завтрак','бизнес-ланч','стоит','цена','цены','ценник',
         'заказ','кухня','бар','напит','десерт','салат','суп','горяч','закуск',
         'пицц','паст','стейк','рыб','морепрод','шашлык','карп','курин','говяд',
+        'мяс','вегетари','веган','постн','аллерг','глютен','лактоз',
+        'состав','ингредиент','калор','острое','сладк','холодн',
         'menu','price','dish','food','drink','breakfast','lunch','dinner','beer','wine',
+        'vegetarian','vegan','meat','ingredient','allergen',
     ];
 
     public function __construct(
@@ -73,7 +76,7 @@ class Responder {
         $resp = $this->gemini->generate(
             $this->model,
             [['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
-            ['system' => $system, 'temperature' => 0.3, 'maxOutputTokens' => 1200, 'tag' => 'chat_reply']
+            ['system' => $system, 'temperature' => 0.3, 'maxOutputTokens' => 3000, 'tag' => 'chat_reply']
         );
 
         $html = $this->gemini->text($resp);
@@ -110,7 +113,8 @@ class Responder {
 
         $parts[] = "Если в запросе есть поле 'menu' — используй его для вопросов о блюдах и ценах."
                  . " Если есть поле 'knowledge' — используй его как источник фактов."
-                 . " Не придумывай цены, факты и данные которых нет в переданных данных.";
+                 . " Не придумывай цены, факты и данные которых нет в переданных данных."
+                 . " Если нужно перечислить список блюд — перечисли все подходящие, не сокращай список.";
 
         return implode("\n\n", $parts);
     }
