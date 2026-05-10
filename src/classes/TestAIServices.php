@@ -343,6 +343,7 @@ class TestAIWebhookService {
     private TestAIDailySummaryService $dailySvc;
     private TestAISettingsRepository $settingsRepo;
     private TestAIKnowledgeService $knowledgeSvc;
+    private TestAIMenuService $menuSvc;
     private TestAILogger $log;
 
     public function __construct(
@@ -355,6 +356,7 @@ class TestAIWebhookService {
         TestAIDailySummaryService $dailySvc,
         TestAISettingsRepository $settingsRepo,
         TestAIKnowledgeService $knowledgeSvc,
+        TestAIMenuService $menuSvc,
         TestAILogger $log
     ) {
         $this->cfg = $cfg;
@@ -366,6 +368,7 @@ class TestAIWebhookService {
         $this->dailySvc = $dailySvc;
         $this->settingsRepo = $settingsRepo;
         $this->knowledgeSvc = $knowledgeSvc;
+        $this->menuSvc = $menuSvc;
         $this->log = $log;
     }
 
@@ -430,6 +433,17 @@ class TestAIWebhookService {
             $this->log->info('summary_command', ['chat_id' => $chatId, 'message_id' => $messageId, 'day' => $cmdDay]);
             $this->handleSummaryCommand($chatId, $messageId, $cmdDay);
             return;
+        }
+
+        if ($needReply && trim($queryText) !== '') {
+            $menuAnswer = $this->menuSvc->tryAnswer($queryText);
+            if ($menuAnswer !== '') {
+                $replyTo = $chatType === 'private' ? null : $messageId;
+                $safe = htmlspecialchars($menuAnswer, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $ok = $this->tg->sendMessage($chatId, $safe, $replyTo);
+                $this->log->info('telegram_send_result', ['chat_id' => $chatId, 'message_id' => $messageId, 'ok' => $ok ? 1 : 0, 'via' => 'menu_service']);
+                return;
+            }
         }
 
         if ($this->gemini->canCall() && $m->mediaType && $m->mediaFileId && ($needReply || $chatType === 'private')) {
@@ -941,7 +955,7 @@ class TestAIKnowledgeService {
             $sourceUrl = trim((string)($r['source_url'] ?? ''));
             $liveOk = false;
             if ($content === '' && $sourceUrl !== '' && $liveFetched < 2) {
-                $live = $this->tryFetchLiveContent($sourceUrl);
+                $live = $this->tryFetchLiveContent($sourceUrl, 3000);
                 if ($live !== '') {
                     $content = $live;
                     $liveFetched++;
@@ -962,7 +976,11 @@ class TestAIKnowledgeService {
         return $out;
     }
 
-    private function tryFetchLiveContent(string $url): string {
+    public function fetchLiveTextForUrl(string $url, int $maxLen = 3000): string {
+        return $this->tryFetchLiveContent($url, $maxLen);
+    }
+
+    private function tryFetchLiveContent(string $url, int $maxLen): string {
         $url = trim($url);
         if ($url === '') return '';
         if (!preg_match('#^https?://#i', $url)) $url = 'https://' . ltrim($url, '/');
@@ -992,7 +1010,7 @@ class TestAIKnowledgeService {
             }
         }
 
-        return $this->htmlToText($body);
+        return $this->htmlToText($body, $maxLen);
     }
 
     private function isAllowedUrl(string $url): bool {
@@ -1013,7 +1031,7 @@ class TestAIKnowledgeService {
         return isset($allowed[$host]);
     }
 
-    private function htmlToText(string $html): string {
+    private function htmlToText(string $html, int $maxLen = 3000): string {
         $t = $html;
         $t = preg_replace('/<\s*(script|style|noscript)[^>]*>[\s\S]*?<\s*\/\s*\\1\s*>/i', '', $t);
         $t = preg_replace('/<\s*(br|br\/)\s*>/i', "\n", $t);
@@ -1023,7 +1041,8 @@ class TestAIKnowledgeService {
         $t = preg_replace("/[ \t]+/", ' ', (string)$t);
         $t = preg_replace("/\n{3,}/", "\n\n", (string)$t);
         $t = trim((string)$t);
-        if (mb_strlen($t) > 3000) $t = mb_substr($t, 0, 3000) . '…';
+        $maxLen = max(500, min(60000, $maxLen));
+        if (mb_strlen($t) > $maxLen) $t = mb_substr($t, 0, $maxLen) . '…';
         return $t;
     }
 
@@ -1049,5 +1068,139 @@ class TestAIKnowledgeService {
         if (preg_match('/\b(анонс|афиш|событи|мероприят|концерт|музык|live|dj|дуэт|duo|bibi)\b/u', $qq)) { $out['анонс'] = true; $out['афиша'] = true; }
 
         return array_keys($out);
+    }
+}
+
+class TestAIMenuService {
+    private TestAIKnowledgeService $knowledgeSvc;
+
+    public function __construct(TestAIKnowledgeService $knowledgeSvc) {
+        $this->knowledgeSvc = $knowledgeSvc;
+    }
+
+    public function tryAnswer(string $question): string {
+        $q = mb_strtolower(trim($question));
+        if ($q === '') return '';
+
+        $isMenu = (bool)preg_match('/\b(меню|блюд|блюда|завтрак|завтраки|бар|пиво|вино|цена|цен|сто(ит|ят)|бургер|панкейк|вафл|breakfast)\b/u', $q);
+        if (!$isMenu) return '';
+
+        $needMostExpensive = (bool)preg_match('/\b(сам(ое|ый)\s+дорог|most\s+expensive|дороже\s+всего)\b/u', $q);
+        $needBreakfast = (bool)preg_match('/\b(завтрак|завтраки|breakfast)\b/u', $q);
+        $needCount = (bool)preg_match('/\b(сколько)\b[\s\S]{0,20}\b(блюд|позици|позиций|items?)\b/u', $q);
+        if (!$needMostExpensive && !$needBreakfast && !$needCount) return '';
+
+        $text = $this->knowledgeSvc->fetchLiveTextForUrl('https://veranda.my/links/menu.php', 60000);
+        if ($text === '') return '';
+
+        $menu = $this->parseMenuText($text);
+        if (!$menu['items']) return '';
+
+        if ($needBreakfast) {
+            $items = $this->itemsBySection($menu['items'], 'Кухня', 'Завтраки');
+            if (!$items) return 'Завтраки в меню не найдены.';
+            $lines = [];
+            foreach (array_slice($items, 0, 20) as $it) $lines[] = $it['name'] . ' — ' . $this->fmtPrice($it['price'], $it['currency']);
+            return "Завтраки (до 15:00):\n" . implode("\n", $lines);
+        }
+
+        if ($needMostExpensive) {
+            $max = $this->maxItem($menu['items'], 'Кухня');
+            if (!$max) return '';
+            return 'Самое дорогое блюдо: ' . $max['name'] . ' — ' . $this->fmtPrice($max['price'], $max['currency']) . '.';
+        }
+
+        if ($needCount) {
+            $count = $this->countKitchenDishes($menu['items']);
+            return 'В меню кухни сейчас ' . $count . ' блюд (без доп. позиций и бара).';
+        }
+
+        return '';
+    }
+
+    private function parseMenuText(string $text): array {
+        $lines = preg_split("/\r?\n/u", $text);
+        $items = [];
+        $group = '';
+        $section = '';
+        $lastName = '';
+
+        foreach (is_array($lines) ? $lines : [] as $raw) {
+            $line = trim((string)$raw);
+            if ($line === '') continue;
+            if (mb_strlen($line) > 160) $line = mb_substr($line, 0, 160);
+
+            if ($line === 'Кухня' || $line === 'Бар') { $group = $line; $section = ''; $lastName = ''; continue; }
+            if (preg_match('/^Последнее обновление меню:/u', $line)) break;
+
+            if (preg_match('/^(\d[\d\s\.]{0,20})\s*(₫|VND|vnd)$/u', $line, $m)) {
+                $price = (int)preg_replace('/\D+/', '', (string)($m[1] ?? '0'));
+                $cur = (string)($m[2] ?? '₫');
+                if ($lastName !== '' && $price > 0) {
+                    $items[] = ['group' => $group, 'section' => $section, 'name' => $lastName, 'price' => $price, 'currency' => $cur];
+                }
+                $lastName = '';
+                continue;
+            }
+
+            if (preg_match('/\d$/u', $line) && !preg_match('/₫|VND|vnd/u', $line) && mb_strlen($line) <= 70) {
+                $s = preg_replace('/\d+$/u', '', $line);
+                $s = trim((string)$s);
+                if ($s !== '' && $s !== 'Кухня' && $s !== 'Бар') $section = $s;
+                $lastName = '';
+                continue;
+            }
+
+            if (preg_match('/^(Блюдо кухни|Напиток\.|Горячий суп|Классический|мягкий|насыщенный|ферментированный|охлаждённое|свежевыжатый|освежающий)/u', $line)) continue;
+
+            $lastName = $line;
+        }
+
+        return ['items' => $items];
+    }
+
+    private function itemsBySection(array $items, string $group, string $sectionPrefix): array {
+        $out = [];
+        foreach ($items as $it) {
+            if (!is_array($it)) continue;
+            if (($it['group'] ?? '') !== $group) continue;
+            $sec = (string)($it['section'] ?? '');
+            if ($sec === '' || stripos($sec, $sectionPrefix) !== 0) continue;
+            $out[] = $it;
+        }
+        return $out;
+    }
+
+    private function maxItem(array $items, string $group): array {
+        $max = null;
+        foreach ($items as $it) {
+            if (!is_array($it)) continue;
+            if (($it['group'] ?? '') !== $group) continue;
+            $sec = (string)($it['section'] ?? '');
+            if (stripos($sec, 'Дополнительно') === 0) continue;
+            $p = (int)($it['price'] ?? 0);
+            if ($p <= 0) continue;
+            if ($max === null || $p > (int)$max['price']) $max = $it;
+        }
+        return is_array($max) ? $max : [];
+    }
+
+    private function countKitchenDishes(array $items): int {
+        $c = 0;
+        foreach ($items as $it) {
+            if (!is_array($it)) continue;
+            if (($it['group'] ?? '') !== 'Кухня') continue;
+            $sec = (string)($it['section'] ?? '');
+            if (stripos($sec, 'Дополнительно') === 0) continue;
+            if (stripos($sec, 'Детское меню') === 0) continue;
+            $c++;
+        }
+        return $c;
+    }
+
+    private function fmtPrice(int $n, string $cur): string {
+        $s = number_format(max(0, $n), 0, '.', ' ');
+        if ($cur === 'VND' || $cur === 'vnd') $cur = '₫';
+        return $s . ' ' . $cur;
     }
 }

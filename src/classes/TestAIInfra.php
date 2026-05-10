@@ -449,6 +449,8 @@ class TestAIHtmlSanitizer {
         $out = preg_replace('/^\s*<html\b[^>]*>\s*<body\b[^>]*>\s*/i', '', $out) ?? $out;
         $out = preg_replace('/\s*<\/body>\s*<\/html>\s*$/i', '', $out) ?? $out;
         $out = strip_tags($out, $allowed);
+        $out = html_entity_decode($out, ENT_QUOTES | ENT_HTML5 | ENT_SUBSTITUTE, 'UTF-8');
+        $out = strip_tags($out, $allowed);
         $out = str_replace($nlToken, "\n", $out);
         $out = preg_replace("/\n{3,}/", "\n\n", $out) ?? $out;
         return trim($out);

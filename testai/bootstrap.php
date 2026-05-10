@@ -52,10 +52,11 @@ $tg = new \App\Classes\TestAITelegramClient($cfg->tgToken, $log);
 $gemini = new \App\Classes\TestAIGeminiClient($cfg->geminiKey, $cfg->geminiProxyBase(), $cfg->geminiProxyKey, $log);
 $sanitizer = new \App\Classes\TestAIHtmlSanitizer();
 $knowledgeSvc = new \App\Classes\TestAIKnowledgeService($cfg, $kbRepo, $log);
+$menuSvc = new \App\Classes\TestAIMenuService($knowledgeSvc);
 
 $announcementSvc = new \App\Classes\TestAIAnnouncementService($cfg, $gemini, $sanitizer, $dailyRepo, $rawRepo, $settingsRepo, __DIR__ . '/cache');
 $dailySvc = new \App\Classes\TestAIDailySummaryService($cfg, $gemini, $rawRepo, $dailyRepo, $settingsRepo);
-$webhookSvc = new \App\Classes\TestAIWebhookService($cfg, $gemini, $tg, $sanitizer, $rawRepo, $dailyRepo, $dailySvc, $settingsRepo, $knowledgeSvc, $log);
+$webhookSvc = new \App\Classes\TestAIWebhookService($cfg, $gemini, $tg, $sanitizer, $rawRepo, $dailyRepo, $dailySvc, $settingsRepo, $knowledgeSvc, $menuSvc, $log);
 
 return [
   'cfg' => $cfg,
@@ -76,6 +77,7 @@ return [
   'gemini' => $gemini,
   'sanitizer' => $sanitizer,
   'knowledgeSvc' => $knowledgeSvc,
+  'menuSvc' => $menuSvc,
   'announcementSvc' => $announcementSvc,
   'dailySvc' => $dailySvc,
   'webhookSvc' => $webhookSvc,
