@@ -6,6 +6,7 @@ namespace App\Classes\TestAI\Service;
 
 use App\Classes\TestAI\Infra\GeminiClient;
 use App\Classes\TestAI\Infra\HtmlSanitizer;
+use App\Classes\TestAI\Infra\PosterClient;
 use App\Classes\TestAI\Repository\SettingsRepository;
 
 /**
@@ -38,7 +39,8 @@ class Responder {
         private HtmlSanitizer       $sanitizer,
         private SettingsRepository  $settings,
         private KnowledgeService    $knowledgeSvc,
-        private MenuService         $menuSvc
+        private MenuService         $menuSvc,
+        private ?PosterClient       $poster = null
     ) {}
 
     /**
@@ -56,9 +58,10 @@ class Responder {
         // 1. PHP topic detection — no AI
         $needsMenu = $this->isMenuQuestion($question);
 
-        // 2. Load data in parallel (both are cheap SQL / filtered text)
-        $menuText = $needsMenu ? $this->menuSvc->getMenuText($lang === 'en' ? 'en' : 'ru') : '';
-        $kbDocs   = $this->knowledgeSvc->search($question, $isAuthorized);
+        // 2. Load data (cheap SQL / cached API calls)
+        $menuText    = $needsMenu ? $this->menuSvc->getMenuText($lang === 'en' ? 'en' : 'ru') : '';
+        $posterText  = ($needsMenu && $this->poster) ? $this->poster->getAvailabilityText() : '';
+        $kbDocs      = $this->knowledgeSvc->search($question, $isAuthorized);
 
         // 3. Build system prompt
         $system = $this->buildSystem($lang);
@@ -69,14 +72,15 @@ class Responder {
             'lang'     => $lang,
             'context'  => $this->trimContext($context),
         ];
-        if ($menuText !== '') $payload['menu']      = $menuText;
-        if ($kbDocs)          $payload['knowledge'] = $kbDocs;
+        if ($menuText !== '')  $payload['menu']         = $menuText;
+        if ($posterText !== '') $payload['availability'] = $posterText;
+        if ($kbDocs)           $payload['knowledge']    = $kbDocs;
 
         // 5. ONE Gemini call
         $resp = $this->gemini->generate(
             $this->model,
             [['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
-            ['system' => $system, 'temperature' => 0.3, 'maxOutputTokens' => 3000, 'tag' => 'chat_reply']
+            ['system' => $system, 'temperature' => 0.3, 'maxOutputTokens' => 8192, 'tag' => 'chat_reply']
         );
 
         $html = $this->gemini->text($resp);
@@ -112,6 +116,7 @@ class Responder {
                  . " Если пользователь написал на другом языке — отвечай на его языке.";
 
         $parts[] = "Если в запросе есть поле 'menu' — используй его для вопросов о блюдах и ценах."
+                 . " Если есть поле 'availability' — используй его чтобы сообщать что сейчас в наличии или нет."
                  . " Если есть поле 'knowledge' — используй его как источник фактов."
                  . " Не придумывай цены, факты и данные которых нет в переданных данных."
                  . " Если нужно перечислить список блюд — перечисли все подходящие, не сокращай список.";

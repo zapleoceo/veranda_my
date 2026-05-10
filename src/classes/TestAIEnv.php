@@ -56,6 +56,8 @@ class TestAIConfig {
     public string $appUrl;
     public string $geminiProxyUrl;
     public string $geminiProxyKey;
+    public string $posterToken;
+    public string $posterBaseUrl;
 
     public static function fromEnv(string $root, string $envFile, array $envLoadedKeys): self {
         $cfg = new self();
@@ -99,6 +101,9 @@ class TestAIConfig {
         $cfg->geminiProxyKey = (string)($_ENV['GEMINI_PROXY_KEY'] ?? '');
         if ($cfg->geminiProxyKey === '') $cfg->geminiProxyKey = (string)($_ENV['nGEMINI_PROXY_KEY'] ?? '');
         if ($cfg->geminiProxyKey === '') $cfg->geminiProxyKey = (string)($_ENV['CLOUDFLARE_TURN_API_TOKEN'] ?? '');
+
+        $cfg->posterToken   = (string)($_ENV['POSTER_API_TOKEN'] ?? '');
+        $cfg->posterBaseUrl = rtrim((string)($_ENV['POSTER_API_BASE_URL'] ?? 'https://joinposter.com/api'), '/');
 
         return $cfg;
     }
