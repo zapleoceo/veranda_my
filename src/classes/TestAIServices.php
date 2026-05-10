@@ -501,10 +501,41 @@ class TestAIWebhookService {
         $system = trim(implode("\n\n", $parts));
         if ($system !== '') $system .= "\n\n";
         $system .= "Reply in " . strtoupper($lang) . ". If the user asks in a different language, prefer the user's language.";
+        $system .= "\n\nUse payload.knowledge_docs as the knowledge base: if provided, answer using it. If the user asks to check the knowledge base, do not refuse; use knowledge_docs or say that no relevant info was found. If payload.daily_for_announcements is provided, use its events when answering about today's announcements.";
 
-        $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($queryText, 5);
-        if (!$knowledgeDocs && $this->isMenuQuestion($queryText)) {
-            $knowledgeDocs = $this->knowledgeSvc->selectForQuestion('меню ' . $queryText, 5);
+        $searchText = $queryText;
+        if ($this->isKbCheckRequest($queryText)) {
+            $prev = $this->lastQuestionFromContext($ctxMsgs);
+            if ($prev !== '') $searchText = $prev;
+        }
+
+        $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($searchText, 5);
+        if (!$knowledgeDocs && $this->isMenuQuestion($searchText)) {
+            $knowledgeDocs = $this->knowledgeSvc->selectForQuestion('меню ' . $searchText, 5);
+        }
+        if (!$knowledgeDocs && $this->isAnnouncementQuestion($searchText)) {
+            $knowledgeDocs = $this->knowledgeSvc->selectForQuestion('анонс афиша событие ' . $searchText, 5);
+        }
+
+        $dailyForAnnouncements = null;
+        if ($this->isAnnouncementQuestion($searchText)) {
+            $day = date('Y-m-d');
+            if (preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $searchText, $m)) $day = (string)($m[1] ?? $day);
+            $row = $this->dailyRepo->getByDay($day);
+            if ($row === null && $waitSec <= 0 && $this->gemini->canCall()) {
+                $okRun = $this->dailySvc->runDay($day);
+                $this->log->info('daily_summary_run', ['day' => $day, 'ok' => $okRun ? 1 : 0, 'via' => 'chat_announce']);
+                $row = $this->dailyRepo->getByDay($day);
+            }
+            if (is_array($row)) {
+                $ej = json_decode((string)($row['events_json'] ?? '[]'), true);
+                if (!is_array($ej)) $ej = [];
+                $dailyForAnnouncements = [
+                    'day' => $day,
+                    'updated_at' => (string)($row['updated_at'] ?? ''),
+                    'events' => $ej,
+                ];
+            }
         }
         $payload = [
             'chat_id' => $chatId,
@@ -521,6 +552,7 @@ class TestAIWebhookService {
             'context' => $ctxMsgs,
         ];
         if ($knowledgeDocs) $payload['knowledge_docs'] = $knowledgeDocs;
+        if (is_array($dailyForAnnouncements)) $payload['daily_for_announcements'] = $dailyForAnnouncements;
 
         $minIntervalSec = 4;
         $this->settingsRepo->setKey('gemini_next_allowed_until', gmdate('c', time() + $minIntervalSec), date('Y-m-d H:i:s'));
@@ -724,6 +756,33 @@ class TestAIWebhookService {
         $t = mb_strtolower(trim((string)$q));
         if ($t === '') return false;
         return (bool)preg_match('/\b(меню|блюд|блюда|завтрак|завтраки|бар|пиво|вино|цена|цен|сто(ит|ят)|бургер|панкейк|вафл|breakfast)\b/u', $t);
+    }
+
+    private function isAnnouncementQuestion(string $q): bool {
+        $t = mb_strtolower(trim((string)$q));
+        if ($t === '') return false;
+        return (bool)preg_match('/\b(анонс|афиш|событи|мероприят|концерт|музык|live|dj|дуэт|дуо|bibi)\b/u', $t);
+    }
+
+    private function isKbCheckRequest(string $q): bool {
+        $t = mb_strtolower(trim((string)$q));
+        if ($t === '') return false;
+        return (bool)preg_match('/\b(посмотр|проверь|провер|глянь|look|check)\b[\s\S]{0,40}\b(баз[ае]\s+знан|knowledge\s*base|kb)\b/u', $t)
+            || (bool)preg_match('/\b(баз[ае]\s+знан|knowledge\s*base|kb)\b/u', $t);
+    }
+
+    private function lastQuestionFromContext(array $ctxMsgs): string {
+        for ($i = count($ctxMsgs) - 1; $i >= 0; $i--) {
+            $m = $ctxMsgs[$i] ?? null;
+            if (!is_array($m)) continue;
+            $t = trim((string)($m['text'] ?? ''));
+            if ($t === '') continue;
+            if ($this->isKbCheckRequest($t)) continue;
+            if (preg_match('/^\/\w+/u', $t)) continue;
+            if (mb_strlen($t) < 4) continue;
+            return $t;
+        }
+        return '';
     }
 
     private function loadInstrMap(): array {
@@ -987,6 +1046,7 @@ class TestAIKnowledgeService {
         if (preg_match('/\b(завтрак|завтраки|breakfast)\b/u', $qq)) { $out['завтрак'] = true; $out['меню'] = true; }
         if (preg_match('/\b(бар|пиво|вино|коктейл)\b/u', $qq)) { $out['бар'] = true; $out['меню'] = true; }
         if (preg_match('/\b(цена|цен|сто(ит|ят)|сколько)\b/u', $qq)) { $out['цена'] = true; $out['меню'] = true; }
+        if (preg_match('/\b(анонс|афиш|событи|мероприят|концерт|музык|live|dj|дуэт|duo|bibi)\b/u', $qq)) { $out['анонс'] = true; $out['афиша'] = true; }
 
         return array_keys($out);
     }
