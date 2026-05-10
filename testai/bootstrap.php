@@ -27,6 +27,14 @@ $dailyRepo = new \App\Classes\TestAIDailySummariesRepository($db, $tDaily);
 $settingsRepo = new \App\Classes\TestAISettingsRepository($db, $tSettings);
 $kbRepo = new \App\Classes\TestAIKnowledgeRepository($db, $tKb);
 
+$sysKey = 'bot_system_instruction';
+$sysRow = $settingsRepo->getKey($sysKey);
+$sysVal = trim((string)($sysRow['v'] ?? ''));
+if ($sysVal === '') {
+  $sysVal = "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a. Do not use div/p/ul/ol/li/h1-h6 tags. Do not use <br> tag; use plain newlines instead. Keep it concise. If knowledge_docs are provided, use them as a primary factual source. If information is missing, do not invent; ask for clarification or suggest contacting staff.";
+  $settingsRepo->setKey($sysKey, $sysVal, date('Y-m-d H:i:s'));
+}
+
 $log = new \App\Classes\TestAILogger($cfg->logDir);
 $tg = new \App\Classes\TestAITelegramClient($cfg->tgToken, $log);
 $gemini = new \App\Classes\TestAIGeminiClient($cfg->geminiKey, $cfg->geminiProxyBase(), $cfg->geminiProxyKey, $log);

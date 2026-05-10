@@ -8,8 +8,10 @@ $dailyRepo = $ctx['dailyRepo'];
 $dailySvc = $ctx['dailySvc'];
 $settingsRepo = $ctx['settingsRepo'];
 $kbRepo = $ctx['kbRepo'];
+$knowledgeSvc = $ctx['knowledgeSvc'];
 $gemini = $ctx['gemini'];
 $announcementSvc = $ctx['announcementSvc'];
+$sanitizer = $ctx['sanitizer'];
 $log = $ctx['log'] ?? null;
 
 $aibotDate = trim((string)($_GET['date'] ?? ''));
@@ -37,6 +39,7 @@ if ($ajax !== '') {
         $counts = $rawRepo->getCountsForDay($aibotDate);
         $dailyRow = $dailyRepo->getByDay($aibotDate);
         $promptRow = $settingsRepo->getBotPrompt();
+        $sysRow = $settingsRepo->getKey('bot_system_instruction');
         $file = ($log instanceof \App\Classes\TestAILogger) ? $log->filePath() : '';
 
         $respondJson([
@@ -53,6 +56,7 @@ if ($ajax !== '') {
             'day_with_media_text' => (int)($counts['with_media_text'] ?? 0),
             'daily_exists' => $dailyRow ? 1 : 0,
             'prompt_updated_at' => (string)($promptRow['updated_at'] ?? ''),
+            'system_updated_at' => (string)($sysRow['updated_at'] ?? ''),
             'log_file' => $file,
         ]);
     }
@@ -103,6 +107,92 @@ if ($ajax !== '') {
         $settingsRepo->setBotPrompt($prompt, date('Y-m-d H:i:s'));
         $row = $settingsRepo->getBotPrompt();
         $respondJson(['ok' => true, 'updated_at' => (string)($row['updated_at'] ?? '')]);
+    }
+
+    if ($ajax === 'system_get') {
+        $row = $settingsRepo->getKey('bot_system_instruction');
+        $respondJson(['ok' => true, 'system' => (string)($row['v'] ?? ''), 'updated_at' => (string)($row['updated_at'] ?? '')]);
+    }
+
+    if ($ajax === 'system_save') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') $respondJson(['ok' => false, 'error' => 'method_not_allowed'], 405);
+        $system = (string)($_POST['system'] ?? '');
+        $settingsRepo->setKey('bot_system_instruction', $system, date('Y-m-d H:i:s'));
+        $row = $settingsRepo->getKey('bot_system_instruction');
+        $respondJson(['ok' => true, 'updated_at' => (string)($row['updated_at'] ?? '')]);
+    }
+
+    if ($ajax === 'context_preview') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') $respondJson(['ok' => false, 'error' => 'method_not_allowed'], 405);
+        $q = trim((string)($_POST['question'] ?? ''));
+        if ($q === '') $respondJson(['ok' => false, 'error' => 'missing_question'], 400);
+
+        $chatId = trim((string)($_POST['chat_id'] ?? ''));
+        $ctxMsgs = [];
+        if ($chatId !== '') {
+            $rows = $rawRepo->fetchRecentByChat($chatId, 30);
+            $rows = array_reverse(is_array($rows) ? $rows : []);
+            foreach ($rows as $r) {
+                if (!is_array($r)) continue;
+                $u = trim((string)($r['tg_username'] ?? ''));
+                if ($u === '') $u = trim((string)($r['tg_name'] ?? ''));
+                $t = trim((string)($r['text'] ?? ''));
+                $mt = trim((string)($r['media_text'] ?? ''));
+                $combined = trim($t . "\n" . ($mt !== '' ? ('[media]' . "\n" . $mt) : ''));
+                if ($combined === '') continue;
+                if (mb_strlen($combined) > 900) $combined = mb_substr($combined, 0, 900) . '…';
+                $ctxMsgs[] = [
+                    'at' => (string)($r['received_at'] ?? ''),
+                    'from' => $u,
+                    'text' => $combined,
+                ];
+            }
+        }
+
+        $pRow = $settingsRepo->getBotPrompt();
+        $sysRow = $settingsRepo->getKey('bot_system_instruction');
+        $system = trim((string)($pRow['prompt'] ?? ''));
+        $base = trim((string)($sysRow['v'] ?? ''));
+        if ($base !== '') {
+            if ($system !== '') $system .= "\n\n";
+            $system .= $base;
+        }
+
+        $docs = $knowledgeSvc->selectForQuestion($q, 5);
+        $payload = ['question' => $q];
+        if ($ctxMsgs) $payload['context'] = $ctxMsgs;
+        if ($docs) $payload['knowledge_docs'] = $docs;
+
+        $respondJson([
+            'ok' => true,
+            'question' => $q,
+            'chat_id' => $chatId,
+            'system_len' => mb_strlen($system),
+            'system_preview' => mb_substr($system, 0, 500),
+            'context_count' => count($ctxMsgs),
+            'knowledge_docs_count' => count($docs),
+            'knowledge_docs' => $docs,
+            'payload' => $payload,
+        ]);
+    }
+
+    if ($ajax === 'log_tail') {
+        $n = (int)($_GET['n'] ?? 120);
+        $n = max(1, min(400, $n));
+        $file = ($log instanceof \App\Classes\TestAILogger) ? $log->filePath() : '';
+        if ($file === '' || !is_file($file)) $respondJson(['ok' => false, 'error' => 'missing_log_file'], 400);
+        $size = @filesize($file);
+        if (!is_int($size) || $size <= 0) $respondJson(['ok' => true, 'file' => $file, 'tail' => '']);
+        $read = min(260000, $size);
+        $fh = @fopen($file, 'rb');
+        if (!is_resource($fh)) $respondJson(['ok' => false, 'error' => 'open_failed'], 400);
+        @fseek($fh, -$read, SEEK_END);
+        $buf = (string)@fread($fh, $read);
+        @fclose($fh);
+        $buf = str_replace("\r\n", "\n", $buf);
+        $parts = array_values(array_filter(explode("\n", $buf), fn($x) => $x !== ''));
+        $slice = array_slice($parts, max(0, count($parts) - $n));
+        $respondJson(['ok' => true, 'file' => $file, 'tail' => implode("\n", $slice)]);
     }
 
     if ($ajax === 'kb_list') {
@@ -188,4 +278,6 @@ if ($ajax !== '') {
 
 $aibotPromptRow = $settingsRepo->getBotPrompt();
 $aibotPrompt = (string)($aibotPromptRow['prompt'] ?? '');
+$aibotSystemRow = $settingsRepo->getKey('bot_system_instruction');
+$aibotSystem = (string)($aibotSystemRow['v'] ?? '');
 $aibotKbItems = $kbRepo->list(80, 0);

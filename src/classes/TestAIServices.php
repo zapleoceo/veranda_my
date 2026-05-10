@@ -337,7 +337,12 @@ class TestAIWebhookService {
         $ctxMsgs = $this->buildContextMessages($chatId);
         $system = trim($botPrompt);
         if ($system !== '') $system .= "\n\n";
-        $system .= "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a. Do not use div/p/ul/ol/li/h1-h6 tags. Do not use <br> tag; use plain newlines instead. Keep it concise. If knowledge_docs are provided, use them as a primary factual source. If information is missing, do not invent; ask for clarification or suggest contacting staff.";
+        $sys = $this->settingsRepo->getKey('bot_system_instruction');
+        $base = trim((string)($sys['v'] ?? ''));
+        if ($base === '') {
+            $base = "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a. Do not use div/p/ul/ol/li/h1-h6 tags. Do not use <br> tag; use plain newlines instead. Keep it concise. If knowledge_docs are provided, use them as a primary factual source. If information is missing, do not invent; ask for clarification or suggest contacting staff.";
+        }
+        $system .= $base;
 
         $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($queryText, 5);
         $payload = [
@@ -648,11 +653,13 @@ class TestAIKnowledgeService {
             $title = trim((string)($r['title'] ?? ''));
             $content = trim((string)($r['content'] ?? ''));
             $sourceUrl = trim((string)($r['source_url'] ?? ''));
+            $liveOk = false;
             if ($content === '' && $sourceUrl !== '' && $liveFetched < 2) {
                 $live = $this->tryFetchLiveContent($sourceUrl);
                 if ($live !== '') {
                     $content = $live;
                     $liveFetched++;
+                    $liveOk = true;
                 }
             }
             if ($content === '') continue;
@@ -662,6 +669,7 @@ class TestAIKnowledgeService {
                 'title' => $title,
                 'source_url' => $sourceUrl,
                 'content' => $content,
+                'live_fetched' => $liveOk ? 1 : 0,
                 'updated_at' => (string)($r['updated_at'] ?? ''),
             ];
         }

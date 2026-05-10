@@ -23,12 +23,29 @@
   <div class="settings-grid" style="margin-top:18px;">
     <div class="card" style="padding:18px;">
       <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
-        <div style="font-weight:900;">Промт бота</div>
-        <button class="btn" type="button" id="btnPromptSave">Сохранить</button>
+        <div style="font-weight:900;">Инструкции</div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+        <div style="font-weight:800; font-size:13px;">System (общие правила)</div>
+        <button class="btn" type="button" id="btnSystemSave">Сохранить system</button>
+      </div>
+      <div class="small-muted" id="systemMeta" style="margin-top:6px;"></div>
+      <div class="form-group" style="margin-top:10px;">
+        <textarea id="systemText" placeholder="Правила ответа (Telegram HTML), ограничения, поведение."><?= htmlspecialchars($aibotSystem) ?></textarea>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:14px;">
+        <div style="font-weight:800; font-size:13px;">Prompt (контент ресторана)</div>
+        <button class="btn" type="button" id="btnPromptSave">Сохранить prompt</button>
       </div>
       <div class="small-muted" id="promptMeta" style="margin-top:6px;"></div>
       <div class="form-group" style="margin-top:10px;">
-        <textarea id="promptText" placeholder="Сюда вставь системный промт (правила, стиль, ссылки)."><?= htmlspecialchars($aibotPrompt) ?></textarea>
+        <textarea id="promptText" placeholder="Локальные инструкции: тон, стиль, что можно/нельзя обещать, ссылки."><?= htmlspecialchars($aibotPrompt) ?></textarea>
+      </div>
+
+      <div class="small-muted" style="margin-top:10px;">
+        Live источники: если у записи в базе знаний пустой текст, но указан URL, бот подтянет актуальные данные по URL во время ответа.
       </div>
     </div>
 
@@ -118,10 +135,31 @@
     </div>
 
     <div class="card" style="padding:18px;">
+      <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
+        <div style="font-weight:900;">Проверка контекста</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn" type="button" id="btnCtxPreview">Показать контекст</button>
+          <button class="btn" type="button" id="btnLogTail">Логи</button>
+        </div>
+      </div>
+      <div class="small-muted" style="margin-top:6px;">
+        Показывает, какие документы (и какие live URL) попадут в запрос к модели для заданного вопроса.
+      </div>
+      <div class="form-group" style="margin-top:10px;">
+        <label for="ctxQuestion">Вопрос</label>
+        <input id="ctxQuestion" type="text" placeholder="Например: какое сегодня меню?">
+      </div>
+      <div class="form-group" style="margin-top:10px;">
+        <label for="ctxChatId">Chat ID (необязательно, чтобы увидеть историю)</label>
+        <input id="ctxChatId" type="text" placeholder="169510539">
+      </div>
+      <div class="small-muted" id="ctxMeta" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card" style="padding:18px;">
       <div style="font-weight:900;">Вывод</div>
       <div class="small-muted" id="outMeta" style="margin-top:6px;"></div>
       <div class="card" style="padding:14px; margin-top:10px; overflow:auto;" id="outBox"></div>
     </div>
   </div>
 </div>
-

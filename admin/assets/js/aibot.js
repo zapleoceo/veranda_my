@@ -9,6 +9,12 @@
   const pillDaily = $('pillDaily')
   const promptText = $('promptText')
   const promptMeta = $('promptMeta')
+  const systemText = $('systemText')
+  const systemMeta = $('systemMeta')
+
+  const ctxQuestion = $('ctxQuestion')
+  const ctxChatId = $('ctxChatId')
+  const ctxMeta = $('ctxMeta')
 
   const kbTbody = $('kbTbody')
   const kbEditor = $('kbEditor')
@@ -68,6 +74,7 @@
     setPill(pillDaily, 'Daily', j.daily_exists ? 'ok' : 'warn')
     metaEl.textContent = `raw=${Number(j.raw_total || 0)} · day=${Number(j.day_count || 0)} · media=${Number(j.day_with_media || 0)}`
     promptMeta.textContent = j.prompt_updated_at ? `Обновлено: ${String(j.prompt_updated_at)}` : ''
+    systemMeta.textContent = j.system_updated_at ? `Обновлено: ${String(j.system_updated_at)}` : ''
     if (j.gemini_proxy_base) outMeta.textContent = `Proxy: ${String(j.gemini_proxy_base)} · Model: ${String(j.gemini_model || '')}`
   }
 
@@ -113,6 +120,40 @@
     const j = await fetchJson(apiUrl('prompt_save'), { method: 'POST', body: fd })
     if (!j.ok) return
     await state()
+  }
+
+  const systemSave = async () => {
+    const fd = new FormData()
+    fd.set('system', systemText.value || '')
+    const j = await fetchJson(apiUrl('system_save'), { method: 'POST', body: fd })
+    if (!j.ok) return
+    await state()
+  }
+
+  const ctxPreview = async () => {
+    const q = (ctxQuestion.value || '').trim()
+    if (!q) return
+    ctxMeta.textContent = 'Сбор контекста…'
+    outMeta.textContent = 'Контекст'
+    const fd = new FormData()
+    fd.set('question', q)
+    const chatId = (ctxChatId.value || '').trim()
+    if (chatId) fd.set('chat_id', chatId)
+    const j = await fetchJson(apiUrl('context_preview'), { method: 'POST', body: fd })
+    if (!j.ok) {
+      ctxMeta.textContent = ''
+      return renderText(j.error || 'Ошибка')
+    }
+    ctxMeta.textContent = `docs=${Number(j.knowledge_docs_count || 0)} · ctx=${Number(j.context_count || 0)} · system_len=${Number(j.system_len || 0)}`
+    renderText(JSON.stringify(j, null, 2))
+  }
+
+  const logTail = async () => {
+    outMeta.textContent = 'Логи'
+    const j = await fetchJson(`${apiUrl('log_tail')}&n=160`)
+    if (!j.ok) return renderText(j.error || 'Ошибка')
+    const head = j.file ? `FILE: ${String(j.file)}\n\n` : ''
+    renderText(head + String(j.tail || ''))
   }
 
   const kbSetEditorVisible = (on) => {
@@ -215,6 +256,9 @@
   $('btnDailyGet').addEventListener('click', dailyGet)
   $('btnDailyRun').addEventListener('click', dailyRun)
   $('btnPromptSave').addEventListener('click', promptSave)
+  $('btnSystemSave').addEventListener('click', systemSave)
+  $('btnCtxPreview').addEventListener('click', ctxPreview)
+  $('btnLogTail').addEventListener('click', logTail)
 
   $('btnKbNew').addEventListener('click', kbNew)
   $('btnKbRefresh').addEventListener('click', kbRefresh)
@@ -241,4 +285,3 @@
   kbSetEditorVisible(false)
   state()
 })()
-
