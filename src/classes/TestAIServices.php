@@ -41,11 +41,17 @@ class TestAIAnnouncementService {
         $events = $this->collectEventsForAnnounceDate($date);
         $todayMessages = $this->collectTodayMessagesIfToday($date);
 
+        $map = $this->loadInstrMap();
         $lang = $this->resolveLang('bot_lang_announce', json_encode([$events, $todayMessages], JSON_UNESCAPED_UNICODE) ?: '');
         $common = trim((string)($this->settingsRepo->getBotPrompt()['prompt'] ?? ''));
         $base = trim((string)($this->settingsRepo->getKey('bot_system_base')['v'] ?? ''));
         $announceSys = trim((string)($this->settingsRepo->getKey('bot_system_announce')['v'] ?? ''));
-        $system = trim(implode("\n\n", array_values(array_filter([$common, $base, $announceSys]))));
+        $parts = [];
+        if ($this->isOn($map, 'announce', 'common_prompt') && $common !== '') $parts[] = $common;
+        if ($this->isOn($map, 'announce', 'system_base') && $base !== '') $parts[] = $base;
+        if ($this->isOn($map, 'announce', 'system_announce') && $announceSys !== '') $parts[] = $announceSys;
+        if (!$parts && $announceSys !== '') $parts[] = $announceSys;
+        $system = trim(implode("\n\n", $parts));
         if ($system !== '') $system .= "\n\n";
         $system .= "Write the announcement in " . strtoupper($lang) . ".";
         $prompt = $lang === 'ru'
@@ -102,6 +108,28 @@ class TestAIAnnouncementService {
         if ($s === '') return 0;
         if (!preg_match_all('/[A-Za-z]/', $s, $m)) return 0;
         return is_array($m[0] ?? null) ? count($m[0]) : 0;
+    }
+
+    private function loadInstrMap(): array {
+        $row = $this->settingsRepo->getKey('bot_instr_map');
+        $decoded = json_decode((string)($row['v'] ?? ''), true);
+        if (!is_array($decoded)) $decoded = [];
+        $fallback = [
+            'chat' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 1, 'system_daily' => 0, 'system_announce' => 0],
+            'daily' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 1, 'system_announce' => 0],
+            'announce' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 0, 'system_announce' => 1],
+        ];
+        foreach ($fallback as $mode => $blocks) {
+            if (!is_array($decoded[$mode] ?? null)) $decoded[$mode] = [];
+            foreach ($blocks as $k => $v) {
+                $decoded[$mode][$k] = !empty($decoded[$mode][$k]) ? 1 : 0;
+            }
+        }
+        return $decoded;
+    }
+
+    private function isOn(array $map, string $mode, string $block): bool {
+        return !empty($map[$mode][$block]);
     }
 
     private function cacheFile(string $date): string {
@@ -200,11 +228,17 @@ class TestAIDailySummaryService {
             ];
         }
 
+        $map = $this->loadInstrMap();
         $lang = $this->resolveLang('bot_lang_daily', json_encode($items, JSON_UNESCAPED_UNICODE) ?: '');
         $common = trim((string)($this->settingsRepo->getBotPrompt()['prompt'] ?? ''));
         $base = trim((string)($this->settingsRepo->getKey('bot_system_base')['v'] ?? ''));
         $dailySys = trim((string)($this->settingsRepo->getKey('bot_system_daily')['v'] ?? ''));
-        $system = trim(implode("\n\n", array_values(array_filter([$common, $base, $dailySys]))));
+        $parts = [];
+        if ($this->isOn($map, 'daily', 'common_prompt') && $common !== '') $parts[] = $common;
+        if ($this->isOn($map, 'daily', 'system_base') && $base !== '') $parts[] = $base;
+        if ($this->isOn($map, 'daily', 'system_daily') && $dailySys !== '') $parts[] = $dailySys;
+        if (!$parts && $dailySys !== '') $parts[] = $dailySys;
+        $system = trim(implode("\n\n", $parts));
         if ($system !== '') $system .= "\n\n";
         $system .= "All string fields must be written in " . strtoupper($lang) . ".";
         $prompt = $lang === 'ru'
@@ -274,6 +308,28 @@ class TestAIDailySummaryService {
         if ($s === '') return 0;
         if (!preg_match_all('/[A-Za-z]/', $s, $m)) return 0;
         return is_array($m[0] ?? null) ? count($m[0]) : 0;
+    }
+
+    private function loadInstrMap(): array {
+        $row = $this->settingsRepo->getKey('bot_instr_map');
+        $decoded = json_decode((string)($row['v'] ?? ''), true);
+        if (!is_array($decoded)) $decoded = [];
+        $fallback = [
+            'chat' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 1, 'system_daily' => 0, 'system_announce' => 0],
+            'daily' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 1, 'system_announce' => 0],
+            'announce' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 0, 'system_announce' => 1],
+        ];
+        foreach ($fallback as $mode => $blocks) {
+            if (!is_array($decoded[$mode] ?? null)) $decoded[$mode] = [];
+            foreach ($blocks as $k => $v) {
+                $decoded[$mode][$k] = !empty($decoded[$mode][$k]) ? 1 : 0;
+            }
+        }
+        return $decoded;
+    }
+
+    private function isOn(array $map, string $mode, string $block): bool {
+        return !empty($map[$mode][$block]);
     }
 }
 
@@ -432,11 +488,17 @@ class TestAIWebhookService {
         $botPrompt = is_array($p) ? (string)($p['prompt'] ?? '') : '';
 
         $ctxMsgs = $this->buildContextMessages($chatId);
+        $map = $this->loadInstrMap();
         $lang = $this->resolveLang('bot_lang_chat', $queryText, $ctxMsgs);
         $common = trim($botPrompt);
         $baseSys = trim((string)($this->settingsRepo->getKey('bot_system_base')['v'] ?? ''));
         $chatSys = trim((string)($this->settingsRepo->getKey('bot_system_chat')['v'] ?? ''));
-        $system = trim(implode("\n\n", array_values(array_filter([$common, $baseSys, $chatSys]))));
+        $parts = [];
+        if ($this->isOn($map, 'chat', 'common_prompt') && $common !== '') $parts[] = $common;
+        if ($this->isOn($map, 'chat', 'system_base') && $baseSys !== '') $parts[] = $baseSys;
+        if ($this->isOn($map, 'chat', 'system_chat') && $chatSys !== '') $parts[] = $chatSys;
+        if (!$parts && $chatSys !== '') $parts[] = $chatSys;
+        $system = trim(implode("\n\n", $parts));
         if ($system !== '') $system .= "\n\n";
         $system .= "Reply in " . strtoupper($lang) . ". If the user asks in a different language, prefer the user's language.";
 
@@ -653,6 +715,28 @@ class TestAIWebhookService {
         if (preg_match('/\p{Cyrillic}/u', $t)) return 'ru';
         if (preg_match('/[A-Za-z]/', $t)) return 'en';
         return '';
+    }
+
+    private function loadInstrMap(): array {
+        $row = $this->settingsRepo->getKey('bot_instr_map');
+        $decoded = json_decode((string)($row['v'] ?? ''), true);
+        if (!is_array($decoded)) $decoded = [];
+        $fallback = [
+            'chat' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 1, 'system_daily' => 0, 'system_announce' => 0],
+            'daily' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 1, 'system_announce' => 0],
+            'announce' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 0, 'system_announce' => 1],
+        ];
+        foreach ($fallback as $mode => $blocks) {
+            if (!is_array($decoded[$mode] ?? null)) $decoded[$mode] = [];
+            foreach ($blocks as $k => $v) {
+                $decoded[$mode][$k] = !empty($decoded[$mode][$k]) ? 1 : 0;
+            }
+        }
+        return $decoded;
+    }
+
+    private function isOn(array $map, string $mode, string $block): bool {
+        return !empty($map[$mode][$block]);
     }
 
     private function parseSummaryCommand(string $text): ?string {

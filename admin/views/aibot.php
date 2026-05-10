@@ -26,7 +26,14 @@
         <div style="font-weight:900;">Инструкции (наглядно)</div>
       </div>
 
-      <div class="table-wrap" style="margin-top:12px; overflow:auto;">
+      <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px;">
+        <div class="small-muted" id="mapMeta">
+          <?= $aibotInstrMapUpdatedAt ? ('Обновлено: ' . htmlspecialchars($aibotInstrMapUpdatedAt)) : '' ?>
+        </div>
+        <button class="btn" type="button" id="btnMapSave">Сохранить галочки</button>
+      </div>
+
+      <div class="table-wrap" style="margin-top:10px; overflow:auto;">
         <table style="width:max-content; min-width:100%; border-collapse:collapse;">
           <thead>
             <tr>
@@ -39,33 +46,33 @@
           <tbody>
             <tr>
               <td style="padding:8px 10px; white-space:nowrap;">Common prompt</td>
-              <td style="padding:8px 10px;">✓</td>
-              <td style="padding:8px 10px;">✓</td>
-              <td style="padding:8px 10px;">✓</td>
+              <td style="padding:8px 10px;"><input data-map="chat" data-block="common_prompt" type="checkbox" <?= !empty($aibotInstrMap['chat']['common_prompt']) ? 'checked' : '' ?>></td>
+              <td style="padding:8px 10px;"><input data-map="daily" data-block="common_prompt" type="checkbox" <?= !empty($aibotInstrMap['daily']['common_prompt']) ? 'checked' : '' ?>></td>
+              <td style="padding:8px 10px;"><input data-map="announce" data-block="common_prompt" type="checkbox" <?= !empty($aibotInstrMap['announce']['common_prompt']) ? 'checked' : '' ?>></td>
             </tr>
             <tr>
               <td style="padding:8px 10px; white-space:nowrap;">System base</td>
-              <td style="padding:8px 10px;">✓</td>
-              <td style="padding:8px 10px;">✓</td>
-              <td style="padding:8px 10px;">✓</td>
+              <td style="padding:8px 10px;"><input data-map="chat" data-block="system_base" type="checkbox" <?= !empty($aibotInstrMap['chat']['system_base']) ? 'checked' : '' ?>></td>
+              <td style="padding:8px 10px;"><input data-map="daily" data-block="system_base" type="checkbox" <?= !empty($aibotInstrMap['daily']['system_base']) ? 'checked' : '' ?>></td>
+              <td style="padding:8px 10px;"><input data-map="announce" data-block="system_base" type="checkbox" <?= !empty($aibotInstrMap['announce']['system_base']) ? 'checked' : '' ?>></td>
             </tr>
             <tr>
               <td style="padding:8px 10px; white-space:nowrap;">System chat</td>
-              <td style="padding:8px 10px;">✓</td>
-              <td style="padding:8px 10px;"></td>
-              <td style="padding:8px 10px;"></td>
+              <td style="padding:8px 10px;"><input data-map="chat" data-block="system_chat" type="checkbox" <?= !empty($aibotInstrMap['chat']['system_chat']) ? 'checked' : '' ?>></td>
+              <td style="padding:8px 10px;"><input data-map="daily" data-block="system_chat" type="checkbox" <?= !empty($aibotInstrMap['daily']['system_chat']) ? 'checked' : '' ?>></td>
+              <td style="padding:8px 10px;"><input data-map="announce" data-block="system_chat" type="checkbox" <?= !empty($aibotInstrMap['announce']['system_chat']) ? 'checked' : '' ?>></td>
             </tr>
             <tr>
               <td style="padding:8px 10px; white-space:nowrap;">System daily</td>
-              <td style="padding:8px 10px;"></td>
-              <td style="padding:8px 10px;">✓</td>
-              <td style="padding:8px 10px;"></td>
+              <td style="padding:8px 10px;"><input data-map="chat" data-block="system_daily" type="checkbox" <?= !empty($aibotInstrMap['chat']['system_daily']) ? 'checked' : '' ?>></td>
+              <td style="padding:8px 10px;"><input data-map="daily" data-block="system_daily" type="checkbox" <?= !empty($aibotInstrMap['daily']['system_daily']) ? 'checked' : '' ?>></td>
+              <td style="padding:8px 10px;"><input data-map="announce" data-block="system_daily" type="checkbox" <?= !empty($aibotInstrMap['announce']['system_daily']) ? 'checked' : '' ?>></td>
             </tr>
             <tr>
               <td style="padding:8px 10px; white-space:nowrap;">System announce</td>
-              <td style="padding:8px 10px;"></td>
-              <td style="padding:8px 10px;"></td>
-              <td style="padding:8px 10px;">✓</td>
+              <td style="padding:8px 10px;"><input data-map="chat" data-block="system_announce" type="checkbox" <?= !empty($aibotInstrMap['chat']['system_announce']) ? 'checked' : '' ?>></td>
+              <td style="padding:8px 10px;"><input data-map="daily" data-block="system_announce" type="checkbox" <?= !empty($aibotInstrMap['daily']['system_announce']) ? 'checked' : '' ?>></td>
+              <td style="padding:8px 10px;"><input data-map="announce" data-block="system_announce" type="checkbox" <?= !empty($aibotInstrMap['announce']['system_announce']) ? 'checked' : '' ?>></td>
             </tr>
           </tbody>
         </table>

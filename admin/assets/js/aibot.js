@@ -22,6 +22,8 @@
   const langDaily = $('langDaily')
   const langAnnounce = $('langAnnounce')
 
+  const mapMeta = $('mapMeta')
+
   const ctxQuestion = $('ctxQuestion')
   const ctxMode = $('ctxMode')
   const ctxChatId = $('ctxChatId')
@@ -89,6 +91,7 @@
     chatMeta.textContent = j.system_chat_updated_at ? `Обновлено: ${String(j.system_chat_updated_at)}` : ''
     dailySysMeta.textContent = j.system_daily_updated_at ? `Обновлено: ${String(j.system_daily_updated_at)}` : ''
     announceSysMeta.textContent = j.system_announce_updated_at ? `Обновлено: ${String(j.system_announce_updated_at)}` : ''
+    if (mapMeta) mapMeta.textContent = j.instr_map_updated_at ? `Обновлено: ${String(j.instr_map_updated_at)}` : ''
     if (langChat && j.lang_chat) langChat.value = String(j.lang_chat)
     if (langDaily && j.lang_daily) langDaily.value = String(j.lang_daily)
     if (langAnnounce && j.lang_announce) langAnnounce.value = String(j.lang_announce)
@@ -172,6 +175,20 @@
     const ok1 = await settingSave('bot_system_announce', announceSysText.value || '')
     const ok2 = await settingSave('bot_lang_announce', langAnnounce && langAnnounce.value ? langAnnounce.value : 'ru')
     if (!ok1 || !ok2) return
+    await state()
+  }
+
+  const mapSave = async () => {
+    const inputs = Array.from(document.querySelectorAll('input[data-map][data-block]'))
+    const map = { chat: {}, daily: {}, announce: {} }
+    inputs.forEach((el) => {
+      const m = String(el.getAttribute('data-map') || '')
+      const b = String(el.getAttribute('data-block') || '')
+      if (!m || !b || !map[m]) return
+      map[m][b] = el.checked ? 1 : 0
+    })
+    const ok = await settingSave('bot_instr_map', JSON.stringify(map))
+    if (!ok) return
     await state()
   }
 
@@ -306,6 +323,7 @@
   $('btnChatSave').addEventListener('click', chatSave)
   $('btnDailySysSave').addEventListener('click', dailySysSave)
   $('btnAnnounceSysSave').addEventListener('click', announceSysSave)
+  $('btnMapSave').addEventListener('click', mapSave)
   $('btnCtxPreview').addEventListener('click', ctxPreview)
   $('btnLogTail').addEventListener('click', logTail)
 

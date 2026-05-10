@@ -46,6 +46,7 @@ if ($ajax !== '') {
         $langChatRow = $settingsRepo->getKey('bot_lang_chat');
         $langAnnRow = $settingsRepo->getKey('bot_lang_announce');
         $langDailyRow = $settingsRepo->getKey('bot_lang_daily');
+        $mapRow = $settingsRepo->getKey('bot_instr_map');
         $file = ($log instanceof \App\Classes\TestAILogger) ? $log->filePath() : '';
 
         $respondJson([
@@ -69,6 +70,7 @@ if ($ajax !== '') {
             'lang_chat' => (string)($langChatRow['v'] ?? ''),
             'lang_announce' => (string)($langAnnRow['v'] ?? ''),
             'lang_daily' => (string)($langDailyRow['v'] ?? ''),
+            'instr_map_updated_at' => (string)($mapRow['updated_at'] ?? ''),
             'log_file' => $file,
         ]);
     }
@@ -181,19 +183,41 @@ if ($ajax !== '') {
         $mode = strtolower(trim((string)($_POST['mode'] ?? 'chat')));
         if (!in_array($mode, ['chat', 'announce', 'daily'], true)) $mode = 'chat';
 
+        $mapRow = $settingsRepo->getKey('bot_instr_map');
+        $decoded = json_decode((string)($mapRow['v'] ?? ''), true);
+        if (!is_array($decoded)) $decoded = [];
+        $fallback = [
+            'chat' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 1, 'system_daily' => 0, 'system_announce' => 0],
+            'daily' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 1, 'system_announce' => 0],
+            'announce' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 0, 'system_announce' => 1],
+        ];
+        $map = $fallback;
+        foreach (['chat', 'daily', 'announce'] as $m) {
+            if (!is_array($decoded[$m] ?? null)) continue;
+            foreach ($map[$m] as $k => $v) $map[$m][$k] = !empty($decoded[$m][$k]) ? 1 : 0;
+        }
+
         $common = trim((string)($settingsRepo->getBotPrompt()['prompt'] ?? ''));
         $base = trim((string)($settingsRepo->getKey('bot_system_base')['v'] ?? ''));
-        $applied = ['common_prompt' => $common !== '' ? 1 : 0, 'system_base' => $base !== '' ? 1 : 0];
-        $systemParts = array_values(array_filter([$common, $base]));
+        $chatSys = trim((string)($settingsRepo->getKey('bot_system_chat')['v'] ?? ''));
+        $dailySys = trim((string)($settingsRepo->getKey('bot_system_daily')['v'] ?? ''));
+        $annSys = trim((string)($settingsRepo->getKey('bot_system_announce')['v'] ?? ''));
+
+        $applied = ['mode' => $mode];
+        $systemParts = [];
+        if (!empty($map[$mode]['common_prompt']) && $common !== '') { $systemParts[] = $common; $applied['common_prompt'] = 1; } else { $applied['common_prompt'] = 0; }
+        if (!empty($map[$mode]['system_base']) && $base !== '') { $systemParts[] = $base; $applied['system_base'] = 1; } else { $applied['system_base'] = 0; }
+        if (!empty($map[$mode]['system_chat']) && $chatSys !== '') { $systemParts[] = $chatSys; $applied['system_chat'] = 1; } else { $applied['system_chat'] = 0; }
+        if (!empty($map[$mode]['system_daily']) && $dailySys !== '') { $systemParts[] = $dailySys; $applied['system_daily'] = 1; } else { $applied['system_daily'] = 0; }
+        if (!empty($map[$mode]['system_announce']) && $annSys !== '') { $systemParts[] = $annSys; $applied['system_announce'] = 1; } else { $applied['system_announce'] = 0; }
+        if (!$systemParts) {
+            $fallbackSys = $mode === 'daily' ? $dailySys : ($mode === 'announce' ? $annSys : $chatSys);
+            if ($fallbackSys !== '') $systemParts[] = $fallbackSys;
+        }
         $langKey = 'bot_lang_chat';
         $modeSysKey = 'bot_system_chat';
         if ($mode === 'announce') { $langKey = 'bot_lang_announce'; $modeSysKey = 'bot_system_announce'; }
         if ($mode === 'daily') { $langKey = 'bot_lang_daily'; $modeSysKey = 'bot_system_daily'; }
-        $modeSys = trim((string)($settingsRepo->getKey($modeSysKey)['v'] ?? ''));
-        $applied['mode'] = $mode;
-        $applied['mode_system_key'] = $modeSysKey;
-        $applied['mode_system'] = $modeSys !== '' ? 1 : 0;
-        if ($modeSys !== '') $systemParts[] = $modeSys;
         $system = trim(implode("\n\n", $systemParts));
 
         $langVal = strtolower(trim((string)($settingsRepo->getKey($langKey)['v'] ?? 'auto')));
@@ -336,4 +360,20 @@ $aibotSystemDaily = (string)($settingsRepo->getKey('bot_system_daily')['v'] ?? '
 $aibotLangChat = (string)($settingsRepo->getKey('bot_lang_chat')['v'] ?? 'auto');
 $aibotLangAnnounce = (string)($settingsRepo->getKey('bot_lang_announce')['v'] ?? 'ru');
 $aibotLangDaily = (string)($settingsRepo->getKey('bot_lang_daily')['v'] ?? 'ru');
+$aibotInstrMapRow = $settingsRepo->getKey('bot_instr_map');
+$aibotInstrMapUpdatedAt = (string)($aibotInstrMapRow['updated_at'] ?? '');
+$aibotInstrMap = [
+    'chat' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 1, 'system_daily' => 0, 'system_announce' => 0],
+    'daily' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 1, 'system_announce' => 0],
+    'announce' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 0, 'system_announce' => 1],
+];
+$decoded = json_decode((string)($aibotInstrMapRow['v'] ?? ''), true);
+if (is_array($decoded)) {
+    foreach (['chat', 'daily', 'announce'] as $m) {
+        if (!is_array($decoded[$m] ?? null)) continue;
+        foreach ($aibotInstrMap[$m] as $k => $v) {
+            $aibotInstrMap[$m][$k] = !empty($decoded[$m][$k]) ? 1 : 0;
+        }
+    }
+}
 $aibotKbItems = $kbRepo->list(80, 0);

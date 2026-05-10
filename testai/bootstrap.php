@@ -35,6 +35,11 @@ $defaults = [
   'bot_lang_chat' => 'auto',
   'bot_lang_announce' => 'ru',
   'bot_lang_daily' => 'ru',
+  'bot_instr_map' => json_encode([
+    'chat' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 1, 'system_daily' => 0, 'system_announce' => 0],
+    'daily' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 1, 'system_announce' => 0],
+    'announce' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 0, 'system_announce' => 1],
+  ], JSON_UNESCAPED_UNICODE),
 ];
 foreach ($defaults as $k => $v) {
   $row = $settingsRepo->getKey($k);
