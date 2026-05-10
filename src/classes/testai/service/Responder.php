@@ -33,6 +33,8 @@ class Responder {
         'vegetarian','vegan','meat','ingredient','allergen',
     ];
 
+    private const CACHE_TTL = 600;
+
     public function __construct(
         private string              $model,
         private GeminiClient        $gemini,
@@ -57,6 +59,13 @@ class Responder {
 
         // 1. PHP topic detection — no AI
         $needsMenu = $this->isMenuQuestion($question);
+
+        $cacheKey = null;
+        if (!$needsMenu && count($context) <= 1) {
+            $cacheKey = '_rc:' . sha1(mb_strtolower($question) . ':' . ($isAuthorized ? '1' : '0'));
+            $cached   = $this->getCache($cacheKey);
+            if ($cached !== null) return $cached;
+        }
 
         // 2. Load data (cheap SQL / cached API calls)
         $menuText    = $needsMenu ? $this->menuSvc->getMenuText($lang === 'en' ? 'en' : 'ru') : '';
@@ -84,9 +93,18 @@ class Responder {
         );
 
         $html = $this->gemini->text($resp);
-        if ($html === '') $html = $this->errorText($resp, $lang);
+        if ($html === '') {
+            $this->storeRateLimitBlock($resp);
+            $html = $this->errorText($resp, $lang);
+        }
 
-        return $this->sanitizer->sanitizeTelegramHtml($html);
+        $html = $this->sanitizer->sanitizeTelegramHtml($html);
+
+        if ($cacheKey !== null && $html !== '' && !str_contains($html, 'Лимит') && !str_contains($html, 'Не получилось')) {
+            $this->setCache($cacheKey, $html);
+        }
+
+        return $html;
     }
 
     private function buildSystem(string $lang): string {
@@ -170,5 +188,35 @@ class Responder {
                 : 'AI rate limit reached.' . $retry;
         }
         return $lang === 'ru' ? 'Не получилось сформировать ответ.' : 'Could not generate a response.';
+    }
+
+    private function getCache(string $key): ?string {
+        $raw = $this->settings->get($key);
+        if ($raw === '') return null;
+        $data = json_decode($raw, true);
+        if (!is_array($data) || (int)($data['exp'] ?? 0) < time()) return null;
+        $html = (string)($data['html'] ?? '');
+        return $html !== '' ? $html : null;
+    }
+
+    private function setCache(string $key, string $html): void {
+        $this->settings->set($key, json_encode(['html' => $html, 'exp' => time() + self::CACHE_TTL], JSON_UNESCAPED_UNICODE) ?: '');
+        if (random_int(1, 20) === 1) {
+            try {
+                $this->settings->deleteExpiredCache('_rc:');
+            } catch (\Throwable) {}
+        }
+    }
+
+    private function storeRateLimitBlock(array $resp): void {
+        if (!is_array($resp['error'] ?? null)) return;
+        $err = trim((string)($resp['error']['message'] ?? ''));
+        if ($err === '' || !preg_match('/quota|rate.?limit/i', $err)) return;
+        $retry = 60;
+        if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) $retry = (int)ceil((float)($m[1] ?? 0));
+        $until = time() + max(30, $retry);
+        $ts = gmdate('c', $until);
+        $this->settings->set('gemini_block_until', $ts);
+        $this->settings->set('gemini_next_allowed_until', $ts);
     }
 }

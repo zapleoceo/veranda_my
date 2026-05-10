@@ -4,7 +4,9 @@
   <div class="ai-bar">
     <span class="ai-pill" id="pillDb">DB</span>
     <span class="ai-pill" id="pillGemini">AI</span>
+    <span class="ai-pill err" id="pillBlock" style="display:none">⊘ 0с</span>
     <span class="ai-meta" id="aibotMeta"></span>
+    <button class="ai-btn ai-btn-warn" id="btnBlockReset" style="display:none" title="Снять блокировку AI">Сброс</button>
     <button class="ai-btn" id="btnRefreshState" title="Обновить статус">↻</button>
   </div>
 
@@ -188,6 +190,8 @@
 .ai-btn-primary { padding: 4px 14px; font-size: 12px; border: none; border-radius: 4px; background: #333; color: #fff; cursor: pointer; white-space: nowrap; }
 .ai-btn-primary:hover { background: #111; }
 .ai-btn-del { color: #c00; }
+.ai-btn-warn { background: #fff3cd; border-color: #f59e0b; color: #92400e; }
+.ai-btn-warn:hover { background: #fde68a; }
 
 /* Inputs */
 #ai-root input[type="text"],

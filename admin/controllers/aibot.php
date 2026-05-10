@@ -45,6 +45,12 @@ if ($ajax !== '') {
         $counts   = $msgRepo->getCountsForDay($aibotDate);
         $dailyRow = $dailyRepo->getByDay($aibotDate);
         $logFile  = ($log instanceof \App\Classes\TestAI\Infra\Logger) ? $log->filePath() : '';
+        $blockUntil = $settingsRepo->get('gemini_block_until');
+        $nextUntil  = $settingsRepo->get('gemini_next_allowed_until');
+        $blockTs    = $blockUntil !== '' ? (int)strtotime($blockUntil) : 0;
+        $nextTs     = $nextUntil !== '' ? (int)strtotime($nextUntil) : 0;
+        $blockRem   = ($blockTs > 0 && $blockTs > time()) ? ($blockTs - time()) : 0;
+        $nextRem    = ($nextTs > 0 && $nextTs > time()) ? ($nextTs - time()) : 0;
         $json([
             'ok'                  => true,
             'db_ok'               => $dbOk,
@@ -55,9 +61,17 @@ if ($ajax !== '') {
             'raw_last_received_at'=> (string)($totals['raw_last_received_at'] ?? ''),
             'day_count'           => (int)($counts['count'] ?? 0),
             'log_file'            => $logFile,
+            'block_remaining'     => max($blockRem, $nextRem),
             'identity_updated_at' => $settingsRepo->getWithMeta('bot_identity')['updated_at'] ?? '',
             'forbidden_updated_at'=> $settingsRepo->getWithMeta('bot_forbidden')['updated_at'] ?? '',
         ]);
+    }
+
+    if ($ajax === 'block_reset') {
+        $requirePost();
+        $settingsRepo->set('gemini_block_until', '');
+        $settingsRepo->set('gemini_next_allowed_until', '');
+        $json(['ok' => true]);
     }
 
     // ── Logs ─────────────────────────────────────────────────────────────────
