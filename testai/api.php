@@ -129,6 +129,110 @@ if ($ajax === 'log_tail') {
   exit;
 }
 
+if ($ajax === 'gemini_usage') {
+  if ($adminKey !== '' && (string)($_GET['key'] ?? '') !== $adminKey) {
+    $bad('forbidden');
+    exit;
+  }
+  $file = ($log instanceof \App\Classes\TestAILogger) ? $log->filePath() : '';
+  if ($file === '' || !is_file($file)) {
+    $bad('missing_log_file');
+    exit;
+  }
+
+  $maxBytes = (int)($_GET['max_bytes'] ?? 700000);
+  $maxBytes = max(50000, min(2500000, $maxBytes));
+
+  $size = @filesize($file);
+  if (!is_int($size) || $size <= 0) {
+    $ok(['file' => $file, 'size' => 0, 'events_parsed' => 0, 'counts' => []]);
+    exit;
+  }
+
+  $fh = @fopen($file, 'rb');
+  if (!is_resource($fh)) {
+    $bad('cannot_open_log_file');
+    exit;
+  }
+  $read = min($maxBytes, $size);
+  @fseek($fh, -$read, SEEK_END);
+  $buf = (string)@fread($fh, $read);
+  @fclose($fh);
+  $buf = str_replace("\r\n", "\n", $buf);
+  $lines = array_values(array_filter(explode("\n", $buf), fn($x) => trim((string)$x) !== ''));
+
+  $now = time();
+  $counts = [
+    'last_60s' => 0,
+    'last_10m' => 0,
+    'last_60m' => 0,
+    'last_24h' => 0,
+    'http' => [],
+  ];
+  $eventsParsed = 0;
+  $latest = null;
+  $latestRate = null;
+
+  foreach ($lines as $line) {
+    if (strpos($line, '"event":"gemini_http"') === false) continue;
+    $j = json_decode($line, true);
+    if (!is_array($j) || (string)($j['event'] ?? '') !== 'gemini_http') continue;
+    $eventsParsed++;
+
+    $ts = (string)($j['ts'] ?? '');
+    $t = strtotime($ts);
+    if (!is_int($t) || $t <= 0) continue;
+
+    $ctx = is_array($j['ctx'] ?? null) ? $j['ctx'] : [];
+    $code = (int)($ctx['http_code'] ?? 0);
+    $err = (string)($ctx['error'] ?? '');
+    if (!isset($counts['http'][(string)$code])) $counts['http'][(string)$code] = 0;
+    $counts['http'][(string)$code]++;
+
+    $age = $now - $t;
+    if ($age <= 60) $counts['last_60s']++;
+    if ($age <= 600) $counts['last_10m']++;
+    if ($age <= 3600) $counts['last_60m']++;
+    if ($age <= 86400) $counts['last_24h']++;
+
+    if ($latest === null || $t >= (int)($latest['t'] ?? 0)) {
+      $latest = [
+        'ts' => $ts,
+        't' => $t,
+        'http_code' => $code,
+        'has_error' => $err !== '' ? 1 : 0,
+      ];
+    }
+
+    if ($err !== '' && preg_match('/limit:\s*(\d+)/i', $err, $m)) {
+      $limit = (int)($m[1] ?? 0);
+      $retrySec = null;
+      if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m2)) $retrySec = (float)($m2[1] ?? 0);
+      $latestRate = [
+        'ts' => $ts,
+        'http_code' => $code,
+        'limit' => $limit,
+        'retry_in_sec' => $retrySec,
+      ];
+    }
+  }
+
+  $assumedLimitPerMin = is_array($latestRate) && (int)($latestRate['limit'] ?? 0) > 0 ? (int)$latestRate['limit'] : null;
+  $remaining = is_int($assumedLimitPerMin) ? max(0, $assumedLimitPerMin - (int)$counts['last_60s']) : null;
+
+  $ok([
+    'file' => $file,
+    'size' => $size,
+    'events_parsed' => $eventsParsed,
+    'counts' => $counts,
+    'latest' => $latest,
+    'latest_rate_limit' => $latestRate,
+    'assumed_limit_per_minute' => $assumedLimitPerMin,
+    'assumed_remaining_this_minute' => $remaining,
+  ]);
+  exit;
+}
+
 if ($ajax === 'get_prompt') {
   $p = $settingsRepo->getBotPrompt();
   $ok(['prompt' => (string)($p['prompt'] ?? ''), 'updated_at' => (string)($p['updated_at'] ?? '')]);
