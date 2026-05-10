@@ -85,7 +85,7 @@ if ($ajax === 'gemini_test') {
   $resp = $gemini->generate(
     (string)$cfg->geminiModel,
     [['text' => $q]],
-    ['system' => 'Reply with plain text only.', 'temperature' => 0.0, 'maxOutputTokens' => 50]
+    ['system' => 'Reply with plain text only.', 'temperature' => 0.0, 'maxOutputTokens' => 50, 'tag' => 'gemini_test']
   );
   $txt = $gemini->text($resp);
   $err = '';
@@ -168,6 +168,7 @@ if ($ajax === 'gemini_usage') {
     'last_60m' => 0,
     'last_24h' => 0,
     'http' => [],
+    'tag' => [],
   ];
   $eventsParsed = 0;
   $latest = null;
@@ -186,8 +187,13 @@ if ($ajax === 'gemini_usage') {
     $ctx = is_array($j['ctx'] ?? null) ? $j['ctx'] : [];
     $code = (int)($ctx['http_code'] ?? 0);
     $err = (string)($ctx['error'] ?? '');
+    $tag = trim((string)($ctx['tag'] ?? ''));
     if (!isset($counts['http'][(string)$code])) $counts['http'][(string)$code] = 0;
     $counts['http'][(string)$code]++;
+    if ($tag !== '') {
+      if (!isset($counts['tag'][$tag])) $counts['tag'][$tag] = 0;
+      $counts['tag'][$tag]++;
+    }
 
     $age = $now - $t;
     if ($age <= 60) $counts['last_60s']++;

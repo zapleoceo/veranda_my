@@ -290,10 +290,13 @@ class TestAIGeminiClient {
             $err = '';
             if (is_array($data['error'] ?? null)) $err = trim((string)($data['error']['message'] ?? ''));
             if (mb_strlen($err) > 500) $err = mb_substr($err, 0, 500) . '…';
+            $tag = '';
+            if (isset($opts['tag'])) $tag = trim((string)$opts['tag']);
             $this->logger->info('gemini_http', [
                 'http_code' => (int)$code,
                 'model' => $model,
                 'via_proxy' => $this->proxyBase !== '' ? 1 : 0,
+                'tag' => $tag,
                 'has_error' => $err !== '' ? 1 : 0,
                 'error' => $err,
             ]);

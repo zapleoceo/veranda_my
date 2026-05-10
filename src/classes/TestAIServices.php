@@ -49,7 +49,7 @@ class TestAIAnnouncementService {
         $resp = $this->gemini->generate(
             $this->cfg->geminiModel,
             [['text' => $prompt], ['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
-            ['system' => $system, 'temperature' => 0.3, 'maxOutputTokens' => 2200]
+            ['system' => $system, 'temperature' => 0.3, 'maxOutputTokens' => 2200, 'tag' => 'announce_generate']
         );
         $html = $this->gemini->text($resp);
         $html = $this->sanitizer->sanitizeHtml($html);
@@ -163,7 +163,7 @@ class TestAIDailySummaryService {
                 ['text' => $prompt],
                 ['text' => json_encode(['day' => $day, 'messages' => $items], JSON_UNESCAPED_UNICODE)],
             ],
-            ['system' => $system, 'temperature' => 0.2, 'maxOutputTokens' => 2500, 'responseMimeType' => 'application/json']
+            ['system' => $system, 'temperature' => 0.2, 'maxOutputTokens' => 2500, 'responseMimeType' => 'application/json', 'tag' => 'daily_summary']
         );
 
         $j = $this->gemini->json($resp);
@@ -308,7 +308,7 @@ class TestAIWebhookService {
         $resp = $this->gemini->generate(
             $this->cfg->geminiModel,
             [['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
-            ['system' => $system, 'temperature' => 0.35, 'maxOutputTokens' => 1200]
+            ['system' => $system, 'temperature' => 0.35, 'maxOutputTokens' => 1200, 'tag' => 'chat_reply']
         );
 
         $html = $this->gemini->text($resp);
@@ -414,7 +414,7 @@ class TestAIWebhookService {
                 ['text' => $prompt],
                 ['inline_data' => ['mime_type' => $mimeType ?: 'application/octet-stream', 'data' => $b64]],
             ],
-            ['system' => $system, 'temperature' => 0.2, 'maxOutputTokens' => 1000, 'responseMimeType' => 'application/json']
+            ['system' => $system, 'temperature' => 0.2, 'maxOutputTokens' => 1000, 'responseMimeType' => 'application/json', 'tag' => 'media_extract']
         );
         $j = $this->gemini->json($resp);
         if (!is_array($j) || !isset($j['text'])) return '';
