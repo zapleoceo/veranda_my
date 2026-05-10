@@ -503,6 +503,9 @@ class TestAIWebhookService {
         $system .= "Reply in " . strtoupper($lang) . ". If the user asks in a different language, prefer the user's language.";
 
         $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($queryText, 5);
+        if (!$knowledgeDocs && $this->isMenuQuestion($queryText)) {
+            $knowledgeDocs = $this->knowledgeSvc->selectForQuestion('меню ' . $queryText, 5);
+        }
         $payload = [
             'chat_id' => $chatId,
             'chat_type' => $chatType,
@@ -715,6 +718,12 @@ class TestAIWebhookService {
         if (preg_match('/\p{Cyrillic}/u', $t)) return 'ru';
         if (preg_match('/[A-Za-z]/', $t)) return 'en';
         return '';
+    }
+
+    private function isMenuQuestion(string $q): bool {
+        $t = mb_strtolower(trim((string)$q));
+        if ($t === '') return false;
+        return (bool)preg_match('/\b(меню|блюд|блюда|завтрак|завтраки|бар|пиво|вино|цена|цен|сто(ит|ят)|бургер|панкейк|вафл|breakfast)\b/u', $t);
     }
 
     private function loadInstrMap(): array {
@@ -968,10 +977,17 @@ class TestAIKnowledgeService {
             $p = trim((string)$p);
             if ($p === '') continue;
             if (mb_strlen($p) < 3) continue;
-            if (in_array($p, ['какие', 'какой', 'какая', 'какое', 'есть', 'у', 'вас', 'в', 'на', 'и', 'или', 'что', 'это', 'нет', 'там', 'по', 'меню', 'цена', 'сколько', 'стоит', 'пожалуйста', 'спасибо'], true)) continue;
+            if (in_array($p, ['какие', 'какой', 'какая', 'какое', 'есть', 'у', 'вас', 'в', 'на', 'и', 'или', 'что', 'это', 'нет', 'там', 'по', 'сколько', 'пожалуйста', 'спасибо'], true)) continue;
             $out[$p] = true;
             if (count($out) >= 10) break;
         }
+
+        $qq = (string)$q;
+        if (preg_match('/\b(меню|блюд|блюда|позици|ассортимент)\b/u', $qq)) $out['меню'] = true;
+        if (preg_match('/\b(завтрак|завтраки|breakfast)\b/u', $qq)) { $out['завтрак'] = true; $out['меню'] = true; }
+        if (preg_match('/\b(бар|пиво|вино|коктейл)\b/u', $qq)) { $out['бар'] = true; $out['меню'] = true; }
+        if (preg_match('/\b(цена|цен|сто(ит|ят)|сколько)\b/u', $qq)) { $out['цена'] = true; $out['меню'] = true; }
+
         return array_keys($out);
     }
 }
