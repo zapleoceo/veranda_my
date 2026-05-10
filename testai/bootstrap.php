@@ -40,6 +40,37 @@ $defaults = [
     'daily' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 1, 'system_announce' => 0],
     'announce' => ['common_prompt' => 1, 'system_base' => 1, 'system_chat' => 0, 'system_daily' => 0, 'system_announce' => 1],
   ], JSON_UNESCAPED_UNICODE),
+  'bot_behavior_json' => json_encode([
+    'kb' => [
+      'enable' => 1,
+      'check_triggers' => ['посмотри в базе знаний', 'проверь в базе знаний', 'база знаний', 'kb', 'knowledge base'],
+      'live_fetch_enable' => 1,
+      'live_fetch_max_docs' => 2,
+      'live_fetch_max_len' => 60000,
+      'force_prefix_menu' => 'меню',
+      'force_prefix_announce' => 'анонс афиша событие',
+    ],
+    'detectors' => [
+      'menu_keywords' => ['меню', 'блюд', 'позици', 'завтрак', 'бар', 'пиво', 'вино', 'цена', 'бургер', 'панкейк', 'вафл', 'breakfast'],
+      'announce_keywords' => ['анонс', 'афиш', 'событи', 'мероприят', 'концерт', 'музык', 'live', 'dj', 'дуэт', 'duo', 'bibi'],
+    ],
+    'chat' => [
+      'system_append' => "Use payload.knowledge_docs as the knowledge base: if provided, answer using it. If the user asks to check the knowledge base, do not refuse; use knowledge_docs or say that no relevant info was found. If payload.daily_for_announcements is provided, use its events when answering about announcements.",
+    ],
+    'announce' => [
+      'inject_daily' => 1,
+      'daily_autogen' => 1,
+    ],
+    'menu_service' => [
+      'enable' => 1,
+      'menu_url' => 'https://veranda.my/links/menu.php',
+      'max_len' => 60000,
+      'detect_keywords' => ['меню', 'завтрак', 'завтраки', 'блюдо', 'блюда', 'позиции', 'бар', 'пиво', 'вино', 'цена', 'сколько', 'дорог', 'breakfast'],
+      'intent_breakfast' => ['завтрак', 'завтраки', 'breakfast'],
+      'intent_count' => ['сколько блюд', 'сколько позиций', 'сколько в меню'],
+      'intent_most_expensive' => ['самое дорогое', 'самый дорогой', 'дороже всего', 'most expensive'],
+    ],
+  ], JSON_UNESCAPED_UNICODE),
 ];
 foreach ($defaults as $k => $v) {
   $row = $settingsRepo->getKey($k);
@@ -51,8 +82,8 @@ $log = new \App\Classes\TestAILogger($cfg->logDir);
 $tg = new \App\Classes\TestAITelegramClient($cfg->tgToken, $log);
 $gemini = new \App\Classes\TestAIGeminiClient($cfg->geminiKey, $cfg->geminiProxyBase(), $cfg->geminiProxyKey, $log);
 $sanitizer = new \App\Classes\TestAIHtmlSanitizer();
-$knowledgeSvc = new \App\Classes\TestAIKnowledgeService($cfg, $kbRepo, $log);
-$menuSvc = new \App\Classes\TestAIMenuService($knowledgeSvc);
+$knowledgeSvc = new \App\Classes\TestAIKnowledgeService($cfg, $kbRepo, $settingsRepo, $log);
+$menuSvc = new \App\Classes\TestAIMenuService($knowledgeSvc, $settingsRepo);
 
 $announcementSvc = new \App\Classes\TestAIAnnouncementService($cfg, $gemini, $sanitizer, $dailyRepo, $rawRepo, $settingsRepo, __DIR__ . '/cache');
 $dailySvc = new \App\Classes\TestAIDailySummaryService($cfg, $gemini, $rawRepo, $dailyRepo, $settingsRepo);

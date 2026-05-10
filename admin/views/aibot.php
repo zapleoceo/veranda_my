@@ -167,6 +167,19 @@
           </div>
         </div>
       </div>
+
+      <div class="card" style="padding:14px; margin-top:12px;">
+        <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
+          <div style="font-weight:800; font-size:13px;">Поведение (без хардкода)</div>
+          <button class="btn" type="button" id="btnBehaviorSave">Сохранить</button>
+        </div>
+        <div class="small-muted" id="behaviorMeta" style="margin-top:6px;">
+          <?= $aibotBehaviorUpdatedAt ? ('Обновлено: ' . htmlspecialchars($aibotBehaviorUpdatedAt)) : '' ?>
+        </div>
+        <div class="form-group" style="margin-top:10px;">
+          <textarea id="behaviorJson" placeholder="JSON настройки поведения (детекторы, KB, daily injection)."><?= htmlspecialchars($aibotBehaviorJson) ?></textarea>
+        </div>
+      </div>
     </div>
 
     <div class="card" style="padding:18px;">

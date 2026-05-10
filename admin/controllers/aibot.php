@@ -47,6 +47,7 @@ if ($ajax !== '') {
         $langAnnRow = $settingsRepo->getKey('bot_lang_announce');
         $langDailyRow = $settingsRepo->getKey('bot_lang_daily');
         $mapRow = $settingsRepo->getKey('bot_instr_map');
+        $behRow = $settingsRepo->getKey('bot_behavior_json');
         $file = ($log instanceof \App\Classes\TestAILogger) ? $log->filePath() : '';
 
         $respondJson([
@@ -71,6 +72,7 @@ if ($ajax !== '') {
             'lang_announce' => (string)($langAnnRow['v'] ?? ''),
             'lang_daily' => (string)($langDailyRow['v'] ?? ''),
             'instr_map_updated_at' => (string)($mapRow['updated_at'] ?? ''),
+            'behavior_updated_at' => (string)($behRow['updated_at'] ?? ''),
             'log_file' => $file,
         ]);
     }
@@ -183,6 +185,37 @@ if ($ajax !== '') {
         $mode = strtolower(trim((string)($_POST['mode'] ?? 'chat')));
         if (!in_array($mode, ['chat', 'announce', 'daily'], true)) $mode = 'chat';
 
+        $behRow = $settingsRepo->getKey('bot_behavior_json');
+        $beh = json_decode((string)($behRow['v'] ?? ''), true);
+        if (!is_array($beh)) $beh = [];
+        $kbCfg = is_array($beh['kb'] ?? null) ? $beh['kb'] : [];
+        $chatCfg = is_array($beh['chat'] ?? null) ? $beh['chat'] : [];
+        $detCfg = is_array($beh['detectors'] ?? null) ? $beh['detectors'] : [];
+        $kbEnabled = !empty($kbCfg['enable']);
+
+        $normList = function ($v): array {
+            $out = [];
+            if (!is_array($v)) return [];
+            foreach ($v as $it) {
+                $s = mb_strtolower(trim((string)$it));
+                if ($s === '') continue;
+                $out[$s] = true;
+            }
+            return array_keys($out);
+        };
+        $matchesAny = function (string $hay, array $needles) : bool {
+            foreach ($needles as $n) {
+                if ($n === '') continue;
+                if (mb_stripos($hay, $n) !== false) return true;
+            }
+            return false;
+        };
+        $qLower = mb_strtolower($q);
+        $menuKw = $normList($detCfg['menu_keywords'] ?? []);
+        $annKw = $normList($detCfg['announce_keywords'] ?? []);
+        $isMenu = $matchesAny($qLower, $menuKw);
+        $isAnn = $matchesAny($qLower, $annKw);
+
         $mapRow = $settingsRepo->getKey('bot_instr_map');
         $decoded = json_decode((string)($mapRow['v'] ?? ''), true);
         if (!is_array($decoded)) $decoded = [];
@@ -229,8 +262,16 @@ if ($ajax !== '') {
         }
         if ($system !== '') $system .= "\n\n";
         $system .= "Language: " . strtoupper($langVal) . ".";
+        $systemAppend = trim((string)($chatCfg['system_append'] ?? ''));
+        if ($mode === 'chat' && $systemAppend !== '') $system .= "\n\n" . $systemAppend;
 
-        $docs = $knowledgeSvc->selectForQuestion($q, 5);
+        $docs = $kbEnabled ? $knowledgeSvc->selectForQuestion($q, 5) : [];
+        $usedPrefix = '';
+        if ($kbEnabled && !$docs && $mode === 'chat') {
+            if ($isMenu) $usedPrefix = trim((string)($kbCfg['force_prefix_menu'] ?? ''));
+            if ($isAnn && $usedPrefix === '') $usedPrefix = trim((string)($kbCfg['force_prefix_announce'] ?? ''));
+            if ($usedPrefix !== '') $docs = $knowledgeSvc->selectForQuestion($usedPrefix . ' ' . $q, 5);
+        }
         $payload = ['mode' => $mode, 'lang' => $langVal, 'question' => $q];
         if ($ctxMsgs) $payload['context'] = $ctxMsgs;
         if ($docs) $payload['knowledge_docs'] = $docs;
@@ -243,6 +284,13 @@ if ($ajax !== '') {
             'system_len' => mb_strlen($system),
             'system_preview' => mb_substr($system, 0, 500),
             'applied' => $applied,
+            'behavior' => [
+                'kb_enabled' => $kbEnabled ? 1 : 0,
+                'is_menu' => $isMenu ? 1 : 0,
+                'is_announce' => $isAnn ? 1 : 0,
+                'system_append' => ($mode === 'chat' && $systemAppend !== '') ? 1 : 0,
+                'used_prefix' => $usedPrefix,
+            ],
             'lang' => $langVal,
             'context_count' => count($ctxMsgs),
             'knowledge_docs_count' => count($docs),
@@ -360,6 +408,9 @@ $aibotSystemDaily = (string)($settingsRepo->getKey('bot_system_daily')['v'] ?? '
 $aibotLangChat = (string)($settingsRepo->getKey('bot_lang_chat')['v'] ?? 'auto');
 $aibotLangAnnounce = (string)($settingsRepo->getKey('bot_lang_announce')['v'] ?? 'ru');
 $aibotLangDaily = (string)($settingsRepo->getKey('bot_lang_daily')['v'] ?? 'ru');
+$aibotBehaviorRow = $settingsRepo->getKey('bot_behavior_json');
+$aibotBehaviorJson = (string)($aibotBehaviorRow['v'] ?? '');
+$aibotBehaviorUpdatedAt = (string)($aibotBehaviorRow['updated_at'] ?? '');
 $aibotInstrMapRow = $settingsRepo->getKey('bot_instr_map');
 $aibotInstrMapUpdatedAt = (string)($aibotInstrMapRow['updated_at'] ?? '');
 $aibotInstrMap = [

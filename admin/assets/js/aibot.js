@@ -23,6 +23,8 @@
   const langAnnounce = $('langAnnounce')
 
   const mapMeta = $('mapMeta')
+  const behaviorJson = $('behaviorJson')
+  const behaviorMeta = $('behaviorMeta')
 
   const ctxQuestion = $('ctxQuestion')
   const ctxMode = $('ctxMode')
@@ -92,6 +94,7 @@
     dailySysMeta.textContent = j.system_daily_updated_at ? `Обновлено: ${String(j.system_daily_updated_at)}` : ''
     announceSysMeta.textContent = j.system_announce_updated_at ? `Обновлено: ${String(j.system_announce_updated_at)}` : ''
     if (mapMeta) mapMeta.textContent = j.instr_map_updated_at ? `Обновлено: ${String(j.instr_map_updated_at)}` : ''
+    if (behaviorMeta) behaviorMeta.textContent = j.behavior_updated_at ? `Обновлено: ${String(j.behavior_updated_at)}` : ''
     if (langChat && j.lang_chat) langChat.value = String(j.lang_chat)
     if (langDaily && j.lang_daily) langDaily.value = String(j.lang_daily)
     if (langAnnounce && j.lang_announce) langAnnounce.value = String(j.lang_announce)
@@ -175,6 +178,20 @@
     const ok1 = await settingSave('bot_system_announce', announceSysText.value || '')
     const ok2 = await settingSave('bot_lang_announce', langAnnounce && langAnnounce.value ? langAnnounce.value : 'ru')
     if (!ok1 || !ok2) return
+    await state()
+  }
+
+  const behaviorSave = async () => {
+    if (!behaviorJson) return
+    const raw = String(behaviorJson.value || '')
+    try {
+      if (raw.trim() !== '') JSON.parse(raw)
+    } catch (e) {
+      outText.value = 'Ошибка JSON: ' + String(e && e.message ? e.message : e)
+      return
+    }
+    const ok = await settingSave('bot_behavior_json', raw)
+    if (!ok) return
     await state()
   }
 
@@ -324,6 +341,7 @@
   $('btnDailySysSave').addEventListener('click', dailySysSave)
   $('btnAnnounceSysSave').addEventListener('click', announceSysSave)
   $('btnMapSave').addEventListener('click', mapSave)
+  $('btnBehaviorSave').addEventListener('click', behaviorSave)
   $('btnCtxPreview').addEventListener('click', ctxPreview)
   $('btnLogTail').addEventListener('click', logTail)
 

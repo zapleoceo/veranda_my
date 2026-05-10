@@ -345,6 +345,7 @@ class TestAIWebhookService {
     private TestAIKnowledgeService $knowledgeSvc;
     private TestAIMenuService $menuSvc;
     private TestAILogger $log;
+    private ?array $behaviorCache;
 
     public function __construct(
         TestAIConfig $cfg,
@@ -370,6 +371,7 @@ class TestAIWebhookService {
         $this->knowledgeSvc = $knowledgeSvc;
         $this->menuSvc = $menuSvc;
         $this->log = $log;
+        $this->behaviorCache = null;
     }
 
     public function handleUpdate(array $update): void {
@@ -515,28 +517,41 @@ class TestAIWebhookService {
         $system = trim(implode("\n\n", $parts));
         if ($system !== '') $system .= "\n\n";
         $system .= "Reply in " . strtoupper($lang) . ". If the user asks in a different language, prefer the user's language.";
-        $system .= "\n\nUse payload.knowledge_docs as the knowledge base: if provided, answer using it. If the user asks to check the knowledge base, do not refuse; use knowledge_docs or say that no relevant info was found. If payload.daily_for_announcements is provided, use its events when answering about today's announcements.";
+        $beh = $this->loadBehavior();
+        $kbCfg = is_array($beh['kb'] ?? null) ? $beh['kb'] : [];
+        $chatCfg = is_array($beh['chat'] ?? null) ? $beh['chat'] : [];
+        $announceCfg = is_array($beh['announce'] ?? null) ? $beh['announce'] : [];
+        $kbEnabled = !empty($kbCfg['enable']);
+
+        $systemAppend = trim((string)($chatCfg['system_append'] ?? ''));
+        if ($systemAppend !== '') $system .= "\n\n" . $systemAppend;
 
         $searchText = $queryText;
-        if ($this->isKbCheckRequest($queryText)) {
-            $prev = $this->lastQuestionFromContext($ctxMsgs);
+        if ($this->isKbCheckRequest($queryText, $kbCfg)) {
+            $prev = $this->lastQuestionFromContext($ctxMsgs, $kbCfg);
             if ($prev !== '') $searchText = $prev;
         }
 
-        $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($searchText, 5);
-        if (!$knowledgeDocs && $this->isMenuQuestion($searchText)) {
-            $knowledgeDocs = $this->knowledgeSvc->selectForQuestion('меню ' . $searchText, 5);
-        }
-        if (!$knowledgeDocs && $this->isAnnouncementQuestion($searchText)) {
-            $knowledgeDocs = $this->knowledgeSvc->selectForQuestion('анонс афиша событие ' . $searchText, 5);
+        $knowledgeDocs = [];
+        if ($kbEnabled) {
+            $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($searchText, 5);
+            if (!$knowledgeDocs && $this->isMenuQuestion($searchText, $beh)) {
+                $prefix = trim((string)($kbCfg['force_prefix_menu'] ?? ''));
+                if ($prefix !== '') $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($prefix . ' ' . $searchText, 5);
+            }
+            if (!$knowledgeDocs && $this->isAnnouncementQuestion($searchText, $beh)) {
+                $prefix = trim((string)($kbCfg['force_prefix_announce'] ?? ''));
+                if ($prefix !== '') $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($prefix . ' ' . $searchText, 5);
+            }
         }
 
         $dailyForAnnouncements = null;
-        if ($this->isAnnouncementQuestion($searchText)) {
+        $wantDaily = $this->isAnnouncementQuestion($searchText, $beh) && !empty($announceCfg['inject_daily']);
+        if ($wantDaily) {
             $day = date('Y-m-d');
             if (preg_match('/\b(\d{4}-\d{2}-\d{2})\b/', $searchText, $m)) $day = (string)($m[1] ?? $day);
             $row = $this->dailyRepo->getByDay($day);
-            if ($row === null && $waitSec <= 0 && $this->gemini->canCall()) {
+            if ($row === null && !empty($announceCfg['daily_autogen']) && $waitSec <= 0 && $this->gemini->canCall()) {
                 $okRun = $this->dailySvc->runDay($day);
                 $this->log->info('daily_summary_run', ['day' => $day, 'ok' => $okRun ? 1 : 0, 'via' => 'chat_announce']);
                 $row = $this->dailyRepo->getByDay($day);
@@ -766,37 +781,68 @@ class TestAIWebhookService {
         return '';
     }
 
-    private function isMenuQuestion(string $q): bool {
+    private function isMenuQuestion(string $q, array $beh): bool {
         $t = mb_strtolower(trim((string)$q));
         if ($t === '') return false;
-        return (bool)preg_match('/\b(меню|блюд|блюда|завтрак|завтраки|бар|пиво|вино|цена|цен|сто(ит|ят)|бургер|панкейк|вафл|breakfast)\b/u', $t);
+        $det = is_array($beh['detectors'] ?? null) ? $beh['detectors'] : [];
+        $kw = $this->normalizeStrList($det['menu_keywords'] ?? []);
+        return $this->matchesAny($t, $kw);
     }
 
-    private function isAnnouncementQuestion(string $q): bool {
+    private function isAnnouncementQuestion(string $q, array $beh): bool {
         $t = mb_strtolower(trim((string)$q));
         if ($t === '') return false;
-        return (bool)preg_match('/\b(анонс|афиш|событи|мероприят|концерт|музык|live|dj|дуэт|дуо|bibi)\b/u', $t);
+        $det = is_array($beh['detectors'] ?? null) ? $beh['detectors'] : [];
+        $kw = $this->normalizeStrList($det['announce_keywords'] ?? []);
+        return $this->matchesAny($t, $kw);
     }
 
-    private function isKbCheckRequest(string $q): bool {
+    private function isKbCheckRequest(string $q, array $kbCfg): bool {
         $t = mb_strtolower(trim((string)$q));
         if ($t === '') return false;
-        return (bool)preg_match('/\b(посмотр|проверь|провер|глянь|look|check)\b[\s\S]{0,40}\b(баз[ае]\s+знан|knowledge\s*base|kb)\b/u', $t)
-            || (bool)preg_match('/\b(баз[ае]\s+знан|knowledge\s*base|kb)\b/u', $t);
+        $tr = $this->normalizeStrList($kbCfg['check_triggers'] ?? []);
+        return $this->matchesAny($t, $tr);
     }
 
-    private function lastQuestionFromContext(array $ctxMsgs): string {
+    private function lastQuestionFromContext(array $ctxMsgs, array $kbCfg): string {
         for ($i = count($ctxMsgs) - 1; $i >= 0; $i--) {
             $m = $ctxMsgs[$i] ?? null;
             if (!is_array($m)) continue;
             $t = trim((string)($m['text'] ?? ''));
             if ($t === '') continue;
-            if ($this->isKbCheckRequest($t)) continue;
+            if ($this->isKbCheckRequest($t, $kbCfg)) continue;
             if (preg_match('/^\/\w+/u', $t)) continue;
             if (mb_strlen($t) < 4) continue;
             return $t;
         }
         return '';
+    }
+
+    private function loadBehavior(): array {
+        if (is_array($this->behaviorCache)) return $this->behaviorCache;
+        $row = $this->settingsRepo->getKey('bot_behavior_json');
+        $decoded = json_decode((string)($row['v'] ?? ''), true);
+        $this->behaviorCache = is_array($decoded) ? $decoded : [];
+        return $this->behaviorCache;
+    }
+
+    private function normalizeStrList($v): array {
+        $out = [];
+        if (!is_array($v)) return [];
+        foreach ($v as $it) {
+            $s = mb_strtolower(trim((string)$it));
+            if ($s === '') continue;
+            $out[] = $s;
+        }
+        return array_values(array_unique($out));
+    }
+
+    private function matchesAny(string $haystackLower, array $needlesLower): bool {
+        foreach ($needlesLower as $n) {
+            if ($n === '') continue;
+            if (mb_stripos($haystackLower, $n) !== false) return true;
+        }
+        return false;
     }
 
     private function loadInstrMap(): array {
@@ -929,11 +975,13 @@ class TestAIWebhookService {
 class TestAIKnowledgeService {
     private TestAIConfig $cfg;
     private TestAIKnowledgeRepository $kb;
+    private TestAISettingsRepository $settingsRepo;
     private ?TestAILogger $log;
 
-    public function __construct(TestAIConfig $cfg, TestAIKnowledgeRepository $kb, ?TestAILogger $log = null) {
+    public function __construct(TestAIConfig $cfg, TestAIKnowledgeRepository $kb, TestAISettingsRepository $settingsRepo, ?TestAILogger $log = null) {
         $this->cfg = $cfg;
         $this->kb = $kb;
+        $this->settingsRepo = $settingsRepo;
         $this->log = $log;
     }
 
@@ -941,6 +989,14 @@ class TestAIKnowledgeService {
         $limit = max(1, min(8, $limit));
         $q = trim(mb_strtolower($question));
         if ($q === '') return [];
+
+        $beh = $this->loadBehavior();
+        $kbCfg = is_array($beh['kb'] ?? null) ? $beh['kb'] : [];
+        $liveEnable = !empty($kbCfg['live_fetch_enable']);
+        $liveMaxDocs = (int)($kbCfg['live_fetch_max_docs'] ?? 2);
+        $liveMaxDocs = max(0, min(6, $liveMaxDocs));
+        $liveMaxLen = (int)($kbCfg['live_fetch_max_len'] ?? 60000);
+        $liveMaxLen = max(500, min(60000, $liveMaxLen));
 
         $keywords = $this->extractKeywords($q);
         if (!$keywords) return [];
@@ -954,8 +1010,8 @@ class TestAIKnowledgeService {
             $content = trim((string)($r['content'] ?? ''));
             $sourceUrl = trim((string)($r['source_url'] ?? ''));
             $liveOk = false;
-            if ($content === '' && $sourceUrl !== '' && $liveFetched < 2) {
-                $live = $this->tryFetchLiveContent($sourceUrl, 3000);
+            if ($liveEnable && $content === '' && $sourceUrl !== '' && $liveMaxDocs > 0 && $liveFetched < $liveMaxDocs) {
+                $live = $this->tryFetchLiveContent($sourceUrl, $liveMaxLen);
                 if ($live !== '') {
                     $content = $live;
                     $liveFetched++;
@@ -1069,28 +1125,44 @@ class TestAIKnowledgeService {
 
         return array_keys($out);
     }
+
+    private function loadBehavior(): array {
+        $row = $this->settingsRepo->getKey('bot_behavior_json');
+        $decoded = json_decode((string)($row['v'] ?? ''), true);
+        return is_array($decoded) ? $decoded : [];
+    }
 }
 
 class TestAIMenuService {
     private TestAIKnowledgeService $knowledgeSvc;
+    private TestAISettingsRepository $settingsRepo;
 
-    public function __construct(TestAIKnowledgeService $knowledgeSvc) {
+    public function __construct(TestAIKnowledgeService $knowledgeSvc, TestAISettingsRepository $settingsRepo) {
         $this->knowledgeSvc = $knowledgeSvc;
+        $this->settingsRepo = $settingsRepo;
     }
 
     public function tryAnswer(string $question): string {
         $q = mb_strtolower(trim($question));
         if ($q === '') return '';
 
-        $isMenu = (bool)preg_match('/\b(меню|блюд|блюда|завтрак|завтраки|бар|пиво|вино|цена|цен|сто(ит|ят)|бургер|панкейк|вафл|breakfast)\b/u', $q);
-        if (!$isMenu) return '';
+        $beh = $this->loadBehavior();
+        $cfg = is_array($beh['menu_service'] ?? null) ? $beh['menu_service'] : [];
+        if (empty($cfg['enable'])) return '';
 
-        $needMostExpensive = (bool)preg_match('/\b(сам(ое|ый)\s+дорог|most\s+expensive|дороже\s+всего)\b/u', $q);
-        $needBreakfast = (bool)preg_match('/\b(завтрак|завтраки|breakfast)\b/u', $q);
-        $needCount = (bool)preg_match('/\b(сколько)\b[\s\S]{0,20}\b(блюд|позици|позиций|items?)\b/u', $q);
+        $detectKeywords = $this->normalizeStrList($cfg['detect_keywords'] ?? []);
+        if (!$this->matchesAny($q, $detectKeywords)) return '';
+
+        $needBreakfast = $this->matchesAny($q, $this->normalizeStrList($cfg['intent_breakfast'] ?? []));
+        $needCount = $this->matchesAny($q, $this->normalizeStrList($cfg['intent_count'] ?? []));
+        $needMostExpensive = $this->matchesAny($q, $this->normalizeStrList($cfg['intent_most_expensive'] ?? []));
         if (!$needMostExpensive && !$needBreakfast && !$needCount) return '';
 
-        $text = $this->knowledgeSvc->fetchLiveTextForUrl('https://veranda.my/links/menu.php', 60000);
+        $url = trim((string)($cfg['menu_url'] ?? ''));
+        if ($url === '') return '';
+        $maxLen = (int)($cfg['max_len'] ?? 60000);
+        $maxLen = max(5000, min(60000, $maxLen));
+        $text = $this->knowledgeSvc->fetchLiveTextForUrl($url, $maxLen);
         if ($text === '') return '';
 
         $menu = $this->parseMenuText($text);
@@ -1202,5 +1274,30 @@ class TestAIMenuService {
         $s = number_format(max(0, $n), 0, '.', ' ');
         if ($cur === 'VND' || $cur === 'vnd') $cur = '₫';
         return $s . ' ' . $cur;
+    }
+
+    private function loadBehavior(): array {
+        $row = $this->settingsRepo->getKey('bot_behavior_json');
+        $decoded = json_decode((string)($row['v'] ?? ''), true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function normalizeStrList($v): array {
+        $out = [];
+        if (!is_array($v)) return [];
+        foreach ($v as $it) {
+            $s = mb_strtolower(trim((string)$it));
+            if ($s === '') continue;
+            $out[] = $s;
+        }
+        return array_values(array_unique($out));
+    }
+
+    private function matchesAny(string $haystackLower, array $needlesLower): bool {
+        foreach ($needlesLower as $n) {
+            if ($n === '') continue;
+            if (mb_stripos($haystackLower, $n) !== false) return true;
+        }
+        return false;
     }
 }
