@@ -2,6 +2,63 @@
 
 namespace App\Classes;
 
+class TestAILogger {
+    private string $file;
+
+    public function __construct(string $dir, string $fileName = 'testai.log') {
+        $dir = rtrim(trim($dir), '/\\');
+        if ($dir === '') $dir = '.';
+        if (!is_dir($dir)) @mkdir($dir, 0775, true);
+        $this->file = $dir . '/' . ltrim($fileName, '/\\');
+    }
+
+    public function filePath(): string {
+        return $this->file;
+    }
+
+    public function info(string $event, array $ctx = []): void {
+        $this->write('info', $event, $ctx);
+    }
+
+    public function error(string $event, array $ctx = []): void {
+        $this->write('error', $event, $ctx);
+    }
+
+    private function write(string $level, string $event, array $ctx): void {
+        $safe = $this->sanitize($ctx);
+        $line = json_encode([
+            'ts' => date('c'),
+            'level' => $level,
+            'event' => $event,
+            'ctx' => $safe,
+        ], JSON_UNESCAPED_UNICODE);
+        if (!is_string($line)) return;
+        @file_put_contents($this->file, $line . "\n", FILE_APPEND | LOCK_EX);
+    }
+
+    private function sanitize(array $ctx): array {
+        $out = [];
+        foreach ($ctx as $k => $v) {
+            $key = is_string($k) ? $k : (string)$k;
+            $lk = strtolower($key);
+            if (strpos($lk, 'token') !== false || strpos($lk, 'secret') !== false || strpos($lk, 'pass') !== false || strpos($lk, 'key') !== false) {
+                $out[$key] = '[redacted]';
+                continue;
+            }
+            if (is_scalar($v) || $v === null) {
+                $out[$key] = $v;
+                continue;
+            }
+            if (is_array($v)) {
+                $out[$key] = $this->sanitize($v);
+                continue;
+            }
+            $out[$key] = '[' . gettype($v) . ']';
+        }
+        return $out;
+    }
+}
+
 class TestAIDbSchema {
     public function ensure(Database $db, string $tRaw, string $tDaily, string $tSettings): void {
         try {
@@ -51,9 +108,11 @@ class TestAITelegramClient {
     private string $token;
     private int $lastHttpCode = 0;
     private string $lastRaw = '';
+    private ?TestAILogger $logger = null;
 
-    public function __construct(string $token) {
+    public function __construct(string $token, ?TestAILogger $logger = null) {
         $this->token = trim($token);
+        $this->logger = $logger;
     }
 
     public function hasToken(): bool {
@@ -129,11 +188,13 @@ class TestAITelegramClient {
         if (!$ok) {
             $desc = is_array($r) ? (string)($r['description'] ?? '') : '';
             $err = is_array($r) ? (string)($r['error_code'] ?? '') : '';
-            error_log('testai telegram sendMessage failed: ' . json_encode([
-                'http_code' => $this->lastHttpCode,
-                'error_code' => $err,
-                'description' => $desc,
-            ], JSON_UNESCAPED_UNICODE));
+            if ($this->logger) {
+                $this->logger->error('telegram_send_failed', [
+                    'http_code' => $this->lastHttpCode,
+                    'error_code' => $err,
+                    'description' => $desc,
+                ]);
+            }
         }
         return $ok;
     }

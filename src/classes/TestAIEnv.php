@@ -39,6 +39,7 @@ class TestAIConfig {
     public array $envLoadedKeys;
     public string $spotTzName;
     public string $apiTzName;
+    public string $logDir;
 
     public string $dbHost;
     public string $dbName;
@@ -68,6 +69,7 @@ class TestAIConfig {
         if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) $apiTzName = $spotTzName;
         $cfg->spotTzName = $spotTzName;
         $cfg->apiTzName = $apiTzName;
+        $cfg->logDir = (string)($_ENV['LOG_DIR'] ?? ($root . '/data/logs'));
 
         $cfg->dbHost = (string)($_ENV['DB_HOST'] ?? 'localhost');
         $cfg->dbName = (string)($_ENV['DB_NAME'] ?? 'veranda_my');

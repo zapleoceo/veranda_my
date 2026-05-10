@@ -25,7 +25,8 @@ $rawRepo = new \App\Classes\TestAIRawMessagesRepository($db, $tRaw);
 $dailyRepo = new \App\Classes\TestAIDailySummariesRepository($db, $tDaily);
 $settingsRepo = new \App\Classes\TestAISettingsRepository($db, $tSettings);
 
-$tg = new \App\Classes\TestAITelegramClient($cfg->tgToken);
+$log = new \App\Classes\TestAILogger($cfg->logDir);
+$tg = new \App\Classes\TestAITelegramClient($cfg->tgToken, $log);
 $gemini = new \App\Classes\TestAIGeminiClient($cfg->geminiKey, $cfg->geminiProxyBase(), $cfg->geminiProxyKey);
 $sanitizer = new \App\Classes\TestAIHtmlSanitizer();
 
@@ -38,6 +39,7 @@ return [
   'root' => $root,
   'envFile' => $envFile,
   'envLoadedKeys' => $envLoadedKeys,
+  'log' => $log,
   'db' => $db,
   'tRaw' => $tRaw,
   'tDaily' => $tDaily,
