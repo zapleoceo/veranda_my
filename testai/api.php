@@ -25,6 +25,10 @@ if ($ajax === 'gemini_usage' && $wantHtml) {
 } else {
   header('Content-Type: application/json; charset=utf-8');
 }
+if (in_array($ajax, ['health', 'gemini_test', 'log_tail', 'gemini_usage'], true)) {
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+}
 $date = trim((string)($_GET['date'] ?? ''));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) $date = date('Y-m-d');
 
