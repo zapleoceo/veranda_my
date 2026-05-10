@@ -341,6 +341,183 @@
     await behaviorSave()
   }
 
+  const tourStart = () => {
+    const steps = [
+      { sel: '#aibotDate', title: 'Дата', text: 'Выбирает дату для кеша анонса/саммари и дневной статистики.' },
+      { sel: '#pillDb', title: 'Статусы', text: 'DB — доступна ли база данных. Gemini — можно ли сейчас вызывать AI. Daily — есть ли саммари за выбранную дату.' },
+      { sel: '#btnLogTail', title: 'Логи', text: 'Показывает хвост testai.log: полезно для ошибок Telegram, планов агента и вызовов источников.' },
+      { sel: '#blkMatrix', title: 'Матрица инструкций', text: 'Галочки определяют, какие блоки инструкций попадут в system для chat/daily/announce.' },
+      { sel: '#blkCommon', title: 'Common prompt', text: 'Факты о ресторане и постоянные правила. Это важнее всего для качества ответов.' },
+      { sel: '#blkSystemChat', title: 'System chat', text: 'Правила формата Telegram и языка ответов в чате.' },
+      { sel: '#blkBehavior', title: 'Поведение', text: 'Тут включаются инструменты и задаются лимиты для агента, KB/live и меню.' },
+      { sel: '#blkKb', title: 'База знаний', text: 'KB записи, которые бот может искать и (опционально) подтягивать live по URL.' },
+      { sel: '#blkTest', title: 'Тест бота', text: 'Можно задать вопрос и увидеть trace: какие источники были вызваны и что вернули.' },
+      { sel: '#blkOutput', title: 'Вывод', text: 'Здесь появляется результат теста, логи и отладочная информация.' },
+    ]
+
+    let idx = 0
+    let highlightEl = null
+
+    const overlay = document.createElement('div')
+    overlay.setAttribute('data-aibot-tour', '1')
+    overlay.style.position = 'fixed'
+    overlay.style.inset = '0'
+    overlay.style.background = 'rgba(0,0,0,0.55)'
+    overlay.style.zIndex = '99999'
+
+    const panel = document.createElement('div')
+    panel.style.position = 'fixed'
+    panel.style.maxWidth = '420px'
+    panel.style.background = '#151515'
+    panel.style.border = '1px solid rgba(255,255,255,0.12)'
+    panel.style.borderRadius = '12px'
+    panel.style.padding = '12px'
+    panel.style.boxShadow = '0 18px 40px rgba(0,0,0,0.45)'
+    panel.style.color = '#fff'
+
+    const title = document.createElement('div')
+    title.style.fontWeight = '900'
+    title.style.marginBottom = '6px'
+
+    const body = document.createElement('div')
+    body.style.color = 'rgba(255,255,255,0.78)'
+    body.style.fontSize = '13px'
+    body.style.lineHeight = '1.35'
+
+    const meta = document.createElement('div')
+    meta.style.marginTop = '10px'
+    meta.style.color = 'rgba(255,255,255,0.55)'
+    meta.style.fontSize = '12px'
+
+    const btnRow = document.createElement('div')
+    btnRow.style.display = 'flex'
+    btnRow.style.gap = '8px'
+    btnRow.style.justifyContent = 'flex-end'
+    btnRow.style.marginTop = '12px'
+
+    const mkBtn = (label) => {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = 'btn'
+      return b
+    }
+
+    const bPrev = mkBtn('Назад')
+    const bNext = mkBtn('Дальше')
+    const bClose = mkBtn('Закрыть')
+
+    btnRow.appendChild(bPrev)
+    btnRow.appendChild(bNext)
+    btnRow.appendChild(bClose)
+
+    panel.appendChild(title)
+    panel.appendChild(body)
+    panel.appendChild(meta)
+    panel.appendChild(btnRow)
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close()
+    })
+
+    const openDetailsParents = (el) => {
+      let cur = el
+      while (cur) {
+        if (cur.tagName && String(cur.tagName).toLowerCase() === 'details') cur.open = true
+        cur = cur.parentElement
+      }
+    }
+
+    const clearHighlight = () => {
+      if (highlightEl) {
+        highlightEl.style.outline = ''
+        highlightEl.style.outlineOffset = ''
+      }
+      highlightEl = null
+    }
+
+    const placePanel = (rect) => {
+      const pad = 10
+      const vw = window.innerWidth || 1200
+      const vh = window.innerHeight || 800
+      const w = 420
+      let left = Math.min(vw - w - pad, Math.max(pad, rect.left))
+      let top = rect.bottom + 10
+      panel.style.left = left + 'px'
+      panel.style.top = top + 'px'
+      panel.style.right = 'auto'
+      panel.style.bottom = 'auto'
+
+      const pr = panel.getBoundingClientRect()
+      if (pr.bottom > vh - pad) {
+        top = rect.top - pr.height - 10
+        if (top < pad) top = pad
+        panel.style.top = top + 'px'
+      }
+      if (pr.right > vw - pad) {
+        left = vw - pr.width - pad
+        if (left < pad) left = pad
+        panel.style.left = left + 'px'
+      }
+    }
+
+    const render = () => {
+      const s = steps[idx]
+      const el = document.querySelector(s.sel)
+      if (!el) {
+        title.textContent = s.title
+        body.textContent = s.text
+        meta.textContent = `${idx + 1}/${steps.length} · элемент не найден`
+        placePanel(new DOMRect(40, 40, 10, 10))
+        clearHighlight()
+        return
+      }
+
+      openDetailsParents(el)
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      clearHighlight()
+      highlightEl = el
+      highlightEl.style.outline = '3px solid rgba(122, 200, 255, 0.95)'
+      highlightEl.style.outlineOffset = '4px'
+
+      title.textContent = s.title
+      body.textContent = s.text
+      meta.textContent = `${idx + 1}/${steps.length}`
+      placePanel(el.getBoundingClientRect())
+    }
+
+    const close = () => {
+      clearHighlight()
+      window.removeEventListener('keydown', onKey)
+      overlay.remove()
+      panel.remove()
+    }
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') close()
+      if (e.key === 'ArrowRight') next()
+      if (e.key === 'ArrowLeft') prev()
+    }
+
+    const next = () => {
+      idx = Math.min(steps.length - 1, idx + 1)
+      render()
+    }
+    const prev = () => {
+      idx = Math.max(0, idx - 1)
+      render()
+    }
+
+    bClose.addEventListener('click', close)
+    bNext.addEventListener('click', () => (idx >= steps.length - 1 ? close() : next()))
+    bPrev.addEventListener('click', prev)
+
+    document.body.appendChild(overlay)
+    document.body.appendChild(panel)
+    window.addEventListener('keydown', onKey)
+    render()
+  }
+
   const agentAsk = async () => {
     const q = (agentQuestion && agentQuestion.value ? agentQuestion.value : '').trim()
     if (!q) return
@@ -501,6 +678,7 @@
 
   on('btnState', 'click', state)
   on('btnLogTail', 'click', logTail)
+  on('btnTour', 'click', tourStart)
   on('btnAnnounceGet', 'click', announceGet)
   on('btnAnnounceGen', 'click', announceGen)
   on('btnDailyGet', 'click', dailyGet)
