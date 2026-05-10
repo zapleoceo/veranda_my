@@ -146,6 +146,11 @@ if ($ajax === 'gemini_usage') {
     exit;
   }
 
+  $block = is_object($settingsRepo) ? $settingsRepo->getKey('gemini_block_until') : ['v' => '', 'updated_at' => ''];
+  $blockUntilStr = is_array($block) ? (string)($block['v'] ?? '') : '';
+  $blockUntilTs = $blockUntilStr !== '' ? strtotime($blockUntilStr) : false;
+  $blockRemainingSec = is_int($blockUntilTs) && $blockUntilTs > time() ? ($blockUntilTs - time()) : 0;
+
   $maxBytes = (int)($_GET['max_bytes'] ?? 700000);
   $maxBytes = max(50000, min(2500000, $maxBytes));
 
@@ -239,6 +244,10 @@ if ($ajax === 'gemini_usage') {
     'counts' => $counts,
     'latest' => $latest,
     'latest_rate_limit' => $latestRate,
+    'cooldown' => [
+      'block_until' => $blockUntilStr,
+      'remaining_sec' => $blockRemainingSec,
+    ],
     'assumed_limit_per_minute' => $assumedLimitPerMin,
     'assumed_remaining_this_minute' => $remaining,
   ];
@@ -256,30 +265,59 @@ if ($ajax === 'gemini_usage') {
     $latestTs = is_array($latest) ? (string)($latest['ts'] ?? '') : '';
     $latestAge = $latestTs !== '' ? max(0, $nowTs - (int)strtotime($latestTs)) : null;
     $cooldown = is_array($latestRate) ? (float)($latestRate['retry_in_sec'] ?? 0) : 0.0;
+    $cooldownRemaining = $blockRemainingSec > 0 ? $blockRemainingSec : ($cooldown > 0 ? (int)ceil($cooldown) : 0);
+
+    $refresh = (int)($_GET['refresh'] ?? 5);
+    $refresh = max(0, min(60, $refresh));
 
     echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
     echo '<title>Gemini usage</title>';
     echo '<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:16px;line-height:1.35}';
-    echo 'table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:6px 8px;vertical-align:top}';
+    echo 'table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px 8px;vertical-align:top}';
     echo 'th{background:#f7f7f7;text-align:left}code{background:#f3f3f3;padding:2px 4px;border-radius:4px}';
+    echo '.row{display:flex;flex-wrap:wrap;gap:12px}.card{border:1px solid #ddd;border-radius:10px;padding:10px 12px;min-width:220px}';
+    echo '.muted{color:#666}.ok{color:#166534}.bad{color:#b91c1c}.warn{color:#92400e}.kpi{font-size:20px;font-weight:700}';
+    echo '.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}.btn{display:inline-block;border:1px solid #ccc;border-radius:8px;padding:6px 10px;text-decoration:none;color:#111;background:#fff}';
     echo '</style></head><body>';
-    echo '<h2>Gemini usage (server-side)</h2>';
+    echo '<div class="top">';
+    echo '<div><h2 style="margin:0">Gemini usage</h2><div class="muted">server-side (from logs)</div></div>';
+    echo '<div style="flex:1"></div>';
+    echo '<a class="btn" href="?ajax=gemini_usage">Refresh</a>';
+    echo '<a class="btn" href="?ajax=gemini_usage&pretty=1">JSON pretty</a>';
+    echo '<a class="btn" href="?ajax=log_tail&n=120">log_tail</a>';
+    echo '</div>';
 
-    echo '<table><tbody>';
-    echo '<tr><th>Log file</th><td><code>' . $h($file) . '</code></td></tr>';
-    echo '<tr><th>Log size</th><td>' . $h($fmtBytes((int)$size)) . '</td></tr>';
-    echo '<tr><th>Events parsed</th><td>' . (int)$eventsParsed . '</td></tr>';
-    echo '<tr><th>Assumed limit/min</th><td>' . ($assumedLimitPerMin === null ? '—' : (int)$assumedLimitPerMin) . '</td></tr>';
-    echo '<tr><th>Remaining this minute (assumed)</th><td>' . ($remaining === null ? '—' : (int)$remaining) . '</td></tr>';
-    echo '</tbody></table>';
+    if ($cooldownRemaining > 0) {
+      echo '<div class="card" style="border-color:#f59e0b;background:#fffbeb">';
+      echo '<div class="warn"><b>Cooldown</b>: wait ~<span id="cooldown">' . (int)$cooldownRemaining . '</span> sec</div>';
+      echo '<div class="muted">Bot will not call Gemini until cooldown passes</div>';
+      echo '</div>';
+    } else {
+      echo '<div class="card" style="border-color:#16a34a;background:#f0fdf4">';
+      echo '<div class="ok"><b>Ready</b>: no cooldown</div>';
+      echo '</div>';
+    }
 
-    echo '<h3>Counts</h3>';
-    echo '<table><tbody>';
-    echo '<tr><th>Last 60s</th><td>' . (int)($counts['last_60s'] ?? 0) . '</td></tr>';
-    echo '<tr><th>Last 10m</th><td>' . (int)($counts['last_10m'] ?? 0) . '</td></tr>';
-    echo '<tr><th>Last 60m</th><td>' . (int)($counts['last_60m'] ?? 0) . '</td></tr>';
-    echo '<tr><th>Last 24h</th><td>' . (int)($counts['last_24h'] ?? 0) . '</td></tr>';
-    echo '</tbody></table>';
+    echo '<div class="row" style="margin-top:12px">';
+    echo '<div class="card"><div class="muted">Assumed limit/min</div><div class="kpi">' . ($assumedLimitPerMin === null ? '—' : (int)$assumedLimitPerMin) . '</div></div>';
+    echo '<div class="card"><div class="muted">Used last 60s</div><div class="kpi">' . (int)($counts['last_60s'] ?? 0) . '</div></div>';
+    echo '<div class="card"><div class="muted">Used last 10m</div><div class="kpi">' . (int)($counts['last_10m'] ?? 0) . '</div></div>';
+    echo '<div class="card"><div class="muted">Remaining this minute (assumed)</div><div class="kpi">' . ($remaining === null ? '—' : (int)$remaining) . '</div></div>';
+    echo '</div>';
+
+    echo '<div class="row" style="margin-top:12px">';
+    echo '<div class="card" style="flex:1;min-width:300px">';
+    echo '<div class="muted">Log</div>';
+    echo '<div><code>' . $h($file) . '</code></div>';
+    echo '<div class="muted">Size: ' . $h($fmtBytes((int)$size)) . ' · Events parsed: ' . (int)$eventsParsed . '</div>';
+    echo '</div>';
+    echo '<div class="card" style="min-width:300px">';
+    echo '<div class="muted">Latest call</div>';
+    echo '<div><b>ts</b>: ' . $h($latestTs !== '' ? $latestTs : '—') . '</div>';
+    echo '<div><b>age</b>: ' . ($latestAge === null ? '—' : ((int)$latestAge . ' sec')) . '</div>';
+    echo '<div><b>http</b>: ' . (is_array($latest) ? (int)($latest['http_code'] ?? 0) : 0) . '</div>';
+    echo '</div>';
+    echo '</div>';
 
     $http = is_array($counts['http'] ?? null) ? $counts['http'] : [];
     ksort($http);
@@ -301,15 +339,11 @@ if ($ajax === 'gemini_usage') {
     if (!$tags) echo '<tr><td colspan="2">No tagged calls yet (wait for new requests)</td></tr>';
     echo '</tbody></table>';
 
-    echo '<h3>Latest</h3>';
-    echo '<table><tbody>';
-    echo '<tr><th>Timestamp</th><td>' . $h($latestTs !== '' ? $latestTs : '—') . '</td></tr>';
-    echo '<tr><th>Age</th><td>' . ($latestAge === null ? '—' : ((int)$latestAge . ' sec')) . '</td></tr>';
-    echo '<tr><th>HTTP</th><td>' . (is_array($latest) ? (int)($latest['http_code'] ?? 0) : 0) . '</td></tr>';
-    echo '<tr><th>Retry in</th><td>' . ($cooldown > 0 ? ((int)ceil($cooldown) . ' sec') : '—') . '</td></tr>';
-    echo '</tbody></table>';
-
-    echo '<p><a href="?ajax=gemini_usage">JSON</a> · <a href="?ajax=log_tail&n=120">log_tail</a></p>';
+    if ($refresh > 0) {
+      echo '<script>(function(){var s=' . (int)$refresh . ';var el=document.getElementById("cooldown");';
+      echo 'setInterval(function(){if(el){var v=parseInt(el.textContent||"0",10);if(v>0)el.textContent=String(v-1);} },1000);';
+      echo 'setTimeout(function(){location.reload();}, s*1000);})();</script>';
+    }
     echo '</body></html>';
     exit;
   }
