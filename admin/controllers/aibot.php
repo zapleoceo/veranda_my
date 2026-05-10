@@ -51,17 +51,20 @@ if ($ajax !== '') {
         $nextTs     = $nextUntil !== '' ? (int)strtotime($nextUntil) : 0;
         $blockRem   = ($blockTs > 0 && $blockTs > time()) ? ($blockTs - time()) : 0;
         $nextRem    = ($nextTs > 0 && $nextTs > time()) ? ($nextTs - time()) : 0;
+        $blockRemaining = max($blockRem, $nextRem);
+        $canCall = $gemini->canCall();
         $json([
             'ok'                  => true,
             'db_ok'               => $dbOk,
-            'gemini_can_call'     => $gemini->canCall(),
+            'gemini_can_call'     => $canCall,
+            'gemini_ready'        => ($canCall && $blockRemaining === 0) ? 1 : 0,
             'gemini_model'        => (string)$cfg->geminiModel,
             'daily_exists'        => $dailyRow ? 1 : 0,
             'raw_total'           => (int)($totals['raw_total'] ?? 0),
             'raw_last_received_at'=> (string)($totals['raw_last_received_at'] ?? ''),
             'day_count'           => (int)($counts['count'] ?? 0),
             'log_file'            => $logFile,
-            'block_remaining'     => max($blockRem, $nextRem),
+            'block_remaining'     => $blockRemaining,
             'identity_updated_at' => $settingsRepo->getWithMeta('bot_identity')['updated_at'] ?? '',
             'forbidden_updated_at'=> $settingsRepo->getWithMeta('bot_forbidden')['updated_at'] ?? '',
         ]);
