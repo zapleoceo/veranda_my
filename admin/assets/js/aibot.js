@@ -9,10 +9,21 @@
   const pillDaily = $('pillDaily')
   const promptText = $('promptText')
   const promptMeta = $('promptMeta')
-  const systemText = $('systemText')
-  const systemMeta = $('systemMeta')
+  const baseText = $('baseText')
+  const baseMeta = $('baseMeta')
+  const chatText = $('chatText')
+  const chatMeta = $('chatMeta')
+  const dailySysText = $('dailySysText')
+  const dailySysMeta = $('dailySysMeta')
+  const announceSysText = $('announceSysText')
+  const announceSysMeta = $('announceSysMeta')
+
+  const langChat = $('langChat')
+  const langDaily = $('langDaily')
+  const langAnnounce = $('langAnnounce')
 
   const ctxQuestion = $('ctxQuestion')
+  const ctxMode = $('ctxMode')
   const ctxChatId = $('ctxChatId')
   const ctxMeta = $('ctxMeta')
 
@@ -74,7 +85,13 @@
     setPill(pillDaily, 'Daily', j.daily_exists ? 'ok' : 'warn')
     metaEl.textContent = `raw=${Number(j.raw_total || 0)} · day=${Number(j.day_count || 0)} · media=${Number(j.day_with_media || 0)}`
     promptMeta.textContent = j.prompt_updated_at ? `Обновлено: ${String(j.prompt_updated_at)}` : ''
-    systemMeta.textContent = j.system_updated_at ? `Обновлено: ${String(j.system_updated_at)}` : ''
+    baseMeta.textContent = j.system_base_updated_at ? `Обновлено: ${String(j.system_base_updated_at)}` : ''
+    chatMeta.textContent = j.system_chat_updated_at ? `Обновлено: ${String(j.system_chat_updated_at)}` : ''
+    dailySysMeta.textContent = j.system_daily_updated_at ? `Обновлено: ${String(j.system_daily_updated_at)}` : ''
+    announceSysMeta.textContent = j.system_announce_updated_at ? `Обновлено: ${String(j.system_announce_updated_at)}` : ''
+    if (langChat && j.lang_chat) langChat.value = String(j.lang_chat)
+    if (langDaily && j.lang_daily) langDaily.value = String(j.lang_daily)
+    if (langAnnounce && j.lang_announce) langAnnounce.value = String(j.lang_announce)
     if (j.gemini_proxy_base) outMeta.textContent = `Proxy: ${String(j.gemini_proxy_base)} · Model: ${String(j.gemini_model || '')}`
   }
 
@@ -122,11 +139,39 @@
     await state()
   }
 
-  const systemSave = async () => {
+  const settingSave = async (key, value) => {
     const fd = new FormData()
-    fd.set('system', systemText.value || '')
-    const j = await fetchJson(apiUrl('system_save'), { method: 'POST', body: fd })
-    if (!j.ok) return
+    fd.set('key', String(key || ''))
+    fd.set('value', String(value || ''))
+    const j = await fetchJson(apiUrl('setting_save'), { method: 'POST', body: fd })
+    if (!j.ok) return false
+    return true
+  }
+
+  const baseSave = async () => {
+    const ok = await settingSave('bot_system_base', baseText.value || '')
+    if (!ok) return
+    await state()
+  }
+
+  const chatSave = async () => {
+    const ok1 = await settingSave('bot_system_chat', chatText.value || '')
+    const ok2 = await settingSave('bot_lang_chat', langChat && langChat.value ? langChat.value : 'auto')
+    if (!ok1 || !ok2) return
+    await state()
+  }
+
+  const dailySysSave = async () => {
+    const ok1 = await settingSave('bot_system_daily', dailySysText.value || '')
+    const ok2 = await settingSave('bot_lang_daily', langDaily && langDaily.value ? langDaily.value : 'ru')
+    if (!ok1 || !ok2) return
+    await state()
+  }
+
+  const announceSysSave = async () => {
+    const ok1 = await settingSave('bot_system_announce', announceSysText.value || '')
+    const ok2 = await settingSave('bot_lang_announce', langAnnounce && langAnnounce.value ? langAnnounce.value : 'ru')
+    if (!ok1 || !ok2) return
     await state()
   }
 
@@ -137,6 +182,7 @@
     outMeta.textContent = 'Контекст'
     const fd = new FormData()
     fd.set('question', q)
+    fd.set('mode', (ctxMode && ctxMode.value ? ctxMode.value : 'chat'))
     const chatId = (ctxChatId.value || '').trim()
     if (chatId) fd.set('chat_id', chatId)
     const j = await fetchJson(apiUrl('context_preview'), { method: 'POST', body: fd })
@@ -256,7 +302,10 @@
   $('btnDailyGet').addEventListener('click', dailyGet)
   $('btnDailyRun').addEventListener('click', dailyRun)
   $('btnPromptSave').addEventListener('click', promptSave)
-  $('btnSystemSave').addEventListener('click', systemSave)
+  $('btnBaseSave').addEventListener('click', baseSave)
+  $('btnChatSave').addEventListener('click', chatSave)
+  $('btnDailySysSave').addEventListener('click', dailySysSave)
+  $('btnAnnounceSysSave').addEventListener('click', announceSysSave)
   $('btnCtxPreview').addEventListener('click', ctxPreview)
   $('btnLogTail').addEventListener('click', logTail)
 

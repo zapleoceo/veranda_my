@@ -8,6 +8,7 @@ class TestAIAnnouncementService {
     private TestAIHtmlSanitizer $sanitizer;
     private TestAIDailySummariesRepository $dailyRepo;
     private TestAIRawMessagesRepository $rawRepo;
+    private TestAISettingsRepository $settingsRepo;
     private string $cacheDir;
 
     public function __construct(
@@ -16,6 +17,7 @@ class TestAIAnnouncementService {
         TestAIHtmlSanitizer $sanitizer,
         TestAIDailySummariesRepository $dailyRepo,
         TestAIRawMessagesRepository $rawRepo,
+        TestAISettingsRepository $settingsRepo,
         string $cacheDir
     ) {
         $this->cfg = $cfg;
@@ -23,6 +25,7 @@ class TestAIAnnouncementService {
         $this->sanitizer = $sanitizer;
         $this->dailyRepo = $dailyRepo;
         $this->rawRepo = $rawRepo;
+        $this->settingsRepo = $settingsRepo;
         $this->cacheDir = $cacheDir;
     }
 
@@ -38,10 +41,19 @@ class TestAIAnnouncementService {
         $events = $this->collectEventsForAnnounceDate($date);
         $todayMessages = $this->collectTodayMessagesIfToday($date);
 
-        $system = 'Return HTML only. No markdown. No scripts. Use simple tags: div,p,br,strong,em,ul,li,h2,h3,a,span.';
-        $prompt = "Create a short HTML announcement for the restaurant for date {$date}. If no information is available, return HTML with a short message that there is no confirmed announcement yet.";
+        $lang = $this->resolveLang('bot_lang_announce', json_encode([$events, $todayMessages], JSON_UNESCAPED_UNICODE) ?: '');
+        $common = trim((string)($this->settingsRepo->getBotPrompt()['prompt'] ?? ''));
+        $base = trim((string)($this->settingsRepo->getKey('bot_system_base')['v'] ?? ''));
+        $announceSys = trim((string)($this->settingsRepo->getKey('bot_system_announce')['v'] ?? ''));
+        $system = trim(implode("\n\n", array_values(array_filter([$common, $base, $announceSys]))));
+        if ($system !== '') $system .= "\n\n";
+        $system .= "Write the announcement in " . strtoupper($lang) . ".";
+        $prompt = $lang === 'ru'
+            ? "Сформируй короткий HTML-анонс для ресторана на дату {$date}. Если информации нет — верни HTML с коротким сообщением, что подтверждённого анонса пока нет."
+            : "Create a short HTML announcement for the restaurant for date {$date}. If no information is available, return HTML with a short message that there is no confirmed announcement yet.";
         $payload = [
             'date' => $date,
+            'lang' => $lang,
             'events' => $events,
             'today_messages' => $todayMessages,
         ];
@@ -60,6 +72,19 @@ class TestAIAnnouncementService {
         }
 
         return $html;
+    }
+
+    private function resolveLang(string $key, string $text): string {
+        $row = $this->settingsRepo->getKey($key);
+        $mode = strtolower(trim((string)($row['v'] ?? 'auto')));
+        if (in_array($mode, ['ru', 'en'], true)) return $mode;
+        return $this->detectLang($text);
+    }
+
+    private function detectLang(string $text): string {
+        if (preg_match('/\p{Cyrillic}/u', $text)) return 'ru';
+        if (preg_match('/[A-Za-z]/', $text)) return 'en';
+        return 'ru';
     }
 
     private function cacheFile(string $date): string {
@@ -118,17 +143,20 @@ class TestAIDailySummaryService {
     private TestAIGeminiClient $gemini;
     private TestAIRawMessagesRepository $rawRepo;
     private TestAIDailySummariesRepository $dailyRepo;
+    private TestAISettingsRepository $settingsRepo;
 
     public function __construct(
         TestAIConfig $cfg,
         TestAIGeminiClient $gemini,
         TestAIRawMessagesRepository $rawRepo,
-        TestAIDailySummariesRepository $dailyRepo
+        TestAIDailySummariesRepository $dailyRepo,
+        TestAISettingsRepository $settingsRepo
     ) {
         $this->cfg = $cfg;
         $this->gemini = $gemini;
         $this->rawRepo = $rawRepo;
         $this->dailyRepo = $dailyRepo;
+        $this->settingsRepo = $settingsRepo;
     }
 
     public function runDay(string $day): bool {
@@ -155,13 +183,21 @@ class TestAIDailySummaryService {
             ];
         }
 
-        $system = 'Return strict JSON only with keys: summary_text (string), events (array). Each event: announce_date (YYYY-MM-DD), title, facts (array of strings), confidence (0..100), sources (array of {tg_chat_id,tg_message_id}).';
-        $prompt = "Summarize this day chat activity and extract restaurant announcements. Day: {$day}. If no announcements, events must be empty array.";
+        $lang = $this->resolveLang('bot_lang_daily', json_encode($items, JSON_UNESCAPED_UNICODE) ?: '');
+        $common = trim((string)($this->settingsRepo->getBotPrompt()['prompt'] ?? ''));
+        $base = trim((string)($this->settingsRepo->getKey('bot_system_base')['v'] ?? ''));
+        $dailySys = trim((string)($this->settingsRepo->getKey('bot_system_daily')['v'] ?? ''));
+        $system = trim(implode("\n\n", array_values(array_filter([$common, $base, $dailySys]))));
+        if ($system !== '') $system .= "\n\n";
+        $system .= "All string fields must be written in " . strtoupper($lang) . ".";
+        $prompt = $lang === 'ru'
+            ? "Сделай сводку активности чата за день и извлеки анонсы ресторана. День: {$day}. Если анонсов нет — events должен быть пустым массивом."
+            : "Summarize this day chat activity and extract restaurant announcements. Day: {$day}. If no announcements, events must be empty array.";
         $resp = $this->gemini->generate(
             $this->cfg->geminiModel,
             [
                 ['text' => $prompt],
-                ['text' => json_encode(['day' => $day, 'messages' => $items], JSON_UNESCAPED_UNICODE)],
+                ['text' => json_encode(['day' => $day, 'lang' => $lang, 'messages' => $items], JSON_UNESCAPED_UNICODE)],
             ],
             ['system' => $system, 'temperature' => 0.2, 'maxOutputTokens' => 2500, 'responseMimeType' => 'application/json', 'tag' => 'daily_summary']
         );
@@ -177,6 +213,19 @@ class TestAIDailySummaryService {
 
         $this->dailyRepo->upsert($day, $summary, $eventsJson, date('Y-m-d H:i:s'));
         return true;
+    }
+
+    private function resolveLang(string $key, string $text): string {
+        $row = $this->settingsRepo->getKey($key);
+        $mode = strtolower(trim((string)($row['v'] ?? 'auto')));
+        if (in_array($mode, ['ru', 'en'], true)) return $mode;
+        return $this->detectLang($text);
+    }
+
+    private function detectLang(string $text): string {
+        if (preg_match('/\p{Cyrillic}/u', $text)) return 'ru';
+        if (preg_match('/[A-Za-z]/', $text)) return 'en';
+        return 'ru';
     }
 }
 
@@ -335,14 +384,13 @@ class TestAIWebhookService {
         $botPrompt = is_array($p) ? (string)($p['prompt'] ?? '') : '';
 
         $ctxMsgs = $this->buildContextMessages($chatId);
-        $system = trim($botPrompt);
+        $lang = $this->resolveLang('bot_lang_chat', $queryText, $ctxMsgs);
+        $common = trim($botPrompt);
+        $baseSys = trim((string)($this->settingsRepo->getKey('bot_system_base')['v'] ?? ''));
+        $chatSys = trim((string)($this->settingsRepo->getKey('bot_system_chat')['v'] ?? ''));
+        $system = trim(implode("\n\n", array_values(array_filter([$common, $baseSys, $chatSys]))));
         if ($system !== '') $system .= "\n\n";
-        $sys = $this->settingsRepo->getKey('bot_system_instruction');
-        $base = trim((string)($sys['v'] ?? ''));
-        if ($base === '') {
-            $base = "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a. Do not use div/p/ul/ol/li/h1-h6 tags. Do not use <br> tag; use plain newlines instead. Keep it concise. If knowledge_docs are provided, use them as a primary factual source. If information is missing, do not invent; ask for clarification or suggest contacting staff.";
-        }
-        $system .= $base;
+        $system .= "Reply in " . strtoupper($lang) . ". If the user asks in a different language, prefer the user's language.";
 
         $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($queryText, 5);
         $payload = [
@@ -355,6 +403,7 @@ class TestAIWebhookService {
                 'name' => $name,
             ],
             'message_id' => $messageId,
+            'lang' => $lang,
             'question' => $queryText,
             'context' => $ctxMsgs,
         ];
@@ -533,6 +582,29 @@ class TestAIWebhookService {
         }
         $code = (int)($resp['_http_code'] ?? 0);
         return $code ? ("Gemini пустой ответ (HTTP {$code}).") : 'Не получилось сформировать ответ.';
+    }
+
+    private function resolveLang(string $key, string $question, array $ctxMsgs): string {
+        $row = $this->settingsRepo->getKey($key);
+        $mode = strtolower(trim((string)($row['v'] ?? 'auto')));
+        if (in_array($mode, ['ru', 'en'], true)) return $mode;
+        $qLang = $this->detectLang($question);
+        if ($qLang !== '') return $qLang;
+        $ctxText = '';
+        foreach ($ctxMsgs as $m) {
+            if (!is_array($m)) continue;
+            $ctxText .= "\n" . (string)($m['text'] ?? '');
+            if (mb_strlen($ctxText) > 1200) break;
+        }
+        return $this->detectLang($ctxText);
+    }
+
+    private function detectLang(string $text): string {
+        $t = trim((string)$text);
+        if ($t === '') return '';
+        if (preg_match('/\p{Cyrillic}/u', $t)) return 'ru';
+        if (preg_match('/[A-Za-z]/', $t)) return 'en';
+        return '';
     }
 
     private function parseSummaryCommand(string $text): ?string {

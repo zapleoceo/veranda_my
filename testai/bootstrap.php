@@ -27,12 +27,19 @@ $dailyRepo = new \App\Classes\TestAIDailySummariesRepository($db, $tDaily);
 $settingsRepo = new \App\Classes\TestAISettingsRepository($db, $tSettings);
 $kbRepo = new \App\Classes\TestAIKnowledgeRepository($db, $tKb);
 
-$sysKey = 'bot_system_instruction';
-$sysRow = $settingsRepo->getKey($sysKey);
-$sysVal = trim((string)($sysRow['v'] ?? ''));
-if ($sysVal === '') {
-  $sysVal = "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a. Do not use div/p/ul/ol/li/h1-h6 tags. Do not use <br> tag; use plain newlines instead. Keep it concise. If knowledge_docs are provided, use them as a primary factual source. If information is missing, do not invent; ask for clarification or suggest contacting staff.";
-  $settingsRepo->setKey($sysKey, $sysVal, date('Y-m-d H:i:s'));
+$defaults = [
+  'bot_system_base' => "You are an assistant for a restaurant. Be concise and accurate. If information is missing, do not invent; ask for clarification or suggest contacting staff.",
+  'bot_system_chat' => "Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a. Do not use div/p/ul/ol/li/h1-h6 tags. Do not use <br> tag; use plain newlines instead.",
+  'bot_system_announce' => "Return HTML only. No markdown. No scripts. Use simple tags: div,p,br,strong,em,ul,li,h2,h3,a,span.",
+  'bot_system_daily' => "Return strict JSON only with keys: summary_text (string), events (array). Each event: announce_date (YYYY-MM-DD), title, facts (array of strings), confidence (0..100), sources (array of {tg_chat_id,tg_message_id}).",
+  'bot_lang_chat' => 'auto',
+  'bot_lang_announce' => 'ru',
+  'bot_lang_daily' => 'ru',
+];
+foreach ($defaults as $k => $v) {
+  $row = $settingsRepo->getKey($k);
+  $val = trim((string)($row['v'] ?? ''));
+  if ($val === '') $settingsRepo->setKey($k, (string)$v, date('Y-m-d H:i:s'));
 }
 
 $log = new \App\Classes\TestAILogger($cfg->logDir);
@@ -41,8 +48,8 @@ $gemini = new \App\Classes\TestAIGeminiClient($cfg->geminiKey, $cfg->geminiProxy
 $sanitizer = new \App\Classes\TestAIHtmlSanitizer();
 $knowledgeSvc = new \App\Classes\TestAIKnowledgeService($cfg, $kbRepo, $log);
 
-$announcementSvc = new \App\Classes\TestAIAnnouncementService($cfg, $gemini, $sanitizer, $dailyRepo, $rawRepo, __DIR__ . '/cache');
-$dailySvc = new \App\Classes\TestAIDailySummaryService($cfg, $gemini, $rawRepo, $dailyRepo);
+$announcementSvc = new \App\Classes\TestAIAnnouncementService($cfg, $gemini, $sanitizer, $dailyRepo, $rawRepo, $settingsRepo, __DIR__ . '/cache');
+$dailySvc = new \App\Classes\TestAIDailySummaryService($cfg, $gemini, $rawRepo, $dailyRepo, $settingsRepo);
 $webhookSvc = new \App\Classes\TestAIWebhookService($cfg, $gemini, $tg, $sanitizer, $rawRepo, $dailyRepo, $dailySvc, $settingsRepo, $knowledgeSvc, $log);
 
 return [

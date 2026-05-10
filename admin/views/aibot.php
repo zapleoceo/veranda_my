@@ -23,29 +23,142 @@
   <div class="settings-grid" style="margin-top:18px;">
     <div class="card" style="padding:18px;">
       <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
-        <div style="font-weight:900;">Инструкции</div>
+        <div style="font-weight:900;">Инструкции (наглядно)</div>
       </div>
 
-      <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:10px;">
-        <div style="font-weight:800; font-size:13px;">System (общие правила)</div>
-        <button class="btn" type="button" id="btnSystemSave">Сохранить system</button>
-      </div>
-      <div class="small-muted" id="systemMeta" style="margin-top:6px;"></div>
-      <div class="form-group" style="margin-top:10px;">
-        <textarea id="systemText" placeholder="Правила ответа (Telegram HTML), ограничения, поведение."><?= htmlspecialchars($aibotSystem) ?></textarea>
+      <div class="table-wrap" style="margin-top:12px; overflow:auto;">
+        <table style="width:max-content; min-width:100%; border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:8px 10px;">Блок</th>
+              <th style="text-align:left; padding:8px 10px;">Чат (Telegram)</th>
+              <th style="text-align:left; padding:8px 10px;">Саммари (JSON)</th>
+              <th style="text-align:left; padding:8px 10px;">Анонс (сайт HTML)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:8px 10px; white-space:nowrap;">Common prompt</td>
+              <td style="padding:8px 10px;">✓</td>
+              <td style="padding:8px 10px;">✓</td>
+              <td style="padding:8px 10px;">✓</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px; white-space:nowrap;">System base</td>
+              <td style="padding:8px 10px;">✓</td>
+              <td style="padding:8px 10px;">✓</td>
+              <td style="padding:8px 10px;">✓</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px; white-space:nowrap;">System chat</td>
+              <td style="padding:8px 10px;">✓</td>
+              <td style="padding:8px 10px;"></td>
+              <td style="padding:8px 10px;"></td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px; white-space:nowrap;">System daily</td>
+              <td style="padding:8px 10px;"></td>
+              <td style="padding:8px 10px;">✓</td>
+              <td style="padding:8px 10px;"></td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px; white-space:nowrap;">System announce</td>
+              <td style="padding:8px 10px;"></td>
+              <td style="padding:8px 10px;"></td>
+              <td style="padding:8px 10px;">✓</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:14px;">
-        <div style="font-weight:800; font-size:13px;">Prompt (контент ресторана)</div>
-        <button class="btn" type="button" id="btnPromptSave">Сохранить prompt</button>
+        <div style="font-weight:800; font-size:13px;">Common prompt (для всех запросов)</div>
+        <button class="btn" type="button" id="btnPromptSave">Сохранить common</button>
       </div>
       <div class="small-muted" id="promptMeta" style="margin-top:6px;"></div>
       <div class="form-group" style="margin-top:10px;">
-        <textarea id="promptText" placeholder="Локальные инструкции: тон, стиль, что можно/нельзя обещать, ссылки."><?= htmlspecialchars($aibotPrompt) ?></textarea>
+        <textarea id="promptText" placeholder="Факты/правила ресторана, стиль, ссылки."><?= htmlspecialchars($aibotPrompt) ?></textarea>
       </div>
 
-      <div class="small-muted" style="margin-top:10px;">
-        Live источники: если у записи в базе знаний пустой текст, но указан URL, бот подтянет актуальные данные по URL во время ответа.
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:14px;">
+        <div class="card" style="padding:14px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
+            <div style="font-weight:800; font-size:13px;">System base (для всех)</div>
+            <button class="btn" type="button" id="btnBaseSave">Сохранить</button>
+          </div>
+          <div class="small-muted" id="baseMeta" style="margin-top:6px;"></div>
+          <div class="form-group" style="margin-top:10px;">
+            <textarea id="baseText" placeholder="Общие правила поведения, политика, точность."><?= htmlspecialchars($aibotSystemBase) ?></textarea>
+          </div>
+        </div>
+
+        <div class="card" style="padding:14px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
+            <div style="font-weight:800; font-size:13px;">System chat (Telegram)</div>
+            <button class="btn" type="button" id="btnChatSave">Сохранить</button>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-top:10px;">
+            <div class="form-group" style="min-width:160px; margin:0;">
+              <label for="langChat">Язык</label>
+              <select id="langChat">
+                <option value="auto" <?= ($aibotLangChat === 'auto' ? 'selected' : '') ?>>auto</option>
+                <option value="ru" <?= ($aibotLangChat === 'ru' ? 'selected' : '') ?>>ru</option>
+                <option value="en" <?= ($aibotLangChat === 'en' ? 'selected' : '') ?>>en</option>
+              </select>
+            </div>
+            <div class="small-muted" id="chatMeta" style="margin:0;"></div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <textarea id="chatText" placeholder="Формат Telegram HTML, ограничения тегов."><?= htmlspecialchars($aibotSystemChat) ?></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+        <div class="card" style="padding:14px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
+            <div style="font-weight:800; font-size:13px;">System daily (саммари JSON)</div>
+            <button class="btn" type="button" id="btnDailySysSave">Сохранить</button>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-top:10px;">
+            <div class="form-group" style="min-width:160px; margin:0;">
+              <label for="langDaily">Язык</label>
+              <select id="langDaily">
+                <option value="auto" <?= ($aibotLangDaily === 'auto' ? 'selected' : '') ?>>auto</option>
+                <option value="ru" <?= ($aibotLangDaily === 'ru' ? 'selected' : '') ?>>ru</option>
+                <option value="en" <?= ($aibotLangDaily === 'en' ? 'selected' : '') ?>>en</option>
+              </select>
+            </div>
+            <div class="small-muted" id="dailySysMeta" style="margin:0;"></div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <textarea id="dailySysText" placeholder="JSON контракт и правила извлечения событий."><?= htmlspecialchars($aibotSystemDaily) ?></textarea>
+          </div>
+        </div>
+
+        <div class="card" style="padding:14px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
+            <div style="font-weight:800; font-size:13px;">System announce (анонс сайта)</div>
+            <button class="btn" type="button" id="btnAnnounceSysSave">Сохранить</button>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-top:10px;">
+            <div class="form-group" style="min-width:160px; margin:0;">
+              <label for="langAnnounce">Язык</label>
+              <select id="langAnnounce">
+                <option value="auto" <?= ($aibotLangAnnounce === 'auto' ? 'selected' : '') ?>>auto</option>
+                <option value="ru" <?= ($aibotLangAnnounce === 'ru' ? 'selected' : '') ?>>ru</option>
+                <option value="en" <?= ($aibotLangAnnounce === 'en' ? 'selected' : '') ?>>en</option>
+              </select>
+            </div>
+            <div class="small-muted" id="announceSysMeta" style="margin:0;"></div>
+          </div>
+          <div class="form-group" style="margin-top:10px;">
+            <textarea id="announceSysText" placeholder="HTML для сайта (допустимые теги)."><?= htmlspecialchars($aibotSystemAnnounce) ?></textarea>
+          </div>
+          <div class="small-muted" style="margin-top:10px;">
+            Live источники: если у записи в базе знаний пустой текст, но указан URL, бот подтянет актуальные данные по URL во время ответа.
+          </div>
+        </div>
       </div>
     </div>
 
@@ -148,6 +261,14 @@
       <div class="form-group" style="margin-top:10px;">
         <label for="ctxQuestion">Вопрос</label>
         <input id="ctxQuestion" type="text" placeholder="Например: какое сегодня меню?">
+      </div>
+      <div class="form-group" style="margin-top:10px;">
+        <label for="ctxMode">Режим</label>
+        <select id="ctxMode">
+          <option value="chat">chat</option>
+          <option value="daily">daily</option>
+          <option value="announce">announce</option>
+        </select>
       </div>
       <div class="form-group" style="margin-top:10px;">
         <label for="ctxChatId">Chat ID (необязательно, чтобы увидеть историю)</label>

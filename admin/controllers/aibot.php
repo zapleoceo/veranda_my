@@ -39,7 +39,13 @@ if ($ajax !== '') {
         $counts = $rawRepo->getCountsForDay($aibotDate);
         $dailyRow = $dailyRepo->getByDay($aibotDate);
         $promptRow = $settingsRepo->getBotPrompt();
-        $sysRow = $settingsRepo->getKey('bot_system_instruction');
+        $sysBaseRow = $settingsRepo->getKey('bot_system_base');
+        $sysChatRow = $settingsRepo->getKey('bot_system_chat');
+        $sysAnnRow = $settingsRepo->getKey('bot_system_announce');
+        $sysDailyRow = $settingsRepo->getKey('bot_system_daily');
+        $langChatRow = $settingsRepo->getKey('bot_lang_chat');
+        $langAnnRow = $settingsRepo->getKey('bot_lang_announce');
+        $langDailyRow = $settingsRepo->getKey('bot_lang_daily');
         $file = ($log instanceof \App\Classes\TestAILogger) ? $log->filePath() : '';
 
         $respondJson([
@@ -56,7 +62,13 @@ if ($ajax !== '') {
             'day_with_media_text' => (int)($counts['with_media_text'] ?? 0),
             'daily_exists' => $dailyRow ? 1 : 0,
             'prompt_updated_at' => (string)($promptRow['updated_at'] ?? ''),
-            'system_updated_at' => (string)($sysRow['updated_at'] ?? ''),
+            'system_base_updated_at' => (string)($sysBaseRow['updated_at'] ?? ''),
+            'system_chat_updated_at' => (string)($sysChatRow['updated_at'] ?? ''),
+            'system_announce_updated_at' => (string)($sysAnnRow['updated_at'] ?? ''),
+            'system_daily_updated_at' => (string)($sysDailyRow['updated_at'] ?? ''),
+            'lang_chat' => (string)($langChatRow['v'] ?? ''),
+            'lang_announce' => (string)($langAnnRow['v'] ?? ''),
+            'lang_daily' => (string)($langDailyRow['v'] ?? ''),
             'log_file' => $file,
         ]);
     }
@@ -110,16 +122,33 @@ if ($ajax !== '') {
     }
 
     if ($ajax === 'system_get') {
-        $row = $settingsRepo->getKey('bot_system_instruction');
+        $row = $settingsRepo->getKey('bot_system_base');
         $respondJson(['ok' => true, 'system' => (string)($row['v'] ?? ''), 'updated_at' => (string)($row['updated_at'] ?? '')]);
     }
 
     if ($ajax === 'system_save') {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') $respondJson(['ok' => false, 'error' => 'method_not_allowed'], 405);
         $system = (string)($_POST['system'] ?? '');
-        $settingsRepo->setKey('bot_system_instruction', $system, date('Y-m-d H:i:s'));
-        $row = $settingsRepo->getKey('bot_system_instruction');
+        $settingsRepo->setKey('bot_system_base', $system, date('Y-m-d H:i:s'));
+        $row = $settingsRepo->getKey('bot_system_base');
         $respondJson(['ok' => true, 'updated_at' => (string)($row['updated_at'] ?? '')]);
+    }
+
+    if ($ajax === 'setting_get') {
+        $key = trim((string)($_GET['key'] ?? ''));
+        if ($key === '') $respondJson(['ok' => false, 'error' => 'missing_key'], 400);
+        $row = $settingsRepo->getKey($key);
+        $respondJson(['ok' => true, 'key' => $key, 'value' => (string)($row['v'] ?? ''), 'updated_at' => (string)($row['updated_at'] ?? '')]);
+    }
+
+    if ($ajax === 'setting_save') {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') $respondJson(['ok' => false, 'error' => 'method_not_allowed'], 405);
+        $key = trim((string)($_POST['key'] ?? ''));
+        if ($key === '') $respondJson(['ok' => false, 'error' => 'missing_key'], 400);
+        $value = (string)($_POST['value'] ?? '');
+        $settingsRepo->setKey($key, $value, date('Y-m-d H:i:s'));
+        $row = $settingsRepo->getKey($key);
+        $respondJson(['ok' => true, 'key' => $key, 'updated_at' => (string)($row['updated_at'] ?? '')]);
     }
 
     if ($ajax === 'context_preview') {
@@ -149,26 +178,48 @@ if ($ajax !== '') {
             }
         }
 
-        $pRow = $settingsRepo->getBotPrompt();
-        $sysRow = $settingsRepo->getKey('bot_system_instruction');
-        $system = trim((string)($pRow['prompt'] ?? ''));
-        $base = trim((string)($sysRow['v'] ?? ''));
-        if ($base !== '') {
-            if ($system !== '') $system .= "\n\n";
-            $system .= $base;
+        $mode = strtolower(trim((string)($_POST['mode'] ?? 'chat')));
+        if (!in_array($mode, ['chat', 'announce', 'daily'], true)) $mode = 'chat';
+
+        $common = trim((string)($settingsRepo->getBotPrompt()['prompt'] ?? ''));
+        $base = trim((string)($settingsRepo->getKey('bot_system_base')['v'] ?? ''));
+        $applied = ['common_prompt' => $common !== '' ? 1 : 0, 'system_base' => $base !== '' ? 1 : 0];
+        $systemParts = array_values(array_filter([$common, $base]));
+        $langKey = 'bot_lang_chat';
+        $modeSysKey = 'bot_system_chat';
+        if ($mode === 'announce') { $langKey = 'bot_lang_announce'; $modeSysKey = 'bot_system_announce'; }
+        if ($mode === 'daily') { $langKey = 'bot_lang_daily'; $modeSysKey = 'bot_system_daily'; }
+        $modeSys = trim((string)($settingsRepo->getKey($modeSysKey)['v'] ?? ''));
+        $applied['mode'] = $mode;
+        $applied['mode_system_key'] = $modeSysKey;
+        $applied['mode_system'] = $modeSys !== '' ? 1 : 0;
+        if ($modeSys !== '') $systemParts[] = $modeSys;
+        $system = trim(implode("\n\n", $systemParts));
+
+        $langVal = strtolower(trim((string)($settingsRepo->getKey($langKey)['v'] ?? 'auto')));
+        if (!in_array($langVal, ['ru', 'en'], true)) {
+            $t = $q;
+            if ($mode === 'daily' && $ctxMsgs) $t = json_encode($ctxMsgs, JSON_UNESCAPED_UNICODE) ?: $q;
+            if ($mode === 'announce') $t = $q;
+            $langVal = preg_match('/\p{Cyrillic}/u', $t) ? 'ru' : (preg_match('/[A-Za-z]/', $t) ? 'en' : 'ru');
         }
+        if ($system !== '') $system .= "\n\n";
+        $system .= "Language: " . strtoupper($langVal) . ".";
 
         $docs = $knowledgeSvc->selectForQuestion($q, 5);
-        $payload = ['question' => $q];
+        $payload = ['mode' => $mode, 'lang' => $langVal, 'question' => $q];
         if ($ctxMsgs) $payload['context'] = $ctxMsgs;
         if ($docs) $payload['knowledge_docs'] = $docs;
 
         $respondJson([
             'ok' => true,
+            'mode' => $mode,
             'question' => $q,
             'chat_id' => $chatId,
             'system_len' => mb_strlen($system),
             'system_preview' => mb_substr($system, 0, 500),
+            'applied' => $applied,
+            'lang' => $langVal,
             'context_count' => count($ctxMsgs),
             'knowledge_docs_count' => count($docs),
             'knowledge_docs' => $docs,
@@ -278,6 +329,11 @@ if ($ajax !== '') {
 
 $aibotPromptRow = $settingsRepo->getBotPrompt();
 $aibotPrompt = (string)($aibotPromptRow['prompt'] ?? '');
-$aibotSystemRow = $settingsRepo->getKey('bot_system_instruction');
-$aibotSystem = (string)($aibotSystemRow['v'] ?? '');
+$aibotSystemBase = (string)($settingsRepo->getKey('bot_system_base')['v'] ?? '');
+$aibotSystemChat = (string)($settingsRepo->getKey('bot_system_chat')['v'] ?? '');
+$aibotSystemAnnounce = (string)($settingsRepo->getKey('bot_system_announce')['v'] ?? '');
+$aibotSystemDaily = (string)($settingsRepo->getKey('bot_system_daily')['v'] ?? '');
+$aibotLangChat = (string)($settingsRepo->getKey('bot_lang_chat')['v'] ?? 'auto');
+$aibotLangAnnounce = (string)($settingsRepo->getKey('bot_lang_announce')['v'] ?? 'ru');
+$aibotLangDaily = (string)($settingsRepo->getKey('bot_lang_daily')['v'] ?? 'ru');
 $aibotKbItems = $kbRepo->list(80, 0);
