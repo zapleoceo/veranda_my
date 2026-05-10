@@ -262,7 +262,7 @@ class TestAIWebhookService {
 
         $this->rawRepo->upsert($m);
 
-        if ($this->gemini->canCall() && $m->mediaType && $m->mediaFileId) {
+        if ($this->gemini->canCall() && $m->mediaType && $m->mediaFileId && ($needReply || $chatType === 'private')) {
             $mediaText = $this->tryExtractMediaText($m->mediaFileId, $m->mediaMime ?: 'application/octet-stream');
             if ($mediaText !== '') {
                 $m->mediaText = $mediaText;
@@ -446,6 +446,14 @@ class TestAIWebhookService {
     private function fallbackTelegramHtml(array $resp): string {
         $err = '';
         if (is_array($resp['error'] ?? null)) $err = trim((string)($resp['error']['message'] ?? ''));
+        if ($err !== '' && preg_match('/quota exceeded|exceeded your current quota|rate limit/i', $err)) {
+            $retry = '';
+            if (preg_match('/retry in\s+([0-9.]+)s/i', $err, $m)) {
+                $sec = (float)($m[1] ?? 0);
+                if ($sec > 0) $retry = ' Попробуйте через ' . (int)ceil($sec) . ' сек.';
+            }
+            return 'Лимит запросов к AI исчерпан.' . $retry;
+        }
         $plain = $this->gemini->text($resp);
         $plain = trim(strip_tags($plain));
         if ($plain !== '') {

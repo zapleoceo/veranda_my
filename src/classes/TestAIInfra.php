@@ -222,11 +222,13 @@ class TestAIGeminiClient {
     private string $apiKey;
     private string $proxyBase;
     private string $proxyKey;
+    private ?TestAILogger $logger = null;
 
-    public function __construct(string $apiKey, string $proxyBase, string $proxyKey) {
+    public function __construct(string $apiKey, string $proxyBase, string $proxyKey, ?TestAILogger $logger = null) {
         $this->apiKey = trim($apiKey);
         $this->proxyBase = rtrim(trim($proxyBase), '/');
         $this->proxyKey = trim($proxyKey);
+        $this->logger = $logger;
     }
 
     public function canCall(): bool {
@@ -284,6 +286,18 @@ class TestAIGeminiClient {
         $data = json_decode(is_string($resp) ? $resp : '', true);
         if (!is_array($data)) $data = [];
         $data['_http_code'] = (int)$code;
+        if ($this->logger) {
+            $err = '';
+            if (is_array($data['error'] ?? null)) $err = trim((string)($data['error']['message'] ?? ''));
+            if (mb_strlen($err) > 500) $err = mb_substr($err, 0, 500) . '…';
+            $this->logger->info('gemini_http', [
+                'http_code' => (int)$code,
+                'model' => $model,
+                'via_proxy' => $this->proxyBase !== '' ? 1 : 0,
+                'has_error' => $err !== '' ? 1 : 0,
+                'error' => $err,
+            ]);
+        }
         return $data;
     }
 

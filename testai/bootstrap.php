@@ -27,7 +27,7 @@ $settingsRepo = new \App\Classes\TestAISettingsRepository($db, $tSettings);
 
 $log = new \App\Classes\TestAILogger($cfg->logDir);
 $tg = new \App\Classes\TestAITelegramClient($cfg->tgToken, $log);
-$gemini = new \App\Classes\TestAIGeminiClient($cfg->geminiKey, $cfg->geminiProxyBase(), $cfg->geminiProxyKey);
+$gemini = new \App\Classes\TestAIGeminiClient($cfg->geminiKey, $cfg->geminiProxyBase(), $cfg->geminiProxyKey, $log);
 $sanitizer = new \App\Classes\TestAIHtmlSanitizer();
 
 $announcementSvc = new \App\Classes\TestAIAnnouncementService($cfg, $gemini, $sanitizer, $dailyRepo, $rawRepo, __DIR__ . '/cache');
