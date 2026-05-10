@@ -186,9 +186,9 @@ class Responder {
         if ($err !== '' && preg_match('/quota|rate.?limit/i', $err)) {
             $retry = '';
             if ($waitSec > 0) {
-                $retry = ($lang === 'ru' ? ' Попробуйте через ' : ' Try again in ') . (int)ceil($waitSec) . ' сек.';
+                $retry = ($lang === 'ru' ? ' Попробуйте через ' : ' Try again in ') . $this->fmtWait($waitSec, $lang) . '.';
             } elseif (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) {
-                $retry = ($lang === 'ru' ? ' Попробуйте через ' : ' Try again in ') . (int)ceil((float)$m[1]) . ' сек.';
+                $retry = ($lang === 'ru' ? ' Попробуйте через ' : ' Try again in ') . $this->fmtWait((int)ceil((float)$m[1]), $lang) . '.';
             }
             return $lang === 'ru'
                 ? 'Лимит запросов к AI исчерпан.' . $retry
@@ -245,5 +245,25 @@ class Responder {
         if (stripos($err, 'free_tier_requests') !== false && preg_match('/\blimit:\s*20\b/i', $err)) return true;
         if (preg_match('/requests\s+per\s+day|\\bRPD\\b/i', $err)) return true;
         return false;
+    }
+
+    private function fmtWait(int $sec, string $lang): string {
+        $sec = max(0, $sec);
+        if ($sec < 60) return (string)$sec . ($lang === 'ru' ? ' сек' : ' sec');
+        $h = intdiv($sec, 3600);
+        $m = intdiv($sec % 3600, 60);
+        $s = $sec % 60;
+        if ($lang === 'ru') {
+            $out = [];
+            if ($h > 0) $out[] = $h . ' ч';
+            if ($m > 0) $out[] = $m . ' мин';
+            if ($h === 0 && $m === 0) $out[] = $s . ' сек';
+            return implode(' ', $out);
+        }
+        $out = [];
+        if ($h > 0) $out[] = $h . 'h';
+        if ($m > 0) $out[] = $m . 'm';
+        if ($h === 0 && $m === 0) $out[] = $s . 's';
+        return implode(' ', $out);
     }
 }
