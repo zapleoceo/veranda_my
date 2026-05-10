@@ -181,6 +181,12 @@ if ($ajax === 'gemini_usage') {
     'http' => [],
     'tag' => [],
   ];
+  $tagWindows = [
+    'last_60s' => [],
+    'last_10m' => [],
+    'last_60m' => [],
+    'last_24h' => [],
+  ];
   $eventsParsed = 0;
   $latest = null;
   $latestRate = null;
@@ -211,6 +217,12 @@ if ($ajax === 'gemini_usage') {
     if ($age <= 600) $counts['last_10m']++;
     if ($age <= 3600) $counts['last_60m']++;
     if ($age <= 86400) $counts['last_24h']++;
+    if ($tag !== '') {
+      if ($age <= 60) $tagWindows['last_60s'][$tag] = (int)($tagWindows['last_60s'][$tag] ?? 0) + 1;
+      if ($age <= 600) $tagWindows['last_10m'][$tag] = (int)($tagWindows['last_10m'][$tag] ?? 0) + 1;
+      if ($age <= 3600) $tagWindows['last_60m'][$tag] = (int)($tagWindows['last_60m'][$tag] ?? 0) + 1;
+      if ($age <= 86400) $tagWindows['last_24h'][$tag] = (int)($tagWindows['last_24h'][$tag] ?? 0) + 1;
+    }
 
     if ($latest === null || $t >= (int)($latest['t'] ?? 0)) {
       $latest = [
@@ -238,10 +250,17 @@ if ($ajax === 'gemini_usage') {
   $remaining = is_int($assumedLimitPerMin) ? max(0, $assumedLimitPerMin - (int)$counts['last_60s']) : null;
 
   $payload = [
+    'mode' => [
+      'proxy_base' => (string)$cfg->geminiProxyBase(),
+      'via_proxy' => $cfg->geminiProxyBase() !== '' ? 1 : 0,
+      'server_has_gemini_key' => trim((string)($cfg->geminiKey ?? '')) !== '' ? 1 : 0,
+      'note' => $cfg->geminiProxyBase() !== '' ? 'Gemini API key is used inside Cloudflare Worker (not in server .env)' : 'Gemini API key is used directly from server .env',
+    ],
     'file' => $file,
     'size' => $size,
     'events_parsed' => $eventsParsed,
     'counts' => $counts,
+    'tag_windows' => $tagWindows,
     'latest' => $latest,
     'latest_rate_limit' => $latestRate,
     'cooldown' => [
@@ -270,15 +289,21 @@ if ($ajax === 'gemini_usage') {
 
     $refresh = (int)($_GET['refresh'] ?? 5);
     $refresh = max(0, min(60, $refresh));
+    $maxBytesInput = (int)($_GET['max_bytes'] ?? 700000);
+    $maxBytesInput = max(50000, min(2500000, $maxBytesInput));
 
     echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
     echo '<title>Gemini usage</title>';
     echo '<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:16px;line-height:1.35}';
-    echo 'table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px 8px;vertical-align:top}';
+    echo 'table{border-collapse:collapse;width:auto}td,th{border:1px solid #ddd;padding:6px 8px;vertical-align:top}';
     echo 'th{background:#f7f7f7;text-align:left}code{background:#f3f3f3;padding:2px 4px;border-radius:4px}';
-    echo '.row{display:flex;flex-wrap:wrap;gap:12px}.card{border:1px solid #ddd;border-radius:10px;padding:10px 12px;min-width:220px}';
+    echo '.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}.card{border:1px solid #ddd;border-radius:10px;padding:10px 12px;display:inline-block}';
     echo '.muted{color:#666}.ok{color:#166534}.bad{color:#b91c1c}.warn{color:#92400e}.kpi{font-size:20px;font-weight:700}';
     echo '.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}.btn{display:inline-block;border:1px solid #ccc;border-radius:8px;padding:6px 10px;text-decoration:none;color:#111;background:#fff}';
+    echo '.kpis{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.kpiCard{border:1px solid #ddd;border-radius:10px;padding:8px 10px;min-width:160px}';
+    echo '.kpiLabel{font-size:12px;color:#666}.kpiValue{font-size:18px;font-weight:700}';
+    echo '.grid{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}.stack{display:flex;flex-direction:column;gap:10px}';
+    echo '.small th,.small td{padding:4px 6px;font-size:13px}.nowrap{white-space:nowrap}';
     echo '</style></head><body>';
     echo '<div class="top">';
     echo '<div><h2 style="margin:0">Gemini usage</h2><div class="muted">server-side (from logs)</div></div>';
@@ -287,6 +312,8 @@ if ($ajax === 'gemini_usage') {
     echo '<a class="btn" href="?ajax=gemini_usage&pretty=1">JSON pretty</a>';
     echo '<a class="btn" href="?ajax=log_tail&n=120">log_tail</a>';
     echo '</div>';
+
+    echo '<div class="muted" style="margin:6px 0 10px 0">Mode: ' . ($payload['mode']['via_proxy'] ? '<b>proxy</b>' : '<b>direct</b>') . ' · ' . $h((string)$payload['mode']['note']) . '</div>';
 
     if ($cooldownRemaining > 0) {
       echo '<div class="card" style="border-color:#f59e0b;background:#fffbeb">';
@@ -302,46 +329,64 @@ if ($ajax === 'gemini_usage') {
       echo '</div>';
     }
 
-    echo '<div class="row" style="margin-top:12px">';
-    echo '<div class="card"><div class="muted">Assumed limit/min</div><div class="kpi">' . ($assumedLimitPerMin === null ? '—' : (int)$assumedLimitPerMin) . '</div></div>';
-    echo '<div class="card"><div class="muted">Used last 60s</div><div class="kpi">' . (int)($counts['last_60s'] ?? 0) . '</div></div>';
-    echo '<div class="card"><div class="muted">Used last 10m</div><div class="kpi">' . (int)($counts['last_10m'] ?? 0) . '</div></div>';
-    echo '<div class="card"><div class="muted">Remaining this minute (assumed)</div><div class="kpi">' . ($remaining === null ? '—' : (int)$remaining) . '</div></div>';
+    echo '<div class="kpis">';
+    echo '<div class="kpiCard"><div class="kpiLabel">Limit/min (assumed)</div><div class="kpiValue">' . ($assumedLimitPerMin === null ? '—' : (int)$assumedLimitPerMin) . '</div></div>';
+    echo '<div class="kpiCard"><div class="kpiLabel">Used 60s</div><div class="kpiValue">' . (int)($counts['last_60s'] ?? 0) . '</div></div>';
+    echo '<div class="kpiCard"><div class="kpiLabel">Used 10m</div><div class="kpiValue">' . (int)($counts['last_10m'] ?? 0) . '</div></div>';
+    echo '<div class="kpiCard"><div class="kpiLabel">Used 60m</div><div class="kpiValue">' . (int)($counts['last_60m'] ?? 0) . '</div></div>';
+    echo '<div class="kpiCard"><div class="kpiLabel">Remaining/min (assumed)</div><div class="kpiValue">' . ($remaining === null ? '—' : (int)$remaining) . '</div></div>';
     echo '</div>';
 
-    echo '<div class="row" style="margin-top:12px">';
-    echo '<div class="card" style="flex:1;min-width:300px">';
+    echo '<div class="grid">';
+    echo '<div class="card">';
     echo '<div class="muted">Log</div>';
-    echo '<div><code>' . $h($file) . '</code></div>';
-    echo '<div class="muted">Size: ' . $h($fmtBytes((int)$size)) . ' · Events parsed: ' . (int)$eventsParsed . '</div>';
+    echo '<div class="nowrap"><code>' . $h($file) . '</code></div>';
+    echo '<div class="muted">Size: ' . $h($fmtBytes((int)$size)) . ' · Parsed: ' . (int)$eventsParsed . '</div>';
+    echo '<div class="muted">max_bytes: ' . (int)$maxBytesInput . '</div>';
     echo '</div>';
-    echo '<div class="card" style="min-width:300px">';
-    echo '<div class="muted">Latest call</div>';
-    echo '<div><b>ts</b>: ' . $h($latestTs !== '' ? $latestTs : '—') . '</div>';
-    echo '<div><b>age</b>: ' . ($latestAge === null ? '—' : ((int)$latestAge . ' sec')) . '</div>';
-    echo '<div><b>http</b>: ' . (is_array($latest) ? (int)($latest['http_code'] ?? 0) : 0) . '</div>';
+    echo '<div class="card">';
+    echo '<div class="muted">Latest</div>';
+    echo '<div class="nowrap"><b>ts</b>: ' . $h($latestTs !== '' ? $latestTs : '—') . '</div>';
+    echo '<div class="nowrap"><b>age</b>: ' . ($latestAge === null ? '—' : ((int)$latestAge . ' sec')) . '</div>';
+    echo '<div class="nowrap"><b>http</b>: ' . (is_array($latest) ? (int)($latest['http_code'] ?? 0) : 0) . '</div>';
+    echo '</div>';
+    echo '<div class="card">';
+    echo '<div class="muted">Auto refresh</div>';
+    echo '<div class="nowrap"><a class="btn" href="?ajax=gemini_usage&refresh=0">off</a> ';
+    echo '<a class="btn" href="?ajax=gemini_usage&refresh=2">2s</a> ';
+    echo '<a class="btn" href="?ajax=gemini_usage&refresh=5">5s</a> ';
+    echo '<a class="btn" href="?ajax=gemini_usage&refresh=10">10s</a></div>';
     echo '</div>';
     echo '</div>';
 
     $http = is_array($counts['http'] ?? null) ? $counts['http'] : [];
     ksort($http);
-    echo '<h3>HTTP codes</h3>';
-    echo '<table><thead><tr><th>Code</th><th>Count</th></tr></thead><tbody>';
+    echo '<div class="grid" style="margin-top:12px">';
+    echo '<div class="card"><div class="muted">HTTP codes</div>';
+    echo '<table class="small"><thead><tr><th class="nowrap">Code</th><th class="nowrap">Count</th></tr></thead><tbody>';
     foreach ($http as $code => $cnt) {
       echo '<tr><td>' . $h((string)$code) . '</td><td>' . (int)$cnt . '</td></tr>';
     }
     if (!$http) echo '<tr><td colspan="2">—</td></tr>';
     echo '</tbody></table>';
+    echo '</div>';
 
     $tags = is_array($counts['tag'] ?? null) ? $counts['tag'] : [];
     arsort($tags);
-    echo '<h3>Tags</h3>';
-    echo '<table><thead><tr><th>Tag</th><th>Count</th></tr></thead><tbody>';
-    foreach ($tags as $tag => $cnt) {
-      echo '<tr><td>' . $h((string)$tag) . '</td><td>' . (int)$cnt . '</td></tr>';
-    }
-    if (!$tags) echo '<tr><td colspan="2">No tagged calls yet (wait for new requests)</td></tr>';
-    echo '</tbody></table>';
+    echo '<div class="card"><div class="muted">Tags (total in window)</div>';
+    echo '<table class="small"><thead><tr><th class="nowrap">Tag</th><th class="nowrap">Count</th></tr></thead><tbody>';
+    foreach ($tags as $tag => $cnt) echo '<tr><td>' . $h((string)$tag) . '</td><td>' . (int)$cnt . '</td></tr>';
+    if (!$tags) echo '<tr><td colspan="2">No tags yet</td></tr>';
+    echo '</tbody></table></div>';
+
+    $tw10 = is_array($tagWindows['last_10m'] ?? null) ? $tagWindows['last_10m'] : [];
+    arsort($tw10);
+    echo '<div class="card"><div class="muted">Tags (last 10m)</div>';
+    echo '<table class="small"><thead><tr><th class="nowrap">Tag</th><th class="nowrap">Calls</th></tr></thead><tbody>';
+    foreach ($tw10 as $tag => $cnt) echo '<tr><td>' . $h((string)$tag) . '</td><td>' . (int)$cnt . '</td></tr>';
+    if (!$tw10) echo '<tr><td colspan="2">—</td></tr>';
+    echo '</tbody></table></div>';
+    echo '</div>';
 
     if ($refresh > 0) {
       echo '<script>(function(){var s=' . (int)$refresh . ';var el=document.getElementById("cooldown");';
