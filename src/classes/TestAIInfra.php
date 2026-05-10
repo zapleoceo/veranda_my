@@ -395,9 +395,11 @@ class TestAIHtmlSanitizer {
         if ($html === '') return '';
         if (mb_strlen($html) > 50000) $html = mb_substr($html, 0, 50000);
 
+        $html = preg_replace('/<\s*br\s*\/?\s*>/i', "\n", $html);
+        if ($html === null) $html = '';
         $html = str_ireplace(
-            ['</p>', '</div>', '</li>', '</h2>', '</h3>', '<br>', '<br/>', '<br />'],
-            ["\n", "\n", "\n", "\n", "\n", "\n", "\n", "\n"],
+            ['</p>', '</div>', '</li>', '</h2>', '</h3>'],
+            ["\n", "\n", "\n", "\n", "\n"],
             $html
         );
         $html = preg_replace('/<\s*(p|div|ul|ol|li|h2|h3)\b[^>]*>/i', "\n", $html);
@@ -405,7 +407,7 @@ class TestAIHtmlSanitizer {
         $html = preg_replace("/\n{3,}/", "\n\n", $html);
         if ($html === null) $html = '';
 
-        $allowedTags = ['b','strong','i','em','u','ins','s','strike','del','code','pre','a','br'];
+        $allowedTags = ['b','strong','i','em','u','ins','s','strike','del','code','pre','a'];
         $allowed = '<' . implode('><', $allowedTags) . '>';
         $html = strip_tags($html, $allowed);
 
@@ -442,6 +444,7 @@ class TestAIHtmlSanitizer {
         $out = preg_replace('/^\s*<html\b[^>]*>\s*<body\b[^>]*>\s*/i', '', $out) ?? $out;
         $out = preg_replace('/\s*<\/body>\s*<\/html>\s*$/i', '', $out) ?? $out;
         $out = strip_tags($out, $allowed);
+        $out = preg_replace("/\n{3,}/", "\n\n", $out) ?? $out;
         return trim($out);
     }
 }

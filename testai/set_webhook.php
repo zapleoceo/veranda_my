@@ -1,16 +1,14 @@
 <?php
 declare(strict_types=1);
 
-$root = dirname(__DIR__);
-require_once $root . '/src/classes/TestAIEnv.php';
-require_once $root . '/src/classes/TestAIInfra.php';
+$ctx = require __DIR__ . '/bootstrap.php';
+$cfg = $ctx['cfg'];
+$tg = $ctx['tg'];
 
-$envFile = $root . '/.env';
-$envLoadedKeys = (new \App\Classes\TestAIEnvLoader())->load($envFile);
-$cfg = \App\Classes\TestAIConfig::fromEnv($root, $envFile, $envLoadedKeys);
-$cfg->applyTimezone();
+$adminKey = (string)($cfg->adminKey ?? '');
+if ($adminKey !== '' && (string)($_GET['key'] ?? '') !== $adminKey) { echo "forbidden\n"; exit(0); }
 
-$token = (string)$cfg->tgToken;
+$token = (string)($cfg->tgToken ?? '');
 $appUrl = $cfg->appUrl !== '' ? $cfg->appUrl : 'https://veranda.my';
 
 if ($token === '') {
@@ -19,7 +17,6 @@ if ($token === '') {
 }
 
 $hookUrl = $appUrl . '/testai/webhook';
-$tg = new \App\Classes\TestAITelegramClient($token);
 $resp = $tg->postJson('setWebhook', [
   'url' => $hookUrl,
   'allowed_updates' => ['message', 'edited_message', 'channel_post', 'edited_channel_post'],

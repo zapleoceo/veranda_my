@@ -226,11 +226,10 @@ class TestAIWebhookService {
         if ($msg === null) return;
 
         $chat = is_array($msg['chat'] ?? null) ? $msg['chat'] : [];
+        $chatType = (string)($chat['type'] ?? 'unknown');
         $chatId = isset($chat['id']) ? (string)$chat['id'] : '';
         if ($chatId === '') return;
-        if (is_array($this->cfg->allowedChatIds) && !isset($this->cfg->allowedChatIds[$chatId])) return;
-
-        $chatType = (string)($chat['type'] ?? 'unknown');
+        if ($chatType !== 'private' && is_array($this->cfg->allowedChatIds) && !isset($this->cfg->allowedChatIds[$chatId])) return;
         $chatTitle = (string)($chat['title'] ?? '');
         $messageId = isset($msg['message_id']) ? (int)$msg['message_id'] : 0;
         $ts = isset($msg['date']) ? (int)$msg['date'] : time();
@@ -246,12 +245,15 @@ class TestAIWebhookService {
         if ($text === '' && $caption !== '') $text = $caption;
 
         [$needReply, $queryText] = $this->detectNeedReply($chatType, $text);
+        $cmdDay = $this->parseSummaryCommand($text);
         $this->log->info('webhook_message', [
             'chat_id' => $chatId,
             'chat_type' => $chatType,
             'message_id' => $messageId,
             'has_text' => $text !== '' ? 1 : 0,
+            'text_head' => mb_substr($text, 0, 120),
             'need_reply' => $needReply ? 1 : 0,
+            'is_summary' => $cmdDay !== null ? 1 : 0,
             'can_call_gemini' => $this->gemini->canCall() ? 1 : 0,
         ]);
 
@@ -271,8 +273,8 @@ class TestAIWebhookService {
 
         $this->rawRepo->upsert($m);
 
-        $cmdDay = $this->parseSummaryCommand($text);
         if ($cmdDay !== null) {
+            $this->log->info('summary_command', ['chat_id' => $chatId, 'message_id' => $messageId, 'day' => $cmdDay]);
             $this->handleSummaryCommand($chatId, $messageId, $cmdDay);
             return;
         }
@@ -335,7 +337,7 @@ class TestAIWebhookService {
         $ctxMsgs = $this->buildContextMessages($chatId);
         $system = trim($botPrompt);
         if ($system !== '') $system .= "\n\n";
-        $system .= "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a,br. Do not use div/p/ul/ol/li/h1-h6 tags. Keep it concise. If knowledge_docs are provided, use them as a primary factual source. If information is missing, do not invent; ask for clarification or suggest contacting staff.";
+        $system .= "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a. Do not use div/p/ul/ol/li/h1-h6 tags. Do not use <br> tag; use plain newlines instead. Keep it concise. If knowledge_docs are provided, use them as a primary factual source. If information is missing, do not invent; ask for clarification or suggest contacting staff.";
 
         $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($queryText, 5);
         $payload = [
@@ -531,11 +533,17 @@ class TestAIWebhookService {
     private function parseSummaryCommand(string $text): ?string {
         $t = trim($text);
         if ($t === '') return null;
-        if (preg_match('/^\/summary(?:@\w+)?(?:\s+(\d{4}-\d{2}-\d{2}))?\s*$/u', $t, $m)) {
-            $day = trim((string)($m[1] ?? ''));
-            if ($day === '') $day = date('Y-m-d');
-            return $day;
+        if (!preg_match('/^\/summary(?:@\w+)?(?:\s+([0-9]{4}(?:-[0-9]{1,2}){0,2}))?\s*$/u', $t, $m)) return null;
+        $raw = trim((string)($m[1] ?? ''));
+        if ($raw === '') return date('Y-m-d');
+        if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $raw, $mm)) {
+            $y = (int)$mm[1];
+            $mo = (int)$mm[2];
+            $d = (int)$mm[3];
+            if (!checkdate($mo, $d, $y)) return date('Y-m-d');
+            return sprintf('%04d-%02d-%02d', $y, $mo, $d);
         }
+        if (preg_match('/^\d{4}-\d{1,2}$/', $raw)) return date('Y-m-d');
         return null;
     }
 
@@ -565,6 +573,7 @@ class TestAIWebhookService {
         }
 
         $html = $this->formatDailySummaryHtml($day, $row);
+        $html = $this->sanitizer->sanitizeTelegramHtml($html);
         $ok = $this->tg->sendMessage($chatId, $html, null);
         $this->log->info('telegram_send_result', ['chat_id' => $chatId, 'message_id' => $messageId, 'ok' => $ok ? 1 : 0]);
     }
@@ -582,8 +591,8 @@ class TestAIWebhookService {
         }
 
         $out = '<b>Сводка за ' . htmlspecialchars($day, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</b>';
-        if ($createdAt !== '') $out .= '<br><i>Обновлено: ' . htmlspecialchars($createdAt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</i>';
-        $out .= '<br><br>';
+        if ($createdAt !== '') $out .= "\n" . '<i>Обновлено: ' . htmlspecialchars($createdAt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</i>';
+        $out .= "\n\n";
 
         if ($summary !== '') {
             $out .= htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -604,8 +613,7 @@ class TestAIWebhookService {
         }
 
         if ($items) {
-            $out .= '<br><br><b>События:</b><br>' . htmlspecialchars(implode("\n", $items), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            $out = str_replace("\n", "<br>", $out);
+            $out .= "\n\n" . '<b>События:</b>' . "\n" . htmlspecialchars(implode("\n", $items), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         }
 
         if (mb_strlen($out) > 3800) $out = mb_substr($out, 0, 3800) . '…';
@@ -614,10 +622,14 @@ class TestAIWebhookService {
 }
 
 class TestAIKnowledgeService {
+    private TestAIConfig $cfg;
     private TestAIKnowledgeRepository $kb;
+    private ?TestAILogger $log;
 
-    public function __construct(TestAIKnowledgeRepository $kb) {
+    public function __construct(TestAIConfig $cfg, TestAIKnowledgeRepository $kb, ?TestAILogger $log = null) {
+        $this->cfg = $cfg;
         $this->kb = $kb;
+        $this->log = $log;
     }
 
     public function selectForQuestion(string $question, int $limit = 5): array {
@@ -630,21 +642,95 @@ class TestAIKnowledgeService {
 
         $rows = $this->kb->searchActiveByKeywords($keywords, $limit);
         $out = [];
+        $liveFetched = 0;
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
             $title = trim((string)($r['title'] ?? ''));
             $content = trim((string)($r['content'] ?? ''));
+            $sourceUrl = trim((string)($r['source_url'] ?? ''));
+            if ($content === '' && $sourceUrl !== '' && $liveFetched < 2) {
+                $live = $this->tryFetchLiveContent($sourceUrl);
+                if ($live !== '') {
+                    $content = $live;
+                    $liveFetched++;
+                }
+            }
             if ($content === '') continue;
             if (mb_strlen($content) > 1500) $content = mb_substr($content, 0, 1500) . '…';
             $out[] = [
                 'id' => (int)($r['id'] ?? 0),
                 'title' => $title,
-                'source_url' => (string)($r['source_url'] ?? ''),
+                'source_url' => $sourceUrl,
                 'content' => $content,
                 'updated_at' => (string)($r['updated_at'] ?? ''),
             ];
         }
         return $out;
+    }
+
+    private function tryFetchLiveContent(string $url): string {
+        $url = trim($url);
+        if ($url === '') return '';
+        if (!preg_match('#^https?://#i', $url)) $url = 'https://' . ltrim($url, '/');
+        if (!$this->isAllowedUrl($url)) return '';
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 7);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['User-Agent: veranda-ai-bot/1.0', 'Accept: text/html,application/json;q=0.9,text/plain;q=0.8,*/*;q=0.1']);
+        $body = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $ct = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        curl_close($ch);
+        if (!is_string($body) || $body === '' || $code < 200 || $code >= 300) {
+            if ($this->log) $this->log->info('live_source_fetch_failed', ['url' => $url, 'http_code' => $code]);
+            return '';
+        }
+
+        if (strlen($body) > 350000) $body = substr($body, 0, 350000);
+        $ctLow = strtolower($ct);
+        if (strpos($ctLow, 'application/json') !== false || (strlen(ltrim($body)) > 0 && ltrim($body)[0] === '{')) {
+            $j = json_decode($body, true);
+            if (is_array($j)) {
+                $pretty = json_encode($j, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                return is_string($pretty) ? trim($pretty) : '';
+            }
+        }
+
+        return $this->htmlToText($body);
+    }
+
+    private function isAllowedUrl(string $url): bool {
+        $u = @parse_url($url);
+        $host = is_array($u) ? strtolower((string)($u['host'] ?? '')) : '';
+        if ($host === '') return false;
+
+        $cfgHost = '';
+        if ($this->cfg->appUrl !== '') {
+            $uu = @parse_url($this->cfg->appUrl);
+            $cfgHost = is_array($uu) ? strtolower((string)($uu['host'] ?? '')) : '';
+        }
+        $allowed = [];
+        foreach ([$cfgHost, 'veranda.my', 'www.veranda.my'] as $h) {
+            $h = trim((string)$h);
+            if ($h !== '') $allowed[$h] = true;
+        }
+        return isset($allowed[$host]);
+    }
+
+    private function htmlToText(string $html): string {
+        $t = $html;
+        $t = preg_replace('/<\s*(script|style|noscript)[^>]*>[\s\S]*?<\s*\/\s*\\1\s*>/i', '', $t);
+        $t = preg_replace('/<\s*(br|br\/)\s*>/i', "\n", $t);
+        $t = preg_replace('/<\s*\/?\s*(p|div|li|tr|h[1-6])[^>]*>/i', "\n", $t);
+        $t = strip_tags((string)$t);
+        $t = html_entity_decode((string)$t, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $t = preg_replace("/[ \t]+/", ' ', (string)$t);
+        $t = preg_replace("/\n{3,}/", "\n\n", (string)$t);
+        $t = trim((string)$t);
+        if (mb_strlen($t) > 3000) $t = mb_substr($t, 0, 3000) . '…';
+        return $t;
     }
 
     private function extractKeywords(string $q): array {

@@ -31,7 +31,7 @@ $log = new \App\Classes\TestAILogger($cfg->logDir);
 $tg = new \App\Classes\TestAITelegramClient($cfg->tgToken, $log);
 $gemini = new \App\Classes\TestAIGeminiClient($cfg->geminiKey, $cfg->geminiProxyBase(), $cfg->geminiProxyKey, $log);
 $sanitizer = new \App\Classes\TestAIHtmlSanitizer();
-$knowledgeSvc = new \App\Classes\TestAIKnowledgeService($kbRepo);
+$knowledgeSvc = new \App\Classes\TestAIKnowledgeService($cfg, $kbRepo, $log);
 
 $announcementSvc = new \App\Classes\TestAIAnnouncementService($cfg, $gemini, $sanitizer, $dailyRepo, $rawRepo, __DIR__ . '/cache');
 $dailySvc = new \App\Classes\TestAIDailySummaryService($cfg, $gemini, $rawRepo, $dailyRepo);
