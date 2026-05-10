@@ -187,6 +187,7 @@ class TestAIWebhookService {
     private TestAIHtmlSanitizer $sanitizer;
     private TestAIRawMessagesRepository $rawRepo;
     private TestAISettingsRepository $settingsRepo;
+    private TestAILogger $log;
 
     public function __construct(
         TestAIConfig $cfg,
@@ -194,7 +195,8 @@ class TestAIWebhookService {
         TestAITelegramClient $tg,
         TestAIHtmlSanitizer $sanitizer,
         TestAIRawMessagesRepository $rawRepo,
-        TestAISettingsRepository $settingsRepo
+        TestAISettingsRepository $settingsRepo,
+        TestAILogger $log
     ) {
         $this->cfg = $cfg;
         $this->gemini = $gemini;
@@ -202,10 +204,14 @@ class TestAIWebhookService {
         $this->sanitizer = $sanitizer;
         $this->rawRepo = $rawRepo;
         $this->settingsRepo = $settingsRepo;
+        $this->log = $log;
     }
 
     public function handleUpdate(array $update): void {
-        if (!$this->tg->hasToken()) return;
+        if (!$this->tg->hasToken()) {
+            $this->log->error('tg_token_missing');
+            return;
+        }
 
         $msg = $this->extractMessage($update);
         if ($msg === null) return;
@@ -231,6 +237,14 @@ class TestAIWebhookService {
         if ($text === '' && $caption !== '') $text = $caption;
 
         [$needReply, $queryText] = $this->detectNeedReply($chatType, $text);
+        $this->log->info('webhook_message', [
+            'chat_id' => $chatId,
+            'chat_type' => $chatType,
+            'message_id' => $messageId,
+            'has_text' => $text !== '' ? 1 : 0,
+            'need_reply' => $needReply ? 1 : 0,
+            'can_call_gemini' => $this->gemini->canCall() ? 1 : 0,
+        ]);
 
         $m = new TestAIMessage();
         $m->chatId = $chatId;
@@ -256,7 +270,17 @@ class TestAIWebhookService {
             }
         }
 
-        if (!$needReply || trim($queryText) === '' || !$this->gemini->canCall()) return;
+        if (!$needReply || trim($queryText) === '' || !$this->gemini->canCall()) {
+            $this->log->info('webhook_skip_reply', [
+                'chat_id' => $chatId,
+                'chat_type' => $chatType,
+                'message_id' => $messageId,
+                'need_reply' => $needReply ? 1 : 0,
+                'query_empty' => trim($queryText) === '' ? 1 : 0,
+                'can_call_gemini' => $this->gemini->canCall() ? 1 : 0,
+            ]);
+            return;
+        }
 
         $botPrompt = '';
         $p = $this->settingsRepo->getBotPrompt();
@@ -291,7 +315,22 @@ class TestAIWebhookService {
         $html = $this->sanitizer->sanitizeTelegramHtml($html);
         if ($html === '') $html = $this->fallbackTelegramHtml($resp);
 
-        $this->tg->sendMessage($chatId, $html, $messageId);
+        $err = '';
+        if (is_array($resp['error'] ?? null)) $err = (string)($resp['error']['message'] ?? '');
+        $this->log->info('gemini_reply_ready', [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'http_code' => (int)($resp['_http_code'] ?? 0),
+            'has_error' => $err !== '' ? 1 : 0,
+            'html_len' => mb_strlen($html),
+        ]);
+
+        $ok = $this->tg->sendMessage($chatId, $html, $messageId);
+        $this->log->info('telegram_send_result', [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'ok' => $ok ? 1 : 0,
+        ]);
     }
 
     private function extractMessage(array $update): ?array {
@@ -420,4 +459,3 @@ class TestAIWebhookService {
         return $code ? ("Gemini пустой ответ (HTTP {$code}).") : 'Не получилось сформировать ответ.';
     }
 }
-
