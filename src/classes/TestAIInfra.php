@@ -411,6 +411,11 @@ class TestAIHtmlSanitizer {
         $allowed = '<' . implode('><', $allowedTags) . '>';
         $html = strip_tags($html, $allowed);
 
+        $html = str_replace("\r\n", "\n", $html);
+        $html = str_replace("\r", "\n", $html);
+        $nlToken = '___TG_NL___';
+        $html = str_replace("\n", $nlToken, $html);
+
         $doc = new \DOMDocument('1.0', 'UTF-8');
         libxml_use_internal_errors(true);
         $doc->loadHTML('<?xml encoding="utf-8" ?>' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
@@ -444,6 +449,7 @@ class TestAIHtmlSanitizer {
         $out = preg_replace('/^\s*<html\b[^>]*>\s*<body\b[^>]*>\s*/i', '', $out) ?? $out;
         $out = preg_replace('/\s*<\/body>\s*<\/html>\s*$/i', '', $out) ?? $out;
         $out = strip_tags($out, $allowed);
+        $out = str_replace($nlToken, "\n", $out);
         $out = preg_replace("/\n{3,}/", "\n\n", $out) ?? $out;
         return trim($out);
     }

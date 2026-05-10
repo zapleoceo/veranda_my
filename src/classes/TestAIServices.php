@@ -65,6 +65,17 @@ class TestAIAnnouncementService {
         );
         $html = $this->gemini->text($resp);
         $html = $this->sanitizer->sanitizeHtml($html);
+        if ($lang === 'ru' && $this->latinCount(strip_tags($html)) >= 40) {
+            $system2 = $system . "\n\nRewrite: output must be in RU.";
+            $resp2 = $this->gemini->generate(
+                $this->cfg->geminiModel,
+                [['text' => $prompt], ['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
+                ['system' => $system2, 'temperature' => 0.2, 'maxOutputTokens' => 2200, 'tag' => 'announce_generate_ru_fix']
+            );
+            $html2 = $this->gemini->text($resp2);
+            $html2 = $this->sanitizer->sanitizeHtml($html2);
+            if ($html2 !== '') $html = $html2;
+        }
 
         if ($html !== '') {
             $this->ensureCacheDir();
@@ -85,6 +96,12 @@ class TestAIAnnouncementService {
         if (preg_match('/\p{Cyrillic}/u', $text)) return 'ru';
         if (preg_match('/[A-Za-z]/', $text)) return 'en';
         return 'ru';
+    }
+
+    private function latinCount(string $s): int {
+        if ($s === '') return 0;
+        if (!preg_match_all('/[A-Za-z]/', $s, $m)) return 0;
+        return is_array($m[0] ?? null) ? count($m[0]) : 0;
     }
 
     private function cacheFile(string $date): string {
@@ -205,6 +222,17 @@ class TestAIDailySummaryService {
         $j = $this->gemini->json($resp);
         if (!is_array($j)) return false;
 
+        if ($lang === 'ru' && $this->needsRuRewrite($j)) {
+            $system2 = $system . "\n\nRewrite: translate all string fields to RU. Keep the same JSON schema.";
+            $resp2 = $this->gemini->generate(
+                $this->cfg->geminiModel,
+                [['text' => json_encode(['lang' => 'ru', 'data' => $j], JSON_UNESCAPED_UNICODE)]],
+                ['system' => $system2, 'temperature' => 0.1, 'maxOutputTokens' => 2500, 'responseMimeType' => 'application/json', 'tag' => 'daily_summary_ru_fix']
+            );
+            $j2 = $this->gemini->json($resp2);
+            if (is_array($j2)) $j = $j2;
+        }
+
         $summary = trim((string)($j['summary_text'] ?? ''));
         $events = $j['events'] ?? [];
         if (!is_array($events)) $events = [];
@@ -226,6 +254,26 @@ class TestAIDailySummaryService {
         if (preg_match('/\p{Cyrillic}/u', $text)) return 'ru';
         if (preg_match('/[A-Za-z]/', $text)) return 'en';
         return 'ru';
+    }
+
+    private function needsRuRewrite(array $j): bool {
+        $t = (string)($j['summary_text'] ?? '');
+        if ($this->latinCount($t) >= 20) return true;
+        $events = $j['events'] ?? [];
+        if (is_array($events)) {
+            foreach ($events as $ev) {
+                if (!is_array($ev)) continue;
+                $title = (string)($ev['title'] ?? '');
+                if ($this->latinCount($title) >= 12) return true;
+            }
+        }
+        return false;
+    }
+
+    private function latinCount(string $s): int {
+        if ($s === '') return 0;
+        if (!preg_match_all('/[A-Za-z]/', $s, $m)) return 0;
+        return is_array($m[0] ?? null) ? count($m[0]) : 0;
     }
 }
 
@@ -637,6 +685,14 @@ class TestAIWebhookService {
         $waitSec = max($blockRem, $nextRem);
 
         $row = $this->dailyRepo->getByDay($day);
+        $langRow = $this->settingsRepo->getKey('bot_lang_daily');
+        $langMode = strtolower(trim((string)($langRow['v'] ?? 'ru')));
+        $wantRu = $langMode === 'ru';
+        $hasLatin = false;
+        if ($wantRu && is_array($row)) {
+            $t = (string)($row['summary_text'] ?? '');
+            $hasLatin = preg_match('/[A-Za-z]/', $t) ? true : false;
+        }
         if ($row === null) {
             if ($waitSec > 0) {
                 $msg = 'Лимит запросов к AI исчерпан. Попробуйте через ' . (int)ceil($waitSec) . ' сек.';
@@ -646,6 +702,10 @@ class TestAIWebhookService {
             }
             $okRun = $this->dailySvc->runDay($day);
             $this->log->info('daily_summary_run', ['day' => $day, 'ok' => $okRun ? 1 : 0, 'via' => 'tg_summary']);
+            $row = $this->dailyRepo->getByDay($day);
+        } elseif ($hasLatin && $waitSec <= 0 && $this->gemini->canCall()) {
+            $okRun = $this->dailySvc->runDay($day);
+            $this->log->info('daily_summary_rerun_lang_fix', ['day' => $day, 'ok' => $okRun ? 1 : 0, 'via' => 'tg_summary']);
             $row = $this->dailyRepo->getByDay($day);
         }
 
@@ -681,6 +741,8 @@ class TestAIWebhookService {
         foreach ($events as $ev) {
             if (!is_array($ev)) continue;
             $title = trim((string)($ev['title'] ?? ''));
+            $title = html_entity_decode($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $title = trim(strip_tags($title));
             if ($title === '') continue;
             $ad = trim((string)($ev['announce_date'] ?? ''));
             $line = '— ' . $title;
