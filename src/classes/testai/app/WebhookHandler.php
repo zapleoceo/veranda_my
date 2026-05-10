@@ -143,6 +143,11 @@ class WebhookHandler {
             return;
         }
 
+        if ($this->isGreeting($queryText)) {
+            $this->tg->sendMessage($chatId, 'Привет! Я бот Veranda. Могу подсказать по меню, напиткам, ценам, времени работы и контактам.', $chatType === 'private' ? null : $messageId);
+            return;
+        }
+
         // Rate limit check
         $waitSec = $this->geminiWaitSec();
         if ($waitSec > 0) {
@@ -311,5 +316,12 @@ class WebhookHandler {
         $bRem = (is_int($b) && $b > $now) ? $b - $now : 0;
         $nRem = (is_int($n) && $n > $now) ? $n - $now : 0;
         return max($bRem, $nRem);
+    }
+
+    private function isGreeting(string $text): bool {
+        $t = trim(mb_strtolower($text));
+        if ($t === '') return false;
+        if (mb_strlen($t) > 40) return false;
+        return (bool)preg_match('/^(привет|здравствуй|здравствуйте|добрый\\s+день|добрый\\s+вечер|доброе\\s+утро|hi|hello)\\b/u', $t);
     }
 }

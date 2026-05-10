@@ -178,6 +178,11 @@ class Responder {
     private function errorText(array $resp, string $lang, int $waitSec = 0): string {
         $err = '';
         if (is_array($resp['error'] ?? null)) $err = trim((string)($resp['error']['message'] ?? ''));
+        if ($this->isDailyLimitError($err)) {
+            return $lang === 'ru'
+                ? 'Дневной лимит запросов к AI исчерпан. Попробуйте завтра.'
+                : 'Daily AI request limit reached. Try again tomorrow.';
+        }
         if ($err !== '' && preg_match('/quota|rate.?limit/i', $err)) {
             $retry = '';
             if ($waitSec > 0) {
@@ -216,7 +221,11 @@ class Responder {
         if ($err === '' || !preg_match('/quota|rate.?limit/i', $err)) return;
         $retry = 60;
         if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) $retry = (int)ceil((float)($m[1] ?? 0));
-        $until = time() + max(90, $retry + 10);
+        if ($this->isDailyLimitError($err)) {
+            $until = time() + 6 * 3600;
+        } else {
+            $until = time() + max(90, $retry + 10);
+        }
         $ts = gmdate('c', $until);
         $this->settings->set('gemini_block_until', $ts);
         $this->settings->set('gemini_next_allowed_until', $ts);
@@ -229,5 +238,12 @@ class Responder {
         $bRem = (is_int($b) && $b > $now) ? ($b - $now) : 0;
         $nRem = (is_int($n) && $n > $now) ? ($n - $now) : 0;
         return max($bRem, $nRem);
+    }
+
+    private function isDailyLimitError(string $err): bool {
+        if ($err === '') return false;
+        if (stripos($err, 'free_tier_requests') !== false && preg_match('/\blimit:\s*20\b/i', $err)) return true;
+        if (preg_match('/requests\s+per\s+day|\\bRPD\\b/i', $err)) return true;
+        return false;
     }
 }
