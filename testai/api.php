@@ -265,7 +265,8 @@ if ($ajax === 'gemini_usage') {
     $latestTs = is_array($latest) ? (string)($latest['ts'] ?? '') : '';
     $latestAge = $latestTs !== '' ? max(0, $nowTs - (int)strtotime($latestTs)) : null;
     $cooldown = is_array($latestRate) ? (float)($latestRate['retry_in_sec'] ?? 0) : 0.0;
-    $cooldownRemaining = $blockRemainingSec > 0 ? $blockRemainingSec : ($cooldown > 0 ? (int)ceil($cooldown) : 0);
+    $cooldownRemaining = $blockRemainingSec > 0 ? $blockRemainingSec : 0;
+    $lastRetrySuggestion = $cooldown > 0 ? (int)ceil($cooldown) : 0;
 
     $refresh = (int)($_GET['refresh'] ?? 5);
     $refresh = max(0, min(60, $refresh));
@@ -295,6 +296,9 @@ if ($ajax === 'gemini_usage') {
     } else {
       echo '<div class="card" style="border-color:#16a34a;background:#f0fdf4">';
       echo '<div class="ok"><b>Ready</b>: no cooldown</div>';
+      if ($lastRetrySuggestion > 0) {
+        echo '<div class="muted">Last 429 suggested retry in ~' . (int)$lastRetrySuggestion . ' sec</div>';
+      }
       echo '</div>';
     }
 
