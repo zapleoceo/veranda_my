@@ -1,4 +1,4 @@
-/* aibot.js — admin UI for the AI bot */
+/* aibot.js */
 (function () {
   'use strict';
 
@@ -6,27 +6,11 @@
   const adminBase = window.location.pathname.replace(/\/[^/]*$/, '');
   const api = (params) => adminBase + '?tab=aibot&' + new URLSearchParams(params);
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
-
-  function setPill(id, ok, text) {
-    const el = $(id);
-    if (!el) return;
-    el.className = 'pill ' + (ok ? 'ok' : 'err');
-    if (text !== undefined) el.textContent = text;
-  }
-
-  function savedAt(id, ts) {
-    const el = $(id);
-    if (el && ts) el.textContent = 'Сохранено: ' + ts;
-  }
-
   async function post(action, body) {
     const fd = new FormData();
     for (const [k, v] of Object.entries(body)) fd.append(k, String(v));
-    const r = await fetch(api({ ajax: action }), { method: 'POST', body: fd });
-    return r.json();
+    return (await fetch(api({ ajax: action }), { method: 'POST', body: fd })).json();
   }
-
   async function get(action, extra = {}) {
     return (await fetch(api({ ajax: action, ...extra }))).json();
   }
@@ -34,20 +18,17 @@
   function htmlEsc(s) {
     return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
-
   function date() { return $('aibotDate')?.value || ''; }
+  function ts(id, v) { const el = $(id); if (el && v) el.textContent = 'Сохранено: ' + v; }
 
-  // ── Status ───────────────────────────────────────────────────────────────
+  // ── Status ──────────────────────────────────────────────────────────────
 
   async function loadState() {
     const d = await get('state', { date: date() });
-    setPill('pillDb',     d.db_ok,          d.db_ok ? 'DB ✓' : 'DB ✗');
-    setPill('pillGemini', d.gemini_can_call, d.gemini_can_call ? 'AI ✓' : 'AI ✗');
-    const meta = $('aibotMeta');
-    if (meta) meta.textContent = d.gemini_model
-      ? ('Модель: ' + d.gemini_model + '  ·  Сообщений в БД: ' + (d.raw_total || 0))
-      : '';
-    const lp = $('logFilePath');
+    const db = $('pillDb'), ai = $('pillGemini'), meta = $('aibotMeta'), lp = $('logFilePath');
+    if (db)   { db.className = 'ai-pill ' + (d.db_ok ? 'ok' : 'err'); db.textContent = d.db_ok ? 'DB ✓' : 'DB ✗'; }
+    if (ai)   { ai.className = 'ai-pill ' + (d.gemini_can_call ? 'ok' : 'err'); ai.textContent = d.gemini_can_call ? 'AI ✓' : 'AI ✗'; }
+    if (meta) meta.textContent = d.gemini_model ? d.gemini_model + ' · ' + (d.raw_total || 0) + ' сообщ.' : '';
     if (lp && d.log_file) lp.textContent = d.log_file;
   }
 
@@ -63,29 +44,45 @@
     const res = $('botTestResult');
     if (res) { res.style.display = 'block'; res.innerHTML = '<em>Думает...</em>'; }
     const d = await post('bot_test', { question: q });
-    if (res) res.innerHTML = d.ok
-      ? d.html
-      : ('<span style="color:#c00">Ошибка: ' + htmlEsc(d.error || '?') + '</span>');
+    if (res) res.innerHTML = d.ok ? d.html : '<span style="color:#c00">Ошибка: ' + htmlEsc(d.error || '?') + '</span>';
   }
 
   $('btnBotTest')?.addEventListener('click', runBotTest);
   $('botTestQ')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') runBotTest(); });
 
-  // ── Bot identity ──────────────────────────────────────────────────────────
+  // ── Settings ──────────────────────────────────────────────────────────────
 
   $('btnIdentitySave')?.addEventListener('click', async () => {
     const d = await post('identity_save', { value: $('botIdentity')?.value ?? '' });
-    if (d.ok) savedAt('identitySavedAt', d.updated_at);
-    else alert('Ошибка: ' + (d.error || '?'));
+    if (d.ok) ts('identitySavedAt', d.updated_at); else alert('Ошибка: ' + (d.error || '?'));
   });
-
-  // ── Forbidden topics ──────────────────────────────────────────────────────
 
   $('btnForbiddenSave')?.addEventListener('click', async () => {
     const d = await post('forbidden_save', { value: $('botForbidden')?.value ?? '' });
-    if (d.ok) savedAt('forbiddenSavedAt', d.updated_at);
-    else alert('Ошибка: ' + (d.error || '?'));
+    if (d.ok) ts('forbiddenSavedAt', d.updated_at); else alert('Ошибка: ' + (d.error || '?'));
   });
+
+  // ── Poster ────────────────────────────────────────────────────────────────
+
+  async function loadPosterStatus() {
+    const d = await get('poster_status');
+    if (!d.ok || !d.configured) { const el = $('posterStatus'); if (el) el.textContent = 'POSTER_API_TOKEN не настроен'; return; }
+    const el = $('posterStatus'); if (el) el.textContent = d.text || '';
+    const upd = $('posterUpdatedAt'); if (upd && d.updated_at) upd.textContent = 'Обновлено: ' + d.updated_at;
+  }
+
+  $('btnPosterRefresh')?.addEventListener('click', async () => {
+    const btn = $('btnPosterRefresh');
+    if (btn) { btn.disabled = true; btn.textContent = '...'; }
+    const d = await get('poster_refresh');
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Обновить'; }
+    const el = $('posterStatus'); if (el && d.ok) el.textContent = d.text || '';
+    const upd = $('posterUpdatedAt'); if (upd && d.ok) upd.textContent = 'Обновлено: ' + d.updated_at;
+  });
+
+  // Load poster status when service section opens
+  $('ai-root')?.closest('.card')?.parentElement?.addEventListener('click', () => {});
+  document.querySelector('.ai-service')?.addEventListener('toggle', loadPosterStatus, { once: true });
 
   // ── Logs ─────────────────────────────────────────────────────────────────
 
@@ -101,41 +98,24 @@
 
   // ── Operations ────────────────────────────────────────────────────────────
 
-  function showOpsResult(html) {
-    const el = $('opsOutput');
-    if (el) el.innerHTML = html;
-  }
+  function showOps(html) { const el = $('opsOutput'); if (el) el.innerHTML = html; }
 
-  $('btnAnnounceGet')?.addEventListener('click', async () => {
-    const d = await get('announce_get', { date: date() });
-    showOpsResult(d.html || '<em>Кеш пуст</em>');
-  });
-
-  $('btnAnnounceGen')?.addEventListener('click', async () => {
-    showOpsResult('<em>Генерация...</em>');
-    const d = await get('announce_generate', { date: date() });
-    showOpsResult(d.html || '<em>Ошибка генерации</em>');
-  });
-
+  $('btnAnnounceGet')?.addEventListener('click', async () => showOps((await get('announce_get', { date: date() })).html || '<em>Кеш пуст</em>'));
+  $('btnAnnounceGen')?.addEventListener('click', async () => { showOps('<em>Генерация...</em>'); showOps((await get('announce_generate', { date: date() })).html || '<em>Ошибка</em>'); });
   $('btnDailyGet')?.addEventListener('click', async () => {
     const d = await get('daily_get', { date: date() });
-    showOpsResult(d.exists
-      ? ('<b>Саммари за ' + date() + '</b><br><pre style="white-space:pre-wrap">' + htmlEsc(d.summary_text) + '</pre>')
-      : '<em>Саммари не найдено</em>');
+    showOps(d.exists ? '<b>Саммари за ' + date() + '</b><br><pre style="white-space:pre-wrap">' + htmlEsc(d.summary_text) + '</pre>' : '<em>Нет</em>');
   });
-
   $('btnDailyRun')?.addEventListener('click', async () => {
-    showOpsResult('<em>Генерация...</em>');
+    showOps('<em>Генерация...</em>');
     const d = await post('daily_run', { date: date() });
-    showOpsResult(d.ok
-      ? ('<b>Готово</b><br><pre style="white-space:pre-wrap">' + htmlEsc(d.summary_text) + '</pre>')
-      : '<em>Ошибка генерации</em>');
+    showOps(d.ok ? '<b>Готово</b><br><pre style="white-space:pre-wrap">' + htmlEsc(d.summary_text) + '</pre>' : '<em>Ошибка</em>');
   });
 
-  // ── KB table ──────────────────────────────────────────────────────────────
+  // ── KB table (event delegation — works for server-rendered AND dynamic rows) ──
 
-  const ACCESS_LABEL = { public: 'Для всех', members: 'Только своим', never: 'Скрыто' };
-  const ACCESS_CLASS = { public: 'pill-public', members: 'pill-members', never: 'pill-never' };
+  const ACCESS_LABEL = { public: 'Все', members: 'Своим', never: 'Скрыто' };
+  const ACCESS_CLASS = { public: 'ai-acc-public', members: 'ai-acc-members', never: 'ai-acc-never' };
 
   async function reloadKb() {
     const d = await get('kb_list');
@@ -143,40 +123,32 @@
     const tbody = $('kbBody');
     if (!tbody) return;
     if (!d.items.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="padding:16px 10px; color:#999; text-align:center;">База знаний пуста. Добавьте документ или импортируйте страницу по URL.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="ai-empty">Пусто. Добавьте документ или импортируйте URL.</td></tr>';
       return;
     }
     tbody.innerHTML = d.items.map(it => `
       <tr data-id="${it.id}">
-        <td style="padding:8px 10px">${htmlEsc(it.title)}</td>
-        <td style="padding:8px 10px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
-          ${it.source_url ? `<a href="${htmlEsc(it.source_url)}" target="_blank" style="font-size:12px">🔗 URL</a>` : '<span class="small-muted">текст</span>'}
-        </td>
-        <td style="padding:8px 10px">
-          <span class="pill ${ACCESS_CLASS[it.access] || ''}">${ACCESS_LABEL[it.access] || it.access}</span>
-        </td>
-        <td style="padding:8px 10px">${it.is_active ? '<span style="color:#2e7d32">●</span>' : '<span style="color:#999">○</span>'}</td>
-        <td style="padding:8px 10px; white-space:nowrap">
-          <button class="btn btn-sm btn-kb-edit" data-id="${it.id}">✏</button>
-          <button class="btn btn-sm btn-kb-del" data-id="${it.id}" style="color:#c00">✕</button>
+        <td>${htmlEsc(it.title)}</td>
+        <td>${it.source_url ? `<a href="${htmlEsc(it.source_url)}" target="_blank">🔗</a>` : '<span class="ai-muted">текст</span>'}</td>
+        <td><span class="ai-acc ${ACCESS_CLASS[it.access] || ''}">${ACCESS_LABEL[it.access] || it.access}</span></td>
+        <td>${it.is_active ? '<span class="ai-dot-on">●</span>' : '<span class="ai-dot-off">○</span>'}</td>
+        <td class="ai-actions">
+          <button class="ai-btn btn-kb-edit" data-id="${it.id}">✏</button>
+          <button class="ai-btn ai-btn-del btn-kb-del" data-id="${it.id}">✕</button>
         </td>
       </tr>`).join('');
-    attachKbListeners();
   }
 
-  function attachKbListeners() {
-    document.querySelectorAll('.btn-kb-edit').forEach(btn => {
-      btn.addEventListener('click', () => openKbModal(+btn.dataset.id));
-    });
-    document.querySelectorAll('.btn-kb-del').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        if (!confirm('Удалить документ?')) return;
-        const d = await post('kb_delete', { id: btn.dataset.id });
-        if (d.ok) reloadKb(); else alert('Ошибка удаления');
-      });
-    });
-  }
-  attachKbListeners();
+  // Delegate clicks on KB table — catches both server-rendered and JS-rendered rows
+  document.addEventListener('click', (e) => {
+    const editBtn = e.target.closest('.btn-kb-edit');
+    if (editBtn) { openKbModal(+editBtn.dataset.id); return; }
+    const delBtn = e.target.closest('.btn-kb-del');
+    if (delBtn) {
+      if (!confirm('Удалить документ?')) return;
+      post('kb_delete', { id: delBtn.dataset.id }).then(d => { if (d.ok) reloadKb(); else alert('Ошибка'); });
+    }
+  });
 
   // ── KB modal ──────────────────────────────────────────────────────────────
 
@@ -188,20 +160,17 @@
     $('kbAccess').value         = 'public';
     $('kbActive').checked       = true;
     $('kbModalErr').textContent = '';
-    $('kbModalTitle').textContent = id ? 'Редактировать документ' : 'Новый документ';
+    $('kbModalTitle').textContent = id ? 'Редактировать' : 'Новый документ';
     $('kbModal').style.display  = 'flex';
-
-    if (id) {
-      get('kb_get', { id }).then(d => {
-        if (!d.ok || !d.item) return;
-        const it = d.item;
-        $('kbTitle').value    = it.title || '';
-        $('kbUrl').value      = it.source_url || '';
-        $('kbContent').value  = it.content || '';
-        $('kbAccess').value   = it.access || 'public';
-        $('kbActive').checked = !!+it.is_active;
-      });
-    }
+    if (id) get('kb_get', { id }).then(d => {
+      if (!d.ok || !d.item) return;
+      const it = d.item;
+      $('kbTitle').value    = it.title || '';
+      $('kbUrl').value      = it.source_url || '';
+      $('kbContent').value  = it.content || '';
+      $('kbAccess').value   = it.access || 'public';
+      $('kbActive').checked = !!+it.is_active;
+    });
   }
 
   function closeKbModal() { $('kbModal').style.display = 'none'; }
@@ -217,11 +186,9 @@
     const content = ($('kbContent')?.value ?? '').trim();
     const access  = $('kbAccess')?.value || 'public';
     const active  = $('kbActive')?.checked ? 1 : 0;
-
     $('kbModalErr').textContent = '';
     if (!title) { $('kbModalErr').textContent = 'Введите название'; return; }
     if (!content && !url) { $('kbModalErr').textContent = 'Заполните содержимое или URL'; return; }
-
     const d = await post('kb_save', { id, title, source_url: url, content, access, is_active: active });
     if (d.ok) { closeKbModal(); reloadKb(); }
     else $('kbModalErr').textContent = 'Ошибка: ' + (d.error || '?');
@@ -232,13 +199,10 @@
   $('btnKbImport')?.addEventListener('click', async () => {
     const url = ($('kbImportUrl')?.value ?? '').trim();
     if (!url) return;
-    const btn  = $('btnKbImport');
-    const prev = btn.textContent;
-    btn.textContent = 'Загрузка...';
-    btn.disabled    = true;
+    const btn = $('btnKbImport');
+    btn.disabled = true; btn.textContent = '...';
     const d = await post('kb_import_url', { url });
-    btn.textContent = prev;
-    btn.disabled    = false;
+    btn.disabled = false; btn.textContent = '↗ URL';
     if (d.ok) { $('kbImportUrl').value = ''; reloadKb(); }
     else alert('Ошибка импорта: ' + (d.error || '?'));
   });

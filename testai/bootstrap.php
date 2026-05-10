@@ -15,6 +15,7 @@ require_once $root . '/src/classes/testai/infra/GeminiClient.php';
 require_once $root . '/src/classes/testai/infra/TelegramClient.php';
 require_once $root . '/src/classes/testai/infra/HtmlSanitizer.php';
 require_once $root . '/src/classes/testai/infra/UrlFetcher.php';
+require_once $root . '/src/classes/testai/infra/PosterClient.php';
 
 // Repositories
 require_once $root . '/src/classes/testai/repository/Schema.php';
@@ -90,12 +91,13 @@ $gemini    = new \App\Classes\TestAI\Infra\GeminiClient($cfg->geminiKey, $cfg->g
 $tg        = new \App\Classes\TestAI\Infra\TelegramClient($cfg->tgToken, $log);
 $sanitizer = new \App\Classes\TestAI\Infra\HtmlSanitizer();
 $fetcher   = new \App\Classes\TestAI\Infra\UrlFetcher($cfg->appUrl);
+$poster    = new \App\Classes\TestAI\Infra\PosterClient($cfg->posterToken, $cfg->posterBaseUrl, $settingsRepo);
 
 // ─── Services ────────────────────────────────────────────────────────────────
 
 $knowledgeSvc    = new \App\Classes\TestAI\Service\KnowledgeService($kbRepo, $fetcher);
 $menuSvc         = new \App\Classes\TestAI\Service\MenuService($menuRepo);
-$responder       = new \App\Classes\TestAI\Service\Responder($cfg->geminiModel, $gemini, $sanitizer, $settingsRepo, $knowledgeSvc, $menuSvc);
+$responder       = new \App\Classes\TestAI\Service\Responder($cfg->geminiModel, $gemini, $sanitizer, $settingsRepo, $knowledgeSvc, $menuSvc, $poster);
 $dailySvc        = new \App\Classes\TestAI\Service\DailySummaryService($cfg->geminiModel, $gemini, $msgRepo, $dailyRepo, $settingsRepo);
 $announcementSvc = new \App\Classes\TestAI\Service\AnnouncementService($cfg->geminiModel, $gemini, $sanitizer, $dailyRepo, $msgRepo, $settingsRepo, __DIR__ . '/cache');
 
@@ -129,6 +131,7 @@ return [
     'tg'              => $tg,
     'sanitizer'       => $sanitizer,
     'fetcher'         => $fetcher,
+    'poster'          => $poster,
     'knowledgeSvc'    => $knowledgeSvc,
     'menuSvc'         => $menuSvc,
     'responder'       => $responder,

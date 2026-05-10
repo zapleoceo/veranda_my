@@ -8,6 +8,7 @@ $dailyRepo    = $ctx['dailyRepo'];
 $dailySvc     = $ctx['dailySvc'];
 $announceSvc  = $ctx['announcementSvc'];
 $responder    = $ctx['responder'];
+$poster       = $ctx['poster'];
 $gemini       = $ctx['gemini'];
 $sanitizer    = $ctx['sanitizer'];
 $fetcher      = $ctx['fetcher'];
@@ -162,6 +163,20 @@ if ($ajax !== '') {
         // Admin test is always authorized
         $html = $responder->respond($q, [], true);
         $json(['ok' => true, 'html' => $html]);
+    }
+
+    // ── Poster availability ───────────────────────────────────────────────────
+    if ($ajax === 'poster_refresh') {
+        if (!$poster->isConfigured()) $json(['ok' => false, 'error' => 'poster_not_configured'], 400);
+        $text = $poster->getAvailabilityText(forceRefresh: true);
+        $json(['ok' => true, 'text' => $text, 'updated_at' => $poster->lastUpdatedAt()]);
+    }
+    if ($ajax === 'poster_status') {
+        $json(['ok' => true,
+            'configured' => $poster->isConfigured(),
+            'text'       => $poster->getAvailabilityText(),
+            'updated_at' => $poster->lastUpdatedAt(),
+        ]);
     }
 
     // ── Announce / daily (operations) ─────────────────────────────────────────
