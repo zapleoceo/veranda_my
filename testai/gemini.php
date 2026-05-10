@@ -1,8 +1,32 @@
 <?php
 declare(strict_types=1);
 
+function testai_gemini_proxy_base(): string {
+  $v = trim((string)($_ENV['GEMINI_PROXY_URL'] ?? ''));
+  if ($v !== '') return rtrim($v, '/');
+
+  $appUrl = trim((string)($_ENV['APP_URL'] ?? ''));
+  if ($appUrl === '' || !preg_match('#^https?://#i', $appUrl)) return '';
+  return rtrim($appUrl, '/') . '/__gemini';
+}
+
+function testai_gemini_proxy_key(): string {
+  $v = trim((string)($_ENV['GEMINI_PROXY_KEY'] ?? ''));
+  if ($v !== '') return $v;
+  return trim((string)($_ENV['CLOUDFLARE_TURN_API_TOKEN'] ?? ''));
+}
+
+function testai_gemini_can_call(string $apiKey): bool {
+  return testai_gemini_proxy_base() !== '' || trim($apiKey) !== '';
+}
+
 function testai_gemini_generate(string $apiKey, string $model, array $parts, array $opts = []): array {
-  $endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent?key=' . rawurlencode($apiKey);
+  $proxyBase = testai_gemini_proxy_base();
+  if ($proxyBase !== '') {
+    $endpoint = $proxyBase . '/v1beta/models/' . rawurlencode($model) . ':generateContent';
+  } else {
+    $endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent?key=' . rawurlencode($apiKey);
+  }
   $payload = [
     'contents' => [
       [
@@ -29,7 +53,12 @@ function testai_gemini_generate(string $apiKey, string $model, array $parts, arr
 
   $ch = curl_init($endpoint);
   curl_setopt($ch, CURLOPT_POST, true);
-  curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+  $headers = ['Content-Type: application/json'];
+  if ($proxyBase !== '') {
+    $proxyKey = testai_gemini_proxy_key();
+    if ($proxyKey !== '') $headers[] = 'X-Proxy-Key: ' . $proxyKey;
+  }
+  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
   curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   curl_setopt($ch, CURLOPT_TIMEOUT, 25);
@@ -65,4 +94,3 @@ function testai_gemini_json(array $resp): ?array {
   }
   return null;
 }
-

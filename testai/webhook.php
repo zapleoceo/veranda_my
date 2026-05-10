@@ -145,7 +145,7 @@ try {
   );
 } catch (\Throwable $e) {}
 
-if ($geminiKey !== '' && $mediaType && $mediaFileId) {
+if (testai_gemini_can_call($geminiKey) && $mediaType && $mediaFileId) {
   $fileInfo = testai_tg_get_file_url($tgToken, $mediaFileId);
   $fileSize = is_array($fileInfo) ? (int)($fileInfo['file_size'] ?? 0) : 0;
   if (is_array($fileInfo) && !empty($fileInfo['url']) && $fileSize > 0 && $fileSize <= 15_000_000) {
@@ -181,7 +181,7 @@ if ($mediaText !== null && trim($mediaText) !== '') {
 
 echo 'ok';
 
-if (!$needReply || $queryText === '' || $geminiKey === '') exit;
+if (!$needReply || $queryText === '' || !testai_gemini_can_call($geminiKey)) exit;
 
 $botPrompt = '';
 if (is_string($tSettings) && $tSettings !== '') {

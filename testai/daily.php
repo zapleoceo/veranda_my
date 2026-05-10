@@ -10,7 +10,7 @@ $tDaily = $ctx['tDaily'];
 $geminiKey = (string)$ctx['geminiKey'];
 $geminiModel = (string)$ctx['geminiModel'];
 
-if ($geminiKey === '') { echo "missing gemini_key\n"; exit(0); }
+if (!testai_gemini_can_call($geminiKey)) { echo "missing gemini_key\n"; exit(0); }
 
 $day = trim((string)($_GET['day'] ?? ''));
 if ($day === '') $day = date('Y-m-d', strtotime('-1 day'));
@@ -78,4 +78,3 @@ try {
 } catch (\Throwable $e) {}
 
 echo "ok\n";
-

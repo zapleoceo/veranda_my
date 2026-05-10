@@ -232,7 +232,7 @@ if ($adminKey !== '' && (string)($_GET['key'] ?? '') !== $adminKey) {
   exit;
 }
 
-if ($geminiKey === '') {
+if (!testai_gemini_can_call($geminiKey)) {
   $bad('missing_gemini_key');
   exit;
 }
