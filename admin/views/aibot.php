@@ -1,39 +1,40 @@
 <div id="ai-root">
 
-  <!-- ── Status ─────────────────────────────────────────────────────────── -->
-  <div class="ai-bar">
-    <span class="ai-pill" id="pillDb">DB</span>
-    <span class="ai-pill" id="pillGemini">AI</span>
-    <span class="ai-pill err" id="pillBlock" style="display:none">⊘ 0с</span>
-    <span class="ai-meta" id="aibotMeta"></span>
-    <button class="ai-btn ai-btn-warn" id="btnBlockReset" style="display:none" title="Снять блокировку AI">Сброс</button>
-    <button class="ai-btn" id="btnRefreshState" title="Обновить статус">↻</button>
-  </div>
+  <div class="ai-top">
+    <div class="ai-bar">
+      <span class="ai-pill" id="pillDb">DB</span>
+      <span class="ai-pill" id="pillGemini">AI</span>
+      <span class="ai-pill err" id="pillBlock" style="display:none">⊘ 0с</span>
+      <span class="ai-meta" id="aibotMeta"></span>
+      <button class="ai-btn ai-btn-warn" id="btnBlockReset" style="display:none" title="Снять блокировку AI">Сброс</button>
+      <button class="ai-btn" id="btnRefreshState" title="Обновить статус">↻</button>
+    </div>
 
-  <!-- ── Test ───────────────────────────────────────────────────────────── -->
-  <div class="ai-test-row">
-    <input id="botTestQ" type="text" placeholder="Проверить бота — задай вопрос...">
-    <button class="ai-btn-primary" id="btnBotTest">→</button>
+    <div class="ai-test-row">
+      <input id="botTestQ" type="text" placeholder="Проверить бота — задай вопрос...">
+      <button class="ai-btn-primary" id="btnBotTest">→</button>
+    </div>
   </div>
   <div id="botTestResult" class="ai-result" style="display:none"></div>
 
   <!-- ── Bot identity ───────────────────────────────────────────────────── -->
-  <div class="ai-block">
-    <div class="ai-label">Личность бота</div>
-    <textarea id="botIdentity" rows="4" placeholder="Как зовут бота, каким тоном отвечает, что умеет..."><?= htmlspecialchars($aibotIdentity) ?></textarea>
-    <div class="ai-save-row">
-      <button class="ai-btn-primary" id="btnIdentitySave">Сохранить</button>
-      <span class="ai-ts" id="identitySavedAt"></span>
+  <div class="ai-grid2">
+    <div class="ai-block">
+      <div class="ai-label">Личность бота</div>
+      <textarea id="botIdentity" rows="3" placeholder="Как зовут бота, каким тоном отвечает, что умеет..."><?= htmlspecialchars($aibotIdentity) ?></textarea>
+      <div class="ai-save-row">
+        <button class="ai-btn-primary" id="btnIdentitySave">Сохранить</button>
+        <span class="ai-ts" id="identitySavedAt"></span>
+      </div>
     </div>
-  </div>
 
-  <!-- ── Forbidden topics ───────────────────────────────────────────────── -->
-  <div class="ai-block">
-    <div class="ai-label">Запрещённые темы <span class="ai-hint">— каждая строка отдельно</span></div>
-    <textarea id="botForbidden" rows="3" placeholder="закупочные цены&#10;зарплаты сотрудников"><?= htmlspecialchars($aibotForbidden) ?></textarea>
-    <div class="ai-save-row">
-      <button class="ai-btn-primary" id="btnForbiddenSave">Сохранить</button>
-      <span class="ai-ts" id="forbiddenSavedAt"></span>
+    <div class="ai-block">
+      <div class="ai-label">Запрещённые темы <span class="ai-hint">— каждая строка отдельно</span></div>
+      <textarea id="botForbidden" rows="2" placeholder="закупочные цены&#10;зарплаты сотрудников"><?= htmlspecialchars($aibotForbidden) ?></textarea>
+      <div class="ai-save-row">
+        <button class="ai-btn-primary" id="btnForbiddenSave">Сохранить</button>
+        <span class="ai-ts" id="forbiddenSavedAt"></span>
+      </div>
     </div>
   </div>
 
@@ -162,13 +163,15 @@
 </div>
 
 <style>
-#ai-root { font-size: 13px; color: #222; }
+#ai-root { font-size: 13px; }
 
 /* Layout blocks */
-.ai-bar  { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.ai-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.ai-bar  { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .ai-meta { flex: 1; font-size: 11px; color: #888; }
 .ai-row  { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.ai-block { border-top: 1px solid #eee; padding: 10px 0 6px; }
+.ai-grid2 { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.ai-block { border-top: 1px solid #eee; padding: 8px 0 4px; }
 .ai-save-row { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
 .ai-ts   { font-size: 11px; color: #999; }
 .ai-muted { color: #999; }
@@ -197,19 +200,19 @@
 #ai-root input[type="text"],
 #ai-root input[type="date"],
 #ai-root select { padding: 4px 8px; border: 1px solid #d0d0d0; border-radius: 4px; font-size: 12px; font-family: inherit; }
-#ai-root textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d0d0d0; border-radius: 4px; font-family: inherit; font-size: 13px; resize: vertical; }
-.ai-test-row { display: flex; gap: 6px; margin-bottom: 6px; }
+#ai-root textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #d0d0d0; border-radius: 4px; font-family: inherit; font-size: 13px; resize: vertical; min-height: 68px; }
+.ai-test-row { display: flex; gap: 6px; flex: 1; min-width: min(520px, 100%); }
 .ai-test-row input { flex: 1; padding: 6px 10px; border: 1px solid #d0d0d0; border-radius: 4px; font-size: 13px; font-family: inherit; }
 .ai-url-input { width: 200px; }
 .ai-date { width: 130px; }
 
 /* Result */
-.ai-result { padding: 8px 12px; background: #f9f9f9; border-radius: 4px; font-size: 13px; margin-bottom: 10px; border: 1px solid #eee; }
+.ai-result { padding: 8px 12px; background: #f9f9f9; border-radius: 4px; font-size: 13px; margin-bottom: 8px; border: 1px solid #eee; }
 
 /* Table */
 .ai-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .ai-table th { padding: 4px 8px; background: #f5f5f5; text-align: left; font-size: 11px; font-weight: 600; color: #666; border-bottom: 1px solid #e8e8e8; }
-.ai-table td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.ai-table td { padding: 4px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
 .ai-table tr:last-child td { border-bottom: none; }
 .ai-table tr:hover td { background: #fafafa; }
 .ai-actions { white-space: nowrap; }
@@ -239,4 +242,10 @@
 .ai-field input, .ai-field textarea, .ai-field select { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid #d0d0d0; border-radius: 4px; font-family: inherit; font-size: 13px; }
 .ai-field textarea { resize: vertical; }
 .ai-err { color: #c00; font-size: 12px; margin-top: 6px; min-height: 16px; }
+
+@media (min-width: 980px) {
+  .ai-grid2 { grid-template-columns: 1fr 1fr; }
+  .ai-grid2 > .ai-block { border-top: none; border-left: 1px solid #eee; padding: 0 0 0 10px; }
+  .ai-grid2 > .ai-block:first-child { border-left: none; padding-left: 0; }
+}
 </style>
