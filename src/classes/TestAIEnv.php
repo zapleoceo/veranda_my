@@ -69,7 +69,11 @@ class TestAIConfig {
         if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) $apiTzName = $spotTzName;
         $cfg->spotTzName = $spotTzName;
         $cfg->apiTzName = $apiTzName;
-        $cfg->logDir = (string)($_ENV['LOG_DIR'] ?? ($root . '/data/logs'));
+        $logDir = (string)($_ENV['LOG_DIR'] ?? ($root . '/data/logs'));
+        $logDir = trim($logDir);
+        if ($logDir === '') $logDir = $root . '/data/logs';
+        if (!preg_match('#^/|^[A-Za-z]:[\\\\/]#', $logDir)) $logDir = $root . '/' . ltrim($logDir, '/\\');
+        $cfg->logDir = $logDir;
 
         $cfg->dbHost = (string)($_ENV['DB_HOST'] ?? 'localhost');
         $cfg->dbName = (string)($_ENV['DB_NAME'] ?? 'veranda_my');
