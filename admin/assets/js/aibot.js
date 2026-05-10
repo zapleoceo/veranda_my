@@ -25,6 +25,21 @@
   const mapMeta = $('mapMeta')
   const behaviorJson = $('behaviorJson')
   const behaviorMeta = $('behaviorMeta')
+  const behAgentEnable = $('behAgentEnable')
+  const behAgentAllowDailyGenerate = $('behAgentAllowDailyGenerate')
+  const behAgentMaxCalls = $('behAgentMaxCalls')
+  const behAgentPlanTemp = $('behAgentPlanTemp')
+  const behAgentFinalTemp = $('behAgentFinalTemp')
+  const behAgentFinalMaxTokens = $('behAgentFinalMaxTokens')
+  const behKbEnable = $('behKbEnable')
+  const behKbLiveEnable = $('behKbLiveEnable')
+  const behKbLiveMaxDocs = $('behKbLiveMaxDocs')
+  const behKbLiveMaxLen = $('behKbLiveMaxLen')
+  const behKbCheckTriggers = $('behKbCheckTriggers')
+  const behMenuEnable = $('behMenuEnable')
+  const behMenuUrl = $('behMenuUrl')
+  const behMenuMaxLen = $('behMenuMaxLen')
+  const behChatSystemAppend = $('behChatSystemAppend')
 
   const agentQuestion = $('agentQuestion')
   const agentChatId = $('agentChatId')
@@ -199,6 +214,133 @@
     await state()
   }
 
+  const behaviorParse = () => {
+    if (!behaviorJson) return {}
+    const raw = String(behaviorJson.value || '').trim()
+    if (!raw) return {}
+    try {
+      const j = JSON.parse(raw)
+      return j && typeof j === 'object' ? j : {}
+    } catch (e) {
+      return {}
+    }
+  }
+
+  const setVal = (el, v) => { if (el) el.value = String(v == null ? '' : v) }
+  const setChk = (el, v) => { if (el) el.checked = !!v }
+  const getInt = (el, def, min, max) => {
+    const n = parseInt(String(el && el.value != null ? el.value : ''), 10)
+    const x = Number.isFinite(n) ? n : def
+    return Math.max(min, Math.min(max, x))
+  }
+  const getFloat = (el, def, min, max) => {
+    const n = parseFloat(String(el && el.value != null ? el.value : ''), 10)
+    const x = Number.isFinite(n) ? n : def
+    return Math.max(min, Math.min(max, x))
+  }
+
+  const behaviorFillForm = () => {
+    const beh = behaviorParse()
+    const agent = (beh && beh.agent && typeof beh.agent === 'object') ? beh.agent : {}
+    const kb = (beh && beh.kb && typeof beh.kb === 'object') ? beh.kb : {}
+    const menu = (beh && beh.menu_service && typeof beh.menu_service === 'object') ? beh.menu_service : {}
+    const chat = (beh && beh.chat && typeof beh.chat === 'object') ? beh.chat : {}
+
+    setChk(behAgentEnable, agent.enable !== 0)
+    setChk(behAgentAllowDailyGenerate, !!agent.allow_daily_generate)
+    setVal(behAgentMaxCalls, agent.max_calls != null ? agent.max_calls : 3)
+    setVal(behAgentPlanTemp, agent.plan_temp != null ? agent.plan_temp : 0.1)
+    setVal(behAgentFinalTemp, agent.final_temp != null ? agent.final_temp : 0.35)
+    setVal(behAgentFinalMaxTokens, agent.final_max_tokens != null ? agent.final_max_tokens : 1200)
+
+    setChk(behKbEnable, kb.enable !== 0)
+    setChk(behKbLiveEnable, kb.live_fetch_enable !== 0)
+    setVal(behKbLiveMaxDocs, kb.live_fetch_max_docs != null ? kb.live_fetch_max_docs : 2)
+    setVal(behKbLiveMaxLen, kb.live_fetch_max_len != null ? kb.live_fetch_max_len : 60000)
+    const tr = Array.isArray(kb.check_triggers) ? kb.check_triggers : []
+    setVal(behKbCheckTriggers, tr.map(String).join('\n'))
+
+    setChk(behMenuEnable, menu.enable !== 0)
+    setVal(behMenuUrl, menu.menu_url != null ? menu.menu_url : 'https://veranda.my/links/menu.php')
+    setVal(behMenuMaxLen, menu.max_len != null ? menu.max_len : 60000)
+
+    setVal(behChatSystemAppend, chat.system_append != null ? chat.system_append : '')
+
+    const tools = Array.isArray(beh.tools) ? beh.tools : []
+    const byName = {}
+    tools.forEach((t) => {
+      if (!t || typeof t !== 'object') return
+      const name = String(t.name || '').trim()
+      if (!name) return
+      byName[name] = t
+    })
+    const toolNames = ['kb_search', 'kb_fetch_url', 'daily_get', 'daily_generate', 'menu_breakfasts', 'menu_most_expensive', 'menu_count_kitchen']
+    toolNames.forEach((name) => {
+      const enEl = document.querySelector(`input[data-tool-en="${name}"]`)
+      const dEl = document.querySelector(`input[data-tool-desc="${name}"]`)
+      const t = byName[name] || {}
+      if (enEl) enEl.checked = !!t.enabled
+      if (dEl) dEl.value = t.desc != null ? String(t.desc) : ''
+    })
+  }
+
+  const behaviorBuild = () => {
+    const beh0 = behaviorParse()
+    const beh = (beh0 && typeof beh0 === 'object') ? beh0 : {}
+
+    beh.agent = Object.assign({}, beh.agent || {}, {
+      enable: behAgentEnable ? (behAgentEnable.checked ? 1 : 0) : 1,
+      max_calls: getInt(behAgentMaxCalls, 3, 0, 6),
+      plan_temp: getFloat(behAgentPlanTemp, 0.1, 0, 1),
+      final_temp: getFloat(behAgentFinalTemp, 0.35, 0, 1),
+      final_max_tokens: getInt(behAgentFinalMaxTokens, 1200, 200, 2500),
+      allow_daily_generate: behAgentAllowDailyGenerate ? (behAgentAllowDailyGenerate.checked ? 1 : 0) : 0,
+    })
+
+    const triggers = String(behKbCheckTriggers && behKbCheckTriggers.value ? behKbCheckTriggers.value : '')
+      .split('\n')
+      .map((x) => String(x || '').trim())
+      .filter((x) => x)
+    beh.kb = Object.assign({}, beh.kb || {}, {
+      enable: behKbEnable ? (behKbEnable.checked ? 1 : 0) : 1,
+      live_fetch_enable: behKbLiveEnable ? (behKbLiveEnable.checked ? 1 : 0) : 1,
+      live_fetch_max_docs: getInt(behKbLiveMaxDocs, 2, 0, 6),
+      live_fetch_max_len: getInt(behKbLiveMaxLen, 60000, 500, 60000),
+      check_triggers: triggers,
+    })
+
+    const url = String(behMenuUrl && behMenuUrl.value ? behMenuUrl.value : '').trim()
+    beh.menu_service = Object.assign({}, beh.menu_service || {}, {
+      enable: behMenuEnable ? (behMenuEnable.checked ? 1 : 0) : 1,
+      menu_url: url,
+      max_len: getInt(behMenuMaxLen, 60000, 5000, 60000),
+    })
+
+    beh.chat = Object.assign({}, beh.chat || {}, {
+      system_append: String(behChatSystemAppend && behChatSystemAppend.value ? behChatSystemAppend.value : ''),
+    })
+
+    const toolNames = ['kb_search', 'kb_fetch_url', 'daily_get', 'daily_generate', 'menu_breakfasts', 'menu_most_expensive', 'menu_count_kitchen']
+    beh.tools = toolNames.map((name) => {
+      const enEl = document.querySelector(`input[data-tool-en="${name}"]`)
+      const dEl = document.querySelector(`input[data-tool-desc="${name}"]`)
+      return {
+        name,
+        enabled: enEl && enEl.checked ? 1 : 0,
+        desc: dEl && dEl.value ? String(dEl.value) : '',
+      }
+    })
+
+    return beh
+  }
+
+  const behaviorBuildAndSave = async () => {
+    if (!behaviorJson) return
+    const beh = behaviorBuild()
+    behaviorJson.value = JSON.stringify(beh, null, 2)
+    await behaviorSave()
+  }
+
   const agentAsk = async () => {
     const q = (agentQuestion && agentQuestion.value ? agentQuestion.value : '').trim()
     if (!q) return
@@ -369,7 +511,7 @@
   on('btnDailySysSave', 'click', dailySysSave)
   on('btnAnnounceSysSave', 'click', announceSysSave)
   on('btnMapSave', 'click', mapSave)
-  on('btnBehaviorSave', 'click', behaviorSave)
+  on('btnBehaviorSave', 'click', behaviorBuildAndSave)
   on('btnAgentAsk', 'click', agentAsk)
   on('btnCtxPreview', 'click', ctxPreview)
 
@@ -398,5 +540,6 @@
   }
 
   kbSetEditorVisible(false)
+  behaviorFillForm()
   state()
 })()

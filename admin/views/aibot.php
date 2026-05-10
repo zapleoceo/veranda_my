@@ -183,9 +183,128 @@
         <div class="small-muted" id="behaviorMeta" style="margin-top:6px;">
           <?= $aibotBehaviorUpdatedAt ? ('Обновлено: ' . htmlspecialchars($aibotBehaviorUpdatedAt)) : '' ?>
         </div>
-        <div class="form-group" style="margin-top:10px;">
-          <textarea id="behaviorJson" placeholder="JSON настройки поведения (детекторы, KB, daily injection)."><?= htmlspecialchars($aibotBehaviorJson) ?></textarea>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+          <div class="card" style="padding:14px;">
+            <div style="font-weight:800; font-size:13px;">Агент</div>
+            <div class="small-muted" style="margin-top:6px;">Планирует вызовы источников и формирует ответ по их результатам.</div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+              <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
+                <input id="behAgentEnable" type="checkbox" checked> Включен
+              </label>
+              <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
+                <input id="behAgentAllowDailyGenerate" type="checkbox"> Разрешить daily_generate
+              </label>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:10px;">
+              <div class="form-group" style="margin:0;">
+                <label for="behAgentMaxCalls">Макс. вызовов</label>
+                <input id="behAgentMaxCalls" type="number" min="0" max="6" step="1" value="3">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label for="behAgentPlanTemp">Plan temp</label>
+                <input id="behAgentPlanTemp" type="number" min="0" max="1" step="0.05" value="0.1">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label for="behAgentFinalTemp">Final temp</label>
+                <input id="behAgentFinalTemp" type="number" min="0" max="1" step="0.05" value="0.35">
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label for="behAgentFinalMaxTokens">Max tokens</label>
+              <input id="behAgentFinalMaxTokens" type="number" min="200" max="2500" step="50" value="1200">
+            </div>
+          </div>
+
+          <div class="card" style="padding:14px;">
+            <div style="font-weight:800; font-size:13px;">KB / Live</div>
+            <div class="small-muted" style="margin-top:6px;">Поиск по базе знаний и live-подтягивание URL (только разрешённые домены).</div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+              <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
+                <input id="behKbEnable" type="checkbox" checked> Включен KB
+              </label>
+              <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
+                <input id="behKbLiveEnable" type="checkbox" checked> Live fetch
+              </label>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+              <div class="form-group" style="margin:0;">
+                <label for="behKbLiveMaxDocs">Макс. live-доков</label>
+                <input id="behKbLiveMaxDocs" type="number" min="0" max="6" step="1" value="2">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label for="behKbLiveMaxLen">Макс. длина текста</label>
+                <input id="behKbLiveMaxLen" type="number" min="500" max="60000" step="500" value="60000">
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label for="behKbCheckTriggers">Фразы “проверь в KB” (по одной на строку)</label>
+              <textarea id="behKbCheckTriggers" style="min-height:110px;" placeholder="посмотри в базе знаний&#10;kb&#10;knowledge base"></textarea>
+            </div>
+          </div>
         </div>
+
+        <div class="card" style="padding:14px; margin-top:12px;">
+          <div style="font-weight:800; font-size:13px;">Инструменты (tools)</div>
+          <div class="small-muted" style="margin-top:6px;">Галочки определяют, какие источники доступны агенту. Описание помогает агенту выбирать правильно.</div>
+          <div class="table-wrap" style="margin-top:10px; overflow:auto;">
+            <table style="width:max-content; min-width:100%; border-collapse:collapse;">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding:8px 10px;">Tool</th>
+                  <th style="text-align:left; padding:8px 10px;">Enabled</th>
+                  <th style="text-align:left; padding:8px 10px;">Описание</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach (['kb_search','kb_fetch_url','daily_get','daily_generate','menu_breakfasts','menu_most_expensive','menu_count_kitchen'] as $t): ?>
+                  <tr data-tool="<?= htmlspecialchars($t) ?>">
+                    <td style="padding:8px 10px; white-space:nowrap;"><?= htmlspecialchars($t) ?></td>
+                    <td style="padding:8px 10px;"><input type="checkbox" data-tool-en="<?= htmlspecialchars($t) ?>"></td>
+                    <td style="padding:8px 10px; min-width:380px;">
+                      <input type="text" data-tool-desc="<?= htmlspecialchars($t) ?>" style="width:100%;" placeholder="Коротко: что делает и какие args">
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+          <div class="card" style="padding:14px;">
+            <div style="font-weight:800; font-size:13px;">Меню</div>
+            <div class="small-muted" style="margin-top:6px;">Источник меню для инструментов menu_*.</div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+              <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
+                <input id="behMenuEnable" type="checkbox" checked> Включен
+              </label>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label for="behMenuUrl">Menu URL</label>
+              <input id="behMenuUrl" type="url" placeholder="https://veranda.my/links/menu.php">
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+              <label for="behMenuMaxLen">Макс. длина fetch</label>
+              <input id="behMenuMaxLen" type="number" min="5000" max="60000" step="1000" value="60000">
+            </div>
+          </div>
+
+          <div class="card" style="padding:14px;">
+            <div style="font-weight:800; font-size:13px;">Chat policy (agent)</div>
+            <div class="small-muted" style="margin-top:6px;">Короткие правила: “используй tool_results / не выдумывай”.</div>
+            <div class="form-group" style="margin-top:10px;">
+              <label for="behChatSystemAppend">System append</label>
+              <textarea id="behChatSystemAppend" style="min-height:160px;" placeholder="Use payload.tool_results ..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <details style="margin-top:12px;">
+          <summary style="cursor:pointer; font-weight:800;">Advanced: JSON</summary>
+          <div class="form-group" style="margin-top:10px;">
+            <textarea id="behaviorJson" placeholder="JSON настройки поведения."><?= htmlspecialchars($aibotBehaviorJson) ?></textarea>
+          </div>
+        </details>
       </div>
     </div>
 
