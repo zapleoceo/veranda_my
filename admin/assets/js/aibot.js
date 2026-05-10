@@ -1,4 +1,4 @@
-/* aibot.js — simple admin UI for the AI bot */
+/* aibot.js — admin UI for the AI bot */
 (function () {
   'use strict';
 
@@ -31,11 +31,6 @@
     return (await fetch(api({ ajax: action, ...extra }))).json();
   }
 
-  function showOpsResult(html) {
-    const el = $('opsOutput');
-    if (el) el.innerHTML = html;
-  }
-
   function htmlEsc(s) {
     return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
@@ -48,7 +43,6 @@
     const d = await get('state', { date: date() });
     setPill('pillDb',     d.db_ok,          d.db_ok ? 'DB ✓' : 'DB ✗');
     setPill('pillGemini', d.gemini_can_call, d.gemini_can_call ? 'AI ✓' : 'AI ✗');
-    setPill('pillDaily',  d.daily_exists,    d.daily_exists ? 'Daily ✓' : 'Daily —');
     const meta = $('aibotMeta');
     if (meta) meta.textContent = d.gemini_model
       ? ('Модель: ' + d.gemini_model + '  ·  Сообщений в БД: ' + (d.raw_total || 0))
@@ -61,13 +55,21 @@
   $('aibotDate')?.addEventListener('change', loadState);
   loadState();
 
-  // ── Logs ─────────────────────────────────────────────────────────────────
+  // ── Bot test ──────────────────────────────────────────────────────────────
 
-  $('btnLogTail')?.addEventListener('click', async () => {
-    const d = await get('log_tail', { n: 120 });
-    const out = $('logOutput');
-    if (out) out.textContent = d.tail || '(пусто)';
-  });
+  async function runBotTest() {
+    const q = ($('botTestQ')?.value ?? '').trim();
+    if (!q) return;
+    const res = $('botTestResult');
+    if (res) { res.style.display = 'block'; res.innerHTML = '<em>Думает...</em>'; }
+    const d = await post('bot_test', { question: q });
+    if (res) res.innerHTML = d.ok
+      ? d.html
+      : ('<span style="color:#c00">Ошибка: ' + htmlEsc(d.error || '?') + '</span>');
+  }
+
+  $('btnBotTest')?.addEventListener('click', runBotTest);
+  $('botTestQ')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') runBotTest(); });
 
   // ── Bot identity ──────────────────────────────────────────────────────────
 
@@ -85,7 +87,24 @@
     else alert('Ошибка: ' + (d.error || '?'));
   });
 
+  // ── Logs ─────────────────────────────────────────────────────────────────
+
+  $('btnLogTail')?.addEventListener('click', async () => {
+    const out = $('logOutput');
+    if (!out) return;
+    out.style.display = 'block';
+    out.textContent = 'Загрузка...';
+    const d = await get('log_tail', { n: 100 });
+    out.textContent = d.tail || '(пусто)';
+    out.scrollTop = out.scrollHeight;
+  });
+
   // ── Operations ────────────────────────────────────────────────────────────
+
+  function showOpsResult(html) {
+    const el = $('opsOutput');
+    if (el) el.innerHTML = html;
+  }
 
   $('btnAnnounceGet')?.addEventListener('click', async () => {
     const d = await get('announce_get', { date: date() });
@@ -113,22 +132,6 @@
       : '<em>Ошибка генерации</em>');
   });
 
-  // ── Bot test ──────────────────────────────────────────────────────────────
-
-  async function runBotTest() {
-    const q = ($('botTestQ')?.value ?? '').trim();
-    if (!q) return;
-    const res = $('botTestResult');
-    if (res) { res.style.display = 'block'; res.innerHTML = '<em>Думает...</em>'; }
-    const d = await post('bot_test', { question: q });
-    if (res) res.innerHTML = d.ok
-      ? d.html
-      : ('<span style="color:#c00">Ошибка: ' + htmlEsc(d.error || '?') + '</span>');
-  }
-
-  $('btnBotTest')?.addEventListener('click', runBotTest);
-  $('botTestQ')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') runBotTest(); });
-
   // ── KB table ──────────────────────────────────────────────────────────────
 
   const ACCESS_LABEL = { public: 'Для всех', members: 'Только своим', never: 'Скрыто' };
@@ -139,10 +142,14 @@
     if (!d.ok) return;
     const tbody = $('kbBody');
     if (!tbody) return;
+    if (!d.items.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="padding:16px 10px; color:#999; text-align:center;">База знаний пуста. Добавьте документ или импортируйте страницу по URL.</td></tr>';
+      return;
+    }
     tbody.innerHTML = d.items.map(it => `
       <tr data-id="${it.id}">
         <td style="padding:8px 10px">${htmlEsc(it.title)}</td>
-        <td style="padding:8px 10px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
+        <td style="padding:8px 10px; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
           ${it.source_url ? `<a href="${htmlEsc(it.source_url)}" target="_blank" style="font-size:12px">🔗 URL</a>` : '<span class="small-muted">текст</span>'}
         </td>
         <td style="padding:8px 10px">
@@ -174,15 +181,15 @@
   // ── KB modal ──────────────────────────────────────────────────────────────
 
   function openKbModal(id) {
-    $('kbId').value          = id || '';
-    $('kbTitle').value       = '';
-    $('kbUrl').value         = '';
-    $('kbContent').value     = '';
-    $('kbAccess').value      = 'public';
-    $('kbActive').checked    = true;
+    $('kbId').value             = id || '';
+    $('kbTitle').value          = '';
+    $('kbUrl').value            = '';
+    $('kbContent').value        = '';
+    $('kbAccess').value         = 'public';
+    $('kbActive').checked       = true;
     $('kbModalErr').textContent = '';
     $('kbModalTitle').textContent = id ? 'Редактировать документ' : 'Новый документ';
-    $('kbModal').style.display = 'flex';
+    $('kbModal').style.display  = 'flex';
 
     if (id) {
       get('kb_get', { id }).then(d => {
@@ -225,13 +232,13 @@
   $('btnKbImport')?.addEventListener('click', async () => {
     const url = ($('kbImportUrl')?.value ?? '').trim();
     if (!url) return;
-    const btn = $('btnKbImport');
+    const btn  = $('btnKbImport');
     const prev = btn.textContent;
     btn.textContent = 'Загрузка...';
-    btn.disabled = true;
+    btn.disabled    = true;
     const d = await post('kb_import_url', { url });
     btn.textContent = prev;
-    btn.disabled = false;
+    btn.disabled    = false;
     if (d.ok) { $('kbImportUrl').value = ''; reloadKb(); }
     else alert('Ошибка импорта: ' + (d.error || '?'));
   });

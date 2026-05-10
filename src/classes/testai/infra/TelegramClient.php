@@ -63,34 +63,56 @@ class TelegramClient {
 
     public function sendMessage(string $chatId, string $html, ?int $replyToMessageId = null): bool {
         if ($this->token === '') return false;
-        $payload = [
-            'chat_id'                  => $chatId,
-            'text'                     => $html,
-            'parse_mode'               => 'HTML',
-            'disable_web_page_preview' => true,
-        ];
-        if ($replyToMessageId !== null && $replyToMessageId > 0) {
-            $payload['reply_to_message_id'] = $replyToMessageId;
-        }
 
-        $r  = $this->postJson('sendMessage', $payload);
-        $ok = is_array($r) && !empty($r['ok']);
+        $chunks = $this->splitMessage($html, 4000);
+        $allOk  = true;
 
-        if (!$ok && $this->log) {
-            $desc = is_array($r) ? (string)($r['description'] ?? '') : '';
-            $this->log->error('telegram_send_failed', [
-                'http_code'   => $this->lastHttpCode,
-                'error_code'  => is_array($r) ? (string)($r['error_code'] ?? '') : '',
-                'description' => $desc,
-            ]);
-            // retry without reply_to if original message was deleted
-            if ($replyToMessageId !== null && stripos($desc, 'message to be replied not found') !== false) {
-                $p2 = $payload;
-                unset($p2['reply_to_message_id']);
-                $r2 = $this->postJson('sendMessage', $p2);
-                return is_array($r2) && !empty($r2['ok']);
+        foreach ($chunks as $i => $chunk) {
+            $payload = [
+                'chat_id'                  => $chatId,
+                'text'                     => $chunk,
+                'parse_mode'               => 'HTML',
+                'disable_web_page_preview' => true,
+            ];
+            if ($i === 0 && $replyToMessageId !== null && $replyToMessageId > 0) {
+                $payload['reply_to_message_id'] = $replyToMessageId;
             }
+
+            $r  = $this->postJson('sendMessage', $payload);
+            $ok = is_array($r) && !empty($r['ok']);
+
+            if (!$ok && $this->log) {
+                $desc = is_array($r) ? (string)($r['description'] ?? '') : '';
+                $this->log->error('telegram_send_failed', [
+                    'http_code'   => $this->lastHttpCode,
+                    'error_code'  => is_array($r) ? (string)($r['error_code'] ?? '') : '',
+                    'description' => $desc,
+                ]);
+                // retry without reply_to if original message was deleted
+                if ($i === 0 && $replyToMessageId !== null && stripos($desc, 'message to be replied not found') !== false) {
+                    $p2 = $payload;
+                    unset($p2['reply_to_message_id']);
+                    $r2 = $this->postJson('sendMessage', $p2);
+                    $ok = is_array($r2) && !empty($r2['ok']);
+                }
+            }
+            if (!$ok) $allOk = false;
         }
-        return $ok;
+        return $allOk;
+    }
+
+    private function splitMessage(string $html, int $maxLen): array {
+        if (mb_strlen($html) <= $maxLen) return [$html];
+        $chunks = [];
+        while (mb_strlen($html) > $maxLen) {
+            $slice = mb_substr($html, 0, $maxLen);
+            // prefer to split at a newline
+            $pos = mb_strrpos($slice, "\n");
+            if ($pos === false || $pos < (int)($maxLen / 3)) $pos = $maxLen;
+            $chunks[] = trim(mb_substr($html, 0, $pos));
+            $html = trim(mb_substr($html, $pos));
+        }
+        if ($html !== '') $chunks[] = $html;
+        return array_values(array_filter($chunks));
     }
 }
