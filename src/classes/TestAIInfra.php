@@ -391,6 +391,7 @@ class TestAIHtmlSanitizer {
         $out = preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/i', '', $out) ?? $out;
         $out = preg_replace('/^\s*<html\b[^>]*>\s*<body\b[^>]*>\s*/i', '', $out) ?? $out;
         $out = preg_replace('/\s*<\/body>\s*<\/html>\s*$/i', '', $out) ?? $out;
+        $out = strip_tags($out, $allowed);
         return trim($out);
     }
 }
