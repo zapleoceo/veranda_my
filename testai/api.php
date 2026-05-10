@@ -16,9 +16,15 @@ $envFile = (string)($ctx['envFile'] ?? '');
 $envLoadedKeys = is_array($ctx['envLoadedKeys'] ?? null) ? array_keys($ctx['envLoadedKeys']) : [];
 $log = $ctx['log'] ?? null;
 
-header('Content-Type: application/json; charset=utf-8');
-
 $ajax = trim((string)($_GET['ajax'] ?? ''));
+$accept = (string)($_SERVER['HTTP_ACCEPT'] ?? '');
+$wantHtml = ((string)($_GET['format'] ?? '') === 'html')
+  || (strpos($accept, 'text/html') !== false && strpos($accept, 'application/json') === false);
+if ($ajax === 'gemini_usage' && $wantHtml) {
+  header('Content-Type: text/html; charset=utf-8');
+} else {
+  header('Content-Type: application/json; charset=utf-8');
+}
 $date = trim((string)($_GET['date'] ?? ''));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) $date = date('Y-m-d');
 
@@ -226,7 +232,7 @@ if ($ajax === 'gemini_usage') {
   $assumedLimitPerMin = is_array($latestRate) && (int)($latestRate['limit'] ?? 0) > 0 ? (int)$latestRate['limit'] : null;
   $remaining = is_int($assumedLimitPerMin) ? max(0, $assumedLimitPerMin - (int)$counts['last_60s']) : null;
 
-  $ok([
+  $payload = [
     'file' => $file,
     'size' => $size,
     'events_parsed' => $eventsParsed,
@@ -235,7 +241,86 @@ if ($ajax === 'gemini_usage') {
     'latest_rate_limit' => $latestRate,
     'assumed_limit_per_minute' => $assumedLimitPerMin,
     'assumed_remaining_this_minute' => $remaining,
-  ]);
+  ];
+
+  if ($wantHtml) {
+    $h = fn(string $s) => htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $fmtBytes = function (int $bytes): string {
+      if ($bytes < 1024) return $bytes . ' B';
+      if ($bytes < 1024 * 1024) return round($bytes / 1024, 1) . ' KB';
+      if ($bytes < 1024 * 1024 * 1024) return round($bytes / (1024 * 1024), 1) . ' MB';
+      return round($bytes / (1024 * 1024 * 1024), 2) . ' GB';
+    };
+
+    $nowTs = time();
+    $latestTs = is_array($latest) ? (string)($latest['ts'] ?? '') : '';
+    $latestAge = $latestTs !== '' ? max(0, $nowTs - (int)strtotime($latestTs)) : null;
+    $cooldown = is_array($latestRate) ? (float)($latestRate['retry_in_sec'] ?? 0) : 0.0;
+
+    echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+    echo '<title>Gemini usage</title>';
+    echo '<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:16px;line-height:1.35}';
+    echo 'table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:6px 8px;vertical-align:top}';
+    echo 'th{background:#f7f7f7;text-align:left}code{background:#f3f3f3;padding:2px 4px;border-radius:4px}';
+    echo '</style></head><body>';
+    echo '<h2>Gemini usage (server-side)</h2>';
+
+    echo '<table><tbody>';
+    echo '<tr><th>Log file</th><td><code>' . $h($file) . '</code></td></tr>';
+    echo '<tr><th>Log size</th><td>' . $h($fmtBytes((int)$size)) . '</td></tr>';
+    echo '<tr><th>Events parsed</th><td>' . (int)$eventsParsed . '</td></tr>';
+    echo '<tr><th>Assumed limit/min</th><td>' . ($assumedLimitPerMin === null ? '—' : (int)$assumedLimitPerMin) . '</td></tr>';
+    echo '<tr><th>Remaining this minute (assumed)</th><td>' . ($remaining === null ? '—' : (int)$remaining) . '</td></tr>';
+    echo '</tbody></table>';
+
+    echo '<h3>Counts</h3>';
+    echo '<table><tbody>';
+    echo '<tr><th>Last 60s</th><td>' . (int)($counts['last_60s'] ?? 0) . '</td></tr>';
+    echo '<tr><th>Last 10m</th><td>' . (int)($counts['last_10m'] ?? 0) . '</td></tr>';
+    echo '<tr><th>Last 60m</th><td>' . (int)($counts['last_60m'] ?? 0) . '</td></tr>';
+    echo '<tr><th>Last 24h</th><td>' . (int)($counts['last_24h'] ?? 0) . '</td></tr>';
+    echo '</tbody></table>';
+
+    $http = is_array($counts['http'] ?? null) ? $counts['http'] : [];
+    ksort($http);
+    echo '<h3>HTTP codes</h3>';
+    echo '<table><thead><tr><th>Code</th><th>Count</th></tr></thead><tbody>';
+    foreach ($http as $code => $cnt) {
+      echo '<tr><td>' . $h((string)$code) . '</td><td>' . (int)$cnt . '</td></tr>';
+    }
+    if (!$http) echo '<tr><td colspan="2">—</td></tr>';
+    echo '</tbody></table>';
+
+    $tags = is_array($counts['tag'] ?? null) ? $counts['tag'] : [];
+    arsort($tags);
+    echo '<h3>Tags</h3>';
+    echo '<table><thead><tr><th>Tag</th><th>Count</th></tr></thead><tbody>';
+    foreach ($tags as $tag => $cnt) {
+      echo '<tr><td>' . $h((string)$tag) . '</td><td>' . (int)$cnt . '</td></tr>';
+    }
+    if (!$tags) echo '<tr><td colspan="2">No tagged calls yet (wait for new requests)</td></tr>';
+    echo '</tbody></table>';
+
+    echo '<h3>Latest</h3>';
+    echo '<table><tbody>';
+    echo '<tr><th>Timestamp</th><td>' . $h($latestTs !== '' ? $latestTs : '—') . '</td></tr>';
+    echo '<tr><th>Age</th><td>' . ($latestAge === null ? '—' : ((int)$latestAge . ' sec')) . '</td></tr>';
+    echo '<tr><th>HTTP</th><td>' . (is_array($latest) ? (int)($latest['http_code'] ?? 0) : 0) . '</td></tr>';
+    echo '<tr><th>Retry in</th><td>' . ($cooldown > 0 ? ((int)ceil($cooldown) . ' sec') : '—') . '</td></tr>';
+    echo '</tbody></table>';
+
+    echo '<p><a href="?ajax=gemini_usage">JSON</a> · <a href="?ajax=log_tail&n=120">log_tail</a></p>';
+    echo '</body></html>';
+    exit;
+  }
+
+  $pretty = ((string)($_GET['pretty'] ?? '') === '1');
+  if ($pretty) {
+    print json_encode(array_merge(['ok' => true], $payload), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+  }
+
+  $ok($payload);
   exit;
 }
 
