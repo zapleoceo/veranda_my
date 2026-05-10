@@ -27,14 +27,26 @@
     const d = await get('state', { date: date() });
     const db = $('pillDb'), ai = $('pillGemini'), block = $('pillBlock'), br = $('btnBlockReset'), meta = $('aibotMeta'), lp = $('logFilePath');
     if (db)   { db.className = 'ai-pill ' + (d.db_ok ? 'ok' : 'err'); db.textContent = d.db_ok ? 'DB ✓' : 'DB ✗'; }
-    if (ai)   { ai.className = 'ai-pill ' + (d.gemini_can_call ? 'ok' : 'err'); ai.textContent = d.gemini_can_call ? 'AI ✓' : 'AI ✗'; }
     const rem = Math.max(0, parseInt(d.block_remaining || 0, 10) || 0);
+    if (ai) {
+      const can = !!d.gemini_can_call;
+      const ready = (parseInt(d.gemini_ready || 0, 10) || 0) === 1;
+      if (!can) { ai.className = 'ai-pill err'; ai.textContent = 'AI ✗'; }
+      else if (!ready || rem > 0) { ai.className = 'ai-pill err'; ai.textContent = 'AI ⏳'; }
+      else { ai.className = 'ai-pill ok'; ai.textContent = 'AI ✓'; }
+    }
     if (block) {
       if (rem > 0) { block.style.display = ''; block.textContent = '⊘ ' + rem + 'с'; }
       else block.style.display = 'none';
     }
     if (br) br.style.display = rem > 0 ? '' : 'none';
-    if (meta) meta.textContent = d.gemini_model ? d.gemini_model + ' · ' + (d.raw_total || 0) + ' сообщ.' : '';
+    if (meta) {
+      const parts = [];
+      if (d.gemini_model) parts.push(d.gemini_model);
+      parts.push((d.raw_total || 0) + ' сообщ.');
+      if (rem > 0) parts.push('cooldown ' + rem + 'с');
+      meta.textContent = parts.join(' · ');
+    }
     if (lp && d.log_file) lp.textContent = d.log_file;
   }
 
