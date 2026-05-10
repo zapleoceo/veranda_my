@@ -1,466 +1,184 @@
-<div class="card">
-  <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
-    <div class="form-group" style="min-width:220px;">
-      <label for="aibotDate">Дата</label>
-      <div class="small-muted">Фильтр для кеша анонса/саммари и статистики сообщений.</div>
-      <input id="aibotDate" type="date" value="<?= htmlspecialchars($aibotDate) ?>">
-    </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-      <button class="btn" type="button" id="btnState">Статус</button>
-      <button class="btn" type="button" id="btnLogTail">Логи</button>
-      <button class="btn" type="button" id="btnTour">Мануал</button>
-    </div>
+<div class="card" id="aibot-root">
+
+  <!-- ── Status bar ─────────────────────────────────────────────────────── -->
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <span class="pill" id="pillDb" title="База данных">DB</span>
+    <span class="pill" id="pillGemini" title="Gemini AI">AI</span>
+    <span class="pill" id="pillDaily" title="Daily summary за выбранную дату">Daily</span>
+    <span class="small-muted" id="aibotMeta"></span>
+    <button class="btn btn-sm" id="btnRefreshState" type="button">↻ Статус</button>
+    <input type="date" id="aibotDate" value="<?= htmlspecialchars($aibotDate) ?>" style="margin-left:auto;">
   </div>
 
+  <!-- ── Logs (collapsed) ───────────────────────────────────────────────── -->
   <details style="margin-top:12px;">
-    <summary style="cursor:pointer; font-weight:800;">Операции (кеш)</summary>
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-      <button class="btn" type="button" id="btnAnnounceGet">Анонс (кеш)</button>
-      <button class="btn" type="button" id="btnAnnounceGen">Сгенерировать анонс</button>
-      <button class="btn" type="button" id="btnDailyGet">Саммари (кеш)</button>
-      <button class="btn" type="button" id="btnDailyRun">Сгенерировать саммари</button>
+    <summary style="cursor:pointer; font-weight:600;">Логи</summary>
+    <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+      <button class="btn btn-sm" id="btnLogTail" type="button">Обновить</button>
+      <span class="small-muted" id="logFilePath"></span>
     </div>
+    <pre id="logOutput" style="margin-top:8px; max-height:320px; overflow:auto; font-size:11px; background:#f5f5f5; padding:10px; border-radius:6px; white-space:pre-wrap;"></pre>
   </details>
 
-  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; align-items:center;">
-    <span class="pill" id="pillDb">DB</span>
-    <span class="pill" id="pillGemini">Gemini</span>
-    <span class="pill" id="pillDaily">Daily</span>
-    <span class="small-muted" id="aibotMeta"></span>
+  <!-- ── Operations (collapsed) ────────────────────────────────────────── -->
+  <details style="margin-top:12px;">
+    <summary style="cursor:pointer; font-weight:600;">Операции (анонс / саммари)</summary>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+      <button class="btn btn-sm" id="btnAnnounceGet" type="button">Анонс (кеш)</button>
+      <button class="btn btn-sm" id="btnAnnounceGen" type="button">Сгенерировать анонс</button>
+      <button class="btn btn-sm" id="btnDailyGet" type="button">Саммари (кеш)</button>
+      <button class="btn btn-sm" id="btnDailyRun" type="button">Сгенерировать саммари</button>
+    </div>
+    <div id="opsOutput" style="margin-top:10px;"></div>
+  </details>
+
+  <hr style="margin:18px 0; border:none; border-top:1px solid #e0e0e0;">
+
+  <!-- ── Section 1: Who is the bot ─────────────────────────────────────── -->
+  <div style="margin-bottom:24px;">
+    <div style="font-weight:700; font-size:15px; margin-bottom:6px;">Кто такой бот</div>
+    <div class="small-muted" style="margin-bottom:8px;">Опиши бота в свободной форме: название, характер, как отвечает. Это главная инструкция для ИИ.</div>
+    <textarea id="botIdentity" rows="6" style="width:100%; box-sizing:border-box; font-family:inherit; font-size:13px; padding:10px; border:1px solid #ccc; border-radius:6px; resize:vertical;"><?= htmlspecialchars($aibotIdentity) ?></textarea>
+    <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+      <button class="btn" id="btnIdentitySave" type="button">Сохранить</button>
+      <span class="small-muted" id="identitySavedAt"></span>
+    </div>
   </div>
-  <div class="small-muted" style="margin-top:6px;">
-    DB — доступна ли база данных. Gemini — можно ли сейчас вызывать AI (лимиты/кулдаун). Daily — есть ли саммари за выбранную дату.
+
+  <!-- ── Section 2: Forbidden topics ──────────────────────────────────── -->
+  <div style="margin-bottom:24px;">
+    <div style="font-weight:700; font-size:15px; margin-bottom:6px;">Что нельзя говорить</div>
+    <div class="small-muted" style="margin-bottom:8px;">Каждая строка — тема, которую бот <b>никогда</b> не обсуждает и не раскрывает (закупочные цены, зарплаты и т.п.).</div>
+    <textarea id="botForbidden" rows="5" style="width:100%; box-sizing:border-box; font-family:inherit; font-size:13px; padding:10px; border:1px solid #ccc; border-radius:6px; resize:vertical;"><?= htmlspecialchars($aibotForbidden) ?></textarea>
+    <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+      <button class="btn" id="btnForbiddenSave" type="button">Сохранить</button>
+      <span class="small-muted" id="forbiddenSavedAt"></span>
+    </div>
   </div>
 
-  <div class="settings-grid" style="margin-top:18px;">
-    <div class="card" style="padding:18px;">
-      <details id="blkMatrix" open>
-        <summary style="cursor:pointer; font-weight:900;">Инструкции: матрица применений</summary>
-        <div class="small-muted" style="margin-top:6px;">Галочки определяют, какие блоки инструкций попадут в system для chat/daily/announce.</div>
-        <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:10px;">
-          <div class="small-muted" id="mapMeta">
-            <?= $aibotInstrMapUpdatedAt ? ('Обновлено: ' . htmlspecialchars($aibotInstrMapUpdatedAt)) : '' ?>
-          </div>
-          <button class="btn" type="button" id="btnMapSave">Сохранить галочки</button>
-        </div>
+  <hr style="margin:18px 0; border:none; border-top:1px solid #e0e0e0;">
 
-        <div class="table-wrap" style="margin-top:10px; overflow:auto;">
-          <table style="width:max-content; min-width:100%; border-collapse:collapse;">
-            <thead>
-              <tr>
-                <th style="text-align:left; padding:8px 10px;">Блок</th>
-                <th style="text-align:left; padding:8px 10px;">Чат (Telegram)</th>
-                <th style="text-align:left; padding:8px 10px;">Саммари (JSON)</th>
-                <th style="text-align:left; padding:8px 10px;">Анонс (сайт HTML)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="padding:8px 10px; white-space:nowrap;">Common prompt</td>
-                <td style="padding:8px 10px;"><input data-map="chat" data-block="common_prompt" type="checkbox" <?= !empty($aibotInstrMap['chat']['common_prompt']) ? 'checked' : '' ?>></td>
-                <td style="padding:8px 10px;"><input data-map="daily" data-block="common_prompt" type="checkbox" <?= !empty($aibotInstrMap['daily']['common_prompt']) ? 'checked' : '' ?>></td>
-                <td style="padding:8px 10px;"><input data-map="announce" data-block="common_prompt" type="checkbox" <?= !empty($aibotInstrMap['announce']['common_prompt']) ? 'checked' : '' ?>></td>
-              </tr>
-              <tr>
-                <td style="padding:8px 10px; white-space:nowrap;">System base</td>
-                <td style="padding:8px 10px;"><input data-map="chat" data-block="system_base" type="checkbox" <?= !empty($aibotInstrMap['chat']['system_base']) ? 'checked' : '' ?>></td>
-                <td style="padding:8px 10px;"><input data-map="daily" data-block="system_base" type="checkbox" <?= !empty($aibotInstrMap['daily']['system_base']) ? 'checked' : '' ?>></td>
-                <td style="padding:8px 10px;"><input data-map="announce" data-block="system_base" type="checkbox" <?= !empty($aibotInstrMap['announce']['system_base']) ? 'checked' : '' ?>></td>
-              </tr>
-              <tr>
-                <td style="padding:8px 10px; white-space:nowrap;">System chat</td>
-                <td style="padding:8px 10px;"><input data-map="chat" data-block="system_chat" type="checkbox" <?= !empty($aibotInstrMap['chat']['system_chat']) ? 'checked' : '' ?>></td>
-                <td style="padding:8px 10px;"><input data-map="daily" data-block="system_chat" type="checkbox" <?= !empty($aibotInstrMap['daily']['system_chat']) ? 'checked' : '' ?>></td>
-                <td style="padding:8px 10px;"><input data-map="announce" data-block="system_chat" type="checkbox" <?= !empty($aibotInstrMap['announce']['system_chat']) ? 'checked' : '' ?>></td>
-              </tr>
-              <tr>
-                <td style="padding:8px 10px; white-space:nowrap;">System daily</td>
-                <td style="padding:8px 10px;"><input data-map="chat" data-block="system_daily" type="checkbox" <?= !empty($aibotInstrMap['chat']['system_daily']) ? 'checked' : '' ?>></td>
-                <td style="padding:8px 10px;"><input data-map="daily" data-block="system_daily" type="checkbox" <?= !empty($aibotInstrMap['daily']['system_daily']) ? 'checked' : '' ?>></td>
-                <td style="padding:8px 10px;"><input data-map="announce" data-block="system_daily" type="checkbox" <?= !empty($aibotInstrMap['announce']['system_daily']) ? 'checked' : '' ?>></td>
-              </tr>
-              <tr>
-                <td style="padding:8px 10px; white-space:nowrap;">System announce</td>
-                <td style="padding:8px 10px;"><input data-map="chat" data-block="system_announce" type="checkbox" <?= !empty($aibotInstrMap['chat']['system_announce']) ? 'checked' : '' ?>></td>
-                <td style="padding:8px 10px;"><input data-map="daily" data-block="system_announce" type="checkbox" <?= !empty($aibotInstrMap['daily']['system_announce']) ? 'checked' : '' ?>></td>
-                <td style="padding:8px 10px;"><input data-map="announce" data-block="system_announce" type="checkbox" <?= !empty($aibotInstrMap['announce']['system_announce']) ? 'checked' : '' ?>></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </details>
-
-      <details id="blkCommon" style="margin-top:12px;" open>
-        <summary style="cursor:pointer; font-weight:900;">Common prompt</summary>
-        <div class="small-muted" style="margin-top:6px;">Факты о ресторане, стиль и постоянные правила. Это попадает во все режимы, если стоит галочка в матрице.</div>
-        <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:10px;">
-          <div class="small-muted" id="promptMeta"></div>
-          <button class="btn" type="button" id="btnPromptSave">Сохранить common</button>
-        </div>
-        <div class="form-group" style="margin-top:10px;">
-          <textarea id="promptText" placeholder="Факты/правила ресторана, стиль, ссылки."><?= htmlspecialchars($aibotPrompt) ?></textarea>
-        </div>
-      </details>
-
-      <details id="blkSystemBase" style="margin-top:12px;">
-        <summary style="cursor:pointer; font-weight:900;">System base</summary>
-        <div class="small-muted" style="margin-top:6px;">Общие правила поведения (не выдумывать, уточнять, тон, ограничения).</div>
-        <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:10px;">
-          <div class="small-muted" id="baseMeta"></div>
-          <button class="btn" type="button" id="btnBaseSave">Сохранить</button>
-        </div>
-        <div class="form-group" style="margin-top:10px;">
-          <textarea id="baseText" placeholder="Общие правила поведения, политика, точность."><?= htmlspecialchars($aibotSystemBase) ?></textarea>
-        </div>
-      </details>
-
-      <details id="blkSystemChat" style="margin-top:12px;">
-        <summary style="cursor:pointer; font-weight:900;">System chat (Telegram)</summary>
-        <div class="small-muted" style="margin-top:6px;">Правила форматирования ответа в Telegram и язык ответов в чате.</div>
-        <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-top:10px;">
-          <div class="form-group" style="min-width:160px; margin:0;">
-            <label for="langChat">Язык</label>
-            <div class="small-muted">auto — по языку вопроса; ru/en — принудительно.</div>
-            <select id="langChat">
-              <option value="auto" <?= ($aibotLangChat === 'auto' ? 'selected' : '') ?>>auto</option>
-              <option value="ru" <?= ($aibotLangChat === 'ru' ? 'selected' : '') ?>>ru</option>
-              <option value="en" <?= ($aibotLangChat === 'en' ? 'selected' : '') ?>>en</option>
-            </select>
-          </div>
-          <div class="small-muted" id="chatMeta" style="margin:0;"></div>
-          <button class="btn" type="button" id="btnChatSave">Сохранить</button>
-        </div>
-        <div class="form-group" style="margin-top:10px;">
-          <label for="chatText">Текст инструкции</label>
-          <div class="small-muted">Здесь обычно: допустимые HTML-теги, запреты (например, без br), стиль ответа.</div>
-          <textarea id="chatText" placeholder="Формат Telegram HTML, ограничения тегов."><?= htmlspecialchars($aibotSystemChat) ?></textarea>
-        </div>
-      </details>
-
-      <details id="blkSystemDaily" style="margin-top:12px;">
-        <summary style="cursor:pointer; font-weight:900;">System daily (саммари JSON)</summary>
-        <div class="small-muted" style="margin-top:6px;">Инструкция для генерации daily summary: строгий JSON контракт, правила извлечения событий.</div>
-        <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-top:10px;">
-          <div class="form-group" style="min-width:160px; margin:0;">
-            <label for="langDaily">Язык</label>
-            <div class="small-muted">ru — саммари всегда на русском.</div>
-            <select id="langDaily">
-              <option value="auto" <?= ($aibotLangDaily === 'auto' ? 'selected' : '') ?>>auto</option>
-              <option value="ru" <?= ($aibotLangDaily === 'ru' ? 'selected' : '') ?>>ru</option>
-              <option value="en" <?= ($aibotLangDaily === 'en' ? 'selected' : '') ?>>en</option>
-            </select>
-          </div>
-          <div class="small-muted" id="dailySysMeta" style="margin:0;"></div>
-          <button class="btn" type="button" id="btnDailySysSave">Сохранить</button>
-        </div>
-        <div class="form-group" style="margin-top:10px;">
-          <textarea id="dailySysText" placeholder="JSON контракт и правила извлечения событий."><?= htmlspecialchars($aibotSystemDaily) ?></textarea>
-        </div>
-      </details>
-
-      <details id="blkSystemAnnounce" style="margin-top:12px;">
-        <summary style="cursor:pointer; font-weight:900;">System announce (анонс сайта)</summary>
-        <div class="small-muted" style="margin-top:6px;">Инструкция для HTML-анонса (для сайта): допустимые теги, стиль, структура.</div>
-        <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-top:10px;">
-          <div class="form-group" style="min-width:160px; margin:0;">
-            <label for="langAnnounce">Язык</label>
-            <div class="small-muted">ru — анонс всегда на русском.</div>
-            <select id="langAnnounce">
-              <option value="auto" <?= ($aibotLangAnnounce === 'auto' ? 'selected' : '') ?>>auto</option>
-              <option value="ru" <?= ($aibotLangAnnounce === 'ru' ? 'selected' : '') ?>>ru</option>
-              <option value="en" <?= ($aibotLangAnnounce === 'en' ? 'selected' : '') ?>>en</option>
-            </select>
-          </div>
-          <div class="small-muted" id="announceSysMeta" style="margin:0;"></div>
-          <button class="btn" type="button" id="btnAnnounceSysSave">Сохранить</button>
-        </div>
-        <div class="form-group" style="margin-top:10px;">
-          <textarea id="announceSysText" placeholder="HTML для сайта (допустимые теги)."><?= htmlspecialchars($aibotSystemAnnounce) ?></textarea>
-        </div>
-      </details>
-
-      <details id="blkBehavior" style="margin-top:12px;" open>
-      <summary style="cursor:pointer; font-weight:900;">Поведение агента и источников</summary>
-      <div class="small-muted" style="margin-top:6px;">Это конфигурация того, какие источники доступны ИИ и как он должен ими пользоваться.</div>
-
-      <div class="card" style="padding:14px; margin-top:10px;">
-        <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
-          <div style="font-weight:800; font-size:13px;">Поведение (без хардкода)</div>
-          <button class="btn" type="button" id="btnBehaviorSave">Сохранить</button>
-        </div>
-        <div class="small-muted" id="behaviorMeta" style="margin-top:6px;">
-          <?= $aibotBehaviorUpdatedAt ? ('Обновлено: ' . htmlspecialchars($aibotBehaviorUpdatedAt)) : '' ?>
-        </div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
-          <div class="card" style="padding:14px;">
-            <div style="font-weight:800; font-size:13px;">Агент</div>
-            <div class="small-muted" style="margin-top:6px;">Планирует вызовы источников и формирует ответ по их результатам.</div>
-            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:10px;">
-              <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
-                <input id="behAgentEnable" type="checkbox" checked> Включен
-              </label>
-              <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
-                <input id="behAgentAllowDailyGenerate" type="checkbox"> Разрешить daily_generate
-              </label>
-            </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:10px;">
-              <div class="form-group" style="margin:0;">
-                <label for="behAgentMaxCalls">Макс. вызовов</label>
-                <input id="behAgentMaxCalls" type="number" min="0" max="6" step="1" value="3">
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label for="behAgentPlanTemp">Plan temp</label>
-                <input id="behAgentPlanTemp" type="number" min="0" max="1" step="0.05" value="0.1">
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label for="behAgentFinalTemp">Final temp</label>
-                <input id="behAgentFinalTemp" type="number" min="0" max="1" step="0.05" value="0.35">
-              </div>
-            </div>
-            <div class="form-group" style="margin-top:10px;">
-              <label for="behAgentFinalMaxTokens">Max tokens</label>
-              <input id="behAgentFinalMaxTokens" type="number" min="200" max="2500" step="50" value="1200">
-            </div>
-          </div>
-
-          <div class="card" style="padding:14px;">
-            <div style="font-weight:800; font-size:13px;">KB / Live</div>
-            <div class="small-muted" style="margin-top:6px;">Поиск по базе знаний и live-подтягивание URL (только разрешённые домены).</div>
-            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:10px;">
-              <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
-                <input id="behKbEnable" type="checkbox" checked> Включен KB
-              </label>
-              <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
-                <input id="behKbLiveEnable" type="checkbox" checked> Live fetch
-              </label>
-            </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
-              <div class="form-group" style="margin:0;">
-                <label for="behKbLiveMaxDocs">Макс. live-доков</label>
-                <input id="behKbLiveMaxDocs" type="number" min="0" max="6" step="1" value="2">
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label for="behKbLiveMaxLen">Макс. длина текста</label>
-                <input id="behKbLiveMaxLen" type="number" min="500" max="60000" step="500" value="60000">
-              </div>
-            </div>
-            <div class="form-group" style="margin-top:10px;">
-              <label for="behKbCheckTriggers">Фразы “проверь в KB” (по одной на строку)</label>
-              <textarea id="behKbCheckTriggers" style="min-height:110px;" placeholder="посмотри в базе знаний&#10;kb&#10;knowledge base"></textarea>
-            </div>
-          </div>
-        </div>
-
-        <div class="card" style="padding:14px; margin-top:12px;">
-          <div style="font-weight:800; font-size:13px;">Инструменты (tools)</div>
-          <div class="small-muted" style="margin-top:6px;">Галочки определяют, какие источники доступны агенту. Описание помогает агенту выбирать правильно.</div>
-          <div class="table-wrap" style="margin-top:10px; overflow:auto;">
-            <table style="width:max-content; min-width:100%; border-collapse:collapse;">
-              <thead>
-                <tr>
-                  <th style="text-align:left; padding:8px 10px;">Tool</th>
-                  <th style="text-align:left; padding:8px 10px;">Enabled</th>
-                  <th style="text-align:left; padding:8px 10px;">Описание</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach (['kb_search','kb_fetch_url','daily_get','daily_generate','menu_breakfasts','menu_most_expensive','menu_count_kitchen'] as $t): ?>
-                  <tr data-tool="<?= htmlspecialchars($t) ?>">
-                    <td style="padding:8px 10px; white-space:nowrap;"><?= htmlspecialchars($t) ?></td>
-                    <td style="padding:8px 10px;"><input type="checkbox" data-tool-en="<?= htmlspecialchars($t) ?>"></td>
-                    <td style="padding:8px 10px; min-width:380px;">
-                      <input type="text" data-tool-desc="<?= htmlspecialchars($t) ?>" style="width:100%;" placeholder="Коротко: что делает и какие args">
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
-          <div class="card" style="padding:14px;">
-            <div style="font-weight:800; font-size:13px;">Меню</div>
-            <div class="small-muted" style="margin-top:6px;">Источник меню для инструментов menu_*.</div>
-            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:10px;">
-              <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
-                <input id="behMenuEnable" type="checkbox" checked> Включен
-              </label>
-            </div>
-            <div class="form-group" style="margin-top:10px;">
-              <label for="behMenuUrl">Menu URL</label>
-              <input id="behMenuUrl" type="url" placeholder="https://veranda.my/links/menu.php">
-            </div>
-            <div class="form-group" style="margin-top:10px;">
-              <label for="behMenuMaxLen">Макс. длина fetch</label>
-              <input id="behMenuMaxLen" type="number" min="5000" max="60000" step="1000" value="60000">
-            </div>
-          </div>
-
-          <div class="card" style="padding:14px;">
-            <div style="font-weight:800; font-size:13px;">Chat policy (agent)</div>
-            <div class="small-muted" style="margin-top:6px;">Короткие правила: “используй tool_results / не выдумывай”.</div>
-            <div class="form-group" style="margin-top:10px;">
-              <label for="behChatSystemAppend">System append</label>
-              <textarea id="behChatSystemAppend" style="min-height:160px;" placeholder="Use payload.tool_results ..."></textarea>
-            </div>
-          </div>
-        </div>
-
-        <details style="margin-top:12px;">
-          <summary style="cursor:pointer; font-weight:800;">Advanced: JSON</summary>
-          <div class="form-group" style="margin-top:10px;">
-            <textarea id="behaviorJson" placeholder="JSON настройки поведения."><?= htmlspecialchars($aibotBehaviorJson) ?></textarea>
-          </div>
-        </details>
+  <!-- ── Section 3: Knowledge base ─────────────────────────────────────── -->
+  <div style="margin-bottom:24px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+      <div style="font-weight:700; font-size:15px;">База знаний</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <input id="kbImportUrl" type="text" placeholder="https://veranda.my/..." style="width:260px; padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
+        <button class="btn btn-sm" id="btnKbImport" type="button">Импорт URL</button>
+        <button class="btn" id="btnKbAdd" type="button">+ Добавить</button>
       </div>
-      </details>
     </div>
 
-    <details id="blkKb" class="card" style="padding:18px;" open>
-      <summary style="cursor:pointer; font-weight:900;">База знаний (KB)</summary>
-      <div class="small-muted" style="margin-top:6px;">Редактируемые записи для ответов бота. Если у записи пустой текст, но указан URL, контент может подтягиваться live.</div>
+    <div class="small-muted" style="margin-bottom:10px;">
+      <b>Для всех</b> — отвечает любому. <b>Только своим</b> — только авторизованным чатам. <b>Скрыто</b> — хранится, боту недоступно.
+      <br>Если заполнен только URL — бот подгружает страницу при каждом релевантном запросе (кеш 2 ч).
+    </div>
 
-      <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px;">
-        <div class="small-muted">Список и редактор</div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn" type="button" id="btnKbNew">Новая запись</button>
-          <button class="btn" type="button" id="btnKbRefresh">Обновить</button>
-        </div>
-      </div>
+    <!-- KB table -->
+    <div class="table-wrap" style="overflow:auto;">
+      <table id="kbTable" style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="background:#f5f5f5; text-align:left;">
+            <th style="padding:8px 10px;">Название</th>
+            <th style="padding:8px 10px;">Источник</th>
+            <th style="padding:8px 10px;">Доступ</th>
+            <th style="padding:8px 10px;">Статус</th>
+            <th style="padding:8px 10px;"></th>
+          </tr>
+        </thead>
+        <tbody id="kbBody">
+          <?php foreach ($aibotKbItems as $ki): ?>
+          <tr data-id="<?= (int)$ki['id'] ?>">
+            <td style="padding:8px 10px;"><?= htmlspecialchars((string)($ki['title'] ?? '')) ?></td>
+            <td style="padding:8px 10px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              <?php if (!empty($ki['source_url'])): ?>
+                <a href="<?= htmlspecialchars((string)$ki['source_url']) ?>" target="_blank" style="font-size:12px;">🔗 URL</a>
+              <?php else: ?>
+                <span class="small-muted">текст</span>
+              <?php endif; ?>
+            </td>
+            <td style="padding:8px 10px;">
+              <span class="pill pill-<?= htmlspecialchars((string)($ki['access'] ?? 'public')) ?>"><?= match((string)($ki['access'] ?? 'public')) { 'members' => 'Только своим', 'never' => 'Скрыто', default => 'Для всех' } ?></span>
+            </td>
+            <td style="padding:8px 10px;">
+              <?= $ki['is_active'] ? '<span style="color:#2e7d32">●</span>' : '<span style="color:#999">○</span>' ?>
+            </td>
+            <td style="padding:8px 10px; white-space:nowrap;">
+              <button class="btn btn-sm btn-kb-edit" type="button" data-id="<?= (int)$ki['id'] ?>">✏</button>
+              <button class="btn btn-sm btn-kb-del" type="button" data-id="<?= (int)$ki['id'] ?>" style="color:#c00;">✕</button>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; align-items:flex-end;">
-        <div class="form-group" style="flex:1; min-width:260px;">
-          <label for="kbImportUrl">Импорт URL (только veranda.my)</label>
-          <div class="small-muted">Создаёт запись KB из страницы и кладёт текст в поле “Текст”.</div>
-          <input id="kbImportUrl" type="url" placeholder="https://veranda.my/links/menu.php">
-        </div>
-        <button class="btn" type="button" id="btnKbImport">Импортировать</button>
-      </div>
+  <hr style="margin:18px 0; border:none; border-top:1px solid #e0e0e0;">
 
-      <div class="table-wrap" style="margin-top:12px; overflow:auto;">
-        <table style="width:max-content; min-width:100%; border-collapse:collapse;">
-          <thead>
-            <tr>
-              <th style="text-align:left; padding:8px 10px;">ID</th>
-              <th style="text-align:left; padding:8px 10px;">Заголовок</th>
-              <th style="text-align:left; padding:8px 10px;">Теги</th>
-              <th style="text-align:left; padding:8px 10px;">URL</th>
-              <th style="text-align:left; padding:8px 10px;">Updated</th>
-              <th style="text-align:left; padding:8px 10px;"></th>
-            </tr>
-          </thead>
-          <tbody id="kbTbody">
-            <?php foreach ($aibotKbItems as $it): ?>
-              <tr data-id="<?= (int)($it['id'] ?? 0) ?>">
-                <td style="padding:8px 10px; white-space:nowrap;"><?= (int)($it['id'] ?? 0) ?></td>
-                <td style="padding:8px 10px;"><?= htmlspecialchars((string)($it['title'] ?? '')) ?></td>
-                <td style="padding:8px 10px; white-space:nowrap;"><?= htmlspecialchars((string)($it['tags'] ?? '')) ?></td>
-                <td style="padding:8px 10px;"><?= htmlspecialchars((string)($it['source_url'] ?? '')) ?></td>
-                <td style="padding:8px 10px; white-space:nowrap;"><?= htmlspecialchars((string)($it['updated_at'] ?? '')) ?></td>
-                <td style="padding:8px 10px; white-space:nowrap;">
-                  <button class="btn" type="button" data-act="edit">Edit</button>
-                  <button class="btn btn-danger" type="button" data-act="del">Del</button>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-          </tbody>
-        </table>
-      </div>
+  <!-- ── Section 4: Test the bot ───────────────────────────────────────── -->
+  <div>
+    <div style="font-weight:700; font-size:15px; margin-bottom:8px;">Проверить бота</div>
+    <div style="display:flex; gap:8px;">
+      <input id="botTestQ" type="text" placeholder="Задай вопрос боту..." style="flex:1; padding:8px 12px; border:1px solid #ccc; border-radius:6px; font-size:13px;">
+      <button class="btn" id="btnBotTest" type="button">Спросить</button>
+    </div>
+    <div id="botTestResult" style="margin-top:12px; padding:12px; background:#f9f9f9; border-radius:6px; min-height:40px; font-size:13px; display:none;"></div>
+  </div>
 
-      <div class="card" style="padding:16px; margin-top:14px;" id="kbEditor" hidden>
-        <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
-          <div style="font-weight:900;">Редактор</div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button class="btn" type="button" id="btnKbSave">Сохранить</button>
-            <button class="btn" type="button" id="btnKbCancel">Закрыть</button>
-          </div>
-        </div>
-        <input type="hidden" id="kbId" value="">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
-          <div class="form-group">
-            <label for="kbTitle">Заголовок</label>
-            <div class="small-muted">Короткое имя документа (например: “Меню”, “Контакты”, “Правила бронирования”).</div>
-            <input id="kbTitle" type="text">
-          </div>
-          <div class="form-group">
-            <label for="kbTags">Теги</label>
-            <div class="small-muted">Через запятую: помогает поиску (например: меню, завтраки, бар).</div>
-            <input id="kbTags" type="text" placeholder="menu, breakfast, rules">
-          </div>
-        </div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px; align-items:end;">
-          <div class="form-group">
-            <label for="kbSourceUrl">Source URL</label>
-            <div class="small-muted">Если “Текст” пустой, может использоваться как live-источник.</div>
-            <input id="kbSourceUrl" type="url" placeholder="https://veranda.my/links/...">
-          </div>
-          <div class="form-group" style="display:flex; gap:10px; align-items:center;">
-            <label style="margin:0; font-size:12px; font-weight:800; color:var(--muted, rgba(255,255,255,0.62));">
-              <input id="kbIsActive" type="checkbox" checked> Активно
-            </label>
-          </div>
-        </div>
-        <div class="form-group" style="margin-top:12px;">
-          <label for="kbContent">Текст</label>
-          <div class="small-muted">Если заполнен — это “стабильный” источник. Если пусто + есть URL — будет подтягиваться live (если включено).</div>
-          <textarea id="kbContent" style="min-height:220px;"></textarea>
-        </div>
-        <div class="small-muted" id="kbEditorMeta"></div>
-      </div>
-    </details>
+</div>
 
-    <details id="blkTest" class="card" style="padding:18px;" open>
-      <summary style="cursor:pointer; font-weight:900;">Тест бота</summary>
-      <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px;">
-        <div class="small-muted">Тестирует агентный режим и показывает trace вызовов.</div>
-        <button class="btn" type="button" id="btnAgentAsk">Спросить</button>
-      </div>
-      <div class="small-muted" style="margin-top:6px;">
-        Показывает ответ и trace: какие источники были вызваны и что вернули.
-      </div>
-      <div class="form-group" style="margin-top:10px;">
-        <label for="agentQuestion">Вопрос</label>
-        <div class="small-muted">Любой вопрос, как в Telegram.</div>
-        <input id="agentQuestion" type="text" placeholder="Например: дай анонс на сегодня">
-      </div>
-      <div class="form-group" style="margin-top:10px;">
-        <label for="agentChatId">Chat ID (необязательно, чтобы подтянуть историю)</label>
-        <div class="small-muted">Если указать chat id, подмешается история сообщений из DB.</div>
-        <input id="agentChatId" type="text" placeholder="169510539">
-      </div>
-      <div class="small-muted" id="agentMeta" style="margin-top:8px;"></div>
+<!-- ── KB editor modal ────────────────────────────────────────────────────── -->
+<div id="kbModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:10px; padding:24px; width:min(600px,95vw); max-height:90vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,.2);">
+    <div style="font-weight:700; font-size:16px; margin-bottom:16px;" id="kbModalTitle">Документ базы знаний</div>
 
-      <details style="margin-top:12px;">
-        <summary style="cursor:pointer; font-weight:800;">Отладка: показать контекст</summary>
-        <div class="small-muted" style="margin-top:6px;">Показывает system/payload до вызова агента (для дебага).</div>
-        <div class="form-group" style="margin-top:10px;">
-          <label for="ctxQuestion">Вопрос</label>
-          <input id="ctxQuestion" type="text" placeholder="Например: какое сегодня меню?">
-        </div>
-        <div class="form-group" style="margin-top:10px;">
-          <label for="ctxMode">Режим</label>
-          <select id="ctxMode">
-            <option value="chat">chat</option>
-            <option value="daily">daily</option>
-            <option value="announce">announce</option>
-          </select>
-        </div>
-        <div class="form-group" style="margin-top:10px;">
-          <label for="ctxChatId">Chat ID (необязательно, чтобы увидеть историю)</label>
-          <input id="ctxChatId" type="text" placeholder="169510539">
-        </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-          <button class="btn" type="button" id="btnCtxPreview">Показать контекст</button>
-        </div>
-        <div class="small-muted" id="ctxMeta" style="margin-top:8px;"></div>
-      </details>
-    </details>
+    <input type="hidden" id="kbId">
 
-    <details id="blkOutput" class="card" style="padding:18px;" open>
-      <summary style="cursor:pointer; font-weight:900;">Вывод</summary>
-      <div class="small-muted" id="outMeta" style="margin-top:6px;"></div>
-      <div class="card" style="padding:14px; margin-top:10px; overflow:auto;" id="outBox"></div>
-    </details>
+    <div class="form-group">
+      <label>Название *</label>
+      <input type="text" id="kbTitle" style="width:100%; box-sizing:border-box;">
+    </div>
+
+    <div class="form-group" style="margin-top:12px;">
+      <label>URL источника <span class="small-muted">(если есть — бот подгружает страницу)</span></label>
+      <input type="text" id="kbUrl" placeholder="https://veranda.my/..." style="width:100%; box-sizing:border-box;">
+    </div>
+
+    <div class="form-group" style="margin-top:12px;">
+      <label>Содержимое <span class="small-muted">(можно пусто если есть URL)</span></label>
+      <textarea id="kbContent" rows="8" style="width:100%; box-sizing:border-box; font-family:inherit; font-size:13px; padding:8px; border:1px solid #ccc; border-radius:6px; resize:vertical;"></textarea>
+    </div>
+
+    <div style="display:flex; gap:16px; margin-top:12px; flex-wrap:wrap;">
+      <div>
+        <label style="font-weight:600; display:block; margin-bottom:4px;">Доступ</label>
+        <select id="kbAccess" style="padding:6px 10px; border:1px solid #ccc; border-radius:6px;">
+          <option value="public">Для всех</option>
+          <option value="members">Только своим</option>
+          <option value="never">Скрыто</option>
+        </select>
+      </div>
+      <div style="display:flex; align-items:flex-end; gap:6px;">
+        <input type="checkbox" id="kbActive" checked style="width:16px; height:16px;">
+        <label for="kbActive">Активен</label>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-top:20px; justify-content:flex-end;">
+      <button class="btn btn-sm" id="btnKbCancel" type="button">Отмена</button>
+      <button class="btn" id="btnKbSave" type="button">Сохранить</button>
+    </div>
+    <div class="small-muted" id="kbModalErr" style="margin-top:8px; color:#c00;"></div>
   </div>
 </div>
+
+<style>
+.pill { display:inline-block; padding:2px 10px; border-radius:12px; font-size:12px; font-weight:600; background:#e0e0e0; color:#555; }
+.pill.ok { background:#c8e6c9; color:#2e7d32; }
+.pill.err { background:#ffcdd2; color:#b71c1c; }
+.pill.pill-public  { background:#e3f2fd; color:#1565c0; }
+.pill.pill-members { background:#fff3e0; color:#e65100; }
+.pill.pill-never   { background:#f5f5f5; color:#999; }
+.btn-sm { padding:4px 10px; font-size:12px; }
+</style>
