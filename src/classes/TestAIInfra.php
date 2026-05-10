@@ -385,6 +385,12 @@ class TestAIHtmlSanitizer {
         }
 
         $out = $doc->saveHTML();
-        return is_string($out) ? trim($out) : '';
+        if (!is_string($out)) return '';
+        $out = trim($out);
+        $out = preg_replace('/^\s*<\?xml[^>]*\?>\s*/i', '', $out) ?? $out;
+        $out = preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/i', '', $out) ?? $out;
+        $out = preg_replace('/^\s*<html\b[^>]*>\s*<body\b[^>]*>\s*/i', '', $out) ?? $out;
+        $out = preg_replace('/\s*<\/body>\s*<\/html>\s*$/i', '', $out) ?? $out;
+        return trim($out);
     }
 }
