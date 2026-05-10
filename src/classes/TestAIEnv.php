@@ -13,8 +13,20 @@ class TestAIEnvLoader {
             if ($t === '' || strpos($t, '#') === 0 || strpos($t, '=') === false) continue;
             [$name, $value] = explode('=', $t, 2);
             $k = trim((string)$name);
+            $k = preg_replace('/^\xEF\xBB\xBF/', '', $k) ?? $k;
             if ($k === '') continue;
-            $_ENV[$k] = trim((string)$value);
+            $raw = trim((string)$value);
+            if ($raw !== '' && $raw[0] !== '"' && $raw[0] !== "'") {
+                $raw = preg_replace('/\s+#.*$/', '', $raw) ?? $raw;
+                $raw = trim($raw);
+            }
+            if (strlen($raw) >= 2 && $raw[0] === '"' && substr($raw, -1) === '"') {
+                $raw = substr($raw, 1, -1);
+                $raw = str_replace(['\\n', '\\r', '\\t', '\\"', '\\\\'], ["\n", "\r", "\t", '"', '\\'], $raw);
+            } elseif (strlen($raw) >= 2 && $raw[0] === "'" && substr($raw, -1) === "'") {
+                $raw = substr($raw, 1, -1);
+            }
+            $_ENV[$k] = $raw;
             $loaded[$k] = true;
         }
         return $loaded;
@@ -79,6 +91,7 @@ class TestAIConfig {
         $cfg->appUrl = rtrim((string)($_ENV['APP_URL'] ?? ''), '/');
         $cfg->geminiProxyUrl = rtrim((string)($_ENV['GEMINI_PROXY_URL'] ?? ''), '/');
         $cfg->geminiProxyKey = (string)($_ENV['GEMINI_PROXY_KEY'] ?? '');
+        if ($cfg->geminiProxyKey === '') $cfg->geminiProxyKey = (string)($_ENV['nGEMINI_PROXY_KEY'] ?? '');
         if ($cfg->geminiProxyKey === '') $cfg->geminiProxyKey = (string)($_ENV['CLOUDFLARE_TURN_API_TOKEN'] ?? '');
 
         return $cfg;
