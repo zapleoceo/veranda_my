@@ -186,6 +186,8 @@ class TestAIWebhookService {
     private TestAITelegramClient $tg;
     private TestAIHtmlSanitizer $sanitizer;
     private TestAIRawMessagesRepository $rawRepo;
+    private TestAIDailySummariesRepository $dailyRepo;
+    private TestAIDailySummaryService $dailySvc;
     private TestAISettingsRepository $settingsRepo;
     private TestAILogger $log;
 
@@ -195,6 +197,8 @@ class TestAIWebhookService {
         TestAITelegramClient $tg,
         TestAIHtmlSanitizer $sanitizer,
         TestAIRawMessagesRepository $rawRepo,
+        TestAIDailySummariesRepository $dailyRepo,
+        TestAIDailySummaryService $dailySvc,
         TestAISettingsRepository $settingsRepo,
         TestAILogger $log
     ) {
@@ -203,6 +207,8 @@ class TestAIWebhookService {
         $this->tg = $tg;
         $this->sanitizer = $sanitizer;
         $this->rawRepo = $rawRepo;
+        $this->dailyRepo = $dailyRepo;
+        $this->dailySvc = $dailySvc;
         $this->settingsRepo = $settingsRepo;
         $this->log = $log;
     }
@@ -261,6 +267,14 @@ class TestAIWebhookService {
         $m->metaJson = json_encode(['has_media' => $m->mediaType ? 1 : 0], JSON_UNESCAPED_UNICODE) ?: '{}';
 
         $this->rawRepo->upsert($m);
+
+        if ($chatType === 'private') {
+            $cmdDay = $this->parseSummaryCommand($text);
+            if ($cmdDay !== null) {
+                $this->handleSummaryCommand($chatId, $messageId, $cmdDay);
+                return;
+            }
+        }
 
         if ($this->gemini->canCall() && $m->mediaType && $m->mediaFileId && ($needReply || $chatType === 'private')) {
             $mediaText = $this->tryExtractMediaText($m->mediaFileId, $m->mediaMime ?: 'application/octet-stream');
@@ -509,5 +523,89 @@ class TestAIWebhookService {
         }
         $code = (int)($resp['_http_code'] ?? 0);
         return $code ? ("Gemini пустой ответ (HTTP {$code}).") : 'Не получилось сформировать ответ.';
+    }
+
+    private function parseSummaryCommand(string $text): ?string {
+        $t = trim($text);
+        if ($t === '') return null;
+        if (preg_match('/^\/summary(?:@\w+)?(?:\s+(\d{4}-\d{2}-\d{2}))?\s*$/u', $t, $m)) {
+            $day = trim((string)($m[1] ?? ''));
+            if ($day === '') $day = date('Y-m-d');
+            return $day;
+        }
+        return null;
+    }
+
+    private function handleSummaryCommand(string $chatId, int $messageId, string $day): void {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $day)) $day = date('Y-m-d');
+
+        $now = time();
+        $block = $this->settingsRepo->getKey('gemini_block_until');
+        $blockUntil = strtotime((string)($block['v'] ?? ''));
+        $blockRem = is_int($blockUntil) && $blockUntil > $now ? ($blockUntil - $now) : 0;
+        $next = $this->settingsRepo->getKey('gemini_next_allowed_until');
+        $nextUntil = strtotime((string)($next['v'] ?? ''));
+        $nextRem = is_int($nextUntil) && $nextUntil > $now ? ($nextUntil - $now) : 0;
+        $waitSec = max($blockRem, $nextRem);
+
+        $row = $this->dailyRepo->getByDay($day);
+        if ($row === null) {
+            if ($waitSec > 0) {
+                $msg = 'Лимит запросов к AI исчерпан. Попробуйте через ' . (int)ceil($waitSec) . ' сек.';
+                $ok = $this->tg->sendMessage($chatId, $msg, null);
+                $this->log->info('telegram_send_result', ['chat_id' => $chatId, 'message_id' => $messageId, 'ok' => $ok ? 1 : 0]);
+                return;
+            }
+            $okRun = $this->dailySvc->runDay($day);
+            $this->log->info('daily_summary_run', ['day' => $day, 'ok' => $okRun ? 1 : 0, 'via' => 'tg_summary']);
+            $row = $this->dailyRepo->getByDay($day);
+        }
+
+        $html = $this->formatDailySummaryHtml($day, $row);
+        $ok = $this->tg->sendMessage($chatId, $html, null);
+        $this->log->info('telegram_send_result', ['chat_id' => $chatId, 'message_id' => $messageId, 'ok' => $ok ? 1 : 0]);
+    }
+
+    private function formatDailySummaryHtml(string $day, ?array $row): string {
+        $summary = '';
+        $events = [];
+        $createdAt = '';
+        if (is_array($row)) {
+            $summary = trim((string)($row['summary_text'] ?? ''));
+            $createdAt = (string)($row['created_at'] ?? '');
+            $eventsJson = (string)($row['events_json'] ?? '[]');
+            $decoded = json_decode($eventsJson, true);
+            if (is_array($decoded)) $events = $decoded;
+        }
+
+        $out = '<b>Сводка за ' . htmlspecialchars($day, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</b>';
+        if ($createdAt !== '') $out .= '<br><i>Обновлено: ' . htmlspecialchars($createdAt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</i>';
+        $out .= '<br><br>';
+
+        if ($summary !== '') {
+            $out .= htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        } else {
+            $out .= 'Пока нет сохранённой сводки за этот день.';
+        }
+
+        $items = [];
+        foreach ($events as $ev) {
+            if (!is_array($ev)) continue;
+            $title = trim((string)($ev['title'] ?? ''));
+            if ($title === '') continue;
+            $ad = trim((string)($ev['announce_date'] ?? ''));
+            $line = '— ' . $title;
+            if ($ad !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $ad)) $line .= ' (' . $ad . ')';
+            $items[] = $line;
+            if (count($items) >= 12) break;
+        }
+
+        if ($items) {
+            $out .= '<br><br><b>События:</b><br>' . htmlspecialchars(implode("\n", $items), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $out = str_replace("\n", "<br>", $out);
+        }
+
+        if (mb_strlen($out) > 3800) $out = mb_substr($out, 0, 3800) . '…';
+        return $out;
     }
 }

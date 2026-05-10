@@ -32,7 +32,7 @@ $sanitizer = new \App\Classes\TestAIHtmlSanitizer();
 
 $announcementSvc = new \App\Classes\TestAIAnnouncementService($cfg, $gemini, $sanitizer, $dailyRepo, $rawRepo, __DIR__ . '/cache');
 $dailySvc = new \App\Classes\TestAIDailySummaryService($cfg, $gemini, $rawRepo, $dailyRepo);
-$webhookSvc = new \App\Classes\TestAIWebhookService($cfg, $gemini, $tg, $sanitizer, $rawRepo, $settingsRepo, $log);
+$webhookSvc = new \App\Classes\TestAIWebhookService($cfg, $gemini, $tg, $sanitizer, $rawRepo, $dailyRepo, $dailySvc, $settingsRepo, $log);
 
 return [
   'cfg' => $cfg,
