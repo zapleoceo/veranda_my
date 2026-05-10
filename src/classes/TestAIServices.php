@@ -325,7 +325,8 @@ class TestAIWebhookService {
             'html_len' => mb_strlen($html),
         ]);
 
-        $ok = $this->tg->sendMessage($chatId, $html, $messageId);
+        $replyTo = $chatType === 'private' ? null : $messageId;
+        $ok = $this->tg->sendMessage($chatId, $html, $replyTo);
         $this->log->info('telegram_send_result', [
             'chat_id' => $chatId,
             'message_id' => $messageId,

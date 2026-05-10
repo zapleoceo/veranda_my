@@ -195,6 +195,24 @@ class TestAITelegramClient {
                     'description' => $desc,
                 ]);
             }
+
+            if ($replyToMessageId !== null && $replyToMessageId > 0 && stripos($desc, 'message to be replied not found') !== false) {
+                $payload2 = $payload;
+                unset($payload2['reply_to_message_id']);
+                $r2 = $this->postJson('sendMessage', $payload2);
+                $ok2 = is_array($r2) && !empty($r2['ok']);
+                if ($this->logger) {
+                    $desc2 = is_array($r2) ? (string)($r2['description'] ?? '') : '';
+                    $err2 = is_array($r2) ? (string)($r2['error_code'] ?? '') : '';
+                    $this->logger->info('telegram_send_retry_no_reply', [
+                        'ok' => $ok2 ? 1 : 0,
+                        'http_code' => $this->lastHttpCode,
+                        'error_code' => $err2,
+                        'description' => $desc2,
+                    ]);
+                }
+                return $ok2;
+            }
         }
         return $ok;
     }
