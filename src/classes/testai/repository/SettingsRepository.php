@@ -46,4 +46,24 @@ class SettingsRepository {
     public function setIfEmpty(string $key, string $value): void {
         if ($this->get($key) === '') $this->set($key, $value);
     }
+
+    public function deleteExpiredCache(string $prefix): void {
+        try {
+            $rows = $this->db->query(
+                "SELECT k, v FROM {$this->table} WHERE k LIKE ? LIMIT 200",
+                [$prefix . '%']
+            )->fetchAll();
+            if (!is_array($rows)) return;
+            $now = time();
+            foreach ($rows as $row) {
+                if (!is_array($row)) continue;
+                $k = (string)($row['k'] ?? '');
+                if ($k === '') continue;
+                $data = json_decode((string)($row['v'] ?? ''), true);
+                if (!is_array($data) || (int)($data['exp'] ?? 0) < $now) {
+                    $this->db->query("DELETE FROM {$this->table} WHERE k = ? LIMIT 1", [$k]);
+                }
+            }
+        } catch (\Throwable) {}
+    }
 }

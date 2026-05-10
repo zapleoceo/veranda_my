@@ -25,14 +25,27 @@
 
   async function loadState() {
     const d = await get('state', { date: date() });
-    const db = $('pillDb'), ai = $('pillGemini'), meta = $('aibotMeta'), lp = $('logFilePath');
+    const db = $('pillDb'), ai = $('pillGemini'), block = $('pillBlock'), br = $('btnBlockReset'), meta = $('aibotMeta'), lp = $('logFilePath');
     if (db)   { db.className = 'ai-pill ' + (d.db_ok ? 'ok' : 'err'); db.textContent = d.db_ok ? 'DB ✓' : 'DB ✗'; }
     if (ai)   { ai.className = 'ai-pill ' + (d.gemini_can_call ? 'ok' : 'err'); ai.textContent = d.gemini_can_call ? 'AI ✓' : 'AI ✗'; }
+    const rem = Math.max(0, parseInt(d.block_remaining || 0, 10) || 0);
+    if (block) {
+      if (rem > 0) { block.style.display = ''; block.textContent = '⊘ ' + rem + 'с'; }
+      else block.style.display = 'none';
+    }
+    if (br) br.style.display = rem > 0 ? '' : 'none';
     if (meta) meta.textContent = d.gemini_model ? d.gemini_model + ' · ' + (d.raw_total || 0) + ' сообщ.' : '';
     if (lp && d.log_file) lp.textContent = d.log_file;
   }
 
   $('btnRefreshState')?.addEventListener('click', loadState);
+  $('btnBlockReset')?.addEventListener('click', async () => {
+    const btn = $('btnBlockReset');
+    if (btn) btn.disabled = true;
+    try { await post('block_reset', {}); } catch (e) {}
+    if (btn) btn.disabled = false;
+    loadState();
+  });
   $('aibotDate')?.addEventListener('change', loadState);
   loadState();
 

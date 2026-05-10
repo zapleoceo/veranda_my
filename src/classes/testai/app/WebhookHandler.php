@@ -147,12 +147,8 @@ class WebhookHandler {
         $waitSec = $this->geminiWaitSec();
         if ($waitSec > 0) {
             $this->log->info('gemini_wait', ['chat_id' => $chatId, 'wait_sec' => $waitSec]);
-            if ($chatType === 'private' && $waitSec <= 70) {
-                sleep((int)$waitSec);
-            } else {
-                $this->tg->sendMessage($chatId, 'Лимит запросов к AI исчерпан. Попробуйте через ' . (int)ceil($waitSec) . ' сек.', null);
-                return;
-            }
+            $this->tg->sendMessage($chatId, 'Лимит запросов к AI исчерпан. Попробуйте через ' . (int)ceil($waitSec) . ' сек.', null);
+            return;
         }
 
         // Build context from recent messages in this chat
@@ -224,7 +220,10 @@ class WebhookHandler {
             $this->tg->sendMessage($chatId, 'Лимит запросов. Попробуйте через ' . (int)ceil($waitSec) . ' сек.', $messageId);
             return;
         }
-        if ($waitSec > 0) sleep((int)$waitSec);
+        if ($waitSec > 0) {
+            $this->tg->sendMessage($chatId, 'Лимит запросов. Попробуйте через ' . (int)ceil($waitSec) . ' сек.', $messageId);
+            return;
+        }
 
         $ok  = $this->dailySvc->runDay($day);
         $row = $this->dailyRepo->getByDay($day);
