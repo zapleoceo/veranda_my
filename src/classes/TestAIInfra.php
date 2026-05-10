@@ -166,7 +166,7 @@ class TestAIGeminiClient {
         $ch = curl_init($endpoint);
         curl_setopt($ch, CURLOPT_POST, true);
         $headers = ['Content-Type: application/json'];
-        if ($this->proxyBase !== '' && $this->proxyKey !== '') $headers[] = 'X-Gemini-Proxy-Key: ' . $this->proxyKey;
+        if ($this->proxyBase !== '' && $this->proxyKey !== '') $headers[] = 'X-Veranda-Key: ' . $this->proxyKey;
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload, JSON_UNESCAPED_UNICODE));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
