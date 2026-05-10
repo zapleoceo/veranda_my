@@ -60,7 +60,7 @@ class TestAILogger {
 }
 
 class TestAIDbSchema {
-    public function ensure(Database $db, string $tRaw, string $tDaily, string $tSettings): void {
+    public function ensure(Database $db, string $tRaw, string $tDaily, string $tSettings, string $tKb = ''): void {
         try {
             $pdo = $db->getPdo();
             $pdo->exec("CREATE TABLE IF NOT EXISTS {$tRaw} (
@@ -99,6 +99,21 @@ class TestAIDbSchema {
                 v TEXT NOT NULL,
                 updated_at DATETIME NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+            if ($tKb !== '') {
+                $pdo->exec("CREATE TABLE IF NOT EXISTS {$tKb} (
+                    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    title VARCHAR(255) NOT NULL,
+                    source_url VARCHAR(512) NULL,
+                    content MEDIUMTEXT NOT NULL,
+                    tags VARCHAR(255) NULL,
+                    is_active TINYINT(1) NOT NULL DEFAULT 1,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    KEY idx_active (is_active),
+                    KEY idx_updated_at (updated_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+            }
         } catch (\Throwable $e) {
         }
     }

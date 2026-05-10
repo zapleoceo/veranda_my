@@ -189,6 +189,7 @@ class TestAIWebhookService {
     private TestAIDailySummariesRepository $dailyRepo;
     private TestAIDailySummaryService $dailySvc;
     private TestAISettingsRepository $settingsRepo;
+    private TestAIKnowledgeService $knowledgeSvc;
     private TestAILogger $log;
 
     public function __construct(
@@ -200,6 +201,7 @@ class TestAIWebhookService {
         TestAIDailySummariesRepository $dailyRepo,
         TestAIDailySummaryService $dailySvc,
         TestAISettingsRepository $settingsRepo,
+        TestAIKnowledgeService $knowledgeSvc,
         TestAILogger $log
     ) {
         $this->cfg = $cfg;
@@ -210,6 +212,7 @@ class TestAIWebhookService {
         $this->dailyRepo = $dailyRepo;
         $this->dailySvc = $dailySvc;
         $this->settingsRepo = $settingsRepo;
+        $this->knowledgeSvc = $knowledgeSvc;
         $this->log = $log;
     }
 
@@ -334,8 +337,9 @@ class TestAIWebhookService {
         $ctxMsgs = $this->buildContextMessages($chatId);
         $system = trim($botPrompt);
         if ($system !== '') $system .= "\n\n";
-        $system .= "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a,br. Do not use div/p/ul/ol/li/h1-h6 tags. Keep it concise.";
+        $system .= "You are a Telegram bot assistant. Reply in Telegram-compatible HTML only. No markdown. Allowed tags: b,strong,i,em,u,ins,s,strike,del,code,pre,a,br. Do not use div/p/ul/ol/li/h1-h6 tags. Keep it concise. If knowledge_docs are provided, use them as a primary factual source. If information is missing, do not invent; ask for clarification or suggest contacting staff.";
 
+        $knowledgeDocs = $this->knowledgeSvc->selectForQuestion($queryText, 5);
         $payload = [
             'chat_id' => $chatId,
             'chat_type' => $chatType,
@@ -349,6 +353,7 @@ class TestAIWebhookService {
             'question' => $queryText,
             'context' => $ctxMsgs,
         ];
+        if ($knowledgeDocs) $payload['knowledge_docs'] = $knowledgeDocs;
 
         $minIntervalSec = 4;
         $this->settingsRepo->setKey('gemini_next_allowed_until', gmdate('c', time() + $minIntervalSec), date('Y-m-d H:i:s'));
@@ -607,5 +612,56 @@ class TestAIWebhookService {
 
         if (mb_strlen($out) > 3800) $out = mb_substr($out, 0, 3800) . '…';
         return $out;
+    }
+}
+
+class TestAIKnowledgeService {
+    private TestAIKnowledgeRepository $kb;
+
+    public function __construct(TestAIKnowledgeRepository $kb) {
+        $this->kb = $kb;
+    }
+
+    public function selectForQuestion(string $question, int $limit = 5): array {
+        $limit = max(1, min(8, $limit));
+        $q = trim(mb_strtolower($question));
+        if ($q === '') return [];
+
+        $keywords = $this->extractKeywords($q);
+        if (!$keywords) return [];
+
+        $rows = $this->kb->searchActiveByKeywords($keywords, $limit);
+        $out = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) continue;
+            $title = trim((string)($r['title'] ?? ''));
+            $content = trim((string)($r['content'] ?? ''));
+            if ($content === '') continue;
+            if (mb_strlen($content) > 1500) $content = mb_substr($content, 0, 1500) . '…';
+            $out[] = [
+                'id' => (int)($r['id'] ?? 0),
+                'title' => $title,
+                'source_url' => (string)($r['source_url'] ?? ''),
+                'content' => $content,
+                'updated_at' => (string)($r['updated_at'] ?? ''),
+            ];
+        }
+        return $out;
+    }
+
+    private function extractKeywords(string $q): array {
+        $q = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $q);
+        $q = is_string($q) ? $q : '';
+        $parts = preg_split('/\s+/u', trim($q));
+        $out = [];
+        foreach (is_array($parts) ? $parts : [] as $p) {
+            $p = trim((string)$p);
+            if ($p === '') continue;
+            if (mb_strlen($p) < 3) continue;
+            if (in_array($p, ['какие', 'какой', 'какая', 'какое', 'есть', 'у', 'вас', 'в', 'на', 'и', 'или', 'что', 'это', 'нет', 'там', 'по', 'меню', 'цена', 'сколько', 'стоит', 'пожалуйста', 'спасибо'], true)) continue;
+            $out[$p] = true;
+            if (count($out) >= 10) break;
+        }
+        return array_keys($out);
     }
 }

@@ -315,3 +315,130 @@ class TestAISettingsRepository {
         }
     }
 }
+
+class TestAIKnowledgeRepository {
+    private Database $db;
+    private string $tKb;
+
+    public function __construct(Database $db, string $tKb) {
+        $this->db = $db;
+        $this->tKb = $tKb;
+    }
+
+    public function list(int $limit = 50, int $offset = 0): array {
+        $limit = max(1, min(200, $limit));
+        $offset = max(0, $offset);
+        try {
+            $rows = $this->db->query(
+                "SELECT id, title, source_url, tags, is_active, created_at, updated_at
+                 FROM {$this->tKb}
+                 ORDER BY updated_at DESC
+                 LIMIT {$limit} OFFSET {$offset}"
+            )->fetchAll();
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    public function getById(int $id): ?array {
+        if ($id <= 0) return null;
+        try {
+            $row = $this->db->query(
+                "SELECT id, title, source_url, content, tags, is_active, created_at, updated_at
+                 FROM {$this->tKb}
+                 WHERE id = ?
+                 LIMIT 1",
+                [$id]
+            )->fetch();
+            return is_array($row) ? $row : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function upsert(?int $id, string $title, string $content, string $sourceUrl, string $tags, int $isActive): int {
+        $title = trim($title);
+        if ($title === '') $title = 'Untitled';
+        if (mb_strlen($title) > 255) $title = mb_substr($title, 0, 255);
+
+        $sourceUrl = trim($sourceUrl);
+        if (mb_strlen($sourceUrl) > 512) $sourceUrl = mb_substr($sourceUrl, 0, 512);
+
+        $tags = trim($tags);
+        if (mb_strlen($tags) > 255) $tags = mb_substr($tags, 0, 255);
+
+        $content = trim($content);
+        $isActive = $isActive ? 1 : 0;
+
+        try {
+            if (is_int($id) && $id > 0) {
+                $this->db->query(
+                    "UPDATE {$this->tKb}
+                     SET title = ?, source_url = NULLIF(?, ''), content = ?, tags = NULLIF(?, ''), is_active = ?
+                     WHERE id = ?
+                     LIMIT 1",
+                    [$title, $sourceUrl, $content, $tags, $isActive, $id]
+                );
+                return $id;
+            }
+
+            $this->db->query(
+                "INSERT INTO {$this->tKb} (title, source_url, content, tags, is_active)
+                 VALUES (?, NULLIF(?, ''), ?, NULLIF(?, ''), ?)",
+                [$title, $sourceUrl, $content, $tags, $isActive]
+            );
+            $pdo = $this->db->getPdo();
+            return $pdo ? (int)$pdo->lastInsertId() : 0;
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    public function delete(int $id): bool {
+        if ($id <= 0) return false;
+        try {
+            $this->db->query("DELETE FROM {$this->tKb} WHERE id = ? LIMIT 1", [$id]);
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public function searchActiveByKeywords(array $keywords, int $limit = 6): array {
+        $limit = max(1, min(12, $limit));
+        $kw = [];
+        foreach ($keywords as $k) {
+            $t = trim(mb_strtolower((string)$k));
+            if ($t === '' || mb_strlen($t) < 2) continue;
+            $kw[$t] = true;
+        }
+        $kwList = array_keys($kw);
+        if (!$kwList) return [];
+
+        $conds = [];
+        $params = [];
+        foreach ($kwList as $k) {
+            $like = '%' . $k . '%';
+            $conds[] = '(LOWER(title) LIKE ? OR LOWER(content) LIKE ? OR LOWER(COALESCE(tags, \'\')) LIKE ?)';
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+        }
+        $where = implode(' OR ', $conds);
+
+        try {
+            $rows = $this->db->query(
+                "SELECT id, title, source_url, content, tags, updated_at
+                 FROM {$this->tKb}
+                 WHERE is_active = 1 AND ({$where})
+                 ORDER BY updated_at DESC
+                 LIMIT {$limit}",
+                $params
+            )->fetchAll();
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+}
