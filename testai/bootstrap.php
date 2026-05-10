@@ -3,92 +3,38 @@ declare(strict_types=1);
 
 $root = dirname(__DIR__);
 require_once $root . '/src/classes/Database.php';
+require_once $root . '/src/classes/TestAIEnv.php';
+require_once $root . '/src/classes/TestAIInfra.php';
+require_once $root . '/src/classes/TestAIRepositories.php';
+require_once $root . '/src/classes/TestAIServices.php';
 
 $envFile = $root . '/.env';
-$envLoadedKeys = [];
+$envLoadedKeys = (new \App\Classes\TestAIEnvLoader())->load($envFile);
+$cfg = \App\Classes\TestAIConfig::fromEnv($root, $envFile, $envLoadedKeys);
+$cfg->applyTimezone();
 
-if (file_exists($envFile)) {
-  $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-  foreach ($lines as $line) {
-    if (strpos(trim($line), '#') === 0 || strpos($line, '=') === false) continue;
-    [$name, $value] = explode('=', $line, 2);
-    $k = trim($name);
-    $_ENV[$k] = trim($value);
-    $envLoadedKeys[$k] = true;
-  }
-}
-
-$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
-if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) $spotTzName = 'Asia/Ho_Chi_Minh';
-$apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
-if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) $apiTzName = $spotTzName;
-date_default_timezone_set($apiTzName);
-
-$dbHost = $_ENV['DB_HOST'] ?? 'localhost';
-$dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
-$dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
-$dbPass = $_ENV['DB_PASS'] ?? '';
-$tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
-
-$testaiTgToken = (string)($_ENV['ai_tg_bot'] ?? '');
-$geminiKey = (string)($_ENV['gemini_key'] ?? '');
-$allowedChatsRaw = (string)($_ENV['TESTAI_ALLOWED_CHAT_IDS'] ?? '');
-$adminKey = (string)($_ENV['TESTAI_ADMIN_KEY'] ?? '');
-$geminiModel = trim((string)($_ENV['TESTAI_GEMINI_MODEL'] ?? 'gemini-2.5-flash'));
-
-$db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+$db = new \App\Classes\Database($cfg->dbHost, $cfg->dbName, $cfg->dbUser, $cfg->dbPass, $cfg->dbTableSuffix);
 
 $tRaw = $db->t('testai_tg_messages_raw');
 $tDaily = $db->t('testai_daily_summaries');
 $tSettings = $db->t('testai_settings');
 
-try {
-  $pdo = $db->getPdo();
-  $pdo->exec("CREATE TABLE IF NOT EXISTS {$tRaw} (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    tg_chat_id BIGINT NOT NULL,
-    tg_chat_type VARCHAR(16) NOT NULL,
-    tg_chat_title VARCHAR(255) NULL,
-    tg_message_id BIGINT NOT NULL,
-    tg_user_id BIGINT NULL,
-    tg_username VARCHAR(64) NULL,
-    tg_name VARCHAR(128) NULL,
-    received_at DATETIME NOT NULL,
-    text TEXT NOT NULL,
-    media_type VARCHAR(16) NULL,
-    media_file_id VARCHAR(255) NULL,
-    media_file_unique_id VARCHAR(255) NULL,
-    media_mime VARCHAR(128) NULL,
-    media_duration_sec INT NULL,
-    media_text TEXT NULL,
-    meta_json TEXT NULL,
-    UNIQUE KEY uniq_chat_msg (tg_chat_id, tg_message_id),
-    KEY idx_received_at (received_at),
-    KEY idx_chat_time (tg_chat_id, received_at)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+(new \App\Classes\TestAIDbSchema())->ensure($db, $tRaw, $tDaily, $tSettings);
 
-  $pdo->exec("CREATE TABLE IF NOT EXISTS {$tDaily} (
-    day DATE NOT NULL PRIMARY KEY,
-    summary_text TEXT NOT NULL,
-    events_json TEXT NOT NULL,
-    created_at DATETIME NOT NULL,
-    KEY idx_created_at (created_at)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+$rawRepo = new \App\Classes\TestAIRawMessagesRepository($db, $tRaw);
+$dailyRepo = new \App\Classes\TestAIDailySummariesRepository($db, $tDaily);
+$settingsRepo = new \App\Classes\TestAISettingsRepository($db, $tSettings);
 
-  $pdo->exec("CREATE TABLE IF NOT EXISTS {$tSettings} (
-    k VARCHAR(64) NOT NULL PRIMARY KEY,
-    v TEXT NOT NULL,
-    updated_at DATETIME NOT NULL
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-} catch (\Throwable $e) {}
+$tg = new \App\Classes\TestAITelegramClient($cfg->tgToken);
+$gemini = new \App\Classes\TestAIGeminiClient($cfg->geminiKey, $cfg->geminiProxyBase(), $cfg->geminiProxyKey);
+$sanitizer = new \App\Classes\TestAIHtmlSanitizer();
 
-$allowedChatIds = null;
-if (trim($allowedChatsRaw) !== '') {
-  $ids = array_values(array_filter(array_map('trim', explode(',', $allowedChatsRaw)), fn($x) => $x !== ''));
-  $allowedChatIds = $ids ? array_fill_keys($ids, true) : null;
-}
+$announcementSvc = new \App\Classes\TestAIAnnouncementService($cfg, $gemini, $sanitizer, $dailyRepo, $rawRepo, __DIR__ . '/cache');
+$dailySvc = new \App\Classes\TestAIDailySummaryService($cfg, $gemini, $rawRepo, $dailyRepo);
+$webhookSvc = new \App\Classes\TestAIWebhookService($cfg, $gemini, $tg, $sanitizer, $rawRepo, $settingsRepo);
 
 return [
+  'cfg' => $cfg,
   'root' => $root,
   'envFile' => $envFile,
   'envLoadedKeys' => $envLoadedKeys,
@@ -96,9 +42,13 @@ return [
   'tRaw' => $tRaw,
   'tDaily' => $tDaily,
   'tSettings' => $tSettings,
-  'tgToken' => $testaiTgToken,
-  'geminiKey' => $geminiKey,
-  'geminiModel' => $geminiModel,
-  'allowedChatIds' => $allowedChatIds,
-  'adminKey' => $adminKey,
+  'rawRepo' => $rawRepo,
+  'dailyRepo' => $dailyRepo,
+  'settingsRepo' => $settingsRepo,
+  'tg' => $tg,
+  'gemini' => $gemini,
+  'sanitizer' => $sanitizer,
+  'announcementSvc' => $announcementSvc,
+  'dailySvc' => $dailySvc,
+  'webhookSvc' => $webhookSvc,
 ];

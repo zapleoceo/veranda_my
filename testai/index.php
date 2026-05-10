@@ -1,10 +1,29 @@
 <?php
 declare(strict_types=1);
 
-$ctx = require __DIR__ . '/bootstrap.php';
+$root = dirname(__DIR__);
+$envFile = $root . '/.env';
+if (file_exists($envFile)) {
+  $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+  foreach (is_array($lines) ? $lines : [] as $line) {
+    $t = trim((string)$line);
+    if ($t === '' || strpos($t, '#') === 0 || strpos($t, '=') === false) continue;
+    [$name, $value] = explode('=', $t, 2);
+    $k = trim((string)$name);
+    if ($k === '') continue;
+    $_ENV[$k] = trim((string)$value);
+  }
+}
+
+$spotTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? ''));
+if ($spotTzName === '' || !in_array($spotTzName, timezone_identifiers_list(), true)) $spotTzName = 'Asia/Ho_Chi_Minh';
+$apiTzName = trim((string)($_ENV['POSTER_API_TIMEZONE'] ?? ''));
+if ($apiTzName === '' || !in_array($apiTzName, timezone_identifiers_list(), true)) $apiTzName = $spotTzName;
+date_default_timezone_set($apiTzName);
+
 $date = trim((string)($_GET['date'] ?? ''));
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) $date = date('Y-m-d');
-$adminKey = (string)($ctx['adminKey'] ?? '');
+$adminKey = (string)($_ENV['TESTAI_ADMIN_KEY'] ?? '');
 $key = trim((string)($_GET['key'] ?? ''));
 ?>
 <!doctype html>
