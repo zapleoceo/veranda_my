@@ -218,13 +218,19 @@ try {
              LIMIT 1",
             [$username]
         )->fetch();
-        $userPermissions = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
-        if (is_array($userPermissions) && (!empty($userPermissions['admin']) || !empty($userPermissions['exclude_toggle']) || !empty($userPermissions['telegram_ack']) || !empty($userPermissions['vposter_button']))) {
-            $isAllowed = true;
-        }
+        $decoded = json_decode((string)($uRow['permissions_json'] ?? '{}'), true);
+        $userPermissions = is_array($decoded) ? $decoded : [];
     }
 
-    if (in_array($action, ['vposter', 'vdecline', 'vrestore', 'vposter_fix', 'vposter_cancel'], true) && empty($userPermissions['vposter_button']) && empty($userPermissions['admin'])) {
+    $isAdmin = !empty($userPermissions['admin']);
+    $canIgnore = $isAdmin || !empty($userPermissions['telegram_ack']);
+    $canPoster = $isAdmin || !empty($userPermissions['vposter_button']);
+    $isAllowed = $isAdmin || $canIgnore || $canPoster || !empty($userPermissions['exclude_toggle']);
+
+    if (in_array($action, ['ignore_tx', 'ignore_item'], true) && !$canIgnore) {
+        $isAllowed = false;
+    }
+    if (in_array($action, ['vposter', 'vdecline', 'vrestore', 'vposter_fix', 'vposter_cancel'], true) && !$canPoster) {
         $isAllowed = false;
     }
 
