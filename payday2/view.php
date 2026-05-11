@@ -397,14 +397,14 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
                 <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2SettingsBtn" title="Настройки Payday2" data-help-abs="Настройки интеграции с Telegram и счетами Poster.">⚙</button>
                 <div class="pd2-d-flex">
                     <button type="button" class="pd2-icon-btn" id="btnKashShift" title="KashShift" data-help-abs="Просмотр кассовых смен из Poster.">
-                        <img src="/payday2/img/Cash.png" alt="KashShift">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1h2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8h2V7Zm2 1h8V7a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v1Zm-2 2v8h12v-8H7Zm6 1c1.66 0 3 1.12 3 2.5S14.66 16 13 16s-3-1.12-3-2.5S11.34 11 13 11Z"/></svg>
                     </button>
                     <button type="button" class="pd2-icon-btn pd2-ml-5" id="btnSupplies" title="Supplies" data-help-abs="Просмотр списка поставок из Poster.">
-                        <img src="/payday2/img/Supply.png" alt="Supplies">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 7a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1h3a2 2 0 0 1 2 2v6a3 3 0 0 1-3 3H6a2 2 0 0 1-2-2V7Zm2 0v12h13a1 1 0 0 0 1-1v-6h-5V7H6Zm3 2h4v2H9V9Zm-1 4h6v2H8v-2Z"/></svg>
                     </button>
                 </div>
                 <button type="button" class="pd2-icon-btn pd2-ml-5" id="payday2CheckFinderBtn" title="Чек" data-help-abs="Поиск и удаление чека Poster по номеру.">
-                    <img src="/payday2/img/receipt.png" alt="Чек">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 2h12v20l-2-1-2 1-2-1-2 1-2-1-2 1V2Zm2 4v2h8V6H8Zm0 4v2h8v-2H8Zm0 4v2h6v-2H8Z"/></svg>
                 </button>
             </div>
             <div class="tabs" data-help="Переключение режимов сверки финансов: приходы (IN) или расходы (OUT).">

@@ -302,6 +302,11 @@
     height: 100%;
     object-fit: contain;
 }
+.pd2-icon-btn svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
 
 .tabs .tab,
 .pd2-icon-btn,
