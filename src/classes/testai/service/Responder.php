@@ -238,6 +238,17 @@ class Responder {
         if (!is_array($resp['error'] ?? null)) return;
         $err = trim((string)($resp['error']['message'] ?? ''));
         if ($err === '' || !preg_match('/quota|rate.?limit/i', $err)) return;
+        // When a proxy with rotating keys is configured, a 429 on one key doesn't
+        // mean all keys are exhausted — the proxy handles rotation automatically.
+        // Only set a short per-minute cooldown; let the proxy decide on retries.
+        if ($this->gemini->hasProxy()) {
+            $retry = 30;
+            if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) $retry = (int)ceil((float)($m[1] ?? 0));
+            $until = time() + max(30, min(120, $retry));
+            $ts = gmdate('c', $until);
+            $this->settings->set('gemini_next_allowed_until', $ts);
+            return;
+        }
         $retry = 60;
         if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) $retry = (int)ceil((float)($m[1] ?? 0));
         $until = $this->isDailyLimitError($err) ? time() + 6 * 3600 : time() + max(90, $retry + 10);
