@@ -8,7 +8,7 @@
     <script src="/assets/app.js" defer></script>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="stylesheet" href="/assets/css/common.css">
-    <link rel="stylesheet" href="/roma/style.css">
+    <link rel="stylesheet" href="/roma/style.css?v=<?= (int)@filemtime(__DIR__ . '/style.css') ?>">
 </head>
 <body>
 <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 0 16px;">
@@ -69,6 +69,6 @@
 </div>
 
 <script src="/assets/user_menu.js" defer></script>
-<script src="/roma/script.js"></script>
+<script src="/roma/script.js?v=<?= (int)@filemtime(__DIR__ . '/script.js') ?>"></script>
 </body>
 </html>
