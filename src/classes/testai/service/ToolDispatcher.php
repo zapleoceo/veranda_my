@@ -72,11 +72,11 @@ class ToolDispatcher {
             ],
             [
                 'name'        => 'search_events',
-                'description' => 'Search for upcoming events, concerts, announcements at the restaurant.',
+                'description' => 'Search for upcoming or recent events, concerts, shows, film screenings, parties, DJ nights, live music, and announcements at the restaurant. Use whenever the user asks about events, schedule, what\'s on, what\'s happening, films or movies shown at the venue.',
                 'parameters'  => [
                     'type'       => 'object',
                     'properties' => [
-                        'query'     => ['type' => 'string', 'description' => 'Event search query'],
+                        'query'     => ['type' => 'string', 'description' => 'Event search query (e.g. film, concert, DJ, party)'],
                         'days_back' => ['type' => 'integer', 'description' => 'Days back to search (default 14)'],
                     ],
                     'required' => ['query'],
@@ -95,11 +95,12 @@ class ToolDispatcher {
             ],
             [
                 'name'        => 'get_weekly_summary',
-                'description' => 'Get a summary of restaurant activity for the past few days.',
+                'description' => 'Get a daily summary of restaurant activity. Use when the user asks for a summary, digest, or recap for a specific day or period ("за вчера", "за понедельник", "за эту неделю").',
                 'parameters'  => [
                     'type'       => 'object',
                     'properties' => [
-                        'days_back' => ['type' => 'integer', 'description' => 'Days to look back (1-7, default 7)'],
+                        'date'      => ['type' => 'string', 'description' => 'Specific date YYYY-MM-DD. Use when user asks for a specific day (yesterday, Monday, etc.).'],
+                        'days_back' => ['type' => 'integer', 'description' => 'Days to look back (1-7, default 7). Used when no specific date given.'],
                     ],
                 ],
             ],
@@ -161,8 +162,19 @@ class ToolDispatcher {
     }
 
     private function getWeeklySummary(array $args): array {
-        $days      = max(1, min(7, (int)($args['days_back'] ?? 7)));
         $summaries = [];
+
+        // Specific date requested (e.g. "за вчера" → "2026-05-10")
+        $dateArg = trim((string)($args['date'] ?? ''));
+        if ($dateArg !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateArg)) {
+            $row = $this->dailyRepo->getByDay($dateArg);
+            if (is_array($row) && trim((string)($row['summary_text'] ?? '')) !== '') {
+                $summaries[] = ['date' => $dateArg, 'summary' => $row['summary_text']];
+            }
+            return ['summaries' => $summaries, 'count' => count($summaries)];
+        }
+
+        $days = max(1, min(7, (int)($args['days_back'] ?? 7)));
         for ($i = $days - 1; $i >= 0; $i--) {
             $day = date('Y-m-d', strtotime("-{$i} days"));
             $row = $this->dailyRepo->getByDay($day);
