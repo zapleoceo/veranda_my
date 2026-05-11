@@ -6,8 +6,6 @@ const err = document.getElementById('err');
 const tbody = document.getElementById('tbody');
 const tfoot = document.getElementById('tfoot');
 const romaSum = document.getElementById('romaSum');
-const romaDiscount = document.getElementById('romaDiscount');
-const romaNet = document.getElementById('romaNet');
 
 const setLoading = (on) => {
     btn.disabled = on;
@@ -26,8 +24,6 @@ const load = async () => {
     tbody.innerHTML = '';
     tfoot.innerHTML = '';
     romaSum.textContent = '0';
-    romaDiscount.textContent = '0';
-    romaNet.textContent = '0';
     try {
         const url = new URL(location.href);
         url.searchParams.set('ajax', 'load');
@@ -44,7 +40,6 @@ const load = async () => {
             tr.innerHTML = `
                 <td>${String(it.product_name || '')}</td>
                 <td class="num">${String(it.count || '0')}</td>
-                <td class="num">${String(it.discount || '0')}</td>
                 <td class="num">${String(it.sum || '0')}</td>
             `;
             tbody.appendChild(tr);
@@ -55,13 +50,10 @@ const load = async () => {
         trTot.innerHTML = `
             <td>Итого</td>
             <td class="num">${String(j.totals?.count || '0')}</td>
-            <td class="num">${String(j.totals?.discount || '0')}</td>
             <td class="num">${String(j.totals?.sum || '0')}</td>
         `;
         tfoot.appendChild(trTot);
         romaSum.textContent = String(j.roma?.sum || '0');
-        romaDiscount.textContent = String(j.roma?.discount || '0');
-        romaNet.textContent = String(j.roma?.net || '0');
     } catch (e) {
         setError(e && e.message ? e.message : 'Ошибка');
     } finally {

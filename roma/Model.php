@@ -19,69 +19,35 @@ class Model {
         }
 
         $poster = new \App\Classes\PosterAPI($this->token);
-        $txs = $poster->request('dash.getTransactions', [
-            'dateFrom' => str_replace('-', '', $dateFrom),
-            'dateTo' => str_replace('-', '', $dateTo),
-            'status' => 2,
-            'include_products' => 1,
-            'include_history' => 0,
+        $resp = $poster->request('dash.getProductsSales', [
+            'date_from' => str_replace('-', '', $dateFrom),
+            'date_to' => str_replace('-', '', $dateTo),
         ], 'GET');
 
-        if (!is_array($txs)) $txs = [];
+        if (!is_array($resp)) $resp = [];
 
         $rows = [];
         $totalCount = 0.0;
         $totalSumMinor = 0.0;
-        $totalDiscountMinor = 0.0;
 
-        foreach ($txs as $tx) {
-            if (!is_array($tx)) continue;
+        foreach ($resp as $r) {
+            $catId = (int)($r['category_id'] ?? 0);
+            if ($catId !== self::ROMA_CATEGORY_ID) continue;
 
-            $products = $this->extractProducts($tx);
-            if (!$products) continue;
+            $name = trim((string)($r['product_name'] ?? ''));
+            if ($name === '') continue;
 
-            $txProductsTotalMinor = 0.0;
-            foreach ($products as $p) {
-                if (!is_array($p)) continue;
-                $txProductsTotalMinor += $this->toMinor($p['sum'] ?? $p['product_sum'] ?? $p['productSum'] ?? $p['sum_minor'] ?? 0);
+            $count = (float)($r['count'] ?? 0);
+            $sumMinor = (float)($r['product_sum'] ?? 0);
+
+            if (!isset($rows[$name])) {
+                $rows[$name] = ['product_name' => $name, 'count' => 0.0, 'sum_minor' => 0.0];
             }
+            $rows[$name]['count'] += $count;
+            $rows[$name]['sum_minor'] += $sumMinor;
 
-            $txSumMinor = $this->toMinor($tx['sum'] ?? $tx['sum_minor'] ?? 0);
-            $allocBaseMinor = $txProductsTotalMinor > 0 ? $txProductsTotalMinor : $txSumMinor;
-            $txDiscountMinor = $this->extractDiscountMinor($tx, $allocBaseMinor);
-
-            $txRomaDiscountMinor = 0.0;
-
-            foreach ($products as $p) {
-                if (!is_array($p)) continue;
-
-                $catId = (int)($p['category_id'] ?? $p['categoryId'] ?? 0);
-                if ($catId !== self::ROMA_CATEGORY_ID) continue;
-
-                $name = trim((string)($p['product_name'] ?? $p['productName'] ?? $p['name'] ?? ''));
-                if ($name === '') continue;
-
-                $count = (float)($p['count'] ?? $p['qty'] ?? $p['quantity'] ?? 0);
-                $sumMinor = (float)$this->toMinor($p['sum'] ?? $p['product_sum'] ?? $p['productSum'] ?? $p['sum_minor'] ?? 0);
-
-                $discMinor = 0.0;
-                if ($txDiscountMinor > 0 && $allocBaseMinor > 0 && $sumMinor > 0) {
-                    $discMinor = $txDiscountMinor * ($sumMinor / $allocBaseMinor);
-                }
-                $txRomaDiscountMinor += $discMinor;
-
-                if (!isset($rows[$name])) {
-                    $rows[$name] = ['product_name' => $name, 'count' => 0.0, 'sum_minor' => 0.0, 'discount_minor' => 0.0];
-                }
-                $rows[$name]['count'] += $count;
-                $rows[$name]['sum_minor'] += $sumMinor;
-                $rows[$name]['discount_minor'] += $discMinor;
-
-                $totalCount += $count;
-                $totalSumMinor += $sumMinor;
-            }
-
-            $totalDiscountMinor += $txRomaDiscountMinor;
+            $totalCount += $count;
+            $totalSumMinor += $sumMinor;
         }
 
         $items = array_values($rows);
@@ -97,17 +63,12 @@ class Model {
             $outItems[] = [
                 'product_name' => (string)$it['product_name'],
                 'count' => $this->fmtCount($it['count']),
-                'discount' => $this->fmtMoney((float)($it['discount_minor'] ?? 0)),
                 'sum' => $this->fmtMoney($it['sum_minor']),
                 'sum_minor' => (int)round((float)$it['sum_minor']),
-                'discount_minor' => (int)round((float)($it['discount_minor'] ?? 0)),
             ];
         }
 
-        $netSumMinor = $totalSumMinor - $totalDiscountMinor;
         $romaMinor = $totalSumMinor * self::ROMA_FACTOR;
-        $romaDiscountMinor = $totalDiscountMinor * self::ROMA_FACTOR;
-        $romaNetMinor = $netSumMinor * self::ROMA_FACTOR;
 
         return [
             'date_from' => $dateFrom,
@@ -117,54 +78,14 @@ class Model {
             'totals' => [
                 'count' => $this->fmtCount($totalCount),
                 'sum' => $this->fmtMoney($totalSumMinor),
-                'discount' => $this->fmtMoney($totalDiscountMinor),
-                'net' => $this->fmtMoney($netSumMinor),
                 'sum_minor' => (int)round($totalSumMinor),
-                'discount_minor' => (int)round($totalDiscountMinor),
-                'net_minor' => (int)round($netSumMinor),
             ],
             'roma' => [
                 'factor' => self::ROMA_FACTOR,
                 'sum' => $this->fmtMoney($romaMinor),
                 'sum_minor' => (int)round($romaMinor),
-                'discount' => $this->fmtMoney($romaDiscountMinor),
-                'discount_minor' => (int)round($romaDiscountMinor),
-                'net' => $this->fmtMoney($romaNetMinor),
-                'net_minor' => (int)round($romaNetMinor),
             ],
         ];
-    }
-
-    private function extractProducts(array $tx): array {
-        $p = $tx['products'] ?? $tx['product'] ?? $tx['items'] ?? null;
-        if (!is_array($p)) return [];
-        if (isset($p['product_name']) || isset($p['productName']) || isset($p['category_id']) || isset($p['categoryId'])) {
-            return [$p];
-        }
-        return $p;
-    }
-
-    private function extractDiscountMinor(array $tx, float $allocBaseMinor): float {
-        $raw = $tx['discount_sum'] ?? $tx['discountSum'] ?? $tx['discount'] ?? 0;
-        $v = (float)$this->toMinor($raw);
-        if ($v <= 0) return 0.0;
-        if ($v <= 100.0 && $allocBaseMinor > 0) {
-            return $allocBaseMinor * ($v / 100.0);
-        }
-        return $v;
-    }
-
-    private function toMinor($v): float {
-        if (is_int($v)) return (float)$v;
-        if (is_float($v)) return $v;
-        if (is_numeric($v)) return (float)$v;
-        if (is_string($v)) {
-            $t = trim($v);
-            if ($t === '') return 0.0;
-            $t = str_replace(',', '.', $t);
-            return is_numeric($t) ? (float)$t : 0.0;
-        }
-        return 0.0;
     }
 
     private function fmtCount(float $v): string {
