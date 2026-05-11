@@ -21,6 +21,10 @@ class GeminiClient {
         return $this->proxyBase !== '' || $this->apiKey !== '';
     }
 
+    public function hasProxy(): bool {
+        return $this->proxyBase !== '';
+    }
+
     /** Single-turn call with a flat parts array. */
     public function generate(string $model, array $parts, array $opts = []): array {
         $payload = ['contents' => [['role' => 'user', 'parts' => $parts]]];
