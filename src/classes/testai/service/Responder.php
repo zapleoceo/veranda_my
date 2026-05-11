@@ -152,6 +152,9 @@ class Responder {
             $parts[] = $identity;
         }
 
+        $parts[] = 'Сегодня: ' . date('Y-m-d') . ' (' . $this->ruDayOfWeek((int)date('N')) . ').'
+                 . ' Используй эту дату для вычисления «вчера», «на этой неделе» и т.п.';
+
         if ($forbidden !== '') {
             $lines = array_values(array_filter(array_map('trim', explode("\n", $forbidden))));
             if ($lines) {
@@ -290,5 +293,9 @@ class Responder {
         if ($m > 0) $out[] = $m . 'm';
         if ($h === 0 && $m === 0) $out[] = ($sec % 60) . 's';
         return implode(' ', $out);
+    }
+
+    private function ruDayOfWeek(int $n): string {
+        return ['', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье'][$n] ?? '';
     }
 }
