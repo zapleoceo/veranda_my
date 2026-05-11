@@ -30,6 +30,8 @@ class Model {
         $totalCount = 0.0;
         $totalSumMinor = 0.0;
         $totalDiscountMinor = 0.0;
+        $totalPayedMinor = 0.0;
+        $totalPriceWeightedMinor = 0.0;
 
         foreach ($resp as $r) {
             $catId = (int)($r['category_id'] ?? 0);
@@ -41,17 +43,30 @@ class Model {
             $count = (float)($r['count'] ?? 0);
             $sumMinor = (float)($r['product_sum'] ?? 0);
             $discountMinor = (float)($r['discount'] ?? 0);
+            $payedMinor = (float)($r['payed_sum'] ?? 0);
+            $priceMinor = (float)($r['price'] ?? 0);
 
             if (!isset($rows[$name])) {
-                $rows[$name] = ['product_name' => $name, 'count' => 0.0, 'sum_minor' => 0.0, 'discount_minor' => 0.0];
+                $rows[$name] = [
+                    'product_name' => $name,
+                    'count' => 0.0,
+                    'sum_minor' => 0.0,
+                    'discount_minor' => 0.0,
+                    'payed_minor' => 0.0,
+                    'price_weighted_minor' => 0.0,
+                ];
             }
             $rows[$name]['count'] += $count;
             $rows[$name]['sum_minor'] += $sumMinor;
             $rows[$name]['discount_minor'] += $discountMinor;
+            $rows[$name]['payed_minor'] += $payedMinor;
+            $rows[$name]['price_weighted_minor'] += ($priceMinor > 0 && $count > 0) ? ($priceMinor * $count) : 0.0;
 
             $totalCount += $count;
             $totalSumMinor += $sumMinor;
             $totalDiscountMinor += $discountMinor;
+            $totalPayedMinor += $payedMinor;
+            $totalPriceWeightedMinor += ($priceMinor > 0 && $count > 0) ? ($priceMinor * $count) : 0.0;
         }
 
         $items = array_values($rows);
@@ -64,17 +79,26 @@ class Model {
 
         $outItems = [];
         foreach ($items as $it) {
+            $cnt = (float)($it['count'] ?? 0);
+            $priceMinor = ($cnt > 0)
+                ? ((float)($it['price_weighted_minor'] ?? 0) / $cnt)
+                : 0.0;
             $outItems[] = [
                 'product_name' => (string)$it['product_name'],
-                'count' => $this->fmtCount($it['count']),
+                'count' => $this->fmtCount($cnt),
+                'price' => $this->fmtMoney($priceMinor),
+                'price_minor' => (int)round($priceMinor),
                 'discount' => $this->fmtMoney((float)($it['discount_minor'] ?? 0)),
                 'discount_minor' => (int)round((float)($it['discount_minor'] ?? 0)),
+                'payed_sum' => $this->fmtMoney((float)($it['payed_minor'] ?? 0)),
+                'payed_minor' => (int)round((float)($it['payed_minor'] ?? 0)),
                 'sum' => $this->fmtMoney($it['sum_minor']),
                 'sum_minor' => (int)round((float)$it['sum_minor']),
             ];
         }
 
         $netSumMinor = $totalSumMinor - $totalDiscountMinor;
+        $avgPriceMinor = $totalCount > 0 ? ($totalPriceWeightedMinor / $totalCount) : 0.0;
         $romaMinor = $totalSumMinor * self::ROMA_FACTOR;
         $romaDiscountMinor = $totalDiscountMinor * self::ROMA_FACTOR;
         $romaNetMinor = $netSumMinor * self::ROMA_FACTOR;
@@ -86,8 +110,12 @@ class Model {
             'items' => $outItems,
             'totals' => [
                 'count' => $this->fmtCount($totalCount),
+                'price' => $this->fmtMoney($avgPriceMinor),
+                'price_minor' => (int)round($avgPriceMinor),
                 'discount' => $this->fmtMoney($totalDiscountMinor),
                 'discount_minor' => (int)round($totalDiscountMinor),
+                'payed_sum' => $this->fmtMoney($totalPayedMinor),
+                'payed_minor' => (int)round($totalPayedMinor),
                 'sum' => $this->fmtMoney($totalSumMinor),
                 'sum_minor' => (int)round($totalSumMinor),
                 'net' => $this->fmtMoney($netSumMinor),

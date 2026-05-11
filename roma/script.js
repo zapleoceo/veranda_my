@@ -44,7 +44,9 @@ const load = async () => {
             tr.innerHTML = `
                 <td>${String(it.product_name || '')}</td>
                 <td class="num">${String(it.count || '0')}</td>
+                <td class="num">${String(it.price || '0')}</td>
                 <td class="num">${String(it.discount || '0')}</td>
+                <td class="num">${String(it.payed_sum || '0')}</td>
                 <td class="num">${String(it.sum || '0')}</td>
             `;
             tbody.appendChild(tr);
@@ -55,7 +57,9 @@ const load = async () => {
         trTot.innerHTML = `
             <td>Итого</td>
             <td class="num">${String(j.totals?.count || '0')}</td>
+            <td class="num">${String(j.totals?.price || '0')}</td>
             <td class="num">${String(j.totals?.discount || '0')}</td>
+            <td class="num">${String(j.totals?.payed_sum || '0')}</td>
             <td class="num">${String(j.totals?.sum || '0')}</td>
         `;
         tfoot.appendChild(trTot);
