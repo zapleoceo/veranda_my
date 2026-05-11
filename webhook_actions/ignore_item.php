@@ -14,8 +14,17 @@ try {
     );
     $callbackText = 'Игнор блюда установлен.';
     if (!empty($chatId) && !empty($messageId) && is_callable($postJson)) {
-        $postJson('deleteMessage', ['chat_id' => (string)$chatId, 'message_id' => (int)$messageId]);
-        $callbackText = 'Игнор блюда установлен. Сообщение удалено.';
+        $r = $postJson('deleteMessage', ['chat_id' => (string)$chatId, 'message_id' => (int)$messageId]);
+        if (is_array($r) && !empty($r['ok'])) {
+            $callbackText = 'Игнор блюда установлен. Сообщение удалено.';
+        } else {
+            $postJson('editMessageReplyMarkup', [
+                'chat_id' => (string)$chatId,
+                'message_id' => (int)$messageId,
+                'reply_markup' => ['inline_keyboard' => []],
+            ]);
+            $callbackText = 'Игнор блюда установлен. Кнопки убраны.';
+        }
     }
 } catch (\Throwable $e) {
     $callbackText = 'Ошибка';
