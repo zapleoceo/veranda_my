@@ -26,8 +26,10 @@ use App\Classes\TestAI\Service\Responder;
  *   - Call Responder (1 Gemini call) and send reply
  */
 class WebhookHandler {
-    /** Chats in this list are "authorized" (can see KB docs with access=members) */
+    /** Chats explicitly whitelisted (can see KB docs with access=members). Empty = open mode (all groups allowed). */
     private array $allowedChatIds;
+    /** When true, all group chats are accepted (allowedChatIds not configured). */
+    private bool $openMode;
 
     public function __construct(
         private string              $model,
@@ -41,7 +43,7 @@ class WebhookHandler {
         private Logger              $log,
         array                       $allowedChatIds = []
     ) {
-        // index by chat_id for O(1) lookup
+        $this->openMode       = empty($allowedChatIds);
         $this->allowedChatIds = array_flip(array_map('strval', $allowedChatIds));
     }
 
@@ -59,12 +61,12 @@ class WebhookHandler {
         $chatId   = isset($chat['id']) ? (string)$chat['id'] : '';
         if ($chatId === '') return;
 
-        // Non-private chats must be in the allowed list
-        if ($chatType !== 'private' && !isset($this->allowedChatIds[$chatId])) return;
+        // Non-private chats: reject if a whitelist is configured and this chat isn't in it.
+        // Open mode (no whitelist): accept all groups the bot is already a member of.
+        if ($chatType !== 'private' && !$this->openMode && !isset($this->allowedChatIds[$chatId])) return;
 
-        // Private chats are always authorized (they can see members-level KB)
-        // Group chats are authorized only if in the allowed list
-        $isAuthorized = $chatType === 'private' || isset($this->allowedChatIds[$chatId]);
+        // Authorized = private chat OR explicitly whitelisted group (or all groups in open mode)
+        $isAuthorized = $chatType === 'private' || $this->openMode || isset($this->allowedChatIds[$chatId]);
 
         $chatTitle = (string)($chat['title'] ?? '');
         $messageId = isset($msg['message_id']) ? (int)$msg['message_id'] : 0;
