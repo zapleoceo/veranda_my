@@ -40,9 +40,11 @@ function tr3_api_events_for_day(array $ctx): void {
     $responder = $ai['responder'] ?? null;
     if (!is_object($responder) || !method_exists($responder, 'respond')) throw new \RuntimeException('AI responder not configured');
 
-    $q = "Какие события есть на {$day}? Если ничего нет — напиши, что события на ту дату еще не запланировано.";
+    $q = "Какие события есть на {$day} коротко в одну строчку? Если ничего нет — напиши, что события на ту дату еще не запланировано.";
     $html = $responder->respond($q, [], false);
     $cand = trim(strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", (string)$html)));
+    $cand = preg_replace('/\s+/u', ' ', $cand ?? '');
+    $cand = trim((string)$cand);
     if ($cand !== '') {
       $text = $cand;
       $okAi = true;
