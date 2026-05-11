@@ -7,8 +7,6 @@ const tbody = document.getElementById('tbody');
 const tfoot = document.getElementById('tfoot');
 const romaBase = document.getElementById('romaBase');
 const romaSum = document.getElementById('romaSum');
-const romaDiscount = document.getElementById('romaDiscount');
-const romaGross = document.getElementById('romaGross');
 
 const setLoading = (on) => {
     btn.disabled = on;
@@ -28,8 +26,6 @@ const load = async () => {
     tfoot.innerHTML = '';
     romaBase.textContent = '0';
     romaSum.textContent = '0';
-    romaDiscount.textContent = '0';
-    romaGross.textContent = '0';
     try {
         const url = new URL(location.href);
         url.searchParams.set('ajax', 'load');
@@ -67,8 +63,6 @@ const load = async () => {
         tfoot.appendChild(trTot);
         romaBase.textContent = String(j.totals?.payed_sum || '0');
         romaSum.textContent = String(j.roma?.sum || '0');
-        romaDiscount.textContent = String(j.roma?.discount || '0');
-        romaGross.textContent = String(j.roma?.gross || '0');
     } catch (e) {
         setError(e && e.message ? e.message : 'Ошибка');
     } finally {
