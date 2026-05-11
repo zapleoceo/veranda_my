@@ -194,15 +194,20 @@ $data = $callback['data'] ?? '';
 $message = $callback['message'] ?? [];
 $messageId = isset($message['message_id']) ? (int)$message['message_id'] : 0;
 $chatId = isset($message['chat']['id']) ? (string)$message['chat']['id'] : '';
+$from = $callback['from'] ?? [];
+$fromUser = strtolower(trim((string)($from['username'] ?? '')));
+$fromUser = ltrim($fromUser, '@');
+$logLine('CALLBACK data=' . (string)$data . ' chat=' . (string)$chatId . ' msg=' . (int)$messageId . ' from=@' . (string)$fromUser);
 
 if (!preg_match('/^(ignore_item|ignore_tx|vposter|vdecline|vrestore|vposter_fix|vposter_cancel):(\d+)$/', $data, $m)) {
+    $logLine('CALLBACK_SKIP data=' . (string)$data);
     echo 'ok';
     exit;
 }
 
 $action = (string)($m[1] ?? '');
 $id = (int)($m[2] ?? 0);
-$from = $callback['from'] ?? [];
+$from = $from;
 $ackBy = trim(($from['first_name'] ?? '') . ' ' . ($from['last_name'] ?? ''));
 if ($ackBy === '') {
     $ackBy = $from['username'] ?? 'unknown';

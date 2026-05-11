@@ -26,6 +26,7 @@ try {
         );
     }
     $deleted = 0;
+    $markupCleared = 0;
     if ($txDate !== '' && is_callable($postJson) && !empty($chatId)) {
         $tgItems = $db->t('tg_alert_items');
         $ids = [];
@@ -48,14 +49,29 @@ try {
         if (!empty($messageId) && (int)$messageId > 0) $ids[(int)$messageId] = true;
         foreach (array_keys($ids) as $mid) {
             $r = $postJson('deleteMessage', ['chat_id' => (string)$chatId, 'message_id' => (int)$mid]);
-            if (is_array($r) && array_key_exists('ok', $r) && !empty($r['ok'])) $deleted++;
+            if (is_array($r) && !empty($r['ok'])) {
+                $deleted++;
+            } else {
+                $r2 = $postJson('editMessageReplyMarkup', [
+                    'chat_id' => (string)$chatId,
+                    'message_id' => (int)$mid,
+                    'reply_markup' => ['inline_keyboard' => []],
+                ]);
+                if (is_array($r2) && !empty($r2['ok'])) $markupCleared++;
+            }
         }
         try {
             $db->query("DELETE FROM {$tgItems} WHERE transaction_date = ? AND transaction_id = ?", [$txDate, $txId]);
         } catch (\Throwable $e) {
         }
     }
-    $callbackText = $deleted > 0 ? ('Игнор чека установлен. Удалено сообщений: ' . $deleted) : 'Игнор чека установлен.';
+    if ($deleted > 0) {
+        $callbackText = 'Игнор чека установлен. Удалено сообщений: ' . $deleted;
+    } elseif ($markupCleared > 0) {
+        $callbackText = 'Игнор чека установлен. Кнопки убраны: ' . $markupCleared;
+    } else {
+        $callbackText = 'Игнор чека установлен.';
+    }
 } catch (\Throwable $e) {
     $callbackText = 'Ошибка';
 }
