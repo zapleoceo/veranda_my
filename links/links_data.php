@@ -22,6 +22,7 @@ $i18n = [
             'tg_veranda' => ['title' => 'Написать в Telegram', 'subtitle' => ''],
             'tg_group' => ['title' => 'Наша группа в Telegram', 'subtitle' => ''],
             'phone' => ['title' => 'Позвонить нам', 'subtitle' => ''],
+            'instagram' => ['title' => 'Мы в Instagram', 'subtitle' => ''],
             'facebook' => ['title' => 'Мы в Facebook', 'subtitle' => ''],
             'director' => ['title' => 'Написать управляющему', 'subtitle' => ''],
             'map' => ['title' => 'Как добраться', 'subtitle' => ''],
@@ -46,6 +47,7 @@ $i18n = [
             'tg_veranda' => ['title' => 'Message on Telegram', 'subtitle' => ''],
             'tg_group' => ['title' => 'Our Telegram group', 'subtitle' => ''],
             'phone' => ['title' => 'Call us', 'subtitle' => ''],
+            'instagram' => ['title' => 'Instagram', 'subtitle' => ''],
             'facebook' => ['title' => 'We are on Facebook', 'subtitle' => ''],
             'director' => ['title' => 'Message manager', 'subtitle' => ''],
             'map' => ['title' => 'Get directions', 'subtitle' => ''],
@@ -70,6 +72,7 @@ $i18n = [
             'tg_veranda' => ['title' => 'Nhắn qua Telegram', 'subtitle' => ''],
             'tg_group' => ['title' => 'Nhóm Telegram của chúng tôi', 'subtitle' => ''],
             'phone' => ['title' => 'Gọi cho chúng tôi', 'subtitle' => ''],
+            'instagram' => ['title' => 'Instagram', 'subtitle' => ''],
             'facebook' => ['title' => 'Facebook', 'subtitle' => ''],
             'director' => ['title' => 'Nhắn quản lý', 'subtitle' => ''],
             'map' => ['title' => 'Chỉ đường', 'subtitle' => ''],
@@ -94,6 +97,7 @@ $i18n = [
             'tg_veranda' => ['title' => 'Telegram으로 메시지', 'subtitle' => ''],
             'tg_group' => ['title' => 'Telegram 그룹', 'subtitle' => ''],
             'phone' => ['title' => '전화하기', 'subtitle' => ''],
+            'instagram' => ['title' => 'Instagram', 'subtitle' => ''],
             'facebook' => ['title' => 'Facebook', 'subtitle' => ''],
             'director' => ['title' => '매니저에게 메시지', 'subtitle' => ''],
             'map' => ['title' => '오시는 길', 'subtitle' => ''],
@@ -103,7 +107,7 @@ $i18n = [
 
 $sections = [
     'primary' => ['menu', 'reserve'],
-    'contacts' => ['tg_veranda', 'whatsapp', 'phone', 'tg_group', 'facebook', 'director'],
+    'contacts' => ['tg_veranda', 'whatsapp', 'phone', 'tg_group', 'instagram', 'facebook', 'director'],
     'visit' => ['map'],
 ];
 
@@ -115,6 +119,7 @@ $linkDefs = [
     'menu' => ['href' => '/links/menu.php', 'icon' => 'menu'],
     'reserve' => ['href' => '/tr3', 'icon' => 'reserve'],
     'director' => ['href' => 'https://t.me/zapleo_ceo', 'icon' => 'director'],
+    'instagram' => ['href' => 'https://www.instagram.com/veranda.my/', 'icon' => 'instagram'],
     'facebook' => ['href' => 'https://www.facebook.com/share/1LSPvAR8X7/', 'icon' => 'facebook'],
     'map' => ['href' => 'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9', 'icon' => 'map'],
 ];
