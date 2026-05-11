@@ -55,6 +55,15 @@ $postJson = function (string $method, array $payload) use ($apiBase): ?array {
     return is_array($data) ? $data : null;
 };
 
+$logLine = function (string $msg): void {
+    $root = dirname(__DIR__);
+    $path = $root . '/telegram.log';
+    try {
+        @file_put_contents($path, '[' . date('Y-m-d H:i:s') . '] WEBHOOK ' . $msg . "\n", FILE_APPEND);
+    } catch (\Throwable $e) {
+    }
+};
+
 if (!empty($update['message'])) {
     $msg = $update['message'];
     $chat = is_array($msg['chat'] ?? null) ? $msg['chat'] : [];
@@ -223,7 +232,7 @@ try {
     }
 
     $isAdmin = !empty($userPermissions['admin']);
-    $canIgnore = $isAdmin || !empty($userPermissions['telegram_ack']);
+    $canIgnore = $isAdmin || !empty($userPermissions['telegram_ack']) || !empty($userPermissions['exclude_toggle']);
     $canPoster = $isAdmin || !empty($userPermissions['vposter_button']);
     $isAllowed = $isAdmin || $canIgnore || $canPoster || !empty($userPermissions['exclude_toggle']);
 
@@ -235,10 +244,12 @@ try {
     }
 
     if (!$isAllowed) {
+        $deny = 'DENY action=' . $action . ' id=' . $id . ' user=@' . $username;
+        $logLine($deny);
         if ($callbackId !== '') {
             $postJson('answerCallbackQuery', [
                 'callback_query_id' => $callbackId,
-                'text' => 'Эта кнопка только для уважаемых людей',
+                'text' => ($username !== '' ? ('Нет доступа для @' . $username) : 'Нет доступа: у вас нет username в Telegram') . '. Попросите доступ "✅ Принято (Telegram)".',
                 'show_alert' => true
             ]);
         }
@@ -249,10 +260,13 @@ try {
     if (in_array($action, ['vposter', 'vdecline', 'vrestore', 'vposter_fix', 'vposter_cancel', 'ignore_tx', 'ignore_item'], true) && $id > 0) {
         $actionFile = __DIR__ . '/' . $action . '.php';
         if (file_exists($actionFile)) {
+            $logLine('ALLOW action=' . $action . ' id=' . $id . ' user=@' . $username);
             require_once $actionFile;
         }
     }
-} catch (\Exception $e) {
+} catch (\Throwable $e) {
+    $logLine('ERROR action=' . $action . ' id=' . $id . ' msg=' . preg_replace('/\s+/', ' ', $e->getMessage()));
+    $callbackText = 'Ошибка: ' . $e->getMessage();
 }
 
 if ($callbackId !== '') {
