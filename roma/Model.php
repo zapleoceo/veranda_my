@@ -45,6 +45,9 @@ class Model {
             $discountMinor = (float)($r['discount'] ?? 0);
             $payedMinor = (float)($r['payed_sum'] ?? 0);
             $priceMinor = (float)($r['price'] ?? 0);
+            if ($priceMinor <= 0 && $count > 0 && $sumMinor > 0) {
+                $priceMinor = $sumMinor / $count;
+            }
 
             if (!isset($rows[$name])) {
                 $rows[$name] = [
@@ -99,9 +102,10 @@ class Model {
 
         $netSumMinor = $totalSumMinor - $totalDiscountMinor;
         $avgPriceMinor = $totalCount > 0 ? ($totalPriceWeightedMinor / $totalCount) : 0.0;
-        $romaMinor = $totalSumMinor * self::ROMA_FACTOR;
+        $romaMinor = $totalPayedMinor * self::ROMA_FACTOR;
         $romaDiscountMinor = $totalDiscountMinor * self::ROMA_FACTOR;
         $romaNetMinor = $netSumMinor * self::ROMA_FACTOR;
+        $romaGrossMinor = $totalSumMinor * self::ROMA_FACTOR;
 
         return [
             'date_from' => $dateFrom,
@@ -129,6 +133,8 @@ class Model {
                 'discount_minor' => (int)round($romaDiscountMinor),
                 'net' => $this->fmtMoney($romaNetMinor),
                 'net_minor' => (int)round($romaNetMinor),
+                'gross' => $this->fmtMoney($romaGrossMinor),
+                'gross_minor' => (int)round($romaGrossMinor),
             ],
         ];
     }
