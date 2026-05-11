@@ -66,6 +66,11 @@ switch ($ajax) {
     require_once __DIR__ . '/api_menu.php';
     tr3_api_menu_preorder($ctx);
     break;
+
+  case 'events_for_day':
+    require_once __DIR__ . '/api_events.php';
+    tr3_api_events_for_day($ctx);
+    break;
 }
 
 api_json_headers(false);
