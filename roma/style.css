@@ -24,4 +24,5 @@ tr.total td { font-weight: 900; background: rgba(26,115,232,0.06); }
 .roma-actions { display: flex; align-items: center; }
 .roma-error { display: none; }
 .roma-col-count { width: 140px; text-align: right; }
+.roma-col-discount { width: 180px; text-align: right; }
 .roma-col-saldo { width: 180px; text-align: right; }

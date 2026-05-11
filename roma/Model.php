@@ -29,6 +29,7 @@ class Model {
         $rows = [];
         $totalCount = 0.0;
         $totalSumMinor = 0.0;
+        $totalDiscountMinor = 0.0;
 
         foreach ($resp as $r) {
             $catId = (int)($r['category_id'] ?? 0);
@@ -39,15 +40,18 @@ class Model {
 
             $count = (float)($r['count'] ?? 0);
             $sumMinor = (float)($r['product_sum'] ?? 0);
+            $discountMinor = (float)($r['discount'] ?? 0);
 
             if (!isset($rows[$name])) {
-                $rows[$name] = ['product_name' => $name, 'count' => 0.0, 'sum_minor' => 0.0];
+                $rows[$name] = ['product_name' => $name, 'count' => 0.0, 'sum_minor' => 0.0, 'discount_minor' => 0.0];
             }
             $rows[$name]['count'] += $count;
             $rows[$name]['sum_minor'] += $sumMinor;
+            $rows[$name]['discount_minor'] += $discountMinor;
 
             $totalCount += $count;
             $totalSumMinor += $sumMinor;
+            $totalDiscountMinor += $discountMinor;
         }
 
         $items = array_values($rows);
@@ -63,12 +67,17 @@ class Model {
             $outItems[] = [
                 'product_name' => (string)$it['product_name'],
                 'count' => $this->fmtCount($it['count']),
+                'discount' => $this->fmtMoney((float)($it['discount_minor'] ?? 0)),
+                'discount_minor' => (int)round((float)($it['discount_minor'] ?? 0)),
                 'sum' => $this->fmtMoney($it['sum_minor']),
                 'sum_minor' => (int)round((float)$it['sum_minor']),
             ];
         }
 
+        $netSumMinor = $totalSumMinor - $totalDiscountMinor;
         $romaMinor = $totalSumMinor * self::ROMA_FACTOR;
+        $romaDiscountMinor = $totalDiscountMinor * self::ROMA_FACTOR;
+        $romaNetMinor = $netSumMinor * self::ROMA_FACTOR;
 
         return [
             'date_from' => $dateFrom,
@@ -77,13 +86,21 @@ class Model {
             'items' => $outItems,
             'totals' => [
                 'count' => $this->fmtCount($totalCount),
+                'discount' => $this->fmtMoney($totalDiscountMinor),
+                'discount_minor' => (int)round($totalDiscountMinor),
                 'sum' => $this->fmtMoney($totalSumMinor),
                 'sum_minor' => (int)round($totalSumMinor),
+                'net' => $this->fmtMoney($netSumMinor),
+                'net_minor' => (int)round($netSumMinor),
             ],
             'roma' => [
                 'factor' => self::ROMA_FACTOR,
                 'sum' => $this->fmtMoney($romaMinor),
                 'sum_minor' => (int)round($romaMinor),
+                'discount' => $this->fmtMoney($romaDiscountMinor),
+                'discount_minor' => (int)round($romaDiscountMinor),
+                'net' => $this->fmtMoney($romaNetMinor),
+                'net_minor' => (int)round($romaNetMinor),
             ],
         ];
     }
