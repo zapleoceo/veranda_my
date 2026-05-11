@@ -15,9 +15,9 @@ class MessageRepository {
                 "INSERT INTO {$this->table}
                     (tg_chat_id, tg_chat_type, tg_chat_title, tg_message_id, tg_user_id,
                      tg_username, tg_name, received_at, text,
-                     media_type, media_file_id, media_file_unique_id, media_mime, media_duration_sec, media_text, meta_json)
+                     media_type, media_file_id, media_file_unique_id, media_mime, media_duration_sec, media_text, meta_json, importance)
                  VALUES (?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?,
-                         NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), ?)
+                         NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''), ?, ?)
                  ON DUPLICATE KEY UPDATE
                     tg_chat_type            = VALUES(tg_chat_type),
                     tg_chat_title           = VALUES(tg_chat_title),
@@ -38,6 +38,7 @@ class MessageRepository {
                     $m['username'], $m['name'], $m['received_at'], $m['text'],
                     $m['media_type'], $m['media_file_id'], $m['media_file_unique_id'],
                     $m['media_mime'], $m['media_duration_sec'], $m['media_text'], $m['meta_json'],
+                    (int)($m['importance'] ?? 5),
                 ]
             );
         } catch (\Throwable) {}
@@ -82,6 +83,47 @@ class MessageRepository {
         } catch (\Throwable) {
             return [];
         }
+    }
+
+    /**
+     * FULLTEXT search across recent messages.
+     * Used by ToolDispatcher when searching for events/announcements.
+     *
+     * @return array<array{tg_chat_id:string, tg_message_id:int, tg_username:string, received_at:string, text:string, media_text:string|null}>
+     */
+    public function searchFulltext(string $query, int $daysBack = 14, int $limit = 15): array {
+        $limit = max(1, min(50, $limit));
+        $since = date('Y-m-d H:i:s', strtotime("-{$daysBack} days"));
+        $query = trim($query);
+
+        if ($query !== '') {
+            try {
+                $rows = $this->db->query(
+                    "SELECT tg_chat_id, tg_message_id, tg_username, tg_name, received_at, text, media_text
+                     FROM {$this->table}
+                     WHERE received_at >= ?
+                       AND MATCH(text, media_text) AGAINST(? IN BOOLEAN MODE)
+                     ORDER BY received_at DESC LIMIT {$limit}",
+                    [$since, $query]
+                )->fetchAll();
+                if (is_array($rows) && count($rows) > 0) return $rows;
+            } catch (\Throwable) {}
+
+            // Fallback: LIKE search
+            $like = '%' . str_replace(['%', '_'], ['\%', '\_'], $query) . '%';
+            try {
+                $rows = $this->db->query(
+                    "SELECT tg_chat_id, tg_message_id, tg_username, tg_name, received_at, text, media_text
+                     FROM {$this->table}
+                     WHERE received_at >= ? AND (text LIKE ? OR media_text LIKE ?)
+                     ORDER BY received_at DESC LIMIT {$limit}",
+                    [$since, $like, $like]
+                )->fetchAll();
+                return is_array($rows) ? $rows : [];
+            } catch (\Throwable) {}
+        }
+
+        return [];
     }
 
     public function getTotals(): array {

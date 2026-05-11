@@ -14,7 +14,7 @@ class KnowledgeRepository {
         $offset = max(0, $offset);
         try {
             $rows = $this->db->query(
-                "SELECT id, title, source_url, access, is_active, created_at, updated_at
+                "SELECT id, title, source_url, access, category, is_active, created_at, updated_at
                  FROM {$this->table}
                  ORDER BY updated_at DESC
                  LIMIT {$limit} OFFSET {$offset}"
@@ -29,7 +29,7 @@ class KnowledgeRepository {
         if ($id <= 0) return null;
         try {
             $row = $this->db->query(
-                "SELECT id, title, source_url, content, access, is_active, created_at, updated_at
+                "SELECT id, title, source_url, content, access, category, tags, is_active, created_at, updated_at
                  FROM {$this->table} WHERE id = ? LIMIT 1",
                 [$id]
             )->fetch();
@@ -40,13 +40,49 @@ class KnowledgeRepository {
     }
 
     /**
-     * Search active KB docs by keywords.
-     * access: 'public' always returned; 'members' only when $authorized=true; 'never' never returned.
+     * FULLTEXT search with LIKE fallback. Used by ToolDispatcher.
+     */
+    public function searchFulltext(string $query, bool $authorized, int $limit = 6): array {
+        $limit      = max(1, min(12, $limit));
+        $accessCond = $authorized ? "access IN ('public','members')" : "access = 'public'";
+        $query      = trim($query);
+        if ($query === '') return [];
+
+        try {
+            $rows = $this->db->query(
+                "SELECT id, title, source_url, content, access, category, updated_at
+                 FROM {$this->table}
+                 WHERE is_active = 1 AND {$accessCond}
+                   AND MATCH(title, content) AGAINST(? IN BOOLEAN MODE)
+                 ORDER BY updated_at DESC LIMIT {$limit}",
+                [$query]
+            )->fetchAll();
+            if (is_array($rows) && count($rows) > 0) return $rows;
+        } catch (\Throwable) {}
+
+        // Fallback: LIKE
+        $like = '%' . str_replace(['%', '_'], ['\%', '\_'], mb_strtolower($query)) . '%';
+        try {
+            $rows = $this->db->query(
+                "SELECT id, title, source_url, content, access, category, updated_at
+                 FROM {$this->table}
+                 WHERE is_active = 1 AND {$accessCond}
+                   AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ?)
+                 ORDER BY updated_at DESC LIMIT {$limit}",
+                [$like, $like]
+            )->fetchAll();
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * Keyword LIKE search (legacy, used by KnowledgeService::search).
      */
     public function searchByKeywords(array $keywords, bool $authorized, int $limit = 6): array {
         $limit = max(1, min(12, $limit));
 
-        // normalize keywords
         $kw = [];
         foreach ($keywords as $k) {
             $t = trim(mb_strtolower((string)$k));
@@ -70,11 +106,10 @@ class KnowledgeRepository {
 
         try {
             $rows = $this->db->query(
-                "SELECT id, title, source_url, content, access, updated_at
+                "SELECT id, title, source_url, content, access, category, updated_at
                  FROM {$this->table}
                  WHERE is_active = 1 AND {$accessCond} AND ({$where})
-                 ORDER BY updated_at DESC
-                 LIMIT {$limit}",
+                 ORDER BY updated_at DESC LIMIT {$limit}",
                 $params
             )->fetchAll();
             return is_array($rows) ? $rows : [];
@@ -83,27 +118,39 @@ class KnowledgeRepository {
         }
     }
 
-    public function upsert(?int $id, string $title, string $content, string $sourceUrl, string $access, int $isActive): int {
+    public function upsert(
+        ?int $id,
+        string $title,
+        string $content,
+        string $sourceUrl,
+        string $access,
+        int $isActive,
+        string $category = 'other',
+        string $tags = ''
+    ): int {
         $title     = mb_substr(trim($title) ?: 'Untitled', 0, 255);
         $sourceUrl = mb_substr(trim($sourceUrl), 0, 512);
         $access    = in_array($access, ['public', 'members', 'never'], true) ? $access : 'public';
+        $category  = mb_substr(trim($category) ?: 'other', 0, 64);
         $content   = trim($content);
         $isActive  = $isActive ? 1 : 0;
+        $tagsVal   = trim($tags) !== '' ? trim($tags) : null;
 
         try {
             if ($id !== null && $id > 0) {
                 $this->db->query(
                     "UPDATE {$this->table}
-                     SET title = ?, source_url = NULLIF(?, ''), content = ?, access = ?, is_active = ?
+                     SET title = ?, source_url = NULLIF(?, ''), content = ?, access = ?,
+                         category = ?, tags = ?, is_active = ?
                      WHERE id = ? LIMIT 1",
-                    [$title, $sourceUrl, $content, $access, $isActive, $id]
+                    [$title, $sourceUrl, $content, $access, $category, $tagsVal, $isActive, $id]
                 );
                 return $id;
             }
             $this->db->query(
-                "INSERT INTO {$this->table} (title, source_url, content, access, is_active)
-                 VALUES (?, NULLIF(?, ''), ?, ?, ?)",
-                [$title, $sourceUrl, $content, $access, $isActive]
+                "INSERT INTO {$this->table} (title, source_url, content, access, category, tags, is_active)
+                 VALUES (?, NULLIF(?, ''), ?, ?, ?, ?, ?)",
+                [$title, $sourceUrl, $content, $access, $category, $tagsVal, $isActive]
             );
             $pdo = $this->db->getPdo();
             return $pdo ? (int)$pdo->lastInsertId() : 0;

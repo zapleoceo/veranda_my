@@ -7,15 +7,16 @@ namespace App\Classes\TestAI\Infra;
 use App\Classes\TestAI\Repository\SettingsRepository;
 
 /**
- * Fetches current dish availability from Poster POS.
- * Used to tell the bot which menu items are currently 86'd.
- * Results are cached in settings table for CACHE_TTL seconds.
+ * Fetches menu data from Poster POS.
+ * Products are cached in settings table for CACHE_TTL seconds.
+ * Provides: availability text + dish composition lookup.
  */
 class PosterClient {
-    private const CACHE_TEXT = 'poster_availability_text';
-    private const CACHE_TS   = 'poster_availability_ts';
-    private const CACHE_TTL  = 1800; // 30 min
-    private const SPOT_ID    = 1;
+    private const CACHE_TEXT     = 'poster_availability_text';
+    private const CACHE_PRODUCTS = 'poster_products_json';
+    private const CACHE_TS       = 'poster_availability_ts';
+    private const CACHE_TTL      = 1800; // 30 min
+    private const SPOT_ID        = 1;
 
     public function __construct(
         private string             $token,
@@ -28,26 +29,80 @@ class PosterClient {
     /** Returns formatted availability text (may be stale on API error). */
     public function getAvailabilityText(bool $forceRefresh = false): string {
         if (!$this->isConfigured()) return '';
+        $products = $this->getCachedProducts($forceRefresh);
+        if ($products === null) return $this->settings->get(self::CACHE_TEXT);
+        return $this->formatAvailability($products);
+    }
 
-        $cached = $this->settings->get(self::CACHE_TEXT);
-        $ts     = $this->settings->get(self::CACHE_TS);
+    /**
+     * Find a dish by name and return its ingredient list.
+     * Uses fuzzy matching via similar_text().
+     */
+    public function getDishComposition(string $dishName): string {
+        if (!$this->isConfigured()) return '';
+        $products = $this->getCachedProducts();
+        if ($products === null) return 'Нет доступа к POS системе.';
 
-        if (!$forceRefresh && $cached !== '' && $ts !== '' && (time() - (int)strtotime($ts)) < self::CACHE_TTL) {
-            return $cached;
+        $needle  = mb_strtolower(trim($dishName));
+        $best    = null;
+        $bestPct = 0.0;
+
+        foreach ($products as $p) {
+            $name = mb_strtolower(trim((string)($p['product_name'] ?? '')));
+            if ($name === '') continue;
+            similar_text($needle, $name, $pct);
+            // boost exact substring match
+            if (str_contains($name, $needle) || str_contains($needle, $name)) $pct = max($pct, 80.0);
+            if ($pct > $bestPct) { $bestPct = $pct; $best = $p; }
         }
 
-        $products = $this->fetchProducts();
-        if ($products === null) return $cached; // fallback to stale cache
+        if ($best === null || $bestPct < 45) return 'Блюдо не найдено в POS системе.';
 
-        $text = $this->formatAvailability($products);
-        $this->settings->set(self::CACHE_TEXT, $text);
-        $this->settings->set(self::CACHE_TS, date('c'));
-        return $text;
+        $ingredients = is_array($best['ingredients'] ?? null) ? $best['ingredients'] : [];
+        if (!$ingredients) {
+            $name = trim((string)($best['product_name'] ?? $dishName));
+            return "Состав «{$name}» не указан в POS системе.";
+        }
+
+        $parts = [];
+        foreach ($ingredients as $ing) {
+            $iName  = trim((string)($ing['ingredient_name'] ?? ''));
+            $brutto = trim((string)($ing['brutto'] ?? ''));
+            $unit   = trim((string)($ing['ingredient_unit'] ?? ''));
+            if ($iName === '') continue;
+            $parts[] = $brutto !== '' ? "{$iName} {$brutto}{$unit}" : $iName;
+        }
+
+        $name = trim((string)($best['product_name'] ?? $dishName));
+        return "Состав «{$name}»: " . implode(', ', $parts) . '.';
     }
 
     /** Returns last refresh timestamp or empty string. */
     public function lastUpdatedAt(): string {
         return $this->settings->get(self::CACHE_TS);
+    }
+
+    private function getCachedProducts(bool $forceRefresh = false): ?array {
+        $ts  = $this->settings->get(self::CACHE_TS);
+        $raw = $this->settings->get(self::CACHE_PRODUCTS);
+
+        if (!$forceRefresh && $raw !== '' && $ts !== '' && (time() - (int)strtotime($ts)) < self::CACHE_TTL) {
+            $products = json_decode($raw, true);
+            if (is_array($products)) return $products;
+        }
+
+        $products = $this->fetchProducts();
+        if ($products === null) {
+            // Return stale data rather than nothing
+            $stale = $raw !== '' ? json_decode($raw, true) : null;
+            return is_array($stale) ? $stale : null;
+        }
+
+        $text = $this->formatAvailability($products);
+        $this->settings->set(self::CACHE_PRODUCTS, json_encode($products, JSON_UNESCAPED_UNICODE) ?: '');
+        $this->settings->set(self::CACHE_TEXT, $text);
+        $this->settings->set(self::CACHE_TS, date('c'));
+        return $products;
     }
 
     private function fetchProducts(): ?array {

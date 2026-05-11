@@ -12,6 +12,7 @@ $poster       = $ctx['poster'];
 $gemini       = $ctx['gemini'];
 $sanitizer    = $ctx['sanitizer'];
 $fetcher      = $ctx['fetcher'];
+$knowledgeSvc = $ctx['knowledgeSvc'];
 $log          = $ctx['log'];
 $cfg          = $ctx['cfg'];
 
@@ -132,7 +133,17 @@ if ($ajax !== '') {
         $url      = (string)($_POST['source_url'] ?? '');
         $access   = (string)($_POST['access'] ?? 'public');
         $isActive = (int)($_POST['is_active'] ?? 1);
-        $newId    = $kbRepo->upsert($id > 0 ? $id : null, $title, $content, $url, $access, $isActive);
+        $category = (string)($_POST['category'] ?? 'other');
+        $tags     = (string)($_POST['tags'] ?? '');
+
+        // Auto-categorize when saving a new doc or when category is still 'other' and tags empty
+        if ($category === 'other' && $tags === '' && ($content !== '' || $title !== '')) {
+            $cat      = $knowledgeSvc->categorizeDoc($title, $content ?: $title);
+            $category = $cat['category'] ?? 'other';
+            $tags     = is_string($cat['tags'] ?? null) ? $cat['tags'] : '';
+        }
+
+        $newId = $kbRepo->upsert($id > 0 ? $id : null, $title, $content, $url, $access, $isActive, $category, $tags);
         if ($newId <= 0) $json(['ok' => false, 'error' => 'save_failed'], 500);
         $json(['ok' => true, 'id' => $newId, 'item' => $kbRepo->getById($newId)]);
     }
@@ -167,7 +178,8 @@ if ($ajax !== '') {
             if ($t !== '') $title = $t;
         }
 
-        $newId = $kbRepo->upsert(null, $title, $text, $url, 'public', 1);
+        $cat   = $knowledgeSvc->categorizeDoc($title, $text);
+        $newId = $kbRepo->upsert(null, $title, $text, $url, 'public', 1, $cat['category'] ?? 'other', is_string($cat['tags'] ?? null) ? $cat['tags'] : '');
         if ($newId <= 0) $json(['ok' => false, 'error' => 'save_failed'], 500);
         $json(['ok' => true, 'id' => $newId, 'item' => $kbRepo->getById($newId)]);
     }

@@ -148,12 +148,13 @@
     const tbody = $('kbBody');
     if (!tbody) return;
     if (!d.items.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="ai-empty">Пусто. Добавьте документ или импортируйте URL.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="ai-empty">Пусто. Добавьте документ или импортируйте URL.</td></tr>';
       return;
     }
     tbody.innerHTML = d.items.map(it => `
       <tr data-id="${it.id}">
         <td>${htmlEsc(it.title)}</td>
+        <td><span class="ai-cat">${htmlEsc(it.category || 'other')}</span></td>
         <td>${it.source_url ? `<a href="${htmlEsc(it.source_url)}" target="_blank">🔗</a>` : '<span class="ai-muted">текст</span>'}</td>
         <td><span class="ai-acc ${ACCESS_CLASS[it.access] || ''}">${ACCESS_LABEL[it.access] || it.access}</span></td>
         <td>${it.is_active ? '<span class="ai-dot-on">●</span>' : '<span class="ai-dot-off">○</span>'}</td>
@@ -178,15 +179,17 @@
   // ── KB modal ──────────────────────────────────────────────────────────────
 
   function openKbModal(id) {
-    $('kbId').value             = id || '';
-    $('kbTitle').value          = '';
-    $('kbUrl').value            = '';
-    $('kbContent').value        = '';
-    $('kbAccess').value         = 'public';
-    $('kbActive').checked       = true;
-    $('kbModalErr').textContent = '';
+    $('kbId').value               = id || '';
+    $('kbTitle').value            = '';
+    $('kbUrl').value              = '';
+    $('kbContent').value          = '';
+    $('kbAccess').value           = 'public';
+    $('kbCategory').value         = 'other';
+    $('kbTags').value             = '';
+    $('kbActive').checked         = true;
+    $('kbModalErr').textContent   = '';
     $('kbModalTitle').textContent = id ? 'Редактировать' : 'Новый документ';
-    $('kbModal').style.display  = 'flex';
+    $('kbModal').style.display    = 'flex';
     if (id) get('kb_get', { id }).then(d => {
       if (!d.ok || !d.item) return;
       const it = d.item;
@@ -194,6 +197,8 @@
       $('kbUrl').value      = it.source_url || '';
       $('kbContent').value  = it.content || '';
       $('kbAccess').value   = it.access || 'public';
+      $('kbCategory').value = it.category || 'other';
+      $('kbTags').value     = it.tags || '';
       $('kbActive').checked = !!+it.is_active;
     });
   }
@@ -205,16 +210,18 @@
   $('kbModal')?.addEventListener('click', (e) => { if (e.target === $('kbModal')) closeKbModal(); });
 
   $('btnKbSave')?.addEventListener('click', async () => {
-    const id      = +($('kbId')?.value || 0);
-    const title   = ($('kbTitle')?.value ?? '').trim();
-    const url     = ($('kbUrl')?.value ?? '').trim();
-    const content = ($('kbContent')?.value ?? '').trim();
-    const access  = $('kbAccess')?.value || 'public';
-    const active  = $('kbActive')?.checked ? 1 : 0;
+    const id       = +($('kbId')?.value || 0);
+    const title    = ($('kbTitle')?.value ?? '').trim();
+    const url      = ($('kbUrl')?.value ?? '').trim();
+    const content  = ($('kbContent')?.value ?? '').trim();
+    const access   = $('kbAccess')?.value || 'public';
+    const category = $('kbCategory')?.value || 'other';
+    const tags     = ($('kbTags')?.value ?? '').trim();
+    const active   = $('kbActive')?.checked ? 1 : 0;
     $('kbModalErr').textContent = '';
     if (!title) { $('kbModalErr').textContent = 'Введите название'; return; }
     if (!content && !url) { $('kbModalErr').textContent = 'Заполните содержимое или URL'; return; }
-    const d = await post('kb_save', { id, title, source_url: url, content, access, is_active: active });
+    const d = await post('kb_save', { id, title, source_url: url, content, access, category, tags, is_active: active });
     if (d.ok) { closeKbModal(); reloadKb(); }
     else $('kbModalErr').textContent = 'Ошибка: ' + (d.error || '?');
   });
