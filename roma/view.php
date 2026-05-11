@@ -60,7 +60,7 @@
 
         <div class="romaTotal">
             <div class="romaBox">
-                Рассчет роме: <span id="romaSum">0</span>
+                <span id="romaBase">0</span> * 65% = <span id="romaSum">0</span>
                 · Скидка: <span id="romaDiscount">0</span>
                 · По салдо: <span id="romaGross">0</span>
             </div>
