@@ -6,49 +6,38 @@ namespace App\Classes\TestAI\Service;
 
 use App\Classes\TestAI\Infra\GeminiClient;
 use App\Classes\TestAI\Infra\HtmlSanitizer;
-use App\Classes\TestAI\Infra\PosterClient;
 use App\Classes\TestAI\Repository\SettingsRepository;
 
 /**
- * Answers a chat question using exactly ONE Gemini call.
+ * Answers a chat question using Gemini function calling (tool use).
  *
  * Flow:
- *   1. PHP detects topic (menu or KB) — no AI call.
- *   2. PHP loads data: menu from DB, KB docs filtered by access level.
- *   3. Single Gemini call: system + data + question → answer.
+ *   1. Detect language (no AI).
+ *   2. Check response cache for short, context-free questions.
+ *   3. Step 1 Gemini call: question + context + tool declarations → Gemini decides which tools to use.
+ *   4. If Gemini returns functionCall(s): PHP dispatches each → collects results.
+ *   5. Step 2 Gemini call: previous turn + tool results → final answer.
+ *   6. Sanitize HTML, store in cache, return.
  *
- * Privacy is enforced at two levels:
- *   - SQL: 'members' docs only returned for authorized chats.
- *   - System prompt: forbidden topics injected as hard NEVER rules.
- *   - MenuRepository: cost_raw is never selected, only price_raw.
+ * Privacy enforced by:
+ *   - ToolDispatcher: authorized flag passed to every tool call.
+ *   - System prompt: forbidden topics as hard NEVER rules.
  */
 class Responder {
-    private const MENU_KEYWORDS = [
-        'меню','блюд','завтрак','бизнес-ланч','стоит','цена','цены','ценник',
-        'заказ','кухня','бар','напит','десерт','салат','суп','горяч','закуск',
-        'пицц','паст','стейк','рыб','морепрод','шашлык','карп','курин','говяд',
-        'мяс','вегетари','веган','постн','аллерг','глютен','лактоз',
-        'состав','ингредиент','калор','острое','сладк','холодн',
-        'menu','price','dish','food','drink','breakfast','lunch','dinner','beer','wine',
-        'vegetarian','vegan','meat','ingredient','allergen',
-    ];
-
-    private const CACHE_TTL = 600;
+    private const CACHE_TTL = 600; // 10 min
 
     public function __construct(
-        private string              $model,
-        private GeminiClient        $gemini,
-        private HtmlSanitizer       $sanitizer,
-        private SettingsRepository  $settings,
-        private KnowledgeService    $knowledgeSvc,
-        private MenuService         $menuSvc,
-        private ?PosterClient       $poster = null
+        private string             $model,
+        private GeminiClient       $gemini,
+        private HtmlSanitizer      $sanitizer,
+        private SettingsRepository $settings,
+        private ToolDispatcher     $toolDispatcher
     ) {}
 
     /**
-     * @param string $question     The user's question
+     * @param string $question     User's question
      * @param array  $context      Recent chat messages [{from, text, at}]
-     * @param bool   $isAuthorized True if chat is in allowed list
+     * @param bool   $isAuthorized True if chat is authorized (sees 'members' KB docs)
      * @return string              Sanitized Telegram HTML answer
      */
     public function respond(string $question, array $context, bool $isAuthorized): string {
@@ -57,54 +46,100 @@ class Responder {
 
         $lang = $this->detectLang($question, $context);
 
-        // 1. PHP topic detection — no AI
-        $needsMenu = $this->isMenuQuestion($question);
-
+        // Cache only for simple one-shot questions (no/minimal context)
         $cacheKey = null;
-        if (!$needsMenu && count($context) <= 1) {
+        if (count($context) <= 1) {
             $cacheKey = '_rc:' . sha1(mb_strtolower($question) . ':' . ($isAuthorized ? '1' : '0'));
             $cached   = $this->getCache($cacheKey);
             if ($cached !== null) return $cached;
         }
 
-        // 2. Load data (cheap SQL / cached API calls)
-        $menuText    = $needsMenu ? $this->menuSvc->getMenuText($lang === 'en' ? 'en' : 'ru') : '';
-        $posterText  = ($needsMenu && $this->poster) ? $this->poster->getAvailabilityText() : '';
-        $kbDocs      = $this->knowledgeSvc->search($question, $isAuthorized);
+        $system   = $this->buildSystem($lang);
+        $toolDecls = $this->toolDispatcher->getDeclarations();
+        $contents  = $this->buildContents($question, $context, $lang);
 
-        // 3. Build system prompt
-        $system = $this->buildSystem($lang);
+        // Step 1: Gemini decides which tools to call (or answers directly)
+        $resp1     = $this->gemini->generateWithTools(
+            $this->model, $contents, $toolDecls,
+            ['system' => $system, 'temperature' => 0.3, 'maxOutputTokens' => 8192, 'tag' => 'chat_step1']
+        );
+        $toolCalls = $this->gemini->extractToolCalls($resp1);
 
-        // 4. Build payload
+        if ($toolCalls) {
+            // Dispatch each tool call
+            $toolResults = [];
+            foreach ($toolCalls as $tc) {
+                $result        = $this->toolDispatcher->dispatch($tc['name'], $tc['args'], $isAuthorized, $lang);
+                $toolResults[] = ['name' => $tc['name'], 'result' => $result];
+            }
+
+            // Step 2: Second call with tool results injected
+            $contents2 = $this->appendToolResults($contents, $resp1, $toolResults);
+            $resp2     = $this->gemini->generateWithTools(
+                $this->model, $contents2, $toolDecls,
+                ['system' => $system, 'temperature' => 0.3, 'maxOutputTokens' => 8192, 'tag' => 'chat_step2']
+            );
+
+            $html = $this->gemini->text($resp2);
+            if ($html === '') {
+                $this->storeRateLimitBlock($resp2);
+                $html = $this->errorText($resp2, $lang, $this->waitSecFromSettings());
+            }
+        } else {
+            // Direct text answer (no tools needed)
+            $html = $this->gemini->text($resp1);
+            if ($html === '') {
+                $this->storeRateLimitBlock($resp1);
+                $html = $this->errorText($resp1, $lang, $this->waitSecFromSettings());
+            }
+        }
+
+        $html = $this->sanitizer->sanitizeTelegramHtml($html);
+
+        if ($cacheKey !== null && $html !== ''
+            && !str_contains($html, 'Лимит') && !str_contains($html, 'Не получилось')) {
+            $this->setCache($cacheKey, $html);
+        }
+
+        return $html;
+    }
+
+    // ─── Private helpers ─────────────────────────────────────────────────────
+
+    private function buildContents(string $question, array $context, string $lang): array {
         $payload = [
             'question' => $question,
             'lang'     => $lang,
             'context'  => $this->trimContext($context),
         ];
-        if ($menuText !== '')  $payload['menu']         = $menuText;
-        if ($posterText !== '') $payload['availability'] = $posterText;
-        if ($kbDocs)           $payload['knowledge']    = $kbDocs;
+        return [
+            ['role' => 'user', 'parts' => [['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]]],
+        ];
+    }
 
-        // 5. ONE Gemini call
-        $resp = $this->gemini->generate(
-            $this->model,
-            [['text' => json_encode($payload, JSON_UNESCAPED_UNICODE)]],
-            ['system' => $system, 'temperature' => 0.3, 'maxOutputTokens' => 8192, 'tag' => 'chat_reply']
-        );
-
-        $html = $this->gemini->text($resp);
-        if ($html === '') {
-            $this->storeRateLimitBlock($resp);
-            $html = $this->errorText($resp, $lang, $this->waitSecFromSettings());
+    private function appendToolResults(array $contents, array $modelResp, array $toolResults): array {
+        // Append model's turn (with functionCall parts)
+        $modelParts = $modelResp['candidates'][0]['content']['parts'] ?? [];
+        if ($modelParts) {
+            $contents[] = ['role' => 'model', 'parts' => $modelParts];
         }
 
-        $html = $this->sanitizer->sanitizeTelegramHtml($html);
-
-        if ($cacheKey !== null && $html !== '' && !str_contains($html, 'Лимит') && !str_contains($html, 'Не получилось')) {
-            $this->setCache($cacheKey, $html);
+        // Append tool results as functionResponse parts
+        $responseParts = [];
+        foreach ($toolResults as $tr) {
+            $result = is_array($tr['result']) ? $tr['result'] : ['result' => (string)$tr['result']];
+            $responseParts[] = [
+                'functionResponse' => [
+                    'name'     => $tr['name'],
+                    'response' => $result,
+                ],
+            ];
+        }
+        if ($responseParts) {
+            $contents[] = ['role' => 'user', 'parts' => $responseParts];
         }
 
-        return $html;
+        return $contents;
     }
 
     private function buildSystem(string $lang): string {
@@ -126,6 +161,8 @@ class Responder {
             }
         }
 
+        $parts[] = "Используй доступные инструменты для получения актуальных данных. Не придумывай факты, цены и составы блюд.";
+
         $parts[] = "Отвечай в Telegram HTML. Разрешённые теги: <b>, <i>, <code>, <pre>, <a href=\"...\">."
                  . " Не используй <br> — вместо этого перевод строки."
                  . " Не используй markdown (**, __, ```, #).";
@@ -133,27 +170,12 @@ class Responder {
         $parts[] = "Язык ответа: " . strtoupper($lang) . "."
                  . " Если пользователь написал на другом языке — отвечай на его языке.";
 
-        $parts[] = "Если в запросе есть поле 'menu' — используй его для вопросов о блюдах и ценах."
-                 . " Если есть поле 'availability' — используй его чтобы сообщать что сейчас в наличии или нет."
-                 . " Если есть поле 'knowledge' — используй его как источник фактов."
-                 . " Не придумывай цены, факты и данные которых нет в переданных данных."
-                 . " Если нужно перечислить список блюд — перечисли все подходящие, не сокращай список.";
-
         return implode("\n\n", $parts);
-    }
-
-    private function isMenuQuestion(string $question): bool {
-        $q = mb_strtolower($question);
-        foreach (self::MENU_KEYWORDS as $kw) {
-            if (mb_strpos($q, $kw) !== false) return true;
-        }
-        return false;
     }
 
     private function detectLang(string $question, array $context): string {
         if (preg_match('/\p{Cyrillic}/u', $question)) return 'ru';
         if (preg_match('/[A-Za-z]{3}/u', $question))  return 'en';
-        // fallback: scan recent context
         foreach (array_reverse($context) as $msg) {
             $t = (string)($msg['text'] ?? '');
             if (preg_match('/\p{Cyrillic}/u', $t)) return 'ru';
@@ -162,7 +184,6 @@ class Responder {
         return 'ru';
     }
 
-    /** Keep context concise — last 15 messages, max 800 chars each. */
     private function trimContext(array $context): array {
         $out = [];
         foreach (array_slice($context, -15) as $m) {
@@ -209,9 +230,7 @@ class Responder {
     private function setCache(string $key, string $html): void {
         $this->settings->set($key, json_encode(['html' => $html, 'exp' => time() + self::CACHE_TTL], JSON_UNESCAPED_UNICODE) ?: '');
         if (random_int(1, 20) === 1) {
-            try {
-                $this->settings->deleteExpiredCache('_rc:');
-            } catch (\Throwable) {}
+            try { $this->settings->deleteExpiredCache('_rc:'); } catch (\Throwable) {}
         }
     }
 
@@ -221,11 +240,7 @@ class Responder {
         if ($err === '' || !preg_match('/quota|rate.?limit/i', $err)) return;
         $retry = 60;
         if (preg_match('/retry in\s*([0-9.]+)s/i', $err, $m)) $retry = (int)ceil((float)($m[1] ?? 0));
-        if ($this->isDailyLimitError($err)) {
-            $until = time() + 6 * 3600;
-        } else {
-            $until = time() + max(90, $retry + 10);
-        }
+        $until = $this->isDailyLimitError($err) ? time() + 6 * 3600 : time() + max(90, $retry + 10);
         $ts = gmdate('c', $until);
         $this->settings->set('gemini_block_until', $ts);
         $this->settings->set('gemini_next_allowed_until', $ts);
@@ -252,18 +267,17 @@ class Responder {
         if ($sec < 60) return (string)$sec . ($lang === 'ru' ? ' сек' : ' sec');
         $h = intdiv($sec, 3600);
         $m = intdiv($sec % 3600, 60);
-        $s = $sec % 60;
         if ($lang === 'ru') {
             $out = [];
             if ($h > 0) $out[] = $h . ' ч';
             if ($m > 0) $out[] = $m . ' мин';
-            if ($h === 0 && $m === 0) $out[] = $s . ' сек';
+            if ($h === 0 && $m === 0) $out[] = ($sec % 60) . ' сек';
             return implode(' ', $out);
         }
         $out = [];
         if ($h > 0) $out[] = $h . 'h';
         if ($m > 0) $out[] = $m . 'm';
-        if ($h === 0 && $m === 0) $out[] = $s . 's';
+        if ($h === 0 && $m === 0) $out[] = ($sec % 60) . 's';
         return implode(' ', $out);
     }
 }

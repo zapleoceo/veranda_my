@@ -113,6 +113,7 @@ class WebhookHandler {
             'media_duration_sec'  => $media['duration_sec'],
             'media_text'          => null,
             'meta_json'           => json_encode(['has_media' => $media['type'] ? 1 : 0]) ?: '{}',
+            'importance'          => 5,
         ];
         $this->msgRepo->upsert($record);
 

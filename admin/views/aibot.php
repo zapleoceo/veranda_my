@@ -53,6 +53,7 @@
       <thead>
         <tr>
           <th>Название</th>
+          <th>Категория</th>
           <th>Источник</th>
           <th>Доступ</th>
           <th>●</th>
@@ -63,6 +64,7 @@
         <?php foreach ($aibotKbItems as $ki): ?>
         <tr data-id="<?= (int)$ki['id'] ?>">
           <td><?= htmlspecialchars((string)($ki['title'] ?? '')) ?></td>
+          <td><span class="ai-cat"><?= htmlspecialchars((string)($ki['category'] ?? 'other')) ?></span></td>
           <td><?php if (!empty($ki['source_url'])): ?><a href="<?= htmlspecialchars((string)$ki['source_url']) ?>" target="_blank">🔗</a><?php else: ?><span class="ai-muted">текст</span><?php endif; ?></td>
           <td><?php $acc = (string)($ki['access'] ?? 'public'); ?>
             <span class="ai-acc ai-acc-<?= $acc ?>"><?= match($acc) { 'members' => 'Своим', 'never' => 'Скрыто', default => 'Все' } ?></span></td>
@@ -74,7 +76,7 @@
         </tr>
         <?php endforeach; ?>
         <?php if (empty($aibotKbItems)): ?>
-        <tr id="kbEmpty"><td colspan="5" class="ai-empty">Пусто. Добавьте документ или импортируйте URL.</td></tr>
+        <tr id="kbEmpty"><td colspan="6" class="ai-empty">Пусто. Добавьте документ или импортируйте URL.</td></tr>
         <?php endif; ?>
       </tbody>
     </table>
@@ -140,7 +142,20 @@
       <label>Содержимое <span class="ai-hint">(или пусто если есть URL)</span></label>
       <textarea id="kbContent" rows="6"></textarea>
     </div>
-    <div class="ai-row" style="margin-top:10px; gap:16px">
+    <div class="ai-row" style="margin-top:10px; gap:16px; flex-wrap:wrap">
+      <div>
+        <label style="display:block; margin-bottom:3px; font-size:11px; color:#777;">Категория</label>
+        <select id="kbCategory">
+          <option value="other">other</option>
+          <option value="contacts">contacts</option>
+          <option value="hours">hours</option>
+          <option value="menu">menu</option>
+          <option value="events">events</option>
+          <option value="policies">policies</option>
+          <option value="location">location</option>
+          <option value="team">team</option>
+        </select>
+      </div>
       <div>
         <label style="display:block; margin-bottom:3px; font-size:11px; color:#777;">Доступ</label>
         <select id="kbAccess">
@@ -153,6 +168,10 @@
         <input type="checkbox" id="kbActive" checked>
         <label for="kbActive">Активен</label>
       </div>
+    </div>
+    <div class="ai-field" style="margin-top:8px">
+      <label>Теги <span class="ai-hint">(через запятую, или оставь пусто — автозаполнится)</span></label>
+      <input type="text" id="kbTags" placeholder="часы работы, режим, выходные">
     </div>
     <div class="ai-row" style="justify-content:flex-end; margin-top:14px; gap:6px">
       <button class="ai-btn" id="btnKbCancel">Отмена</button>
@@ -222,6 +241,7 @@
 .ai-acc-public  { color: #1565c0; }
 .ai-acc-members { color: #e65100; }
 .ai-acc-never   { color: #999; }
+.ai-cat { font-size: 10px; color: #888; background: #f0f0f0; border-radius: 3px; padding: 1px 5px; }
 
 /* Service section */
 .ai-service { margin-top: 10px; border-top: 1px solid #eee; }

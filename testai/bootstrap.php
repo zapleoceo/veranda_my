@@ -23,11 +23,13 @@ require_once $root . '/src/classes/testai/repository/MessageRepository.php';
 require_once $root . '/src/classes/testai/repository/DailyRepository.php';
 require_once $root . '/src/classes/testai/repository/SettingsRepository.php';
 require_once $root . '/src/classes/testai/repository/KnowledgeRepository.php';
+require_once $root . '/src/classes/testai/repository/EventRepository.php';
 require_once $root . '/src/classes/testai/repository/MenuRepository.php';
 
 // Services
 require_once $root . '/src/classes/testai/service/KnowledgeService.php';
 require_once $root . '/src/classes/testai/service/MenuService.php';
+require_once $root . '/src/classes/testai/service/ToolDispatcher.php';
 require_once $root . '/src/classes/testai/service/Responder.php';
 require_once $root . '/src/classes/testai/service/DailySummaryService.php';
 require_once $root . '/src/classes/testai/service/AnnouncementService.php';
@@ -50,16 +52,18 @@ $tRaw      = $db->t('testai_tg_messages_raw');
 $tDaily    = $db->t('testai_daily_summaries');
 $tSettings = $db->t('testai_settings');
 $tKb       = $db->t('testai_kb_docs');
+$tEvents   = $db->t('testai_events');
 
-(new \App\Classes\TestAI\Repository\Schema())->ensure($db, $tRaw, $tDaily, $tSettings, $tKb);
+(new \App\Classes\TestAI\Repository\Schema())->ensure($db, $tRaw, $tDaily, $tSettings, $tKb, $tEvents);
 
 // ─── Repositories ────────────────────────────────────────────────────────────
 
-$msgRepo       = new \App\Classes\TestAI\Repository\MessageRepository($db, $tRaw);
-$dailyRepo     = new \App\Classes\TestAI\Repository\DailyRepository($db, $tDaily);
-$settingsRepo  = new \App\Classes\TestAI\Repository\SettingsRepository($db, $tSettings);
-$kbRepo        = new \App\Classes\TestAI\Repository\KnowledgeRepository($db, $tKb);
-$menuRepo      = new \App\Classes\TestAI\Repository\MenuRepository($db);
+$msgRepo      = new \App\Classes\TestAI\Repository\MessageRepository($db, $tRaw);
+$dailyRepo    = new \App\Classes\TestAI\Repository\DailyRepository($db, $tDaily);
+$settingsRepo = new \App\Classes\TestAI\Repository\SettingsRepository($db, $tSettings);
+$kbRepo       = new \App\Classes\TestAI\Repository\KnowledgeRepository($db, $tKb);
+$eventRepo    = new \App\Classes\TestAI\Repository\EventRepository($db, $tEvents);
+$menuRepo     = new \App\Classes\TestAI\Repository\MenuRepository($db);
 
 // ─── Default settings (only written once) ────────────────────────────────────
 
@@ -95,9 +99,14 @@ $poster    = new \App\Classes\TestAI\Infra\PosterClient($cfg->posterToken, $cfg-
 
 // ─── Services ────────────────────────────────────────────────────────────────
 
-$knowledgeSvc    = new \App\Classes\TestAI\Service\KnowledgeService($kbRepo, $fetcher);
-$menuSvc         = new \App\Classes\TestAI\Service\MenuService($menuRepo);
-$responder       = new \App\Classes\TestAI\Service\Responder($cfg->geminiModel, $gemini, $sanitizer, $settingsRepo, $knowledgeSvc, $menuSvc, $poster);
+$knowledgeSvc = new \App\Classes\TestAI\Service\KnowledgeService($kbRepo, $fetcher, $gemini, $cfg->geminiModel);
+$menuSvc      = new \App\Classes\TestAI\Service\MenuService($menuRepo);
+
+$toolDispatcher = new \App\Classes\TestAI\Service\ToolDispatcher(
+    $menuSvc, $knowledgeSvc, $poster, $eventRepo, $dailyRepo, $msgRepo
+);
+
+$responder       = new \App\Classes\TestAI\Service\Responder($cfg->geminiModel, $gemini, $sanitizer, $settingsRepo, $toolDispatcher);
 $dailySvc        = new \App\Classes\TestAI\Service\DailySummaryService($cfg->geminiModel, $gemini, $msgRepo, $dailyRepo, $settingsRepo);
 $announcementSvc = new \App\Classes\TestAI\Service\AnnouncementService($cfg->geminiModel, $gemini, $sanitizer, $dailyRepo, $msgRepo, $settingsRepo, __DIR__ . '/cache');
 
@@ -122,10 +131,12 @@ return [
     'tDaily'          => $tDaily,
     'tSettings'       => $tSettings,
     'tKb'             => $tKb,
+    'tEvents'         => $tEvents,
     'msgRepo'         => $msgRepo,
     'dailyRepo'       => $dailyRepo,
     'settingsRepo'    => $settingsRepo,
     'kbRepo'          => $kbRepo,
+    'eventRepo'       => $eventRepo,
     'menuRepo'        => $menuRepo,
     'gemini'          => $gemini,
     'tg'              => $tg,
@@ -134,6 +145,7 @@ return [
     'poster'          => $poster,
     'knowledgeSvc'    => $knowledgeSvc,
     'menuSvc'         => $menuSvc,
+    'toolDispatcher'  => $toolDispatcher,
     'responder'       => $responder,
     'dailySvc'        => $dailySvc,
     'announcementSvc' => $announcementSvc,
