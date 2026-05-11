@@ -14,7 +14,7 @@ class KnowledgeRepository {
         $offset = max(0, $offset);
         try {
             $rows = $this->db->query(
-                "SELECT id, title, source_url, access, category, is_active, created_at, updated_at
+                "SELECT id, title, source_url, access, category, tags, is_active, created_at, updated_at
                  FROM {$this->table}
                  ORDER BY updated_at DESC
                  LIMIT {$limit} OFFSET {$offset}"
