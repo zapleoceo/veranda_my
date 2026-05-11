@@ -136,22 +136,52 @@ class ToolDispatcher {
 
     private function searchEvents(array $args): array {
         $query    = trim((string)($args['query'] ?? ''));
-        $daysBack = max(1, min(30, (int)($args['days_back'] ?? 14)));
+        $daysBack = max(1, min(30, (int)($args['days_back'] ?? 30)));
 
         // Try structured events table first
         $events = $this->eventRepo->searchEvents($query, $daysBack);
 
         if (!$events) {
-            // Fallback: FULLTEXT search in raw messages
-            $msgs = $this->msgRepo->searchFulltext($query, $daysBack, 12);
+            // Fallback: FULLTEXT search in raw messages.
+            // Expand query with common Russian synonyms for better recall.
+            $expandedQuery = $this->expandEventQuery($query);
+            $msgs = $this->msgRepo->searchFulltext($expandedQuery, $daysBack, 20);
+
+            // Filter out short messages / user questions — keep only announcement-like content
+            $msgs = array_values(array_filter($msgs, function (array $m): bool {
+                $text = trim((string)($m['text'] ?? ''));
+                if (mb_strlen($text) < 80) return false;             // too short = user question
+                if (preg_match('/^\s*[^.!]*\?\s*$/u', $text)) return false; // pure question
+                return true;
+            }));
+
             $events = array_map(fn($m) => [
                 'event_date'  => substr((string)($m['received_at'] ?? ''), 0, 10),
                 'title'       => mb_substr(trim((string)($m['text'] ?? '')), 0, 120),
                 'description' => trim((string)($m['text'] ?? '')),
-            ], $msgs);
+            ], array_slice($msgs, 0, 8));
         }
 
         return ['events' => $events, 'count' => count($events)];
+    }
+
+    private function expandEventQuery(string $query): string {
+        $synonyms = [
+            'фильм'   => 'фильм кино кинотеатр показ',
+            'кино'    => 'кино фильм показ',
+            'концерт' => 'концерт живая музыка live music',
+            'музыка'  => 'музыка концерт live',
+            'событи'  => 'событие мероприятие афиша анонс',
+            'мероприя'=> 'мероприятие событие афиша',
+            'афиш'    => 'афиша анонс события мероприятия',
+        ];
+        $lower = mb_strtolower($query);
+        foreach ($synonyms as $stem => $expansion) {
+            if (str_contains($lower, $stem)) {
+                return $expansion;
+            }
+        }
+        return $query . ' афиша анонс';
     }
 
     private function searchKnowledge(array $args, bool $authorized): array {
