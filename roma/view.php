@@ -25,7 +25,7 @@
         <div class="row">
             <div class="roma-header-info">
                 <h1>/roma — продажи кальянов (категория 47)</h1>
-                <div class="muted">Источник: Poster dash.getProductsSales · без кэширования</div>
+                <div class="muted">Источник: Poster dash.getTransactions · без кэширования</div>
             </div>
             <label>
                 Дата начала (date_from)
@@ -48,6 +48,7 @@
                 <tr>
                     <th>Название кальяна</th>
                     <th class="roma-col-count">Кол‑во</th>
+                    <th class="roma-col-discount">Скидка</th>
                     <th class="roma-col-saldo">Сальдо</th>
                 </tr>
             </thead>
@@ -56,7 +57,11 @@
         </table>
 
         <div class="romaTotal">
-            <div class="romaBox">Итого роме: <span id="romaSum">0</span></div>
+            <div class="romaBox">
+                Итого роме: <span id="romaSum">0</span>
+                · Скидка: <span id="romaDiscount">0</span>
+                · После скидки: <span id="romaNet">0</span>
+            </div>
         </div>
     </div>
 </div>
