@@ -54,11 +54,17 @@ jobs:
           for i in 1 2 3; do
             echo "rsync attempt ${i}/3"
             rsync -az \
+              --delete \
+              --delete-after \
               --exclude ".env" \
               --exclude ".env.*" \
               --exclude "*.log" \
               --exclude "telegram.log" \
               --exclude "prob_close_backfill.log" \
+              --exclude "tmp/" \
+              --exclude "cache/" \
+              --exclude ".cache/" \
+              --exclude "testai/cache/" \
               --exclude ".git/" \
               --exclude ".github/" \
               -e "ssh ${SSH_OPTS}" \
