@@ -287,7 +287,8 @@
     padding: 0;
     border: 1px solid var(--border);
     border-radius: 10px;
-    background: #e5e7eb;
+    background: var(--card);
+    color: var(--text);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -295,7 +296,7 @@
     height: 34px;
     width: 34px;
     overflow: hidden;
-    transition: background 0.2s, border-color 0.2s;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
 .pd2-icon-btn img {
     width: 100%;
