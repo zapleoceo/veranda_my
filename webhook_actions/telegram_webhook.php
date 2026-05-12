@@ -186,7 +186,7 @@ $message = $callback['message'] ?? [];
 $messageId = isset($message['message_id']) ? (int)$message['message_id'] : 0;
 $chatId = isset($message['chat']['id']) ? (string)$message['chat']['id'] : '';
 
-if (!preg_match('/^(ack_alert|ack_tx|ignore_item|ignore_tx|vposter|vdecline|vrestore|vposter_fix|vposter_cancel):(\d+)$/', $data, $m)) {
+if (!preg_match('/^(ignore_item|ignore_tx|vposter|vdecline|vrestore|vposter_fix|vposter_cancel):(\d+)$/', $data, $m)) {
     echo 'ok';
     exit;
 }
@@ -240,7 +240,7 @@ try {
         exit;
     }
 
-    if (in_array($action, ['vposter', 'vdecline', 'vrestore', 'vposter_fix', 'vposter_cancel', 'ignore_tx', 'ignore_item', 'ack_tx', 'ack_alert'], true) && $id > 0) {
+    if (in_array($action, ['vposter', 'vdecline', 'vrestore', 'vposter_fix', 'vposter_cancel', 'ignore_tx', 'ignore_item'], true) && $id > 0) {
         $actionFile = __DIR__ . '/' . $action . '.php';
         if (file_exists($actionFile)) {
             require_once $actionFile;
