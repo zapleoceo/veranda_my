@@ -1692,13 +1692,19 @@
       scrollbar-color: rgba(184,135,70,0.75) rgba(0,0,0,0.25);
     }
     textarea.preorder-box { font-family: var(--font-body); resize: none; }
-    #reqComment.preorder-box,
-    #reqPreorderBox.preorder-box {
-      height: 106px;
-      min-height: 106px;
-      max-height: 106px;
+    #reqComment.preorder-box {
       padding: 10px 12px;
       box-sizing: border-box;
+      resize: vertical;
+      max-height: 30dvh;
+    }
+    #reqPreorderBox.preorder-box {
+      padding: 10px 12px;
+      box-sizing: border-box;
+      height: auto;
+      min-height: calc(3 * 1.35em + 1.5rem);
+      max-height: none;
+      overflow: hidden;
     }
     .mobile-text { display: none; }
     .preorder-box::-webkit-scrollbar { width: 10px; height: 10px; }
