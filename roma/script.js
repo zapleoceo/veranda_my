@@ -5,6 +5,7 @@ const loader = document.getElementById('loader');
 const err = document.getElementById('err');
 const tbody = document.getElementById('tbody');
 const tfoot = document.getElementById('tfoot');
+const romaBase = document.getElementById('romaBase');
 const romaSum = document.getElementById('romaSum');
 const romaDiscount = document.getElementById('romaDiscount');
 const romaGross = document.getElementById('romaGross');
@@ -25,6 +26,7 @@ const load = async () => {
     setLoading(true);
     tbody.innerHTML = '';
     tfoot.innerHTML = '';
+    romaBase.textContent = '0';
     romaSum.textContent = '0';
     romaDiscount.textContent = '0';
     romaGross.textContent = '0';
@@ -63,6 +65,7 @@ const load = async () => {
             <td class="num">${String(j.totals?.sum || '0')}</td>
         `;
         tfoot.appendChild(trTot);
+        romaBase.textContent = String(j.totals?.payed_sum || '0');
         romaSum.textContent = String(j.roma?.sum || '0');
         romaDiscount.textContent = String(j.roma?.discount || '0');
         romaGross.textContent = String(j.roma?.gross || '0');
