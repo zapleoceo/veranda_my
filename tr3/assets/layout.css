@@ -306,6 +306,11 @@
       grid-template-columns: 1fr;
       gap: var(--space-6);
     }
+    .map-block {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--space-3);
+    }
     .map-invite {
       margin: 0;
       padding: 10px 12px;
@@ -338,11 +343,6 @@
       max-height: 80vh;
     }
     .event-banner {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      right: 12px;
-      z-index: 5;
       padding: 10px 12px;
       border-radius: 14px;
       border: 1px solid rgba(255,255,255,0.12);
@@ -353,9 +353,11 @@
       font-weight: 700;
       line-height: 1.25;
       white-space: pre-wrap;
-      max-height: 32%;
-      overflow: auto;
       pointer-events: none;
+    }
+    .event-banner--below {
+      position: relative;
+      z-index: 1;
     }
     @media (min-width: 900px) {
       .map-shell { aspect-ratio: 875 / 620; }
@@ -475,7 +477,7 @@
 
     @media (max-width: 640px) {
       .map-shell__mesh .blob { filter: blur(56px); }
-      .event-banner { top: 8px; left: 8px; right: 8px; max-height: 38%; }
+      .event-banner { font-size: 12px; padding: 8px 10px; }
     }
 
     #mapZoomBox { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }

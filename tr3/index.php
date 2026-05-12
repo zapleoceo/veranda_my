@@ -73,7 +73,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260512_0001">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260512_0002">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -129,28 +129,34 @@ $mk = function (string $l) use ($self, $baseQs) {
       </div>
   
       <section class="layout">
-        <div class="map-shell">
-          <div class="map-shell__bg" aria-hidden="true">
-            <div class="map-shell__mesh" aria-hidden="true">
-              <div class="blob b1"></div>
-              <div class="blob b2"></div>
-              <div class="blob b3"></div>
+        <div class="map-block">
+          <div class="map-shell">
+            <div class="map-shell__bg" aria-hidden="true">
+              <div class="map-shell__mesh" aria-hidden="true">
+                <div class="blob b1"></div>
+                <div class="blob b2"></div>
+                <div class="blob b3"></div>
+              </div>
+              <div class="map-shell__spotlight" aria-hidden="true"></div>
             </div>
-            <div class="map-shell__spotlight" aria-hidden="true"></div>
-          </div>
-          <div class="tile-layer" aria-hidden="true"></div>
-          <div class="event-banner" id="eventBanner" aria-live="polite" hidden></div>
+            <div class="tile-layer" aria-hidden="true"></div>
             <div class="map-zoom-box" id="mapZoomBox">
               <div class="map-zoom-inner" id="mapZoomInner">
-              <div class="map" aria-label="<?= htmlspecialchars(tr('map_aria')) ?>">
-            <div class="map-canvas" id="mapCanvasMain" data-hall="2">
-            <div class="decor-layer" id="mapDecorMain" aria-hidden="true"></div>
-            <div class="tables-layer" id="mapTablesMain"></div>
-            </div>
-            <div class="map-canvas" id="mapCanvasCinema" data-hall="7" hidden><div class="decor-layer" id="mapDecorCinema" aria-hidden="true"></div><div class="tables-layer" id="mapTablesCinema"></div></div>
+                <div class="map" aria-label="<?= htmlspecialchars(tr('map_aria')) ?>">
+                  <div class="map-canvas" id="mapCanvasMain" data-hall="2">
+                    <div class="decor-layer" id="mapDecorMain" aria-hidden="true"></div>
+                    <div class="tables-layer" id="mapTablesMain"></div>
+                  </div>
+                  <div class="map-canvas" id="mapCanvasCinema" data-hall="7" hidden>
+                    <div class="decor-layer" id="mapDecorCinema" aria-hidden="true"></div>
+                    <div class="tables-layer" id="mapTablesCinema"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+          <div class="event-banner event-banner--below" id="eventBanner" aria-live="polite" hidden></div>
+        </div>
       </section>
     </main>
   </div>
@@ -377,7 +383,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr3/assets/tr3.boot.js?v=20260512_0001" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260512_0002" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>

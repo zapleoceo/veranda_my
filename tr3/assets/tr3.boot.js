@@ -33,7 +33,7 @@
         latestWeekend: j.latestWeekend,
         apiBase: j.apiBase,
       };
-      return loadScript('/tr3/assets/app.js?v=20260511_0001');
+      return loadScript('/tr3/assets/app.js?v=20260512_0002');
     })
     .catch((e) => {
       const msg = document.createElement('div');

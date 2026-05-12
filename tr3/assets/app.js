@@ -2040,6 +2040,7 @@
       reqGuests.addEventListener('input', () => {
         if (pendingBooking) pendingBooking.guests = Number(reqGuests.value || 0) || pendingBooking.guests;
         updatePreorderUi();
+        renderPreorderBox();
         saveDraft();
         if (reqGuestsHintTimer) clearTimeout(reqGuestsHintTimer);
         reqGuestsHintTimer = setTimeout(() => { updateReqGuestsHint().catch(() => null); }, 180);
