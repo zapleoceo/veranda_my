@@ -437,11 +437,11 @@
         grid-template-columns: repeat(3, 1fr);
     }
 
-    .links-section--contacts .card[data-key="tg_group"],
     .links-section--contacts .card[data-key="director"] {
         grid-column: 1 / -1;
     }
 
+    .links-section--contacts .card[data-key="tg_group"] { grid-column: 1 / 2; }
     .links-section--contacts .card[data-key="instagram"] { grid-column: 2 / 3; }
     .links-section--contacts .card[data-key="facebook"] { grid-column: 3 / 4; }
 }
