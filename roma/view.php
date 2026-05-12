@@ -48,7 +48,9 @@
                 <tr>
                     <th>Название кальяна</th>
                     <th class="roma-col-count">Кол‑во</th>
+                    <th class="roma-col-price">Цена</th>
                     <th class="roma-col-discount">Скидка</th>
+                    <th class="roma-col-payed">Оплачено</th>
                     <th class="roma-col-saldo">Сальдо</th>
                 </tr>
             </thead>
