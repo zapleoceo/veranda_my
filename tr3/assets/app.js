@@ -602,7 +602,7 @@
     let dtpSelTime = null;
     let skipNextResDateAutoLoad = false;
 
-    const phoneDigits = (raw) => String(raw || '').replace(/\D+/g, '').slice(0, 15);
+    const phoneDigits = (raw) => String(raw || '').split('|')[0].replace(/\D+/g, '').slice(0, 15);
     const isPhoneValid = (raw) => {
       try {
         if (typeof libphonenumber === 'undefined') return /^[1-9]\d{8,14}$/.test(phoneDigits(raw));
@@ -1458,7 +1458,7 @@
             if (parsed && parsed.isValid()) return parsed.format('E.164');
           }
         } catch (e) {}
-        const digits = phoneDigits(reqPhone.value);
+        const digits = phoneDigits(String(reqPhone.value || '').split('|')[0]);
         return digits ? ('+' + digits) : '';
       };
 
