@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep -l -i \"database\\\\|schema\\\\|create table\")",
+      "Bash(mkdir -p \"D:\\\\Projects\\\\Veranda site 2\\\\.claude\\\\worktrees\\\\dazzling-shtern-877a5d\\\\src\\\\classes\\\\testai\\\\infra\" \"D:\\\\Projects\\\\Veranda site 2\\\\.claude\\\\worktrees\\\\dazzling-shtern-877a5d\\\\src\\\\classes\\\\testai\\\\repository\" \"D:\\\\Projects\\\\Veranda site 2\\\\.clone\\\\worktrees\\\\dazzling-shtern-877a5d\\\\src\\\\classes\\\\testai\\\\service\" \"D:\\\\Projects\\\\Veranda site 2\\\\.claude\\\\worktrees\\\\dazzling-shtern-877a5d\\\\src\\\\classes\\\\testai\\\\service\" \"D:\\\\Projects\\\\Veranda site 2\\\\.claude\\\\worktrees\\\\dazzling-shtern-877a5d\\\\src\\\\classes\\\\testai\\\\app\")",
+      "Bash(Remove-Item \"D:\\\\Projects\\\\Veranda site 2\\\\.claude\\\\worktrees\\\\dazzling-shtern-877a5d\\\\src\\\\classes\\\\TestAIInfra.php\" -Force)",
+      "Bash(Remove-Item \"D:\\\\Projects\\\\Veranda site 2\\\\.claude\\\\worktrees\\\\dazzling-shtern-877a5d\\\\src\\\\classes\\\\TestAIRepositories.php\" -Force)",
+      "Bash(Remove-Item \"D:\\\\Projects\\\\Veranda site 2\\\\.claude\\\\worktrees\\\\dazzling-shtern-877a5d\\\\src\\\\classes\\\\TestAIServices.php\" -Force)",
+      "Bash(Write-Host \"Deleted\")",
+      "Bash(git add *)"
+    ]
+  }
+}
