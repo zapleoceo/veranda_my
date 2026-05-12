@@ -381,9 +381,70 @@
       });
     };
 
+    const eventBanner = document.getElementById('eventBanner');
+    const normDay = (raw) => {
+      const s = String(raw || '').slice(0, 10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+    };
+    const setEventBannerText = (text) => {
+      if (!eventBanner) return;
+      const t = String(text || '').trim();
+      if (!t) {
+        eventBanner.hidden = true;
+        eventBanner.textContent = '';
+        return;
+      }
+      eventBanner.textContent = t;
+      eventBanner.hidden = false;
+    };
+    const eventsCache = new Map();
+    let eventsActiveDay = '';
+    let eventsCtrl = null;
+    const loadEventsForDay = async (dayRaw) => {
+      const day = normDay(dayRaw);
+      if (!day) {
+        eventsActiveDay = '';
+        setEventBannerText('');
+        return;
+      }
+      if (eventsActiveDay === day && eventBanner && !eventBanner.hidden && String(eventBanner.textContent || '').trim() !== '') return;
+      eventsActiveDay = day;
+
+      if (eventsCache.has(day)) {
+        setEventBannerText(eventsCache.get(day));
+        return;
+      }
+
+      setEventBannerText('');
+
+      if (eventsCtrl && typeof eventsCtrl.abort === 'function') {
+        try { eventsCtrl.abort(); } catch (_) {}
+      }
+      eventsCtrl = (typeof AbortController === 'function') ? new AbortController() : null;
+
+      const url = apiUrl();
+      url.searchParams.set('ajax', 'events_for_day');
+      url.searchParams.set('day', day);
+
+      const fallback = 'События на эту дату еще не запланировано.';
+      try {
+        const r = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal: eventsCtrl ? eventsCtrl.signal : undefined });
+        const j = await r.json().catch(() => null);
+        const txt = (r.ok && j && typeof j === 'object' && j.ok) ? String(j.text || '') : '';
+        const finalText = txt.trim() || fallback;
+        eventsCache.set(day, finalText);
+        if (eventsActiveDay === day) setEventBannerText(finalText);
+      } catch (e) {
+        if (e && String(e.name || '') === 'AbortError') return;
+        eventsCache.set(day, fallback);
+        if (eventsActiveDay === day) setEventBannerText(fallback);
+      }
+    };
+
     const setBusyLabel = (dateStr) => {
       const busyDateLabel = document.getElementById('busyDateLabel');
       if (busyDateLabel) busyDateLabel.textContent = t('data_on');
+      loadEventsForDay(dateStr).catch(() => null);
     };
     const setBusyLoader = (isOn) => {
       const busyDateLoader = document.getElementById('busyDateLoader');

@@ -73,7 +73,7 @@ $mk = function (string $l) use ($self, $baseQs) {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260510_0842">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260511_0001">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -88,8 +88,13 @@ $mk = function (string $l) use ($self, $baseQs) {
     <main class="panel">
       <div class="topbar">
         <div class="title-wrap">
-          <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
-          <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
+          <div class="title-line">
+            <a class="menu-back tr3-back" href="/links/?lang=<?= urlencode($lang) ?>" aria-label="Back">←</a>
+            <div class="title-stack">
+              <h1 data-i18n="page_title"><?= htmlspecialchars(tr('page_title')) ?></h1>
+              <input type="date" id="resDate" aria-label="<?= htmlspecialchars(tr('select_date_time')) ?>">
+            </div>
+          </div>
         </div>
         <div class="center-controls">
           <div class="date-wrap">
@@ -134,6 +139,7 @@ $mk = function (string $l) use ($self, $baseQs) {
             <div class="map-shell__spotlight" aria-hidden="true"></div>
           </div>
           <div class="tile-layer" aria-hidden="true"></div>
+          <div class="event-banner" id="eventBanner" aria-live="polite" hidden></div>
             <div class="map-zoom-box" id="mapZoomBox">
               <div class="map-zoom-inner" id="mapZoomInner">
               <div class="map" aria-label="<?= htmlspecialchars(tr('map_aria')) ?>">
@@ -371,7 +377,7 @@ $mk = function (string $l) use ($self, $baseQs) {
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr3/assets/tr3.boot.js?v=20260510_0842" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260511_0001" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>
