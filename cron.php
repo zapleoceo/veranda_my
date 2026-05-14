@@ -296,6 +296,206 @@ try {
     echo "[" . date('Y-m-d H:i:s') . "] Updated sync marker.\n";
     $logger->info('done', ['date' => $dateFrom]);
 
+    $sendTgMessageWithUrl = function (string $token, int $chatId, string $text, string $btnText, string $url): ?int {
+        if ($token === '' || $chatId <= 0) return null;
+        $apiUrl = "https://api.telegram.org/bot{$token}/sendMessage";
+        $params = [
+            'chat_id' => (string)$chatId,
+            'text' => $text,
+            'parse_mode' => 'HTML',
+            'reply_markup' => json_encode([
+                'inline_keyboard' => [
+                    [
+                        [
+                            'text' => $btnText,
+                            'url' => $url,
+                        ],
+                    ],
+                ],
+            ], JSON_UNESCAPED_UNICODE),
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $apiUrl);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $resp = curl_exec($ch);
+        curl_close($ch);
+        if ($resp === false || $resp === null || $resp === '') return null;
+        $data = json_decode($resp, true);
+        if (!is_array($data) || empty($data['ok']) || !is_array($data['result'] ?? null)) return null;
+        $mid = (int)($data['result']['message_id'] ?? 0);
+        return $mid > 0 ? $mid : null;
+    };
+
+    $waBridgeSend = function (string $phone, string $text): bool {
+        $host = trim((string)($_ENV['WA_HTTP_HOST'] ?? '127.0.0.1'));
+        $portRaw = trim((string)($_ENV['WA_HTTP_PORT'] ?? '3210'));
+        $port = is_numeric($portRaw) ? (int)$portRaw : 3210;
+        if ($port <= 0 || $port > 65535) $port = 3210;
+
+        $secret = trim((string)($_ENV['WA_NODE_SECRET'] ?? ($_ENV['WA_BRIDGE_SECRET'] ?? '')));
+        if ($secret === '') return false;
+
+        $url = 'http://' . $host . ':' . $port . '/send';
+        $payload = ['phone' => $phone, 'text' => $text];
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+        if ($json === false) return false;
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Accept: application/json',
+            'X-WA-BRIDGE: ' . $secret,
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        $resp = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($resp === false || $httpCode < 200 || $httpCode >= 300) return false;
+        $body = trim((string)$resp);
+        if ($body === '') return true;
+        $j = json_decode($body, true);
+        if (!is_array($j)) return true;
+        if (array_key_exists('ok', $j)) return !empty($j['ok']);
+        if (array_key_exists('sent', $j)) return !empty($j['sent']);
+        if (array_key_exists('success', $j)) return !empty($j['success']);
+        return true;
+    };
+
+    $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? ($_ENV['TG_BOT_TOKEN'] ?? '')));
+    $siteBase = trim((string)($_ENV['SITE_BASE_URL'] ?? 'https://veranda.my'));
+    if ($siteBase === '') $siteBase = 'https://veranda.my';
+
+    $remindedTg = 0;
+    $remindedWa = 0;
+
+    $tgStates = $db->t('table_reservation_tg_states');
+    $waStates = $db->t('table_reservation_wa_states');
+
+    try { $db->query("ALTER TABLE {$tgStates} ADD COLUMN return_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
+    try { $db->query("ALTER TABLE {$tgStates} ADD COLUMN return_msg_id BIGINT NULL"); } catch (\Throwable $e) {}
+    try { $db->query("ALTER TABLE {$tgStates} ADD COLUMN reminder_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
+    try { $db->query("ALTER TABLE {$tgStates} ADD COLUMN reminder_msg_id BIGINT NULL"); } catch (\Throwable $e) {}
+    try { $db->query("ALTER TABLE {$waStates} ADD COLUMN return_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
+    try { $db->query("ALTER TABLE {$waStates} ADD COLUMN reminder_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
+
+    $dueTg = [];
+    try {
+        $dueTg = $db->query(
+            "SELECT code, payload_json, tg_user_id
+             FROM {$tgStates}
+             WHERE used_at IS NULL
+               AND expires_at > NOW()
+               AND return_sent_at IS NOT NULL
+               AND reminder_sent_at IS NULL
+               AND tg_user_id IS NOT NULL
+               AND tg_user_id > 0
+               AND return_sent_at <= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+             LIMIT 50"
+        )->fetchAll();
+    } catch (\Throwable $e) {
+        $dueTg = [];
+    }
+
+    foreach ($dueTg as $row) {
+        $code = (string)($row['code'] ?? '');
+        if ($code === '') continue;
+        $tgUserId = (int)($row['tg_user_id'] ?? 0);
+        if ($tgUserId <= 0) continue;
+        $payload = json_decode((string)($row['payload_json'] ?? '{}'), true);
+        if (!is_array($payload)) $payload = [];
+        $sourcePage = trim((string)($payload['source_page'] ?? 'tr3/'));
+        if ($sourcePage === '') $sourcePage = 'tr3/';
+        $returnUrl = rtrim($siteBase, '/') . '/' . ltrim($sourcePage, '/') . '?tg_state=' . rawurlencode($code);
+
+        $tableLabel = trim((string)($payload['table_label'] ?? ($payload['table_num'] ?? '')));
+        $start = trim((string)($payload['start'] ?? ''));
+        $guests = (int)($payload['guests'] ?? 0);
+
+        $details = [];
+        if ($tableLabel !== '') $details[] = 'Стол: ' . htmlspecialchars($tableLabel);
+        if ($start !== '') $details[] = 'Время: ' . htmlspecialchars($start);
+        if ($guests > 0) $details[] = 'Гостей: ' . $guests;
+        $detailsText = $details ? ("\n\n" . implode("\n", $details)) : '';
+
+        $text = "Напоминание.\n\nАккаунт подтвержден.\nНажми кнопку ниже, чтобы завершить бронирование:" . $detailsText;
+        $mid = $sendTgMessageWithUrl($tgToken, $tgUserId, $text, 'Завершить бронирование', $returnUrl);
+        try {
+            $db->query(
+                "UPDATE {$tgStates}
+                 SET reminder_sent_at = ?,
+                     reminder_msg_id = NULLIF(?, 0)
+                 WHERE code = ?",
+                [date('Y-m-d H:i:s'), (int)($mid ?? 0), $code]
+            );
+        } catch (\Throwable $e) {}
+        $remindedTg++;
+    }
+
+    $dueWa = [];
+    try {
+        $dueWa = $db->query(
+            "SELECT code, phone, payload_json
+             FROM {$waStates}
+             WHERE used_at IS NULL
+               AND expires_at > NOW()
+               AND return_sent_at IS NOT NULL
+               AND reminder_sent_at IS NULL
+               AND return_sent_at <= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+             LIMIT 50"
+        )->fetchAll();
+    } catch (\Throwable $e) {
+        $dueWa = [];
+    }
+
+    foreach ($dueWa as $row) {
+        $code = (string)($row['code'] ?? '');
+        if ($code === '') continue;
+        $phone = trim((string)($row['phone'] ?? ''));
+        if ($phone === '') continue;
+        $payload = json_decode((string)($row['payload_json'] ?? '{}'), true);
+        if (!is_array($payload)) $payload = [];
+        $sourcePage = trim((string)($payload['source_page'] ?? 'tr3/'));
+        if ($sourcePage === '') $sourcePage = 'tr3/';
+        $returnUrl = rtrim($siteBase, '/') . '/' . ltrim($sourcePage, '/') . '?wa_state=' . rawurlencode($code);
+
+        $tableLabel = trim((string)($payload['table_label'] ?? ($payload['table_num'] ?? '')));
+        $start = trim((string)($payload['start'] ?? ''));
+        $guests = (int)($payload['guests'] ?? 0);
+
+        $lines = [];
+        $lines[] = "Напоминание.";
+        $lines[] = "";
+        $lines[] = "Чтобы завершить бронирование, перейдите по ссылке:";
+        $lines[] = $returnUrl;
+        if ($tableLabel !== '' || $start !== '' || $guests > 0) $lines[] = "";
+        if ($tableLabel !== '') $lines[] = "Стол: {$tableLabel}";
+        if ($start !== '') $lines[] = "Время: {$start}";
+        if ($guests > 0) $lines[] = "Гостей: {$guests}";
+        $ok = $waBridgeSend($phone, implode("\n", $lines));
+        try {
+            $db->query(
+                "UPDATE {$waStates}
+                 SET reminder_sent_at = ?
+                 WHERE code = ?",
+                [date('Y-m-d H:i:s'), $code]
+            );
+        } catch (\Throwable $e) {}
+        $remindedWa++;
+    }
+
+    if ($remindedTg > 0 || $remindedWa > 0) {
+        echo "[" . date('Y-m-d H:i:s') . "] LinkReminders: tg=" . (int)$remindedTg . ", wa=" . (int)$remindedWa . ".\n";
+        $logger->info('link_reminders', ['tg' => (int)$remindedTg, 'wa' => (int)$remindedWa]);
+    }
+
     $durationMs = (int)round((microtime(true) - $startedAt) * 1000);
     $resultParts = [];
     $resultParts[] = 'duration_ms=' . $durationMs;

@@ -58,11 +58,19 @@ function tr3_api_tg_state_create(array $ctx): void {
     created_at DATETIME NOT NULL,
     expires_at DATETIME NOT NULL,
     used_at DATETIME NULL,
+    return_sent_at DATETIME NULL,
+    return_msg_id BIGINT NULL,
+    reminder_sent_at DATETIME NULL,
+    reminder_msg_id BIGINT NULL,
     tg_user_id BIGINT NULL,
     tg_username VARCHAR(64) NULL,
     tg_name VARCHAR(128) NULL,
     KEY idx_expires_at (expires_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+  try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN return_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
+  try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN return_msg_id BIGINT NULL"); } catch (\Throwable $e) {}
+  try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN reminder_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
+  try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN reminder_msg_id BIGINT NULL"); } catch (\Throwable $e) {}
 
   $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE);
   if ($payloadJson === false) $payloadJson = '{}';
@@ -131,8 +139,12 @@ function tr3_api_wa_state_create(array $ctx): void {
     created_at DATETIME NOT NULL,
     expires_at DATETIME NOT NULL,
     used_at DATETIME NULL,
+    return_sent_at DATETIME NULL,
+    reminder_sent_at DATETIME NULL,
     KEY idx_expires_at (expires_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+  try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN return_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
+  try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN reminder_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
 
   $payload['whatsapp_phone'] = $phoneNorm;
   $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE);
@@ -146,6 +158,7 @@ function tr3_api_wa_state_create(array $ctx): void {
   $msg = "Подтвердите WhatsApp номер:\n" . $returnUrl;
   $sent = wa_bridge_send($phoneNorm, $msg);
   if (!$sent) api_error(500, $trFor('err_wa_send_failed'));
+  try { $db->query("UPDATE {$t} SET return_sent_at = ? WHERE code = ?", [$createdAt, $code]); } catch (\Throwable $e) {}
 
   api_send_json(['ok' => true, 'code' => $code, 'return_url' => $returnUrl], 200);
 }
