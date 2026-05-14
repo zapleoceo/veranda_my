@@ -1,0 +1,31 @@
+name: CodeQL
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 3 * * 1"
+
+concurrency:
+  group: codeql-veranda-my
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript,actions,php
+
+      - uses: github/codeql-action/analyze@v3

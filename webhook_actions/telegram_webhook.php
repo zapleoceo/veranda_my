@@ -87,6 +87,10 @@ if (!empty($update['message'])) {
                     created_at DATETIME NOT NULL,
                     expires_at DATETIME NOT NULL,
                     used_at DATETIME NULL,
+                    return_sent_at DATETIME NULL,
+                    return_msg_id BIGINT NULL,
+                    reminder_sent_at DATETIME NULL,
+                    reminder_msg_id BIGINT NULL,
                     tg_user_id BIGINT NULL,
                     tg_username VARCHAR(64) NULL,
                     tg_name VARCHAR(128) NULL,
@@ -95,6 +99,10 @@ if (!empty($update['message'])) {
                 try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_user_id BIGINT NULL"); } catch (\Throwable $e) {}
                 try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_username VARCHAR(64) NULL"); } catch (\Throwable $e) {}
                 try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN tg_name VARCHAR(128) NULL"); } catch (\Throwable $e) {}
+                try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN return_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
+                try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN return_msg_id BIGINT NULL"); } catch (\Throwable $e) {}
+                try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN reminder_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
+                try { $pdo->exec("ALTER TABLE {$t} ADD COLUMN reminder_msg_id BIGINT NULL"); } catch (\Throwable $e) {}
             } catch (\Throwable $e) {
             }
             $row = $db->query(
@@ -128,20 +136,33 @@ if (!empty($update['message'])) {
                 $sourcePage = (is_array($payloadData) && !empty($payloadData['source_page'])) ? $payloadData['source_page'] : 'Tr2.php';
 
                 $returnUrl = 'https://veranda.my/' . ltrim($sourcePage, '/') . '?tg_state=' . rawurlencode($startCode);
-                $postJson('sendMessage', [
+                $resp = $postJson('sendMessage', [
                     'chat_id' => $chatId,
-                    'text' => "Готово.\nНажми кнопку ниже, чтобы вернуться к заявке:",
+                    'text' => "Аккаунт подтвержден.\nНажми кнопку ниже, чтобы завершить бронирование:",
                     'reply_markup' => [
                         'inline_keyboard' => [
                             [
                                 [
-                                    'text' => 'Вернуться на сайт',
+                                    'text' => 'Завершить бронирование',
                                     'url' => $returnUrl,
                                 ],
                             ],
                         ],
                     ],
                 ]);
+                $msgId = 0;
+                if (is_array($resp) && !empty($resp['ok']) && is_array($resp['result'] ?? null)) {
+                    $msgId = (int)($resp['result']['message_id'] ?? 0);
+                }
+                try {
+                    $db->query(
+                        "UPDATE {$t}
+                         SET return_sent_at = ?,
+                             return_msg_id = NULLIF(?, 0)
+                         WHERE code = ?",
+                        [date('Y-m-d H:i:s'), $msgId, $startCode]
+                    );
+                } catch (\Throwable $e) {}
                 echo 'ok';
                 exit;
             }
