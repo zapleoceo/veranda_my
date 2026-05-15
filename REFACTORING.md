@@ -65,7 +65,7 @@ veranda.my/
 │   │
 │   ├── Infrastructure/
 │   │   ├── Config.php          ← .env loader — ONE instance, replaces 8+ duplicates
-│   │   ├── Database.php        ← PDO singleton
+│   │   ├── Database.php        ← PDO singleton with table prefix helper t()
 │   │   ├── HttpClient.php      ← curl abstraction — replaces 313 duplicates
 │   │   └── Logger.php          ← PSR-3 Monolog singleton
 │   │
@@ -74,9 +74,32 @@ veranda.my/
 │   │   └── WebhookSecretMiddleware.php
 │   │
 │   ├── Controllers/
-│   │   ├── Admin/              ← one controller per admin tab
-│   │   ├── Auth/               ← login, callback, logout
+│   │   ├── Admin/
+│   │   │   ├── DashboardController.php   ← Kitchen wait-time charts, date range filter
+│   │   │   ├── AccessController.php      ← User CRUD + 14 permission toggles
+│   │   │   ├── LogsController.php        ← Log tail viewer + manual sync runner
+│   │   │   ├── ReservationsAdminController.php ← Reservation config (system_meta)
+│   │   │   ├── SyncController.php        ← 4 sync job statuses + manual trigger
+│   │   │   ├── TelegramAdminController.php    ← Alert settings + AJAX test send
+│   │   │   └── MenuController.php        ← Menu list/edit/publish, Poster sync
+│   │   │
+│   │   ├── Auth/
+│   │   │   ├── LoginController.php       ← Google OAuth redirect
+│   │   │   └── CallbackController.php    ← OAuth code exchange + session
+│   │   │
 │   │   └── WebhookController.php
+│   │
+│   ├── Views/
+│   │   ├── layout.php                    ← Shared dark-theme HTML shell (nav + flash)
+│   │   └── admin/
+│   │       ├── dashboard.php             ← Chart.js bar+line charts
+│   │       ├── access.php                ← User table + permissions modal
+│   │       ├── logs.php                  ← Log viewer + sync runner
+│   │       ├── reservations.php          ← Config form
+│   │       ├── sync.php                  ← Job status cards + manual run
+│   │       ├── telegram.php              ← Alert settings + test form
+│   │       ├── menu_list.php             ← Filterable table + inline publish toggles
+│   │       └── menu_edit.php             ← 4-language translation editor
 │   │
 │   ├── Actions/                ← Telegram webhook callback handlers
 │   │   ├── ActionInterface.php
@@ -107,13 +130,6 @@ veranda.my/
 │   └── Models/                 ← value objects / readonly data classes
 │       ├── AlertItem.php
 │       └── Transaction.php
-│
-├── templates/                  ← HTML views (extracted from inline PHP)
-│   ├── admin/
-│   ├── tr3/
-│   ├── reservations/
-│   ├── links/
-│   └── payday/
 │
 ├── cron/                       ← thin crontab entry points
 │   ├── kitchen_sync.php        ← bootstrap + KitchenSyncService->run()
@@ -170,10 +186,10 @@ veranda.my/
 | 0 — Setup | ✅ Done | Branch, structure, composer.json, deploy-staging.yml, REFACTORING.md |
 | 1 — Foundation | ✅ Done | Config, HttpClient (+headers), Logger, Database, TelegramBotClient, AuthMiddleware, WebhookSecretMiddleware, PHPUnit baseline (14 tests) |
 | 2a — Telegram alerts | ✅ Done | TelegramAlertService, ReservationReminderService, AlertItemRepository, MetaRepository, AlertItem, cron/telegram_alerts.php, setWebhook removed |
-| 2b — Kitchen sync | 🔄 In progress | KitchenSyncService from cron.php |
-| 2c — Webhook actions | ⏳ Pending | WebhookController + ActionInterface + 7 action classes |
-| 2d — Cron entry points | ⏳ Pending | kitchen_sync.php, menu_sync.php, daily_summary.php |
-| 3 — Admin panel | ⏳ Pending | Slim routes, controllers, templates/ |
+| 2b — Kitchen sync | ✅ Done | KitchenSyncService from cron.php (548 lines) |
+| 2c — Webhook actions | ✅ Done | WebhookController + ActionInterface + 7 action classes (Ignore, Vposter, Vdecline, Vrestore) |
+| 2d — Cron entry points | ✅ Done | kitchen_sync.php, menu_sync.php, daily_summary.php |
+| 3 — Admin panel | ✅ Done | 7 controllers + 8 views, dark theme, Google OAuth login, Chart.js dashboard, Menu CRUD with Poster sync |
 | 4 — Modules | ⏳ Pending | tr3, reservations, links, kitchen_online |
 | 5 — payday2 | ⏳ Pending | Split ajax.php (111K) + view.php (83K) into controllers/services/templates |
 | 6 — wa_listener | ⏳ Pending | Node.js src/ restructure |
@@ -181,32 +197,36 @@ veranda.my/
 
 ---
 
-## Server setup required (one-time, manual)
+## Server setup (actual — FastPanel single-account)
 
-Before staging works, on the server:
+The server runs FastPanel with a single user account `veranda_my_usr`. Both production and
+staging live under the same account:
 
-```bash
-# 1. Verify PHP 8.2 is available
-ls /opt/ | grep php
+| Site | Document root | URL |
+|------|--------------|-----|
+| Production | `/var/www/veranda_my_usr/data/www/veranda.my/` | https://veranda.my |
+| Staging | `/var/www/veranda_my_usr/data/www/veranda.my/beta/public/` | https://beta.veranda.my |
 
-# 2. Create staging document root
-mkdir -p /var/www/beta_veranda_my
+**SSL**: Cloudflare **Flexible** mode — origin serves HTTP on port 80. Do NOT switch to
+Full/Full Strict; port 443 nginx config redirects to index.html and breaks Slim routing.
 
-# 3. Create FastPanel vhost: beta.veranda.my
-#    - Root: /var/www/beta_veranda_my/public
-#    - PHP handler: PHP-FPM
-#    - PHP version: 8.2
-#    - SSL: Cloudflare Flexible (same as prod)
+**PHP binary**: `/opt/php82/bin/php` (for cron scripts and CLI tools).
 
-# 4. Add STAGING_DEPLOY_PATH = /var/www/beta_veranda_my to GitHub Secrets
+**`.env` location**: `/var/www/veranda_my_usr/data/www/veranda.my/beta/.env`
+(excluded from rsync by deploy workflow — never committed to repo).
 
-# 5. Install Composer on server (if not present)
-curl -sS https://getcomposer.org/installer | /opt/php82/bin/php -- --install-dir=/usr/local/bin --filename=composer
+**GitHub Actions secrets used by `deploy-staging.yml`**:
 
-# 6. Copy .env from prod and adjust for staging
-cp /var/www/veranda_my/.env /var/www/beta_veranda_my/.env
-# Edit: APP_ENV=development, TELEGRAM_WEBHOOK_SECRET=<different>
-```
+| Secret | Value |
+|--------|-------|
+| `STAGING_SSH_PRIVATE_KEY` | ED25519 key for `veranda_my_usr@5.101.179.132` |
+| `STAGING_KNOWN_HOSTS` | server host key fingerprint |
+| `STAGING_SSH_HOST` | `5.101.179.132` |
+| `STAGING_SSH_USER` | `veranda_my_usr` |
+| `STAGING_SSH_PORT` | `22` |
+| `STAGING_DEPLOY_PATH` | `/var/www/veranda_my_usr/data/www/veranda.my/beta` |
+
+**SSH key injection**: use `printf '%s\n'` (not `echo`) to preserve ED25519 key newlines.
 
 ---
 
