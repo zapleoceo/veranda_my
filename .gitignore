@@ -31,3 +31,9 @@ Thumbs.db
 
 # testai runtime cache
 /testai/cache/
+
+# wa_listener runtime files (not in git)
+/wa_listener/auth/
+/wa_listener/qr_state.json
+/wa_listener/node_modules/
+/wa_listener/package-lock.json
