@@ -207,7 +207,7 @@ async function startSock() {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        console.log('[wa] QR received, sending to Telegram');
+        console.log('wa_listener: sending QR to Telegram chat_id=' + QR_TG_CHAT_ID);
         await sendQrToTelegram(qr);
       }
 
@@ -249,7 +249,7 @@ function jsonReply(res, code, body) {
 async function handleSend(req, res) {
   const header = req.headers['x-wa-bridge'] || '';
   if (!BRIDGE_SECRET || header !== BRIDGE_SECRET) {
-    return jsonReply(res, 403, { ok: false, error: 'Forbidden' });
+    return jsonReply(res, 403, { ok: false, error: 'forbidden' });
   }
 
   let body = '';
