@@ -35,7 +35,7 @@ if ($ajax === 'menu_list') $tab = 'menu';
 if ($ajax === 'telegram_test' || $ajax === 'telegram_status_ensure') $tab = 'telegram';
 
 if ($tab === 'main') $tab = 'access';
-if (!in_array($tab, ['sync', 'access', 'telegram', 'menu', 'categories', 'reservations', 'logs', 'aibot'], true)) {
+if (!in_array($tab, ['sync', 'access', 'telegram', 'menu', 'categories', 'reservations', 'logs'], true)) {
     $tab = 'sync';
 }
 
