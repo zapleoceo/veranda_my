@@ -39,6 +39,19 @@ class HttpClient
         return $this->_exec($ch);
     }
 
+    /** POST with JSON body and custom headers (e.g. auth headers for WA bridge) */
+    public function postJsonBodyWithHeaders(string $url, array $data, array $headers): array|null
+    {
+        $ch = $this->_init($url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array_merge(
+            ['Content-Type: application/json'],
+            $headers
+        ));
+        return $this->_exec($ch);
+    }
+
     /** POST multipart/form-data (for file uploads) */
     public function postMultipart(string $url, array $fields): array|null
     {
