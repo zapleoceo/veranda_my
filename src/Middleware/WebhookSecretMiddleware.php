@@ -19,6 +19,11 @@ class WebhookSecretMiddleware implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
+        // WA bridge events authenticate themselves inside the controller
+        if (isset($request->getQueryParams()['wa_event'])) {
+            return $handler->handle($request);
+        }
+
         $expected = Config::get('TELEGRAM_WEBHOOK_SECRET');
 
         // If no secret is configured — allow all (dev/testing)
