@@ -7,9 +7,13 @@ use App\Infrastructure\Database;
 use App\Infrastructure\HttpClient;
 use App\Infrastructure\Logger;
 use App\Infrastructure\TelegramBotClient;
+use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
+use Slim\Psr7\Factory\ResponseFactory;
 
 return [
+    ResponseFactoryInterface::class => fn() => new ResponseFactory(),
+
     Database::class => fn() => Database::getInstance(),
 
     HttpClient::class => fn() => new HttpClient(timeoutSeconds: 10),
