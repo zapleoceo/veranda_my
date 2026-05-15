@@ -165,16 +165,19 @@ veranda.my/
 
 ## Phase progress
 
-| Phase | Status | Branch | Notes |
-|-------|--------|--------|-------|
-| 0 — Setup | ✅ Done | `refactor/slim4` | Branch created, structure, composer, CI |
-| 1 — Foundation | 🔄 In progress | `refactor/phase-1-foundation` | Config, HttpClient, Logger, DB, Middleware |
-| 2 — Telegram | ⏳ Pending | — | TelegramAlertService, KitchenSyncService, WebhookController |
-| 3 — Admin | ⏳ Pending | — | Slim routes, AuthMiddleware |
-| 4 — Modules | ⏳ Pending | — | tr3, reservations, links, kitchen_online |
-| 5 — payday2 | ⏳ Pending | — | Split 111K + 83K monoliths |
-| 6 — wa_listener | ⏳ Pending | — | Node.js restructure |
-| 7 — Cutover | ⏳ Pending | — | Staging tests → merge to main |
+| Phase | Status | Notes |
+|-------|--------|-------|
+| 0 — Setup | ✅ Done | Branch, structure, composer.json, deploy-staging.yml, REFACTORING.md |
+| 1 — Foundation | ✅ Done | Config, HttpClient (+headers), Logger, Database, TelegramBotClient, AuthMiddleware, WebhookSecretMiddleware, PHPUnit baseline (14 tests) |
+| 2a — Telegram alerts | ✅ Done | TelegramAlertService, ReservationReminderService, AlertItemRepository, MetaRepository, AlertItem, cron/telegram_alerts.php, setWebhook removed |
+| 2b — Kitchen sync | 🔄 In progress | KitchenSyncService from cron.php |
+| 2c — Webhook actions | ⏳ Pending | WebhookController + ActionInterface + 7 action classes |
+| 2d — Cron entry points | ⏳ Pending | kitchen_sync.php, menu_sync.php, daily_summary.php |
+| 3 — Admin panel | ⏳ Pending | Slim routes, controllers, templates/ |
+| 4 — Modules | ⏳ Pending | tr3, reservations, links, kitchen_online |
+| 5 — payday2 | ⏳ Pending | Split ajax.php (111K) + view.php (83K) into controllers/services/templates |
+| 6 — wa_listener | ⏳ Pending | Node.js src/ restructure |
+| 7 — Cutover | ⏳ Pending | Staging smoke tests → merge refactor/slim4 → main |
 
 ---
 
