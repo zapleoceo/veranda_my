@@ -25,12 +25,16 @@ jobs:
 
       - name: Configure SSH
         shell: bash
+        env:
+          SSH_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          echo "${{ secrets.STAGING_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          echo "${{ secrets.STAGING_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          printf '%s\n' "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
+          ssh-keygen -l -f ~/.ssh/id_ed25519
 
       - name: Check SSH connectivity
         shell: bash
