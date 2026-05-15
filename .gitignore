@@ -19,7 +19,8 @@ Thumbs.db
 # Generated artifacts
 *.tmp
 
-# Payday2 local config (must be environment-specific, not tracked)
+# Payday2 local config — environment-specific, lives on server only.
+# NEVER REMOVE THIS LINE — deleting it would wipe the file from the server on next rsync --delete deploy.
 /payday2/local_config.json
 
 # Project docs (local only)
