@@ -30,7 +30,7 @@ chmod 600 ~/.ssh/authorized_keys
 
 Нужные секреты для workflow:
 
-- `SSH_HOST`: IP/домен сервера (например `159.253.23.113` или `veranda.my`)
+- `SSH_HOST`: IP/домен сервера (например `5.101.179.132` или `veranda.my`)
 - `SSH_PORT`: `22`
 - `SSH_USER`: `veranda_my_usr`
 - `DEPLOY_PATH`: `/var/www/veranda_my_usr/data/www/veranda.my`
@@ -46,4 +46,3 @@ Workflow деплоя находится тут: [.github/workflows/deploy.yml](
 
 - Любой push в `main` запускает Action “Deploy to veranda.my”.
 - После деплоя workflow выполняет `php -l` на ключевых файлах на сервере.
-

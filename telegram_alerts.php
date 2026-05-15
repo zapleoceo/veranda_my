@@ -227,19 +227,24 @@ try {
     try { $db->query("ALTER TABLE {$waStates} ADD COLUMN return_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
     try { $db->query("ALTER TABLE {$waStates} ADD COLUMN reminder_sent_at DATETIME NULL"); } catch (\Throwable $e) {}
 
+    $nowSql = date('Y-m-d H:i:s');
+    $returnCutoffSql = date('Y-m-d H:i:s', time() - 600);
+
     $dueTg = [];
     try {
         $dueTg = $db->query(
             "SELECT code, payload_json, tg_user_id
              FROM {$tgStates}
              WHERE used_at IS NULL
-               AND expires_at > NOW()
+               AND expires_at > ?
                AND return_sent_at IS NOT NULL
                AND reminder_sent_at IS NULL
                AND tg_user_id IS NOT NULL
                AND tg_user_id > 0
-               AND return_sent_at <= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+               AND return_sent_at <= ?
              LIMIT 50"
+            ,
+            [$nowSql, $returnCutoffSql]
         )->fetchAll();
     } catch (\Throwable $e) {
         $dueTg = [];
@@ -287,11 +292,13 @@ try {
             "SELECT code, phone, payload_json
              FROM {$waStates}
              WHERE used_at IS NULL
-               AND expires_at > NOW()
+               AND expires_at > ?
                AND return_sent_at IS NOT NULL
                AND reminder_sent_at IS NULL
-               AND return_sent_at <= DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+               AND return_sent_at <= ?
              LIMIT 50"
+            ,
+            [$nowSql, $returnCutoffSql]
         )->fetchAll();
     } catch (\Throwable $e) {
         $dueWa = [];

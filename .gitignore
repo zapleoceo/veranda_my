@@ -29,8 +29,6 @@ Thumbs.db
 !/docs/superpowers/specs/**
 /ops/
 
-# testai runtime cache
-/testai/cache/
 
 # wa_listener runtime files (not in git)
 /wa_listener/auth/

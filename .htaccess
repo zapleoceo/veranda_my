@@ -10,10 +10,6 @@ RewriteRule ^tr3/?$ tr3/index.php [L,QSA]
 RewriteRule ^tr3/api/?$ tr3/api.php [L,QSA]
 RewriteRule ^tr4/?$ tr4/index.php [L,QSA]
 RewriteRule ^tr4/api/?$ tr4/api.php [L,QSA]
-RewriteRule ^testai/?$ testai/index.php [L,QSA]
-RewriteRule ^testai/api/?$ testai/api.php [L,QSA]
-RewriteRule ^testai/webhook/?$ testai/webhook.php [L,QSA]
-RewriteRule ^testai/daily/?$ testai/daily.php [L,QSA]
 RewriteRule ^TableReservation/?$ TableReservation.php [L,QSA]
 
 # Redirects from old .php paths to new folders

@@ -64,8 +64,7 @@ jobs:
               --exclude "tmp/" \
               --exclude "cache/" \
               --exclude ".cache/" \
-              --exclude "testai/cache/" \
-              --exclude "wa_listener/auth/" \
+--exclude "wa_listener/auth/" \
               --exclude "wa_listener/qr_state.json" \
               --exclude "wa_listener/node_modules/" \
               --exclude "wa_listener/package-lock.json" \
@@ -96,6 +95,6 @@ jobs:
           for i in 1 2 3; do
             echo "ssh attempt ${i}/3"
             ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-              "cd '${{ secrets.DEPLOY_PATH }}' && php -l index.php && php -l login.php && php -l logout.php && php -l auth_callback.php && php -l dashboard.php && php -l rawdata.php && php -l rawdata_receipts_chunk.php && php -l kitchen_online.php && php -l admin/index.php && php -l cron.php && php -l telegram_alerts.php && php -l roma/index.php && php -l banya/index.php && php -l employees/index.php && php -l reservations/index.php && php -l testai/webhook.php && php -l testai/api.php && php -l testai/daily.php && php -l testai/gemini.php && php -l src/classes/TestAIEnv.php && php -l src/classes/TestAIInfra.php && php -l src/classes/TestAIRepositories.php && php -l src/classes/TestAIServices.php" && break
+              "cd '${{ secrets.DEPLOY_PATH }}' && php -l index.php && php -l login.php && php -l logout.php && php -l auth_callback.php && php -l dashboard.php && php -l rawdata.php && php -l rawdata_receipts_chunk.php && php -l kitchen_online.php && php -l admin/index.php && php -l cron.php && php -l telegram_alerts.php && php -l roma/index.php && php -l banya/index.php && php -l employees/index.php && php -l reservations/index.php" && break
             sleep $((i * 3))
           done
