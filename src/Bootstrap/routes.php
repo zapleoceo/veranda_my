@@ -25,8 +25,8 @@ $app->post('/login', [LoginController::class, 'handle']);
 $app->get('/auth/callback', [CallbackController::class, 'handle']);
 $app->get('/logout', [LoginController::class, 'logout']);
 
-// Telegram webhook (protected by secret header/param)
-$app->post('/telegram_webhook', [WebhookController::class, 'handle'])
+// Telegram webhook (Telegram bot POSTs here; WA bridge uses GET/POST with ?wa_event=)
+$app->map(['GET', 'POST'], '/telegram_webhook', [WebhookController::class, 'handle'])
     ->add(WebhookSecretMiddleware::class);
 
 // Admin panel (protected by session auth)

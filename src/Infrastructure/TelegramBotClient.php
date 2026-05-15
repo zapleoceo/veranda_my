@@ -95,11 +95,30 @@ class TelegramBotClient
         return (bool) ($result['ok'] ?? false);
     }
 
-    public function answerCallbackQuery(string $queryId, string $text = ''): bool
+    public function sendPhoto(string $photoUrl, string $caption = '', ?int $threadId = null): int|null
+    {
+        $params = [
+            'chat_id' => $this->chatId,
+            'photo'   => $photoUrl,
+        ];
+        if ($caption !== '') {
+            $params['caption'] = $caption;
+        }
+        if ($threadId !== null && $threadId > 0) {
+            $params['message_thread_id'] = $threadId;
+        }
+        $result = $this->_call('sendPhoto', $params);
+        return isset($result['ok'], $result['result']['message_id']) && $result['ok']
+            ? (int) $result['result']['message_id']
+            : null;
+    }
+
+    public function answerCallbackQuery(string $queryId, string $text = '', bool $showAlert = false): bool
     {
         $result = $this->_call('answerCallbackQuery', [
             'callback_query_id' => $queryId,
             'text'              => $text,
+            'show_alert'        => $showAlert,
         ]);
         return (bool) ($result['ok'] ?? false);
     }
