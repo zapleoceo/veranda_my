@@ -1,0 +1,84 @@
+name: Deploy to beta.veranda.my (staging)
+
+on:
+  push:
+    branches: ["refactor/slim4"]
+
+concurrency:
+  group: deploy-beta-veranda-my
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Ensure rsync
+        shell: bash
+        run: |
+          if ! command -v rsync >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y rsync
+          fi
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          if [ -n "${{ secrets.SSH_KNOWN_HOSTS }}" ]; then
+            echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          fi
+
+      - name: Deploy files to staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+
+          for i in 1 2 3; do
+            echo "rsync attempt ${i}/3"
+            rsync -az \
+              --delete \
+              --delete-after \
+              --exclude ".env" \
+              --exclude ".env.*" \
+              --exclude "*.log" \
+              --exclude "tmp/" \
+              --exclude "vendor/" \
+              --exclude "logs/" \
+              --exclude "payday2/local_config.json" \
+              --exclude "wa_listener/auth/" \
+              --exclude "wa_listener/qr_state.json" \
+              --exclude "wa_listener/node_modules/" \
+              --exclude ".git/" \
+              --exclude ".github/" \
+              -e "ssh ${SSH_OPTS}" \
+              ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.STAGING_DEPLOY_PATH }}/ && break
+            sleep $((i * 3))
+          done
+
+      - name: Install Composer dependencies (staging)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "cd '${{ secrets.STAGING_DEPLOY_PATH }}' && /opt/php82/bin/php /usr/local/bin/composer install --optimize-autoloader --no-interaction 2>&1"
+
+      - name: Smoke test staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Give PHP-FPM a moment after deploy
+          sleep 3
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://beta.veranda.my/login)
+          echo "GET /login → HTTP ${STATUS}"
+          [ "$STATUS" = "200" ] || (echo "Smoke test FAILED" && exit 1)

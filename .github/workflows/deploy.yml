@@ -64,6 +64,8 @@ jobs:
               --exclude "tmp/" \
               --exclude "cache/" \
               --exclude ".cache/" \
+              --exclude "vendor/" \
+              --exclude "logs/" \
               --exclude "payday2/local_config.json" \
               --exclude "wa_listener/auth/" \
               --exclude "wa_listener/qr_state.json" \
@@ -73,6 +75,18 @@ jobs:
               --exclude ".github/" \
               -e "ssh ${SSH_OPTS}" \
               ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/ && break
+            sleep $((i * 3))
+          done
+
+      - name: Install Composer dependencies (server)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          for i in 1 2 3; do
+            echo "composer attempt ${i}/3"
+            ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+              "cd '${{ secrets.DEPLOY_PATH }}' && /opt/php82/bin/php /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction 2>&1" && break
             sleep $((i * 3))
           done
 
@@ -96,6 +110,6 @@ jobs:
           for i in 1 2 3; do
             echo "ssh attempt ${i}/3"
             ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-              "cd '${{ secrets.DEPLOY_PATH }}' && PHP=/opt/php74/bin/php && \$PHP -l index.php && \$PHP -l login.php && \$PHP -l logout.php && \$PHP -l auth_callback.php && \$PHP -l dashboard.php && \$PHP -l rawdata.php && \$PHP -l rawdata_receipts_chunk.php && \$PHP -l kitchen_online.php && \$PHP -l admin/index.php && \$PHP -l cron.php && \$PHP -l telegram_alerts.php && \$PHP -l roma/index.php && \$PHP -l banya/index.php && \$PHP -l employees/index.php && \$PHP -l reservations/index.php" && break
+              "cd '${{ secrets.DEPLOY_PATH }}' && PHP=/opt/php82/bin/php && \$PHP -l public/index.php && \$PHP -l cron/kitchen_sync.php && \$PHP -l cron/telegram_alerts.php" && break
             sleep $((i * 3))
           done
