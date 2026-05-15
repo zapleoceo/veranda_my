@@ -64,6 +64,136 @@ $logLine = function (string $msg): void {
     }
 };
 
+$waEvent = strtolower(trim((string)($_GET['wa_event'] ?? '')));
+if ($waEvent !== '') {
+    header('Content-Type: application/json; charset=utf-8');
+
+    $secret = trim((string)($_ENV['WA_NODE_SECRET'] ?? ($_ENV['WA_BRIDGE_SECRET'] ?? '')));
+    $provided = trim((string)($_SERVER['HTTP_X_WA_BRIDGE'] ?? ''));
+    if ($provided === '') $provided = trim((string)($_GET['secret'] ?? $_POST['secret'] ?? ''));
+    if ($secret === '' || $provided === '' || !hash_equals($secret, $provided)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $db = null;
+    try {
+        $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
+    } catch (\Throwable $e) {
+        $db = null;
+    }
+
+    $metaTable = ($db instanceof \App\Classes\Database) ? $db->t('system_meta') : '';
+    $getMeta = function (string $key, string $default = '') use ($db, $metaTable): string {
+        if (!($db instanceof \App\Classes\Database) || $metaTable === '') return $default;
+        try {
+            $row = $db->query("SELECT meta_value FROM {$metaTable} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
+            return is_array($row) && array_key_exists('meta_value', $row) ? (string)$row['meta_value'] : $default;
+        } catch (\Throwable $e) {
+            return $default;
+        }
+    };
+    $setMeta = function (string $key, string $value) use ($db, $metaTable): void {
+        if (!($db instanceof \App\Classes\Database) || $metaTable === '') return;
+        try {
+            $db->query(
+                "INSERT INTO {$metaTable} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+                [$key, $value]
+            );
+        } catch (\Throwable $e) {
+        }
+    };
+
+    $defaultChatId = trim((string)($_ENV['TELEGRAM_CHAT_ID'] ?? $_ENV['TG_CHAT_ID'] ?? ''));
+    $defaultThreadId = (int)trim((string)($_ENV['TELEGRAM_THREAD_ID'] ?? $_ENV['TG_THREAD_ID'] ?? '0'));
+    $adminChatId = trim((string)($_ENV['WA_ADMIN_TG_CHAT_ID'] ?? $_ENV['TG_ADMIN_ID'] ?? '169510539'));
+
+    if ($waEvent === 'qr') {
+        $chatId = trim((string)($_POST['chat_id'] ?? $_GET['chat_id'] ?? $defaultChatId));
+        $threadId = (int)trim((string)($_POST['thread_id'] ?? $_GET['thread_id'] ?? (string)$defaultThreadId));
+        $incomingMsgId = (int)trim((string)($_POST['message_id'] ?? $_GET['message_id'] ?? '0'));
+        $text = trim((string)($_POST['text'] ?? $_GET['text'] ?? ''));
+        $photoUrl = trim((string)($_POST['photo_url'] ?? $_GET['photo_url'] ?? ''));
+        $caption = trim((string)($_POST['caption'] ?? $_GET['caption'] ?? ''));
+
+        $sentChatId = $chatId;
+        $sentMsgId = $incomingMsgId;
+
+        if ($sentMsgId <= 0 && $chatId !== '' && ($text !== '' || $photoUrl !== '')) {
+            if ($photoUrl !== '') {
+                $payload = [
+                    'chat_id' => $chatId,
+                    'photo' => $photoUrl,
+                ];
+                if ($caption !== '') $payload['caption'] = $caption;
+                if ($threadId > 0) $payload['message_thread_id'] = $threadId;
+                $resp = $postJson('sendPhoto', $payload);
+                if (is_array($resp) && !empty($resp['ok']) && is_array($resp['result'] ?? null)) {
+                    $sentChatId = $chatId;
+                    $sentMsgId = (int)($resp['result']['message_id'] ?? 0);
+                }
+            } else {
+                $payload = [
+                    'chat_id' => $chatId,
+                    'text' => $text,
+                ];
+                if ($threadId > 0) $payload['message_thread_id'] = $threadId;
+                $resp = $postJson('sendMessage', $payload);
+                if (is_array($resp) && !empty($resp['ok']) && is_array($resp['result'] ?? null)) {
+                    $sentChatId = $chatId;
+                    $sentMsgId = (int)($resp['result']['message_id'] ?? 0);
+                }
+            }
+        }
+
+        if ($sentChatId !== '' && $sentMsgId > 0) {
+            $setMeta('wa_qr_tg_chat_id', $sentChatId);
+            $setMeta('wa_qr_tg_message_id', (string)$sentMsgId);
+            $setMeta('wa_qr_tg_saved_at', date('Y-m-d H:i:s'));
+        }
+
+        echo json_encode(['ok' => $sentMsgId > 0, 'chat_id' => $sentChatId, 'message_id' => $sentMsgId], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($waEvent === 'active') {
+        $qrChatId = trim($getMeta('wa_qr_tg_chat_id', ''));
+        $qrMsgId = (int)trim($getMeta('wa_qr_tg_message_id', '0'));
+        if ($qrChatId === '') $qrChatId = $defaultChatId;
+
+        $deleted = false;
+        if ($qrChatId !== '' && $qrMsgId > 0) {
+            $resp = $postJson('deleteMessage', [
+                'chat_id' => $qrChatId,
+                'message_id' => $qrMsgId,
+            ]);
+            $deleted = is_array($resp) && !empty($resp['ok']);
+        }
+
+        $setMeta('wa_qr_tg_chat_id', '');
+        $setMeta('wa_qr_tg_message_id', '0');
+        $setMeta('wa_qr_tg_saved_at', '');
+
+        $sentActive = false;
+        if ($adminChatId !== '') {
+            $resp = $postJson('sendMessage', [
+                'chat_id' => $adminChatId,
+                'text' => 'WA: активен ✅',
+            ]);
+            $sentActive = is_array($resp) && !empty($resp['ok']);
+        }
+
+        echo json_encode(['ok' => true, 'qr_deleted' => $deleted, 'wa_active_sent' => $sentActive], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Unknown wa_event'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (!empty($update['message'])) {
     $msg = $update['message'];
     $chat = is_array($msg['chat'] ?? null) ? $msg['chat'] : [];

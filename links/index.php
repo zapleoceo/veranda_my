@@ -45,7 +45,9 @@ $hoursLine1 = (string)($i18n[$lang]['hours']['line1'] ?? '');
 $hoursLine2 = (string)($i18n[$lang]['hours']['line2'] ?? '');
 
 $baseUrl = 'https://veranda.my/links/';
-$langUrl = static fn(string $code): string => $baseUrl . '?lang=' . urlencode($code);
+$langUrl = function ($code) use ($baseUrl) {
+    return $baseUrl . '?lang=' . urlencode((string)$code);
+};
 
 $seoTitles = [
     'ru' => 'Veranda — ресторан и бар, Нячанг, Вьетнам',
