@@ -30,8 +30,7 @@
         <a href="?tab=reservations" class="admin-nav-item <?= $tab === 'reservations' ? 'active' : '' ?>">Брони</a>
         <a href="?tab=categories" class="admin-nav-item <?= $tab === 'categories' ? 'active' : '' ?>">Категории</a>
         <a href="?tab=menu" class="admin-nav-item <?= $tab === 'menu' ? 'active' : '' ?>">Меню</a>
-        <a href="?tab=aibot" class="admin-nav-item <?= $tab === 'aibot' ? 'active' : '' ?>">AI bot</a>
-        <a href="?tab=logs" class="admin-nav-item <?= $tab === 'logs' ? 'active' : '' ?>">Логи</a>
+<a href="?tab=logs" class="admin-nav-item <?= $tab === 'logs' ? 'active' : '' ?>">Логи</a>
     </nav>
 
     <?php if ($message): ?>
