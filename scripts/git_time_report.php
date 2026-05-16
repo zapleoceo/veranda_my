@@ -50,7 +50,6 @@ function section(string $p): string {
     if (preg_match('#^errors\.php$|^assets/css/errors\.css$#', $p)) return 'Cooked (errors)';
     if (preg_match('#^zapara\.php$|^assets/css/zapara\.css$|^assets/js/zapara\.js$#', $p)) return 'Zapara';
     if (preg_match('#^sepay/#', $p)) return 'SePay webhook';
-    if (preg_match('#^neworder/#', $p)) return 'Neworder';
 
     if (preg_match('#^links/index\.php$|^assets/css/links_index\.css$|^links/favicon\.svg$#', $p)) return 'Links (публичные)';
     if (preg_match('#^links/table-reservation\.(js|css)$#', $p)) return 'TableReservation (legacy)';

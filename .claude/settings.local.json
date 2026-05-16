@@ -25,7 +25,10 @@
       "mcp__Claude_in_Chrome__javascript_tool",
       "Bash(git rebase *)",
       "Bash(git restore *)",
-      "Bash(GIT_EDITOR=true git rebase --continue)"
+      "Bash(GIT_EDITOR=true git rebase --continue)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(git rm *)"
     ]
   }
 }
