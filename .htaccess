@@ -27,8 +27,6 @@ RewriteRule ^employees/?$ employees/index.php [L,QSA]
 RewriteRule ^reservations/?$ reservations/index.php [L,QSA]
 RewriteRule ^admin/?$ admin/index.php [L,QSA]
 
-RewriteRule ^neworder/?$ neworder/index.php [L,QSA]
-RewriteRule ^neworder/api/?$ neworder/api.php [L,QSA]
 
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.php -f
