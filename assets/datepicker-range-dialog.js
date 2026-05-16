@@ -262,7 +262,13 @@
    };
  
    DateRangeDialog.prototype.focusBestCell = function () {
+     var vm = this.viewDate;
      var preferred = this.rangeEnd || this.rangeStart || clampToDay(new Date());
+     // If preferred is outside the current view month, anchor to 1st of view month
+     // to prevent focusDate() from re-navigating away from the month we just scrolled to.
+     if (preferred.getFullYear() !== vm.getFullYear() || preferred.getMonth() !== vm.getMonth()) {
+       preferred = new Date(vm.getFullYear(), vm.getMonth(), 1);
+     }
      this.focusDate(preferred);
    };
  
