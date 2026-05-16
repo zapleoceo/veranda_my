@@ -32,8 +32,12 @@ use App\Payday3\Http\Actions\SepaySyncAction;
 use App\Payday3\Http\Actions\PosterSyncAction;
 use App\Payday3\Contracts\ReconciliationServiceInterface;
 use App\Payday3\Contracts\DayResetServiceInterface;
+use App\Payday3\Contracts\PosterSyncServiceInterface;
+use App\Payday3\Contracts\SepaySyncServiceInterface;
 use App\Payday3\Services\ReconciliationService;
 use App\Payday3\Services\DayResetService;
+use App\Payday3\Services\PosterSyncService;
+use App\Payday3\Services\SepaySyncService;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -93,6 +97,8 @@ return [
     ),
     DayResetServiceInterface::class => fn($c) => new DayResetService($c->get(Database::class)),
     ClearDayAction::class    => fn($c) => new ClearDayAction($c->get(DayResetServiceInterface::class)),
-    SepaySyncAction::class   => fn()   => new SepaySyncAction(),
-    PosterSyncAction::class  => fn()   => new PosterSyncAction(),
+    SepaySyncServiceInterface::class  => fn($c) => new SepaySyncService($c->get(Database::class)),
+    SepaySyncAction::class            => fn($c) => new SepaySyncAction($c->get(SepaySyncServiceInterface::class)),
+    PosterSyncServiceInterface::class => fn($c) => new PosterSyncService($c->get(Database::class)),
+    PosterSyncAction::class           => fn($c) => new PosterSyncAction($c->get(PosterSyncServiceInterface::class)),
 ];
