@@ -14,6 +14,15 @@ use App\Services\PosterReservationsService;
 use App\Services\RawdataService;
 use App\Services\ReservationMessagingService;
 use App\Services\ReservationsService;
+use App\Payday3\Contracts\LinkRepositoryInterface;
+use App\Payday3\Contracts\PosterRepositoryInterface;
+use App\Payday3\Contracts\SepayRepositoryInterface;
+use App\Payday3\Repositories\LinkRepository;
+use App\Payday3\Repositories\PosterRepository;
+use App\Payday3\Repositories\SepayRepository;
+use App\Payday3\Http\PageDataAssembler;
+use App\Payday3\Http\Payday3Controller;
+use App\Payday3\Http\Actions\LinksAction;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -39,4 +48,16 @@ return [
     ),
 
     LoggerInterface::class => fn() => Logger::get(),
+
+    // ─── Payday3 ──────────────────────────────────────────────
+    SepayRepositoryInterface::class  => fn($c) => new SepayRepository($c->get(Database::class)),
+    PosterRepositoryInterface::class => fn($c) => new PosterRepository($c->get(Database::class)),
+    LinkRepositoryInterface::class   => fn($c) => new LinkRepository($c->get(Database::class)),
+    PageDataAssembler::class => fn($c) => new PageDataAssembler(
+        $c->get(SepayRepositoryInterface::class),
+        $c->get(PosterRepositoryInterface::class),
+        $c->get(LinkRepositoryInterface::class),
+    ),
+    Payday3Controller::class => fn($c) => new Payday3Controller($c->get(PageDataAssembler::class)),
+    LinksAction::class => fn($c) => new LinksAction($c->get(LinkRepositoryInterface::class)),
 ];

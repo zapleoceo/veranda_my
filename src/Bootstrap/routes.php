@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Controllers\Auth\LoginController;
 use App\Controllers\Auth\CallbackController;
 use App\Controllers\Payday2Controller;
+use App\Payday3\Http\Payday3Controller;
+use App\Payday3\Http\Actions\LinksAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -107,6 +109,16 @@ $app->map(['GET', 'POST'], '/reservations[/]', [ReservationsController::class, '
 // resolve to this controller (which renders through layout.php with sidebar).
 $app->map(['GET', 'POST'], '/payday2[/]', [Payday2Controller::class, 'dispatch'])
     ->add(AuthMiddleware::class);
+
+// Phase 6: payday3 — clean Slim-native rebuild of payday2 (SOLID/DRY).
+// Browser-facing render + REST API under /payday3/api/*. Each AJAX endpoint
+// is a single-action class (one responsibility per file).
+$app->group('/payday3', function (RouteCollectorProxy $g) {
+    $g->get('[/]', [Payday3Controller::class, 'index']);
+    $g->group('/api', function (RouteCollectorProxy $api) {
+        $api->get('/links', LinksAction::class);
+    });
+})->add(AuthMiddleware::class);
 
 // Static assets from directories outside public/
 $app->get('/assets/{file:.+}',              [StaticController::class, 'globalAssets']);
