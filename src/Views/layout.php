@@ -70,6 +70,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 }
 .sb-link:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .sb-link.active{color:var(--text);border-left-color:var(--accent);background:rgba(184,135,70,.1)}
+.sb-link.sb-off{color:var(--border);pointer-events:none;cursor:default}
 .sb-sep{height:1px;background:var(--border);margin:.375rem 0}
 .sb-footer{border-top:1px solid var(--border);padding:.5rem;flex-shrink:0}
 .sb-user{display:flex;align-items:center;gap:.5rem;padding:.3rem .5rem}
@@ -214,18 +215,15 @@ $currentPath = $currentPath ?? '/admin';
       <button class="sb-collapse-btn" id="sbCollapseBtn" title="Скрыть меню">&#9664;</button>
     </div>
     <nav class="sb-nav">
-      <?php
-      $_sbFirst = true;
-      foreach ($navSections as $section):
-          $visible = array_filter($section['links'], fn($item) => $_sbCan($item['perm']));
-          if (empty($visible)) continue;
-      ?>
+      <?php $_sbFirst = true; foreach ($navSections as $section): ?>
         <?php if (!$_sbFirst): ?><div class="sb-sep"></div><?php endif; ?>
         <?php $_sbFirst = false; ?>
         <div class="sb-section">
           <div class="sb-title"><?= htmlspecialchars($section['title']) ?></div>
-          <?php foreach ($visible as $href => $item): ?>
-            <a href="<?= $href ?>" class="sb-link<?= $currentPath === $href ? ' active' : '' ?>"><?= htmlspecialchars($item['label']) ?></a>
+          <?php foreach ($section['links'] as $href => $item):
+              $can = $_sbCan($item['perm']);
+          ?>
+            <a href="<?= $href ?>" class="sb-link<?= $currentPath === $href ? ' active' : '' ?><?= $can ? '' : ' sb-off' ?>"><?= htmlspecialchars($item['label']) ?></a>
           <?php endforeach; ?>
         </div>
       <?php endforeach; ?>
