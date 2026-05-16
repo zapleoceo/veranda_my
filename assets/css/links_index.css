@@ -533,3 +533,36 @@
 @media (prefers-reduced-motion: reduce) {
     .blob { animation: none; }
 }
+
+/* ===== Full-window black background, content centered ===== */
+html, body {
+    margin: 0;
+    padding: 0;
+    background: #000;
+    min-height: 100vh;
+    min-height: 100svh;
+}
+
+.links-page {
+    background: #000;
+    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.links-hero {
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+.links-hero__inner {
+    width: 100%;
+    margin: 0 auto;
+}
