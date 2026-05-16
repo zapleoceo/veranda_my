@@ -78,3 +78,4 @@ $app->get('/tr3/assets/{file:.+}',          [StaticController::class, 'tr3Assets
 $app->get('/links/{file:.+}',               [StaticController::class, 'linksStatic']);
 $app->get('/reservations/assets/{file:.+}', [StaticController::class, 'reservationsAssets']);
 $app->get('/reservations/{file:[\w.-]+}',   [StaticController::class, 'reservationsRoot']);
+$app->get('/payday2/assets/{file:.+}',      [StaticController::class, 'payday2Assets']);
