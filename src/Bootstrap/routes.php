@@ -60,6 +60,7 @@ $app->get('/links/menu', [MenuPublicController::class, 'show']);
 $app->get('/menu', [MenuPublicController::class, 'show']);
 
 // Phase 4: tr3 (public booking widget)
+$app->get('/tr3/', function ($req, $res) { return $res->withHeader('Location', '/tr3')->withStatus(301); });
 $app->get('/tr3', [Tr3Controller::class, 'index']);
 $app->map(['GET', 'POST'], '/tr3/api', [Tr3Controller::class, 'api']);
 
