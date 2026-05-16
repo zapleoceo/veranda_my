@@ -189,9 +189,16 @@ class WebhookController
             return $response;
         }
 
-        $ctx     = new ActionContext($this->db, $this->bot, $actionId, $chatId, $messageId, $callbackId, $username, $actorName);
-        $result  = '';
-        $errored = false;
+        // Bind the bot to the chat where the callback came from. Without
+        // this, actions calling $ctx->bot->deleteMessage()/editMessageText()
+        // hit Telegram with chat_id="" because the DI-built bot has no
+        // default chat (TELEGRAM_CHAT_ID is only set in TelegramAlertService).
+        // Symptom in logs: telegram.api_error 'Bad Request: chat identifier
+        // is not specified'.
+        $boundBot = $this->bot->withChatId($chatId);
+        $ctx      = new ActionContext($this->db, $boundBot, $actionId, $chatId, $messageId, $callbackId, $username, $actorName);
+        $result   = '';
+        $errored  = false;
         try {
             /** @var ActionInterface $action */
             $action = new (self::ACTION_MAP[$actionName])();
