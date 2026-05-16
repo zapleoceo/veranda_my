@@ -8,7 +8,7 @@ $canonicalUrl = $seo['canonical'];
 $hreflang     = $seo['hreflang'];
 $seoTitle     = $seo['title'];
 $seoDesc      = $seo['description'];
-$ogImage      = 'https://veranda.my/assets/img/links_bg.png';
+$ogImage      = \App\Infrastructure\Config::baseUrl() . '/assets/img/links_bg.png';
 $telephone    = '+84396314266';
 ?>
 <!doctype html>

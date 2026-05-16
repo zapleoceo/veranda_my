@@ -44,7 +44,7 @@ $hoursTitle = (string)($i18n[$lang]['hours']['title'] ?? '');
 $hoursLine1 = (string)($i18n[$lang]['hours']['line1'] ?? '');
 $hoursLine2 = (string)($i18n[$lang]['hours']['line2'] ?? '');
 
-$baseUrl = 'https://veranda.my/links/';
+$baseUrl = \App\Infrastructure\Config::baseUrl() . '/links/';
 $langUrl = function ($code) use ($baseUrl) {
     return $baseUrl . '?lang=' . urlencode((string)$code);
 };
@@ -108,7 +108,7 @@ foreach ($sections as $sectionKey => $keys) {
 }
 
 $telephone = '+84396314266';
-$ogImage = 'https://veranda.my/assets/img/links_bg.png';
+$ogImage = \App\Infrastructure\Config::baseUrl() . '/assets/img/links_bg.png';
 
 $jsonLd = [
     '@context' => 'https://schema.org',
@@ -123,11 +123,11 @@ $jsonLd = [
         'addressRegion' => 'Khánh Hòa',
         'addressCountry' => 'Vietnam',
     ],
-    'hasMenu' => 'https://veranda.my/links/menu.php',
+    'hasMenu' => \App\Infrastructure\Config::baseUrl() . '/links/menu.php',
     'potentialAction' => [
         [
             '@type' => 'ReserveAction',
-            'target' => 'https://veranda.my/tr3',
+            'target' => \App\Infrastructure\Config::baseUrl() . '/tr3',
         ],
     ],
     'sameAs' => [

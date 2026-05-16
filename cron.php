@@ -370,8 +370,7 @@ try {
     };
 
     $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? ($_ENV['TG_BOT_TOKEN'] ?? '')));
-    $siteBase = trim((string)($_ENV['SITE_BASE_URL'] ?? 'https://veranda.my'));
-    if ($siteBase === '') $siteBase = 'https://veranda.my';
+    $siteBase = rtrim(veranda_base_url(), '/');
 
     $remindedTg = 0;
     $remindedWa = 0;

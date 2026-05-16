@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Infrastructure\Config;
 use App\Infrastructure\Database;
 
 class MenuPublicService
 {
     private const SUPPORTED_LANGS = ['ru', 'en', 'vi', 'ko'];
-    private const BASE_URL        = 'https://veranda.my/links/menu';
 
     public function __construct(private readonly Database $db) {}
 
@@ -90,7 +90,7 @@ class MenuPublicService
 
     public function buildSeoMeta(string $lang, bool $explicit): array
     {
-        $base    = self::BASE_URL;
+        $base    = Config::baseUrl() . '/links/menu';
         $langUrl = static fn(string $c): string => $base . '?lang=' . urlencode($c);
 
         return [

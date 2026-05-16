@@ -270,7 +270,11 @@ if (!empty($update['message'])) {
                 $payloadData = json_decode($payloadJsonStr, true);
                 $sourcePage = (is_array($payloadData) && !empty($payloadData['source_page'])) ? $payloadData['source_page'] : 'Tr2.php';
 
-                $returnUrl = 'https://veranda.my/' . ltrim($sourcePage, '/') . '?tg_state=' . rawurlencode($startCode);
+                $_wh_base = rtrim((string)($_ENV['SITE_BASE_URL'] ?? ''), '/');
+                if ($_wh_base === '') {
+                    $_wh_base = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+                }
+                $returnUrl = $_wh_base . '/' . ltrim($sourcePage, '/') . '?tg_state=' . rawurlencode($startCode);
                 $resp = $postJson('sendMessage', [
                     'chat_id' => $chatId,
                     'text' => "Аккаунт подтвержден.\nНажми кнопку ниже, чтобы завершить бронирование:",
@@ -320,7 +324,7 @@ if (!empty($update['message'])) {
                             [
                                 [
                                     'text' => 'Посмотреть меню',
-                                    'web_app' => ['url' => 'https://veranda.my/links/menu.php'],
+                                    'web_app' => ['url' => $_wh_base . '/links/menu.php'],
                                 ],
                             ],
                             [

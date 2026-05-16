@@ -118,7 +118,7 @@ try {
             ? array_map('strval', $webhookInfo['allowed_updates'])
             : [];
         $needMessage = !in_array('message', $allowed, true);
-        $targetUrl = 'https://veranda.my/telegram_webhook.php';
+        $targetUrl = veranda_base_url() . '/telegram_webhook.php';
         if ($currentUrl !== $targetUrl || $needMessage) {
             $bot->setWebhook($targetUrl);
         }
@@ -212,8 +212,7 @@ try {
         return true;
     };
 
-    $siteBase = trim((string)($_ENV['SITE_BASE_URL'] ?? 'https://veranda.my'));
-    if ($siteBase === '') $siteBase = 'https://veranda.my';
+    $siteBase = rtrim(veranda_base_url(), '/');
 
     $remindedTg = 0;
     $remindedWa = 0;
