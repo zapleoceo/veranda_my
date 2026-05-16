@@ -146,3 +146,35 @@ sudo systemctl enable --now pm2-veranda_my_usr
 
 После любых изменений в pm2 (новые процессы, изменение порядка) — сохранить
 дамп: `ssh veranda_my_usr@... pm2 save`. Иначе при ребуте они не восстановятся.
+
+### 8) FastPanel bad_bots.conf — не блокировать webhooks с пустым User-Agent
+
+FastPanel из коробки кладёт в `/etc/nginx/fastpanel2-includes/bad_bots.conf`
+правило, которое режет с HTTP 444 любой запрос с **пустым** User-Agent (`^$`):
+
+```nginx
+if ($http_user_agent ~* (^$|MegaIndex.ru|DotBot|MauiBot|...)) {
+    return 444;
+}
+```
+
+Это блокирует **все легитимные webhooks** — Telegram, Stripe, GitHub, Slack
+и т.д. UA не шлют. Симптом: Telegram `getWebhookInfo` показывает
+`last_error_message: "Wrong response from the webhook: 520 <none>"`, а в
+`veranda.my-frontend.access.log` POST'ы от Telegram (IP `91.108.x.x`)
+закрываются нулевым байтом и статусом 444.
+
+**Фикс (одноразово, требует root):**
+
+```bash
+sudo cp /etc/nginx/fastpanel2-includes/bad_bots.conf{,.bak.$(date +%F)}
+sudo sed -i 's|(\^\$|(|' /etc/nginx/fastpanel2-includes/bad_bots.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Результат — регулярка остаётся с реальными botnet-краулерами
+(MegaIndex/DotBot/MJ12Bot/...), но пустой UA больше не считается ботом.
+Эталон правильного файла — [`cron/nginx-bad_bots.conf`](cron/nginx-bad_bots.conf).
+
+После любого обновления FastPanel этот файл может быть переписан — проверять
+после апдейтов панели.
