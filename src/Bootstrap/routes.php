@@ -12,6 +12,9 @@ use App\Controllers\Admin\MenuController;
 use App\Controllers\Admin\AccessController;
 use App\Controllers\Admin\ReservationsAdminController;
 use App\Controllers\Admin\LogsController;
+use App\Controllers\KitchenOnlineController;
+use App\Controllers\RawdataController;
+use App\Controllers\MenuPublicController;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\WebhookSecretMiddleware;
 use Slim\App;
@@ -42,4 +45,12 @@ $app->group('/admin', function (RouteCollectorProxy $group) {
     $group->get('/logs', [LogsController::class, 'index']);
 })->add(AuthMiddleware::class);
 
-// TODO Phase 4: tr3, reservations, links, kitchen_online routes
+// Phase 4: staff-facing modules (auth-protected)
+$app->map(['GET', 'POST'], '/kitchen_online', [KitchenOnlineController::class, 'index'])
+    ->add(AuthMiddleware::class);
+$app->map(['GET', 'POST'], '/rawdata', [RawdataController::class, 'index'])
+    ->add(AuthMiddleware::class);
+
+// Phase 4: public menu
+$app->get('/links/menu', [MenuPublicController::class, 'show']);
+$app->get('/menu', [MenuPublicController::class, 'show']);
