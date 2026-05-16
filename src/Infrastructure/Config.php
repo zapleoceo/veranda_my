@@ -27,7 +27,12 @@ class Config
             }
             [$name, $value] = explode('=', $line, 2);
             $name  = trim($name);
-            $value = trim($value);
+            // Strip surrounding single or double quotes so values like
+            // MAIL_PASS="..." in production .env load correctly. Legacy
+            // auth_check.php has always done this; previously the Slim
+            // loader carried the quotes into $_ENV and Gmail IMAP
+            // rejected MAIL_PASS with [AUTHENTICATIONFAILED].
+            $value = trim(trim($value), "\"'");
 
             self::$_data[$name] = $value;
             // also populate $_ENV for legacy code that reads it directly
