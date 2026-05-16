@@ -51,8 +51,5 @@ if (($_GET['ajax'] ?? '') === 'load') {
     exit;
 }
 
-$today = date('Y-m-d');
-$firstOfMonth = date('Y-m-01');
-
 // HTML rendering removed: RomaController renders src/Views/roma_content.php
 // inside src/Views/layout.php; this file only handles AJAX (early-exit above).
