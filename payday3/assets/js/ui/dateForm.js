@@ -20,10 +20,13 @@ export function initDateForm() {
         if (!dateTo.classList.contains('is-hidden')) dateTo.focus();
     });
 
-    // Auto-submit when user changes the single-day input — matches payday2 behaviour.
-    dateFrom?.addEventListener('change', () => {
-        if (dateTo?.classList.contains('is-hidden')) form.submit();
-    });
+    // Auto-submit on any date change — there's no "Открыть" button.
+    // In range mode we still submit immediately because partially-filled
+    // ranges are valid (the controller treats missing dateTo as
+    // dateFrom and vice versa).
+    const submit = () => form.submit();
+    dateFrom?.addEventListener('change', submit);
+    dateTo  ?.addEventListener('change', submit);
 
     form.addEventListener('submit', () => {
         spinner?.classList.remove('is-hidden');
