@@ -11,7 +11,9 @@ if (file_exists(__DIR__ . '/.env')) {
 }
 
 $token = $_ENV['TELEGRAM_BOT_TOKEN'] ?? '';
-$appUrl = rtrim($_ENV['APP_URL'] ?? 'https://veranda.my', '/');
+$_siteHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+$_siteDerived = ($_siteHttps ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+$appUrl = rtrim($_ENV['APP_URL'] ?? $_ENV['SITE_BASE_URL'] ?? $_siteDerived, '/');
 if ($token === '') {
     echo "Missing TELEGRAM_BOT_TOKEN\n";
     exit(1);

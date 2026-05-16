@@ -66,4 +66,20 @@ class Config
         $value = self::get($key);
         return $value !== '' ? (int) $value : $default;
     }
+
+    /**
+     * Base URL of this site — no trailing slash.
+     * Reads SITE_BASE_URL from env; falls back to deriving from the current request.
+     * This is the single source of truth: change SITE_BASE_URL in .env to migrate domains.
+     */
+    public static function baseUrl(): string
+    {
+        $env = rtrim(self::get('SITE_BASE_URL'), '/');
+        if ($env !== '') {
+            return $env;
+        }
+        $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+        $host  = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+        return ($https ? 'https' : 'http') . '://' . $host;
+    }
 }

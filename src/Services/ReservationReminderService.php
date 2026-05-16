@@ -42,7 +42,7 @@ class ReservationReminderService
     private function _processTelegramReminders(string $now, string $cutoff): int
     {
         $table = $this->db->t('table_reservation_tg_states');
-        $siteBase = rtrim(Config::get('SITE_BASE_URL', 'https://veranda.my'), '/');
+        $siteBase = rtrim(Config::baseUrl(), '/');
 
         try {
             $rows = $this->db->query(
@@ -103,7 +103,7 @@ class ReservationReminderService
     private function _processWhatsAppReminders(string $now, string $cutoff): int
     {
         $table    = $this->db->t('table_reservation_wa_states');
-        $siteBase = rtrim(Config::get('SITE_BASE_URL', 'https://veranda.my'), '/');
+        $siteBase = rtrim(Config::baseUrl(), '/');
 
         try {
             $rows = $this->db->query(

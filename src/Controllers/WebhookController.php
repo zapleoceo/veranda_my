@@ -13,6 +13,7 @@ use App\Actions\VposterAction;
 use App\Actions\VposterCancelAction;
 use App\Actions\VposterFixAction;
 use App\Actions\VrestoreAction;
+use App\Infrastructure\Config;
 use App\Infrastructure\Database;
 use App\Infrastructure\TelegramBotClient;
 use Psr\Http\Message\ResponseInterface;
@@ -76,7 +77,7 @@ class WebhookController
             }
             $this->bot->withChatId($chatId)->sendMessageWithKeyboard(
                 'Выбери действие:',
-                [[['text' => 'Посмотреть меню', 'web_app' => ['url' => 'https://veranda.my/links/menu.php']]],
+                [[['text' => 'Посмотреть меню', 'web_app' => ['url' => Config::baseUrl() . '/links/menu.php']]],
                  [['text' => 'Как добраться', 'url' => 'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9']]]
             );
         } elseif (in_array($cmd, ['/start', '/menu'], true) && $chatId !== '' && ($chat['type'] ?? '') !== 'private') {
@@ -112,7 +113,7 @@ class WebhookController
 
         $payload    = json_decode((string) ($row['payload_json'] ?? '{}'), true);
         $sourcePage = is_array($payload) && !empty($payload['source_page']) ? $payload['source_page'] : 'Tr2.php';
-        $returnUrl  = 'https://veranda.my/' . ltrim($sourcePage, '/') . '?tg_state=' . rawurlencode($code);
+        $returnUrl  = Config::baseUrl() . '/' . ltrim($sourcePage, '/') . '?tg_state=' . rawurlencode($code);
 
         $msgId = $this->bot->withChatId($chatId)->sendMessageWithKeyboard(
             "Аккаунт подтвержден.\nНажми кнопку ниже, чтобы завершить бронирование:",

@@ -154,7 +154,7 @@ foreach ($groups as $workshopId => $g) {
 $pageTitle = $lang === 'ru' ? 'Online меню' : ($lang === 'vi' ? 'Thực đơn online' : ($lang === 'ko' ? '온라인 메뉴' : 'Online menu'));
 $menuLabel = $lang === 'ru' ? 'МЕНЮ' : ($lang === 'vi' ? 'THỰC ĐƠN' : ($lang === 'ko' ? '메뉴' : 'MENU'));
 
-$baseUrl = 'https://veranda.my/links/menu.php';
+$baseUrl = \App\Infrastructure\Config::baseUrl() . '/links/menu.php';
 $langUrl = static fn(string $code): string => $baseUrl . '?lang=' . urlencode($code);
 $canonicalUrl = $explicitLang === null ? $baseUrl : $langUrl($lang);
 $hreflang = [
@@ -181,7 +181,7 @@ $seoTitle = (string)($seoTitles[$lang] ?? $seoTitles['en']);
 $metaDescription = (string)($metaDescriptions[$lang] ?? $metaDescriptions['en']);
 $metaOgDescription = $metaDescription;
 
-$ogImage = 'https://veranda.my/assets/img/links_bg.png';
+$ogImage = \App\Infrastructure\Config::baseUrl() . '/assets/img/links_bg.png';
 $telephone = '+84396314266';
 ?>
 <!doctype html>

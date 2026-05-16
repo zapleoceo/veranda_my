@@ -18,11 +18,11 @@
     <meta property="og:title" content="<?= htmlspecialchars($seoTitle ?? 'Veranda') ?>">
     <meta property="og:description" content="<?= htmlspecialchars($metaOgDescription) ?>">
     <meta property="og:url" content="<?= htmlspecialchars($canonicalUrl) ?>">
-    <meta property="og:image" content="<?= htmlspecialchars($ogImage ?? 'https://veranda.my/assets/img/links_bg.png') ?>">
+    <meta property="og:image" content="<?= htmlspecialchars($ogImage ?? (\App\Infrastructure\Config::baseUrl() . '/assets/img/links_bg.png')) ?>">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="<?= htmlspecialchars($seoTitle ?? 'Veranda') ?>">
     <meta name="twitter:description" content="<?= htmlspecialchars($metaOgDescription) ?>">
-    <meta name="twitter:image" content="<?= htmlspecialchars($ogImage ?? 'https://veranda.my/assets/img/links_bg.png') ?>">
+    <meta name="twitter:image" content="<?= htmlspecialchars($ogImage ?? (\App\Infrastructure\Config::baseUrl() . '/assets/img/links_bg.png')) ?>">
     <title><?= htmlspecialchars($seoTitle ?? 'Veranda') ?></title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
     <link rel="preload" as="image" href="/assets/img/links_bg.png" fetchpriority="high">
