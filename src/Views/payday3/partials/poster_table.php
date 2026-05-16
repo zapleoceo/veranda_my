@@ -72,8 +72,17 @@ foreach ($poster as $p) $total = $total->plus($p->totalPayed());
                         <td class="pd3-col pd3-col--tips   nowrap right"><?= htmlspecialchars($p->tipSum->format()) ?></td>
                         <td class="pd3-col pd3-col--total  nowrap right"><strong><?= htmlspecialchars($total_->format()) ?></strong></td>
                         <td class="pd3-col pd3-col--method">
-                            <span class="pm-full"><?= htmlspecialchars($p->paymentMethodDisplay ?? '—') ?></span>
-                            <span class="pm-lite" aria-hidden="true"><?= htmlspecialchars(mb_substr((string)($p->paymentMethodDisplay ?? '—'), 0, 1, 'UTF-8')) ?></span>
+                            <?php
+                                $pmFull = (string)($p->paymentMethodDisplay ?? '—');
+                                // Payment-method abbreviation in Lite mode — matches
+                                // payday2: Vietnam Company → VC, Bybit → BB, anything
+                                // else keeps its full label.
+                                $pmLite = $pmFull;
+                                if (stripos($pmFull, 'vietnam') !== false)      $pmLite = 'VC';
+                                else if (stripos($pmFull, 'bybit')  !== false) $pmLite = 'BB';
+                            ?>
+                            <span class="pm-full"><?= htmlspecialchars($pmFull) ?></span>
+                            <span class="pm-lite" aria-hidden="true"><?= htmlspecialchars($pmLite) ?></span>
                         </td>
                         <td class="pd3-col pd3-col--waiter"><?= htmlspecialchars($p->waiterName) ?></td>
                         <td class="pd3-col pd3-col--table  nowrap"><?= $p->tableId ?: '—' ?></td>

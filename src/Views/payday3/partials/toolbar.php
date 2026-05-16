@@ -30,14 +30,12 @@ declare(strict_types=1);
     </nav>
 
     <form class="pd3-toolbar__dates" method="get" action="/payday3" id="pd3DateForm">
+        <!-- Auto-submit on date change — no explicit "Открыть" button. -->
         <input type="date" name="dateFrom" class="pd3-date" value="<?= htmlspecialchars($range->from) ?>" required>
         <button type="button" class="pd3-icon-btn pd3-icon-btn--small" id="pd3DateRangeToggle" title="Диапазон дат" data-help-abs="Включить диапазон вместо одного дня.">
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M5 12h14v2H5z"/></svg>
         </button>
         <input type="date" name="dateTo" class="pd3-date pd3-date--to <?= $range->isSingleDay() ? 'is-hidden' : '' ?>" value="<?= htmlspecialchars($range->to) ?>">
-        <button type="submit" class="pd3-btn pd3-btn--apply" data-help-abs="Загрузить данные за выбранный период.">
-            Открыть
-        </button>
         <span class="pd3-spinner is-hidden" id="pd3DateSpinner" aria-hidden="true">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
         </span>

@@ -131,9 +131,10 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 }
 .pd3-graph__grid {
     display: grid;
-    grid-template-columns: minmax(360px, 1fr) 100px minmax(560px, 1.4fr);
-    /* min-width: max-content keeps both tables at their natural width;
-       overflow-x on .pd3-graph then shows a horizontal scrollbar. */
+    /* Each table shrinks to its content width; the mid column has a
+       fixed minimum (the icon buttons + glass panel). The container's
+       overflow-x:auto handles the case when content overflows. */
+    grid-template-columns: max-content min-content max-content;
     min-width: max-content;
     gap: 0;
     align-items: stretch;
@@ -230,13 +231,13 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 /* ─── Tables ───────────────────────────────────────────────── */
 
 .pd3-table {
-    width: 100%;
+    width: auto;                    /* don't stretch to pane width */
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 12px;
 }
 .pd3-table th,
 .pd3-table td {
-    padding: 5px 7px;
+    padding: 3px 6px;               /* tight cells */
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
 }
@@ -244,7 +245,7 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     text-align: left;
     color: var(--muted);
     font-weight: 600;
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     position: sticky;
@@ -252,6 +253,7 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     background: var(--card);
     z-index: 2;
     user-select: none;
+    padding: 4px 6px;
 }
 .pd3-table td.right,
 .pd3-table th.right { text-align: right; }
@@ -282,11 +284,20 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-col--method,
 .pd3-col--waiter,
 .pd3-col--table { width: 1%; white-space: nowrap; }
-.pd3-col--content { min-width: 8rem; word-break: break-word; }
+/* Content (sepay description) capped at 250 px — anything longer is
+   ellipsised. payday2 had a similar cap so the table stays narrow. */
+.pd3-col--content {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Minimal padding on the icon-only columns — anchor dot is 7px wide
+   and the checkbox is small, no need for the wider per-cell padding. */
 .pd3-col--hide,
 .pd3-col--cb,
 .pd3-col--anchor,
-.pd3-col--lead { padding-left: 4px; padding-right: 4px; }
+.pd3-col--lead { padding-left: 2px; padding-right: 2px; }
 .pd3-col--table { text-align: right; }
 
 /* Poster's combined leading cell — anchor dot + checkbox in one box,
@@ -294,7 +305,7 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-lead {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
 }
 
 /* ─── Row states ──────────────────────────────────────────── */
@@ -511,6 +522,91 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     transform: scale(1.18);
 }
 
+/* ─── Modal host ───────────────────────────────────────────── */
+
+.pd3-modal-host {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.pd3-modal-host[hidden] { display: none; }
+.pd3-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+}
+.pd3-modal {
+    position: relative;
+    max-width: min(92vw, 540px);
+    max-height: 84vh;
+    overflow: auto;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 18px 48px rgba(0,0,0,0.55);
+    padding: 0;
+}
+.pd3-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+}
+.pd3-modal__header h2 { margin: 0; font-size: 16px; }
+.pd3-modal__close {
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+}
+.pd3-modal__close:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.pd3-modal__body { padding: 16px 18px; }
+.pd3-modal__body p { margin: 0 0 10px; }
+.pd3-modal__body p:last-child { margin-bottom: 0; }
+.pd3-modal__loading {
+    text-align: center;
+    color: var(--muted);
+    padding: 24px 0;
+}
+.pd3-modal__legend {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.pd3-modal__legend li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+}
+.pd3-modal__legend .pd3-legend-line { width: 22px; height: 2px; }
+.pd3-modal__result { margin-top: 12px; }
+
+.pd3-form { display: flex; flex-direction: column; gap: 10px; }
+.pd3-field { display: flex; flex-direction: column; gap: 4px; }
+.pd3-field span { font-size: 11px; color: var(--muted); }
+.pd3-field input {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 7px 10px;
+    font: inherit;
+}
+
 /* Soft-reset button under the mid-col glass — payday2's clearDayBtn. */
 .pd3-soft-reset {
     margin-top: auto;               /* push to the bottom of the mid column */
@@ -528,13 +624,19 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-soft-reset svg { width: 16px; height: 16px; }
 .pd3-soft-reset:hover { background: rgba(239, 68, 68, 0.32); color: #fff; }
 
-/* ─── Lite mode: hide noisy columns ───────────────────────── */
+/* ─── Lite mode: hide noisy columns ─────────────────────────
+   Exact column set that disappears in Lite, matching payday2:
+     Sepay  →  content (description text)
+     Poster →  num, card, tips, waiter, table
+   Kept in Lite:  hide, time, sum, cb, anchor (sepay);  lead,
+                  time, total, method (poster).
+   Method swaps from full name to VC/BB abbreviation via the
+   .pm-full / .pm-lite span pair. */
 
 body.pd3-mode-lite .pd3-col--content,
 body.pd3-mode-lite .pd3-col--num,
 body.pd3-mode-lite .pd3-col--card,
 body.pd3-mode-lite .pd3-col--tips,
-body.pd3-mode-lite .pd3-col--method,
 body.pd3-mode-lite .pd3-col--waiter,
 body.pd3-mode-lite .pd3-col--table { display: none; }
 

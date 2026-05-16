@@ -44,6 +44,7 @@ declare(strict_types=1);
     </section>
 
     <?php require __DIR__ . '/partials/totals.php'; ?>
+    <?php require __DIR__ . '/partials/modals.php'; ?>
 </div>
 
 <script type="application/json" id="pd3-bootstrap">
