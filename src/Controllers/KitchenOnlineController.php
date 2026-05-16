@@ -34,13 +34,21 @@ class KitchenOnlineController
 
     private function _handlePage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $meta      = $this->service->getMeta();
-        $userEmail = (string)($_SESSION['user_email'] ?? '');
-
-        ob_start();
+        $meta            = $this->service->getMeta();
         $lastSyncLabel   = $meta['last_sync'];
         $useLogicalClose = $meta['use_logical_close'];
-        require __DIR__ . '/../Views/kitchen_online.php';
+        $pageTitle       = 'КухняОнлайн';
+        $currentPath     = '/kitchen_online';
+        $headExtra       = '<link rel="stylesheet" href="/assets/css/common.css">' . "\n"
+                         . '<link rel="stylesheet" href="/assets/css/kitchen_online.css?v=20260516">' . "\n"
+                         . '<script src="/assets/app.js" defer></script>';
+
+        ob_start();
+        require __DIR__ . '/../Views/kitchen_online_content.php';
+        $content = (string)ob_get_clean();
+
+        ob_start();
+        require __DIR__ . '/../Views/layout.php';
         $html = (string)ob_get_clean();
 
         $response->getBody()->write($html);

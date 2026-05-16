@@ -1,9 +1,4 @@
 <div class="container">
-    <div class="top-nav">
-        <div class="nav-left"><div class="nav-title">ЗП сотрудников</div></div>
-        <div class="nav-mid"></div>
-    </div>
-
     <div class="card">
         <div class="filters">
             <label>
