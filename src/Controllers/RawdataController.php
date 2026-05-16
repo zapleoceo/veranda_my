@@ -48,9 +48,20 @@ class RawdataController
         $lastSyncLabel  = $this->service->getLastSyncLabel();
         $userEmail      = (string)($_SESSION['user_email'] ?? '');
 
+        $pageTitle   = 'Таблица';
+        $currentPath = '/rawdata';
+        $headExtra   = '<link rel="stylesheet" href="/assets/app.css">' . "\n"
+                     . '<link rel="stylesheet" href="/assets/datepicker-range-dialog.css">' . "\n"
+                     . '<link rel="stylesheet" href="/assets/css/common.css">' . "\n"
+                     . '<link rel="stylesheet" href="/assets/css/rawdata.css">';
+
         ob_start();
-        require __DIR__ . '/../Views/rawdata.php';
-        $html = (string)ob_get_clean();
+        require __DIR__ . '/../Views/rawdata_content.php';
+        $content = (string) ob_get_clean();
+
+        ob_start();
+        require __DIR__ . '/../Views/layout.php';
+        $html = (string) ob_get_clean();
 
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
