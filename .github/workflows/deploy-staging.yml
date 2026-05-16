@@ -77,14 +77,10 @@ jobs:
           SSH_OPTS="-p ${{ secrets.STAGING_SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
           ssh ${SSH_OPTS} "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" "
             D='${{ secrets.STAGING_DEPLOY_PATH }}'
-            # Top-level static dirs — symlink into public/ so nginx serves them directly
-            ln -sfn \$D/assets        \$D/public/assets
-            ln -sfn \$D/links         \$D/public/links
-            ln -sfn \$D/reservations  \$D/public/reservations
-            # tr3: keep public/tr3/ as a real dir (so /tr3 Slim route works),
-            # but symlink the assets subdirectory inside it
-            mkdir -p \$D/public/tr3
-            ln -sfn \$D/tr3/assets    \$D/public/tr3/assets
+            # /assets/* served directly by nginx via symlink (no Slim route conflict)
+            ln -sfn \$D/assets \$D/public/assets
+            # Clean up any stale tr3/ directory that breaks /tr3 Slim routing
+            rm -rf \$D/public/tr3
           "
 
       - name: Composer install
