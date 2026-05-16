@@ -31,7 +31,7 @@ class BanyaController
         $pageTitle    = 'Отчет баня';
         $currentPath  = '/banya';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css">' . "\n"
-                      . '<link rel="stylesheet" href="/assets/css/banya.css?v=20260425_0001">' . "\n"
+                      . '<link rel="stylesheet" href="/assets/css/banya.css?v=20260516_minimal">' . "\n"
                       . '<link rel="stylesheet" href="/banya/style.css?v=20260507_0030">';
 
         ob_start();
