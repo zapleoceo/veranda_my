@@ -190,7 +190,7 @@ veranda.my/
 | 2c — Webhook actions | ✅ Done | WebhookController + ActionInterface + 7 action classes (Ignore, Vposter, Vdecline, Vrestore) |
 | 2d — Cron entry points | ✅ Done | kitchen_sync.php, menu_sync.php, daily_summary.php |
 | 3 — Admin panel | ✅ Done | 7 controllers + 8 views, dark theme, Google OAuth login, Chart.js dashboard, Menu CRUD with Poster sync |
-| 4 — Modules | 🔄 In progress | kitchen_online ✅, rawdata ✅, links/menu ✅; tr3 + reservations ⏳ |
+| 4 — Modules | ✅ Done | kitchen_online, rawdata, links/menu, tr3, reservations |
 | 5 — payday2 | ⏳ Pending | Split ajax.php (111K) + view.php (83K) into controllers/services/templates |
 | 6 — wa_listener | ⏳ Pending | Node.js src/ restructure |
 | 7 — Cutover | ⏳ Pending | Staging smoke tests → merge refactor/slim4 → main |

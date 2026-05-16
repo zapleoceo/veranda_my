@@ -15,6 +15,8 @@ use App\Controllers\Admin\LogsController;
 use App\Controllers\KitchenOnlineController;
 use App\Controllers\RawdataController;
 use App\Controllers\MenuPublicController;
+use App\Controllers\Tr3Controller;
+use App\Controllers\ReservationsController;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\WebhookSecretMiddleware;
 use Slim\App;
@@ -54,3 +56,11 @@ $app->map(['GET', 'POST'], '/rawdata', [RawdataController::class, 'index'])
 // Phase 4: public menu
 $app->get('/links/menu', [MenuPublicController::class, 'show']);
 $app->get('/menu', [MenuPublicController::class, 'show']);
+
+// Phase 4: tr3 (public booking widget)
+$app->get('/tr3', [Tr3Controller::class, 'index']);
+$app->map(['GET', 'POST'], '/tr3/api', [Tr3Controller::class, 'api']);
+
+// Phase 4: reservations (auth-protected)
+$app->map(['GET', 'POST'], '/reservations', [ReservationsController::class, 'index'])
+    ->add(AuthMiddleware::class);
