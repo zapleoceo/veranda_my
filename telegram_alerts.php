@@ -462,11 +462,13 @@ try {
         }
 
         $lastPosterSync = $getMeta('poster_last_sync_at', '');
+        $srvTag = trim((string)(php_uname('n') ?: ''));
         $statusText = 'Открыто чеков: ' . htmlspecialchars($openChecksDisplay) . "\n";
         $statusText .= 'Лимит времени: ' . (int)$waitLimit . " мин\n";
         $statusText .= 'В очереди: 🍸' . $queueBar . ' / 🍔' . $queueKitchen . "\n";
         $statusText .= 'Долгих блюд: 🍸' . $overdueBar . ' / 🍔' . $overdueKitchen . "\n";
         $statusText .= 'Время обновления: ' . ($lastPosterSync !== '' ? $lastPosterSync : date('Y-m-d H:i:s'));
+        if ($srvTag !== '') $statusText .= "\nSrv: {$srvTag}";
         $statusHash = sha1($statusText);
         $prevStatusId = (int)$getMeta('telegram_status_msg_id', '0');
         $prevStatusHash = (string)$getMeta('telegram_status_msg_hash', '');

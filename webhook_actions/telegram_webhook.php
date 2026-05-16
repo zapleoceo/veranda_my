@@ -121,13 +121,17 @@ if ($waEvent !== '') {
         $sentChatId = $chatId;
         $sentMsgId = $incomingMsgId;
 
+        $remoteIp = trim((string)($_SERVER['REMOTE_ADDR'] ?? ''));
+        $ipSuffix = $remoteIp !== '' ? "\nIP: {$remoteIp}" : '';
+
         if ($sentMsgId <= 0 && $chatId !== '' && ($text !== '' || $photoUrl !== '')) {
             if ($photoUrl !== '') {
                 $payload = [
                     'chat_id' => $chatId,
                     'photo' => $photoUrl,
                 ];
-                if ($caption !== '') $payload['caption'] = $caption;
+                if ($caption !== '') $payload['caption'] = $caption . $ipSuffix;
+                elseif ($ipSuffix !== '') $payload['caption'] = ltrim($ipSuffix);
                 if ($threadId > 0) $payload['message_thread_id'] = $threadId;
                 $resp = $postJson('sendPhoto', $payload);
                 if (is_array($resp) && !empty($resp['ok']) && is_array($resp['result'] ?? null)) {
@@ -137,7 +141,7 @@ if ($waEvent !== '') {
             } else {
                 $payload = [
                     'chat_id' => $chatId,
-                    'text' => $text,
+                    'text' => $text . $ipSuffix,
                 ];
                 if ($threadId > 0) $payload['message_thread_id'] = $threadId;
                 $resp = $postJson('sendMessage', $payload);
@@ -178,9 +182,10 @@ if ($waEvent !== '') {
 
         $sentActive = false;
         if ($adminChatId !== '') {
+            $remoteIp = trim((string)($_SERVER['REMOTE_ADDR'] ?? ''));
             $resp = $postJson('sendMessage', [
                 'chat_id' => $adminChatId,
-                'text' => 'WA: активен ✅',
+                'text' => 'WA: активен ✅' . ($remoteIp !== '' ? "\nIP: {$remoteIp}" : ''),
             ]);
             $sentActive = is_array($resp) && !empty($resp['ok']);
         }
