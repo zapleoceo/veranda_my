@@ -1,2 +1,21 @@
-/* common.css — component styles only; CSS vars come from layout.php */
+/* common.css — site-wide design tokens + base reset.
+   Loaded by both layout.php (admin/staff pages) and public pages
+   (links/, links/menu.php, tr3/). Keep visual tokens here so
+   public pages get the same palette without including layout.php. */
+
+:root {
+    --bg:       #0f1117;
+    --surface:  #1a1d27;
+    --border:   #2a2d3a;
+    --text:     #e2e8f0;
+    --muted:    #6b7280;
+    --accent:   #B88746;
+    --danger:   #ef4444;
+    --ok:       #10b981;
+    --card:     var(--surface);
+    --accent2:  rgba(184,135,70,.15);
+    --card2:    rgba(255,255,255,.07);
+    --sb-w:     220px;
+}
+
 * { box-sizing: border-box; }
