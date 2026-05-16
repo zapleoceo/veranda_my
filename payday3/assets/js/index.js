@@ -15,6 +15,7 @@ import { initDateForm }    from './ui/dateForm.js';
 import { refreshStats }    from './ui/stats.js';
 import { LineRenderer }    from './ui/lineRenderer.js';
 import { initLinkActions } from './ui/linkActions.js';
+import { initDataActions } from './ui/dataActions.js';
 
 const bootstrapEl = document.getElementById('pd3-bootstrap');
 let raw = {};
@@ -38,6 +39,7 @@ initSort();
 initEyeToggles();
 initHelpMode();
 initDateForm();
+initDataActions({ state });
 refreshStats();
 
 // Line renderer — bezier connectors between sepay/poster anchors.

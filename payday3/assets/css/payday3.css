@@ -182,6 +182,19 @@
 }
 .pd3-pill:hover { background: rgba(255,255,255,0.05); }
 
+/* Busy state — used by data sync buttons while an HTTP request is
+   in flight. The icon spins via SVG transform. */
+.pd3-pill.is-busy,
+.pd3-soft-reset.is-busy {
+    pointer-events: none;
+    opacity: 0.6;
+}
+.pd3-pill.is-busy svg,
+.pd3-soft-reset.is-busy svg {
+    animation: pd3-spin 0.9s linear infinite;
+    transform-origin: 50% 50%;
+}
+
 .pd3-eye {
     display: inline-flex;
     align-items: center;
@@ -235,24 +248,30 @@
 .pd3-sortable[data-sort-dir="asc"]::after  { content: " ▲"; font-size: 9px; }
 .pd3-sortable[data-sort-dir="desc"]::after { content: " ▼"; font-size: 9px; }
 
-/* ─── Column widths / shape ───────────────────────────────── */
+/* ─── Column widths / shape ───────────────────────────────────
+   Every "compact" column is `width: 1%` — that collapses to its
+   intrinsic content width when the row has at least one greedy cell.
+   The "content" column (sepay text) is the only greedy one: it has
+   no width, so it takes whatever remains.  This avoids the wasted
+   space that fixed widths produced. */
+.pd3-table { table-layout: auto; }
 .pd3-col--hide,
 .pd3-col--cb,
-.pd3-col--anchor { width: 24px; padding-left: 2px; padding-right: 2px; }
-.pd3-col--content { min-width: 0; }
-.pd3-col--time    { width: 78px; }
+.pd3-col--anchor,
+.pd3-col--time,
 .pd3-col--sum,
+.pd3-col--num,
 .pd3-col--card,
 .pd3-col--tips,
-.pd3-col--total   { width: 110px; }
-.pd3-col--num     { width: 64px; }
-.pd3-col--table   { width: 48px; text-align: right; }
-.pd3-col--method  { width: 110px; }
-.pd3-col--waiter  { width: 110px; }
-
-.pd3-table--sepay  td.pd3-col--content { word-break: break-word; }
-.pd3-table--poster td.pd3-col--waiter,
-.pd3-table--poster td.pd3-col--method { word-break: break-word; }
+.pd3-col--total,
+.pd3-col--method,
+.pd3-col--waiter,
+.pd3-col--table { width: 1%; white-space: nowrap; }
+.pd3-col--content { min-width: 8rem; word-break: break-word; }
+.pd3-col--hide,
+.pd3-col--cb,
+.pd3-col--anchor { padding-left: 2px; padding-right: 2px; }
+.pd3-col--table { text-align: right; }
 
 /* ─── Row states ──────────────────────────────────────────── */
 .pd3-row.row-red    { background: linear-gradient(90deg, rgba(239,68,68,0.06), transparent 60%); }
@@ -280,6 +299,10 @@
     width: 7px; height: 7px;
     border-radius: 50%;
     background: var(--muted);
+    /* Sit above the SVG layer so the dot itself isn't covered by the
+       outgoing line stroke. */
+    position: relative;
+    z-index: 2;
 }
 .pd3-row.row-green  .pd3-anchor { background: #10b981; }
 .pd3-row.row-yellow .pd3-anchor { background: #f59e0b; }
@@ -305,6 +328,10 @@
     padding: 12px 6px;
     border-right: 1px solid var(--border);
     background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent 80%);
+    /* The whole mid column sits above the SVG line layer so the glass
+       panel can blur the lines behind it. */
+    position: relative;
+    z-index: 3;
 }
 .pd3-mode-toggle {
     display: inline-flex;
@@ -347,10 +374,14 @@
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    padding: 8px 4px;
-    border-radius: 10px;
-    background: rgba(255,255,255,0.03);
+    padding: 10px 6px 12px;
+    border-radius: 14px;
+    /* Dark frosted glass — blurs the SVG connectors behind. */
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     border: 1px solid var(--border);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 .pd3-mid__btn {
     width: 30px; height: 30px;
@@ -426,6 +457,52 @@
 .pd3-totals .ok     { color: #10b981; }
 .pd3-totals .warn   { color: #f59e0b; }
 .pd3-totals .danger { color: #ef4444; }
+
+/* ─── × button on each line connector ─────────────────────── */
+/* LineRenderer positions the button at a point ON the bezier path
+   (not the chord midpoint). The element is absolute-positioned inside
+   #pd3LineLayer; pointer-events: auto re-enables clicks (the layer
+   itself disables them so the rest of the SVG passes through). */
+.pd3-link-remove {
+    position: absolute;
+    display: none;                  /* shown by JS after positioning */
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.82);
+    color: #fff;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+    z-index: 4;                     /* above SVG (1), anchors (2), mid-col (3) */
+    pointer-events: auto;
+    transition: transform 0.1s ease, background-color 0.15s ease;
+}
+.pd3-link-remove:hover {
+    background: rgba(220, 38, 38, 0.92);
+    transform: scale(1.18);
+}
+
+/* Soft-reset button under the mid-col glass — payday2's clearDayBtn. */
+.pd3-soft-reset {
+    margin-top: auto;               /* push to the bottom of the mid column */
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.pd3-soft-reset svg { width: 16px; height: 16px; }
+.pd3-soft-reset:hover { background: rgba(239, 68, 68, 0.32); color: #fff; }
 
 /* ─── Lite mode: hide noisy columns ───────────────────────── */
 

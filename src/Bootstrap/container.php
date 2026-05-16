@@ -27,8 +27,13 @@ use App\Payday3\Http\Actions\AutoLinkAction;
 use App\Payday3\Http\Actions\ManualLinkAction;
 use App\Payday3\Http\Actions\UnlinkAction;
 use App\Payday3\Http\Actions\ClearLinksAction;
+use App\Payday3\Http\Actions\ClearDayAction;
+use App\Payday3\Http\Actions\SepaySyncAction;
+use App\Payday3\Http\Actions\PosterSyncAction;
 use App\Payday3\Contracts\ReconciliationServiceInterface;
+use App\Payday3\Contracts\DayResetServiceInterface;
 use App\Payday3\Services\ReconciliationService;
+use App\Payday3\Services\DayResetService;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -86,4 +91,8 @@ return [
     ClearLinksAction::class => fn($c) => new ClearLinksAction(
         $c->get(ReconciliationServiceInterface::class),
     ),
+    DayResetServiceInterface::class => fn($c) => new DayResetService($c->get(Database::class)),
+    ClearDayAction::class    => fn($c) => new ClearDayAction($c->get(DayResetServiceInterface::class)),
+    SepaySyncAction::class   => fn()   => new SepaySyncAction(),
+    PosterSyncAction::class  => fn()   => new PosterSyncAction(),
 ];
