@@ -1,4 +1,11 @@
 <?php
+// .htaccess rewrites /links/menu.php (and /menu via Slim) here. When hit
+// directly by Apache the Composer autoloader is not loaded — bootstrap it.
+if (!class_exists(\App\Infrastructure\Config::class, false)) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    \App\Infrastructure\Config::load(__DIR__ . '/../.env');
+}
+
 require_once __DIR__ . '/../src/classes/Database.php';
 
 $supportedLangs = ['ru', 'en', 'vi', 'ko'];
