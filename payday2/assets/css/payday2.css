@@ -5,12 +5,13 @@
 .pd2-layout-toolbar {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 10px;
     padding: 10px 16px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     margin-bottom: 16px;
+    overflow-x: auto;
 }
 
 /* Utility Classes for payday2/view.php */
@@ -21,9 +22,9 @@
 .pd2-tab-gold { background: rgba(184,135,70,0.15); color: #B88746; }
 .pd2-ml-5 { margin-left: 5px; }
 .pd2-top-forms-wrap { display: flex; gap: 10px; margin-left: 10px; align-items: center; flex-wrap: wrap; }
-#dateForm { width: 112px; }
+#dateForm { width: auto; }
 .pd2-date-form { display: flex; gap: 10px; margin: 0; align-items: center; }
-.pd2-date-input { padding: 0 2px !important; width: 108px !important; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; }
+.pd2-date-input { padding: 0 2px !important; width: auto !important; min-width: 90px; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; }
 .pd2-date-input::-webkit-calendar-picker-indicator { margin-left: 2px; padding: 0; }
 
 @keyframes pd2-spin {
@@ -63,8 +64,9 @@
 }
 
 @media (max-width: 800px) {
-    #dateForm { width: 96px !important; }
-    .pd2-date-input { width: 92px !important; height: 34px !important; padding: 0 2px !important; border-radius: 10px !important; }
+    .pd2-layout-toolbar { flex-wrap: wrap; overflow-x: unset; }
+    #dateForm { width: auto !important; }
+    .pd2-date-input { width: auto !important; min-width: 80px; height: 34px !important; padding: 0 2px !important; border-radius: 10px !important; }
     
     .pd2-nav-title-row {
         grid-column: 1;
