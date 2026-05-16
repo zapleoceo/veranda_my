@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 function api_json_headers(bool $noCache = true): void {
+  if (!empty($GLOBALS['_TR3_SLIM_MODE'])) return;
   header('Content-Type: application/json; charset=utf-8');
   if ($noCache) {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -10,6 +11,10 @@ function api_json_headers(bool $noCache = true): void {
 }
 
 function api_send_json(array $data, int $httpCode = 200): void {
+  if (!empty($GLOBALS['_TR3_SLIM_MODE'])) {
+    $GLOBALS['_TR3_SLIM_RESPONSE'] = ['data' => $data, 'code' => $httpCode];
+    throw new \RuntimeException('_tr3_api_done');
+  }
   http_response_code($httpCode);
   echo json_encode($data, JSON_UNESCAPED_UNICODE);
   exit;
