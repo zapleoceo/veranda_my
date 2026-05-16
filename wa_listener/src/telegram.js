@@ -94,4 +94,38 @@ async function clearQrMessage() {
   } catch {}
 }
 
-module.exports = { sendQrToTelegram, clearQrMessage };
+// Deduplicate spammy status messages — only the first transition per minute is
+// forwarded. The full sequence still shows up in pm2 logs.
+const _statusDedup = new Map();
+const STATUS_DEDUP_MS = 60_000;
+
+async function sendStatusToTelegram(text) {
+  if (!TG_BOT_TOKEN || !QR_TG_CHAT_ID || !text) return;
+  const now = Date.now();
+  const last = _statusDedup.get(text) || 0;
+  if (now - last < STATUS_DEDUP_MS) return;
+  _statusDedup.set(text, now);
+  try {
+    await tgPost('sendMessage', {
+      chat_id: QR_TG_CHAT_ID,
+      text: `🟢 WA: ${text}`,
+      disable_notification: true,
+    });
+  } catch (e) {
+    console.error('[wa] status send error:', e.message);
+  }
+}
+
+async function sendErrorToTelegram(text) {
+  if (!TG_BOT_TOKEN || !QR_TG_CHAT_ID || !text) return;
+  try {
+    await tgPost('sendMessage', {
+      chat_id: QR_TG_CHAT_ID,
+      text: `🔴 WA error: ${text}`.slice(0, 4000),
+    });
+  } catch (e) {
+    console.error('[wa] error send error:', e.message);
+  }
+}
+
+module.exports = { sendQrToTelegram, clearQrMessage, sendStatusToTelegram, sendErrorToTelegram };

@@ -43,8 +43,13 @@ $app->post('/login', [LoginController::class, 'handle']);
 $app->get('/auth/callback', [CallbackController::class, 'handle']);
 $app->get('/logout', [LoginController::class, 'logout']);
 
-// Telegram webhook (Telegram bot POSTs here; WA bridge uses GET/POST with ?wa_event=)
+// Telegram webhook (Telegram bot POSTs here; WA bridge uses GET/POST with ?wa_event=).
+// .php alias keeps any legacy bot registrations working — nginx serves the
+// /telegram_webhook.php shim at the document root, which delegates to Slim,
+// and the second route here catches the rewritten request.
 $app->map(['GET', 'POST'], '/telegram_webhook', [WebhookController::class, 'handle'])
+    ->add(WebhookSecretMiddleware::class);
+$app->map(['GET', 'POST'], '/telegram_webhook.php', [WebhookController::class, 'handle'])
     ->add(WebhookSecretMiddleware::class);
 
 // Admin panel (protected by session auth).
