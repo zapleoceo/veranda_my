@@ -192,7 +192,7 @@ veranda.my/
 | 3 — Admin panel | ✅ Done | 7 controllers + 8 views, dark theme, Google OAuth login, Chart.js dashboard, Menu CRUD with Poster sync |
 | 4 — Modules | ✅ Done | kitchen_online, rawdata, links/menu, tr3, reservations |
 | 5 — payday2 | ✅ Done | Slim 4 wrapper: Payday2Controller::dispatch, slim-mode helpers in functions.php (payday2_json_header/http_code/do_exit/redirect), auth guards in ajax.php/post.php/index.php |
-| 6 — wa_listener | ⏳ Pending | Node.js src/ restructure |
+| 6 — wa_listener | ✅ Done | Split index.js into src/config.js + src/telegram.js + src/socket.js + src/server.js + src/index.js; watchdog.js → src/watchdog.js; top-level shims preserved |
 | 7 — Cutover | ⏳ Pending | Staging smoke tests → merge refactor/slim4 → main |
 
 ---
