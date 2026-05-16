@@ -47,6 +47,11 @@ class StaticController
             ->withHeader('Cache-Control', 'public, max-age=86400');
     }
 
+    public function globalAssets(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../assets', $args['file']);
+    }
+
     public function tr3Assets(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         return $this->serve($response, __DIR__ . '/../../tr3/assets', $args['file']);
