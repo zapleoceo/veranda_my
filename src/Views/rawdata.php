@@ -8,15 +8,15 @@
     <link rel="stylesheet" href="/assets/app.css">
     <link rel="stylesheet" href="/assets/datepicker-range-dialog.css">
     <link rel="stylesheet" href="/assets/css/common.css">
+    <link rel="stylesheet" href="/assets/css/user_menu.css">
     <link rel="stylesheet" href="/assets/css/rawdata.css">
 </head>
 <body>
 <div class="container">
     <div class="top-nav">
         <div class="nav-left"><div class="nav-title">Таблица</div></div>
-        <div class="nav-right" style="padding:.5rem 1rem;font-size:.8rem;color:var(--muted)">
-            <?= htmlspecialchars($userEmail) ?>
-            <a href="/logout" style="margin-left:.75rem;color:var(--muted);text-decoration:none">Выйти</a>
+        <div class="nav-right">
+            <?php require __DIR__ . '/partials/user_menu.php'; ?>
         </div>
     </div>
 
