@@ -3,32 +3,31 @@
 /** @var \App\Payday3\Domain\SepayTransaction[]       $sepayOpen */
 /** @var \App\Payday3\Domain\SepayTransaction[]       $sepayHidden */
 /** @var \App\Payday3\Domain\PosterTransaction[]      $poster */
+/** @var \App\Payday3\Domain\ReconciliationLink[]     $links */
 /** @var array<int,array>                             $linksJson */
+/** @var array<int,list<\App\Payday3\Domain\ReconciliationLink>> $linkBySepay */
+/** @var array<int,list<\App\Payday3\Domain\ReconciliationLink>> $linkByPoster */
+/** @var array<int,string>                            $rowStateBySepay */
+/** @var array<int,string>                            $rowStateByPoster */
 
 declare(strict_types=1);
 ?>
-<div class="container pd3-page">
-    <div class="top-nav">
-        <div class="nav-left">
-            <span class="nav-title">PayDay3</span>
-            <span class="muted">
-                <?= htmlspecialchars($range->from) ?>
-                <?= $range->isSingleDay() ? '' : ' — ' . htmlspecialchars($range->to) ?>
-            </span>
-        </div>
-        <?php require dirname(__DIR__) . '/partials/user_menu.php'; ?>
-    </div>
+<div class="container pd3-page" id="pd3Root">
 
-    <?php require __DIR__ . '/partials/filters.php'; ?>
+    <?php require __DIR__ . '/partials/toolbar.php'; ?>
 
-    <section class="pd3-graph" id="pd3GraphRoot">
-        <div class="pd3-graph__tables" id="pd3TablesRoot">
-            <?php require __DIR__ . '/partials/sepay_table.php'; ?>
-            <?php require __DIR__ . '/partials/poster_table.php'; ?>
+    <section class="pd3-card pd3-graph-card">
+        <div class="pd3-graph" id="pd3GraphRoot">
+            <!-- SVG line layer is positioned absolutely over the whole graph.
+                 LineRenderer (Phase 3) mounts the SVG node here. -->
+            <div class="pd3-graph__lines" id="pd3LineLayer" aria-hidden="true"></div>
+
+            <div class="pd3-graph__grid">
+                <?php require __DIR__ . '/partials/sepay_table.php'; ?>
+                <?php require __DIR__ . '/partials/mid_col.php'; ?>
+                <?php require __DIR__ . '/partials/poster_table.php'; ?>
+            </div>
         </div>
-        <!-- SVG line-renderer mounts inside this element. Empty on the
-             server; payday3.js owns its lifecycle. -->
-        <div class="pd3-graph__lines" id="pd3LineLayer" aria-hidden="true"></div>
     </section>
 
     <?php require __DIR__ . '/partials/totals.php'; ?>
@@ -36,9 +35,9 @@ declare(strict_types=1);
 
 <script type="application/json" id="pd3-bootstrap">
 <?= json_encode([
-    'range' => $range->asArray(),
-    'links' => $linksJson,
-    'csrf'  => $_SESSION['payday2_csrf'] ?? '',
+    'range'     => $range->asArray(),
+    'links'     => $linksJson,
+    'csrf'      => $_SESSION['payday2_csrf'] ?? '',
     'endpoints' => [
         'links' => '/payday3/api/links',
     ],

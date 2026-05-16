@@ -8,6 +8,8 @@ use App\Payday3\Contracts\LinkRepositoryInterface;
 use App\Payday3\Contracts\PosterRepositoryInterface;
 use App\Payday3\Contracts\SepayRepositoryInterface;
 use App\Payday3\Domain\DateRange;
+use App\Payday3\Domain\ReconciliationLink;
+use App\Payday3\Domain\RowState;
 
 /**
  * Pulls together every piece of data the view template needs for a
@@ -28,24 +30,54 @@ final class PageDataAssembler
 
     /**
      * @return array{
-     *   range: DateRange,
-     *   sepayOpen:   list<\App\Payday3\Domain\SepayTransaction>,
-     *   sepayHidden: list<\App\Payday3\Domain\SepayTransaction>,
-     *   poster:      list<\App\Payday3\Domain\PosterTransaction>,
-     *   linksJson:   list<array>
+     *   range:        DateRange,
+     *   sepayOpen:    list<\App\Payday3\Domain\SepayTransaction>,
+     *   sepayHidden:  list<\App\Payday3\Domain\SepayTransaction>,
+     *   poster:       list<\App\Payday3\Domain\PosterTransaction>,
+     *   links:        list<ReconciliationLink>,
+     *   linksJson:    list<array>,
+     *   linkBySepay:  array<int,list<ReconciliationLink>>,
+     *   linkByPoster: array<int,list<ReconciliationLink>>,
+     *   rowStateBySepay:  array<int,string>,
+     *   rowStateByPoster: array<int,string>,
      * }
      */
     public function assemble(DateRange $range): array
     {
+        $links = $this->links->listInRange($range);
+
+        $bySepay = [];
+        $byPoster = [];
+        foreach ($links as $l) {
+            $bySepay[$l->sepayId][]            = $l;
+            $byPoster[$l->posterTransactionId][] = $l;
+        }
+
+        $sepayOpen   = $this->sepay->listOpenInRange($range);
+        $sepayHidden = $this->sepay->listHiddenInRange($range);
+        $poster      = $this->poster->listClosedInRange($range);
+
+        // Pre-compute the CSS row class so the template stays loop-only.
+        $rowStateBySepay = [];
+        foreach ($sepayOpen   as $s) $rowStateBySepay[$s->id] = RowState::classify($bySepay[$s->id] ?? []);
+        foreach ($sepayHidden as $s) $rowStateBySepay[$s->id] = RowState::HIDDEN;
+
+        $rowStateByPoster = [];
+        foreach ($poster as $p) {
+            $rowStateByPoster[$p->transactionId] = RowState::classify($byPoster[$p->transactionId] ?? []);
+        }
+
         return [
-            'range'       => $range,
-            'sepayOpen'   => $this->sepay->listOpenInRange($range),
-            'sepayHidden' => $this->sepay->listHiddenInRange($range),
-            'poster'      => $this->poster->listClosedInRange($range),
-            'linksJson'   => array_map(
-                static fn($l) => $l->toJsonShape(),
-                $this->links->listInRange($range),
-            ),
+            'range'            => $range,
+            'sepayOpen'        => $sepayOpen,
+            'sepayHidden'      => $sepayHidden,
+            'poster'           => $poster,
+            'links'            => $links,
+            'linksJson'        => array_map(static fn($l) => $l->toJsonShape(), $links),
+            'linkBySepay'      => $bySepay,
+            'linkByPoster'     => $byPoster,
+            'rowStateBySepay'  => $rowStateBySepay,
+            'rowStateByPoster' => $rowStateByPoster,
         ];
     }
 }
