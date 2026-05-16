@@ -98,5 +98,6 @@ if ($doResync) {
     exit;
 }
 
-require __DIR__ . '/view.php';
+// HTML rendering removed: RawdataController renders
+// src/Views/rawdata_content.php inside src/Views/layout.php.
 

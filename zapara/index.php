@@ -13,5 +13,6 @@ $today = date('Y-m-d');
 $defaultFrom = date('Y-m-d', strtotime('-14 days'));
 $defaultTo = $today;
 
-require __DIR__ . '/view.php';
+// HTML rendering removed: ZaparaController renders
+// src/Views/zapara_content.php inside src/Views/layout.php.
 

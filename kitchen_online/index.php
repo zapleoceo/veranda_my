@@ -48,5 +48,6 @@ $dashboardQuery = http_build_query([
     'hourEnd' => 23
 ]);
 
-require __DIR__ . '/view.php';
+// HTML rendering removed: KitchenOnlineController renders
+// src/Views/kitchen_online_content.php inside src/Views/layout.php.
 
