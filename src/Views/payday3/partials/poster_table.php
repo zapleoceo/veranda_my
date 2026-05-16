@@ -29,7 +29,10 @@ foreach ($poster as $p) $total = $total->plus($p->totalPayed());
         <table class="pd3-table pd3-table--poster" id="pd3PosterTable">
             <thead>
                 <tr>
-                    <th class="pd3-col pd3-col--anchor"></th>
+                    <!-- Anchor + checkbox in a single LEFT-edge cell, mirroring payday2.
+                         The poster table sits on the right of the graph, so its leftmost
+                         column is the one closest to the sepay table and the line layer. -->
+                    <th class="pd3-col pd3-col--lead"></th>
                     <th class="pd3-col pd3-col--num    pd3-sortable nowrap" data-sort-key="num">№</th>
                     <th class="pd3-col pd3-col--time   pd3-sortable nowrap" data-sort-key="ts">Время</th>
                     <th class="pd3-col pd3-col--card   pd3-sortable nowrap right" data-sort-key="card">Card</th>
@@ -38,7 +41,6 @@ foreach ($poster as $p) $total = $total->plus($p->totalPayed());
                     <th class="pd3-col pd3-col--method pd3-sortable" data-sort-key="method">Метод</th>
                     <th class="pd3-col pd3-col--waiter pd3-sortable" data-sort-key="waiter">Официант</th>
                     <th class="pd3-col pd3-col--table  pd3-sortable nowrap" data-sort-key="table">Стол</th>
-                    <th class="pd3-col pd3-col--cb"></th>
                 </tr>
             </thead>
             <tbody>
@@ -58,7 +60,12 @@ foreach ($poster as $p) $total = $total->plus($p->totalPayed());
                         data-method="<?= htmlspecialchars((string)($p->paymentMethodDisplay ?? '')) ?>"
                         data-waiter="<?= htmlspecialchars($p->waiterName) ?>"
                         data-table="<?= $p->tableId ?>">
-                        <td class="pd3-col pd3-col--anchor"><span class="pd3-anchor" id="pd3-poster-anchor-<?= $p->transactionId ?>"></span></td>
+                        <td class="pd3-col pd3-col--lead">
+                            <div class="pd3-lead">
+                                <span class="pd3-anchor" id="pd3-poster-anchor-<?= $p->transactionId ?>"></span>
+                                <input type="checkbox" class="pd3-cb pd3-cb--poster" data-poster-id="<?= $p->transactionId ?>" data-sum="<?= $total_->amount ?>">
+                            </div>
+                        </td>
                         <td class="pd3-col pd3-col--num    nowrap"><?= htmlspecialchars($p->receiptNumber !== '' ? $p->receiptNumber : (string)$p->transactionId) ?></td>
                         <td class="pd3-col pd3-col--time   nowrap"><?= htmlspecialchars($time) ?></td>
                         <td class="pd3-col pd3-col--card   nowrap right"><?= htmlspecialchars($p->payedCard->format()) ?></td>
@@ -70,13 +77,10 @@ foreach ($poster as $p) $total = $total->plus($p->totalPayed());
                         </td>
                         <td class="pd3-col pd3-col--waiter"><?= htmlspecialchars($p->waiterName) ?></td>
                         <td class="pd3-col pd3-col--table  nowrap"><?= $p->tableId ?: '—' ?></td>
-                        <td class="pd3-col pd3-col--cb">
-                            <input type="checkbox" class="pd3-cb pd3-cb--poster" data-poster-id="<?= $p->transactionId ?>" data-sum="<?= $total_->amount ?>">
-                        </td>
                     </tr>
                 <?php endforeach; ?>
                 <?php if ($poster === []): ?>
-                    <tr class="pd3-empty"><td colspan="10">Нет чеков Poster за период.</td></tr>
+                    <tr class="pd3-empty"><td colspan="9">Нет чеков Poster за период.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -84,5 +88,7 @@ foreach ($poster as $p) $total = $total->plus($p->totalPayed());
     <footer class="pd3-pane__footer muted">
         <span>Итого: <strong id="pd3PosterTotal"><?= htmlspecialchars($total->format()) ?></strong></span>
         <span>• чеков: <span id="pd3PosterCount"><?= count($poster) ?></span></span>
+        <span>• связанные: <span id="pd3PosterLinked">—</span></span>
+        <span>• несвязанные: <span id="pd3PosterUnlinked">—</span></span>
     </footer>
 </div>

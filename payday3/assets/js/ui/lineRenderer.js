@@ -206,11 +206,13 @@ export class LineRenderer {
             this._layer.appendChild(btn);
             this._buttons.set(key, btn);
         }
-        // The button must sit ON the bezier path, not on the chord — for
-        // tall vertical offsets those diverge a lot. Evaluate the cubic
-        // at the same `t` used by payday2 (clamp(0.75, 0.99, 1 - 6/len)).
+        // The × sits near the END of the bezier (poster side), not at
+        // the midpoint — that's how payday2 placed it. Clamping to
+        // [0.92, 0.98] keeps it visibly attached to the line without
+        // overlapping the anchor dot itself. Evaluated on the cubic
+        // curve, not the chord, so it always lies ON the path.
         const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-        const t   = Math.min(0.99, Math.max(0.75, 1 - (6 / len)));
+        const t   = Math.min(0.98, Math.max(0.92, 1 - (10 / len)));
         const pt  = cubicPoint(a, b, t);
         btn.style.left = Math.round(pt.x - 8) + 'px';
         btn.style.top  = Math.round(pt.y - 8) + 'px';
