@@ -1,6 +1,6 @@
 (() => {
   const lang = (document.documentElement && document.documentElement.lang) ? document.documentElement.lang : 'ru';
-  const url = new URL('/tr3/api.php', location.origin);
+  const url = new URL('/tr3/api', location.origin);
   url.searchParams.set('ajax', 'bootstrap');
   url.searchParams.set('lang', lang);
 
