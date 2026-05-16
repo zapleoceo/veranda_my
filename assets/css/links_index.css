@@ -572,7 +572,7 @@ html, body {
 /* Cards: solid warm-black with a faint bronze edge, no bluish surface tint */
 .card,
 .primary-btn {
-    background: linear-gradient(180deg, #15110b 0%, #0c0a07 100%) !important;
+    background: linear-gradient(180deg, #060504 0%, #020201 100%) !important;
     border: 1px solid rgba(184,135,70,0.18) !important;
     box-shadow:
         inset 0 1px 0 rgba(184,135,70,0.06),
@@ -611,7 +611,7 @@ html, body {
 
 /* Hours card on footer: same warm-black palette */
 .footer .hours {
-    background: linear-gradient(180deg, #15110b 0%, #0c0a07 100%);
+    background: linear-gradient(180deg, #060504 0%, #020201 100%);
     border: 1px solid rgba(184,135,70,0.18);
     border-radius: 14px;
     padding: 14px 18px;
