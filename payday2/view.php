@@ -383,6 +383,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
     <title>Payday2</title>
+    <link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">
     <link rel="stylesheet" href="/assets/app.css">
     <script src="/assets/app.js" defer></script>
     <script src="/assets/user_menu.js" defer></script>
