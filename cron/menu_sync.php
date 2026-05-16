@@ -1,10 +1,15 @@
 <?php
-require_once __DIR__ . '/src/classes/Database.php';
-require_once __DIR__ . '/src/classes/PosterAPI.php';
-require_once __DIR__ . '/src/classes/PosterMenuSync.php';
 
-if (file_exists(__DIR__ . '/.env')) {
-    $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+// Moved from project-root /menu_cron.php in the May 2026 cleanup.
+// Legacy logic kept verbatim; only the relative paths needed adjusting
+// for the new location (one level deeper).
+
+require_once __DIR__ . '/../src/classes/Database.php';
+require_once __DIR__ . '/../src/classes/PosterAPI.php';
+require_once __DIR__ . '/../src/classes/PosterMenuSync.php';
+
+if (file_exists(__DIR__ . '/../.env')) {
+    $lines = file(__DIR__ . '/../.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
         if (strpos(trim($line), '#') === 0) continue;
         if (strpos($line, '=') === false) continue;

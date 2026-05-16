@@ -62,7 +62,11 @@
       "Bash(grep -rnE \"fetch\\\\\\(['\\\\`]/\\(banya|roma|employees|reservations|kitchen_online|rawdata|zapara|admin|payday2\\)[\\\\\"'?]\" --include=\"*.js\" --include=\"*.php\" .)",
       "Bash(grep -rnE \"fetch\\\\\\([\\\\`'\\\\\"]/\\(banya|roma|employees|reservations|kitchen_online|rawdata|zapara|admin|payday2|dashboard\\)[\\\\`'\\\\\"?]|new URL\\\\\\([\\\\`'\\\\\"]/\\(banya|roma|employees|reservations|kitchen_online|rawdata|zapara|admin|payday2|dashboard\\)[\\\\`'\\\\\"]\\(,|\\\\\\\\\\)\\)\" --include=\"*.js\" assets/ src/)",
       "Bash(grep -rnE \"\\(['\\\\`\\\\\"]\\)/\\(banya|roma|employees|reservations|kitchen_online|rawdata|zapara|admin|payday2|dashboard\\)\\([\\\\?'\\\\\"\\\\`]\\)\" --include=\"*.js\" assets/ src/)",
-      "Bash(grep -v \"/.\\\\\\\\\\(js\\\\\\\\|css\\\\\\\\|png\\\\\\\\\\)\")"
+      "Bash(grep -v \"/.\\\\\\\\\\(js\\\\\\\\|css\\\\\\\\|png\\\\\\\\\\)\")",
+      "Bash(git rm *)",
+      "Bash(rmdir api/menu api/poster/rawdata api/sql/kitchen_online api/sql/rawdata api/sql)",
+      "Bash(/opt/php82/bin/php -l cron/menu_sync.php)",
+      "Bash(/opt/php82/bin/php -l scripts/menu/cron.php)"
     ]
   }
 }

@@ -61,7 +61,7 @@ Workflow деплоя находится тут: [.github/workflows/deploy.yml](
 # Telegram alerts + reservation reminders (обе службы в одном entry-point), каждую минуту
 */1 * * * * /opt/php82/bin/php /var/www/veranda_my_usr/data/www/veranda.my/cron/telegram_alerts.php >> /var/www/veranda_my_usr/data/www/veranda.my/telegram.log 2>&1
 
-# Menu sync — legacy `menu_cron.php` (TODO: переписать в `cron/menu_sync.php`), раз в час
+# Menu sync — `cron/menu_sync.php` (легаси-логика relocated; ещё не переписана в Slim-style, но файл живёт рядом с другими cron entries). Раз в час.
 0 * * * * /opt/php82/bin/php /var/www/veranda_my_usr/data/www/veranda.my/scripts/menu/cron.php >> /var/www/veranda_my_usr/data/www/veranda.my/menu_sync.log 2>&1
 
 # Daily summary — legacy `daily_summary.php` (TODO: переписать в `cron/daily_summary.php`), 03:00
@@ -93,7 +93,7 @@ crontab -l   # проверка
 |------|------------|
 | `cron.log` | вывод `cron/kitchen_sync.php` |
 | `telegram.log` | вывод `cron/telegram_alerts.php` (alerts + reminders) |
-| `menu_sync.log` | вывод legacy `scripts/menu/cron.php` |
+| `menu_sync.log` | вывод `cron/menu_sync.php` (через шим `scripts/menu/cron.php`) |
 | `daily_summary.log` | вывод `daily_summary.php` |
 | `reservations_daily_reminder.log` | вывод legacy `scripts/reservations/daily_booking_reminder.php` |
 | `/var/www/veranda_my_usr/data/logs/veranda.my-frontend.error.log` | nginx + php-fpm ошибки web-запросов |
