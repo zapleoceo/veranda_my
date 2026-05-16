@@ -16,6 +16,7 @@ use App\Controllers\Admin\ReservationsAdminController;
 use App\Controllers\Admin\LogsController;
 use App\Controllers\KitchenOnlineController;
 use App\Controllers\RawdataController;
+use App\Controllers\LinksController;
 use App\Controllers\MenuPublicController;
 use App\Controllers\Tr3Controller;
 use App\Controllers\ReservationsController;
@@ -55,8 +56,11 @@ $app->map(['GET', 'POST'], '/kitchen_online', [KitchenOnlineController::class, '
 $app->map(['GET', 'POST'], '/rawdata', [RawdataController::class, 'index'])
     ->add(AuthMiddleware::class);
 
-// Phase 4: public menu
+// Phase 4: public links landing + menu
+$app->get('/links', [LinksController::class, 'index']);
+$app->get('/links/', function ($req, $res) { return $res->withHeader('Location', '/links')->withStatus(301); });
 $app->get('/links/menu', [MenuPublicController::class, 'show']);
+$app->get('/links/menu.php', [MenuPublicController::class, 'show']);
 $app->get('/menu', [MenuPublicController::class, 'show']);
 
 // Phase 4: tr3 (public booking widget)
@@ -74,6 +78,7 @@ $app->map(['GET', 'POST'], '/payday2', [Payday2Controller::class, 'dispatch'])
     ->add(AuthMiddleware::class);
 
 // Static assets from directories outside public/
+$app->get('/assets/{file:.+}',              [StaticController::class, 'globalAssets']);
 $app->get('/tr3/assets/{file:.+}',          [StaticController::class, 'tr3Assets']);
 $app->get('/links/{file:.+}',               [StaticController::class, 'linksStatic']);
 $app->get('/reservations/assets/{file:.+}', [StaticController::class, 'reservationsAssets']);
