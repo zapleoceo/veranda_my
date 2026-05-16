@@ -62,7 +62,8 @@ $app->get('/menu', [MenuPublicController::class, 'show']);
 // Phase 4: tr3 (public booking widget)
 $app->get('/tr3/', function ($req, $res) { return $res->withHeader('Location', '/tr3')->withStatus(301); });
 $app->get('/tr3', [Tr3Controller::class, 'index']);
-$app->map(['GET', 'POST'], '/tr3/api', [Tr3Controller::class, 'api']);
+$app->map(['GET', 'POST'], '/tr3/api',     [Tr3Controller::class, 'api']);
+$app->map(['GET', 'POST'], '/tr3/api.php', [Tr3Controller::class, 'api']);
 
 // Phase 4: reservations (auth-protected)
 $app->map(['GET', 'POST'], '/reservations', [ReservationsController::class, 'index'])
