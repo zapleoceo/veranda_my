@@ -44,4 +44,4 @@
     </div>
 </div>
 
-<script src="/roma/script.js"></script>
+<script src="/assets/js/roma.js?v=20260516"></script>
