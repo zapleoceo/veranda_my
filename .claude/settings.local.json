@@ -53,7 +53,8 @@
       "Bash(node --check wa_listener/src/socket.js)",
       "Bash(node --check wa_listener/src/telegram.js)",
       "Bash(node -e \"const t = require\\('./wa_listener/src/telegram'\\); /* loaded ok */\")",
-      "Bash(php -l src/Controllers/WebhookController.php)"
+      "Bash(php -l src/Controllers/WebhookController.php)",
+      "Bash(git rm *)"
     ]
   }
 }
