@@ -39,9 +39,17 @@ if ($lang === null) {
 if ($lang === null) $lang = 'ru';
 if (!isset($I18N[$lang])) $lang = 'ru';
 
-function tr(string $key): string {
-  global $I18N, $lang;
-  return isset($I18N[$lang][$key]) ? (string)$I18N[$lang][$key] : $key;
+// Store in $GLOBALS so tr() works whether this file runs at global scope
+// (direct request) or inside a controller method (Slim 4).
+$GLOBALS['_TR3_LANG'] = $lang;
+$GLOBALS['_TR3_I18N'] = $I18N;
+
+if (!function_exists('tr')) {
+  function tr(string $key): string {
+    $I18N = $GLOBALS['_TR3_I18N'] ?? [];
+    $lang = $GLOBALS['_TR3_LANG'] ?? 'ru';
+    return isset($I18N[$lang][$key]) ? (string)$I18N[$lang][$key] : $key;
+  }
 }
 
 $self = strtok((string)($_SERVER['REQUEST_URI'] ?? '/tr3/'), '?');
