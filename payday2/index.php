@@ -29,9 +29,13 @@
  * ==============================================================================
  */
 
+// Direct hit via Apache .htaccess (^payday2/?$ → payday2/index.php) bypasses
+// the framework — auth + sidebar layout live in Slim. Delegate to the front
+// controller; Payday2Controller will require this file again with
+// _PAYDAY2_SLIM_MODE set, and the rest of the code runs in layout mode.
 if (empty($GLOBALS['_PAYDAY2_SLIM_MODE'])) {
-    require_once __DIR__ . '/../auth_check.php';
-    veranda_require('payday');
+    require __DIR__ . '/../public/index.php';
+    return;
 }
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
 $apiTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? 'Asia/Ho_Chi_Minh'));
