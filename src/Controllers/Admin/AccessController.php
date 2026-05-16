@@ -52,11 +52,6 @@ class AccessController
         return $this->_layout($response, $content, '/admin/access', $userEmail, $flash);
     }
 
-    public function save(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
-    {
-        return $response->withHeader('Location', '/admin/access')->withStatus(302);
-    }
-
     private function _handlePost(array $body, string $selfEmail, array &$flash, array &$users): void
     {
         if (isset($body['save_user_permissions'])) {

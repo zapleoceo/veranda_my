@@ -50,14 +50,13 @@ $app->map(['GET', 'POST'], '/telegram_webhook', [WebhookController::class, 'hand
 // Admin panel (protected by session auth)
 $app->group('/admin', function (RouteCollectorProxy $group) {
     $group->get('', [DashboardController::class, 'index']);
-    $group->get('/sync', [SyncController::class, 'index']);
+    $group->map(['GET', 'POST'], '/sync', [SyncController::class, 'index']);
     $group->post('/sync/start', [SyncController::class, 'start']);
-    $group->get('/telegram', [TelegramAdminController::class, 'index']);
-    $group->get('/menu', [MenuController::class, 'index']);
-    $group->get('/access', [AccessController::class, 'index']);
-    $group->post('/access', [AccessController::class, 'save']);
-    $group->get('/reservations', [ReservationsAdminController::class, 'index']);
-    $group->get('/logs', [LogsController::class, 'index']);
+    $group->map(['GET', 'POST'], '/telegram', [TelegramAdminController::class, 'index']);
+    $group->map(['GET', 'POST'], '/menu', [MenuController::class, 'index']);
+    $group->map(['GET', 'POST'], '/access', [AccessController::class, 'index']);
+    $group->map(['GET', 'POST'], '/reservations', [ReservationsAdminController::class, 'index']);
+    $group->map(['GET', 'POST'], '/logs', [LogsController::class, 'index']);
 })->add(AuthMiddleware::class);
 
 // Phase 4: staff-facing modules (auth-protected)
