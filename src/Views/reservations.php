@@ -29,7 +29,7 @@ $fmtSpotDateTimeParts = function (string $s) use ($parseSpotDt): array {
     <title>Брони</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
-    <link rel="stylesheet" href="/assets/reservations/css/reservations.css">
+    <link rel="stylesheet" href="/reservations/assets/css/reservations.css">
     <link rel="stylesheet" href="/reservations/style.css">
     <link rel="stylesheet" href="/assets/css/user_menu.css">
     <style>

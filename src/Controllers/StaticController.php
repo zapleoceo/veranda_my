@@ -66,4 +66,9 @@ class StaticController
     {
         return $this->serve($response, __DIR__ . '/../../reservations/assets', $args['file']);
     }
+
+    public function payday2Assets(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../payday2/assets', $args['file']);
+    }
 }
