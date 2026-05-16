@@ -72,10 +72,12 @@ $app->map(['GET', 'POST'], '/telegram_webhook.php', [WebhookController::class, '
     ->add(WebhookSecretMiddleware::class);
 
 // Admin panel (protected by session auth).
-// /admin/ (trailing slash) redirects to /admin so the group prefix matches.
-$app->get('/admin/', function ($req, $res) {
-    return $res->withHeader('Location', '/admin')->withStatus(301);
-});
+// Both /admin and /admin/ render the dashboard. We cannot 301 /admin/ → /admin
+// because Apache mod_dir auto-redirects /admin → /admin/ (admin/ is a real
+// directory), producing a redirect loop. Instead make both URLs alias the
+// same controller.
+$app->get('/admin/', [DashboardController::class, 'index'])
+    ->add(AuthMiddleware::class);
 $app->group('/admin', function (RouteCollectorProxy $group) {
     $group->get('', [DashboardController::class, 'index']);
     $group->map(['GET', 'POST'], '/sync', [SyncController::class, 'index']);
