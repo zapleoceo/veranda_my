@@ -20,43 +20,34 @@ jobs:
         shell: bash
         run: |
           if ! command -v rsync >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y rsync
+            sudo apt-get update && sudo apt-get install -y rsync
           fi
 
       - name: Configure SSH
         shell: bash
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          if [ -n "${{ secrets.SSH_KNOWN_HOSTS }}" ]; then
-            echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
-          else
-            ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
-          fi
+          printf '%s\n' "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          ssh-keygen -l -f ~/.ssh/id_ed25519
 
       - name: Check SSH connectivity
         shell: bash
         run: |
           set -euo pipefail
-          echo "Checking TCP connectivity to ${{ secrets.SSH_HOST }}:${{ secrets.SSH_PORT }} ..."
-          timeout 5 bash -lc "cat < /dev/null > /dev/tcp/${{ secrets.SSH_HOST }}/${{ secrets.SSH_PORT }}"
-          echo "TCP OK"
-
-      - name: Check SSH auth
-        shell: bash
-        run: |
-          set -euo pipefail
-          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=1"
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10"
           ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "echo SSH_AUTH_OK"
 
       - name: Deploy files
         shell: bash
         run: |
           set -euo pipefail
-          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
 
           for i in 1 2 3; do
             echo "rsync attempt ${i}/3"
@@ -66,43 +57,52 @@ jobs:
               --exclude ".env" \
               --exclude ".env.*" \
               --exclude "*.log" \
-              --exclude "telegram.log" \
-              --exclude "prob_close_backfill.log" \
-              --exclude "tmp/" \
-              --exclude "cache/" \
-              --exclude ".cache/" \
+              --exclude "vendor/" \
+              --exclude "logs/" \
+              --exclude ".git/" \
+              --exclude ".github/" \
               --exclude "payday2/local_config.json" \
               --exclude "wa_listener/auth/" \
               --exclude "wa_listener/qr_state.json" \
               --exclude "wa_listener/node_modules/" \
-              --exclude "wa_listener/package-lock.json" \
-              --exclude ".git/" \
-              --exclude ".github/" \
               -e "ssh ${SSH_OPTS}" \
-              ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/ && break
+              ./ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/" && break
             sleep $((i * 3))
           done
 
-      - name: Remove debug files (server)
+      - name: Link static assets into public/
         shell: bash
         run: |
           set -euo pipefail
-          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
-          for i in 1 2 3; do
-            echo "ssh attempt ${i}/3"
-            ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-              "rm -f '${{ secrets.DEPLOY_PATH }}/mail.php' '${{ secrets.DEPLOY_PATH }}/access.php'" && break
-            sleep $((i * 3))
-          done
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "
+            D='${{ secrets.DEPLOY_PATH }}'
+            ln -sfn \$D/assets \$D/public/assets
+            rm -rf \$D/public/tr3
+          "
 
-      - name: Verify PHP syntax (server)
+      - name: Composer install
         shell: bash
         run: |
           set -euo pipefail
-          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
-          for i in 1 2 3; do
-            echo "ssh attempt ${i}/3"
-            ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-              "cd '${{ secrets.DEPLOY_PATH }}' && PHP=/opt/php74/bin/php && \$PHP -l index.php && \$PHP -l login.php && \$PHP -l logout.php && \$PHP -l auth_callback.php && \$PHP -l dashboard.php && \$PHP -l rawdata.php && \$PHP -l rawdata_receipts_chunk.php && \$PHP -l kitchen_online.php && \$PHP -l admin/index.php && \$PHP -l cron.php && \$PHP -l telegram_alerts.php && \$PHP -l roma/index.php && \$PHP -l banya/index.php && \$PHP -l employees/index.php && \$PHP -l reservations/index.php" && break
-            sleep $((i * 3))
-          done
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "cd '${{ secrets.DEPLOY_PATH }}' && /opt/php82/bin/php /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction 2>&1"
+
+      - name: Verify PHP syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "PHP=/opt/php82/bin/php && cd '${{ secrets.DEPLOY_PATH }}' && \$PHP -l public/index.php && \$PHP -l cron/kitchen_sync.php && \$PHP -l cron/telegram_alerts.php"
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          sleep 3
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://veranda.my/login || echo "000")
+          echo "HTTP status: ${STATUS}"
+          if [ "${STATUS}" != "200" ] && [ "${STATUS}" != "302" ]; then
+            echo "::warning::Smoke test returned ${STATUS} — check PHP-FPM and nginx vhost"
+          fi
