@@ -39,10 +39,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .sb-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:.5rem 0;scrollbar-width:thin;scrollbar-color:var(--border) transparent;min-height:0}
 .sidebar.sb-collapsed{width:0;min-width:0;border-right-color:transparent}
 .sb-brand{
-    padding:.9rem 1.25rem;font-weight:700;font-size:1.05rem;
-    color:var(--accent);letter-spacing:.02em;
+    padding:.9rem 1.25rem;
     border-bottom:1px solid var(--border);flex-shrink:0;
     display:flex;align-items:center;gap:.5rem;white-space:nowrap;
+}
+.sb-brand-name{
+    font-family:'Cinzel',Georgia,serif;font-weight:700;font-size:1rem;
+    color:var(--accent);letter-spacing:.2em;
 }
 .sb-collapse-btn{
     margin-left:auto;background:none;border:none;cursor:pointer;
@@ -90,7 +93,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     background:#13151f;border-bottom:1px solid var(--border);
     padding:.55rem 1rem;position:sticky;top:0;z-index:90;
 }
-.mobile-brand{font-weight:700;font-size:1rem;color:var(--accent);letter-spacing:.02em}
+.mobile-brand{font-size:.95rem}
 .hamburger{
     background:none;border:none;cursor:pointer;padding:.25rem;
     display:flex;flex-direction:column;gap:4px;
@@ -144,6 +147,9 @@ details summary{cursor:pointer;user-select:none}
 }
 </style>
 <?= $headExtra ?? '' ?>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/css/user_menu.css">
 </head>
 <body>
@@ -189,7 +195,7 @@ $currentPath = $currentPath ?? '/admin';
 
   <aside class="sidebar" id="sidebar">
     <div class="sb-brand">
-      &#9658; Veranda
+      <span class="sb-brand-name">Veranda 2</span>
       <button class="sb-collapse-btn" id="sbCollapseBtn" title="Скрыть меню">&#9664;</button>
     </div>
     <nav class="sb-nav">
@@ -216,7 +222,7 @@ $currentPath = $currentPath ?? '/admin';
       <button class="hamburger" id="hamburgerBtn" aria-label="Меню">
         <span></span><span></span><span></span>
       </button>
-      <span class="mobile-brand">&#9658; Veranda</span>
+      <span class="mobile-brand sb-brand-name">Veranda 2</span>
     </div>
 
     <main>
