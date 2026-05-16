@@ -19,11 +19,11 @@ class Payday2Controller
         global $db, $token;
         if (!isset($db)) {
             $db = new \App\Classes\Database(
-                $_ENV['DB_HOST']      ?? 'localhost',
-                $_ENV['DB_NAME']      ?? '',
-                $_ENV['DB_USER']      ?? '',
-                $_ENV['DB_PASSWORD']  ?? '',
-                $_ENV['TABLE_PREFIX'] ?? ''
+                $_ENV['DB_HOST']         ?? 'localhost',
+                $_ENV['DB_NAME']         ?? '',
+                $_ENV['DB_USER']         ?? '',
+                $_ENV['DB_PASS']         ?? '',
+                $_ENV['DB_TABLE_SUFFIX'] ?? ''
             );
         }
         $token = $_ENV['POSTER_API_TOKEN'] ?? '';
