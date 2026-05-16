@@ -4,30 +4,40 @@ declare(strict_types=1);
 
 namespace App\Payday3\Http\Actions;
 
+use App\Payday3\Contracts\SepaySyncServiceInterface;
+use App\Payday3\Domain\DateRange;
 use App\Payday3\Http\JsonResponder;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
- * POST /payday3/api/sepay/sync
+ * POST /payday3/api/sepay/sync?dateFrom=...&dateTo=...
  *
- * Triggered by the 📧 button on the Sepay table card. Pulls fresh
- * BIDV bank-transaction emails out of the inbox and writes them to
- * sepay_transactions.
- *
- * TODO Phase 5: extract the IMAP/parser logic from
- * payday2/ajax.php → MailSyncService. Until then this returns ok
- * so the front-end shows the toast and triggers a page reload —
- * the cron job already keeps sepay_transactions fresh, so the
- * reload usually shows new rows even without a manual fetch.
+ * Pulls fresh bank transactions out of SePay's REST API and writes
+ * them to sepay_transactions. Triggered by the 📧 button on the
+ * Sepay table card. The front-end reloads the page when this returns
+ * so new rows show up alongside the existing data.
  */
 final class SepaySyncAction
 {
+    public function __construct(private readonly SepaySyncServiceInterface $service) {}
+
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        try {
+            $range  = DateRange::fromQuery($request->getQueryParams());
+            $result = $this->service->sync($range);
+        } catch (\InvalidArgumentException $e) {
+            return JsonResponder::error($response, $e->getMessage(), 400);
+        } catch (\RuntimeException $e) {
+            return JsonResponder::error($response, $e->getMessage(), 500);
+        }
         return JsonResponder::ok($response, [
-            'message' => 'Sepay sync is queued (cron handles the actual fetch).',
-            'imported' => 0,
+            'range'    => $range->asArray(),
+            'inserted' => $result['inserted'],
+            'updated'  => $result['updated'],
+            'skipped'  => $result['skipped'],
+            'apiRows'  => $result['apiRows'],
         ]);
     }
 }
