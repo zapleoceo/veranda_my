@@ -37,4 +37,4 @@
     <div class="grid" id="charts"><div class="card muted" style="display:flex; align-items:center; justify-content:center; min-height: 120px;">Выбери период и нажми «Загрузить»</div></div>
 </div>
 
-<script src="/assets/js/zapara.js"></script>
+<script src="/assets/js/zapara.js?v=20260516_slash"></script>

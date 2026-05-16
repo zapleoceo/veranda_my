@@ -386,7 +386,7 @@
             let idx = 0;
 
             const runOne = async (date) => {
-                const url = new URL('/zapara', location.origin);
+                const url = new URL('/zapara/', location.origin);
                 url.searchParams.set('ajax', 'day');
                 url.searchParams.set('date', date);
                 const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });

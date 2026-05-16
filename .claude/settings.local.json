@@ -59,7 +59,10 @@
       "Bash(git checkout *)",
       "Bash(curl.exe -sI --max-time 10 \"https://veranda.my/rawdata?ajax=list&offset=0&limit=5\" -b \"PHPSESSID=fakecookie\")",
       "Bash(curl.exe -sI --max-time 10 \"https://veranda.my/rawdata/?ajax=list&offset=0&limit=5\")",
-      "Bash(grep -rnE \"fetch\\\\\\(['\\\\`]/\\(banya|roma|employees|reservations|kitchen_online|rawdata|zapara|admin|payday2\\)[\\\\\"'?]\" --include=\"*.js\" --include=\"*.php\" .)"
+      "Bash(grep -rnE \"fetch\\\\\\(['\\\\`]/\\(banya|roma|employees|reservations|kitchen_online|rawdata|zapara|admin|payday2\\)[\\\\\"'?]\" --include=\"*.js\" --include=\"*.php\" .)",
+      "Bash(grep -rnE \"fetch\\\\\\([\\\\`'\\\\\"]/\\(banya|roma|employees|reservations|kitchen_online|rawdata|zapara|admin|payday2|dashboard\\)[\\\\`'\\\\\"?]|new URL\\\\\\([\\\\`'\\\\\"]/\\(banya|roma|employees|reservations|kitchen_online|rawdata|zapara|admin|payday2|dashboard\\)[\\\\`'\\\\\"]\\(,|\\\\\\\\\\)\\)\" --include=\"*.js\" assets/ src/)",
+      "Bash(grep -rnE \"\\(['\\\\`\\\\\"]\\)/\\(banya|roma|employees|reservations|kitchen_online|rawdata|zapara|admin|payday2|dashboard\\)\\([\\\\?'\\\\\"\\\\`]\\)\" --include=\"*.js\" assets/ src/)",
+      "Bash(grep -v \"/.\\\\\\\\\\(js\\\\\\\\|css\\\\\\\\|png\\\\\\\\\\)\")"
     ]
   }
 }
