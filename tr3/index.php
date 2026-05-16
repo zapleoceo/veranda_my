@@ -16,6 +16,12 @@ Rules:
 - TR3 assets must live in /tr3/assets with neutral names (app.js, base.css, layout.css, tr3.css, etc.).
 */
 
+// .htaccess rewrites /tr3/ here, bypassing Slim/Composer.
+if (!class_exists(\App\Infrastructure\Config::class, false)) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    \App\Infrastructure\Config::load(__DIR__ . '/../.env');
+}
+
 $cfg = require __DIR__ . '/i18n.php';
 $supportedLangs = is_array($cfg['supported'] ?? null) ? $cfg['supported'] : ['ru', 'en', 'vi'];
 $I18N = is_array($cfg['i18n'] ?? null) ? $cfg['i18n'] : [];
