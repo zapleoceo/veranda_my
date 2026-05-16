@@ -458,3 +458,40 @@ if (!function_exists('payday2_csrf_valid')) {
         return $post !== '' && hash_equals($expected, $post);
     }
 }
+
+// Slim 4 integration helpers — no-ops in legacy mode
+if (!function_exists('payday2_redirect')) {
+    function payday2_redirect(string $url): void {
+        if (!empty($GLOBALS['_PAYDAY2_SLIM_MODE'])) {
+            $GLOBALS['_PAYDAY2_REDIRECT_URL'] = $url;
+            $GLOBALS['_PAYDAY2_SLIM_JSON'] = ob_get_clean() ?: '';
+            throw new \RuntimeException('_payday2_done');
+        }
+        header('Location: ' . $url);
+        exit;
+    }
+}
+if (!function_exists('payday2_json_header')) {
+    function payday2_json_header(): void {
+        if (!empty($GLOBALS['_PAYDAY2_SLIM_MODE'])) return;
+        header('Content-Type: application/json; charset=utf-8');
+    }
+}
+if (!function_exists('payday2_http_code')) {
+    function payday2_http_code(int $code): void {
+        if (!empty($GLOBALS['_PAYDAY2_SLIM_MODE'])) {
+            $GLOBALS['_PAYDAY2_HTTP_CODE'] = $code;
+            return;
+        }
+        http_response_code($code);
+    }
+}
+if (!function_exists('payday2_do_exit')) {
+    function payday2_do_exit(): void {
+        if (!empty($GLOBALS['_PAYDAY2_SLIM_MODE'])) {
+            $GLOBALS['_PAYDAY2_SLIM_JSON'] = ob_get_clean() ?: '';
+            throw new \RuntimeException('_payday2_done');
+        }
+        exit;
+    }
+}

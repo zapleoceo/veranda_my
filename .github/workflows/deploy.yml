@@ -57,6 +57,9 @@ jobs:
               --exclude ".env" \
               --exclude ".env.*" \
               --exclude "*.log" \
+              --exclude "tmp/" \
+              --exclude "cache/" \
+              --exclude ".cache/" \
               --exclude "vendor/" \
               --exclude "logs/" \
               --exclude ".git/" \

@@ -356,7 +356,7 @@ if (count($posterAccountsById) > 0) {
 $fmtVnd = function (int $val): string { return FinanceHelper::fmtVnd($val); };
 $fmtVndCents = function (int $cents): string { return FinanceHelper::fmtVndCents($cents); };
 $payday2CsrfToken = payday2_ensure_csrf();
-$payday2AssetVersion = '20260511_0002';
+$payday2AssetVersion = '20260516_0001';
 $payday2ClientConfig = [
     'userEmail' => (string)($_SESSION['user_email'] ?? ''),
     'csrfToken' => $payday2CsrfToken,
@@ -374,6 +374,8 @@ $payday2ClientConfig = [
 ];
 $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 ?>
+<?php $_pd2Layout = !empty($GLOBALS['_PAYDAY2_USE_LAYOUT']); ?>
+<?php if (!$_pd2Layout): ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -388,7 +390,11 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
  </head>
 <body>
+<?php else: ?>
+<?php $GLOBALS['_PAYDAY2_HEAD_EXTRA'] = '<link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=' . htmlspecialchars($payday2AssetVersion) . '">'; ?>
+<?php endif; ?>
 <div class="container">
+<?php if (!$_pd2Layout): ?>
     <div class="top-nav">
         <div class="nav-left">
             <div class="pd2-nav-title-row pd2-d-flex pd2-align-center pd2-gap-8">
@@ -434,6 +440,50 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
         </div>
         <?php require __DIR__ . '/../partials/user_menu.php'; ?>
     </div>
+<?php else: ?>
+    <div class="pd2-layout-toolbar">
+        <div class="pd2-nav-title-row pd2-d-flex pd2-align-center pd2-gap-8">
+            <div class="nav-title pd2-pointer" id="payday2InfoBtn">Payday2</div>
+            <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2HelpToggleBtn" title="Справка">❓</button>
+            <button type="button" class="btn pd2-p-4-10 pd2-settings-gear" id="payday2SettingsBtn" title="Настройки Payday2" data-help-abs="Настройки интеграции с Telegram и счетами Poster.">⚙</button>
+            <div class="pd2-d-flex">
+                <button type="button" class="pd2-icon-btn" id="btnKashShift" title="KashShift" data-help-abs="Просмотр кассовых смен из Poster.">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1h2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8h2V7Zm2 1h8V7a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v1Zm-2 2v8h12v-8H7Zm6 1c1.66 0 3 1.12 3 2.5S14.66 16 13 16s-3-1.12-3-2.5S11.34 11 13 11Z"/></svg>
+                </button>
+                <button type="button" class="pd2-icon-btn pd2-ml-5" id="btnSupplies" title="Supplies" data-help-abs="Просмотр списка поставок из Poster.">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 7a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1h3a2 2 0 0 1 2 2v6a3 3 0 0 1-3 3H6a2 2 0 0 1-2-2V7Zm2 0v12h13a1 1 0 0 0 1-1v-6h-5V7H6Zm3 2h4v2H9V9Zm-1 4h6v2H8v-2Z"/></svg>
+                </button>
+            </div>
+            <button type="button" class="pd2-icon-btn pd2-ml-5" id="payday2CheckFinderBtn" title="Чек" data-help-abs="Поиск и удаление чека Poster по номеру.">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 2h12v20l-2-1-2 1-2-1-2 1-2-1-2 1V2Zm2 4v2h8V6H8Zm0 4v2h8v-2H8Zm0 4v2h6v-2H8Z"/></svg>
+            </button>
+        </div>
+        <div class="tabs" data-help="Переключение режимов сверки финансов: приходы (IN) или расходы (OUT).">
+            <button type="button" class="tab active" id="tabIn" data-help-abs="Режим IN: Сверка входящих платежей.">IN</button>
+            <button type="button" class="tab" id="tabOut" data-help-abs="Режим OUT: Сверка исходящих платежей (затрат).">OUT</button>
+        </div>
+        <div id="topFormsWrap" class="pd2-top-forms-wrap" data-help="Блок выбора рабочего периода для загрузки транзакций.">
+            <form method="GET" id="dateForm" class="pd2-m-0 pd2-d-flex pd2-align-center pd2-gap-10 pd2-pos-relative">
+                <input type="date" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>" class="btn pd2-date-input pd2-ws-nowrap" data-help-abs="Начальная дата (или единственный день).">
+                <input type="date" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>" class="btn pd2-date-input pd2-d-none" data-help-abs="Конечная дата.">
+                <div id="dateFormLoader" class="pd2-d-none pd2-align-center pd2-ml-4">
+                    <svg class="pd2-loader-spin pd2-v-align-mid" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                    </svg>
+                </div>
+            </form>
+            <form method="POST" id="clearDayForm" class="pd2-m-0 pd2-d-none">
+                <input type="hidden" name="payday2_csrf" value="<?= htmlspecialchars($payday2CsrfToken) ?>">
+                <input type="hidden" name="action" value="clear_day">
+                <input type="hidden" name="dateFrom" value="<?= htmlspecialchars($dateFrom) ?>">
+                <input type="hidden" name="dateTo" value="<?= htmlspecialchars($dateTo) ?>">
+            </form>
+            <div class="pd2-d-flex pd2-align-center pd2-gap-10 pd2-ws-nowrap pd2-d-none">
+                <button class="btn pd2-ws-nowrap" type="submit" form="dateForm">Открыть</button>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
 
     <?php if ($error !== ''): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
@@ -1273,5 +1323,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
 <script src="/payday2/assets/js/payday2_supplies.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2_poster_table.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
+<?php if (!$_pd2Layout): ?>
 </body>
 </html>
+<?php endif; ?>

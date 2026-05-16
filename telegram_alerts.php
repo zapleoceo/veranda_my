@@ -118,7 +118,7 @@ try {
             ? array_map('strval', $webhookInfo['allowed_updates'])
             : [];
         $needMessage = !in_array('message', $allowed, true);
-        $targetUrl = 'https://veranda.my/telegram_webhook.php';
+        $targetUrl = veranda_base_url() . '/telegram_webhook.php';
         if ($currentUrl !== $targetUrl || $needMessage) {
             $bot->setWebhook($targetUrl);
         }
@@ -212,8 +212,7 @@ try {
         return true;
     };
 
-    $siteBase = trim((string)($_ENV['SITE_BASE_URL'] ?? 'https://veranda.my'));
-    if ($siteBase === '') $siteBase = 'https://veranda.my';
+    $siteBase = rtrim(veranda_base_url(), '/');
 
     $remindedTg = 0;
     $remindedWa = 0;
@@ -462,11 +461,13 @@ try {
         }
 
         $lastPosterSync = $getMeta('poster_last_sync_at', '');
+        $srvTag = trim((string)(php_uname('n') ?: ''));
         $statusText = 'Открыто чеков: ' . htmlspecialchars($openChecksDisplay) . "\n";
         $statusText .= 'Лимит времени: ' . (int)$waitLimit . " мин\n";
         $statusText .= 'В очереди: 🍸' . $queueBar . ' / 🍔' . $queueKitchen . "\n";
         $statusText .= 'Долгих блюд: 🍸' . $overdueBar . ' / 🍔' . $overdueKitchen . "\n";
         $statusText .= 'Время обновления: ' . ($lastPosterSync !== '' ? $lastPosterSync : date('Y-m-d H:i:s'));
+        if ($srvTag !== '') $statusText .= "\nSrv: {$srvTag}";
         $statusHash = sha1($statusText);
         $prevStatusId = (int)$getMeta('telegram_status_msg_id', '0');
         $prevStatusHash = (string)$getMeta('telegram_status_msg_hash', '');

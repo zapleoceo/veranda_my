@@ -18,7 +18,7 @@ $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
 $googleClientId = $_ENV['GOOGLE_CLIENT_ID'] ?? '';
 $googleClientSecret = $_ENV['GOOGLE_CLIENT_SECRET'] ?? '';
-$googleRedirectUri = $_ENV['GOOGLE_REDIRECT_URI'] ?? 'https://veranda.my/auth_callback.php';
+$googleRedirectUri = $_ENV['GOOGLE_REDIRECT_URI'] ?? (veranda_base_url() . '/auth_callback.php');
 
 $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass);
 $auth = new \App\Classes\Auth($db, $googleClientId, $googleClientSecret, $googleRedirectUri);

@@ -29,7 +29,7 @@ $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
 $googleClientId = $_ENV['GOOGLE_CLIENT_ID'] ?? '';
 $googleClientSecret = $_ENV['GOOGLE_CLIENT_SECRET'] ?? '';
-$googleRedirectUri = $_ENV['GOOGLE_REDIRECT_URI'] ?? 'https://veranda.my/auth_callback.php';
+$googleRedirectUri = $_ENV['GOOGLE_REDIRECT_URI'] ?? (veranda_base_url() . '/auth_callback.php');
 $tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
 $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
@@ -93,6 +93,19 @@ if (!function_exists('veranda_get_user_permissions')) {
             $out['reservations'] = true;
         }
         return $out;
+    }
+}
+
+if (!function_exists('veranda_base_url')) {
+    /**
+     * Single source of truth for the site base URL in legacy (non-Slim) PHP files.
+     * Set SITE_BASE_URL in .env to override; otherwise derived from the current request.
+     */
+    function veranda_base_url(): string {
+        $env = rtrim((string)($_ENV['SITE_BASE_URL'] ?? ''), '/');
+        if ($env !== '') return $env;
+        $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+        return ($https ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
     }
 }
 

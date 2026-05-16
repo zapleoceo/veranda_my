@@ -29,10 +29,11 @@
  * ==============================================================================
  */
 
-require_once __DIR__ . '/../auth_check.php';
+if (empty($GLOBALS['_PAYDAY2_SLIM_MODE'])) {
+    require_once __DIR__ . '/../auth_check.php';
+    veranda_require('payday');
+}
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
-
-veranda_require('payday');
 $apiTzName = trim((string)($_ENV['POSTER_SPOT_TIMEZONE'] ?? 'Asia/Ho_Chi_Minh'));
 if ($apiTzName === '') $apiTzName = 'Asia/Ho_Chi_Minh';
 date_default_timezone_set($apiTzName);
@@ -75,19 +76,19 @@ require_once __DIR__ . '/functions.php';
 
 if (($_GET['tool'] ?? '') === 'poster_admin_edit_check_tester') {
     require_once __DIR__ . '/poster_admin_edit_check_tester.php';
-    exit;
+    payday2_do_exit();
 }
 
 // Route AJAX requests
 if (isset($_GET['ajax']) && $_GET['ajax'] !== '') {
     require_once __DIR__ . '/ajax.php';
-    exit;
+    payday2_do_exit();
 }
 
 // Route POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once __DIR__ . '/post.php';
-    exit;
+    payday2_do_exit();
 }
 
 // Fetch data and Render View

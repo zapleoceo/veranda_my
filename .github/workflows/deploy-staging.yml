@@ -1,0 +1,110 @@
+name: Deploy to beta.veranda.my
+
+on:
+  push:
+    branches: ["refactor/slim4"]
+
+concurrency:
+  group: deploy-beta-veranda-my
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Ensure rsync
+        shell: bash
+        run: |
+          if ! command -v rsync >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y rsync
+          fi
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          SSH_KEY: ${{ secrets.STAGING_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.STAGING_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          ssh-keygen -l -f ~/.ssh/id_ed25519
+
+      - name: Check SSH connectivity
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.STAGING_SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10"
+          ssh ${SSH_OPTS} "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" "echo SSH_AUTH_OK"
+
+      - name: Deploy files
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.STAGING_SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+
+          for i in 1 2 3; do
+            echo "rsync attempt ${i}/3"
+            rsync -az \
+              --delete \
+              --delete-after \
+              --exclude ".env" \
+              --exclude ".env.*" \
+              --exclude "*.log" \
+              --exclude "vendor/" \
+              --exclude "logs/" \
+              --exclude ".git/" \
+              --exclude ".github/" \
+              --exclude "payday2/local_config.json" \
+              --exclude "wa_listener/auth/" \
+              --exclude "wa_listener/qr_state.json" \
+              --exclude "wa_listener/node_modules/" \
+              -e "ssh ${SSH_OPTS}" \
+              ./ "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}:${{ secrets.STAGING_DEPLOY_PATH }}/" && break
+            sleep $((i * 3))
+          done
+
+      - name: Link static assets into public/
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.STAGING_SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          ssh ${SSH_OPTS} "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" "
+            D='${{ secrets.STAGING_DEPLOY_PATH }}'
+            # /assets/* served directly by nginx via symlink (no Slim route conflict)
+            ln -sfn \$D/assets \$D/public/assets
+            # Clean up any stale tr3/ directory that breaks /tr3 Slim routing
+            rm -rf \$D/public/tr3
+          "
+
+      - name: Composer install
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.STAGING_SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          ssh ${SSH_OPTS} "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
+            "cd '${{ secrets.STAGING_DEPLOY_PATH }}' && /opt/php82/bin/php /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction 2>&1"
+
+      - name: Verify PHP syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.STAGING_SSH_PORT }} -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          ssh ${SSH_OPTS} "${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }}" \
+            "PHP=/opt/php82/bin/php && cd '${{ secrets.STAGING_DEPLOY_PATH }}' && \$PHP -l public/index.php && \$PHP -l cron/kitchen_sync.php && \$PHP -l cron/telegram_alerts.php"
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          sleep 3
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://beta.veranda.my/login || echo "000")
+          echo "HTTP status: ${STATUS}"
+          if [ "${STATUS}" != "200" ] && [ "${STATUS}" != "302" ]; then
+            echo "::warning::Smoke test returned ${STATUS} — server may need PHP-FPM vhost configuration"
+          fi

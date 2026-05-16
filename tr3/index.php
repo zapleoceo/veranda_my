@@ -39,11 +39,20 @@ if ($lang === null) {
 if ($lang === null) $lang = 'ru';
 if (!isset($I18N[$lang])) $lang = 'ru';
 
-function tr(string $key): string {
-  global $I18N, $lang;
-  return isset($I18N[$lang][$key]) ? (string)$I18N[$lang][$key] : $key;
+// Store in $GLOBALS so tr() works whether this file runs at global scope
+// (direct request) or inside a controller method (Slim 4).
+$GLOBALS['_TR3_LANG'] = $lang;
+$GLOBALS['_TR3_I18N'] = $I18N;
+
+if (!function_exists('tr')) {
+  function tr(string $key): string {
+    $I18N = $GLOBALS['_TR3_I18N'] ?? [];
+    $lang = $GLOBALS['_TR3_LANG'] ?? 'ru';
+    return isset($I18N[$lang][$key]) ? (string)$I18N[$lang][$key] : $key;
+  }
 }
 
+$_siteBase = \App\Infrastructure\Config::baseUrl();
 $self = strtok((string)($_SERVER['REQUEST_URI'] ?? '/tr3/'), '?');
 $params = $_GET;
 unset($params['ajax'], $params['lang']);
@@ -61,19 +70,19 @@ $mk = function (string $l) use ($self, $baseQs) {
   <title><?= htmlspecialchars(tr('page_title')) ?></title>
   <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
   <meta name="description" content="<?= htmlspecialchars($lang === 'ru' ? 'Бронирование столика в Veranda: выберите стол и время.' : ($lang === 'vi' ? 'Đặt bàn tại Veranda: chọn bàn và thời gian.' : ($lang === 'en' ? 'Reserve a table at Veranda: pick a table and time.' : 'Veranda 테이블 예약: 테이블과 시간을 선택하세요.'))) ?>">
-  <link rel="canonical" href="https://veranda.my/tr3?lang=<?= urlencode($lang) ?>">
+  <link rel="canonical" href="<?= htmlspecialchars($_siteBase) ?>/tr3?lang=<?= urlencode($lang) ?>">
   <meta property="og:site_name" content="Veranda">
   <meta property="og:type" content="website">
   <meta property="og:title" content="<?= htmlspecialchars(tr('page_title')) ?>">
   <meta property="og:description" content="<?= htmlspecialchars($lang === 'ru' ? 'Онлайн бронирование столика.' : ($lang === 'vi' ? 'Đặt bàn online.' : ($lang === 'en' ? 'Online table reservation.' : '온라인 테이블 예약.'))) ?>">
-  <meta property="og:url" content="https://veranda.my/tr3?lang=<?= urlencode($lang) ?>">
-  <meta property="og:image" content="https://veranda.my/assets/img/links_bg.png">
+  <meta property="og:url" content="<?= htmlspecialchars($_siteBase) ?>/tr3?lang=<?= urlencode($lang) ?>">
+  <meta property="og:image" content="<?= htmlspecialchars($_siteBase) ?>/assets/img/links_bg.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://veranda.my/assets/img/links_bg.png">
+  <meta name="twitter:image" content="<?= htmlspecialchars($_siteBase) ?>/assets/img/links_bg.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260512_0002">
+  <link rel="stylesheet" href="/tr3/assets/tr3.css?v=20260516_0001">
   <noscript>
     <style>
       .modal:target { display: flex !important; }
@@ -374,16 +383,16 @@ $mk = function (string $l) use ($self, $baseQs) {
     '@context' => 'https://schema.org',
     '@type' => 'Restaurant',
     'name' => 'Veranda',
-    'url' => 'https://veranda.my/tr3?lang=' . $lang,
+    'url' => $_siteBase . '/tr3?lang=' . $lang,
     'potentialAction' => [
       '@type' => 'ReserveAction',
       'target' => [
         '@type' => 'EntryPoint',
-        'urlTemplate' => 'https://veranda.my/tr3?lang=' . $lang,
+        'urlTemplate' => $_siteBase . '/tr3?lang=' . $lang,
       ],
     ],
   ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
-  <script src="/tr3/assets/tr3.boot.js?v=20260512_0002" defer></script>
+  <script src="/tr3/assets/tr3.boot.js?v=20260516_0001" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.49/libphonenumber-js.min.js" defer></script>
 </body>
 </html>
