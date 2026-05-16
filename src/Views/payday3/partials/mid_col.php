@@ -43,4 +43,18 @@ declare(strict_types=1);
             <li><span class="pd3-legend-line pd3-legend-line--gray"   aria-hidden="true"></span>Ручная</li>
         </ul>
     </div>
+
+    <!-- Soft-reset (clearDayBtn equivalent). Marks sepay/poster rows in
+         the range as was_deleted=1; the next sync brings them back.
+         Sits at the bottom of the mid column, intentionally separated
+         from the glass panel so it isn't a one-click mistake. -->
+    <button type="button"
+            class="pd3-soft-reset"
+            id="pd3ClearDayBtn"
+            title="Soft reset: Poster/SePay за дату помечаются was_deleted; без физического удаления; после синка записи восстановятся."
+            data-help-abs="Soft-reset выбранного периода. Перенесёт все строки в was_deleted=1; следующая синхронизация их вернёт. Используй когда данные в таблицах визуально 'битые', а в почте/Poster они правильные.">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 5a7 7 0 1 1-6.2 3.8l1.7 1A5 5 0 1 0 12 7h-1.6l2.6 2.6L11.6 11 6 5.4 11.6 0l1.4 1.4L10.4 4H12Z"/>
+        </svg>
+    </button>
 </aside>

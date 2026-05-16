@@ -206,13 +206,14 @@ export class LineRenderer {
             this._layer.appendChild(btn);
             this._buttons.set(key, btn);
         }
-        // Place ~80% along the link, not the midpoint, so the button doesn't cover
-        // the path crossing a row's text.
-        const t = 0.78;
-        const mx = a.x + (b.x - a.x) * t - 8;
-        const my = a.y + (b.y - a.y) * t - 8;
-        btn.style.left = Math.round(mx) + 'px';
-        btn.style.top  = Math.round(my) + 'px';
+        // The button must sit ON the bezier path, not on the chord — for
+        // tall vertical offsets those diverge a lot. Evaluate the cubic
+        // at the same `t` used by payday2 (clamp(0.75, 0.99, 1 - 6/len)).
+        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const t   = Math.min(0.99, Math.max(0.75, 1 - (6 / len)));
+        const pt  = cubicPoint(a, b, t);
+        btn.style.left = Math.round(pt.x - 8) + 'px';
+        btn.style.top  = Math.round(pt.y - 8) + 'px';
         btn.style.display = 'flex';
     }
 
@@ -240,11 +241,32 @@ function pointOf(anchorRect, rootRect, container) {
 }
 
 function bezierPath(a, b) {
+    const { c1, c2 } = bezierControls(a, b);
+    return `M ${a.x} ${a.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${b.x} ${b.y}`;
+}
+
+/** Control points for the cubic. Kept in one place so cubicPoint() and
+ *  bezierPath() never diverge — the same curve underlies the SVG path
+ *  and the × button placement. */
+function bezierControls(a, b) {
     const dx  = b.x - a.x;
     const cdx = Math.min(140, Math.max(40, Math.abs(dx) * 0.35));
-    const c1x = a.x + cdx, c1y = a.y;
-    const c2x = b.x - cdx, c2y = b.y;
-    return `M ${a.x} ${a.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${b.x} ${b.y}`;
+    return {
+        c1: { x: a.x + cdx, y: a.y },
+        c2: { x: b.x - cdx, y: b.y },
+    };
+}
+
+/** Cubic Bezier B(t) for our P1=a, P2=c1, P3=c2, P4=b setup. */
+function cubicPoint(a, b, t) {
+    const { c1, c2 } = bezierControls(a, b);
+    const u = 1 - t;
+    const uu = u * u, tt = t * t;
+    const w1 = uu * u, w2 = 3 * uu * t, w3 = 3 * u * tt, w4 = tt * t;
+    return {
+        x: w1 * a.x + w2 * c1.x + w3 * c2.x + w4 * b.x,
+        y: w1 * a.y + w2 * c1.y + w3 * c2.y + w4 * b.y,
+    };
 }
 
 function svgPath(d, stroke, width) {
