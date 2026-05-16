@@ -20,10 +20,9 @@ class Payday2Controller
         if (!isset($db)) {
             $db = new \App\Classes\Database(
                 $_ENV['DB_HOST']      ?? 'localhost',
+                $_ENV['DB_NAME']      ?? '',
                 $_ENV['DB_USER']      ?? '',
                 $_ENV['DB_PASSWORD']  ?? '',
-                $_ENV['DB_NAME']      ?? '',
-                (int)($_ENV['DB_PORT'] ?? 3306),
                 $_ENV['TABLE_PREFIX'] ?? ''
             );
         }
