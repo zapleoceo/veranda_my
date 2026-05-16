@@ -1,0 +1,69 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controllers;
+
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+
+class StaticController
+{
+    private const MIME = [
+        'css'   => 'text/css; charset=utf-8',
+        'js'    => 'application/javascript; charset=utf-8',
+        'svg'   => 'image/svg+xml',
+        'png'   => 'image/png',
+        'jpg'   => 'image/jpeg',
+        'jpeg'  => 'image/jpeg',
+        'gif'   => 'image/gif',
+        'webp'  => 'image/webp',
+        'woff'  => 'font/woff',
+        'woff2' => 'font/woff2',
+        'ttf'   => 'font/ttf',
+        'ico'   => 'image/x-icon',
+        'json'  => 'application/json',
+    ];
+
+    private function serve(ResponseInterface $response, string $baseDir, string $relativePath): ResponseInterface
+    {
+        $base = realpath($baseDir);
+        if ($base === false) {
+            return $response->withStatus(404);
+        }
+
+        $resolved = realpath($base . DIRECTORY_SEPARATOR . $relativePath);
+        if ($resolved === false || !str_starts_with($resolved, $base) || !is_file($resolved)) {
+            return $response->withStatus(404);
+        }
+
+        $ext  = strtolower(pathinfo($resolved, PATHINFO_EXTENSION));
+        $mime = self::MIME[$ext] ?? 'application/octet-stream';
+        $body = file_get_contents($resolved);
+
+        $response->getBody()->write((string)$body);
+        return $response
+            ->withHeader('Content-Type', $mime)
+            ->withHeader('Cache-Control', 'public, max-age=86400');
+    }
+
+    public function tr3Assets(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../tr3/assets', $args['file']);
+    }
+
+    public function linksStatic(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../links', $args['file']);
+    }
+
+    public function reservationsRoot(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../reservations', $args['file']);
+    }
+
+    public function reservationsAssets(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../reservations/assets', $args['file']);
+    }
+}
