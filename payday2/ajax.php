@@ -1,46 +1,47 @@
-<?php
-require_once __DIR__ . '/../auth_check.php';
+﻿<?php
+if (empty($GLOBALS['_PAYDAY2_SLIM_MODE'])) {
+    require_once __DIR__ . '/../auth_check.php';
+    veranda_require('payday');
+}
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/../src/classes/PosterAdminAjax.php';
 require_once __DIR__ . '/../src/classes/PosterSupplyManager.php';
 
-veranda_require('payday');
-
 $db->createPaydayTables();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!function_exists('payday2_ensure_csrf')) {
-        header('Content-Type: application/json; charset=utf-8');
-        http_response_code(500);
+        payday2_json_header();
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => 'Payday2 bootstrap error'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     payday2_ensure_csrf();
     if (!payday2_csrf_valid()) {
-        header('Content-Type: application/json; charset=utf-8');
-        http_response_code(403);
+        payday2_json_header();
+        payday2_http_code(403);
         echo json_encode(['ok' => false, 'error' => 'Сессия устарела. Обновите страницу (CSRF).'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
 }
 
 if (($_GET['ajax'] ?? '') === 'save_actual_balances') {
     require_once __DIR__ . '/ajax/save_actual_balances.php';
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'load_actual_balances') {
     require_once __DIR__ . '/ajax/load_actual_balances.php';
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'save_local_config') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $payload = json_decode((string)$raw, true);
@@ -49,37 +50,37 @@ if (($_GET['ajax'] ?? '') === 'save_local_config') {
     }
     $r = \App\Payday2\LocalSettings::persistPayload($payload);
     if (!$r['ok']) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => $r['error']], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $payload = json_decode((string)$raw, true);
     $imgData = $payload['image'] ?? '';
     
     if (!$imgData || !preg_match('/^data:image\/(\w+);base64,/', $imgData, $type)) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Invalid image format'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     
     $imgData = substr($imgData, strpos($imgData, ',') + 1);
     $imgData = base64_decode($imgData);
     if ($imgData === false) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'base64_decode failed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     
     $tmpFile = tempnam(sys_get_temp_dir(), 'bal_');
@@ -93,9 +94,9 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
 
     if ($tgToken === '' || $tgChatId === '') {
         @unlink($tmpFile);
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => 'Telegram config is missing (Token or Chat ID empty)'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
 
     $ch = curl_init();
@@ -122,29 +123,29 @@ if (($_GET['ajax'] ?? '') === 'poster_balances_telegram_screenshot') {
     file_put_contents(__DIR__ . '/telegram_debug.log', "cURL Error: $curlErr\nResp: $resp\n", FILE_APPEND);
     
     if ($resp === false) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => 'Telegram request failed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     
     $tgData = json_decode($resp, true);
     if (!isset($tgData['ok']) || !$tgData['ok']) {
         $desc = is_array($tgData) ? (string)($tgData['description'] ?? 'Unknown') : 'Invalid Telegram response';
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Telegram: ' . $desc], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     
     echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'create_transfer') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $payload = json_decode((string)$raw, true);
@@ -153,16 +154,16 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
     $dFrom = trim((string)($payload['dateFrom'] ?? ''));
     $dTo = trim((string)($payload['dateTo'] ?? ''));
     if (!in_array($kind, ['vietnam', 'tips'], true) || $dFrom === '' || $dTo === '') {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $api = new \App\Classes\PosterAPI((string)$token);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => 'API init error'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $methodVietnam = (int)\App\Payday2\Config::METHOD_VIETNAM;
@@ -366,15 +367,15 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
                 'user' => (string)($found['user'] ?? ''),
                 'comment' => (string)$found['comment'],
             ], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
 
         $accAndrey = \App\Payday2\LocalSettings::accountAndreyId();
 
         if ($accountTo <= 0 || $accAndrey <= 0) {
-            http_response_code(400);
+            payday2_http_code(400);
             echo json_encode(['ok' => false, 'error' => 'Счета не настроены. Проверьте настройки (шестеренка).'], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
 
         $api->request('finance.createTransactions', [
@@ -401,18 +402,18 @@ if (($_GET['ajax'] ?? '') === 'create_transfer') {
             'comment' => $comment,
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $payload = json_decode((string)$raw, true);
@@ -423,16 +424,16 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
     $accountFrom = (int)($payload['accountFrom'] ?? 0);
     $accountTo = (int)($payload['accountTo'] ?? 0);
     if (!in_array($kind, ['vietnam', 'tips'], true) || $dFrom === '' || $dTo === '' || $accountFrom <= 0 || $accountTo <= 0) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $api = new \App\Classes\PosterAPI((string)$token);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => 'API init error'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $startTs = strtotime($dFrom . ' 00:00:00');
@@ -599,18 +600,18 @@ if (($_GET['ajax'] ?? '') === 'refresh_finance_transfers') {
 
         echo json_encode(['ok' => true, 'rows' => $out], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'sepay_hide') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $payload = json_decode((string)$raw, true);
@@ -618,14 +619,14 @@ if (($_GET['ajax'] ?? '') === 'sepay_hide') {
     $sepayId = (int)($payload['sepay_id'] ?? 0);
     $comment = trim((string)($payload['comment'] ?? ''));
     if ($sepayId <= 0) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     if ($comment === '') {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Нужен комментарий'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     if (mb_strlen($comment, 'UTF-8') > 2000) {
         $comment = mb_substr($comment, 0, 2000, 'UTF-8');
@@ -645,18 +646,18 @@ if (($_GET['ajax'] ?? '') === 'sepay_hide') {
         );
         echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'manual_link') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
     if (!is_array($payload)) $payload = [];
@@ -682,14 +683,14 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
     }
 
     if (count($sepayIds) === 0 || count($posterIds) === 0) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     if (count($sepayIds) > 1 && count($posterIds) > 1) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Нельзя: выбери 1 платеж и много чеков или 1 чек и много платежей.'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         if (count($sepayIds) === 1) {
@@ -738,18 +739,18 @@ if (($_GET['ajax'] ?? '') === 'manual_link') {
         }
         echo json_encode(['ok' => true, 'created' => true, 'pairs' => $inserted], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'clear_links') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $db->query(
@@ -760,18 +761,18 @@ if (($_GET['ajax'] ?? '') === 'clear_links') {
         );
         echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'auto_link') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $methodVietnamId = (int)\App\Payday2\Config::METHOD_VIETNAM;
@@ -972,27 +973,27 @@ if (($_GET['ajax'] ?? '') === 'auto_link') {
         }
         echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'unlink') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $payload = json_decode(file_get_contents('php://input') ?: '[]', true);
     if (!is_array($payload)) $payload = [];
     $posterId = (int)($payload['poster_transaction_id'] ?? 0);
     $sepayId = (int)($payload['sepay_id'] ?? 0);
     if ($posterId <= 0 || $sepayId <= 0) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $db->query(
@@ -1001,14 +1002,14 @@ if (($_GET['ajax'] ?? '') === 'unlink') {
         );
         echo json_encode(['ok' => true, 'deleted' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'links') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     try {
         $rows = $db->query(
             "SELECT l.poster_transaction_id, l.sepay_id, l.link_type,
@@ -1020,20 +1021,20 @@ if (($_GET['ajax'] ?? '') === 'links') {
         )->fetchAll();
         echo json_encode(['ok' => true, 'links' => $rows], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'mail_out') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     $dFrom = trim((string)($_GET['dateFrom'] ?? ''));
     $dTo = trim((string)($_GET['dateTo'] ?? ''));
     $includeHidden = (int)($_GET['include_hidden'] ?? 0) === 1;
     if ($dTo === '') {
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     if (!function_exists('decode_imap_text')) {
         function decode_imap_text($str) {
@@ -1062,9 +1063,9 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
     $mailPass = $_ENV['MAIL_PASS'] ?? '';
     if (!extension_loaded('imap') || $mailUser === '' || $mailPass === '') {
         echo json_encode(['ok' => false, 'error' => 'IMAP not available'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
-    $inbox = @imap_open('{imap.gmail.com:993/imap/ssl}INBOX', $mailUser, $mailPass);
+    $inbox = @imap_open('{imap.gmail.com:993/imap/ssl/novalidate-cert}INBOX', $mailUser, $mailPass);
     if (!$inbox) {
         $imapErr = function_exists('imap_last_error') ? (string)imap_last_error() : '';
         if ($imapErr !== '') {
@@ -1075,7 +1076,7 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
             'ok' => false,
             'error' => 'IMAP open failed' . ($imapErr !== '' ? (': ' . $imapErr) : ''),
         ], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $fromTs = strtotime($dFrom !== '' ? ($dFrom . ' 00:00:00') : ($dTo . ' 00:00:00'));
     $toTs = strtotime($dTo . ' 23:59:59');
@@ -1083,7 +1084,7 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
     $beforeTs = strtotime($dTo . ' +1 day');
     if ($fromTs === false || $toTs === false || $beforeTs === false) {
         echo json_encode(['ok' => false, 'error' => 'Bad date range'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $searchQuery = 'FROM "bidvsmartbanking@bidv.com.vn" SINCE "' . date('d-M-Y', $fromTs) . '" BEFORE "' . date('d-M-Y', $beforeTs) . '"';
     $emails = imap_search($inbox, $searchQuery) ?: [];
@@ -1173,15 +1174,15 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
         }));
     }
     echo json_encode(['ok' => true, 'rows' => $rows], JSON_UNESCAPED_UNICODE);
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'mail_hide') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $j = json_decode($raw ?: '[]', true);
@@ -1190,9 +1191,9 @@ if (($_GET['ajax'] ?? '') === 'mail_hide') {
     $dTo = trim((string)($j['dateTo'] ?? ''));
     $comment = trim((string)($j['comment'] ?? ''));
     if ($uid <= 0 || $dTo === '') {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $by = '';
     if (!isset($_SESSION)) {
@@ -1208,19 +1209,19 @@ if (($_GET['ajax'] ?? '') === 'mail_hide') {
         );
         echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'finance_out') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     $dFrom = trim((string)($_GET['dateFrom'] ?? ''));
     $dTo = trim((string)($_GET['dateTo'] ?? ''));
     if ($dTo === '') {
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $fromDate = $dFrom !== '' ? $dFrom : $dTo;
@@ -1263,14 +1264,14 @@ if (($_GET['ajax'] ?? '') === 'finance_out') {
         }
         echo json_encode(['ok' => true, 'rows' => $out], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'poster_employees') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     try {
         $apiEmp = new \App\Classes\PosterAPI((string)$token);
         $rows = $apiEmp->request('access.getEmployees', []);
@@ -1284,14 +1285,14 @@ if (($_GET['ajax'] ?? '') === 'poster_employees') {
         }
         echo json_encode(['ok' => true, 'employees' => $out], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'finance_accounts') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     try {
         $apiAcc = new \App\Classes\PosterAPI((string)$token);
         $rows = $apiAcc->request('finance.getAccounts', []);
@@ -1305,18 +1306,18 @@ if (($_GET['ajax'] ?? '') === 'finance_accounts') {
         }
         echo json_encode(['ok' => true, 'accounts' => $out], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'create_poster_transaction') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         if (!payday2_csrf_valid()) {
@@ -1370,23 +1371,23 @@ if (($_GET['ajax'] ?? '') === 'create_poster_transaction') {
 
         echo json_encode(['ok' => true, 'response' => $res], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'find_poster_transaction') {
     require_once __DIR__ . '/ajax/find_poster_transaction.php';
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'poster_verify_transaction') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         if (!payday2_csrf_valid()) {
@@ -1542,14 +1543,14 @@ if (($_GET['ajax'] ?? '') === 'poster_verify_transaction') {
             'match' => $best,
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'finance_categories') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     try {
         $apiCat = new \App\Classes\PosterAPI((string)$token);
         $rows = $apiCat->request('finance.getCategories', []);
@@ -1569,14 +1570,14 @@ if (($_GET['ajax'] ?? '') === 'finance_categories') {
         }
         echo json_encode(['ok' => true, 'categories' => $out], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'kashshift') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     try {
         $apiKS = new \App\Classes\PosterAPI((string)$token);
         $dFrom = str_replace('-', '', trim((string)($_GET['dateFrom'] ?? '')));
@@ -1586,14 +1587,14 @@ if (($_GET['ajax'] ?? '') === 'kashshift') {
         $rows = $apiKS->request('finance.getCashShifts', ['dateFrom' => $dFrom, 'dateTo' => $dTo]);
         echo json_encode(['ok' => true, 'data' => is_array($rows) ? $rows : []], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'kashshift_detail') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     try {
         $apiKSDetail = new \App\Classes\PosterAPI((string)$token);
         $shiftId = trim((string)($_GET['shiftId'] ?? ''));
@@ -1606,14 +1607,14 @@ if (($_GET['ajax'] ?? '') === 'kashshift_detail') {
         }));
         echo json_encode(['ok' => true, 'data' => $rows], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'supplies') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     try {
         $apiSup = new \App\Classes\PosterAPI((string)$token);
         $dFrom = str_replace('-', '', trim((string)($_GET['dateFrom'] ?? '')));
@@ -1628,18 +1629,18 @@ if (($_GET['ajax'] ?? '') === 'supplies') {
         
         echo json_encode(['ok' => true, 'supplies' => $supplies, 'accounts' => $accounts], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'supply_change_account') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         if (!payday2_csrf_valid()) {
@@ -1662,18 +1663,18 @@ if (($_GET['ajax'] ?? '') === 'supply_change_account') {
         
         echo json_encode(['ok' => true, 'response' => $updateRes], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'out_links') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     $dTo = trim((string)($_GET['dateTo'] ?? ''));
     if ($dTo === '') {
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $rows = $db->query(
@@ -1692,44 +1693,44 @@ if (($_GET['ajax'] ?? '') === 'out_links') {
         }
         echo json_encode(['ok' => true, 'links' => $links], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'out_clear_links') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $j = json_decode($raw ?: '[]', true);
     if (!is_array($j)) $j = [];
     $dTo = trim((string)($j['dateTo'] ?? ''));
     if ($dTo === '') {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $cnt = $db->query("DELETE FROM {$ol} WHERE date_to = ?", [$dTo])->rowCount();
         echo json_encode(['ok' => true, 'deleted' => (int)$cnt], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'out_manual_link') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $j = json_decode($raw ?: '[]', true);
@@ -1737,9 +1738,9 @@ if (($_GET['ajax'] ?? '') === 'out_manual_link') {
     $dTo = trim((string)($j['dateTo'] ?? ''));
     $pairs = is_array($j['links'] ?? null) ? $j['links'] : [];
     if ($dTo === '' || !$pairs) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $by = '';
     if (!isset($_SESSION)) {
@@ -1759,9 +1760,9 @@ if (($_GET['ajax'] ?? '') === 'out_manual_link') {
             $normalized[] = [$uid, $fid];
         }
         if (!$normalized) {
-            http_response_code(400);
+            payday2_http_code(400);
             echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
         foreach ($normalized as $pair) {
             $uid = (int)$pair[0];
@@ -1775,18 +1776,18 @@ if (($_GET['ajax'] ?? '') === 'out_manual_link') {
         }
         echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'out_auto_link') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $j = json_decode($raw ?: '[]', true);
@@ -1794,9 +1795,9 @@ if (($_GET['ajax'] ?? '') === 'out_auto_link') {
     $dTo = trim((string)($j['dateTo'] ?? ''));
     $pairs = is_array($j['links'] ?? null) ? $j['links'] : [];
     if ($dTo === '' || !$pairs) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $by = '';
     if (!isset($_SESSION)) {
@@ -1818,9 +1819,9 @@ if (($_GET['ajax'] ?? '') === 'out_auto_link') {
             $normalized[] = [$uid, $fid, $lt];
         }
         if (!$normalized) {
-            http_response_code(400);
+            payday2_http_code(400);
             echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
         foreach ($normalized as $pair) {
             $uid = (int)$pair[0];
@@ -1835,18 +1836,18 @@ if (($_GET['ajax'] ?? '') === 'out_auto_link') {
         }
         echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'out_unlink') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $j = json_decode($raw ?: '[]', true);
@@ -1855,25 +1856,25 @@ if (($_GET['ajax'] ?? '') === 'out_unlink') {
     $uid = (int)($j['mail_uid'] ?? 0);
     $fid = (int)($j['finance_id'] ?? 0);
     if ($dTo === '' || $uid <= 0 || $fid <= 0) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $db->query("DELETE FROM {$ol} WHERE date_to = ? AND mail_uid = ? AND finance_id = ?", [$dTo, $uid, $fid]);
         echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 if (($_GET['ajax'] ?? '') === 'poster_accounts') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $api2 = new \App\Classes\PosterAPI((string)$token);
@@ -1947,18 +1948,18 @@ if (($_GET['ajax'] ?? '') === 'poster_accounts') {
             'balance_total_cents' => $total,
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'balance_sinc_plan') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $raw = file_get_contents('php://input');
@@ -2009,26 +2010,26 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_plan') {
             ],
         ], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }
 
 if (($_GET['ajax'] ?? '') === 'poster_check_find') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $txId = (int)($_GET['transaction_id'] ?? 0);
     $dFrom = trim((string)($_GET['date_from'] ?? ''));
     $dTo = trim((string)($_GET['date_to'] ?? ''));
     if ($txId <= 0 || $dFrom === '' || $dTo === '') {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $api = new \App\Classes\PosterAPI((string)$token);
@@ -2058,32 +2059,32 @@ if (($_GET['ajax'] ?? '') === 'poster_check_find') {
         }
         if (!is_array($found)) {
             echo json_encode(['ok' => true, 'found' => false], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
         $products = [];
         if (isset($found['products']) && is_array($found['products'])) $products = $found['products'];
         echo json_encode(['ok' => true, 'found' => true, 'transaction' => $found, 'products' => $products], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
 }
 
 if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $dFrom = trim((string)($_GET['date_from'] ?? ''));
     $dTo = trim((string)($_GET['date_to'] ?? ''));
     if ($dFrom === '' || $dTo === '') {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $api = new \App\Classes\PosterAPI((string)$token);
@@ -2263,29 +2264,29 @@ if (($_GET['ajax'] ?? '') === 'poster_checks_list') {
             ];
         }
         echo json_encode(['ok' => true, 'checks' => $out], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
 }
 
 if (($_GET['ajax'] ?? '') === 'poster_admin_get_actions') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $payload = json_decode((string)$raw, true);
     if (!is_array($payload)) $payload = [];
     $txId = (int)($payload['transaction_id'] ?? 0);
     if ($txId <= 0) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         if (!isset($_SESSION)) {
@@ -2293,9 +2294,9 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_get_actions') {
         }
         $lockUntil = (int)($_SESSION['payday2_poster_admin_lock_until'] ?? 0);
         if ($lockUntil > time()) {
-            http_response_code(429);
+            payday2_http_code(429);
             echo json_encode(['ok' => false, 'error' => 'Poster Admin: busy, retry later'], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
         $_SESSION['payday2_poster_admin_lock_until'] = time() + 2;
         $ls = \App\Payday2\LocalSettings::merged();
@@ -2312,9 +2313,9 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_get_actions') {
             'user_agent' => (string)($admin['user_agent'] ?? ''),
         ];
         if (trim($cfg['cookie']) === '' && (trim($cfg['account']) === '' || trim($cfg['pos_session']) === '' || trim($cfg['ssid']) === '' || trim($cfg['csrf']) === '')) {
-            http_response_code(400);
+            payday2_http_code(400);
             echo json_encode(['ok' => false, 'error' => 'Poster Admin: заполните настройки (Cookie или account_url/pos_session/ssid/csrf_cookie_poster).'], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
         $client = new \App\Classes\PosterAdminAjax($cfg);
         $params = $client->getActions($txId);
@@ -2326,23 +2327,23 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_get_actions') {
         $out['payedSum'] = (int)($params['payedSum'] ?? $params['payed_sum'] ?? ((int)$out['payedCash'] + (int)$out['payedCard'] + (int)$out['payedCert']));
         $_SESSION['payday2_poster_admin_lock_until'] = 0;
         echo json_encode(['ok' => true, 'params' => $out], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     } catch (\Throwable $e) {
         if (!isset($_SESSION)) { if (session_status() !== PHP_SESSION_ACTIVE) @session_start(); }
         $_SESSION['payday2_poster_admin_lock_until'] = 0;
-        http_response_code(500);
+        payday2_http_code(500);
         @file_put_contents(__DIR__ . '/poster_admin_error.log', date('c') . " get_actions tx={$txId} user=" . (string)($_SESSION['user_email'] ?? '') . " err=" . $e->getMessage() . "\n", FILE_APPEND);
         echo json_encode(['ok' => false, 'error' => $e->getMessage(), 'where' => 'get_actions'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
 }
 
 if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $payload = json_decode((string)$raw, true);
@@ -2350,9 +2351,9 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
     $txId = (int)($payload['transaction_id'] ?? 0);
     $params = $payload['params'] ?? null;
     if ($txId <= 0 || !is_array($params)) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         if (!isset($_SESSION)) {
@@ -2360,9 +2361,9 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
         }
         $lockUntil = (int)($_SESSION['payday2_poster_admin_lock_until'] ?? 0);
         if ($lockUntil > time()) {
-            http_response_code(429);
+            payday2_http_code(429);
             echo json_encode(['ok' => false, 'error' => 'Poster Admin: busy, retry later'], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
         $_SESSION['payday2_poster_admin_lock_until'] = time() + 2;
         $ls = \App\Payday2\LocalSettings::merged();
@@ -2379,17 +2380,17 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
             'user_agent' => (string)($admin['user_agent'] ?? ''),
         ];
         if (trim($cfg['cookie']) === '' && (trim($cfg['account']) === '' || trim($cfg['pos_session']) === '' || trim($cfg['ssid']) === '' || trim($cfg['csrf']) === '')) {
-            http_response_code(400);
+            payday2_http_code(400);
             echo json_encode(['ok' => false, 'error' => 'Poster Admin: заполните настройки (Cookie или account_url/pos_session/ssid/csrf_cookie_poster).'], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
         $client = new \App\Classes\PosterAdminAjax($cfg);
         $current = $client->getActions($txId);
         $fiscal = (int)($current['printFiscal'] ?? $current['print_fiscal'] ?? $current['fiscal'] ?? 0);
         if ($fiscal === 1) {
-            http_response_code(400);
+            payday2_http_code(400);
             echo json_encode(['ok' => false, 'error' => 'Нельзя редактировать фискальный чек.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
         $origTotal = (int)($current['payedSum'] ?? $current['payed_sum'] ?? 0);
         if ($origTotal <= 0) {
@@ -2406,9 +2407,9 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
         if ($cert < 0) $cert = 0;
         $sum = $cash + $card + $cert;
         if ($origTotal > 0 && $sum !== $origTotal) {
-            http_response_code(400);
+            payday2_http_code(400);
             echo json_encode(['ok' => false, 'error' => 'Сумма должна оставаться ' . $origTotal . '. Сейчас: ' . $sum . '.'], JSON_UNESCAPED_UNICODE);
-            exit;
+            payday2_do_exit();
         }
 
         $res = $client->editCheck($txId, [
@@ -2419,32 +2420,32 @@ if (($_GET['ajax'] ?? '') === 'poster_admin_edit_check') {
         ]);
         $_SESSION['payday2_poster_admin_lock_until'] = 0;
         echo json_encode(['ok' => true, 'result' => $res], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     } catch (\Throwable $e) {
         if (!isset($_SESSION)) { if (session_status() !== PHP_SESSION_ACTIVE) @session_start(); }
         $_SESSION['payday2_poster_admin_lock_until'] = 0;
-        http_response_code(500);
+        payday2_http_code(500);
         @file_put_contents(__DIR__ . '/poster_admin_error.log', date('c') . " edit_check tx={$txId} user=" . (string)($_SESSION['user_email'] ?? '') . " err=" . $e->getMessage() . "\n", FILE_APPEND);
         echo json_encode(['ok' => false, 'error' => $e->getMessage(), 'where' => 'edit_check'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
 }
 
 if (($_GET['ajax'] ?? '') === 'poster_check_remove') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     $raw = file_get_contents('php://input');
     $payload = json_decode((string)$raw, true);
     if (!is_array($payload)) $payload = [];
     $txId = (int)($payload['transaction_id'] ?? 0);
     if ($txId <= 0) {
-        http_response_code(400);
+        payday2_http_code(400);
         echo json_encode(['ok' => false, 'error' => 'Bad request'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $api = new \App\Classes\PosterAPI((string)$token);
@@ -2497,20 +2498,20 @@ if (($_GET['ajax'] ?? '') === 'poster_check_remove') {
         }
 
         echo json_encode(['ok' => true, 'telegram_ok' => $tgOk, 'telegram_error' => $tgErr], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
 }
 
 if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
-    header('Content-Type: application/json; charset=utf-8');
+    payday2_json_header();
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
+        payday2_http_code(405);
         echo json_encode(['ok' => false, 'error' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
-        exit;
+        payday2_do_exit();
     }
     try {
         $raw = file_get_contents('php://input');
@@ -2578,7 +2579,7 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
                         if ($cmt !== '' && mb_stripos($cmt, $comment) !== false) {
                             unset($_SESSION['payday_balance_sinc']);
                             echo json_encode(['ok' => true, 'already' => true], JSON_UNESCAPED_UNICODE);
-                            exit;
+                            payday2_do_exit();
                         }
                     }
                 }
@@ -2606,8 +2607,8 @@ if (($_GET['ajax'] ?? '') === 'balance_sinc_commit') {
         unset($_SESSION['payday_balance_sinc']);
         echo json_encode(['ok' => true, 'response' => $res], JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
-        http_response_code(500);
+        payday2_http_code(500);
         echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     }
-    exit;
+    payday2_do_exit();
 }

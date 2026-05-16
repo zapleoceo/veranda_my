@@ -1,0 +1,95 @@
+.emp-style-0 { width: 20px; height: 20px; }
+.emp-style-1 { display:none; }
+.emp-style-2 { text-align:right; cursor:pointer; }
+.emp-style-3 { margin-top: 5px; font-size: 12px; font-weight: 800; }
+.emp-style-4 { margin-bottom: 10px; }
+.emp-style-5 { margin: 14px 0 8px; font-weight: 900; }
+.emp-style-6 { margin-bottom: 8px; }
+.emp-style-7 { display:flex; gap: 5px; align-items:center; flex-wrap: wrap; margin-top: 5px; }
+.emp-style-8 { display:flex; gap: 5px; align-items:center; flex-wrap: wrap; }
+.emp-style-9 { margin-top: 5px; }
+.emp-style-10 { align-self: flex-end; width: 0; min-width: 100%; text-align: right; margin-top: 5px; font-weight: 900; line-height: 1.4; white-space: normal; word-break: break-word; }
+.emp-style-11 { text-align:right; }
+.emp-style-12 { cursor:pointer; }
+.emp-style-13 { display: inline-flex; flex-direction: column; }
+.emp-style-14 { display:flex; align-items:center; gap: 5px; margin: 0; }
+
+#fixModal {
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+#fixModal .modal {
+  position: relative;
+  width: min(1400px, calc(100vw - 16px));
+  max-width: 1400px;
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+}
+
+#fixBody {
+  max-height: calc(100vh - 160px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#fixBody > div {
+  overflow-x: auto;
+}
+
+#fixBody table {
+  width: max-content;
+  table-layout: auto;
+}
+
+#fixBody th,
+#fixBody td {
+  vertical-align: top;
+}
+
+#fixBody th:nth-child(1),
+#fixBody td:nth-child(1),
+#fixBody th:nth-child(2),
+#fixBody td:nth-child(2),
+#fixBody th:nth-child(3),
+#fixBody td:nth-child(3) {
+  white-space: nowrap;
+}
+
+.fix-td {
+  padding: 6px 8px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.fix-td-comment {
+  max-width: 520px;
+  white-space: normal;
+}
+
+.fix-emp-select {
+  max-width: 240px;
+}
+
+.fix-update-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.9);
+  cursor: pointer;
+  line-height: 28px;
+  text-align: center;
+  padding: 0;
+  font-size: 16px;
+}
+
+.fix-update-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fix-update-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.10);
+}

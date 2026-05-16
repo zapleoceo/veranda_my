@@ -1,6 +1,13 @@
 # Secrets and environment
 .env
+.env.testing
 env
+
+# Composer
+/vendor/
+
+# Logs
+/logs/
 
 # Logs
 *.log

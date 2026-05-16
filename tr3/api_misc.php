@@ -29,7 +29,7 @@ function tr3_api_bootstrap(array $ctx): void {
     'latestWorkday' => $ctx['latestWorkday'] ?? '21:00',
     'latestWeekend' => $ctx['latestWeekend'] ?? '22:00',
     'minPreorderPerGuest' => $minPreorderPerGuest,
-    'apiBase' => '/tr3/api.php',
+    'apiBase' => '/tr3/api',
   ]);
 }
 

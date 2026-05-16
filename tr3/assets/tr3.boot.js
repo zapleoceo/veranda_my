@@ -1,6 +1,6 @@
 (() => {
   const lang = (document.documentElement && document.documentElement.lang) ? document.documentElement.lang : 'ru';
-  const url = new URL('/tr3/api.php', location.origin);
+  const url = new URL('/tr3/api', location.origin);
   url.searchParams.set('ajax', 'bootstrap');
   url.searchParams.set('lang', lang);
 
@@ -33,7 +33,7 @@
         latestWeekend: j.latestWeekend,
         apiBase: j.apiBase,
       };
-      return loadScript('/tr3/assets/app.js?v=20260512_0002');
+      return loadScript('/tr3/assets/app.js?v=20260516_0001');
     })
     .catch((e) => {
       const msg = document.createElement('div');

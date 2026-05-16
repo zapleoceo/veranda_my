@@ -1,6 +1,13 @@
 <?php
 declare(strict_types=1);
 
+function _tr3_poster_catch(\Throwable $e): never {
+  if ($e instanceof \RuntimeException && $e->getMessage() === '_tr3_api_done') throw $e;
+  $dbg = trim((string)($_ENV['DEBUG'] ?? $_ENV['TR3_DEBUG'] ?? ''));
+  $msg = ($dbg === '1' || (string)($_GET['_dbg'] ?? '') === '1') ? $e->getMessage() : 'Poster request failed';
+  api_error(500, $msg);
+}
+
 function tr3_api_free_tables(array $ctx): void {
   api_json_headers(true);
 
@@ -13,8 +20,6 @@ function tr3_api_free_tables(array $ctx): void {
   $spotId = (int)($_GET['spot_id'] ?? 1);
   $hallId = (int)($_GET['hall_id'] ?? 2);
   if ($hallId <= 0) $hallId = 2;
-  $settingsByHall = is_array($ctx['tableSettingsByHall'] ?? null) ? $ctx['tableSettingsByHall'] : [];
-  $settingsMap = isset($settingsByHall[(string)$hallId]) && is_array($settingsByHall[(string)$hallId]) ? $settingsByHall[(string)$hallId] : [];
   $settingsByHall = is_array($ctx['tableSettingsByHall'] ?? null) ? $ctx['tableSettingsByHall'] : [];
   $settingsMap = isset($settingsByHall[(string)$hallId]) && is_array($settingsByHall[(string)$hallId]) ? $settingsByHall[(string)$hallId] : [];
 
@@ -132,7 +137,7 @@ function tr3_api_free_tables(array $ctx): void {
       'raw' => null,
     ], 200);
   } catch (\Throwable $e) {
-    api_error(500, 'Poster request failed');
+    _tr3_poster_catch($e);
   }
 }
 
@@ -185,6 +190,9 @@ function tr3_api_reservations(array $ctx): void {
     $respAll = $api->request('incomingOrders.getReservations', [
       'timezone' => 'client',
     ], 'GET');
+
+    $settingsByHall = is_array($ctx['tableSettingsByHall'] ?? null) ? $ctx['tableSettingsByHall'] : [];
+    $settingsMap = isset($settingsByHall[(string)$hallId]) && is_array($settingsByHall[(string)$hallId]) ? $settingsByHall[(string)$hallId] : [];
 
     $tableNameById = [];
     foreach ($settingsMap as $pid => $cfg) {
@@ -302,7 +310,7 @@ function tr3_api_reservations(array $ctx): void {
       'reservations_items' => $items,
     ], 200);
   } catch (\Throwable $e) {
-    api_error(500, 'Poster request failed');
+    _tr3_poster_catch($e);
   }
 }
 
@@ -363,13 +371,13 @@ function tr3_api_hall_tables(array $ctx): void {
       if (!is_array($r)) continue;
       $tid = (int)($r['table_id'] ?? 0);
       if ($tid <= 0) continue;
-    $label = api_resolve_table_label($ctx, $hallId, $tid);
+      $label = api_resolve_table_label($ctx, $hallId, $tid);
       $out[] = [
-      'table_id' => $tid,
-      'poster_table_id' => $tid,
+        'table_id' => $tid,
+        'poster_table_id' => $tid,
         'table_num' => (string)($r['table_num'] ?? ''),
         'table_title' => (string)($r['table_title'] ?? ''),
-      'table_label' => $label,
+        'table_label' => $label,
         'spot_id' => (int)($r['spot_id'] ?? $spotId),
         'hall_id' => (int)($r['hall_id'] ?? $hallId),
         'table_shape' => (string)($r['table_shape'] ?? ''),
@@ -386,7 +394,6 @@ function tr3_api_hall_tables(array $ctx): void {
       'tables' => $out,
     ], 200);
   } catch (\Throwable $e) {
-    api_error(500, 'Poster request failed');
+    _tr3_poster_catch($e);
   }
 }
-

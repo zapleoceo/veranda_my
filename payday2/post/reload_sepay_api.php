@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $isAjax = isset($_GET['ajax']) || (isset($_POST['ajax']) && $_POST['ajax'] === '1');
         if ($isAjax) {
             header('Content-Type: text/plain; charset=utf-8');
@@ -141,5 +141,5 @@ $isAjax = isset($_GET['ajax']) || (isset($_POST['ajax']) && $_POST['ajax'] === '
         
         if ($isAjax) {
             echo json_encode(['ok' => true, 'pct' => 100, 'step' => 'Готово', 'message' => $message], JSON_UNESCAPED_UNICODE) . "\n";
-            exit;
+            payday2_do_exit();
         }
