@@ -76,4 +76,19 @@ class StaticController
     {
         return $this->serve($response, __DIR__ . '/../../payday2/assets', $args['file']);
     }
+
+    public function banyaStatic(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../banya', $args['file']);
+    }
+
+    public function romaStatic(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../roma', $args['file']);
+    }
+
+    public function employeesStatic(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../employees', $args['file']);
+    }
 }

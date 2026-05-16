@@ -101,3 +101,6 @@ $app->get('/links/{file:.+}',               [StaticController::class, 'linksStat
 $app->get('/reservations/assets/{file:.+}', [StaticController::class, 'reservationsAssets']);
 $app->get('/reservations/{file:[\w.-]+}',   [StaticController::class, 'reservationsRoot']);
 $app->get('/payday2/assets/{file:.+}',      [StaticController::class, 'payday2Assets']);
+$app->get('/banya/{file:[\w.-]+}',          [StaticController::class, 'banyaStatic']);
+$app->get('/roma/{file:[\w.-]+}',           [StaticController::class, 'romaStatic']);
+$app->get('/employees/{file:[\w.-]+}',      [StaticController::class, 'employeesStatic']);
