@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/src/classes/Database.php';
-require_once __DIR__ . '/src/classes/Auth.php';
 require_once __DIR__ . '/src/classes/PosterAPI.php';
 
 // Load .env (trim keys; strip surrounding quotes on values — как в типичных .env)
@@ -27,15 +26,29 @@ $dbName = $_ENV['DB_NAME'] ?? 'veranda_my';
 $dbUser = $_ENV['DB_USER'] ?? 'veranda_my';
 $dbPass = $_ENV['DB_PASS'] ?? '';
 $token = $_ENV['POSTER_API_TOKEN'] ?? '';
-$googleClientId = $_ENV['GOOGLE_CLIENT_ID'] ?? '';
-$googleClientSecret = $_ENV['GOOGLE_CLIENT_SECRET'] ?? '';
-$googleRedirectUri = $_ENV['GOOGLE_REDIRECT_URI'] ?? (veranda_base_url() . '/auth_callback.php');
 $tableSuffix = (string)($_ENV['DB_TABLE_SUFFIX'] ?? '');
 
 $db = new \App\Classes\Database($dbHost, $dbName, $dbUser, $dbPass, $tableSuffix);
-$auth = new \App\Classes\Auth($db, $googleClientId, $googleClientSecret, $googleRedirectUri);
 
-$auth->requireAuth();
+// Session-based auth gate. This file is only required by AJAX-only handlers
+// in banya/roma/employees/index.php — all of which run inside Slim's
+// AuthMiddleware (the Apache .htaccess delegator bounces requests through
+// public/index.php first). The middleware already started the session and
+// loaded user_permissions; this guard is a defence-in-depth fallback for
+// any cron / CLI / out-of-band path that still requires this file.
+if (session_status() === PHP_SESSION_NONE) {
+    @session_start();
+}
+if (empty($_SESSION['user_email'])) {
+    if (PHP_SAPI !== 'cli') {
+        $next = (string)($_SERVER['REQUEST_URI'] ?? '');
+        if ($next !== '' && $next[0] === '/' && !str_starts_with($next, '//') && !str_contains($next, "\n") && !str_contains($next, "\r")) {
+            $_SESSION['auth_next'] = $next;
+        }
+        header('Location: /login');
+        exit;
+    }
+}
 
 header('X-Robots-Tag: noindex, nofollow', true);
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0', true);
