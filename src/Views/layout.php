@@ -12,11 +12,11 @@
     --border:   #2a2d3a;
     --text:     #e2e8f0;
     --muted:    #6b7280;
-    --accent:   #6c8ef5;
+    --accent:   #B88746;
     --danger:   #ef4444;
     --ok:       #10b981;
     --card:     var(--surface);
-    --accent2:  rgba(108,142,245,.15);
+    --accent2:  rgba(184,135,70,.15);
     --card2:    rgba(255,255,255,.07);
     --sb-w:     220px;
 }
@@ -69,7 +69,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .sb-link:hover{color:var(--text);background:rgba(255,255,255,.04)}
-.sb-link.active{color:var(--text);border-left-color:var(--accent);background:rgba(108,142,245,.1)}
+.sb-link.active{color:var(--text);border-left-color:var(--accent);background:rgba(184,135,70,.1)}
 .sb-link.sb-off{color:var(--border);pointer-events:none;cursor:default;font-style:italic}
 .sb-sep{height:1px;background:var(--border);margin:.375rem 0}
 .sb-footer{border-top:1px solid var(--border);padding:.5rem;flex-shrink:0}
@@ -132,7 +132,7 @@ input[type=text],input[type=email],input[type=number],input[type=date],select,te
 /* Admin form pattern: label then input/select as siblings → fill container */
 label+input[type=text],label+input[type=email],label+input[type=number],label+input[type=date],
 label+select,label+textarea{display:block;width:100%}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(108,142,245,.15)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(184,135,70,.15)}
 label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:.3rem}
 code{background:#1e2030;border:1px solid var(--border);border-radius:3px;padding:.1rem .3rem;font-size:.8rem}
 details summary{cursor:pointer;user-select:none}
