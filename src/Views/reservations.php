@@ -33,7 +33,7 @@ $fmtSpotDateTimeParts = function (string $s) use ($parseSpotDt): array {
     <link rel="stylesheet" href="/reservations/style.css">
     <link rel="stylesheet" href="/assets/css/user_menu.css">
     <style>
-        :root { --bg:#0f1117; --surface:#1a1d27; --border:#2a2d3a; --text:#e2e8f0; --muted:#6b7280; --accent:#6c8ef5; --card:var(--surface); --accent2:rgba(108,142,245,.15); }
+        :root { --bg:#0f1117; --surface:#1a1d27; --border:#2a2d3a; --text:#e2e8f0; --muted:#6b7280; --accent:#B88746; --card:var(--surface); --accent2:rgba(184,135,70,.15); }
         body { background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; margin:0; }
         .top-nav { display:flex; align-items:center; justify-content:space-between; padding:.75rem 1rem; background:var(--surface); border-bottom:1px solid var(--border); }
         .nav-left { display:flex; align-items:center; gap:1rem; }

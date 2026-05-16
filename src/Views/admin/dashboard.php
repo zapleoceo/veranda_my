@@ -24,7 +24,7 @@ $today = date('Y-m-d');
 <script>
 const labels = <?= json_encode($hours) ?>;
 const chartData = <?= json_encode($chartData) ?>;
-const colors = { '2': '#6c8ef5', '3': '#f59e0b' };
+const colors = { '2': '#B88746', '3': '#f59e0b' };
 
 Object.entries(chartData).forEach(([sid, cd]) => {
     const ctx = document.getElementById('chart' + sid);
