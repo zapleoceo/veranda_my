@@ -8,6 +8,7 @@ use App\Infrastructure\HttpClient;
 use App\Infrastructure\Logger;
 use App\Infrastructure\TelegramBotClient;
 use App\Services\KitchenOnlineService;
+use App\Services\UserPermissionsService;
 use App\Services\MenuPublicService;
 use App\Services\PosterReservationsService;
 use App\Services\RawdataService;
@@ -22,6 +23,7 @@ return [
 
     Database::class => fn() => Database::getInstance(),
 
+    UserPermissionsService::class        => fn($c) => new UserPermissionsService($c->get(Database::class)),
     KitchenOnlineService::class         => fn($c) => new KitchenOnlineService($c->get(Database::class)),
     RawdataService::class               => fn($c) => new RawdataService($c->get(Database::class)),
     MenuPublicService::class            => fn($c) => new MenuPublicService($c->get(Database::class)),
