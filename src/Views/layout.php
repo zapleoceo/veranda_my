@@ -32,21 +32,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     border-right:1px solid var(--border);
     display:flex;flex-direction:column;
     position:sticky;top:0;height:100vh;
-    overflow-y:auto;
+    overflow-y:auto;overflow-x:hidden;
     scrollbar-width:thin;scrollbar-color:var(--border) transparent;
     z-index:100;
+    transition:width .2s ease,min-width .2s ease,border-color .2s ease;
 }
+.sidebar.sb-collapsed{width:0;min-width:0;border-right-color:transparent}
 .sb-brand{
     padding:.9rem 1.25rem;font-weight:700;font-size:1.05rem;
     color:var(--accent);letter-spacing:.02em;
     border-bottom:1px solid var(--border);flex-shrink:0;
+    display:flex;align-items:center;gap:.5rem;white-space:nowrap;
 }
+.sb-collapse-btn{
+    margin-left:auto;background:none;border:none;cursor:pointer;
+    color:var(--muted);padding:.15rem .3rem;font-size:.9rem;line-height:1;
+    transition:color .12s;flex-shrink:0;
+}
+.sb-collapse-btn:hover{color:var(--text)}
 .sb-nav{flex:1;padding:.5rem 0}
 .sb-section{margin-bottom:.125rem}
 .sb-title{
     padding:.55rem 1.25rem .2rem;
     font-size:.63rem;font-weight:700;color:var(--muted);
-    letter-spacing:.1em;text-transform:uppercase;
+    letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;
 }
 .sb-link{
     display:block;padding:.42rem 1.25rem;
@@ -59,6 +68,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .sb-link.active{color:var(--text);border-left-color:var(--accent);background:rgba(108,142,245,.1)}
 .sb-sep{height:1px;background:var(--border);margin:.375rem 0}
 .sb-footer{border-top:1px solid var(--border);padding:.5rem;flex-shrink:0}
+
+/* ── Sidebar re-open button (desktop, collapsed state) ── */
+.sb-show-btn{
+    display:none;
+    position:fixed;left:0;top:0;z-index:101;
+    width:32px;height:32px;
+    background:#13151f;border:none;
+    border-right:1px solid var(--border);border-bottom:1px solid var(--border);
+    border-radius:0 0 6px 0;
+    color:var(--muted);cursor:pointer;font-size:.9rem;
+    align-items:center;justify-content:center;
+    transition:color .12s;
+}
+.sb-show-btn:hover{color:var(--text)}
+.sb-show-btn.visible{display:flex}
 
 /* ── Mobile top bar ──────────────────────────────────── */
 .mobile-bar{
@@ -110,9 +134,13 @@ details summary{cursor:pointer;user-select:none}
     .sidebar{
         position:fixed;left:0;top:0;height:100vh;
         transform:translateX(-100%);transition:transform .25s ease;
+        width:var(--sb-w) !important;min-width:var(--sb-w) !important;
+        border-right-color:var(--border) !important;
     }
     .sidebar.open{transform:translateX(0)}
     .mobile-bar{display:flex}
+    .sb-collapse-btn{display:none}
+    .sb-show-btn{display:none !important}
 }
 </style>
 <?= $headExtra ?? '' ?>
@@ -120,48 +148,68 @@ details summary{cursor:pointer;user-select:none}
 </head>
 <body>
 <?php
+$_sbCan = function(string $p): bool {
+    $perms = $_SESSION['user_permissions'] ?? null;
+    return !is_array($perms) || !empty($perms[$p]);
+};
+
 $navSections = [
     [
         'title' => 'Отчёты',
         'links' => [
-            '/kitchen_online'     => 'Кухня: Онлайн',
-            '/admin'              => 'Кухня: Дашборд',
-            '/zapara'             => 'Кухня: Запара',
-            '/rawdata'            => 'Таблица',
-            '/banya'              => 'Баня',
-            '/roma'               => 'Кальяны',
-            '/reservations'       => 'Брони',
-            '/employees'          => 'ЗП сотрудников',
-            '/payday2'            => 'PayDay2',
+            '/kitchen_online'     => ['label' => 'Кухня: Онлайн',    'perm' => 'kitchen_online'],
+            '/admin'              => ['label' => 'Кухня: Дашборд',    'perm' => 'admin'],
+            '/zapara'             => ['label' => 'Кухня: Запара',     'perm' => 'zapara'],
+            '/rawdata'            => ['label' => 'Таблица',           'perm' => 'rawdata'],
+            '/banya'              => ['label' => 'Баня',              'perm' => 'banya'],
+            '/roma'               => ['label' => 'Кальяны',           'perm' => 'roma'],
+            '/reservations'       => ['label' => 'Брони',             'perm' => 'reservations'],
+            '/employees'          => ['label' => 'ЗП сотрудников',    'perm' => 'employees'],
+            '/payday2'            => ['label' => 'PayDay2',           'perm' => 'payday'],
         ],
     ],
     [
         'title' => 'Управление',
+        'perm'  => 'admin',
         'links' => [
-            '/admin/sync'         => 'Синк',
-            '/admin/access'       => 'Доступ',
-            '/admin/menu'         => 'Меню',
-            '/admin/telegram'     => 'Telegram',
-            '/admin/logs'         => 'Логи',
-            '/admin/reservations' => 'Брони (настройки)',
+            '/admin/sync'         => ['label' => 'Синк',              'perm' => 'admin'],
+            '/admin/access'       => ['label' => 'Доступ',            'perm' => 'admin'],
+            '/admin/menu'         => ['label' => 'Меню',              'perm' => 'admin'],
+            '/admin/telegram'     => ['label' => 'Telegram',          'perm' => 'admin'],
+            '/admin/logs'         => ['label' => 'Логи',              'perm' => 'admin'],
+            '/admin/reservations' => ['label' => 'Брони (настройки)', 'perm' => 'admin'],
         ],
     ],
 ];
 $currentPath = $currentPath ?? '/admin';
 ?>
+<button class="sb-show-btn" id="sbShowBtn" title="Показать меню">&#9658;</button>
 <div class="sb-backdrop" id="sbBackdrop"></div>
 <div class="layout">
 
   <aside class="sidebar" id="sidebar">
-    <div class="sb-brand">▸ Veranda</div>
+    <div class="sb-brand">
+      &#9658; Veranda
+      <button class="sb-collapse-btn" id="sbCollapseBtn" title="Скрыть меню">&#9664;</button>
+    </div>
     <nav class="sb-nav">
-      <?php foreach ($navSections as $i => $section): ?>
-        <?php if ($i > 0): ?><div class="sb-sep"></div><?php endif; ?>
+      <?php
+      $firstSection = true;
+      foreach ($navSections as $section):
+          if (isset($section['perm']) && !$_sbCan($section['perm'])) continue;
+          $visibleLinks = array_filter(
+              $section['links'],
+              fn($item) => $_sbCan($item['perm'])
+          );
+          if (empty($visibleLinks)) continue;
+          if (!$firstSection): ?><div class="sb-sep"></div><?php endif;
+          $firstSection = false;
+      ?>
         <div class="sb-section">
           <div class="sb-title"><?= htmlspecialchars($section['title']) ?></div>
-          <?php foreach ($section['links'] as $href => $label): ?>
+          <?php foreach ($visibleLinks as $href => $item): ?>
             <a href="<?= $href ?>" class="sb-link<?= $currentPath === $href ? ' active' : '' ?>">
-              <?= htmlspecialchars($label) ?>
+              <?= htmlspecialchars($item['label']) ?>
             </a>
           <?php endforeach; ?>
         </div>
@@ -177,7 +225,7 @@ $currentPath = $currentPath ?? '/admin';
       <button class="hamburger" id="hamburgerBtn" aria-label="Меню">
         <span></span><span></span><span></span>
       </button>
-      <span class="mobile-brand">▸ Veranda</span>
+      <span class="mobile-brand">&#9658; Veranda</span>
     </div>
 
     <main>
@@ -195,13 +243,47 @@ $currentPath = $currentPath ?? '/admin';
 
 <script>
 (function () {
-    var sidebar  = document.getElementById('sidebar');
-    var backdrop = document.getElementById('sbBackdrop');
-    var btn      = document.getElementById('hamburgerBtn');
-    function open()  { sidebar.classList.add('open'); backdrop.classList.add('open'); btn.classList.add('open'); }
-    function close() { sidebar.classList.remove('open'); backdrop.classList.remove('open'); btn.classList.remove('open'); }
-    btn.addEventListener('click', function () { sidebar.classList.contains('open') ? close() : open(); });
-    backdrop.addEventListener('click', close);
+    var sidebar   = document.getElementById('sidebar');
+    var backdrop  = document.getElementById('sbBackdrop');
+    var hamburger = document.getElementById('hamburgerBtn');
+    var collapseBtn = document.getElementById('sbCollapseBtn');
+    var showBtn   = document.getElementById('sbShowBtn');
+
+    // Mobile open/close
+    function mobileOpen()  { sidebar.classList.add('open'); backdrop.classList.add('open'); hamburger.classList.add('open'); }
+    function mobileClose() { sidebar.classList.remove('open'); backdrop.classList.remove('open'); hamburger.classList.remove('open'); }
+    hamburger.addEventListener('click', function () { sidebar.classList.contains('open') ? mobileClose() : mobileOpen(); });
+    backdrop.addEventListener('click', mobileClose);
+
+    // Desktop collapse
+    var STORAGE_KEY = 'sb_collapsed';
+    function isDesktop() { return window.innerWidth > 768; }
+
+    function desktopCollapse() {
+        sidebar.classList.add('sb-collapsed');
+        showBtn.classList.add('visible');
+        try { localStorage.setItem(STORAGE_KEY, '1'); } catch(e) {}
+    }
+    function desktopExpand() {
+        sidebar.classList.remove('sb-collapsed');
+        showBtn.classList.remove('visible');
+        try { localStorage.setItem(STORAGE_KEY, '0'); } catch(e) {}
+    }
+
+    collapseBtn.addEventListener('click', function () {
+        if (!isDesktop()) return;
+        desktopCollapse();
+    });
+    showBtn.addEventListener('click', function () {
+        desktopExpand();
+    });
+
+    // Restore state on load
+    if (isDesktop()) {
+        try {
+            if (localStorage.getItem(STORAGE_KEY) === '1') desktopCollapse();
+        } catch(e) {}
+    }
 })();
 </script>
 <script src="/assets/user_menu.js" defer></script>
