@@ -191,7 +191,7 @@ veranda.my/
 | 2d — Cron entry points | ✅ Done | kitchen_sync.php, menu_sync.php, daily_summary.php |
 | 3 — Admin panel | ✅ Done | 7 controllers + 8 views, dark theme, Google OAuth login, Chart.js dashboard, Menu CRUD with Poster sync |
 | 4 — Modules | ✅ Done | kitchen_online, rawdata, links/menu, tr3, reservations |
-| 5 — payday2 | ⏳ Pending | Split ajax.php (111K) + view.php (83K) into controllers/services/templates |
+| 5 — payday2 | ✅ Done | Slim 4 wrapper: Payday2Controller::dispatch, slim-mode helpers in functions.php (payday2_json_header/http_code/do_exit/redirect), auth guards in ajax.php/post.php/index.php |
 | 6 — wa_listener | ⏳ Pending | Node.js src/ restructure |
 | 7 — Cutover | ⏳ Pending | Staging smoke tests → merge refactor/slim4 → main |
 
