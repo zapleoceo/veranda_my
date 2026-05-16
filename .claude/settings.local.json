@@ -51,7 +51,9 @@
       "Bash(grep -nA 25 \"private function _call\" src/Infrastructure/TelegramBotClient.php)",
       "Bash(grep -nA 25 \"function postJson\" src/Infrastructure/HttpClient.php)",
       "Bash(node --check wa_listener/src/socket.js)",
-      "Bash(cd \"/d/Projects/Veranda site 2/.claude/worktrees/ecstatic-hypatia-7b0033\" && grep -nA5 \"payday2Assets\\\\|payday3Assets\" src/Controllers/StaticController.php | head -20)"
+      "Bash(node --check wa_listener/src/telegram.js)",
+      "Bash(node -e \"const t = require\\('./wa_listener/src/telegram'\\); /* loaded ok */\")",
+      "Bash(php -l src/Controllers/WebhookController.php)"
     ]
   }
 }
