@@ -17,6 +17,10 @@ use App\Controllers\Admin\LogsController;
 use App\Controllers\KitchenOnlineController;
 use App\Controllers\RawdataController;
 use App\Controllers\LinksController;
+use App\Controllers\BanyaController;
+use App\Controllers\RomaController;
+use App\Controllers\ZaparaController;
+use App\Controllers\EmployeesController;
 use App\Controllers\MenuPublicController;
 use App\Controllers\Tr3Controller;
 use App\Controllers\ReservationsController;
@@ -54,6 +58,14 @@ $app->group('/admin', function (RouteCollectorProxy $group) {
 $app->map(['GET', 'POST'], '/kitchen_online', [KitchenOnlineController::class, 'index'])
     ->add(AuthMiddleware::class);
 $app->map(['GET', 'POST'], '/rawdata', [RawdataController::class, 'index'])
+    ->add(AuthMiddleware::class);
+$app->map(['GET', 'POST'], '/banya', [BanyaController::class, 'index'])
+    ->add(AuthMiddleware::class);
+$app->map(['GET', 'POST'], '/roma', [RomaController::class, 'index'])
+    ->add(AuthMiddleware::class);
+$app->map(['GET', 'POST'], '/zapara', [ZaparaController::class, 'index'])
+    ->add(AuthMiddleware::class);
+$app->map(['GET', 'POST'], '/employees', [EmployeesController::class, 'index'])
     ->add(AuthMiddleware::class);
 
 // Phase 4: public links landing + menu

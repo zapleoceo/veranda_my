@@ -28,7 +28,7 @@ class WaEventHandler
 
         return match ($event) {
             'qr'     => $this->_handleQr($request, $response, $meta),
-            'active' => $this->_handleActive($response, $meta),
+            'active' => $this->_handleActive($request, $response, $meta),
             default  => $this->_json($response, ['ok' => false, 'error' => 'Unknown wa_event'], 400),
         };
     }
@@ -60,15 +60,19 @@ class WaEventHandler
         $photoUrl  = trim((string) ($params['photo_url'] ?? ''));
         $caption   = trim((string) ($params['caption'] ?? ''));
 
+        $serverParams = $request->getServerParams();
+        $remoteIp = trim((string) ($serverParams['REMOTE_ADDR'] ?? ''));
+        $ipSuffix = $remoteIp !== '' ? "\nIP: {$remoteIp}" : '';
+
         $sentMsgId  = $incomingMsgId;
         $sentChatId = $chatId;
 
         if ($sentMsgId <= 0 && $chatId !== '') {
             $chat = $this->bot->withChatId($chatId);
             if ($photoUrl !== '') {
-                $sentMsgId = $chat->sendPhoto($photoUrl, $caption, $threadId > 0 ? $threadId : null) ?? 0;
+                $sentMsgId = $chat->sendPhoto($photoUrl, ($caption !== '' ? $caption : '') . $ipSuffix, $threadId > 0 ? $threadId : null) ?? 0;
             } elseif ($text !== '') {
-                $sentMsgId = $chat->sendMessageGetId($text, $threadId > 0 ? $threadId : null) ?? 0;
+                $sentMsgId = $chat->sendMessageGetId($text . $ipSuffix, $threadId > 0 ? $threadId : null) ?? 0;
             }
         }
 
@@ -83,7 +87,7 @@ class WaEventHandler
         return $this->_json($response, ['ok' => $sentMsgId > 0, 'chat_id' => $sentChatId, 'message_id' => $sentMsgId]);
     }
 
-    private function _handleActive(ResponseInterface $response, MetaRepository $meta): ResponseInterface
+    private function _handleActive(ServerRequestInterface $request, ResponseInterface $response, MetaRepository $meta): ResponseInterface
     {
         $defaultChatId = Config::get('TELEGRAM_CHAT_ID') ?: Config::get('TG_CHAT_ID');
         $adminChatId   = Config::get('WA_ADMIN_TG_CHAT_ID') ?: Config::get('TG_ADMIN_ID', '169510539');
@@ -98,9 +102,13 @@ class WaEventHandler
 
         $meta->setMany(['wa_qr_tg_chat_id' => '', 'wa_qr_tg_message_id' => '0', 'wa_qr_tg_saved_at' => '']);
 
+        $serverParams = $request->getServerParams();
+        $remoteIp = trim((string) ($serverParams['REMOTE_ADDR'] ?? ''));
+
         $sentActive = false;
         if ($adminChatId !== '') {
-            $this->bot->withChatId($adminChatId)->sendMessage('WA: активен ✅');
+            $text = 'WA: активен ✅' . ($remoteIp !== '' ? "\nIP: {$remoteIp}" : '');
+            $this->bot->withChatId($adminChatId)->sendMessage($text);
             $sentActive = true;
         }
 

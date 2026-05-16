@@ -167,11 +167,13 @@ class TelegramAlertService
             }
 
             $lastSync   = $this->meta->get('poster_last_sync_at', $now);
+            $srvTag     = trim((string) (php_uname('n') ?: ''));
             $statusText = "Открыто чеков: {$m->openChecksDisplay}\n"
                 . "Лимит времени: {$m->waitLimitMinutes} мин\n"
                 . "В очереди: 🍸{$m->queueBar} / 🍔{$m->queueKitchen}\n"
                 . "Долгих блюд: 🍸{$m->overdueBar} / 🍔{$m->overdueKitchen}\n"
-                . "Время обновления: {$lastSync}";
+                . "Время обновления: {$lastSync}"
+                . ($srvTag !== '' ? "\nSrv: {$srvTag}" : '');
 
             $prevId   = (int) $this->meta->get('telegram_status_msg_id', '0');
             $prevIds  = json_decode($this->meta->get('telegram_status_msg_ids_json', '[]'), true);
