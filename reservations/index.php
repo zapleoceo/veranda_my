@@ -1058,4 +1058,6 @@ usort($viewRows, function ($a, $b) use ($getSortVal, $order) {
 
 $resRotate180 = $hallSettingsRepo->getRotate180($resSpotId, $resHallId);
 
-require __DIR__ . '/view.php';
+// HTML rendering removed: ReservationsController renders src/Views/reservations_content.php
+// inside src/Views/layout.php; Slim does not require this file at all
+// (the guard at the top delegates direct Apache hits to public/index.php).

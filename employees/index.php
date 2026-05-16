@@ -57,4 +57,5 @@ if ($ajax !== '') {
 $today = date('Y-m-d');
 $firstOfMonth = date('Y-m-01');
 
-require_once __DIR__ . '/view.php';
+// HTML rendering removed: EmployeesController renders src/Views/employees_content.php
+// inside src/Views/layout.php; this file only handles AJAX (early-exit above).

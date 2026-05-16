@@ -503,4 +503,5 @@ if ($ajax) {
 $today = date('Y-m-d');
 $firstOfMonth = date('Y-m-01');
 
-require __DIR__ . '/view.php';
+// HTML rendering removed: BanyaController renders src/Views/banya_content.php
+// inside src/Views/layout.php; this file only handles AJAX (early-exit above).
