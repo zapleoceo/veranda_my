@@ -176,15 +176,31 @@ class TelegramAlertService
                 . ($srvTag !== '' ? "\nSrv: {$srvTag}" : '');
 
             $prevId   = (int) $this->meta->get('telegram_status_msg_id', '0');
+            $prevHash = (string) $this->meta->get('telegram_status_msg_hash', '');
             $prevIds  = json_decode($this->meta->get('telegram_status_msg_ids_json', '[]'), true);
             $prevIds  = is_array($prevIds) ? $prevIds : [];
 
+            // Skip the round-trip when the status text hasn't changed at all.
+            // Previously every minute we tried to editMessageText → Telegram
+            // returned 400 "message is not modified" → code thought edit
+            // failed → deleted + re-sent the same message. That visibly
+            // flickered the status line in the chat.
+            $currentHash = sha1($statusText);
+            if ($prevId > 0 && $prevHash === $currentHash) {
+                $this->db->query("SELECT RELEASE_LOCK(?)", [self::STATUS_LOCK_NAME]);
+                return;
+            }
+
             if ($prevId > 0 && $this->bot->editMessageText($prevId, $statusText)) {
                 $currentId = $prevId;
+                $this->meta->set('telegram_status_msg_hash', $currentHash);
             } else {
                 $currentId = $this->bot->sendMessageGetId($statusText, $this->threadId);
                 if ($currentId) {
-                    $this->meta->set('telegram_status_msg_id', (string) $currentId);
+                    $this->meta->setMany([
+                        'telegram_status_msg_id'   => (string) $currentId,
+                        'telegram_status_msg_hash' => $currentHash,
+                    ]);
                     if ($prevId > 0) {
                         $this->bot->deleteMessage($prevId);
                     }
