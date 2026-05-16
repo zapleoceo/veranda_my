@@ -17,15 +17,16 @@ declare(strict_types=1);
     <?php require __DIR__ . '/partials/toolbar.php'; ?>
 
     <section class="pd3-card pd3-graph-card">
+        <!-- Single horizontal scroll for the whole tables area.
+             Tables never wrap onto separate rows; if the columns don't fit,
+             the user scrolls this container left/right. The SVG line layer
+             lives inside .pd3-graph__grid so it scrolls with the tables. -->
         <div class="pd3-graph" id="pd3GraphRoot">
-            <!-- SVG line layer is positioned absolutely over the whole graph.
-                 LineRenderer (Phase 3) mounts the SVG node here. -->
-            <div class="pd3-graph__lines" id="pd3LineLayer" aria-hidden="true"></div>
-
             <div class="pd3-graph__grid">
                 <?php require __DIR__ . '/partials/sepay_table.php'; ?>
                 <?php require __DIR__ . '/partials/mid_col.php'; ?>
                 <?php require __DIR__ . '/partials/poster_table.php'; ?>
+                <div class="pd3-graph__lines" id="pd3LineLayer" aria-hidden="true"></div>
             </div>
         </div>
     </section>

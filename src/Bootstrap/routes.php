@@ -7,6 +7,10 @@ use App\Controllers\Auth\CallbackController;
 use App\Controllers\Payday2Controller;
 use App\Payday3\Http\Payday3Controller;
 use App\Payday3\Http\Actions\LinksAction;
+use App\Payday3\Http\Actions\AutoLinkAction;
+use App\Payday3\Http\Actions\ManualLinkAction;
+use App\Payday3\Http\Actions\UnlinkAction;
+use App\Payday3\Http\Actions\ClearLinksAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -135,7 +139,11 @@ $app->map(['GET', 'POST'], '/payday2[/]', [Payday2Controller::class, 'dispatch']
 $app->group('/payday3', function (RouteCollectorProxy $g) {
     $g->get('[/]', [Payday3Controller::class, 'index']);
     $g->group('/api', function (RouteCollectorProxy $api) {
-        $api->get('/links', LinksAction::class);
+        $api->get(   '/links',                                       LinksAction::class);
+        $api->post(  '/links/auto',                                  AutoLinkAction::class);
+        $api->post(  '/links/manual',                                ManualLinkAction::class);
+        $api->post(  '/links/clear',                                 ClearLinksAction::class);
+        $api->delete('/links/{sepayId:[0-9]+}/{posterId:[0-9]+}',    UnlinkAction::class);
     });
 })->add(AuthMiddleware::class);
 

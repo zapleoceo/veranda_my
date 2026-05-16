@@ -23,6 +23,12 @@ use App\Payday3\Repositories\SepayRepository;
 use App\Payday3\Http\PageDataAssembler;
 use App\Payday3\Http\Payday3Controller;
 use App\Payday3\Http\Actions\LinksAction;
+use App\Payday3\Http\Actions\AutoLinkAction;
+use App\Payday3\Http\Actions\ManualLinkAction;
+use App\Payday3\Http\Actions\UnlinkAction;
+use App\Payday3\Http\Actions\ClearLinksAction;
+use App\Payday3\Contracts\ReconciliationServiceInterface;
+use App\Payday3\Services\ReconciliationService;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -59,5 +65,25 @@ return [
         $c->get(LinkRepositoryInterface::class),
     ),
     Payday3Controller::class => fn($c) => new Payday3Controller($c->get(PageDataAssembler::class)),
-    LinksAction::class => fn($c) => new LinksAction($c->get(LinkRepositoryInterface::class)),
+    ReconciliationServiceInterface::class => fn($c) => new ReconciliationService(
+        $c->get(SepayRepositoryInterface::class),
+        $c->get(PosterRepositoryInterface::class),
+        $c->get(LinkRepositoryInterface::class),
+    ),
+    LinksAction::class      => fn($c) => new LinksAction($c->get(LinkRepositoryInterface::class)),
+    AutoLinkAction::class   => fn($c) => new AutoLinkAction(
+        $c->get(ReconciliationServiceInterface::class),
+        $c->get(LinkRepositoryInterface::class),
+    ),
+    ManualLinkAction::class => fn($c) => new ManualLinkAction(
+        $c->get(ReconciliationServiceInterface::class),
+        $c->get(LinkRepositoryInterface::class),
+    ),
+    UnlinkAction::class     => fn($c) => new UnlinkAction(
+        $c->get(ReconciliationServiceInterface::class),
+        $c->get(LinkRepositoryInterface::class),
+    ),
+    ClearLinksAction::class => fn($c) => new ClearLinksAction(
+        $c->get(ReconciliationServiceInterface::class),
+    ),
 ];
