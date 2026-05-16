@@ -102,10 +102,11 @@ async function startSock() {
         connectingInProgress = false;
         console.log('[wa] Connected');
         await clearQrMessage();
-        if (wasReconnect) {
-          // Only ping operator on reconnect, not on first boot.
-          await sendStatusToTelegram('reconnected ✅');
-        }
+        // Ping operator on every connection. Sends `connected ✅` on first
+        // boot (so a restart after deploy shows up), `reconnected ✅` after
+        // a real reconnect. 60s dedup in sendStatusToTelegram swallows the
+        // case where Baileys flaps multiple times in quick succession.
+        await sendStatusToTelegram(wasReconnect ? 'reconnected ✅' : 'connected ✅');
       }
     });
   } catch (e) {

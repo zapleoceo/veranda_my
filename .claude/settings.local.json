@@ -26,9 +26,31 @@
       "Bash(git rebase *)",
       "Bash(git restore *)",
       "Bash(GIT_EDITOR=true git rebase --continue)",
-      "Bash(git checkout *)",
+      "Bash(git stash *)",
       "Bash(git pull *)",
-      "Bash(git rm *)"
+      "Bash(git --no-pager diff --cached --stat)",
+      "Bash(git -C \"/d/Projects/Veranda site 2\" pull --ff-only origin main)",
+      "Bash(git -C \"/d/Projects/Veranda site 2\" log --oneline -3)",
+      "PowerShell(Write-Output \"=== plink ===\"; Get-Command plink.exe -ErrorAction SilentlyContinue | Format-List Name, Source; Write-Output \"=== sshpass ===\"; Get-Command sshpass -ErrorAction SilentlyContinue | Format-List Name, Source; Write-Output \"=== Posh-SSH installed? ===\"; Get-Module -ListAvailable -Name Posh-SSH | Select-Object Name, Version; Write-Output \"=== putty common paths ===\"; @\\(\"C:\\\\Program Files\\\\PuTTY\\\\plink.exe\",\"C:\\\\Program Files \\(x86\\)\\\\PuTTY\\\\plink.exe\",\"$env:LOCALAPPDATA\\\\Programs\\\\PuTTY\\\\plink.exe\"\\) | ForEach-Object { if \\(Test-Path $_\\) { Write-Output \"FOUND: $_\" } })",
+      "PowerShell(& \"C:\\\\Program Files\\\\PuTTY\\\\plink.exe\" -ssh -pw $pw root@5.101.179.132 \"id && uname -a && which pm2 && ls -la /var/www/veranda_my_usr/data/.pm2/dump.pm2 2>&1 | head -1\")",
+      "PowerShell($pw='D8K3tn73ntP7hnXN')",
+      "Bash(git fetch *)",
+      "Bash(sed -n '80,200p' wa_listener/src/telegram.js)",
+      "Bash(sed -n '55,90p' wa_listener/src/socket.js)",
+      "Bash(grep -nB2 -A3 \"send_fail\" src/Services/TelegramAlertService.php)",
+      "Bash(sed -n '55,95p' src/Services/KitchenSyncService.php)",
+      "Bash(sed -n '275,320p' src/Services/TelegramAlertService.php)",
+      "Bash(curl -sI --max-time 10 -X POST -H \"Content-Type: application/json\" -d \"{}\" https://veranda.my/telegram_webhook)",
+      "Bash(curl -s --max-time 10 -X POST -H \"Content-Type: application/json\" -d \"{}\" https://veranda.my/telegram_webhook)",
+      "Bash(curl -sI --max-time 10 -X POST -H \"Content-Type: application/json\" -d \"{}\" https://veranda.my/telegram_webhook.php)",
+      "Bash(curl -sS -D - --max-time 10 -X POST -H \"Content-Type: application/json\" -d \"{}\" https://veranda.my/telegram_webhook -o /dev/null)",
+      "Bash(curl -sS -D - --max-time 15 -X POST -H \"Content-Type: application/json\" -d \"{}\" https://veranda.my/telegram_webhook.php -o /dev/null)",
+      "Bash(curl -sS -D - --max-time 20 -X POST -H \"Content-Type: application/json\" -d '{\"update_id\":1,\"callback_query\":{\"id\":\"1\",\"data\":\"vposter:0\",\"from\":{\"id\":1,\"username\":\"test\"},\"message\":{\"message_id\":1,\"chat\":{\"id\":-100,\"type\":\"supergroup\"}}}}' https://veranda.my/telegram_webhook.php -o /dev/null)",
+      "Bash(curl -sS -D - --max-time 20 -X POST -H \"Content-Type: application/json\" -d '{\"update_id\":1,\"callback_query\":{\"id\":\"1\",\"data\":\"vposter:0\",\"from\":{\"id\":1,\"username\":\"test\"},\"message\":{\"message_id\":1,\"chat\":{\"id\":-100,\"type\":\"supergroup\"}}}}' https://veranda.my/telegram_webhook -o /dev/null)",
+      "Bash(grep -nA 60 \"function saveStats\" src/classes/Database.php)",
+      "Bash(grep -nA 25 \"private function _call\" src/Infrastructure/TelegramBotClient.php)",
+      "Bash(grep -nA 25 \"function postJson\" src/Infrastructure/HttpClient.php)",
+      "Bash(node --check wa_listener/src/socket.js)"
     ]
   }
 }
