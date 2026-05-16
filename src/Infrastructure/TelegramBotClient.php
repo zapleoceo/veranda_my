@@ -148,10 +148,27 @@ class TelegramBotClient
 
     private function _call(string $method, array $params): array|null
     {
-        return $this->http->postJson(
+        $result = $this->http->postJson(
             "https://api.telegram.org/bot{$this->token}/{$method}",
             $params
         );
+
+        // Surface Telegram-side failures with description + error_code so
+        // the operator can tell rate-limits from bad chat_id from too-long
+        // text. Without this the only upstream signal is `send returned null`.
+        if (!is_array($result) || empty($result['ok'])) {
+            Logger::get()->warning('telegram.api_error', [
+                'method'      => $method,
+                'chat_id'     => $params['chat_id']                ?? null,
+                'message_id'  => $params['message_id']             ?? null,
+                'thread_id'   => $params['message_thread_id']      ?? null,
+                'error_code'  => $result['error_code']             ?? null,
+                'description' => $result['description']            ?? '(no response from Telegram)',
+                'retry_after' => $result['parameters']['retry_after'] ?? null,
+            ]);
+        }
+
+        return $result;
     }
 
     private function _msgParams(string $text, ?int $threadId): array

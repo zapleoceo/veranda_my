@@ -65,7 +65,8 @@ class KitchenSyncService
             );
             $stats = $analytics->getStatsForPeriod($date, $date);
             if (!empty($stats)) {
-                $this->db->saveStats($stats);
+                $this->_persistStats($stats);
+                $this->meta->set('poster_last_sync_at', date('Y-m-d H:i:s'));
                 return count($stats);
             }
         } catch (\Throwable $e) {
@@ -73,6 +74,84 @@ class KitchenSyncService
         }
         $this->meta->set('poster_last_sync_at', date('Y-m-d H:i:s'));
         return 0;
+    }
+
+    /**
+     * UPSERT kitchen_stats rows. Migrated verbatim from legacy
+     * App\Classes\Database::saveStats() — kept SQL identical to preserve
+     * the hookah auto-exclude semantics. Caller wraps in try/catch.
+     */
+    private function _persistStats(array $stats): void
+    {
+        $ks  = $this->db->t('kitchen_stats');
+        $sql = "INSERT INTO {$ks}
+                (transaction_date, receipt_number, transaction_opened_at, transaction_closed_at, transaction_id, table_number, waiter_name, transaction_comment, status, pay_type, close_reason, dish_id, item_seq, dish_category_id, dish_sub_category_id, dish_name, ticket_sent_at, ready_pressed_at, ready_chass_at, was_deleted, service_type, total_sum, station, exclude_from_dashboard, exclude_auto)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                dish_id = VALUES(dish_id),
+                item_seq = VALUES(item_seq),
+                dish_category_id = VALUES(dish_category_id),
+                dish_sub_category_id = VALUES(dish_sub_category_id),
+                dish_name = VALUES(dish_name),
+                transaction_opened_at = VALUES(transaction_opened_at),
+                transaction_closed_at = VALUES(transaction_closed_at),
+                table_number = VALUES(table_number),
+                waiter_name = VALUES(waiter_name),
+                transaction_comment = COALESCE(VALUES(transaction_comment), transaction_comment),
+                status = VALUES(status),
+                pay_type = VALUES(pay_type),
+                close_reason = VALUES(close_reason),
+                ticket_sent_at = COALESCE(VALUES(ticket_sent_at), ticket_sent_at),
+                ready_pressed_at = COALESCE(VALUES(ready_pressed_at), ready_pressed_at),
+                ready_chass_at = COALESCE(VALUES(ready_chass_at), ready_chass_at),
+                was_deleted = GREATEST(VALUES(was_deleted), was_deleted),
+                service_type = VALUES(service_type),
+                total_sum = VALUES(total_sum),
+                station = VALUES(station),
+                exclude_from_dashboard = CASE
+                    WHEN (VALUES(dish_category_id) = " . self::HOOKAH_CATEGORY_ID . " OR VALUES(dish_sub_category_id) = " . self::HOOKAH_CATEGORY_ID . ") THEN 1
+                    WHEN exclude_auto = 1 AND VALUES(ready_pressed_at) IS NOT NULL THEN 0
+                    ELSE exclude_from_dashboard
+                END,
+                exclude_auto = CASE
+                    WHEN (VALUES(dish_category_id) = " . self::HOOKAH_CATEGORY_ID . " OR VALUES(dish_sub_category_id) = " . self::HOOKAH_CATEGORY_ID . ") THEN 1
+                    WHEN exclude_auto = 1 AND VALUES(ready_pressed_at) IS NOT NULL THEN 0
+                    ELSE exclude_auto
+                END";
+
+        foreach ($stats as $row) {
+            $mainCat = isset($row['dish_category_id']) && $row['dish_category_id'] !== null ? (int) $row['dish_category_id'] : null;
+            $subCat  = isset($row['dish_sub_category_id']) && $row['dish_sub_category_id'] !== null ? (int) $row['dish_sub_category_id'] : null;
+            $isHookah = ($mainCat === self::HOOKAH_CATEGORY_ID) || ($subCat === self::HOOKAH_CATEGORY_ID);
+
+            $this->db->query($sql, [
+                $row['date'],
+                $row['receipt_number'],
+                $row['transaction_opened_at'],
+                $row['transaction_closed_at'],
+                $row['transaction_id'],
+                $row['table_number']        ?? null,
+                $row['waiter_name']         ?? null,
+                $row['transaction_comment'] ?? null,
+                $row['status'],
+                $row['pay_type']            ?? null,
+                $row['close_reason']        ?? null,
+                $row['dish_id'],
+                isset($row['item_seq']) && (int) $row['item_seq'] > 0 ? (int) $row['item_seq'] : 1,
+                $mainCat,
+                $subCat,
+                $row['dish_name'],
+                $row['ticket_sent_at'],
+                $row['ready_pressed_at'],
+                $row['ready_chass_at']      ?? null,
+                !empty($row['was_deleted']) ? 1 : 0,
+                $row['service_type'],
+                $row['total_sum'],
+                $row['station'],
+                $isHookah ? 1 : 0,
+                $isHookah ? 1 : 0,
+            ]);
+        }
     }
 
     // ─── 2. close metadata refresh ────────────────────────────────────────────
