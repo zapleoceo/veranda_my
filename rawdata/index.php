@@ -1,4 +1,10 @@
 <?php
+
+if (empty($GLOBALS['_VERANDA_SLIM_RUNNING'])) {
+    require __DIR__ . '/../public/index.php';
+    return;
+}
+
 require_once __DIR__ . '/../auth_check.php';
 veranda_require('rawdata');
 date_default_timezone_set('Asia/Ho_Chi_Minh');
