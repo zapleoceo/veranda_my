@@ -90,8 +90,10 @@ $app->map(['GET', 'POST'], '/tr3/api.php', [Tr3Controller::class, 'api']);
 $app->map(['GET', 'POST'], '/reservations', [ReservationsController::class, 'index'])
     ->add(AuthMiddleware::class);
 
-// Phase 5: payday2 (auth-protected)
-$app->map(['GET', 'POST'], '/payday2', [Payday2Controller::class, 'dispatch'])
+// Phase 5: payday2 (auth-protected). Pattern accepts /payday2 and /payday2/
+// so direct .htaccess hits delegated through payday2/index.php → public/index.php
+// resolve to this controller (which renders through layout.php with sidebar).
+$app->map(['GET', 'POST'], '/payday2[/]', [Payday2Controller::class, 'dispatch'])
     ->add(AuthMiddleware::class);
 
 // Static assets from directories outside public/
