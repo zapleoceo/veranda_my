@@ -81,7 +81,20 @@ class RawdataController
             'dir'       => $q['dir'] ?? 'asc',
         ]);
 
-        $payload = json_encode(['ok' => true, 'receipts' => $receipts], JSON_UNESCAPED_UNICODE);
+        ob_start();
+        foreach ($receipts as $receipt) {
+            require __DIR__ . '/../Views/partials/rawdata_receipt.php';
+        }
+        $html = (string) ob_get_clean();
+
+        $payload = json_encode([
+            'ok'             => true,
+            'html'           => $html,
+            'total_receipts' => count($receipts),
+            'next_offset'    => count($receipts),
+            'has_more'       => false,
+        ], JSON_UNESCAPED_UNICODE);
+
         $response->getBody()->write((string)$payload);
         return $response->withHeader('Content-Type', 'application/json');
     }

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= htmlspecialchars($pageTitle ?? 'Veranda Admin') ?></title>
+<link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
 <style>
 :root {
     --bg:       #0f1117;

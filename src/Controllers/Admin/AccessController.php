@@ -126,6 +126,10 @@ class AccessController
         string $userEmail,
         array $flash
     ): ResponseInterface {
+        $pageTitle = match ($path) {
+            '/admin/access' => 'Доступ',
+            default         => 'Admin',
+        };
         ob_start();
         $currentPath = $path;
         $flashOk  = $flash['ok'];

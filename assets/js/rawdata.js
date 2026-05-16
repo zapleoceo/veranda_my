@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     params.set('offset', String(state.offset));
                     params.set('limit', String(state.limit));
 
-                    const res = await fetch(`/api/sql/rawdata/index.php?${params.toString()}`, {
+                    const res = await fetch(`/rawdata?${params.toString()}`, {
                         headers: { 'X-Requested-With': 'XMLHttpRequest' },
                         credentials: 'same-origin'
                     });
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 checkbox.disabled = true;
                 try {
-                    const response = await fetch('/api/sql/rawdata/index.php', {
+                    const response = await fetch('/rawdata', {
                         method: 'POST',
                         headers: { 'X-Requested-With': 'XMLHttpRequest' },
                         body: payload

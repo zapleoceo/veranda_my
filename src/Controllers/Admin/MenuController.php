@@ -232,6 +232,7 @@ class MenuController
 
     private function _layout(ResponseInterface $response, string $content, string $userEmail, array $flash): ResponseInterface
     {
+        $pageTitle = 'Меню';
         ob_start();
         $currentPath = '/admin/menu';
         $flashOk  = $flash['ok'];

@@ -99,6 +99,7 @@ class LogsController
 
     private function _layout(ResponseInterface $response, string $content, string $path, string $userEmail, array $flash): ResponseInterface
     {
+        $pageTitle = 'Логи';
         ob_start();
         $currentPath = $path;
         $flashOk  = $flash['ok'];
