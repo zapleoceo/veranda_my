@@ -2,8 +2,36 @@
 
 const https = require('node:https');
 const fs = require('node:fs');
+const os = require('node:os');
 const QRCode = require('qrcode');
 const { TG_BOT_TOKEN, QR_TG_CHAT_ID, QR_STATE_FILE } = require('./config');
+
+// Hostname + first non-internal IPv4. Cached once per process — interfaces
+// don't change during the listener's lifetime, and the operator wants to
+// instantly tell which host the notification came from when several
+// veranda-like deployments coexist.
+const _serverTag = (() => {
+  const host = os.hostname();
+  const ifaces = os.networkInterfaces();
+  const isPublic = (addr) =>
+    !addr.startsWith('10.') &&
+    !addr.startsWith('192.168.') &&
+    !addr.startsWith('127.') &&
+    !addr.startsWith('169.254.') &&
+    !addr.startsWith('100.') &&
+    !/^172\.(1[6-9]|2\d|3[01])\./.test(addr);
+
+  const all = [];
+  for (const name of Object.keys(ifaces)) {
+    for (const iface of ifaces[name] || []) {
+      if (iface.family !== 'IPv4' || iface.internal) continue;
+      all.push(iface.address);
+    }
+  }
+  const pub = all.find(isPublic);
+  const ip  = pub || all[0] || 'unknown';
+  return `${ip} (${host})`;
+})();
 
 function loadQrState() {
   try { return JSON.parse(fs.readFileSync(QR_STATE_FILE, 'utf8')); } catch { return {}; }
@@ -74,7 +102,11 @@ async function sendQrToTelegram(qr) {
       await tgPost('deleteMessage', { chat_id: QR_TG_CHAT_ID, message_id: state.message_id });
     }
     const pngBuf = await QRCode.toBuffer(qr, { type: 'png', scale: 8 });
-    const res = await tgSendPhoto(QR_TG_CHAT_ID, pngBuf, 'WhatsApp QR — отсканируй телефоном');
+    const res = await tgSendPhoto(
+      QR_TG_CHAT_ID,
+      pngBuf,
+      `WhatsApp QR — отсканируй телефоном\n📡 ${_serverTag}`
+    );
     if (res.ok && res.result && res.result.message_id) {
       saveQrState({ message_id: res.result.message_id });
     }
@@ -108,7 +140,7 @@ async function sendStatusToTelegram(text) {
   try {
     await tgPost('sendMessage', {
       chat_id: QR_TG_CHAT_ID,
-      text: `🟢 WA: ${text}`,
+      text: `🟢 WA: ${text}\n📡 ${_serverTag}`,
       disable_notification: true,
     });
   } catch (e) {
@@ -121,7 +153,7 @@ async function sendErrorToTelegram(text) {
   try {
     await tgPost('sendMessage', {
       chat_id: QR_TG_CHAT_ID,
-      text: `🔴 WA error: ${text}`.slice(0, 4000),
+      text: `🔴 WA error: ${text}\n📡 ${_serverTag}`.slice(0, 4000),
     });
   } catch (e) {
     console.error('[wa] error send error:', e.message);
