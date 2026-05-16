@@ -55,8 +55,6 @@ Workflow деплоя находится тут: [.github/workflows/deploy.yml](
 `~/crontab.bak.YYYYMMDD_HHMMSS`):
 
 ```cron
-@reboot  /usr/bin/pm2 resurrect >/var/www/veranda_my_usr/data/logs/pm2_resurrect.log 2>&1
-
 # Kitchen sync — KitchenSyncService->run() (Poster → kitchen_stats), каждые 5 минут
 */5 * * * * /opt/php82/bin/php /var/www/veranda_my_usr/data/www/veranda.my/cron/kitchen_sync.php >> /var/www/veranda_my_usr/data/www/veranda.my/cron.log 2>&1
 
@@ -99,3 +97,52 @@ crontab -l   # проверка
 | `daily_summary.log` | вывод `daily_summary.php` |
 | `reservations_daily_reminder.log` | вывод legacy `scripts/reservations/daily_booking_reminder.php` |
 | `/var/www/veranda_my_usr/data/logs/veranda.my-frontend.error.log` | nginx + php-fpm ошибки web-запросов |
+
+### 7) WhatsApp listener (pm2 + systemd)
+
+`wa_listener/` — Node.js-сервис, который держит WhatsApp Web-сессию через
+Baileys и выставляет локальный HTTP-эндпойнт `127.0.0.1:3210` для PHP-сайта.
+Используется через `wa_bridge_send($phone, $text)` (см. [tr3/api_context.php](tr3/api_context.php)).
+
+**Управляется через pm2** (2 процесса: `veranda-wa-listener` + `veranda-wa-watchdog`),
+а pm2-демон поднимается при загрузке систему systemd-юнитом:
+
+| Источник истины | Путь на сервере |
+|------------------|-----------------|
+| [`cron/pm2-veranda_my_usr.service`](cron/pm2-veranda_my_usr.service) | `/etc/systemd/system/pm2-veranda_my_usr.service` |
+
+Юнит `Type=oneshot, RemainAfterExit=yes` — `ExecStart=pm2 resurrect` отрабатывает
+один раз и оставляет pm2-демон висеть в cgroup. `enabled` — запускается при boot.
+
+**Healthcheck:**
+
+```bash
+ssh veranda_my_usr@5.101.179.132 "curl -sS http://127.0.0.1:3210/healthz"
+# {"ok":true,"connected":true,"version":"1.0.0"}
+ssh veranda_my_usr@5.101.179.132 "pm2 list"
+```
+
+**Перезапустить вручную:**
+
+```bash
+ssh veranda_my_usr@5.101.179.132 "pm2 restart all"
+# или полный цикл через systemd (требует root):
+sudo systemctl restart pm2-veranda_my_usr
+```
+
+**Логи** pm2 пишет в `~/.pm2/logs/veranda-wa-listener-{out,error}.log` и
+`~/.pm2/logs/veranda-wa-watchdog-{out,error}.log`.
+
+**Первоначальная установка systemd-юнита** (одноразово, требует root):
+
+```bash
+# 1) Скопировать юнит на сервер
+scp cron/pm2-veranda_my_usr.service root@5.101.179.132:/etc/systemd/system/
+
+# 2) Включить и запустить
+sudo systemctl daemon-reload
+sudo systemctl enable --now pm2-veranda_my_usr
+```
+
+После любых изменений в pm2 (новые процессы, изменение порядка) — сохранить
+дамп: `ssh veranda_my_usr@... pm2 save`. Иначе при ребуте они не восстановятся.
