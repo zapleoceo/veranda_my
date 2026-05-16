@@ -73,6 +73,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .sb-link.sb-off{color:var(--border);pointer-events:none;cursor:default;font-style:italic}
 .sb-sep{height:1px;background:var(--border);margin:.375rem 0}
 .sb-footer{border-top:1px solid var(--border);padding:.5rem;flex-shrink:0}
+.sb-user{display:flex;align-items:center;gap:.5rem;padding:.3rem .5rem}
+.sb-user-icon{width:26px;height:26px;border-radius:50%;background:var(--accent2);display:inline-flex;align-items:center;justify-content:center;color:var(--accent);font-weight:800;font-size:11px;flex-shrink:0;overflow:hidden}
+.sb-user-icon img{width:100%;height:100%;object-fit:cover;display:block}
+.sb-user-info{display:flex;flex-direction:column;gap:1px;min-width:0}
+.sb-user-name{font-size:.75rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-user-logout{font-size:.72rem;color:var(--muted);text-decoration:none;line-height:1.3}
+.sb-user-logout:hover{color:var(--danger)}
 
 /* ── Sidebar re-open button (desktop, collapsed state) ── */
 .sb-show-btn{
@@ -288,6 +295,5 @@ $currentPath = $currentPath ?? '/admin';
     }
 })();
 </script>
-<script src="/assets/user_menu.js" defer></script>
 </body>
 </html>
