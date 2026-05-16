@@ -58,6 +58,6 @@
 
 <script src="/assets/app.js" defer></script>
 <script src="/assets/user_menu.js" defer></script>
-<script src="/assets/js/kitchen_online.js"></script>
+<script src="/assets/js/kitchen_online.js?v=20260516"></script>
 </body>
 </html>
