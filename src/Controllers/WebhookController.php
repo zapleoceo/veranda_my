@@ -139,9 +139,27 @@ class WebhookController
         $username   = ltrim(strtolower(trim((string) ($from['username'] ?? ''))), '@');
         $actorName  = trim(($from['first_name'] ?? '') . ' ' . ($from['last_name'] ?? '')) ?: ($username ?: 'unknown');
 
-        $this->logger->debug('webhook.callback', ['data' => $data, 'chat' => $chatId, 'user' => $username]);
+        // Log every callback at INFO so the operator can trace exactly what
+        // arrived (who clicked, what data, on which message) without having
+        // to enable debug logging.
+        $this->logger->info('webhook.callback', [
+            'data'    => $data,
+            'chat'    => $chatId,
+            'msg_id'  => $messageId,
+            'user'    => $username,
+            'name'    => $actorName,
+        ]);
 
         if (!preg_match('/^([a-z_]+):(\d+)$/', $data, $m) || !isset(self::ACTION_MAP[$m[1]])) {
+            // Telegram leaves the button in a "loading" spinner forever if we
+            // don't answer the callback. Always close the loop with a visible
+            // message, even for unknown actions.
+            $this->logger->warning('webhook.callback.unknown_data', ['data' => $data, 'user' => $username]);
+            $this->bot->answerCallbackQuery(
+                $callbackId,
+                'Неизвестная кнопка: ' . ($data !== '' ? $data : '(пустые данные)'),
+                true
+            );
             $response->getBody()->write('ok');
             return $response;
         }
@@ -158,27 +176,47 @@ class WebhookController
 
         if (!$allowed) {
             $msg = $username !== ''
-                ? "Нет доступа для @{$username}. Попросите доступ «✅ Принято (Telegram)»."
-                : 'Нет доступа: у вас нет username в Telegram.';
+                ? "Нет доступа для @{$username}. Попросите admin'а добавить вам право «{$actionName}»."
+                : 'Нет доступа: у вашего Telegram нет публичного @username — добавьте его в настройках профиля.';
+            $this->logger->warning('webhook.callback.denied', [
+                'action'   => $actionName,
+                'user'     => $username ?: '(no username)',
+                'has_user' => $username !== '',
+                'perms'    => $perms,
+            ]);
             $this->bot->answerCallbackQuery($callbackId, $msg, true);
             $response->getBody()->write('ok');
             return $response;
         }
 
-        $ctx    = new ActionContext($this->db, $this->bot, $actionId, $chatId, $messageId, $callbackId, $username, $actorName);
-        $result = '';
+        $ctx     = new ActionContext($this->db, $this->bot, $actionId, $chatId, $messageId, $callbackId, $username, $actorName);
+        $result  = '';
+        $errored = false;
         try {
             /** @var ActionInterface $action */
             $action = new (self::ACTION_MAP[$actionName])();
             $result = $action->handle($ctx);
         } catch (\Throwable $e) {
-            $this->logger->error('webhook.action_error', ['action' => $actionName, 'id' => $actionId, 'err' => $e->getMessage()]);
-            $result = 'Ошибка: ' . $e->getMessage();
+            $errored = true;
+            $this->logger->error('webhook.action_error', [
+                'action' => $actionName,
+                'id'     => $actionId,
+                'err'    => $e->getMessage(),
+                'file'   => $e->getFile(),
+                'line'   => $e->getLine(),
+            ]);
+            // Show the actual exception text in the popup (truncated to
+            // Telegram's 200-char limit) so the operator can copy it back.
+            $result = 'Ошибка: ' . substr($e->getMessage(), 0, 180);
         }
 
         if ($result !== '') {
-            $this->bot->answerCallbackQuery($callbackId, $result);
+            // Errors: show as alert (modal popup that requires dismiss).
+            // Successes: short toast that auto-dismisses.
+            $this->bot->answerCallbackQuery($callbackId, $result, $errored);
         }
+        // If the action returned '' it already called answerCallbackQuery
+        // itself — we don't double-answer (Telegram returns 400 otherwise).
 
         $response->getBody()->write('ok');
         return $response;
