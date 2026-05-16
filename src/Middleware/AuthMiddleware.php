@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Services\UserPermissionsService;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -13,7 +14,8 @@ use Psr\Http\Server\RequestHandlerInterface;
 class AuthMiddleware implements MiddlewareInterface
 {
     public function __construct(
-        private readonly ResponseFactoryInterface $responseFactory
+        private readonly ResponseFactoryInterface $responseFactory,
+        private readonly UserPermissionsService   $permissions,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -23,9 +25,11 @@ class AuthMiddleware implements MiddlewareInterface
         }
 
         if (empty($_SESSION['user_email'])) {
-            $response = $this->responseFactory->createResponse(302);
-            return $response->withHeader('Location', '/login');
+            return $this->responseFactory->createResponse(302)
+                ->withHeader('Location', '/login');
         }
+
+        $this->permissions->loadIntoSession((string) $_SESSION['user_email']);
 
         return $handler->handle($request->withAttribute('user_email', $_SESSION['user_email']));
     }

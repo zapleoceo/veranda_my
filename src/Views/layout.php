@@ -70,7 +70,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 }
 .sb-link:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .sb-link.active{color:var(--text);border-left-color:var(--accent);background:rgba(184,135,70,.1)}
-.sb-link.sb-off{color:var(--border);pointer-events:none;cursor:default;font-style:italic}
 .sb-sep{height:1px;background:var(--border);margin:.375rem 0}
 .sb-footer{border-top:1px solid var(--border);padding:.5rem;flex-shrink:0}
 .sb-user{display:flex;align-items:center;gap:.5rem;padding:.3rem .5rem}
@@ -173,29 +172,33 @@ $_sbCan = function(string $p): bool {
 
 $navSections = [
     [
+        'title' => 'Кухня',
+        'links' => [
+            '/admin'          => ['label' => 'Дашборд',        'perm' => 'dashboard'],
+            '/rawdata'        => ['label' => 'Таблица',         'perm' => 'rawdata'],
+            '/kitchen_online' => ['label' => 'Онлайн',          'perm' => 'kitchen_online'],
+        ],
+    ],
+    [
         'title' => 'Отчёты',
         'links' => [
-            '/kitchen_online'     => ['label' => 'Кухня: Онлайн',    'perm' => 'kitchen_online'],
-            '/admin'              => ['label' => 'Кухня: Дашборд',    'perm' => 'admin'],
-            '/zapara'             => ['label' => 'Кухня: Запара',     'perm' => 'zapara'],
-            '/rawdata'            => ['label' => 'Таблица',           'perm' => 'rawdata'],
-            '/banya'              => ['label' => 'Баня',              'perm' => 'banya'],
-            '/roma'               => ['label' => 'Кальяны',           'perm' => 'roma'],
-            '/reservations'       => ['label' => 'Брони',             'perm' => 'reservations'],
-            '/employees'          => ['label' => 'ЗП сотрудников',    'perm' => 'employees'],
-            '/payday2'            => ['label' => 'PayDay2',           'perm' => 'payday'],
+            '/zapara'       => ['label' => 'Запара',          'perm' => 'zapara'],
+            '/banya'        => ['label' => 'Баня',            'perm' => 'banya'],
+            '/roma'         => ['label' => 'Кальяны',         'perm' => 'roma'],
+            '/payday2'      => ['label' => 'PayDay2',         'perm' => 'payday'],
+            '/employees'    => ['label' => 'ЗП сотрудников',  'perm' => 'employees'],
+            '/reservations' => ['label' => 'Брони',           'perm' => 'reservations'],
         ],
     ],
     [
         'title' => 'Управление',
-        'perm'  => 'admin',
         'links' => [
-            '/admin/sync'         => ['label' => 'Синк',              'perm' => 'admin'],
-            '/admin/access'       => ['label' => 'Доступ',            'perm' => 'admin'],
-            '/admin/menu'         => ['label' => 'Меню',              'perm' => 'admin'],
-            '/admin/telegram'     => ['label' => 'Telegram',          'perm' => 'admin'],
-            '/admin/logs'         => ['label' => 'Логи',              'perm' => 'admin'],
-            '/admin/reservations' => ['label' => 'Брони (настройки)', 'perm' => 'admin'],
+            '/admin/sync'         => ['label' => 'Синк',     'perm' => 'admin'],
+            '/admin/access'       => ['label' => 'Доступы',  'perm' => 'admin'],
+            '/admin/menu'         => ['label' => 'Меню',     'perm' => 'admin'],
+            '/admin/telegram'     => ['label' => 'Telegram', 'perm' => 'admin'],
+            '/admin/logs'         => ['label' => 'Логи',     'perm' => 'admin'],
+            '/admin/reservations' => ['label' => 'Брони',    'perm' => 'admin'],
         ],
     ],
 ];
@@ -211,15 +214,18 @@ $currentPath = $currentPath ?? '/admin';
       <button class="sb-collapse-btn" id="sbCollapseBtn" title="Скрыть меню">&#9664;</button>
     </div>
     <nav class="sb-nav">
-      <?php foreach ($navSections as $i => $section): ?>
-        <?php if ($i > 0): ?><div class="sb-sep"></div><?php endif; ?>
+      <?php
+      $_sbFirst = true;
+      foreach ($navSections as $section):
+          $visible = array_filter($section['links'], fn($item) => $_sbCan($item['perm']));
+          if (empty($visible)) continue;
+      ?>
+        <?php if (!$_sbFirst): ?><div class="sb-sep"></div><?php endif; ?>
+        <?php $_sbFirst = false; ?>
         <div class="sb-section">
           <div class="sb-title"><?= htmlspecialchars($section['title']) ?></div>
-          <?php foreach ($section['links'] as $href => $item):
-              $can = $_sbCan($item['perm']);
-              $cls = 'sb-link' . ($currentPath === $href ? ' active' : '') . ($can ? '' : ' sb-off');
-          ?>
-            <a href="<?= $href ?>" class="<?= $cls ?>"><?= htmlspecialchars($item['label']) ?></a>
+          <?php foreach ($visible as $href => $item): ?>
+            <a href="<?= $href ?>" class="sb-link<?= $currentPath === $href ? ' active' : '' ?>"><?= htmlspecialchars($item['label']) ?></a>
           <?php endforeach; ?>
         </div>
       <?php endforeach; ?>
