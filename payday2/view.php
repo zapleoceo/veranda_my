@@ -374,6 +374,8 @@ $payday2ClientConfig = [
 ];
 $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 ?>
+<?php $_pd2Layout = !empty($GLOBALS['_PAYDAY2_USE_LAYOUT']); ?>
+<?php if (!$_pd2Layout): ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -388,7 +390,11 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
   <link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=<?= htmlspecialchars($payday2AssetVersion) ?>">
  </head>
 <body>
+<?php else: ?>
+<?php $GLOBALS['_PAYDAY2_HEAD_EXTRA'] = '<link rel="stylesheet" href="/payday2/assets/css/payday2.css?v=' . htmlspecialchars($payday2AssetVersion) . '">'; ?>
+<?php endif; ?>
 <div class="container">
+<?php if (!$_pd2Layout): ?>
     <div class="top-nav">
         <div class="nav-left">
             <div class="pd2-nav-title-row pd2-d-flex pd2-align-center pd2-gap-8">
@@ -434,6 +440,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
         </div>
         <?php require __DIR__ . '/../partials/user_menu.php'; ?>
     </div>
+<?php endif; ?>
 
     <?php if ($error !== ''): ?><div class="error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
@@ -1273,5 +1280,7 @@ $payday2ConfigJsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP |
 <script src="/payday2/assets/js/payday2_supplies.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2_poster_table.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
 <script src="/payday2/assets/js/payday2.js?v=<?= htmlspecialchars($payday2AssetVersion) ?>"></script>
+<?php if (!$_pd2Layout): ?>
 </body>
 </html>
+<?php endif; ?>

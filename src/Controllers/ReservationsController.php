@@ -295,9 +295,22 @@ class ReservationsController
         $resSoonHours         = $settings['soon_hours'];
         $resMinPreorderPerGuest = $settings['min_preorder_per_guest'];
 
+        $pageTitle   = 'Брони';
+        $currentPath = '/reservations';
+        $headExtra   = '<link rel="stylesheet" href="/reservations/assets/css/reservations.css">' . "\n"
+                     . '<link rel="stylesheet" href="/reservations/style.css">' . "\n"
+                     . '<style>' . "\n"
+                     . '.res-page { margin: -1.5rem; }' . "\n"
+                     . '.res-page .card { border-radius: 0; border-left: none; border-right: none; border-top: none; }' . "\n"
+                     . '</style>';
+
         ob_start();
-        require __DIR__ . '/../Views/reservations.php';
-        $html = (string)ob_get_clean();
+        require __DIR__ . '/../Views/reservations_content.php';
+        $content = (string) ob_get_clean();
+
+        ob_start();
+        require __DIR__ . '/../Views/layout.php';
+        $html = (string) ob_get_clean();
 
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');

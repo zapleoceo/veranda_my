@@ -12,8 +12,10 @@ class Payday2Controller
     public function dispatch(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $GLOBALS['_PAYDAY2_SLIM_MODE']    = true;
-        $GLOBALS['_PAYDAY2_HTTP_CODE']    = 200;
-        $GLOBALS['_PAYDAY2_SLIM_JSON']    = '';
+        $GLOBALS['_PAYDAY2_USE_LAYOUT']  = true;
+        $GLOBALS['_PAYDAY2_HEAD_EXTRA']  = '';
+        $GLOBALS['_PAYDAY2_HTTP_CODE']   = 200;
+        $GLOBALS['_PAYDAY2_SLIM_JSON']   = '';
         $GLOBALS['_PAYDAY2_REDIRECT_URL'] = '';
 
         global $db, $token;
@@ -73,7 +75,18 @@ class Payday2Controller
         }
 
         // Page view: no exception thrown, ob still has the rendered HTML
-        $html = ob_get_clean() ?: '';
+        $content = ob_get_clean() ?: '';
+
+        $pageTitle   = 'PayDay2';
+        $currentPath = '/payday2';
+        $pd2HeadExtra = (string)($GLOBALS['_PAYDAY2_HEAD_EXTRA'] ?? '');
+        $headExtra   = $pd2HeadExtra . "\n"
+                     . '<style>.container{max-width:none;padding:0;margin:0}</style>';
+
+        ob_start();
+        require __DIR__ . '/../Views/layout.php';
+        $html = (string) ob_get_clean();
+
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     }
