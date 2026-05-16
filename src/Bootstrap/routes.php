@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Controllers\Auth\LoginController;
 use App\Controllers\Auth\CallbackController;
+use App\Controllers\Payday2Controller;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\SyncController;
@@ -63,4 +64,8 @@ $app->map(['GET', 'POST'], '/tr3/api', [Tr3Controller::class, 'api']);
 
 // Phase 4: reservations (auth-protected)
 $app->map(['GET', 'POST'], '/reservations', [ReservationsController::class, 'index'])
+    ->add(AuthMiddleware::class);
+
+// Phase 5: payday2 (auth-protected)
+$app->map(['GET', 'POST'], '/payday2', [Payday2Controller::class, 'dispatch'])
     ->add(AuthMiddleware::class);

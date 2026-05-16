@@ -1,8 +1,9 @@
 <?php
-require_once __DIR__ . '/../auth_check.php';
+if (empty($GLOBALS['_PAYDAY2_SLIM_MODE'])) {
+    require_once __DIR__ . '/../auth_check.php';
+    veranda_require('payday');
+}
 require_once __DIR__ . '/config.php';
-
-veranda_require('payday');
 
 $action = (string)($_POST['action'] ?? '');
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== '') {
@@ -40,6 +41,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action !== '') {
         'error' => $error,
         'at' => time(),
     ];
-    header('Location: ?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo]));
-    exit;
+    payday2_redirect('?' . http_build_query(['dateFrom' => $dateFrom, 'dateTo' => $dateTo]));
 }
