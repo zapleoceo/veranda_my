@@ -1,5 +1,14 @@
 <?php
 
+// Direct hit via Apache .htaccess (^banya/?$ → banya/index.php) bypasses
+// Slim — the framework wraps banya_content.php in src/Views/layout.php
+// (which provides the sidebar). Delegate to the front controller so the
+// request resolves through BanyaController.
+if (empty($GLOBALS['_VERANDA_SLIM_RUNNING'])) {
+    require __DIR__ . '/../public/index.php';
+    return;
+}
+
 require_once __DIR__ . '/../auth_check.php';
 require_once __DIR__ . '/../src/classes/PosterAPI.php';
 require_once __DIR__ . '/Model.php';

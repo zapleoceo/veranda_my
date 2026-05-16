@@ -47,7 +47,11 @@ $app->get('/logout', [LoginController::class, 'logout']);
 $app->map(['GET', 'POST'], '/telegram_webhook', [WebhookController::class, 'handle'])
     ->add(WebhookSecretMiddleware::class);
 
-// Admin panel (protected by session auth)
+// Admin panel (protected by session auth).
+// /admin/ (trailing slash) redirects to /admin so the group prefix matches.
+$app->get('/admin/', function ($req, $res) {
+    return $res->withHeader('Location', '/admin')->withStatus(301);
+});
 $app->group('/admin', function (RouteCollectorProxy $group) {
     $group->get('', [DashboardController::class, 'index']);
     $group->map(['GET', 'POST'], '/sync', [SyncController::class, 'index']);
@@ -59,18 +63,21 @@ $app->group('/admin', function (RouteCollectorProxy $group) {
     $group->map(['GET', 'POST'], '/logs', [LogsController::class, 'index']);
 })->add(AuthMiddleware::class);
 
-// Phase 4: staff-facing modules (auth-protected)
-$app->map(['GET', 'POST'], '/kitchen_online', [KitchenOnlineController::class, 'index'])
+// Phase 4: staff-facing modules (auth-protected). Patterns accept the
+// trailing slash variant ([/]) too so direct .htaccess hits delegated
+// through <module>/index.php → public/index.php resolve here and render
+// via layout.php (with sidebar) instead of legacy view.php standalone.
+$app->map(['GET', 'POST'], '/kitchen_online[/]', [KitchenOnlineController::class, 'index'])
     ->add(AuthMiddleware::class);
-$app->map(['GET', 'POST'], '/rawdata', [RawdataController::class, 'index'])
+$app->map(['GET', 'POST'], '/rawdata[/]', [RawdataController::class, 'index'])
     ->add(AuthMiddleware::class);
-$app->map(['GET', 'POST'], '/banya', [BanyaController::class, 'index'])
+$app->map(['GET', 'POST'], '/banya[/]', [BanyaController::class, 'index'])
     ->add(AuthMiddleware::class);
-$app->map(['GET', 'POST'], '/roma', [RomaController::class, 'index'])
+$app->map(['GET', 'POST'], '/roma[/]', [RomaController::class, 'index'])
     ->add(AuthMiddleware::class);
-$app->map(['GET', 'POST'], '/zapara', [ZaparaController::class, 'index'])
+$app->map(['GET', 'POST'], '/zapara[/]', [ZaparaController::class, 'index'])
     ->add(AuthMiddleware::class);
-$app->map(['GET', 'POST'], '/employees', [EmployeesController::class, 'index'])
+$app->map(['GET', 'POST'], '/employees[/]', [EmployeesController::class, 'index'])
     ->add(AuthMiddleware::class);
 
 // Phase 4: public links landing + menu
@@ -87,7 +94,7 @@ $app->map(['GET', 'POST'], '/tr3/api',     [Tr3Controller::class, 'api']);
 $app->map(['GET', 'POST'], '/tr3/api.php', [Tr3Controller::class, 'api']);
 
 // Phase 4: reservations (auth-protected)
-$app->map(['GET', 'POST'], '/reservations', [ReservationsController::class, 'index'])
+$app->map(['GET', 'POST'], '/reservations[/]', [ReservationsController::class, 'index'])
     ->add(AuthMiddleware::class);
 
 // Phase 5: payday2 (auth-protected). Pattern accepts /payday2 and /payday2/

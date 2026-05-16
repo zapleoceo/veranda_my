@@ -1,4 +1,10 @@
 <?php
+
+if (empty($GLOBALS['_VERANDA_SLIM_RUNNING'])) {
+    require __DIR__ . '/../public/index.php';
+    return;
+}
+
 if (file_exists(dirname(__DIR__) . '/.env')) {
     $lines = file(dirname(__DIR__) . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {

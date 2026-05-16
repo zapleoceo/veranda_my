@@ -1,5 +1,10 @@
 <?php
 
+if (empty($GLOBALS['_VERANDA_SLIM_RUNNING'])) {
+    require __DIR__ . '/../public/index.php';
+    return;
+}
+
 require_once __DIR__ . '/../auth_check.php';
 require_once __DIR__ . '/Model.php';
 
