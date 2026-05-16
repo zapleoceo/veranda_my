@@ -53,6 +53,6 @@ $rawDataQuery = isset($rawDataQuery) ? (string)$rawDataQuery : $dashboardQuery;
         <?php endif; ?>
         <?php if ($canAdmin): ?><a class="ud-link" href="/admin/">Управление</a><?php endif; ?>
         <div class="ud-sep"></div>
-        <a href="/logout.php">Выход</a>
+        <a href="/logout">Выход</a>
     </div>
 </div>

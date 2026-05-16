@@ -45,6 +45,23 @@ $app->post('/login', [LoginController::class, 'handle']);
 $app->get('/auth/callback', [CallbackController::class, 'handle']);
 $app->get('/logout', [LoginController::class, 'logout']);
 
+// Legacy URL aliases — the .php files were deleted; nginx try_files falls
+// through to public/index.php (Slim) which catches these. Google OAuth is
+// still configured with GOOGLE_REDIRECT_URI=/auth_callback.php in .env, so
+// the callback alias is a hard requirement until the Google Cloud Console
+// redirect URI is updated.
+$app->get('/login.php',         [LoginController::class, 'show']);
+$app->get('/logout.php',        [LoginController::class, 'logout']);
+$app->get('/auth_callback.php', [CallbackController::class, 'handle']);
+
+// Legacy /dashboard, /dashboard/, /dashboard.php → /admin (DashboardController
+// inside the Admin group renders the same kitchen-stats chart via layout.php
+// with sidebar). The ?resync=1 launcher that used to live in dashboard/index.php
+// is reachable at /rawdata?resync=1 (RawdataController already owns it).
+$app->get('/dashboard',     function ($req, $res) { return $res->withHeader('Location', '/admin')->withStatus(302); });
+$app->get('/dashboard/',    function ($req, $res) { return $res->withHeader('Location', '/admin')->withStatus(302); });
+$app->get('/dashboard.php', function ($req, $res) { return $res->withHeader('Location', '/admin')->withStatus(302); });
+
 // Telegram webhook (Telegram bot POSTs here; WA bridge uses GET/POST with ?wa_event=).
 // .php alias keeps any legacy bot registrations working — nginx serves the
 // /telegram_webhook.php shim at the document root, which delegates to Slim,
