@@ -41,4 +41,4 @@
     </div>
 </div>
 
-<script src="/assets/js/kitchen_online.js?v=20260516"></script>
+<script src="/assets/js/kitchen_online.js?v=20260516_slash"></script>

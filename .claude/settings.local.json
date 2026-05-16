@@ -56,7 +56,10 @@
       "Bash(php -l src/Controllers/WebhookController.php)",
       "Bash(grep -nA 10 \"TelegramBotClient\" src/Bootstrap/container.php)",
       "Bash(grep -nA 10 \"answerCallbackQuery\" src/Infrastructure/TelegramBotClient.php)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(curl.exe -sI --max-time 10 \"https://veranda.my/rawdata?ajax=list&offset=0&limit=5\" -b \"PHPSESSID=fakecookie\")",
+      "Bash(curl.exe -sI --max-time 10 \"https://veranda.my/rawdata/?ajax=list&offset=0&limit=5\")",
+      "Bash(grep -rnE \"fetch\\\\\\(['\\\\`]/\\(banya|roma|employees|reservations|kitchen_online|rawdata|zapara|admin|payday2\\)[\\\\\"'?]\" --include=\"*.js\" --include=\"*.php\" .)"
     ]
   }
 }
