@@ -128,7 +128,7 @@ const cardsEl = document.getElementById('cards');
                     signal: activeCtrl ? activeCtrl.signal : undefined,
                     body: payload
                 };
-                const res = await fetch(`/api/sql/kitchen_online/index.php?${params.toString()}`, init);
+                const res = await fetch(`/kitchen_online?${params.toString()}`, init);
                 const data = await res.json();
                 if (mySeq !== reqSeq) return null;
                 return data;
@@ -223,7 +223,7 @@ const cardsEl = document.getElementById('cards');
                 const params = new URLSearchParams();
                 params.set('ajax', '1');
                 params.set('action', 'exclude');
-                const res = await fetch(`/api/sql/kitchen_online/index.php?${params.toString()}`, { method: 'POST', body: payload, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const res = await fetch(`/kitchen_online?${params.toString()}`, { method: 'POST', body: payload, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 const data = await res.json();
                 if (!data || !data.ok) throw new Error('bad');
                 const itemEl = btn.closest('.ko-item');
