@@ -32,11 +32,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     border-right:1px solid var(--border);
     display:flex;flex-direction:column;
     position:sticky;top:0;height:100vh;
-    overflow-y:auto;overflow-x:hidden;
-    scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+    overflow:hidden;
     z-index:100;
     transition:width .2s ease,min-width .2s ease,border-color .2s ease;
 }
+.sb-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:.5rem 0;scrollbar-width:thin;scrollbar-color:var(--border) transparent;min-height:0}
 .sidebar.sb-collapsed{width:0;min-width:0;border-right-color:transparent}
 .sb-brand{
     padding:.9rem 1.25rem;font-weight:700;font-size:1.05rem;
@@ -50,7 +50,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     transition:color .12s;flex-shrink:0;
 }
 .sb-collapse-btn:hover{color:var(--text)}
-.sb-nav{flex:1;padding:.5rem 0}
 .sb-section{margin-bottom:.125rem}
 .sb-title{
     padding:.55rem 1.25rem .2rem;
@@ -66,6 +65,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 }
 .sb-link:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .sb-link.active{color:var(--text);border-left-color:var(--accent);background:rgba(108,142,245,.1)}
+.sb-link.sb-off{color:var(--border);pointer-events:none;cursor:default;font-style:italic}
 .sb-sep{height:1px;background:var(--border);margin:.375rem 0}
 .sb-footer{border-top:1px solid var(--border);padding:.5rem;flex-shrink:0}
 
@@ -193,24 +193,15 @@ $currentPath = $currentPath ?? '/admin';
       <button class="sb-collapse-btn" id="sbCollapseBtn" title="Скрыть меню">&#9664;</button>
     </div>
     <nav class="sb-nav">
-      <?php
-      $firstSection = true;
-      foreach ($navSections as $section):
-          if (isset($section['perm']) && !$_sbCan($section['perm'])) continue;
-          $visibleLinks = array_filter(
-              $section['links'],
-              fn($item) => $_sbCan($item['perm'])
-          );
-          if (empty($visibleLinks)) continue;
-          if (!$firstSection): ?><div class="sb-sep"></div><?php endif;
-          $firstSection = false;
-      ?>
+      <?php foreach ($navSections as $i => $section): ?>
+        <?php if ($i > 0): ?><div class="sb-sep"></div><?php endif; ?>
         <div class="sb-section">
           <div class="sb-title"><?= htmlspecialchars($section['title']) ?></div>
-          <?php foreach ($visibleLinks as $href => $item): ?>
-            <a href="<?= $href ?>" class="sb-link<?= $currentPath === $href ? ' active' : '' ?>">
-              <?= htmlspecialchars($item['label']) ?>
-            </a>
+          <?php foreach ($section['links'] as $href => $item):
+              $can = $_sbCan($item['perm']);
+              $cls = 'sb-link' . ($currentPath === $href ? ' active' : '') . ($can ? '' : ' sb-off');
+          ?>
+            <a href="<?= $href ?>" class="<?= $cls ?>"><?= htmlspecialchars($item['label']) ?></a>
           <?php endforeach; ?>
         </div>
       <?php endforeach; ?>
