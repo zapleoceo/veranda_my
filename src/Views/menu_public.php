@@ -37,7 +37,7 @@ $telephone    = '+84396314266';
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens">
+    <link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">
     <link rel="stylesheet" href="/assets/css/links_index.css?v=20260505_0001">
     <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0040">
 </head>

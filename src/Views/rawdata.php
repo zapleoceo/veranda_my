@@ -7,7 +7,7 @@
     <title>Raw Data - Kitchen Analytics</title>
     <link rel="stylesheet" href="/assets/app.css">
     <link rel="stylesheet" href="/assets/datepicker-range-dialog.css">
-    <link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens">
+    <link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">
     <link rel="stylesheet" href="/assets/css/user_menu.css">
     <link rel="stylesheet" href="/assets/css/rawdata.css">
 </head>
