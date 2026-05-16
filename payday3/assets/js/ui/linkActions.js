@@ -66,10 +66,13 @@ function refreshFooterStats() {
     if ($u) $u.textContent = String(unlinked);
 }
 
-function uncheckAll() {
+function uncheckAll(selection) {
     document.querySelectorAll('.pd3-cb').forEach((cb) => { cb.checked = false; });
-    // Trigger one synthetic event so selection.js zeroes its counters.
-    document.body.dispatchEvent(new Event('change', { bubbles: true }));
+    // Programmatic `.checked = false` doesn't fire a change event, so
+    // we manually reset the selection state and force a recompute.
+    selection.sepayIds.clear();
+    selection.posterIds.clear();
+    selection.recompute();
 }
 
 function flash(msg, isErr = false) {
@@ -87,7 +90,7 @@ export function initLinkActions({ state, renderer, selection }) {
         reclassifyRows(links);
         refreshFooterStats();
         renderer.setLinks(links);
-        uncheckAll();
+        uncheckAll(selection);
     };
 
     const $auto   = document.getElementById('pd3LinkAutoBtn');
@@ -127,12 +130,14 @@ export function initLinkActions({ state, renderer, selection }) {
 
     $clear?.addEventListener('click', async () => {
         if ($clear.disabled) return;
-        if (!confirm('Удалить ВСЕ связи за выбранный период?')) return;
+        const r = state.get('range') || {};
+        const period = r.from === r.to ? r.from : `${r.from} — ${r.to}`;
+        if (!confirm(`Снять ВСЕ связи Sepay↔Poster за период ${period}?\n\nЭто удалит и авто-, и ручные связи в выбранном диапазоне дат. Селект чекбоксов не учитывается.`)) return;
         $clear.disabled = true;
         try {
-            const r = await api.post('/payday3/api/links/clear?' + qs());
-            after(r);
-            flash(`Связи очищены (${r.removed})`);
+            const result = await api.post('/payday3/api/links/clear?' + qs());
+            after(result);
+            flash(`Связи очищены (${result.removed ?? 0})`);
         } catch (e) {
             flash(e.message, true);
         } finally {

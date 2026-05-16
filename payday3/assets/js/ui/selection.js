@@ -52,8 +52,9 @@ export function initSelection() {
             }
         }
         const canLink = sepayIds.size > 0 && posterIds.size > 0;
-        if ($linkMake)  $linkMake.toggleAttribute('disabled',  !canLink);
-        if ($linkClear) $linkClear.toggleAttribute('disabled', !(sepayIds.size + posterIds.size));
+        if ($linkMake) $linkMake.toggleAttribute('disabled', !canLink);
+        // linkClear is always available — it clears EVERY link in the
+        // current date range regardless of selection.
     };
 
     document.body.addEventListener('change', (e) => {

@@ -27,8 +27,8 @@ declare(strict_types=1);
                 data-help-abs="Автоматически связать совпадения по сумме/времени.">🧩</button>
 
         <button type="button" class="pd3-mid__btn" id="pd3LinkClearBtn"
-                title="Разорвать"
-                data-help-abs="Удалить связи у выбранных строк." disabled aria-disabled="true">⛓️‍💥</button>
+                title="Снять все связи"
+                data-help-abs="Снять ВСЕ связи за выбранный период. Селект не нужен.">⛓️‍💥</button>
 
         <div class="pd3-mid__sums">
             <div class="pd3-mid__sum-row"><span class="muted">←</span><span id="pd3SelSepaySum">0</span></div>

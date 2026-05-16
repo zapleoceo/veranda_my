@@ -106,6 +106,20 @@
 }
 .pd3-graph-card { padding: 0; overflow: hidden; }
 
+/* IN / OUT section toggle — driven by body.pd3-mode-in / body.pd3-mode-out. */
+.pd3-section { display: none; }
+body.pd3-mode-in  .pd3-section--in  { display: block; }
+body.pd3-mode-out .pd3-section--out { display: block; }
+.pd3-out-placeholder {
+    padding: 32px 24px;
+    text-align: center;
+}
+.pd3-out-placeholder h2 { margin: 0 0 12px; }
+.pd3-link {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
 /* Single horizontal scroll for the whole pair of tables — they are
    never stacked vertically. On narrow viewports the user scrolls
    left/right; the SVG line layer scrolls with the tables because it
@@ -258,6 +272,7 @@
 .pd3-col--hide,
 .pd3-col--cb,
 .pd3-col--anchor,
+.pd3-col--lead,
 .pd3-col--time,
 .pd3-col--sum,
 .pd3-col--num,
@@ -270,8 +285,17 @@
 .pd3-col--content { min-width: 8rem; word-break: break-word; }
 .pd3-col--hide,
 .pd3-col--cb,
-.pd3-col--anchor { padding-left: 2px; padding-right: 2px; }
+.pd3-col--anchor,
+.pd3-col--lead { padding-left: 4px; padding-right: 4px; }
 .pd3-col--table { text-align: right; }
+
+/* Poster's combined leading cell — anchor dot + checkbox in one box,
+   matching payday2's .cell-anchor layout. */
+.pd3-lead {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
 
 /* ─── Row states ──────────────────────────────────────────── */
 .pd3-row.row-red    { background: linear-gradient(90deg, rgba(239,68,68,0.06), transparent 60%); }

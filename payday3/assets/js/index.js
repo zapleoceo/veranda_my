@@ -16,6 +16,7 @@ import { refreshStats }    from './ui/stats.js';
 import { LineRenderer }    from './ui/lineRenderer.js';
 import { initLinkActions } from './ui/linkActions.js';
 import { initDataActions } from './ui/dataActions.js';
+import { initModeTab }     from './ui/modeTab.js';
 
 const bootstrapEl = document.getElementById('pd3-bootstrap');
 let raw = {};
@@ -33,6 +34,7 @@ const state = new State({
 setCsrf(state.get('csrf'));
 window.__pd3 = state;
 
+initModeTab();
 initModeToggle();
 const selection = initSelection();
 initSort();
