@@ -35,6 +35,19 @@ class WebhookController
     private const POSTER_ACTIONS = ['vposter', 'vdecline', 'vrestore', 'vposter_fix', 'vposter_cancel'];
     private const IGNORE_ACTIONS = ['ignore_item', 'ignore_tx'];
 
+    // Friendly Russian label per action group — shown in denial popups so the
+    // user understands which checkbox in /admin/access needs to be ticked.
+    // Mirrors src/Controllers/Admin/AccessController::PERMISSION_KEYS.
+    private const ACTION_PERMISSION_LABEL = [
+        'ignore_item'    => 'Игнор + ✅ Принято',
+        'ignore_tx'      => 'Игнор + ✅ Принято',
+        'vposter'        => 'Кнопка «Бронь в Постере»',
+        'vdecline'       => 'Кнопка «Бронь в Постере»',
+        'vrestore'       => 'Кнопка «Бронь в Постере»',
+        'vposter_fix'    => 'Кнопка «Бронь в Постере»',
+        'vposter_cancel' => 'Кнопка «Бронь в Постере»',
+    ];
+
     public function __construct(
         private Database $db,
         private TelegramBotClient $bot,
@@ -175,9 +188,10 @@ class WebhookController
         };
 
         if (!$allowed) {
+            $permLabel = self::ACTION_PERMISSION_LABEL[$actionName] ?? $actionName;
             $msg = $username !== ''
-                ? "Нет доступа для @{$username}. Попросите admin'а добавить вам право «{$actionName}»."
-                : 'Нет доступа: у вашего Telegram нет публичного @username — добавьте его в настройках профиля.';
+                ? "Нет доступа для @{$username}.\nНужно право «{$permLabel}» — попросите админа поставить галочку на /admin/access."
+                : 'Нет доступа: у вашего Telegram нет публичного @username — добавьте его в настройках профиля Telegram, затем попросите админа выдать права на /admin/access.';
             $this->logger->warning('webhook.callback.denied', [
                 'action'   => $actionName,
                 'user'     => $username ?: '(no username)',

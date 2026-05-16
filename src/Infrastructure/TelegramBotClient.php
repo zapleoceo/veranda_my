@@ -69,7 +69,7 @@ class TelegramBotClient
             );
         }
         $result = $this->_call('editMessageText', $params);
-        return (bool) ($result['ok'] ?? false);
+        return self::_isEditOk($result);
     }
 
     public function editMessageReplyMarkup(int $messageId, array|null $keyboard = null): bool
@@ -83,7 +83,25 @@ class TelegramBotClient
             ),
         ];
         $result = $this->_call('editMessageReplyMarkup', $params);
-        return (bool) ($result['ok'] ?? false);
+        return self::_isEditOk($result);
+    }
+
+    /**
+     * "message is not modified" semantically means the message already matches
+     * what we wanted to push — treat it as success so callers don't waste a
+     * delete+resend cycle (which is what was happening with the every-minute
+     * status alert and visibly flickering it in the chat).
+     */
+    private static function _isEditOk(array|null $result): bool
+    {
+        if (!is_array($result)) {
+            return false;
+        }
+        if (!empty($result['ok'])) {
+            return true;
+        }
+        $desc = (string) ($result['description'] ?? '');
+        return stripos($desc, 'message is not modified') !== false;
     }
 
     public function deleteMessage(int $messageId): bool
