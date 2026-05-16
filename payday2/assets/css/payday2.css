@@ -24,7 +24,7 @@
 .pd2-top-forms-wrap { display: flex; gap: 10px; margin-left: 10px; align-items: center; flex-wrap: wrap; }
 #dateForm { width: auto; }
 .pd2-date-form { display: flex; gap: 10px; margin: 0; align-items: center; }
-.pd2-date-input { padding: 0 2px !important; width: auto !important; min-width: 90px; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; }
+.pd2-date-input { padding: 0 2px !important; width: auto !important; min-width: 90px; height: 34px; box-sizing: border-box; border-radius: 10px; display: flex; align-items: center; background: transparent !important; }
 .pd2-date-input::-webkit-calendar-picker-indicator { margin-left: 2px; padding: 0; }
 
 @keyframes pd2-spin {
