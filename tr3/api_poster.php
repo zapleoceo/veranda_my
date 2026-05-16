@@ -132,7 +132,9 @@ function tr3_api_free_tables(array $ctx): void {
       'raw' => null,
     ], 200);
   } catch (\Throwable $e) {
-    api_error(500, 'Poster request failed');
+    $dbg = trim((string)($_ENV['DEBUG'] ?? $_ENV['TR3_DEBUG'] ?? ''));
+    $msg = ($dbg === '1' || (string)($_GET['_dbg'] ?? '') === '1') ? $e->getMessage() : 'Poster request failed';
+    api_error(500, $msg);
   }
 }
 
@@ -302,7 +304,9 @@ function tr3_api_reservations(array $ctx): void {
       'reservations_items' => $items,
     ], 200);
   } catch (\Throwable $e) {
-    api_error(500, 'Poster request failed');
+    $dbg = trim((string)($_ENV['DEBUG'] ?? $_ENV['TR3_DEBUG'] ?? ''));
+    $msg = ($dbg === '1' || (string)($_GET['_dbg'] ?? '') === '1') ? $e->getMessage() : 'Poster request failed';
+    api_error(500, $msg);
   }
 }
 
@@ -386,7 +390,9 @@ function tr3_api_hall_tables(array $ctx): void {
       'tables' => $out,
     ], 200);
   } catch (\Throwable $e) {
-    api_error(500, 'Poster request failed');
+    $dbg = trim((string)($_ENV['DEBUG'] ?? $_ENV['TR3_DEBUG'] ?? ''));
+    $msg = ($dbg === '1' || (string)($_GET['_dbg'] ?? '') === '1') ? $e->getMessage() : 'Poster request failed';
+    api_error(500, $msg);
   }
 }
 
