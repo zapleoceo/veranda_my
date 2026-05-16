@@ -1,4 +1,11 @@
 <?php
+// .htaccess rewrites /links/ directly to this file, bypassing Slim/Composer.
+// Bootstrap autoloader + env when invoked outside the Slim app.
+if (!class_exists(\App\Infrastructure\Config::class, false)) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+    \App\Infrastructure\Config::load(__DIR__ . '/../.env');
+}
+
 require_once __DIR__ . '/links_data.php';
 
 $lang = null;
