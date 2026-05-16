@@ -29,6 +29,9 @@ try {
         }
     }
 } catch (\Throwable $e) {
+    if ($e instanceof \RuntimeException && $e->getMessage() === '_payday2_done') {
+        throw $e;
+    }
     if ($error === '') $error = $e->getMessage();
 }
 
