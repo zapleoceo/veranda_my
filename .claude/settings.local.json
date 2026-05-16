@@ -7,7 +7,25 @@
       "Bash(Remove-Item \"D:\\\\Projects\\\\Veranda site 2\\\\.claude\\\\worktrees\\\\dazzling-shtern-877a5d\\\\src\\\\classes\\\\TestAIRepositories.php\" -Force)",
       "Bash(Remove-Item \"D:\\\\Projects\\\\Veranda site 2\\\\.claude\\\\worktrees\\\\dazzling-shtern-877a5d\\\\src\\\\classes\\\\TestAIServices.php\" -Force)",
       "Bash(Write-Host \"Deleted\")",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(gh auth *)",
+      "PowerShell(gh auth status)",
+      "PowerShell(Get-Command gh -ErrorAction SilentlyContinue; \\(Get-Command winget -ErrorAction SilentlyContinue\\) | Select-Object -ExpandProperty Source; Test-Path \"$env:USERPROFILE\\\\.ssh\"; Get-ChildItem \"$env:USERPROFILE\\\\.ssh\" -ErrorAction SilentlyContinue | Select-Object Name, Length)",
+      "PowerShell(Write-Output \"=== gh ===\"; Get-Command gh -ErrorAction SilentlyContinue | Format-List Name, Source; Write-Output \"=== winget ===\"; Get-Command winget -ErrorAction SilentlyContinue | Format-List Name, Source; Write-Output \"=== ssh dir ===\"; Test-Path \"$env:USERPROFILE\\\\.ssh\"; Get-ChildItem \"$env:USERPROFILE\\\\.ssh\" -Force -ErrorAction SilentlyContinue | Select-Object Name)",
+      "PowerShell($ver = \"2.62.0\"; $tmpDir = \"$env:LOCALAPPDATA\\\\gh-portable\"; $zip = \"$env:TEMP\\\\gh.zip\"; if \\(-not \\(Test-Path \"$tmpDir\\\\bin\\\\gh.exe\"\\)\\) { New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null; $url = \"https://github.com/cli/cli/releases/download/v$ver/gh_${ver}_windows_amd64.zip\"; Write-Output \"Downloading $url\"; Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing; Expand-Archive -Path $zip -DestinationPath $tmpDir -Force; Remove-Item $zip -Force }; $env:Path = \"$tmpDir\\\\bin;$env:Path\"; & \"$tmpDir\\\\bin\\\\gh.exe\" --version)",
+      "Bash(git config *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "mcp__Claude_in_Chrome__select_browser",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__navigate",
+      "Bash(awk '/^<style>/,/^<\\\\/style>/' \"D:/Projects/Veranda site 2/.claude/worktrees/gracious-matsumoto-5bf919/src/Views/layout.php\")",
+      "mcp__Claude_in_Chrome__javascript_tool",
+      "Bash(git rebase *)",
+      "Bash(git restore *)",
+      "Bash(GIT_EDITOR=true git rebase --continue)"
     ]
   }
 }
