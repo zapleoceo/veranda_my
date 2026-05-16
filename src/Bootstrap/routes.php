@@ -31,6 +31,12 @@ use Slim\Routing\RouteCollectorProxy;
 
 /** @var App $app */
 
+// Root: redirect based on auth state
+$app->get('/', function ($req, $res) {
+    $location = !empty($_SESSION['user_email']) ? '/admin' : '/links';
+    return $res->withHeader('Location', $location)->withStatus(302);
+});
+
 // Auth
 $app->get('/login', [LoginController::class, 'show']);
 $app->post('/login', [LoginController::class, 'handle']);
