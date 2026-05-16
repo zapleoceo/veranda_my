@@ -14,6 +14,9 @@
     --accent:  #6c8ef5;
     --danger:  #ef4444;
     --ok:      #10b981;
+    /* aliases for user_menu.css */
+    --card:    var(--surface);
+    --accent2: rgba(108,142,245,.15);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
@@ -50,6 +53,7 @@ code{background:#1e2030;border:1px solid var(--border);border-radius:3px;padding
 details summary{cursor:pointer;user-select:none}
 </style>
 <?= $headExtra ?? '' ?>
+<link rel="stylesheet" href="/assets/css/user_menu.css">
 </head>
 <body>
 <nav>
@@ -71,8 +75,7 @@ details summary{cursor:pointer;user-select:none}
     <a href="<?= $href ?>" class="<?= trim($active) ?>"><?= $label ?></a>
     <?php endforeach; ?>
     <span class="spacer"></span>
-    <span class="user"><?= htmlspecialchars($userEmail ?? '') ?></span>
-    <a href="/logout" class="logout">Выйти</a>
+    <?php require __DIR__ . '/partials/user_menu.php'; ?>
 </nav>
 <main>
 <?php if (!empty($flashOk)): ?>
@@ -83,5 +86,6 @@ details summary{cursor:pointer;user-select:none}
 <?php endif; ?>
 <?= $content ?? '' ?>
 </main>
+<script src="/assets/user_menu.js" defer></script>
 </body>
 </html>
