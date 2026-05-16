@@ -18,7 +18,7 @@
     --card:     var(--surface);
     --accent2:  rgba(184,135,70,.15);
     --card2:    rgba(255,255,255,.07);
-    --sb-w:     220px;
+    --sb-w:     176px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
