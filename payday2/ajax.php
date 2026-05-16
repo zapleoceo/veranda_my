@@ -1065,7 +1065,7 @@ if (($_GET['ajax'] ?? '') === 'mail_out') {
         echo json_encode(['ok' => false, 'error' => 'IMAP not available'], JSON_UNESCAPED_UNICODE);
         payday2_do_exit();
     }
-    $inbox = @imap_open('{imap.gmail.com:993/imap/ssl}INBOX', $mailUser, $mailPass);
+    $inbox = @imap_open('{imap.gmail.com:993/imap/ssl/novalidate-cert}INBOX', $mailUser, $mailPass);
     if (!$inbox) {
         $imapErr = function_exists('imap_last_error') ? (string)imap_last_error() : '';
         if ($imapErr !== '') {
