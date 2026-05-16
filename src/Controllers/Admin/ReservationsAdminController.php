@@ -74,6 +74,7 @@ class ReservationsAdminController
 
     private function _layout(ResponseInterface $response, string $content, string $path, string $userEmail, array $flash): ResponseInterface
     {
+        $pageTitle = 'Брони — настройки';
         ob_start();
         $currentPath = $path;
         $flashOk  = $flash['ok'];

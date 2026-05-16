@@ -55,9 +55,9 @@
         <div class="filter-group">
             <label for="station">Цех:</label>
             <select name="station" id="station">
-                <option value="all" <?= $stationFilter === 'all' ? 'selected' : '' ?>>Все</option>
-                <option value="2" <?= $stationFilter === '2' ? 'selected' : '' ?>>Kitchen (2)</option>
-                <option value="3" <?= $stationFilter === '3' ? 'selected' : '' ?>>Bar (3)</option>
+                <option value="all"     <?= $stationFilter === 'all'     ? 'selected' : '' ?>>Все</option>
+                <option value="kitchen" <?= $stationFilter === 'kitchen' ? 'selected' : '' ?>>Kitchen</option>
+                <option value="bar"     <?= $stationFilter === 'bar'     ? 'selected' : '' ?>>Bar</option>
             </select>
         </div>
 

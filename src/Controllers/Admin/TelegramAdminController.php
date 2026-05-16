@@ -121,6 +121,7 @@ class TelegramAdminController
 
     private function _layout(ResponseInterface $response, string $content, string $userEmail, array $flash): ResponseInterface
     {
+        $pageTitle = 'Telegram';
         ob_start();
         $currentPath = '/admin/telegram';
         $flashOk  = $flash['ok'];

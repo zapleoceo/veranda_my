@@ -147,11 +147,12 @@ class DashboardController
 
     private function _layout(ResponseInterface $response, string $content, string $path, string $userEmail, array $flash): ResponseInterface
     {
+        $pageTitle = 'Дашборд';
+        $headExtra = '<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>';
         ob_start();
         $currentPath = $path;
         $flashOk  = $flash['ok'];
         $flashErr = $flash['err'];
-        $headExtra = '<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>';
         require __DIR__ . '/../../Views/layout.php';
         $html = ob_get_clean();
         $response->getBody()->write((string) $html);
