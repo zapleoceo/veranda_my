@@ -78,6 +78,17 @@ jobs:
             sleep $((i * 3))
           done
 
+      - name: Link static assets into public/
+        shell: bash
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-p ${{ secrets.SSH_PORT }} -i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o ConnectionAttempts=3 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          ssh ${SSH_OPTS} "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "
+            D='${{ secrets.DEPLOY_PATH }}'
+            ln -sfn \$D/assets \$D/public/assets
+            rm -rf \$D/public/tr3
+          "
+
       - name: Install Composer dependencies (server)
         shell: bash
         run: |
