@@ -77,6 +77,11 @@ class StaticController
         return $this->serve($response, __DIR__ . '/../../payday2/assets', $args['file']);
     }
 
+    public function payday3Assets(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../payday3/assets', $args['file']);
+    }
+
     public function banyaStatic(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         return $this->serve($response, __DIR__ . '/../../banya', $args['file']);
