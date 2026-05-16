@@ -17,6 +17,7 @@
     --ok:       #10b981;
     --card:     var(--surface);
     --accent2:  rgba(108,142,245,.15);
+    --card2:    rgba(255,255,255,.07);
     --sb-w:     220px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -126,8 +127,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .btn-secondary{background:#2d3148;color:var(--text);border:1px solid var(--border)}
 input[type=text],input[type=email],input[type=number],input[type=date],select,textarea{
     background:#0d0f1a;border:1px solid var(--border);border-radius:5px;
-    padding:.4rem .6rem;font-size:.85rem;width:100%;color:var(--text);
+    padding:.4rem .6rem;font-size:.85rem;color:var(--text);
 }
+/* Admin form pattern: label then input/select as siblings → fill container */
+label+input[type=text],label+input[type=email],label+input[type=number],label+input[type=date],
+label+select,label+textarea{display:block;width:100%}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(108,142,245,.15)}
 label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:.3rem}
 code{background:#1e2030;border:1px solid var(--border);border-radius:3px;padding:.1rem .3rem;font-size:.8rem}
