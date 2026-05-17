@@ -8,11 +8,16 @@ use App\Classes\PosterSupplyManager;
 use App\Payday3\Contracts\PosterApiProviderInterface;
 use App\Payday3\Contracts\PosterSuppliesServiceInterface;
 use App\Payday3\Domain\DateRange;
+use App\Payday3\Domain\Money;
 
 /**
  * Supplies (storage.getSupplies) + finance.getAccounts, plus the
  * "change account" mutation that goes through PosterSupplyManager
  * (legacy class kept; only the Service wrapping changes).
+ *
+ * Both endpoints return monetary fields in Poster cents — we convert
+ * supply_sum / total_sum on supplies and balance on accounts to VND
+ * here, mirroring what payday2's JS used to do in the browser.
  */
 final class PosterSuppliesService implements PosterSuppliesServiceInterface
 {
@@ -27,9 +32,41 @@ final class PosterSuppliesService implements PosterSuppliesServiceInterface
         ]);
         $accounts = $api->request('finance.getAccounts', []);
         return [
-            'supplies' => is_array($supplies) ? $supplies : [],
-            'accounts' => is_array($accounts) ? $accounts : [],
+            'supplies' => is_array($supplies) ? array_map([self::class, 'normaliseSupply'], $supplies) : [],
+            'accounts' => is_array($accounts) ? array_map([self::class, 'normaliseAccount'], $accounts) : [],
         ];
+    }
+
+    private static function normaliseSupply(mixed $row): mixed
+    {
+        if (!is_array($row)) return $row;
+        foreach (['supply_sum', 'supply_sum_netto', 'total_sum', 'sum'] as $k) {
+            if (array_key_exists($k, $row) && !is_array($row[$k])) {
+                $row[$k] = Money::posterMinorToVnd($row[$k]);
+            }
+        }
+        // `payed_sum` for supplies is a nested array of per-account
+        // payments — drill in and convert each `sum` field.
+        if (is_array($row['payed_sum'] ?? null)) {
+            $row['payed_sum'] = array_map(static function ($p) {
+                if (is_array($p) && array_key_exists('sum', $p)) {
+                    $p['sum'] = Money::posterMinorToVnd($p['sum']);
+                }
+                return $p;
+            }, $row['payed_sum']);
+        }
+        return $row;
+    }
+
+    private static function normaliseAccount(mixed $row): mixed
+    {
+        if (!is_array($row)) return $row;
+        foreach (['balance', 'balance_start'] as $k) {
+            if (array_key_exists($k, $row) && !is_array($row[$k])) {
+                $row[$k] = Money::posterMinorToVnd($row[$k]);
+            }
+        }
+        return $row;
     }
 
     public function changeAccount(int $supplyId, int $newAccountId): array

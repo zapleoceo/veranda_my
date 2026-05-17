@@ -9,6 +9,7 @@ use App\Payday3\Contracts\PosterApiProviderInterface;
 use App\Payday3\Contracts\PosterCheckServiceInterface;
 use App\Payday3\Contracts\TelegramNotifierInterface;
 use App\Payday3\Domain\DateRange;
+use App\Payday3\Domain\Money;
 
 /**
  * Two operations on Poster checks:
@@ -56,8 +57,10 @@ final class PosterCheckService implements PosterCheckServiceInterface
                 if ((int)($row['transaction_id'] ?? 0) === $transactionId) {
                     return [
                         'found'       => true,
-                        'transaction' => $row,
-                        'products'    => is_array($row['products'] ?? null) ? $row['products'] : [],
+                        'transaction' => self::normaliseTransactionMoney($row),
+                        'products'    => is_array($row['products'] ?? null)
+                                            ? self::normaliseProductsMoney($row['products'])
+                                            : [],
                     ];
                 }
             }
@@ -86,11 +89,14 @@ final class PosterCheckService implements PosterCheckServiceInterface
             if (!is_array($rows) || $rows === []) break;
             foreach ($rows as $row) {
                 if (!is_array($row)) continue;
+                // Poster returns `sum` / `payed_sum` in cents; convert
+                // here so the modal renders ₫ without trailing zeros.
+                $sumRaw = $row['sum'] ?? $row['payed_sum'] ?? 0;
                 $out[] = [
                     'transaction_id' => (int)($row['transaction_id'] ?? 0),
                     'receipt_number' => (int)($row['receipt_number'] ?? $row['transaction_id'] ?? 0),
                     'date_close'     => (string)($row['date_close'] ?? $row['date_close_date'] ?? ''),
-                    'sum'            => (int)($row['sum'] ?? $row['payed_sum'] ?? 0),
+                    'sum'            => Money::posterMinorToVnd($sumRaw),
                     'pay_type'       => (int)($row['pay_type'] ?? 0),
                     'spot_id'        => (int)($row['spot_id'] ?? 0),
                     'table_id'       => (int)($row['table_id'] ?? 0),
@@ -102,6 +108,42 @@ final class PosterCheckService implements PosterCheckServiceInterface
             $page++;
         }
         return $out;
+    }
+
+    /**
+     * Replace every money-shaped field on a transaction row with its
+     * VND-converted equivalent. Operating on a flat list keeps this
+     * deterministic and avoids hitting nested arrays we don't own.
+     *
+     * @param array<string,mixed> $row
+     */
+    private static function normaliseTransactionMoney(array $row): array
+    {
+        foreach (['sum', 'payed_sum', 'payed_cash', 'payed_card',
+                  'payed_third_party', 'payed_cert', 'payed_bonus',
+                  'tip_sum', 'discount', 'round_sum', 'pay_sum'] as $k) {
+            if (array_key_exists($k, $row)) {
+                $row[$k] = Money::posterMinorToVnd($row[$k]);
+            }
+        }
+        return $row;
+    }
+
+    /**
+     * @param  array<int,mixed> $products
+     * @return array<int,array>
+     */
+    private static function normaliseProductsMoney(array $products): array
+    {
+        return array_map(static function ($p) {
+            if (!is_array($p)) return $p;
+            foreach (['product_sum', 'unit_price', 'total', 'price'] as $k) {
+                if (array_key_exists($k, $p)) {
+                    $p[$k] = Money::posterMinorToVnd($p[$k]);
+                }
+            }
+            return $p;
+        }, $products);
     }
 
     public function remove(int $transactionId, string $byLabel): array

@@ -27,6 +27,29 @@ final class Money
         return new self((int)round($cents / 100));
     }
 
+    /**
+     * Poster API consistently returns monetary fields in cents (1 cent =
+     * 0.01 VND), but the wire format is sometimes int, sometimes string
+     * (e.g. "1500000.00"). This is the lenient companion to
+     * fromPosterCents(): accepts any scalar and returns the VND
+     * integer directly (skipping the Money wrapper) so callers can
+     * splat the result straight into JSON response shapes.
+     */
+    public static function posterMinorToVnd(mixed $raw): int
+    {
+        if ($raw === null || $raw === '') return 0;
+        if (is_int($raw))   return self::fromPosterCents($raw)->amount;
+        if (is_float($raw)) return self::fromPosterCents((int)round($raw))->amount;
+        if (is_string($raw)) {
+            $t = trim($raw);
+            if ($t === '') return 0;
+            $t = str_replace(',', '.', $t);
+            if (!is_numeric($t)) return 0;
+            return self::fromPosterCents((int)round((float)$t))->amount;
+        }
+        return 0;
+    }
+
     /** Lenient parser for user input / DB strings. */
     public static function parse(int|float|string|null $v): self
     {
