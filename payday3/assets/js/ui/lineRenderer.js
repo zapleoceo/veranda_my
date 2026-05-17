@@ -30,28 +30,37 @@ const DEFAULT_COLOR_FOR = (link) => {
 
 export class LineRenderer {
     constructor({
-        container,                       // .pd3-graph__grid — positioned ancestor
-        layer,                           // #pd3LineLayer — child of container
-        sepayScroll,                     // #pd3SepayScroll (vertical scroll viewport)
-        posterScroll,                    // #pd3PosterScroll
-        sepayTbody,                      // #pd3SepayTable tbody (for mutations)
-        posterTbody,                     // #pd3PosterTable tbody
-        colorFor   = DEFAULT_COLOR_FOR,
-        onUnlink   = null,
-        horizontalScroller = null,       // element whose scrollLeft moves the layer (.pd3-graph)
+        container,                       // grid wrapper that hosts the SVG layer
+        layer,                           // empty <div> inside container; SVG mounts here
+        leftScroll,                      // left pane's vertical scroll viewport
+        rightScroll,                     // right pane's vertical scroll viewport
+        leftTbody,                       // left tbody (for MutationObserver)
+        rightTbody,                      // right tbody
+        leftAnchorId   = null,           // (link) => element id of the left anchor
+        rightAnchorId  = null,           // (link) => element id of the right anchor
+        linkKey        = null,           // (link) => unique string for close-button reuse
+        colorFor       = DEFAULT_COLOR_FOR,
+        onUnlink       = null,           // (link) => void — called by × button
+        horizontalScroller = null,
+        // Legacy aliases kept for the existing IN-mode bootstrap.
+        sepayScroll = null, posterScroll = null, sepayTbody = null, posterTbody = null,
     }) {
         this._container = container;
         this._layer     = layer;
-        this._sepayScroll  = sepayScroll;
-        this._posterScroll = posterScroll;
+        this._leftScroll   = leftScroll  ?? sepayScroll;
+        this._rightScroll  = rightScroll ?? posterScroll;
+        this._leftTbody    = leftTbody   ?? sepayTbody;
+        this._rightTbody   = rightTbody  ?? posterTbody;
         this._horizontalScroller = horizontalScroller || container;
         this._colorFor  = colorFor;
         this._onUnlink  = onUnlink;
-        this._sepayTbody  = sepayTbody;
-        this._posterTbody = posterTbody;
+        // Default selectors keep IN-mode backward compatibility.
+        this._leftAnchorId  = leftAnchorId  || ((l) => 'pd3-sepay-anchor-'  + l.sepay_id);
+        this._rightAnchorId = rightAnchorId || ((l) => 'pd3-poster-anchor-' + l.poster_transaction_id);
+        this._linkKey       = linkKey       || ((l) => l.sepay_id + ':' + l.poster_transaction_id);
 
         this._links     = [];
-        this._buttons   = new Map();      // key 'sid:pid' → close-button DOM node
+        this._buttons   = new Map();      // key → close-button DOM node (reused across redraws)
         this._raf       = 0;
         this._destroyed = false;
 
@@ -109,8 +118,8 @@ export class LineRenderer {
         if (typeof ResizeObserver === 'function') {
             this._resizeObserver = new ResizeObserver(trigger);
             this._resizeObserver.observe(this._container);
-            if (this._sepayScroll)  this._resizeObserver.observe(this._sepayScroll);
-            if (this._posterScroll) this._resizeObserver.observe(this._posterScroll);
+            if (this._leftScroll)  this._resizeObserver.observe(this._leftScroll);
+            if (this._rightScroll) this._resizeObserver.observe(this._rightScroll);
         }
 
         // Row additions / removals / class changes (sort, hide, lite-mode column toggle).
@@ -118,12 +127,12 @@ export class LineRenderer {
             this._mutationObserver = new MutationObserver(trigger);
             const opts = { childList: true, subtree: true, attributes: true,
                            attributeFilter: ['class', 'style'] };
-            if (this._sepayTbody)  this._mutationObserver.observe(this._sepayTbody,  opts);
-            if (this._posterTbody) this._mutationObserver.observe(this._posterTbody, opts);
+            if (this._leftTbody)  this._mutationObserver.observe(this._leftTbody,  opts);
+            if (this._rightTbody) this._mutationObserver.observe(this._rightTbody, opts);
         }
 
         // Scroll on per-pane vertical scrollers and the horizontal container.
-        const targets = new Set([this._horizontalScroller, this._sepayScroll, this._posterScroll, window]);
+        const targets = new Set([this._horizontalScroller, this._leftScroll, this._rightScroll, window]);
         this._scrollListeners = [];
         for (const el of targets) {
             if (!el) continue;
@@ -155,20 +164,20 @@ export class LineRenderer {
         while (this._group.firstChild) this._group.removeChild(this._group.firstChild);
         for (const btn of this._buttons.values()) btn.style.display = 'none';
 
-        const sepayClip  = this._scrollRect(this._sepayScroll);
-        const posterClip = this._scrollRect(this._posterScroll);
+        const leftClip  = this._scrollRect(this._leftScroll);
+        const rightClip = this._scrollRect(this._rightScroll);
         const keep = new Set();
 
         for (const link of this._links) {
-            const aEl = document.getElementById('pd3-sepay-anchor-'  + link.sepay_id);
-            const bEl = document.getElementById('pd3-poster-anchor-' + link.poster_transaction_id);
+            const aEl = document.getElementById(this._leftAnchorId(link));
+            const bEl = document.getElementById(this._rightAnchorId(link));
             if (!aEl || !bEl) continue;
             if (!isRendered(aEl) || !isRendered(bEl)) continue;
 
             const aRect = aEl.getBoundingClientRect();
             const bRect = bEl.getBoundingClientRect();
-            if (sepayClip  && !isInClipY(aRect, sepayClip))  continue;
-            if (posterClip && !isInClipY(bRect, posterClip)) continue;
+            if (leftClip  && !isInClipY(aRect, leftClip))  continue;
+            if (rightClip && !isInClipY(bRect, rightClip)) continue;
 
             const a = pointOf(aRect, rootRect, this._container);
             const b = pointOf(bRect, rootRect, this._container);
@@ -180,7 +189,7 @@ export class LineRenderer {
             this._group.appendChild(svgPath(d, 'rgba(255,255,255,0.65)', 4));
             this._group.appendChild(svgPath(d, color, 2));
 
-            const key = link.sepay_id + ':' + link.poster_transaction_id;
+            const key = this._linkKey(link);
             this._placeRemoveButton(link, a, b, key);
             keep.add(key);
         }
@@ -201,7 +210,10 @@ export class LineRenderer {
             btn.textContent = '×';
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                this._onUnlink?.(Number(link.sepay_id), Number(link.poster_transaction_id));
+                // The handler receives the full link record — IN-mode
+                // adapter unpacks {sepay_id, poster_transaction_id};
+                // OUT-mode adapter unpacks {mail_uid, finance_id}.
+                this._onUnlink?.(link);
             });
             this._layer.appendChild(btn);
             this._buttons.set(key, btn);

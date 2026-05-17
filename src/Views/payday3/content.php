@@ -32,14 +32,18 @@ declare(strict_types=1);
         </div>
     </section>
 
-    <!-- OUT mode placeholder. Full OUT graph (outgoing bank mail ↔
-         Poster finance transactions) is Phase 6. The tab still works
-         — the UI just shows a placeholder until then. -->
+    <!-- OUT mode: BIDV outgoing mail ↔ Poster finance transactions.
+         Mail rows are fetched live from IMAP and finance rows from
+         Poster API on first activation. The same LineRenderer class
+         draws the connectors — only the anchor-id factories differ. -->
     <section class="pd3-card pd3-graph-card pd3-section pd3-section--out">
-        <div class="pd3-out-placeholder">
-            <h2>OUT-режим</h2>
-            <p class="muted">Сверка исходящих платежей (банковская почта BIDV ↔ финансовые транзакции Poster) ещё не перенесена в payday3.</p>
-            <p class="muted">Пока пользуйся <a href="/payday2?<?= http_build_query(['dateFrom' => $range->from, 'dateTo' => $range->to]) ?>" class="pd3-link">payday2</a> для OUT-режима.</p>
+        <div class="pd3-graph" id="pd3OutGraphRoot">
+            <div class="pd3-graph__grid">
+                <?php require __DIR__ . '/partials/out_mail_table.php'; ?>
+                <?php require __DIR__ . '/partials/out_mid_col.php'; ?>
+                <?php require __DIR__ . '/partials/out_finance_table.php'; ?>
+                <div class="pd3-graph__lines" id="pd3OutLineLayer" aria-hidden="true"></div>
+            </div>
         </div>
     </section>
 

@@ -34,10 +34,24 @@ use App\Payday3\Contracts\ReconciliationServiceInterface;
 use App\Payday3\Contracts\DayResetServiceInterface;
 use App\Payday3\Contracts\PosterSyncServiceInterface;
 use App\Payday3\Contracts\SepaySyncServiceInterface;
+use App\Payday3\Contracts\MailServiceInterface;
+use App\Payday3\Contracts\FinanceServiceInterface;
+use App\Payday3\Contracts\OutLinkRepositoryInterface;
+use App\Payday3\Contracts\OutReconciliationServiceInterface;
 use App\Payday3\Services\ReconciliationService;
 use App\Payday3\Services\DayResetService;
 use App\Payday3\Services\PosterSyncService;
 use App\Payday3\Services\SepaySyncService;
+use App\Payday3\Services\MailImapService;
+use App\Payday3\Services\FinancePosterService;
+use App\Payday3\Services\OutReconciliationService;
+use App\Payday3\Repositories\OutLinkRepository;
+use App\Payday3\Http\Actions\OutDataAction;
+use App\Payday3\Http\Actions\OutAutoLinkAction;
+use App\Payday3\Http\Actions\OutManualLinkAction;
+use App\Payday3\Http\Actions\OutUnlinkAction;
+use App\Payday3\Http\Actions\OutClearLinksAction;
+use App\Payday3\Http\Actions\MailHideAction;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -101,4 +115,35 @@ return [
     SepaySyncAction::class            => fn($c) => new SepaySyncAction($c->get(SepaySyncServiceInterface::class)),
     PosterSyncServiceInterface::class => fn($c) => new PosterSyncService($c->get(Database::class)),
     PosterSyncAction::class           => fn($c) => new PosterSyncAction($c->get(PosterSyncServiceInterface::class)),
+
+    // ─── Payday3 OUT mode ──────────────────────────────────────
+    MailServiceInterface::class       => fn($c) => new MailImapService($c->get(Database::class)),
+    FinanceServiceInterface::class    => fn()   => new FinancePosterService(),
+    OutLinkRepositoryInterface::class => fn($c) => new OutLinkRepository($c->get(Database::class)),
+    OutReconciliationServiceInterface::class => fn($c) => new OutReconciliationService(
+        $c->get(MailServiceInterface::class),
+        $c->get(FinanceServiceInterface::class),
+        $c->get(OutLinkRepositoryInterface::class),
+    ),
+    OutDataAction::class       => fn($c) => new OutDataAction(
+        $c->get(MailServiceInterface::class),
+        $c->get(FinanceServiceInterface::class),
+        $c->get(OutLinkRepositoryInterface::class),
+    ),
+    OutAutoLinkAction::class   => fn($c) => new OutAutoLinkAction(
+        $c->get(OutReconciliationServiceInterface::class),
+        $c->get(OutLinkRepositoryInterface::class),
+    ),
+    OutManualLinkAction::class => fn($c) => new OutManualLinkAction(
+        $c->get(OutReconciliationServiceInterface::class),
+        $c->get(OutLinkRepositoryInterface::class),
+    ),
+    OutUnlinkAction::class     => fn($c) => new OutUnlinkAction(
+        $c->get(OutReconciliationServiceInterface::class),
+        $c->get(OutLinkRepositoryInterface::class),
+    ),
+    OutClearLinksAction::class => fn($c) => new OutClearLinksAction(
+        $c->get(OutReconciliationServiceInterface::class),
+    ),
+    MailHideAction::class      => fn($c) => new MailHideAction($c->get(MailServiceInterface::class)),
 ];
