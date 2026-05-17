@@ -20,6 +20,7 @@ use App\Payday3\Http\Actions\OutManualLinkAction;
 use App\Payday3\Http\Actions\OutUnlinkAction;
 use App\Payday3\Http\Actions\OutClearLinksAction;
 use App\Payday3\Http\Actions\MailHideAction;
+use App\Payday3\Http\Actions\ActualBalanceAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -163,6 +164,9 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->post(  '/out/links/clear',                             OutClearLinksAction::class);
         $api->delete('/out/links/{mailUid:[0-9]+}/{financeId:[0-9]+}', OutUnlinkAction::class);
         $api->post(  '/out/mail/hide',                               MailHideAction::class);
+        // Actual balances — Phase 8 footer card.
+        $api->get(   '/balances',                                    ActualBalanceAction::class);
+        $api->post(  '/balances',                                    ActualBalanceAction::class);
     });
 })->add(AuthMiddleware::class);
 

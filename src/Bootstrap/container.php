@@ -52,6 +52,9 @@ use App\Payday3\Http\Actions\OutManualLinkAction;
 use App\Payday3\Http\Actions\OutUnlinkAction;
 use App\Payday3\Http\Actions\OutClearLinksAction;
 use App\Payday3\Http\Actions\MailHideAction;
+use App\Payday3\Http\Actions\ActualBalanceAction;
+use App\Payday3\Contracts\ActualBalanceRepositoryInterface;
+use App\Payday3\Repositories\ActualBalanceRepository;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -146,4 +149,8 @@ return [
         $c->get(OutReconciliationServiceInterface::class),
     ),
     MailHideAction::class      => fn($c) => new MailHideAction($c->get(MailServiceInterface::class)),
+
+    // ─── Payday3 balances footer ───────────────────────────────
+    ActualBalanceRepositoryInterface::class => fn($c) => new ActualBalanceRepository($c->get(Database::class)),
+    ActualBalanceAction::class              => fn($c) => new ActualBalanceAction($c->get(ActualBalanceRepositoryInterface::class)),
 ];

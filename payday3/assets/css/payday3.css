@@ -522,6 +522,39 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     transform: scale(1.18);
 }
 
+/* ─── Balances footer (Phase 8) ────────────────────────────── */
+.pd3-balances {
+    margin-top: 12px;
+    padding: 10px 12px;
+}
+.pd3-balances__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.pd3-balances__header h3 { margin: 0; font-size: 14px; }
+.pd3-bal-table { width: auto; min-width: 280px; }
+.pd3-bal-input {
+    width: 130px;
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 4px 8px;
+    font: inherit;
+    text-align: right;
+}
+.pd3-balances__footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+}
+.pd3-balances__status { font-size: 12px; }
+.pd3-balances__status.is-ok    { color: #10b981; }
+.pd3-balances__status.is-error { color: #ef4444; }
+
 /* ─── Modal host ───────────────────────────────────────────── */
 
 .pd3-modal-host {

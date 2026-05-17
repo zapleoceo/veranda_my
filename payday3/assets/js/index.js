@@ -19,6 +19,7 @@ import { initDataActions } from './ui/dataActions.js';
 import { initModeTab }     from './ui/modeTab.js';
 import { initModals }      from './ui/modals.js';
 import { initOutMode }     from './out/bootstrap.js';
+import { initBalances }    from './ui/balances.js';
 
 const bootstrapEl = document.getElementById('pd3-bootstrap');
 let raw = {};
@@ -46,6 +47,7 @@ initDateForm();
 initDataActions({ state });
 initModals({ state });
 initOutMode({ state });
+initBalances({ state });
 refreshStats();
 
 // Line renderer — bezier connectors between sepay/poster anchors.
