@@ -35,7 +35,17 @@ class VposterFixAction implements ActionInterface
             return '';
         }
         if ($pushedState === 1) {
+            // Same handling as VposterAction — collapse to final state and
+            // strip the dangling keyboard.
             $ctx->bot->answerCallbackQuery($ctx->callbackQueryId, 'Бронь уже отправлена в Poster');
+            $rowWithHall = $this->_withHallName($row, $ctx);
+            $baseText    = trim(ReservationTelegram::buildManagerText($rowWithHall));
+            $baseText    = preg_replace('/\n?\s*@\w+\s+@\w+\s+свяжитесь\s+с\s+гостем\s*\n?/u', "\n", $baseText);
+            $ctx->bot->editMessageText(
+                $ctx->messageId,
+                $baseText . "\n\n🚀 <b>Уже в Poster</b> (отправлено ранее)",
+                []
+            );
             return '';
         }
 
