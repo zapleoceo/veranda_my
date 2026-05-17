@@ -204,11 +204,17 @@ class TelegramBotClient
 
     private function _normalizeChatId(string $id): string
     {
-        $id = trim($id);
-        if ($id === '' || $id[0] === '@' || $id[0] === '-') {
-            return $id;
-        }
-        $digits = preg_replace('/\D+/', '', $id);
-        return ($digits !== '') ? '-100' . $digits : $id;
+        // Telegram returns chat_id already in the canonical format in every
+        // update payload — positive int for private user/bot chats, negative
+        // for groups, -100xxxxxxxxxx for supergroups/channels. Anyone wiring
+        // a chat id (e.g. .env TELEGRAM_CHAT_ID, callers passing user ids
+        // from webhook) is expected to use the same string. We just trim.
+        //
+        // Previously we prefixed any positive-numeric id with "-100" which
+        // worked for supergroup ids stored without their prefix, but broke
+        // every reply to private chats (user id 169510539 became
+        // -100169510539 -> "Bad Request: chat not found"). Don't second-guess
+        // the caller.
+        return trim($id);
     }
 }

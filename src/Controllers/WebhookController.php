@@ -136,6 +136,17 @@ class WebhookController
         )->fetch();
 
         if (!is_array($row) || empty($row['code'])) {
+            // Code unknown or already used or expired (>30 min). Tell the
+            // user instead of silently dropping the /start; previously the
+            // bot looked dead.
+            $this->logger->info('webhook.reservation_start.code_miss', [
+                'code' => $code,
+                'chat' => $chatId,
+                'user' => $from['username'] ?? null,
+            ]);
+            $this->bot->withChatId($chatId)->sendMessage(
+                'Ссылка для подтверждения устарела или уже использована. Открой бронирование ещё раз на сайте и нажми кнопку Telegram заново.'
+            );
             return;
         }
 
