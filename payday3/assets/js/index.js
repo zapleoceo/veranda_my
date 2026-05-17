@@ -20,6 +20,8 @@ import { initModeTab }     from './ui/modeTab.js';
 import { initModals }      from './ui/modals.js';
 import { initOutMode }     from './out/bootstrap.js';
 import { initBalances }    from './ui/balances.js';
+import { makeInLoader }    from './in/bootstrap.js';
+import { initFinanceTransfers } from './ui/financeTransfers.js';
 
 const bootstrapEl = document.getElementById('pd3-bootstrap');
 let raw = {};
@@ -44,7 +46,6 @@ initSort();
 initEyeToggles();
 initHelpMode();
 initDateForm();
-initDataActions({ state });
 initModals({ state });
 initOutMode({ state });
 initBalances({ state });
@@ -70,6 +71,17 @@ if (renderer) {
 } else {
     console.warn('[payday3] grid not found, LineRenderer disabled');
 }
+
+// AJAX IN-mode refresh — replaces window.location.reload() after sync.
+const loadInData = makeInLoader({ state, renderer });
+const finance    = initFinanceTransfers({ state });
+initDataActions({
+    state,
+    refresh: async () => {
+        await loadInData();
+        finance.reload();
+    },
+});
 
 console.info('[payday3] ready', {
     range: state.get('range'),

@@ -33,6 +33,8 @@ use App\Payday3\Http\Actions\PosterFinanceCategoriesAction;
 use App\Payday3\Http\Actions\PosterCheckListAction;
 use App\Payday3\Http\Actions\PosterBalanceSnapshotAction;
 use App\Payday3\Http\Actions\SettingsAction;
+use App\Payday3\Http\Actions\InDataAction;
+use App\Payday3\Http\Actions\FinanceTransfersAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -196,6 +198,10 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         // Settings (replaces /payday2/?ajax=save_local_config).
         $api->get(   '/settings',                                    SettingsAction::class);
         $api->post(  '/settings',                                    SettingsAction::class);
+        // Full IN-mode snapshot for client-side re-render (after sync / clearDay).
+        $api->get(   '/data',                                        InDataAction::class);
+        // Финансовые транзакции (Vietnam + Tips) card.
+        $api->get(   '/finance/transfers',                           FinanceTransfersAction::class);
     });
 })->add(AuthMiddleware::class);
 

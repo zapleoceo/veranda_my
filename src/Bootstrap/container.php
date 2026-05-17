@@ -81,6 +81,10 @@ use App\Payday3\Http\Actions\PosterFinanceCategoriesAction;
 use App\Payday3\Http\Actions\PosterCheckListAction;
 use App\Payday3\Http\Actions\PosterBalanceSnapshotAction;
 use App\Payday3\Http\Actions\SettingsAction;
+use App\Payday3\Http\Actions\InDataAction;
+use App\Payday3\Http\Actions\FinanceTransfersAction;
+use App\Payday3\Contracts\FinanceTransferServiceInterface;
+use App\Payday3\Services\FinanceTransferService;
 use App\Payday3\Contracts\PosterBalanceServiceInterface;
 use App\Payday3\Services\PosterBalanceService;
 use Psr\Http\Message\ResponseFactoryInterface;
@@ -221,4 +225,16 @@ return [
     ),
     PosterBalanceSnapshotAction::class      => fn($c) => new PosterBalanceSnapshotAction($c->get(PosterBalanceServiceInterface::class)),
     SettingsAction::class                   => fn($c) => new SettingsAction($c->get(LocalSettingsRepositoryInterface::class)),
+
+    // ─── Payday3 IN AJAX-refresh + Финансовые транзакции ──────
+    InDataAction::class => fn($c) => new InDataAction($c->get(PageDataAssembler::class)),
+    FinanceTransferServiceInterface::class => fn($c) => new FinanceTransferService(
+        $c->get(Database::class),
+        $c->get(PosterApiProviderInterface::class),
+        $c->get(LocalSettingsRepositoryInterface::class),
+    ),
+    FinanceTransfersAction::class => fn($c) => new FinanceTransfersAction(
+        $c->get(FinanceTransferServiceInterface::class),
+        $c->get(LocalSettingsRepositoryInterface::class),
+    ),
 ];
