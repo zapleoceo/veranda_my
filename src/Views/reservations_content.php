@@ -308,6 +308,9 @@ $fmtSpotDateTimeParts = function (string $s) use ($parseSpotDt): array {
                     <div class="form-group"><label class="res-modal-k">Hall</label><select name="hall_id" id="editResHallId" class="res-input"></select></div>
                     <div class="form-group"><label class="res-modal-k">Стол (Poster)</label><select name="poster_table_id" id="editResTableNum" class="res-input"></select></div>
                     <div class="form-group"><label class="res-modal-k">Код брони</label><input type="text" name="qr_code" id="editResQRCode" class="res-input"></div>
+                    <div class="form-group"><label class="res-modal-k">Telegram username</label><input type="text" name="tg_username" id="editResTgUsername" class="res-input" placeholder="@username"></div>
+                    <div class="form-group"><label class="res-modal-k">WhatsApp телефон</label><input type="text" name="whatsapp_phone" id="editResWhatsappPhone" class="res-input" placeholder="+84..."></div>
+                    <div class="form-group"><label class="res-modal-k">Zalo телефон</label><input type="text" name="zalo_phone" id="editResZaloPhone" class="res-input" placeholder="+84..."></div>
                     <div class="form-group form-group-span-2"><label class="res-modal-k">Комментарий</label><textarea name="comment" id="editResComment" class="res-input" rows="3"></textarea></div>
                 </form>
             </div>
@@ -320,5 +323,5 @@ $fmtSpotDateTimeParts = function (string $s) use ($parseSpotDt): array {
 
     <div class="res-hscroll" id="resHScroll" hidden><div class="res-hscroll-inner" id="resHScrollInner"></div></div>
 
-<script src="/reservations/assets/js/reservations.js"></script>
+<script src="/reservations/assets/js/reservations.js?v=20260517_account"></script>
 <script src="/reservations/assets/js/reservations_hall.js"></script>
