@@ -1,8 +1,11 @@
 (() => {
   const q = (sel, root = document) => root.querySelector(sel);
+  // See reservations.js for full explanation — keep the trailing slash
+  // so POSTs don't get demoted to GET by Apache's 301 redirect.
   const endpoint = (() => {
-    const p = String(location.pathname || '').replace(/\/+$/, '');
-    return p === '' ? '/reservations' : p;
+    const p = String(location.pathname || '');
+    if (p === '') return '/reservations/';
+    return p.endsWith('/') ? p : (p + '/');
   })();
 
   const postForm = async (url, data) => {

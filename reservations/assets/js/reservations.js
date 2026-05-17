@@ -1,9 +1,16 @@
 (() => {
   const q = (sel, root = document) => root.querySelector(sel);
   const qa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+  // Apache mod_dir 301-redirects /reservations → /reservations/ with the
+  // scheme downgraded to http:// inside the Location header. Browsers
+  // follow 301 POSTs by demoting them to GET and dropping the body —
+  // every action button (reG/reM/вPos/delete) was silently failing as a
+  // result. Always end the endpoint with '/' so the fetch hits Slim
+  // directly without bouncing through Apache.
   const endpoint = (() => {
-    const p = String(location.pathname || '').replace(/\/+$/, '');
-    return p === '' ? '/reservations' : p;
+    const p = String(location.pathname || '');
+    if (p === '') return '/reservations/';
+    return p.endsWith('/') ? p : (p + '/');
   })();
 
   const refreshTableFromUrl = async (url) => {
