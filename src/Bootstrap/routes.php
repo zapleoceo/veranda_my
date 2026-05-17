@@ -35,6 +35,7 @@ use App\Payday3\Http\Actions\PosterBalanceSnapshotAction;
 use App\Payday3\Http\Actions\SettingsAction;
 use App\Payday3\Http\Actions\InDataAction;
 use App\Payday3\Http\Actions\FinanceTransfersAction;
+use App\Payday3\Http\Actions\BalanceScreenshotAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -181,6 +182,8 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         // Actual balances — Phase 8 footer card.
         $api->get(   '/balances',                                    ActualBalanceAction::class);
         $api->post(  '/balances',                                    ActualBalanceAction::class);
+        // Send a screenshot of the balance card to Telegram (sendPhoto).
+        $api->post(  '/balances/telegram',                           BalanceScreenshotAction::class);
         // Poster integrations — replaces /payday2/?ajax=kashshift/supplies/poster_check_*
         $api->get(   '/poster/cashshifts',                           PosterCashShiftListAction::class);
         $api->get(   '/poster/cashshifts/{shiftId:[A-Za-z0-9_-]+}',  PosterCashShiftDetailAction::class);

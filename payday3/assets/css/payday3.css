@@ -553,11 +553,38 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     text-transform: uppercase;
     color: var(--muted);
 }
+.pd3-card__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.pd3-card__actions .pd3-pill {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: color .12s ease, background .12s ease, border-color .12s ease;
+}
+.pd3-card__actions .pd3-pill:hover {
+    color: var(--text);
+    border-color: var(--muted);
+    background: rgba(255,255,255,0.04);
+}
+.pd3-card__actions .pd3-pill.is-busy { animation: pd3-spin 0.8s linear infinite; }
+.pd3-card__actions .pd3-pill:disabled { opacity: 0.5; cursor: progress; }
+@keyframes pd3-spin { to { transform: rotate(360deg); } }
 .pd3-card__footer {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
+    padding: 4px 10px 6px;
     border-top: 1px solid rgba(255,255,255,0.06);
 }
 .pd3-btn--sm {
@@ -611,9 +638,47 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     text-align: right;
 }
 .pd3-bal-input:focus { outline: 2px solid rgba(184,135,70,0.45); outline-offset: 1px; }
+.pd3-bal-input--ghost {
+    /* visual stand-in used during html2canvas screenshot — mimics the
+       input exactly so text doesn't shift in the rendered PNG */
+    display: inline-block;
+    text-align: right;
+}
 .pd3-balances__status { font-size: 11px; }
-.pd3-balances__status.is-ok    { color: #10b981; }
+.pd3-balances__status.is-ok    { color: #10b981; transition: color .2s; }
 .pd3-balances__status.is-error { color: #ef4444; }
+
+/* All-accounts list table — hydrated by reloadPoster(). Scrolls
+   vertically with a dark scrollbar (site-wide rule in common.css). */
+.pd3-bal-accounts {
+    border-top: 1px solid rgba(255,255,255,0.06);
+    max-height: 220px;
+    overflow-y: auto;
+}
+.pd3-bal-accounts__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin: 0;
+}
+.pd3-bal-accounts__table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    z-index: 1;
+    padding: 4px 8px 3px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.pd3-bal-accounts__table tbody td {
+    padding: 2px 8px;
+    border-top: 1px dashed rgba(255,255,255,0.04);
+    font-variant-numeric: tabular-nums;
+}
 
 /* ─── Modal host ───────────────────────────────────────────── */
 

@@ -29,3 +29,27 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
+
+/* ─── Dark scrollbars, site-wide ─────────────────────────────
+   Two-track approach so every browser sees a dark scrollbar:
+     - Firefox / modern browsers: `scrollbar-color` (standard).
+     - WebKit / Blink (Chrome, Edge, Safari): ::-webkit-scrollbar
+       pseudo-elements styled to match the page palette.
+   The thumb uses --border with --muted on hover; the track is a
+   shade darker than the page background so it disappears unless
+   actively in use. */
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar         { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track   { background: transparent; }
+*::-webkit-scrollbar-thumb   {
+    background: var(--border);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+*::-webkit-scrollbar-corner  { background: transparent; }

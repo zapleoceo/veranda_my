@@ -1,10 +1,15 @@
-// Итоговый баланс card. Three sources of truth:
+// Итоговый баланс card. Three columns of truth:
 //   Poster   — GET /payday3/api/poster/balances (live snapshot)
 //   Факт.    — operator-entered, persisted to payday_actual_balances
-//   Разница  — Факт − Poster, computed client-side, coloured
+//              AUTOMATICALLY when the input loses focus (no Save btn)
+//   Δ        — Факт − Poster, computed client-side, coloured
 //
-// Both fetches use the in-flight disabled-button pattern + .is-busy
-// spinner; the user can't double-fire either.
+// Header buttons:
+//   ↻  reload Poster balances + accounts list
+//   ✈  send html2canvas screenshot of the card to Telegram
+//
+// Below the 4-row grid we render every Poster account with its
+// balance — populated from the same /poster/balances payload.
 
 'use strict';
 
@@ -62,7 +67,27 @@ function refreshDiffs(posterMap) {
     }
 }
 
-let posterCache = { andrey: null, vietnam: null, cash: null, total: null };
+function renderAccountsList(accounts) {
+    const wrap  = document.getElementById('pd3BalAccountsWrap');
+    const tbody = document.getElementById('pd3BalAccountsTbody');
+    if (!wrap || !tbody) return;
+    if (!accounts || accounts.length === 0) {
+        wrap.hidden = true;
+        tbody.innerHTML = '';
+        return;
+    }
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[c]);
+    tbody.innerHTML = accounts.map((a) => `<tr>
+        <td class="right nowrap muted">${esc(a.account_id)}</td>
+        <td class="nowrap">${esc(a.name)}</td>
+        <td class="right nowrap">${esc(fmt(a.balance))}</td>
+    </tr>`).join('');
+    wrap.hidden = false;
+}
+
+let posterCache = { andrey: null, vietnam: null, cash: null, total: null, accounts: [] };
 let reloadInFlight = false;
 
 async function reloadPoster() {
@@ -80,6 +105,7 @@ async function reloadPoster() {
             const v = posterCache[k];
             el.textContent = v === null || v === undefined ? '—' : fmt(v);
         }
+        renderAccountsList(posterCache.accounts || []);
         refreshDiffs(posterCache);
     } catch (e) {
         setStatus('Poster balances: ' + (e.message || 'error'), 'error');
@@ -104,27 +130,104 @@ async function loadActual(state) {
     }
 }
 
-let saving = false;
-async function save(state) {
-    if (saving) return;
-    saving = true;
-    const btn = document.getElementById('pd3BalancesSaveBtn');
-    if (btn) btn.disabled = true;
-    setStatus('Сохраняю…');
+// ─── Auto-save plumbing ────────────────────────────────────────
+//
+// We persist whenever a value actually changed AND the user has
+// committed it (blur, Enter, or 600 ms after the last keystroke).
+// Repeated blurs with no change are ignored — no UI flicker.
+
+let savingActual = false;
+let lastSavedKeys = {};
+let saveTimer = 0;
+
+async function saveActualNow(state) {
+    if (savingActual) return;
+    savingActual = true;
     const date = state.get('range')?.to || new Date().toISOString().slice(0, 10);
     const body = { target_date: date };
+    let changed = false;
     for (const k of ['andrey', 'vietnam', 'cash', 'total']) {
         const input = document.getElementById('pd3BalActual_' + k);
-        body['bal_' + k] = input ? parse(input.value) : null;
+        const v = input ? parse(input.value) : null;
+        body['bal_' + k] = v;
+        if (lastSavedKeys[k] !== v) changed = true;
     }
+    if (!changed) { savingActual = false; return; }
+    setStatus('Сохраняю…');
     try {
         await api.post('/payday3/api/balances', body);
+        for (const k of ['andrey', 'vietnam', 'cash', 'total']) lastSavedKeys[k] = body['bal_' + k];
         setStatus('Сохранено в ' + date, 'ok');
     } catch (e) {
         setStatus('Ошибка: ' + (e.message || 'error'), 'error');
     } finally {
-        saving = false;
-        if (btn) btn.disabled = false;
+        savingActual = false;
+    }
+}
+
+function scheduleAutoSave(state, delay = 600) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveActualNow(state), delay);
+}
+
+// ─── Telegram screenshot ───────────────────────────────────────
+
+async function loadHtml2Canvas() {
+    if (window.html2canvas) return window.html2canvas;
+    await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('html2canvas load failed'));
+        document.head.appendChild(s);
+    });
+    return window.html2canvas;
+}
+
+async function sendBalancesToTelegram(state) {
+    const card = document.getElementById('pd3Balances');
+    const btn  = document.getElementById('pd3BalancesTelegramBtn');
+    if (!card || !btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.classList.add('is-busy');
+    setStatus('Готовлю снимок…');
+    try {
+        // Make sure any pending blur-save is committed first.
+        await saveActualNow(state);
+
+        const html2canvas = await loadHtml2Canvas();
+
+        // Swap inputs → divs so html2canvas doesn't mis-baseline text.
+        const inputs = Array.from(card.querySelectorAll('input.pd3-bal-input'));
+        const swaps = inputs.map((inp) => {
+            const fake = document.createElement('div');
+            fake.className = 'pd3-bal-input pd3-bal-input--ghost';
+            fake.textContent = inp.value;
+            inp.parentNode.insertBefore(fake, inp);
+            inp.style.display = 'none';
+            return { inp, fake };
+        });
+        try {
+            const canvas = await html2canvas(card, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: getComputedStyle(document.body).backgroundColor || '#0f172a',
+            });
+            const dataUrl = canvas.toDataURL('image/png');
+            setStatus('Отправка…');
+            await api.post('/payday3/api/balances/telegram', { image: dataUrl });
+            setStatus('Отправлено в Telegram', 'ok');
+        } finally {
+            for (const { inp, fake } of swaps) {
+                fake.remove();
+                inp.style.display = '';
+            }
+        }
+    } catch (e) {
+        setStatus('Telegram: ' + (e.message || 'error'), 'error');
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('is-busy');
     }
 }
 
@@ -132,16 +235,32 @@ export function initBalances({ state }) {
     if (!document.getElementById('pd3Balances')) return;
 
     document.querySelectorAll('.pd3-bal-input').forEach((el) => {
+        // Live diff while typing — cheap, no network.
+        el.addEventListener('input', () => refreshDiffs(posterCache));
+        // Reformat + auto-save when the field loses focus.
         el.addEventListener('blur', () => {
             const v = parse(el.value);
             el.value = v === null ? '' : fmt(v);
             refreshDiffs(posterCache);
+            saveActualNow(state);
         });
-        el.addEventListener('input', () => refreshDiffs(posterCache));
+        // Enter commits without losing focus.
+        el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+        });
+        // Debounced save while typing — handles paste/long edits.
+        el.addEventListener('input', () => scheduleAutoSave(state));
     });
 
-    document.getElementById('pd3BalancesSaveBtn')?.addEventListener('click', () => save(state));
     document.getElementById('pd3BalancesReloadBtn')?.addEventListener('click', () => reloadPoster());
+    document.getElementById('pd3BalancesTelegramBtn')?.addEventListener('click', () => sendBalancesToTelegram(state));
+
+    // Re-save before the user navigates away — guarantees the last
+    // edit makes it to the server even if they tab away in a hurry.
+    window.addEventListener('beforeunload', () => {
+        if (savingActual) return;
+        try { saveActualNow(state); } catch (_) {}
+    });
 
     reloadPoster().then(() => loadActual(state));
 }

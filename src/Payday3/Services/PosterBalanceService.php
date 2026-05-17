@@ -32,12 +32,20 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
     public function snapshot(): array
     {
         $rows = $this->poster->client()->request('finance.getAccounts', []);
-        $byId = [];
+        $byId     = [];
+        $accounts = [];
         if (is_array($rows)) {
             foreach ($rows as $r) {
                 if (!is_array($r)) continue;
                 $id = (int)($r['account_id'] ?? 0);
-                if ($id > 0) $byId[$id] = Money::posterMinorToVnd($r['balance'] ?? 0);
+                if ($id <= 0) continue;
+                $balanceVnd  = Money::posterMinorToVnd($r['balance'] ?? 0);
+                $byId[$id]   = $balanceVnd;
+                $accounts[]  = [
+                    'account_id' => $id,
+                    'name'       => trim((string)($r['name'] ?? '')),
+                    'balance'    => $balanceVnd,
+                ];
             }
         }
         $cfg = $this->settings->load();
@@ -59,6 +67,15 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
         // payday2's "Total" row (`$sum += $r['balance']` across all rows).
         $total = $byId === [] ? null : array_sum($byId);
 
-        return ['andrey' => $a, 'vietnam' => $v, 'cash' => $c, 'total' => $total];
+        // Stable ID-ascending order so the list table doesn't jitter.
+        usort($accounts, static fn($x, $y) => $x['account_id'] <=> $y['account_id']);
+
+        return [
+            'andrey'   => $a,
+            'vietnam'  => $v,
+            'cash'     => $c,
+            'total'    => $total,
+            'accounts' => $accounts,
+        ];
     }
 }
