@@ -66,7 +66,9 @@
       "Bash(git rm *)",
       "Bash(rmdir api/menu api/poster/rawdata api/sql/kitchen_online api/sql/rawdata api/sql)",
       "Bash(/opt/php82/bin/php -l cron/menu_sync.php)",
-      "Bash(/opt/php82/bin/php -l scripts/menu/cron.php)"
+      "Bash(/opt/php82/bin/php -l scripts/menu/cron.php)",
+      "Bash(grep -nE \"btnSave|res_edit|FormData|qs\\\\\\\\\\(\" reservations/assets/js/reservations.js)",
+      "Bash(grep -nE \"get_res\\\\\\\\b|getReservation\\\\\\\\b\" src/Controllers/ReservationsController.php reservations/Model.php)"
     ]
   }
 }

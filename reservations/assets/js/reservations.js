@@ -846,6 +846,13 @@
         q('#editResName').value = d.name || '';
         q('#editResPhone').value = d.phone || '';
         q('#editResQRCode').value = d.qr_code || '';
+        // Linked-account fields: tg_username can be stored with or without
+        // the leading '@'; prepend it for display so the user knows what
+        // the format should be when saving back.
+        const tgUser = String(d.tg_username || '').trim();
+        q('#editResTgUsername').value = tgUser === '' ? '' : (tgUser.startsWith('@') ? tgUser : '@' + tgUser);
+        q('#editResWhatsappPhone').value = d.whatsapp_phone || '';
+        q('#editResZaloPhone').value = d.zalo_phone || '';
         q('#editResComment').value = d.comment || '';
 
         const spotId = Number(d.spot_id || urlSpotId || 1) || 1;
