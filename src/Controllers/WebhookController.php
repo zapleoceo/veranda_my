@@ -61,7 +61,18 @@ class WebhookController
             return (new WaEventHandler($this->db, $this->bot))->handle($request, $response, $waEvent);
         }
 
-        $update = json_decode((string) $request->getBody(), true) ?? [];
+        $rawBody = (string) $request->getBody();
+        $update  = json_decode($rawBody, true) ?? [];
+
+        // Top-level audit: what kind of update arrived. Helps diagnose
+        // "bot doesn't react" — we can tell if Telegram is hitting us at
+        // all and which keys the update contains.
+        $updateKeys = array_diff(array_keys($update), ['update_id']);
+        $this->logger->info('webhook.update', [
+            'update_id' => $update['update_id'] ?? null,
+            'keys'      => array_values($updateKeys),
+            'body_len'  => strlen($rawBody),
+        ]);
 
         if (!empty($update['message'])) {
             return $this->_handleMessage($response, (array) $update['message']);
@@ -69,6 +80,12 @@ class WebhookController
 
         if (!empty($update['callback_query'])) {
             return $this->_handleCallbackQuery($response, (array) $update['callback_query']);
+        }
+
+        // Any other update type (edited_message, my_chat_member,
+        // message_reaction…) — log so we know what to add support for.
+        if (!empty($updateKeys)) {
+            $this->logger->info('webhook.update.unhandled', ['keys' => array_values($updateKeys)]);
         }
 
         $response->getBody()->write('ok');
@@ -81,6 +98,15 @@ class WebhookController
         $chatId = (string) ($chat['id'] ?? '');
         $text   = trim((string) ($msg['text'] ?? ''));
         $cmd    = strtolower((string) preg_replace('/\s+.*/', '', $text));
+
+        // Log every incoming text so /start delivery is traceable.
+        $this->logger->info('webhook.message', [
+            'chat'    => $chatId,
+            'type'    => $chat['type'] ?? null,
+            'user'    => $msg['from']['username'] ?? null,
+            'cmd'     => $cmd,
+            'text_len' => strlen($text),
+        ]);
 
         if ($cmd === '/start' && $chatId !== '' && ($chat['type'] ?? '') === 'private') {
             if (preg_match('/^\/start(?:@\w+)?\s+([a-f0-9]{8,40})$/i', $text, $m)) {
