@@ -146,9 +146,14 @@ export function initLinkActions({ state, renderer, selection }) {
     });
 
     // Per-link unlink hook (called from LineRenderer's × button).
-    return async function onUnlink(sepayId, posterId) {
+    // Receives the full link record so OUT-mode can reuse the same hook
+    // shape with different id fields.
+    return async function onUnlink(link) {
+        const sid = Number(link?.sepay_id);
+        const pid = Number(link?.poster_transaction_id);
+        if (!sid || !pid) return;
         try {
-            const r = await api.delete(`/payday3/api/links/${sepayId}/${posterId}?${qs()}`);
+            const r = await api.delete(`/payday3/api/links/${sid}/${pid}?${qs()}`);
             after(r);
         } catch (e) {
             flash(e.message, true);

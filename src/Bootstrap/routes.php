@@ -14,6 +14,12 @@ use App\Payday3\Http\Actions\ClearLinksAction;
 use App\Payday3\Http\Actions\ClearDayAction;
 use App\Payday3\Http\Actions\SepaySyncAction;
 use App\Payday3\Http\Actions\PosterSyncAction;
+use App\Payday3\Http\Actions\OutDataAction;
+use App\Payday3\Http\Actions\OutAutoLinkAction;
+use App\Payday3\Http\Actions\OutManualLinkAction;
+use App\Payday3\Http\Actions\OutUnlinkAction;
+use App\Payday3\Http\Actions\OutClearLinksAction;
+use App\Payday3\Http\Actions\MailHideAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -150,6 +156,13 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->post(  '/day/clear',                                   ClearDayAction::class);
         $api->post(  '/sepay/sync',                                  SepaySyncAction::class);
         $api->post(  '/poster/sync',                                 PosterSyncAction::class);
+        // OUT-direction reconciliation (BIDV mail ↔ Poster finance).
+        $api->get(   '/out/data',                                    OutDataAction::class);
+        $api->post(  '/out/links/auto',                              OutAutoLinkAction::class);
+        $api->post(  '/out/links/manual',                            OutManualLinkAction::class);
+        $api->post(  '/out/links/clear',                             OutClearLinksAction::class);
+        $api->delete('/out/links/{mailUid:[0-9]+}/{financeId:[0-9]+}', OutUnlinkAction::class);
+        $api->post(  '/out/mail/hide',                               MailHideAction::class);
     });
 })->add(AuthMiddleware::class);
 
