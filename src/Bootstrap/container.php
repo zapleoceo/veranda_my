@@ -55,6 +55,22 @@ use App\Payday3\Http\Actions\MailHideAction;
 use App\Payday3\Http\Actions\ActualBalanceAction;
 use App\Payday3\Contracts\ActualBalanceRepositoryInterface;
 use App\Payday3\Repositories\ActualBalanceRepository;
+use App\Payday3\Contracts\PosterApiProviderInterface;
+use App\Payday3\Contracts\TelegramNotifierInterface;
+use App\Payday3\Contracts\PosterCashShiftServiceInterface;
+use App\Payday3\Contracts\PosterSuppliesServiceInterface;
+use App\Payday3\Contracts\PosterCheckServiceInterface;
+use App\Payday3\Services\PosterApiProvider;
+use App\Payday3\Services\TelegramNotifier;
+use App\Payday3\Services\PosterCashShiftService;
+use App\Payday3\Services\PosterSuppliesService;
+use App\Payday3\Services\PosterCheckService;
+use App\Payday3\Http\Actions\PosterCashShiftListAction;
+use App\Payday3\Http\Actions\PosterCashShiftDetailAction;
+use App\Payday3\Http\Actions\PosterSuppliesListAction;
+use App\Payday3\Http\Actions\PosterSupplyChangeAccountAction;
+use App\Payday3\Http\Actions\PosterCheckFindAction;
+use App\Payday3\Http\Actions\PosterCheckRemoveAction;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -153,4 +169,22 @@ return [
     // ─── Payday3 balances footer ───────────────────────────────
     ActualBalanceRepositoryInterface::class => fn($c) => new ActualBalanceRepository($c->get(Database::class)),
     ActualBalanceAction::class              => fn($c) => new ActualBalanceAction($c->get(ActualBalanceRepositoryInterface::class)),
+
+    // ─── Payday3 Poster integrations (replaces payday2 fallbacks) ─
+    PosterApiProviderInterface::class       => fn()   => new PosterApiProvider(),
+    TelegramNotifierInterface::class        => fn()   => new TelegramNotifier(),
+
+    PosterCashShiftServiceInterface::class  => fn($c) => new PosterCashShiftService($c->get(PosterApiProviderInterface::class)),
+    PosterSuppliesServiceInterface::class   => fn($c) => new PosterSuppliesService($c->get(PosterApiProviderInterface::class)),
+    PosterCheckServiceInterface::class      => fn($c) => new PosterCheckService(
+        $c->get(PosterApiProviderInterface::class),
+        $c->get(TelegramNotifierInterface::class),
+    ),
+
+    PosterCashShiftListAction::class        => fn($c) => new PosterCashShiftListAction($c->get(PosterCashShiftServiceInterface::class)),
+    PosterCashShiftDetailAction::class      => fn($c) => new PosterCashShiftDetailAction($c->get(PosterCashShiftServiceInterface::class)),
+    PosterSuppliesListAction::class         => fn($c) => new PosterSuppliesListAction($c->get(PosterSuppliesServiceInterface::class)),
+    PosterSupplyChangeAccountAction::class  => fn($c) => new PosterSupplyChangeAccountAction($c->get(PosterSuppliesServiceInterface::class)),
+    PosterCheckFindAction::class            => fn($c) => new PosterCheckFindAction($c->get(PosterCheckServiceInterface::class)),
+    PosterCheckRemoveAction::class          => fn($c) => new PosterCheckRemoveAction($c->get(PosterCheckServiceInterface::class)),
 ];
