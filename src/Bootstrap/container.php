@@ -65,12 +65,20 @@ use App\Payday3\Services\TelegramNotifier;
 use App\Payday3\Services\PosterCashShiftService;
 use App\Payday3\Services\PosterSuppliesService;
 use App\Payday3\Services\PosterCheckService;
+use App\Payday3\Services\PosterLookupService;
+use App\Payday3\Services\JsonLocalSettingsRepository;
+use App\Payday3\Contracts\PosterLookupServiceInterface;
+use App\Payday3\Contracts\LocalSettingsRepositoryInterface;
 use App\Payday3\Http\Actions\PosterCashShiftListAction;
 use App\Payday3\Http\Actions\PosterCashShiftDetailAction;
 use App\Payday3\Http\Actions\PosterSuppliesListAction;
 use App\Payday3\Http\Actions\PosterSupplyChangeAccountAction;
 use App\Payday3\Http\Actions\PosterCheckFindAction;
 use App\Payday3\Http\Actions\PosterCheckRemoveAction;
+use App\Payday3\Http\Actions\PosterEmployeesAction;
+use App\Payday3\Http\Actions\PosterFinanceAccountsAction;
+use App\Payday3\Http\Actions\PosterFinanceCategoriesAction;
+use App\Payday3\Http\Actions\SettingsAction;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -137,7 +145,10 @@ return [
 
     // ─── Payday3 OUT mode ──────────────────────────────────────
     MailServiceInterface::class       => fn($c) => new MailImapService($c->get(Database::class)),
-    FinanceServiceInterface::class    => fn()   => new FinancePosterService(),
+    FinanceServiceInterface::class    => fn($c) => new FinancePosterService(
+        $c->get(PosterApiProviderInterface::class),
+        $c->get(LocalSettingsRepositoryInterface::class),
+    ),
     OutLinkRepositoryInterface::class => fn($c) => new OutLinkRepository($c->get(Database::class)),
     OutReconciliationServiceInterface::class => fn($c) => new OutReconciliationService(
         $c->get(MailServiceInterface::class),
@@ -172,14 +183,23 @@ return [
 
     // ─── Payday3 Poster integrations (replaces payday2 fallbacks) ─
     PosterApiProviderInterface::class       => fn()   => new PosterApiProvider(),
-    TelegramNotifierInterface::class        => fn()   => new TelegramNotifier(),
+
+    // LocalSettings — payday3-owned JSON config, with one-time fallback
+    // to payday2/local_config.json so existing deploys keep tuned values.
+    LocalSettingsRepositoryInterface::class => fn() => new JsonLocalSettingsRepository(
+        primaryPath:  dirname(__DIR__, 2) . '/payday3/local_config.json',
+        fallbackPath: dirname(__DIR__, 2) . '/payday2/local_config.json',
+    ),
+    TelegramNotifierInterface::class        => fn($c) => new TelegramNotifier($c->get(LocalSettingsRepositoryInterface::class)),
 
     PosterCashShiftServiceInterface::class  => fn($c) => new PosterCashShiftService($c->get(PosterApiProviderInterface::class)),
     PosterSuppliesServiceInterface::class   => fn($c) => new PosterSuppliesService($c->get(PosterApiProviderInterface::class)),
     PosterCheckServiceInterface::class      => fn($c) => new PosterCheckService(
         $c->get(PosterApiProviderInterface::class),
         $c->get(TelegramNotifierInterface::class),
+        $c->get(LocalSettingsRepositoryInterface::class),
     ),
+    PosterLookupServiceInterface::class     => fn($c) => new PosterLookupService($c->get(PosterApiProviderInterface::class)),
 
     PosterCashShiftListAction::class        => fn($c) => new PosterCashShiftListAction($c->get(PosterCashShiftServiceInterface::class)),
     PosterCashShiftDetailAction::class      => fn($c) => new PosterCashShiftDetailAction($c->get(PosterCashShiftServiceInterface::class)),
@@ -187,4 +207,8 @@ return [
     PosterSupplyChangeAccountAction::class  => fn($c) => new PosterSupplyChangeAccountAction($c->get(PosterSuppliesServiceInterface::class)),
     PosterCheckFindAction::class            => fn($c) => new PosterCheckFindAction($c->get(PosterCheckServiceInterface::class)),
     PosterCheckRemoveAction::class          => fn($c) => new PosterCheckRemoveAction($c->get(PosterCheckServiceInterface::class)),
+    PosterEmployeesAction::class            => fn($c) => new PosterEmployeesAction($c->get(PosterLookupServiceInterface::class)),
+    PosterFinanceAccountsAction::class      => fn($c) => new PosterFinanceAccountsAction($c->get(PosterLookupServiceInterface::class)),
+    PosterFinanceCategoriesAction::class    => fn($c) => new PosterFinanceCategoriesAction($c->get(PosterLookupServiceInterface::class)),
+    SettingsAction::class                   => fn($c) => new SettingsAction($c->get(LocalSettingsRepositoryInterface::class)),
 ];

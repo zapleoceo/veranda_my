@@ -34,11 +34,42 @@ declare(strict_types=1);
             <h2 id="pd3SettingsModalTitle">Настройки</h2>
             <button type="button" class="pd3-modal__close" data-pd3-modal-close aria-label="Закрыть">×</button>
         </header>
-        <div class="pd3-modal__body">
-            <p>Telegram-бот для отчётов о балансах, счета Poster для авто-сопоставления, категории финансовых транзакций.</p>
-            <p class="muted">Пока редактируется в <a href="/payday2" class="pd3-link" target="_blank">payday2 → ⚙</a>.
-            Перенос в payday3 запланирован отдельным этапом — там много полей (BIDV cookies, CSRF, Poster admin curl), требующих своих сервисов.</p>
-        </div>
+        <form class="pd3-modal__body pd3-form" id="pd3SettingsForm">
+            <label class="pd3-field">
+                <span>Telegram chat_id</span>
+                <input type="text" name="telegram_chat_id" required>
+            </label>
+            <label class="pd3-field">
+                <span>Telegram message_thread_id</span>
+                <input type="text" name="telegram_message_thread_id">
+            </label>
+            <label class="pd3-field">
+                <span>Service user_id (для удаления чеков)</span>
+                <input type="number" name="service_user_id" required min="1">
+            </label>
+            <div class="pd3-form__row">
+                <label class="pd3-field">
+                    <span>Account «Андрей»</span>
+                    <input type="number" name="accounts[andrey]" required min="1">
+                </label>
+                <label class="pd3-field">
+                    <span>Account «Tips»</span>
+                    <input type="number" name="accounts[tips]" required min="1">
+                </label>
+                <label class="pd3-field">
+                    <span>Account «Vietnam»</span>
+                    <input type="number" name="accounts[vietnam]" required min="1">
+                </label>
+            </div>
+            <label class="pd3-field">
+                <span>Balance sync account_id</span>
+                <input type="number" name="balance_sinc_account_id" required min="1">
+            </label>
+            <div class="pd3-balances__footer">
+                <button type="submit" class="pd3-btn">Сохранить</button>
+                <span class="pd3-balances__status muted" id="pd3SettingsStatus"></span>
+            </div>
+        </form>
     </div>
 
     <div class="pd3-modal" id="pd3KashShiftModal" role="dialog" aria-modal="true" aria-labelledby="pd3KashShiftTitle" hidden>

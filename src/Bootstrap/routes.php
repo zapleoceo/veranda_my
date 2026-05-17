@@ -27,6 +27,10 @@ use App\Payday3\Http\Actions\PosterSuppliesListAction;
 use App\Payday3\Http\Actions\PosterSupplyChangeAccountAction;
 use App\Payday3\Http\Actions\PosterCheckFindAction;
 use App\Payday3\Http\Actions\PosterCheckRemoveAction;
+use App\Payday3\Http\Actions\PosterEmployeesAction;
+use App\Payday3\Http\Actions\PosterFinanceAccountsAction;
+use App\Payday3\Http\Actions\PosterFinanceCategoriesAction;
+use App\Payday3\Http\Actions\SettingsAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -180,6 +184,13 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->post(  '/poster/supplies/account',                     PosterSupplyChangeAccountAction::class);
         $api->get(   '/poster/checks/find',                          PosterCheckFindAction::class);
         $api->delete('/poster/checks/{id:[0-9]+}',                   PosterCheckRemoveAction::class);
+        // Lookups for dropdowns (employees, finance accounts/categories).
+        $api->get(   '/poster/employees',                            PosterEmployeesAction::class);
+        $api->get(   '/poster/finance/accounts',                     PosterFinanceAccountsAction::class);
+        $api->get(   '/poster/finance/categories',                   PosterFinanceCategoriesAction::class);
+        // Settings (replaces /payday2/?ajax=save_local_config).
+        $api->get(   '/settings',                                    SettingsAction::class);
+        $api->post(  '/settings',                                    SettingsAction::class);
     });
 })->add(AuthMiddleware::class);
 
