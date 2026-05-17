@@ -68,7 +68,9 @@
       "Bash(/opt/php82/bin/php -l cron/menu_sync.php)",
       "Bash(/opt/php82/bin/php -l scripts/menu/cron.php)",
       "Bash(grep -nE \"btnSave|res_edit|FormData|qs\\\\\\\\\\(\" reservations/assets/js/reservations.js)",
-      "Bash(grep -nE \"get_res\\\\\\\\b|getReservation\\\\\\\\b\" src/Controllers/ReservationsController.php reservations/Model.php)"
+      "Bash(grep -nE \"get_res\\\\\\\\b|getReservation\\\\\\\\b\" src/Controllers/ReservationsController.php reservations/Model.php)",
+      "Bash(grep -nE \"const endpoint|let endpoint|postForm\\\\\\\\s*=|endpoint\\\\\\\\s*=\" reservations/assets/js/reservations.js)",
+      "Bash(grep -nE \"const endpoint|let endpoint|location\\\\\\\\.pathname|replace\\\\\\\\\\(/\\\\\\\\\\\\\\\\/\\\\\\\\+\\\\\\\\\\\\$/\" reservations/assets/js/reservations_hall.js)"
     ]
   }
 }

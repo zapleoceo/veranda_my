@@ -323,5 +323,5 @@ $fmtSpotDateTimeParts = function (string $s) use ($parseSpotDt): array {
 
     <div class="res-hscroll" id="resHScroll" hidden><div class="res-hscroll-inner" id="resHScrollInner"></div></div>
 
-<script src="/reservations/assets/js/reservations.js?v=20260517_account"></script>
-<script src="/reservations/assets/js/reservations_hall.js"></script>
+<script src="/reservations/assets/js/reservations.js?v=20260517_slash"></script>
+<script src="/reservations/assets/js/reservations_hall.js?v=20260517_slash"></script>
