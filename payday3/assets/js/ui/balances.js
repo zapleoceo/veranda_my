@@ -170,6 +170,75 @@ function scheduleAutoSave(state, delay = 600) {
     saveTimer = setTimeout(() => saveActualNow(state), delay);
 }
 
+// ─── UPLD — Poster correction transaction ─────────────────────
+//
+// Computes Факт.(Andrey) − Poster(Andrey+Tips) in VND, asks the
+// server for a plan (returns a nonce + preview), confirms with the
+// operator via a native dialog, then commits.
+
+function syncBtnRefresh() {
+    const btn = document.getElementById('pd3BalancesUpldBtn');
+    if (!btn) return;
+    const factual = parse(document.getElementById('pd3BalActual_andrey')?.value);
+    const poster  = posterCache?.andrey;
+    const ready   = factual !== null && poster !== null && poster !== undefined && factual !== poster;
+    btn.disabled = !ready;
+    if (ready) {
+        const diff = factual - poster;
+        btn.title = (diff > 0 ? 'Начислить ' : 'Списать ') + fmt(Math.abs(diff)) + ' (Факт. − Poster по Андрею)';
+    } else if (factual === null) {
+        btn.title = 'Заполни Факт. по Андрею';
+    } else if (poster === null || poster === undefined) {
+        btn.title = 'Нет баланса Poster по Андрею — нажми ↻';
+    } else {
+        btn.title = 'Разница = 0';
+    }
+}
+
+let upldInFlight = false;
+async function runUpld(state) {
+    if (upldInFlight) return;
+    const factual = parse(document.getElementById('pd3BalActual_andrey')?.value);
+    const poster  = posterCache?.andrey;
+    if (factual === null)        { alert('Заполни Факт. по Андрею'); return; }
+    if (poster === null || poster === undefined) {
+        alert('Нет баланса Poster по Андрею — нажми ↻');
+        return;
+    }
+    const diff = factual - poster;
+    if (diff === 0) { alert('Разница = 0'); return; }
+
+    upldInFlight = true;
+    const btn = document.getElementById('pd3BalancesUpldBtn');
+    if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
+    setStatus('Готовлю план…');
+    try {
+        // Make sure the latest Факт. value is on the server before
+        // we use it as the source of truth.
+        await saveActualNow(state);
+
+        const plan = await api.post('/payday3/api/balances/sync/plan', { diff_vnd: diff });
+        if (!plan?.nonce || !plan.plan) throw new Error('Plan empty');
+        const p = plan.plan;
+        const action = p.type === 1 ? 'Начислить' : 'Списать';
+        const accLabel = p.account_name
+            ? `счёт ${p.account_id} (${p.account_name})`
+            : `счёт ${p.account_id}`;
+        const ok = confirm(`${action} ${fmt(p.amount_vnd)} на ${accLabel}?\n\nКомментарий: ${p.comment}`);
+        if (!ok) { setStatus('Отменено'); return; }
+
+        setStatus('Создаю транзакцию в Poster…');
+        const res = await api.post('/payday3/api/balances/sync/commit', { nonce: plan.nonce });
+        setStatus(res?.already ? 'Уже была создана сегодня' : 'Транзакция создана в Poster', 'ok');
+        await reloadPoster();   // pick up the new balance immediately
+    } catch (e) {
+        setStatus('UPLD: ' + (e.message || 'error'), 'error');
+    } finally {
+        upldInFlight = false;
+        if (btn) { btn.classList.remove('is-busy'); syncBtnRefresh(); }
+    }
+}
+
 // ─── Telegram screenshot ───────────────────────────────────────
 
 async function loadHtml2Canvas() {
@@ -236,12 +305,13 @@ export function initBalances({ state }) {
 
     document.querySelectorAll('.pd3-bal-input').forEach((el) => {
         // Live diff while typing — cheap, no network.
-        el.addEventListener('input', () => refreshDiffs(posterCache));
+        el.addEventListener('input', () => { refreshDiffs(posterCache); syncBtnRefresh(); });
         // Reformat + auto-save when the field loses focus.
         el.addEventListener('blur', () => {
             const v = parse(el.value);
             el.value = v === null ? '' : fmt(v);
             refreshDiffs(posterCache);
+            syncBtnRefresh();
             saveActualNow(state);
         });
         // Enter commits without losing focus.
@@ -252,8 +322,9 @@ export function initBalances({ state }) {
         el.addEventListener('input', () => scheduleAutoSave(state));
     });
 
-    document.getElementById('pd3BalancesReloadBtn')?.addEventListener('click', () => reloadPoster());
+    document.getElementById('pd3BalancesReloadBtn')?.addEventListener('click', () => reloadPoster().then(syncBtnRefresh));
     document.getElementById('pd3BalancesTelegramBtn')?.addEventListener('click', () => sendBalancesToTelegram(state));
+    document.getElementById('pd3BalancesUpldBtn')?.addEventListener('click', () => runUpld(state));
 
     // Re-save before the user navigates away — guarantees the last
     // edit makes it to the server even if they tab away in a hurry.
@@ -262,5 +333,5 @@ export function initBalances({ state }) {
         try { saveActualNow(state); } catch (_) {}
     });
 
-    reloadPoster().then(() => loadActual(state));
+    reloadPoster().then(() => loadActual(state)).then(syncBtnRefresh);
 }
