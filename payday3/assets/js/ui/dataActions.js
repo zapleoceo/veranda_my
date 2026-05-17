@@ -1,6 +1,7 @@
 // Sync / clear-day buttons. Each one POSTs to a Slim endpoint, shows
-// a spinner on its button while the request is in flight, then reloads
-// the page so the freshly-synced rows are visible.
+// a spinner on its button while the request is in flight, then asks
+// the IN-mode loader to re-fetch the snapshot so the freshly-synced
+// rows show up — no page reload, no flash, no scroll-reset.
 
 'use strict';
 
@@ -34,9 +35,12 @@ function withBusy(btn, label, fn) {
     };
 }
 
-export function initDataActions({ state }) {
+export function initDataActions({ state, refresh }) {
     const range = () => state.get('range') || {};
     const qs    = () => dateQuery(range());
+    const refreshAll = async () => {
+        if (typeof refresh === 'function') await refresh();
+    };
 
     const $sepaySync  = document.getElementById('pd3SepaySyncBtn');
     const $posterSync = document.getElementById('pd3PosterSyncBtn');
@@ -46,7 +50,7 @@ export function initDataActions({ state }) {
         $sepaySync, 'Loading sepay...',
         async () => {
             await api.post('/payday3/api/sepay/sync?' + qs());
-            window.location.reload();
+            await refreshAll();
         },
     ));
 
@@ -54,7 +58,7 @@ export function initDataActions({ state }) {
         $posterSync, 'Loading poster...',
         async () => {
             await api.post('/payday3/api/poster/sync?' + qs());
-            window.location.reload();
+            await refreshAll();
         },
     ));
 
@@ -68,7 +72,7 @@ export function initDataActions({ state }) {
                 : `Soft-reset за период ${r?.from} — ${r?.to}?\n\nВсе записи Sepay и Poster в диапазоне будут помечены was_deleted=1. Следующая синхронизация их восстановит.`;
             if (!confirm(msg)) return;
             await api.post('/payday3/api/day/clear?' + qs());
-            window.location.reload();
+            await refreshAll();
         },
     ));
 }
