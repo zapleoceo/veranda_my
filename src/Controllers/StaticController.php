@@ -39,12 +39,43 @@ class StaticController
 
         $ext  = strtolower(pathinfo($resolved, PATHINFO_EXTENSION));
         $mime = self::MIME[$ext] ?? 'application/octet-stream';
-        $body = file_get_contents($resolved);
 
+        // Source files we own (JS/CSS) need to invalidate on every
+        // deploy — we can't tolerate a 24-hour stale window.  Send
+        // `must-revalidate` so the browser always asks, plus Last-
+        // Modified / ETag so the answer is usually a cheap 304.
+        $mtime = @filemtime($resolved) ?: 0;
+        $isSource = in_array($ext, ['js', 'css', 'json'], true);
+        $cacheCtl = $isSource
+            ? 'public, max-age=0, must-revalidate'
+            : 'public, max-age=86400';
+
+        $lastModified = $mtime > 0 ? gmdate('D, d M Y H:i:s', $mtime) . ' GMT' : null;
+        $etag         = $mtime > 0 ? sprintf('"%x-%x"', $mtime, filesize($resolved) ?: 0) : null;
+
+        // Conditional GET — return 304 when the file hasn't changed.
+        $req = $_SERVER ?? [];
+        $ifNoneMatch     = trim((string)($req['HTTP_IF_NONE_MATCH']     ?? ''));
+        $ifModifiedSince = trim((string)($req['HTTP_IF_MODIFIED_SINCE'] ?? ''));
+        $notModified =
+            ($etag         !== null && $ifNoneMatch     === $etag) ||
+            ($lastModified !== null && $ifModifiedSince === $lastModified);
+
+        if ($notModified) {
+            $res = $response->withStatus(304)->withHeader('Cache-Control', $cacheCtl);
+            if ($etag         !== null) $res = $res->withHeader('ETag',          $etag);
+            if ($lastModified !== null) $res = $res->withHeader('Last-Modified', $lastModified);
+            return $res;
+        }
+
+        $body = file_get_contents($resolved);
         $response->getBody()->write((string)$body);
-        return $response
-            ->withHeader('Content-Type', $mime)
-            ->withHeader('Cache-Control', 'public, max-age=86400');
+        $response = $response
+            ->withHeader('Content-Type',  $mime)
+            ->withHeader('Cache-Control', $cacheCtl);
+        if ($etag         !== null) $response = $response->withHeader('ETag',          $etag);
+        if ($lastModified !== null) $response = $response->withHeader('Last-Modified', $lastModified);
+        return $response;
     }
 
     public function globalAssets(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface

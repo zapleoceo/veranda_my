@@ -48,8 +48,13 @@ declare(strict_types=1);
     </section>
 
     <?php require __DIR__ . '/partials/totals.php'; ?>
-    <?php require __DIR__ . '/partials/finance_transfers.php'; ?>
-    <?php require __DIR__ . '/partials/balances.php'; ?>
+    <!-- Bottom row: Итоговый баланс + Финансовые транзакции side by side.
+         Flex wraps to a stack on narrow viewports; each card auto-sizes
+         to its content (no wasted whitespace). -->
+    <section class="pd3-bottom-row">
+        <?php require __DIR__ . '/partials/balances.php'; ?>
+        <?php require __DIR__ . '/partials/finance_transfers.php'; ?>
+    </section>
     <?php require __DIR__ . '/partials/modals.php'; ?>
 </div>
 

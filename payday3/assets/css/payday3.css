@@ -522,41 +522,96 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     transform: scale(1.18);
 }
 
-/* ─── Balances footer (Phase 8) ────────────────────────────── */
-.pd3-balances {
-    margin-top: 12px;
-    padding: 10px 12px;
+/* ─── Bottom row: Итоговый баланс + Финансовые транзакции ────
+   Both cards live side-by-side on wide viewports, stack on narrow.
+   Each card is `width: max-content` so it shrinks to its tightest
+   layout instead of padding the page with whitespace. */
+
+.pd3-bottom-row {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
 }
-.pd3-balances__header {
+.pd3-bottom-row > .pd3-card { margin: 0; }
+
+/* Shared compact card chrome — header strip + footer strip. */
+.pd3-card__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.pd3-balances__header h3 { margin: 0; font-size: 14px; }
-.pd3-bal-table { width: auto; min-width: 420px; }
-.pd3-bal-table th, .pd3-bal-table td { padding: 5px 10px; }
+.pd3-card__header h3 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.pd3-card__footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.pd3-btn--sm {
+    padding: 3px 9px;
+    font-size: 11px;
+    line-height: 1.4;
+    border-radius: 6px;
+}
+
+/* ─── Итоговый баланс table ─────────────────────────────────── */
+.pd3-balances { padding: 0; }
+.pd3-bal-table {
+    width: auto;        /* shrink to widest column content */
+    border-collapse: collapse;
+    margin: 0;
+}
+.pd3-bal-table thead th {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    font-weight: 600;
+    padding: 4px 8px 2px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.pd3-bal-table tbody td {
+    padding: 3px 8px;
+    font-variant-numeric: tabular-nums;
+}
+.pd3-bal-table tbody tr + tr td {
+    border-top: 1px dashed rgba(255,255,255,0.04);
+}
 .pd3-bal-table__label { font-weight: 700; }
-.pd3-bal-poster { color: var(--muted); }
-.pd3-bal-diff.is-ok    { color: #10b981; font-weight: 800; }
-.pd3-bal-diff.is-error { color: #ef4444; font-weight: 800; }
+.pd3-bal-poster       { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pd3-bal-diff.is-ok    { color: #10b981; font-weight: 700; }
+.pd3-bal-diff.is-error { color: #ef4444; font-weight: 700; }
 .pd3-bal-input {
-    width: 130px;
+    /* Auto-grow as the operator types — falls back to a ~10-char
+       width on browsers without field-sizing. */
+    width: 10ch;
+    field-sizing: content;
+    min-width: 7ch;
+    box-sizing: content-box;
     background: var(--card);
     color: var(--text);
     border: 1px solid var(--border);
-    border-radius: 7px;
-    padding: 4px 8px;
+    border-radius: 6px;
+    padding: 2px 6px;
     font: inherit;
+    font-variant-numeric: tabular-nums;
     text-align: right;
 }
-.pd3-balances__footer {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 10px;
-}
-.pd3-balances__status { font-size: 12px; }
+.pd3-bal-input:focus { outline: 2px solid rgba(184,135,70,0.45); outline-offset: 1px; }
+.pd3-balances__status { font-size: 11px; }
 .pd3-balances__status.is-ok    { color: #10b981; }
 .pd3-balances__status.is-error { color: #ef4444; }
 
@@ -727,39 +782,69 @@ body.pd3-help-mode [data-help-abs]:hover::after {
 
 /* ─── Финансовые транзакции card ─────────────────────────── */
 
-.pd3-finance { padding: 10px 12px; }
-.pd3-finance__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
+.pd3-finance {
+    padding: 0;
+    flex: 1 1 360px;
+    min-width: 320px;
+    max-width: 760px;
 }
-.pd3-finance__header h3 { font-size: 14px; margin: 0; font-weight: 700; }
 .pd3-finance__row {
-    padding: 8px 0;
-    border-top: 1px solid rgba(0,0,0,0.07);
+    padding: 4px 10px 6px;
 }
-.pd3-finance__row:first-of-type { border-top: none; }
+.pd3-finance__row + .pd3-finance__row {
+    border-top: 1px dashed rgba(255,255,255,0.04);
+}
 .pd3-finance__head {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
+    line-height: 1.4;
 }
-.pd3-finance__title  { font-weight: 700; min-width: 130px; }
-.pd3-finance__total  { font-weight: 700; flex: 1; }
-.pd3-finance__create:disabled { opacity: 0.45; cursor: not-allowed; }
-.pd3-finance__status { margin-top: 6px; font-size: 12px; }
-.pd3-finance__scroll { overflow-x: auto; }
-.pd3-finance__mini   { font-size: 11px; width: 100%; }
-.pd3-finance__mini th,
-.pd3-finance__mini td { padding: 3px 6px; }
-.pd3-finance__empty  { font-style: italic; opacity: 0.6; }
-.pd3-finance-td      { vertical-align: top; }
-.pd3-finance-td-comment {
+.pd3-finance__title {
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--text);
+}
+.pd3-finance__total {
+    font-weight: 700;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    flex: 1;                /* push the create button to the right edge */
+}
+.pd3-finance__create { white-space: nowrap; }
+.pd3-finance__create:disabled { opacity: 0.4; cursor: not-allowed; }
+.pd3-finance__status { margin-top: 4px; font-size: 11px; }
+.pd3-finance__scroll { overflow-x: auto; max-width: 100%; }
+.pd3-finance__mini {
+    font-size: 11px;
+    border-collapse: collapse;
+    width: auto;            /* let the table shrink to its widest cell */
+    margin-top: 4px;
+}
+.pd3-finance__mini th {
+    padding: 2px 8px 4px;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    white-space: nowrap;
+}
+.pd3-finance__mini td {
+    padding: 2px 8px;
     vertical-align: top;
-    max-width: 360px;
-    word-break: break-word;
+    white-space: nowrap;
 }
+.pd3-finance__empty { font-style: italic; opacity: 0.6; }
+.pd3-finance-td-comment {
+    white-space: normal;
+    max-width: 260px;
+    word-break: break-word;
+    color: var(--muted);
+}
+.pd3-fw-normal { font-weight: 400; }
 
 /* ─── Responsive ─────────────────────────────────────────── */
 
