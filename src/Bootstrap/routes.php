@@ -21,6 +21,12 @@ use App\Payday3\Http\Actions\OutUnlinkAction;
 use App\Payday3\Http\Actions\OutClearLinksAction;
 use App\Payday3\Http\Actions\MailHideAction;
 use App\Payday3\Http\Actions\ActualBalanceAction;
+use App\Payday3\Http\Actions\PosterCashShiftListAction;
+use App\Payday3\Http\Actions\PosterCashShiftDetailAction;
+use App\Payday3\Http\Actions\PosterSuppliesListAction;
+use App\Payday3\Http\Actions\PosterSupplyChangeAccountAction;
+use App\Payday3\Http\Actions\PosterCheckFindAction;
+use App\Payday3\Http\Actions\PosterCheckRemoveAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -167,6 +173,13 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         // Actual balances — Phase 8 footer card.
         $api->get(   '/balances',                                    ActualBalanceAction::class);
         $api->post(  '/balances',                                    ActualBalanceAction::class);
+        // Poster integrations — replaces /payday2/?ajax=kashshift/supplies/poster_check_*
+        $api->get(   '/poster/cashshifts',                           PosterCashShiftListAction::class);
+        $api->get(   '/poster/cashshifts/{shiftId:[A-Za-z0-9_-]+}',  PosterCashShiftDetailAction::class);
+        $api->get(   '/poster/supplies',                             PosterSuppliesListAction::class);
+        $api->post(  '/poster/supplies/account',                     PosterSupplyChangeAccountAction::class);
+        $api->get(   '/poster/checks/find',                          PosterCheckFindAction::class);
+        $api->delete('/poster/checks/{id:[0-9]+}',                   PosterCheckRemoveAction::class);
     });
 })->add(AuthMiddleware::class);
 

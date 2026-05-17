@@ -36,17 +36,22 @@ function close() {
     _currentId = null;
 }
 
+function qs(range) {
+    const p = new URLSearchParams();
+    if (range?.from) p.set('dateFrom', range.from);
+    if (range?.to)   p.set('dateTo',   range.to);
+    return p.toString();
+}
+
 async function loadKashShift({ state }) {
     const body = document.getElementById('pd3KashShiftBody');
     if (!body) return;
     body.innerHTML = '<p class="pd3-modal__loading">Загрузка кассовых смен…</p>';
     try {
-        const r = state.get('range') || {};
-        const data = await api.get('/payday2/?ajax=kashshift&dateFrom=' + encodeURIComponent(r.from) + '&dateTo=' + encodeURIComponent(r.to));
-        body.innerHTML = renderKashShift(data);
+        const data = await api.get('/payday3/api/poster/cashshifts?' + qs(state.get('range')));
+        body.innerHTML = renderKashShift(data.shifts || []);
     } catch (e) {
-        body.innerHTML = `<p class="muted">Не удалось загрузить: ${escapeHtml(e.message || 'ошибка')}.</p>
-                          <p class="muted">Воспользуйся <a class="pd3-link" href="/payday2" target="_blank">payday2</a> пока модуль не перенесён в payday3.</p>`;
+        body.innerHTML = `<p class="muted">Не удалось загрузить: ${escapeHtml(e.message || 'ошибка')}.</p>`;
     }
 }
 
@@ -55,20 +60,14 @@ async function loadSupplies({ state }) {
     if (!body) return;
     body.innerHTML = '<p class="pd3-modal__loading">Загрузка поставок…</p>';
     try {
-        const r = state.get('range') || {};
-        const data = await api.get('/payday2/?ajax=supplies&dateFrom=' + encodeURIComponent(r.from) + '&dateTo=' + encodeURIComponent(r.to));
-        body.innerHTML = renderSupplies(data);
+        const data = await api.get('/payday3/api/poster/supplies?' + qs(state.get('range')));
+        body.innerHTML = renderSupplies(data.supplies || [], data.accounts || []);
     } catch (e) {
-        body.innerHTML = `<p class="muted">Не удалось загрузить: ${escapeHtml(e.message || 'ошибка')}.</p>
-                          <p class="muted">Воспользуйся <a class="pd3-link" href="/payday2" target="_blank">payday2</a> пока модуль не перенесён в payday3.</p>`;
+        body.innerHTML = `<p class="muted">Не удалось загрузить: ${escapeHtml(e.message || 'ошибка')}.</p>`;
     }
 }
 
-function renderKashShift(data) {
-    if (!data || (!Array.isArray(data) && !data.shifts)) {
-        return '<p class="muted">Пусто.</p>';
-    }
-    const shifts = Array.isArray(data) ? data : (data.shifts || []);
+function renderKashShift(shifts) {
     if (!shifts.length) return '<p class="muted">Смен за период не найдено.</p>';
     return `<table class="pd3-table" style="width:100%">
         <thead><tr><th>ID</th><th>Открыта</th><th>Закрыта</th><th class="right">Cash</th><th class="right">Card</th></tr></thead>
@@ -81,35 +80,50 @@ function renderKashShift(data) {
         </tr>`).join('')}</tbody></table>`;
 }
 
-function renderSupplies(data) {
-    const list = Array.isArray(data) ? data : (data?.supplies || []);
-    if (!list.length) return '<p class="muted">Поставок за период не найдено.</p>';
+function renderSupplies(supplies, accounts) {
+    if (!supplies.length) return '<p class="muted">Поставок за период не найдено.</p>';
+    const accLabel = (id) => {
+        const a = accounts.find((x) => Number(x.account_id) === Number(id));
+        return a ? (a.account_name || a.title || ('#' + id)) : ('#' + id);
+    };
     return `<table class="pd3-table" style="width:100%">
-        <thead><tr><th>ID</th><th>Дата</th><th>Поставщик</th><th class="right">Сумма</th></tr></thead>
-        <tbody>${list.map((s) => `<tr>
-            <td>${escapeHtml(String(s.id || s.supply_id || ''))}</td>
-            <td>${escapeHtml(String(s.date || s.supply_date || ''))}</td>
-            <td>${escapeHtml(String(s.supplier || s.supplier_name || ''))}</td>
-            <td class="right">${escapeHtml(String(s.sum || s.supply_sum || ''))}</td>
+        <thead><tr><th>ID</th><th>Дата</th><th>Поставщик</th><th class="right">Сумма</th><th>Аккаунт</th></tr></thead>
+        <tbody>${supplies.map((s) => `<tr>
+            <td>${escapeHtml(String(s.supply_id || s.id || ''))}</td>
+            <td>${escapeHtml(String(s.supply_date_start || s.date || ''))}</td>
+            <td>${escapeHtml(String(s.supplier_name || s.supplier || ''))}</td>
+            <td class="right">${escapeHtml(String(s.supply_sum || s.sum || ''))}</td>
+            <td>${escapeHtml(accLabel(s.account_id))}</td>
         </tr>`).join('')}</tbody></table>`;
 }
 
-async function findCheck(query) {
+async function findCheck(query, { state }) {
     const out = document.getElementById('pd3CheckFinderResult');
     if (!out) return;
+    const id = parseInt(String(query).replace(/\D+/g, ''), 10);
+    if (!id || id <= 0) { out.textContent = 'Введи числовой transaction_id.'; return; }
     out.textContent = 'Ищу…';
     try {
-        const data = await api.get('/payday2/?ajax=poster_check_find&query=' + encodeURIComponent(query));
-        if (!data || !data.checks?.length) {
-            out.textContent = 'Ничего не найдено.';
-            return;
-        }
-        out.innerHTML = data.checks.map((c) => `
-            <div class="pd3-checkfinder-row">
-                <strong>#${escapeHtml(String(c.receipt_number || c.transaction_id))}</strong>
-                · ${escapeHtml(String(c.date_close || ''))}
-                · ${escapeHtml(String(c.sum || c.payed_sum || ''))}
-            </div>`).join('');
+        const q = qs(state.get('range'));
+        const data = await api.get('/payday3/api/poster/checks/find?id=' + id + '&' + q);
+        if (!data.found) { out.textContent = 'Чек не найден за выбранный период.'; return; }
+        const t = data.transaction || {};
+        out.innerHTML = `<div class="pd3-checkfinder-row">
+            <strong>#${escapeHtml(String(t.receipt_number || t.transaction_id || id))}</strong>
+            · ${escapeHtml(String(t.date_close || t.date || ''))}
+            · ${escapeHtml(String(t.sum || t.payed_sum || ''))}
+            <button type="button" class="pd3-btn pd3-checkfinder-remove" data-tx="${id}" style="margin-left:8px">Удалить</button>
+        </div>`;
+        out.querySelector('.pd3-checkfinder-remove')?.addEventListener('click', async (e) => {
+            if (!confirm('Удалить чек #' + id + ' через Poster?')) return;
+            const btn = e.currentTarget; btn.disabled = true;
+            try {
+                const r = await api.delete('/payday3/api/poster/checks/' + id);
+                out.innerHTML = `<p class="muted">Удалён.${r.telegram_ok ? ' Уведомление отправлено в Telegram.' : ''}</p>`;
+            } catch (err) {
+                out.innerHTML = `<p class="muted">Ошибка удаления: ${escapeHtml(err.message || 'ошибка')}.</p>`;
+            }
+        });
     } catch (e) {
         out.textContent = 'Ошибка: ' + (e.message || 'request failed');
     }
@@ -149,6 +163,6 @@ export function initModals({ state }) {
     form?.addEventListener('submit', (e) => {
         e.preventDefault();
         const q = document.getElementById('pd3CheckFinderInput')?.value?.trim();
-        if (q) findCheck(q);
+        if (q) findCheck(q, { state });
     });
 }
