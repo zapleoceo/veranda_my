@@ -67,10 +67,13 @@
       "Bash(rmdir api/menu api/poster/rawdata api/sql/kitchen_online api/sql/rawdata api/sql)",
       "Bash(/opt/php82/bin/php -l cron/menu_sync.php)",
       "Bash(/opt/php82/bin/php -l scripts/menu/cron.php)",
-      "Bash(grep -nE \"btnSave|res_edit|FormData|qs\\\\\\\\\\(\" reservations/assets/js/reservations.js)",
-      "Bash(grep -nE \"get_res\\\\\\\\b|getReservation\\\\\\\\b\" src/Controllers/ReservationsController.php reservations/Model.php)",
-      "Bash(grep -nE \"const endpoint|let endpoint|postForm\\\\\\\\s*=|endpoint\\\\\\\\s*=\" reservations/assets/js/reservations.js)",
-      "Bash(grep -nE \"const endpoint|let endpoint|location\\\\\\\\.pathname|replace\\\\\\\\\\(/\\\\\\\\\\\\\\\\/\\\\\\\\+\\\\\\\\\\\\$/\" reservations/assets/js/reservations_hall.js)"
+      "Bash(grep -nA 40 \"function getHallName\" src/classes/PosterSpotHallsService.php)",
+      "Bash(grep -nB2 -A5 \"function _db\" src/Services/PosterReservationsService.php)",
+      "Bash(grep -nA 5 \"function pushToPoster\" src/classes/PosterReservationHelper.php)",
+      "Bash(grep -rnE \"function [a-zA-Z]+\\\\\\(\\\\\\\\\\\\\\\\?App\\\\\\\\\\\\\\\\Classes\\\\\\\\\\\\\\\\Database \" src/classes/)",
+      "Bash(grep -rnE \"function [a-zA-Z_]+\\\\\\([^\\)]*Database \\\\\\\\\\\\$\" src/classes/)",
+      "Bash(php -l src/classes/PosterSpotHallsService.php)",
+      "Bash(php -l src/classes/PosterReservationHelper.php)"
     ]
   }
 }

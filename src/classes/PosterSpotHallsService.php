@@ -7,17 +7,29 @@ require_once __DIR__ . '/PosterAPI.php';
 require_once __DIR__ . '/MetaRepository.php';
 
 class PosterSpotHallsService {
-    public static function getHallName(Database $db, string $posterToken, int $spotId, int $hallId): string {
+    /**
+     * Accept either the legacy App\Classes\Database (used by tr3/api_booking.php
+     * and PosterReservationsService) or the new App\Infrastructure\Database
+     * (used by Slim WebhookController actions like Vposter/Vdecline/...).
+     * Previously the strict App\Classes\Database hint blew up every reservation
+     * button press from the manager chat with a TypeError visible as a popup.
+     */
+    public static function getHallName(Database|\App\Infrastructure\Database $db, string $posterToken, int $spotId, int $hallId): string {
         if ($spotId <= 0 || $hallId <= 0) return '';
         $halls = self::getHallsMap($db, $posterToken, $spotId);
         return array_key_exists($hallId, $halls) ? (string)$halls[$hallId] : '';
     }
 
-    public static function getHallsMap(Database $db, string $posterToken, int $spotId, int $ttlSec = 43200): array {
+    public static function getHallsMap(Database|\App\Infrastructure\Database $db, string $posterToken, int $spotId, int $ttlSec = 43200): array {
         if ($spotId <= 0) return [];
         $ttlSec = $ttlSec > 0 ? $ttlSec : 43200;
         $key = 'poster_spot_halls_' . (string)$spotId;
-        $meta = new MetaRepository($db);
+        // Pick the MetaRepository that matches the concrete Database type
+        // (legacy MetaRepository takes App\Classes\Database; new one takes
+        // App\Infrastructure\Database — they have incompatible constructors).
+        $meta = $db instanceof \App\Infrastructure\Database
+            ? new \App\Repositories\MetaRepository($db)
+            : new MetaRepository($db);
         $vals = $meta->getMany([$key]);
         $raw = array_key_exists($key, $vals) ? (string)$vals[$key] : '';
         $now = time();
