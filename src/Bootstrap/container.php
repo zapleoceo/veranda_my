@@ -83,6 +83,7 @@ use App\Payday3\Http\Actions\PosterBalanceSnapshotAction;
 use App\Payday3\Http\Actions\SettingsAction;
 use App\Payday3\Http\Actions\InDataAction;
 use App\Payday3\Http\Actions\FinanceTransfersAction;
+use App\Payday3\Http\Actions\BalanceScreenshotAction;
 use App\Payday3\Contracts\FinanceTransferServiceInterface;
 use App\Payday3\Services\FinanceTransferService;
 use App\Payday3\Contracts\PosterBalanceServiceInterface;
@@ -236,5 +237,8 @@ return [
     FinanceTransfersAction::class => fn($c) => new FinanceTransfersAction(
         $c->get(FinanceTransferServiceInterface::class),
         $c->get(LocalSettingsRepositoryInterface::class),
+    ),
+    BalanceScreenshotAction::class => fn($c) => new BalanceScreenshotAction(
+        $c->get(TelegramNotifierInterface::class),
     ),
 ];
