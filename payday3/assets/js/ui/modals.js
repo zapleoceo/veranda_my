@@ -135,6 +135,55 @@ function escapeHtml(s) {
     })[c]);
 }
 
+async function loadSettings() {
+    const form = document.getElementById('pd3SettingsForm');
+    if (!form) return;
+    const status = document.getElementById('pd3SettingsStatus');
+    status && (status.textContent = '');
+    try {
+        const data = await api.get('/payday3/api/settings');
+        form.elements['telegram_chat_id'].value           = data.telegram_chat_id || '';
+        form.elements['telegram_message_thread_id'].value = data.telegram_message_thread_id || '';
+        form.elements['service_user_id'].value            = data.service_user_id || '';
+        const acc = data.accounts || {};
+        form.elements['accounts[andrey]'].value  = acc.andrey  || '';
+        form.elements['accounts[tips]'].value    = acc.tips    || '';
+        form.elements['accounts[vietnam]'].value = acc.vietnam || '';
+        form.elements['balance_sinc_account_id'].value = data.balance_sinc_account_id || '';
+    } catch (e) {
+        status && (status.textContent = 'Ошибка загрузки: ' + (e.message || 'error'));
+    }
+}
+
+async function saveSettings(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const status = document.getElementById('pd3SettingsStatus');
+    status && (status.textContent = 'Сохраняю…');
+    const fd = new FormData(form);
+    const body = {
+        telegram_chat_id:           fd.get('telegram_chat_id'),
+        telegram_message_thread_id: fd.get('telegram_message_thread_id'),
+        service_user_id:            Number(fd.get('service_user_id')) || 0,
+        accounts: {
+            andrey:  Number(fd.get('accounts[andrey]'))  || 0,
+            tips:    Number(fd.get('accounts[tips]'))    || 0,
+            vietnam: Number(fd.get('accounts[vietnam]')) || 0,
+        },
+        balance_sinc_account_id: Number(fd.get('balance_sinc_account_id')) || 0,
+    };
+    try {
+        await api.post('/payday3/api/settings', body);
+        status && (status.textContent = 'Сохранено.');
+        status?.classList.add('is-ok');
+        status?.classList.remove('is-error');
+    } catch (e) {
+        status && (status.textContent = 'Ошибка: ' + (e.message || 'error'));
+        status?.classList.add('is-error');
+        status?.classList.remove('is-ok');
+    }
+}
+
 export function initModals({ state }) {
     _host = document.getElementById('pd3ModalHost');
     if (!_host) return;
@@ -147,8 +196,11 @@ export function initModals({ state }) {
             open(modalId);
             if (modalId === 'pd3KashShiftModal')  await loadKashShift({ state });
             if (modalId === 'pd3SuppliesModal')   await loadSupplies({ state });
+            if (modalId === 'pd3SettingsModal')   await loadSettings();
         });
     }
+
+    document.getElementById('pd3SettingsForm')?.addEventListener('submit', saveSettings);
 
     // Backdrop + close button + Esc
     _host.addEventListener('click', (e) => {

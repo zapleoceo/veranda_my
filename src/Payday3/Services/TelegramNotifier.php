@@ -5,21 +5,21 @@ declare(strict_types=1);
 namespace App\Payday3\Services;
 
 use App\Infrastructure\Config;
+use App\Payday3\Contracts\LocalSettingsRepositoryInterface;
 use App\Payday3\Contracts\TelegramNotifierInterface;
 
 /**
- * Thin Telegram bot client — just sendMessage. Used by the
- * check-remove notification today; the screenshot/photo flow
- * (Phase 9) can reuse this for caption + share the cURL boilerplate.
+ * Thin Telegram bot client — just sendMessage.
  *
- * Reads .env: TELEGRAM_BOT_TOKEN (or legacy TG_BOT_TOKEN). Defaults
- * for chat/thread are baked in to match payday2's behaviour but every
- * caller can override.
+ * Defaults for chat/thread come from the LocalSettings repository
+ * (operator-tuned in payday3/local_config.json). Callers can override
+ * per-call to send to a different room.
+ *
+ * Reads .env: TELEGRAM_BOT_TOKEN (or legacy TG_BOT_TOKEN).
  */
 final class TelegramNotifier implements TelegramNotifierInterface
 {
-    private const DEFAULT_CHAT_ID  = '-1003889942420';
-    private const DEFAULT_THREAD   = '1950';
+    public function __construct(private readonly LocalSettingsRepositoryInterface $settings) {}
 
     public function sendText(string $text, ?string $chatId = null, ?string $threadId = null): array
     {
@@ -28,14 +28,18 @@ final class TelegramNotifier implements TelegramNotifierInterface
             ?? Config::get('TELEGRAM_BOT_TOKEN')));
         if ($token === '') return ['ok' => false, 'error' => 'TELEGRAM_BOT_TOKEN missing'];
 
-        $chat   = $chatId   ?? self::DEFAULT_CHAT_ID;
-        $thread = $threadId ?? self::DEFAULT_THREAD;
+        if ($chatId === null || $threadId === null) {
+            $cfg = $this->settings->load();
+            $chatId   = $chatId   ?? $cfg->telegramChatId;
+            $threadId = $threadId ?? $cfg->telegramThreadId;
+        }
+        if ($chatId === '') return ['ok' => false, 'error' => 'telegram_chat_id missing'];
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$token}/sendMessage");
         curl_setopt($ch, CURLOPT_POST, true);
-        $fields = ['chat_id' => $chat, 'text' => $text];
-        if ($thread !== null && $thread !== '') $fields['message_thread_id'] = $thread;
+        $fields = ['chat_id' => $chatId, 'text' => $text];
+        if ($threadId !== null && $threadId !== '') $fields['message_thread_id'] = $threadId;
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($fields));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);

@@ -629,6 +629,8 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-modal__result { margin-top: 12px; }
 
 .pd3-form { display: flex; flex-direction: column; gap: 10px; }
+.pd3-form__row { display: flex; gap: 10px; flex-wrap: wrap; }
+.pd3-form__row .pd3-field { flex: 1 1 0; min-width: 100px; }
 .pd3-field { display: flex; flex-direction: column; gap: 4px; }
 .pd3-field span { font-size: 11px; color: var(--muted); }
 .pd3-field input {

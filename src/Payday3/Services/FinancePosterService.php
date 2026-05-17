@@ -4,37 +4,33 @@ declare(strict_types=1);
 
 namespace App\Payday3\Services;
 
-use App\Classes\PosterAPI;
-use App\Payday2\LocalSettings;
 use App\Payday3\Contracts\FinanceServiceInterface;
+use App\Payday3\Contracts\LocalSettingsRepositoryInterface;
+use App\Payday3\Contracts\PosterApiProviderInterface;
 use App\Payday3\Domain\DateRange;
 use App\Payday3\Domain\FinanceTransaction;
 use App\Payday3\Domain\Money;
 
 /**
  * Fetches Poster finance.getTransactions for the Andrey and Tips
- * accounts (configured via payday2's LocalSettings JSON). Dedupes
- * by transaction_id across the two account-type calls.
- *
- * Port of payday2/ajax.php `finance_out` action.
+ * accounts, deduped by transaction_id. Both account IDs come from
+ * the injected LocalSettings repository — no payday2 import.
  */
 final class FinancePosterService implements FinanceServiceInterface
 {
+    public function __construct(
+        private readonly PosterApiProviderInterface       $poster,
+        private readonly LocalSettingsRepositoryInterface $settings,
+    ) {}
+
     /** @return FinanceTransaction[] */
     public function fetch(DateRange $range): array
     {
-        $token = trim((string)($_ENV['POSTER_API_TOKEN'] ?? ''));
-        if ($token === '') {
-            throw new \RuntimeException('POSTER_API_TOKEN is not configured');
-        }
-        $api = new PosterAPI($token);
+        $api = $this->poster->client();
+        $cfg = $this->settings->load();
 
         $rows = [];
-        $accounts = [
-            LocalSettings::accountAndreyId(),
-            LocalSettings::accountTipsId(),
-        ];
-        foreach ($accounts as $accType) {
+        foreach ([$cfg->accountAndreyId, $cfg->accountTipsId] as $accType) {
             try {
                 $batch = $api->request('finance.getTransactions', [
                     'dateFrom'     => date('Ymd', strtotime($range->from)),
@@ -48,7 +44,7 @@ final class FinancePosterService implements FinanceServiceInterface
             }
         }
 
-        $out = [];
+        $out  = [];
         $seen = [];
         foreach ($rows as $r) {
             if (!is_array($r)) continue;

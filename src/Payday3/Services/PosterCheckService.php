@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Payday3\Services;
 
-use App\Payday2\LocalSettings;
+use App\Payday3\Contracts\LocalSettingsRepositoryInterface;
 use App\Payday3\Contracts\PosterApiProviderInterface;
 use App\Payday3\Contracts\PosterCheckServiceInterface;
 use App\Payday3\Contracts\TelegramNotifierInterface;
@@ -16,19 +16,21 @@ use App\Payday3\Domain\DateRange;
  *   find(transactionId, range)
  *     Paginated walk over transactions.getTransactions (per_page = 1000,
  *     hard cap 50 pages) looking for an exact transaction_id match.
- *     Returns the row + products array when found.
  *
  *   remove(transactionId, byLabel)
- *     Calls transactions.removeTransaction with the configured
- *     service-user id (LocalSettings) and notifies Telegram on
- *     success. byLabel is the "user_name user_email" string that
- *     ends up in the audit message.
+ *     Calls transactions.removeTransaction with the service-user id
+ *     from local settings; on success, fires a Telegram audit note
+ *     to the configured chat/thread.
+ *
+ * No payday2 imports anywhere — service-user, chat-id, thread-id all
+ * come from the injected LocalSettings repository.
  */
 final class PosterCheckService implements PosterCheckServiceInterface
 {
     public function __construct(
-        private readonly PosterApiProviderInterface $poster,
-        private readonly TelegramNotifierInterface  $tg,
+        private readonly PosterApiProviderInterface       $poster,
+        private readonly TelegramNotifierInterface        $tg,
+        private readonly LocalSettingsRepositoryInterface $settings,
     ) {}
 
     public function find(int $transactionId, DateRange $range): array
@@ -70,10 +72,11 @@ final class PosterCheckService implements PosterCheckServiceInterface
         if ($transactionId <= 0) {
             throw new \InvalidArgumentException('Invalid transaction_id');
         }
+        $settings = $this->settings->load();
         $resp = $this->poster->client()->request('transactions.removeTransaction', [
             'spot_tablet_id' => 1,
             'transaction_id' => $transactionId,
-            'user_id'        => LocalSettings::serviceUserId(),
+            'user_id'        => $settings->serviceUserId,
         ], 'POST');
         $errCode = is_array($resp) ? (int)($resp['err_code'] ?? 0) : 0;
         if ($errCode !== 0) {
@@ -82,7 +85,7 @@ final class PosterCheckService implements PosterCheckServiceInterface
 
         $by   = trim($byLabel) !== '' ? trim($byLabel) : '—';
         $text = sprintf('Удален чек (%d) и кем - %s', $transactionId, $by);
-        $tg   = $this->tg->sendText($text);
+        $tg   = $this->tg->sendText($text, $settings->telegramChatId, $settings->telegramThreadId);
         return [
             'ok'             => true,
             'telegram_ok'    => (bool)($tg['ok'] ?? false),
