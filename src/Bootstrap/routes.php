@@ -36,6 +36,8 @@ use App\Payday3\Http\Actions\SettingsAction;
 use App\Payday3\Http\Actions\InDataAction;
 use App\Payday3\Http\Actions\FinanceTransfersAction;
 use App\Payday3\Http\Actions\BalanceScreenshotAction;
+use App\Payday3\Http\Actions\BalanceSyncPlanAction;
+use App\Payday3\Http\Actions\BalanceSyncCommitAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -184,6 +186,11 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->post(  '/balances',                                    ActualBalanceAction::class);
         // Send a screenshot of the balance card to Telegram (sendPhoto).
         $api->post(  '/balances/telegram',                           BalanceScreenshotAction::class);
+        // UPLD: push Факт.−Poster delta as a finance.createTransactions
+        // correction. Two-step: plan returns a nonce + preview, commit
+        // validates the nonce (<5 min TTL) and fires the API call.
+        $api->post(  '/balances/sync/plan',                          BalanceSyncPlanAction::class);
+        $api->post(  '/balances/sync/commit',                        BalanceSyncCommitAction::class);
         // Poster integrations — replaces /payday2/?ajax=kashshift/supplies/poster_check_*
         $api->get(   '/poster/cashshifts',                           PosterCashShiftListAction::class);
         $api->get(   '/poster/cashshifts/{shiftId:[A-Za-z0-9_-]+}',  PosterCashShiftDetailAction::class);
