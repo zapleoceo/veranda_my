@@ -9,6 +9,8 @@ use App\Payday3\Contracts\MailServiceInterface;
 use App\Payday3\Contracts\OutLinkRepositoryInterface;
 use App\Payday3\Domain\DateRange;
 use App\Payday3\Http\JsonResponder;
+use App\Payday3\Http\RequestThrottle;
+use App\Payday3\Http\TooManyRequestsException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -34,6 +36,9 @@ final class OutDataAction
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         try {
+            // IMAP + Poster API are slow; cap one OUT fetch per
+            // 5 seconds per session — UI shows the cooldown remaining.
+            RequestThrottle::guard('out-data', 5);
             $q = $request->getQueryParams();
             $range = DateRange::fromQuery($q);
             $includeHidden = (string)($q['include_hidden'] ?? '') === '1';
@@ -41,6 +46,8 @@ final class OutDataAction
             $mailRows    = $this->mail->fetch($range, $includeHidden);
             $financeRows = $this->finance->fetch($range);
             $linkRows    = $this->links->listInRange($range);
+        } catch (TooManyRequestsException $e) {
+            return JsonResponder::tooManyRequests($response, $e->getMessage(), $e->retryAfter);
         } catch (\InvalidArgumentException $e) {
             return JsonResponder::error($response, $e->getMessage(), 400);
         } catch (\RuntimeException $e) {

@@ -97,35 +97,102 @@ function renderSupplies(supplies, accounts) {
         </tr>`).join('')}</tbody></table>`;
 }
 
-async function findCheck(query, { state }) {
+// Cache of the recent-checks list per modal open. Loaded once when
+// the modal opens; the search input is a CLIENT-SIDE filter over
+// this list. Pressing «Искать по id» falls back to /checks/find for
+// rows older than the loaded page window.
+let checksCache = [];
+
+function renderChecksTable(rows) {
+    if (!rows.length) return '<p class="muted">Чеков за период не найдено.</p>';
+    const fmt = (n) => {
+        const v = Math.round(Number(n) || 0);
+        try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
+        catch (_) { return String(v); }
+    };
+    return `<table class="pd3-table pd3-checkfinder-table">
+        <thead><tr><th>№</th><th>Дата</th><th class="right">Сумма</th><th>Стол</th><th>Официант</th><th></th></tr></thead>
+        <tbody>${rows.map((r) => `<tr data-tx="${r.transaction_id}">
+            <td><strong>${escapeHtml(String(r.receipt_number || r.transaction_id))}</strong></td>
+            <td class="nowrap">${escapeHtml(String(r.date_close || ''))}</td>
+            <td class="right nowrap">${escapeHtml(fmt(r.sum))}</td>
+            <td>${escapeHtml(String(r.table_id || '—'))}</td>
+            <td>${escapeHtml(String(r.waiter_name || ''))}</td>
+            <td><button type="button" class="pd3-btn pd3-checkfinder-remove" data-tx="${r.transaction_id}">Удалить</button></td>
+        </tr>`).join('')}</tbody></table>`;
+}
+
+function wireRemoveButtons() {
     const out = document.getElementById('pd3CheckFinderResult');
     if (!out) return;
-    const id = parseInt(String(query).replace(/\D+/g, ''), 10);
-    if (!id || id <= 0) { out.textContent = 'Введи числовой transaction_id.'; return; }
-    out.textContent = 'Ищу…';
+    out.querySelectorAll('.pd3-checkfinder-remove').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const id = Number(btn.dataset.tx);
+            if (!id) return;
+            if (!confirm('Удалить чек #' + id + ' через Poster?')) return;
+            btn.disabled = true;
+            try {
+                const r = await api.delete('/payday3/api/poster/checks/' + id);
+                btn.closest('tr')?.remove();
+                if (r.telegram_ok) console.info('[payday3] telegram audit sent for', id);
+            } catch (err) {
+                btn.disabled = false;
+                alert('Ошибка удаления: ' + (err.message || 'request failed'));
+            }
+        });
+    });
+}
+
+async function loadChecksList({ state }) {
+    const out = document.getElementById('pd3CheckFinderResult');
+    if (!out) return;
+    out.innerHTML = '<p class="pd3-modal__loading">Загрузка списка чеков…</p>';
+    try {
+        const data = await api.get('/payday3/api/poster/checks?' + qs(state.get('range')));
+        checksCache = data.checks || [];
+        out.innerHTML = renderChecksTable(checksCache);
+        wireRemoveButtons();
+    } catch (e) {
+        out.innerHTML = `<p class="muted">Не удалось загрузить: ${escapeHtml(e.message || 'ошибка')}.</p>`;
+    }
+}
+
+function filterChecksList(needle) {
+    const out = document.getElementById('pd3CheckFinderResult');
+    if (!out) return;
+    const n = String(needle || '').toLowerCase().trim();
+    if (n === '') { out.innerHTML = renderChecksTable(checksCache); wireRemoveButtons(); return; }
+    const filtered = checksCache.filter((r) =>
+        String(r.transaction_id).includes(n)
+        || String(r.receipt_number).includes(n)
+        || String(r.waiter_name || '').toLowerCase().includes(n)
+        || String(r.table_id || '').includes(n)
+    );
+    out.innerHTML = renderChecksTable(filtered);
+    wireRemoveButtons();
+}
+
+async function findCheckById(idStr, { state }) {
+    const out = document.getElementById('pd3CheckFinderResult');
+    if (!out) return;
+    const id = parseInt(String(idStr).replace(/\D+/g, ''), 10);
+    if (!id || id <= 0) { filterChecksList(idStr); return; }
+    out.innerHTML = '<p class="pd3-modal__loading">Ищу…</p>';
     try {
         const q = qs(state.get('range'));
         const data = await api.get('/payday3/api/poster/checks/find?id=' + id + '&' + q);
-        if (!data.found) { out.textContent = 'Чек не найден за выбранный период.'; return; }
-        const t = data.transaction || {};
-        out.innerHTML = `<div class="pd3-checkfinder-row">
-            <strong>#${escapeHtml(String(t.receipt_number || t.transaction_id || id))}</strong>
-            · ${escapeHtml(String(t.date_close || t.date || ''))}
-            · ${escapeHtml(String(t.sum || t.payed_sum || ''))}
-            <button type="button" class="pd3-btn pd3-checkfinder-remove" data-tx="${id}" style="margin-left:8px">Удалить</button>
-        </div>`;
-        out.querySelector('.pd3-checkfinder-remove')?.addEventListener('click', async (e) => {
-            if (!confirm('Удалить чек #' + id + ' через Poster?')) return;
-            const btn = e.currentTarget; btn.disabled = true;
-            try {
-                const r = await api.delete('/payday3/api/poster/checks/' + id);
-                out.innerHTML = `<p class="muted">Удалён.${r.telegram_ok ? ' Уведомление отправлено в Telegram.' : ''}</p>`;
-            } catch (err) {
-                out.innerHTML = `<p class="muted">Ошибка удаления: ${escapeHtml(err.message || 'ошибка')}.</p>`;
-            }
-        });
+        if (!data.found) { out.innerHTML = '<p class="muted">Чек не найден за выбранный период.</p>'; return; }
+        out.innerHTML = renderChecksTable([{
+            transaction_id: id,
+            receipt_number: data.transaction?.receipt_number || id,
+            date_close:     data.transaction?.date_close     || '',
+            sum:            data.transaction?.sum            || data.transaction?.payed_sum || 0,
+            table_id:       data.transaction?.table_id       || '',
+            waiter_name:    data.transaction?.waiter_name    || data.transaction?.name || '',
+        }]);
+        wireRemoveButtons();
     } catch (e) {
-        out.textContent = 'Ошибка: ' + (e.message || 'request failed');
+        out.innerHTML = `<p class="muted">Ошибка: ${escapeHtml(e.message || 'request failed')}</p>`;
     }
 }
 
@@ -194,13 +261,18 @@ export function initModals({ state }) {
         if (!btn) continue;
         btn.addEventListener('click', async () => {
             open(modalId);
-            if (modalId === 'pd3KashShiftModal')  await loadKashShift({ state });
-            if (modalId === 'pd3SuppliesModal')   await loadSupplies({ state });
-            if (modalId === 'pd3SettingsModal')   await loadSettings();
+            if (modalId === 'pd3KashShiftModal')   await loadKashShift({ state });
+            if (modalId === 'pd3SuppliesModal')    await loadSupplies({ state });
+            if (modalId === 'pd3SettingsModal')    await loadSettings();
+            if (modalId === 'pd3CheckFinderModal') await loadChecksList({ state });
         });
     }
 
     document.getElementById('pd3SettingsForm')?.addEventListener('submit', saveSettings);
+
+    // Check-finder: live filter while typing, exact-id search on submit.
+    const finderInput = document.getElementById('pd3CheckFinderInput');
+    finderInput?.addEventListener('input', () => filterChecksList(finderInput.value));
 
     // Backdrop + close button + Esc
     _host.addEventListener('click', (e) => {
@@ -215,6 +287,6 @@ export function initModals({ state }) {
     form?.addEventListener('submit', (e) => {
         e.preventDefault();
         const q = document.getElementById('pd3CheckFinderInput')?.value?.trim();
-        if (q) findCheck(q, { state });
+        if (q) findCheckById(q, { state });
     });
 }

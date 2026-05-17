@@ -30,6 +30,8 @@ use App\Payday3\Http\Actions\PosterCheckRemoveAction;
 use App\Payday3\Http\Actions\PosterEmployeesAction;
 use App\Payday3\Http\Actions\PosterFinanceAccountsAction;
 use App\Payday3\Http\Actions\PosterFinanceCategoriesAction;
+use App\Payday3\Http\Actions\PosterCheckListAction;
+use App\Payday3\Http\Actions\PosterBalanceSnapshotAction;
 use App\Payday3\Http\Actions\SettingsAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
@@ -182,8 +184,11 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->get(   '/poster/cashshifts/{shiftId:[A-Za-z0-9_-]+}',  PosterCashShiftDetailAction::class);
         $api->get(   '/poster/supplies',                             PosterSuppliesListAction::class);
         $api->post(  '/poster/supplies/account',                     PosterSupplyChangeAccountAction::class);
+        $api->get(   '/poster/checks',                               PosterCheckListAction::class);
         $api->get(   '/poster/checks/find',                          PosterCheckFindAction::class);
         $api->delete('/poster/checks/{id:[0-9]+}',                   PosterCheckRemoveAction::class);
+        // Итоговый баланс — Poster live snapshot for the 3 configured accounts.
+        $api->get(   '/poster/balances',                             PosterBalanceSnapshotAction::class);
         // Lookups for dropdowns (employees, finance accounts/categories).
         $api->get(   '/poster/employees',                            PosterEmployeesAction::class);
         $api->get(   '/poster/finance/accounts',                     PosterFinanceAccountsAction::class);

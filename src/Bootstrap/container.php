@@ -78,7 +78,11 @@ use App\Payday3\Http\Actions\PosterCheckRemoveAction;
 use App\Payday3\Http\Actions\PosterEmployeesAction;
 use App\Payday3\Http\Actions\PosterFinanceAccountsAction;
 use App\Payday3\Http\Actions\PosterFinanceCategoriesAction;
+use App\Payday3\Http\Actions\PosterCheckListAction;
+use App\Payday3\Http\Actions\PosterBalanceSnapshotAction;
 use App\Payday3\Http\Actions\SettingsAction;
+use App\Payday3\Contracts\PosterBalanceServiceInterface;
+use App\Payday3\Services\PosterBalanceService;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -210,5 +214,11 @@ return [
     PosterEmployeesAction::class            => fn($c) => new PosterEmployeesAction($c->get(PosterLookupServiceInterface::class)),
     PosterFinanceAccountsAction::class      => fn($c) => new PosterFinanceAccountsAction($c->get(PosterLookupServiceInterface::class)),
     PosterFinanceCategoriesAction::class    => fn($c) => new PosterFinanceCategoriesAction($c->get(PosterLookupServiceInterface::class)),
+    PosterCheckListAction::class            => fn($c) => new PosterCheckListAction($c->get(PosterCheckServiceInterface::class)),
+    PosterBalanceServiceInterface::class    => fn($c) => new PosterBalanceService(
+        $c->get(PosterApiProviderInterface::class),
+        $c->get(LocalSettingsRepositoryInterface::class),
+    ),
+    PosterBalanceSnapshotAction::class      => fn($c) => new PosterBalanceSnapshotAction($c->get(PosterBalanceServiceInterface::class)),
     SettingsAction::class                   => fn($c) => new SettingsAction($c->get(LocalSettingsRepositoryInterface::class)),
 ];
