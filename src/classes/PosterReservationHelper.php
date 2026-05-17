@@ -4,7 +4,14 @@ namespace App\Classes;
 require_once __DIR__ . '/PosterAPI.php';
 
 class PosterReservationHelper {
-    public static function pushToPoster(Database $db, string $apiToken, int $reservationId, string $spotId = '1', string $actor = '') {
+    /**
+     * Accept either legacy App\Classes\Database (tr3/api_booking.php) or
+     * App\Infrastructure\Database (Slim Vposter*/VposterFix actions). Same
+     * reason as PosterSpotHallsService — TypeError on button presses from
+     * the manager chat otherwise. Both classes expose the same surface
+     * (t(), query(), getPdo()).
+     */
+    public static function pushToPoster(Database|\App\Infrastructure\Database $db, string $apiToken, int $reservationId, string $spotId = '1', string $actor = '') {
         if ($reservationId <= 0) {
             return ['ok' => false, 'error' => 'Invalid ID'];
         }
