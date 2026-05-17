@@ -67,6 +67,43 @@ final class PosterCheckService implements PosterCheckServiceInterface
         return ['found' => false];
     }
 
+    public function listRecent(DateRange $range, int $limit = 200): array
+    {
+        if ($limit <= 0) $limit = 200;
+        $api  = $this->poster->client();
+        $out  = [];
+        $page = 1;
+        $per  = min($limit, 1000);
+        $maxPages = 5;
+        while ($page <= $maxPages && count($out) < $limit) {
+            $resp = $api->request('transactions.getTransactions', [
+                'date_from' => $range->from,
+                'date_to'   => $range->to,
+                'per_page'  => $per,
+                'page'      => $page,
+            ], 'GET');
+            $rows = is_array($resp) ? ($resp['data'] ?? []) : [];
+            if (!is_array($rows) || $rows === []) break;
+            foreach ($rows as $row) {
+                if (!is_array($row)) continue;
+                $out[] = [
+                    'transaction_id' => (int)($row['transaction_id'] ?? 0),
+                    'receipt_number' => (int)($row['receipt_number'] ?? $row['transaction_id'] ?? 0),
+                    'date_close'     => (string)($row['date_close'] ?? $row['date_close_date'] ?? ''),
+                    'sum'            => (int)($row['sum'] ?? $row['payed_sum'] ?? 0),
+                    'pay_type'       => (int)($row['pay_type'] ?? 0),
+                    'spot_id'        => (int)($row['spot_id'] ?? 0),
+                    'table_id'       => (int)($row['table_id'] ?? 0),
+                    'waiter_name'    => (string)($row['waiter_name'] ?? $row['name'] ?? ''),
+                ];
+                if (count($out) >= $limit) break;
+            }
+            if (count($rows) < $per) break;
+            $page++;
+        }
+        return $out;
+    }
+
     public function remove(int $transactionId, string $byLabel): array
     {
         if ($transactionId <= 0) {

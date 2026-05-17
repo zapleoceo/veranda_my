@@ -101,7 +101,19 @@ export function initOutMode({ state }) {
         renderer?.setLinks(links);
     }
 
+    // Flood protection: while a fetch is in flight, every reload
+    // button is disabled and shows the .is-busy spinner. A re-entry
+    // attempt aborts (no queue — the user gets the freshest data
+    // from whichever click wins).
+    let loading = false;
     async function load() {
+        if (loading) return;
+        loading = true;
+        const reloadButtons = [
+            document.getElementById('pd3OutMailReloadBtn'),
+            document.getElementById('pd3OutFinanceReloadBtn'),
+        ].filter(Boolean);
+        reloadButtons.forEach((b) => { b.disabled = true; b.classList.add('is-busy'); });
         try {
             const data = await api.get('/payday3/api/out/data?' + rangeQs(state));
             mailRows = data.mail    || [];
@@ -120,6 +132,9 @@ export function initOutMode({ state }) {
             const tb = document.querySelector('#pd3OutMailTable tbody');
             if (tb) tb.innerHTML = `<tr class="pd3-empty"><td colspan="6">Не удалось загрузить: ${e.message || 'ошибка'}</td></tr>`;
             console.error('[payday3-out]', e);
+        } finally {
+            loading = false;
+            reloadButtons.forEach((b) => { b.disabled = false; b.classList.remove('is-busy'); });
         }
     }
 

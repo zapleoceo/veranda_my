@@ -24,6 +24,13 @@ final class JsonResponder
         return self::write($res, ['ok' => false, 'error' => $message], $status);
     }
 
+    /** 429 with Retry-After header, sourced from TooManyRequestsException. */
+    public static function tooManyRequests(ResponseInterface $res, string $message, int $retryAfter): ResponseInterface
+    {
+        return self::write($res, ['ok' => false, 'error' => $message, 'retry_after' => $retryAfter], 429)
+            ->withHeader('Retry-After', (string)$retryAfter);
+    }
+
     private static function write(ResponseInterface $res, array $body, int $status): ResponseInterface
     {
         $json = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

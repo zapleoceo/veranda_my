@@ -92,20 +92,20 @@ declare(strict_types=1);
         </div>
     </div>
 
-    <div class="pd3-modal" id="pd3CheckFinderModal" role="dialog" aria-modal="true" aria-labelledby="pd3CheckFinderTitle" hidden>
+    <div class="pd3-modal pd3-modal--wide" id="pd3CheckFinderModal" role="dialog" aria-modal="true" aria-labelledby="pd3CheckFinderTitle" hidden>
         <header class="pd3-modal__header">
             <h2 id="pd3CheckFinderTitle">Поиск чека Poster</h2>
             <button type="button" class="pd3-modal__close" data-pd3-modal-close aria-label="Закрыть">×</button>
         </header>
         <div class="pd3-modal__body">
-            <form id="pd3CheckFinderForm" class="pd3-form">
-                <label class="pd3-field">
-                    <span>Номер чека или transaction_id</span>
-                    <input type="text" id="pd3CheckFinderInput" inputmode="numeric" autocomplete="off" required>
-                </label>
-                <button type="submit" class="pd3-btn">Искать</button>
+            <form id="pd3CheckFinderForm" class="pd3-form pd3-form--inline">
+                <input type="text" id="pd3CheckFinderInput" autocomplete="off"
+                       placeholder="Фильтр по номеру / id / официанту…">
+                <button type="submit" class="pd3-btn">Искать по id</button>
             </form>
-            <div id="pd3CheckFinderResult" class="pd3-modal__result muted">Введи номер чека и нажми «Искать».</div>
+            <div id="pd3CheckFinderResult" class="pd3-modal__result">
+                <p class="pd3-modal__loading">Загрузка списка чеков за период…</p>
+            </div>
         </div>
     </div>
 </div>
