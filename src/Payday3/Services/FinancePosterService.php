@@ -53,13 +53,17 @@ final class FinancePosterService implements FinanceServiceInterface
                 if (isset($seen[$txId])) continue;
                 $seen[$txId] = true;
             }
+            // Poster `finance.getTransactions` returns amount/balance
+            // in cents (1 cent = 0.01 VND). Without the divide the
+            // OUT-mode finance table rendered every figure 100× too
+            // big.
             $out[] = new FinanceTransaction(
                 transactionId: $txId,
                 userId:        (int)($r['user_id']     ?? 0),
                 categoryId:    (int)($r['category_id'] ?? 0),
                 type:          (int)($r['type']        ?? 0),
-                amount:        Money::vnd((int)($r['amount']  ?? 0)),
-                balance:       Money::vnd((int)($r['balance'] ?? 0)),
+                amount:        Money::vnd(Money::posterMinorToVnd($r['amount']  ?? 0)),
+                balance:       Money::vnd(Money::posterMinorToVnd($r['balance'] ?? 0)),
                 date:          (string)($r['date']     ?? ''),
                 comment:       (string)($r['comment']  ?? ''),
             );

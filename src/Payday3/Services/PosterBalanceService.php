@@ -7,6 +7,7 @@ namespace App\Payday3\Services;
 use App\Payday3\Contracts\LocalSettingsRepositoryInterface;
 use App\Payday3\Contracts\PosterApiProviderInterface;
 use App\Payday3\Contracts\PosterBalanceServiceInterface;
+use App\Payday3\Domain\Money;
 
 /**
  * Snapshot of the three configured Poster accounts' current balances,
@@ -14,8 +15,9 @@ use App\Payday3\Contracts\PosterBalanceServiceInterface;
  * the three operator-configured IDs out of that map; missing IDs
  * yield null so the UI renders '—'.
  *
- * Poster's finance.getAccounts returns balance as VND directly (not
- * cents), confirmed against live data. No 100× conversion needed.
+ * Poster's finance.getAccounts returns balance in cents (1 cent =
+ * 0.01 VND) — same convention as poster_checks. Without dividing by
+ * 100 the UI rendered every figure 100× too big.
  */
 final class PosterBalanceService implements PosterBalanceServiceInterface
 {
@@ -32,7 +34,7 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
             foreach ($rows as $r) {
                 if (!is_array($r)) continue;
                 $id = (int)($r['account_id'] ?? 0);
-                if ($id > 0) $byId[$id] = (int)($r['balance'] ?? 0);
+                if ($id > 0) $byId[$id] = Money::posterMinorToVnd($r['balance'] ?? 0);
             }
         }
         $cfg = $this->settings->load();
