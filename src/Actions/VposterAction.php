@@ -31,11 +31,25 @@ class VposterAction implements ActionInterface
 
         $pushedState = (int) ($row['is_poster_pushed'] ?? 0);
         if ($pushedState === 2) {
+            // Concurrent push in progress — keep the keyboard so the user can
+            // retry after it finishes (or fails).
             $ctx->bot->answerCallbackQuery($ctx->callbackQueryId, 'Бронь уже отправляется в Poster');
             return '';
         }
         if ($pushedState === 1) {
+            // Already pushed — collapse the message to its final state so the
+            // active "Бронь в Постере" button stops dangling. Happens when
+            // the previous press succeeded but the original editMessageText
+            // didn't run (e.g. old code path, network blip, manual DB tweak).
             $ctx->bot->answerCallbackQuery($ctx->callbackQueryId, 'Бронь уже отправлена в Poster');
+            $rowWithHall = $this->_withHallName($row, $ctx);
+            $baseText    = trim(ReservationTelegram::buildManagerText($rowWithHall));
+            $baseText    = preg_replace('/\n?\s*@\w+\s+@\w+\s+свяжитесь\s+с\s+гостем\s*\n?/u', "\n", $baseText);
+            $ctx->bot->editMessageText(
+                $ctx->messageId,
+                $baseText . "\n\n🚀 <b>Уже в Poster</b> (отправлено ранее)",
+                []
+            );
             return '';
         }
 
