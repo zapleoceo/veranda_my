@@ -26,6 +26,9 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
         private readonly LocalSettingsRepositoryInterface $settings,
     ) {}
 
+    /** payday2 hard-codes "Касса" as Poster account_id = 2. */
+    private const CASH_ACCOUNT_ID = 2;
+
     public function snapshot(): array
     {
         $rows = $this->poster->client()->request('finance.getAccounts', []);
@@ -38,13 +41,24 @@ final class PosterBalanceService implements PosterBalanceServiceInterface
             }
         }
         $cfg = $this->settings->load();
-        $a = $byId[$cfg->accountAndreyId]  ?? null;
-        $v = $byId[$cfg->accountVietnamId] ?? null;
-        $c = $byId[$cfg->accountTipsId]    ?? null;
-        $total = null;
-        if ($a !== null || $v !== null || $c !== null) {
-            $total = (int)($a ?? 0) + (int)($v ?? 0) + (int)($c ?? 0);
-        }
+
+        // Mirrors payday2/view.php exactly:
+        //   Андрей  = accountAndreyId + accountTipsId combined
+        //   Вьет.   = accountVietnamId
+        //   Касса   = account_id 2 (hard-coded in payday2)
+        //   Total   = SUM of every account Poster returned
+        $andreyParts = [];
+        if (isset($byId[$cfg->accountAndreyId])) $andreyParts[] = $byId[$cfg->accountAndreyId];
+        if (isset($byId[$cfg->accountTipsId]))   $andreyParts[] = $byId[$cfg->accountTipsId];
+        $a = $andreyParts === [] ? null : array_sum($andreyParts);
+
+        $v = $byId[$cfg->accountVietnamId]  ?? null;
+        $c = $byId[self::CASH_ACCOUNT_ID]   ?? null;
+
+        // Total: sum of EVERY account, not just the three above — matches
+        // payday2's "Total" row (`$sum += $r['balance']` across all rows).
+        $total = $byId === [] ? null : array_sum($byId);
+
         return ['andrey' => $a, 'vietnam' => $v, 'cash' => $c, 'total' => $total];
     }
 }
