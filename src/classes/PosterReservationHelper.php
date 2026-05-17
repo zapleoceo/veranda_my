@@ -6,7 +6,7 @@ require_once __DIR__ . '/PosterAPI.php';
 class PosterReservationHelper {
     /**
      * Accept either legacy App\Classes\Database (tr3/api_booking.php) or
-     * App\Infrastructure\Database (Slim Vposter*/VposterFix actions). Same
+     * App\Infrastructure\Database (Slim Vposter / VposterFix actions). Same
      * reason as PosterSpotHallsService — TypeError on button presses from
      * the manager chat otherwise. Both classes expose the same surface
      * (t(), query(), getPdo()).
