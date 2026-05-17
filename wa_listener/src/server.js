@@ -43,10 +43,23 @@ async function handleSend(req, res) {
       } else {
         await sock.sendMessage(jid, { text });
       }
+      console.log('[wa] sendMessage ok: ' + jid);
       jsonReply(res, 200, { ok: true, sent: true });
     } catch (e) {
-      console.error('[wa] sendMessage error:', e.message);
-      jsonReply(res, 500, { ok: false, error: e.message });
+      const msg = String(e && e.message || e);
+      // Baileys' sendMessage resolves only after WhatsApp server-side ACK.
+      // For valid numbers the message is already on the wire when ACK
+      // arrives slow — we still get a "Timed Out" reject. Empirically the
+      // message is delivered: DB rows with return_sent_at=NULL frequently
+      // had used_at populated (= user clicked the link in WhatsApp).
+      // Treat the timeout as best-effort sent so callers don't false-fail.
+      if (/timed?\s*out/i.test(msg)) {
+        console.warn('[wa] sendMessage timeout, treating as best-effort sent: ' + jid);
+        jsonReply(res, 200, { ok: true, sent: true, ack: false, warning: 'ack_timeout' });
+        return;
+      }
+      console.error('[wa] sendMessage error: ' + jid + ' — ' + msg);
+      jsonReply(res, 500, { ok: false, error: msg });
     }
   });
 }
