@@ -16,7 +16,9 @@ declare(strict_types=1);
 <section class="pd3-card pd3-finance" id="pd3Finance">
     <header class="pd3-card__header">
         <h3>Финансовые транзакции</h3>
-        <button type="button" class="pd3-pill pd3-pill--sync" id="pd3FinanceReloadBtn" title="Обновить">
+        <button type="button" class="pd3-pill pd3-pill--sync" id="pd3FinanceReloadBtn"
+                title="Обновить"
+                data-help-abs="Пересчитать ожидаемые переводы Vietnam/Tips и список найденных в Poster транзакций.">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 2v6h-6"/>
                 <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
@@ -38,6 +40,7 @@ declare(strict_types=1);
                         id="pd3FinanceCreateBtn_<?= htmlspecialchars($row['kind']) ?>"
                         data-kind="<?= htmlspecialchars($row['kind']) ?>"
                         title="Создать транзакцию"
+                        data-help-abs="Создать перевод в Poster на ожидаемую сумму. Доступна когда сумма ненулевая и совпадающей транзакции в Poster ещё нет."
                         disabled>Создать</button>
             </div>
             <div class="pd3-finance__status muted" id="pd3FinanceStatus_<?= htmlspecialchars($row['kind']) ?>">Загрузка…</div>

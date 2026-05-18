@@ -988,25 +988,30 @@ body.pd3-help-mode [data-help-abs] {
     outline-offset: 2px;
     position: relative;
 }
-body.pd3-help-mode [data-help-abs]:hover::after {
-    content: attr(data-help-abs);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
+/* Shared floating tooltip — positioned by helpMode.js via top/left.
+   Lives at the root of <body>, so `overflow: hidden` on any ancestor
+   of the hovered element (e.g. .pd3-graph-card) can no longer clip
+   it. Visible only while body.pd3-help-mode is active because the
+   JS sets/unsets `hidden` on the element. */
+.pd3-help-tip {
+    position: fixed;
+    top: 0; left: 0;
     padding: 6px 10px;
     background: rgba(0,0,0,0.92);
     color: #fff;
     border-radius: 6px;
     font-size: 11px;
+    line-height: 1.4;
     white-space: pre-line;
-    max-width: 240px;
-    z-index: 999;
+    max-width: 320px;
+    z-index: 9999;
     pointer-events: none;
     text-transform: none;
     letter-spacing: 0;
     font-weight: 500;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.45);
 }
+.pd3-help-tip[hidden] { display: none; }
 
 /* ─── Финансовые транзакции card ─────────────────────────── */
 
