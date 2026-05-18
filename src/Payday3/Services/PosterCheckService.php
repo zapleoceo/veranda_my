@@ -96,6 +96,17 @@ final class PosterCheckService implements PosterCheckServiceInterface
 
         $names = $this->productNameMap($api);
 
+        // Collect spots referenced by the check set so we can fetch
+        // their tables once and resolve table_title for the table_id
+        // column.
+        $spotIds = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            $sid = (int)($row['spot_id'] ?? $row['spotId'] ?? 1);
+            if ($sid > 0) $spotIds[$sid] = true;
+        }
+        $tableTitles = $this->tableTitleMap($api, array_keys($spotIds));
+
         $out = [];
         foreach ($rows as $row) {
             if (!is_array($row)) continue;
@@ -143,6 +154,15 @@ final class PosterCheckService implements PosterCheckServiceInterface
                 ];
             }
 
+            $spotId    = (int)($row['spot_id'] ?? $row['spotId'] ?? 1);
+            $tableId   = (int)($row['table_id'] ?? 0);
+            // Prefer the title Poster sent inline; fall back to the
+            // per-spot map we just built; raw id is the last resort.
+            $tableTitle = trim((string)($row['table_title'] ?? $row['table_name'] ?? ''));
+            if ($tableTitle === '' && $tableId > 0) {
+                $tableTitle = $tableTitles[$spotId][$tableId] ?? '';
+            }
+
             $out[] = [
                 'transaction_id' => $txId,
                 'receipt_number' => (int)($row['receipt_number'] ?? $txId),
@@ -151,8 +171,9 @@ final class PosterCheckService implements PosterCheckServiceInterface
                 'payed_sum'      => Money::posterMinorToVnd($row['payed_sum'] ?? $row['sum'] ?? 0),
                 'pay_type'       => (int)($row['pay_type'] ?? 0),
                 'status'         => $status,
-                'spot_id'        => (int)($row['spot_id'] ?? $row['spotId'] ?? 0),
-                'table_id'       => (int)($row['table_id'] ?? 0),
+                'spot_id'        => $spotId,
+                'table_id'       => $tableId,
+                'table_title'    => $tableTitle,
                 'waiter_name'    => (string)($row['waiter_name'] ?? $row['name'] ?? ''),
                 'products'       => $productsOut,
             ];
@@ -203,6 +224,94 @@ final class PosterCheckService implements PosterCheckServiceInterface
             $page++;
         }
         return $out;
+    }
+
+    /**
+     * Build a {spot_id: {table_id: title}} map by walking each spot's
+     * halls via spots.getSpotTablesHalls + spots.getTableHallTables.
+     * Falls back to a flat spots.getTableHallTables call if a spot
+     * exposes no halls. Cached in $_SESSION for 6 hours — same TTL
+     * payday2 used. Without this map the Check Finder modal shows
+     * raw table_id integers instead of the operator-friendly title
+     * ("Бар 1", "ВИП", etc.).
+     *
+     * Errors are swallowed per-spot so one tenant's quirky API
+     * response can't blank-out the entire map.
+     *
+     * @param array<int,int> $spotIds
+     * @return array<int,array<int,string>>
+     */
+    private function tableTitleMap($api, array $spotIds): array
+    {
+        if ($spotIds === []) return [];
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+
+        $cache = $_SESSION['pd3_tables_cache'] ?? null;
+        $cacheTs    = is_array($cache) ? (int)($cache['ts']    ?? 0)    : 0;
+        $cacheSpots = is_array($cache) ? ($cache['spots'] ?? null) : null;
+        $spotMaps   = (is_array($cacheSpots) && $cacheTs > 0 && (time() - $cacheTs) < 6 * 3600)
+            ? $cacheSpots
+            : [];
+
+        $getTables = static function (array $params) use ($api) {
+            try {
+                return $api->request('spots.getTableHallTables', $params, 'GET');
+            } catch (\Throwable $e) {
+                if (stripos((string)$e->getMessage(), 'http=405') !== false) {
+                    return $api->request('spots.getTableHallTables', $params, 'POST');
+                }
+                return [];
+            }
+        };
+        $getHalls = static function (int $sId) use ($api) {
+            try {
+                return $api->request('spots.getSpotTablesHalls', ['spot_id' => $sId], 'GET');
+            } catch (\Throwable $e) {
+                if (stripos((string)$e->getMessage(), 'http=405') !== false) {
+                    return $api->request('spots.getSpotTablesHalls', ['spot_id' => $sId], 'POST');
+                }
+                return [];
+            }
+        };
+
+        $changed = false;
+        foreach ($spotIds as $spotId) {
+            $spotId = (int)$spotId;
+            if ($spotId <= 0) $spotId = 1;
+            if (isset($spotMaps[$spotId]) && is_array($spotMaps[$spotId]) && count($spotMaps[$spotId]) > 0) {
+                continue;
+            }
+            $tables = [];
+            $halls  = $getHalls($spotId);
+            if (is_array($halls) && $halls !== []) {
+                foreach ($halls as $hall) {
+                    if (!is_array($hall)) continue;
+                    $hallId = (int)($hall['hall_id'] ?? 0);
+                    if ($hallId <= 0) continue;
+                    $hallTables = $getTables(['spot_id' => $spotId, 'hall_id' => $hallId, 'without_deleted' => 1]);
+                    if (is_array($hallTables)) {
+                        $tables = array_merge($tables, $hallTables);
+                    }
+                }
+            }
+            if ($tables === []) {
+                $fallback = $getTables(['spot_id' => $spotId, 'without_deleted' => 1]);
+                if (is_array($fallback)) $tables = $fallback;
+            }
+            $map = [];
+            foreach ($tables as $t) {
+                if (!is_array($t)) continue;
+                $tid = (int)($t['table_id'] ?? 0);
+                $ttl = trim((string)($t['table_title'] ?? $t['table_name'] ?? ''));
+                if ($tid > 0 && $ttl !== '') $map[$tid] = $ttl;
+            }
+            $spotMaps[$spotId] = $map;
+            $changed = true;
+        }
+        if ($changed) {
+            $_SESSION['pd3_tables_cache'] = ['ts' => time(), 'spots' => $spotMaps];
+        }
+        return $spotMaps;
     }
 
     /**

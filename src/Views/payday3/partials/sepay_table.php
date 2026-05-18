@@ -49,7 +49,10 @@ $h = static function (\App\Payday3\Domain\SepayTransaction $s, string $rowClass)
             </button>
         </div>
         <div class="pd3-pane__actions">
-            <button type="button" class="pd3-eye" id="pd3SepayHiddenToggle" title="Показать/скрыть скрытые" aria-pressed="false">👁</button>
+            <button type="button" class="pd3-eye" id="pd3SepayHiddenToggle"
+                    title="Показать/скрыть скрытые"
+                    data-help-abs="Показать/скрыть платежи Sepay, которые оператор пометил кнопкой − (не наш платёж)."
+                    aria-pressed="false">👁</button>
         </div>
     </header>
     <div class="pd3-pane__scroll" id="pd3SepayScroll">

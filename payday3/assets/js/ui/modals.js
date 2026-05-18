@@ -195,7 +195,7 @@ function renderChecksTable(rows) {
                 <td class="nowrap muted">${escapeHtml(String(r.date_close || ''))}</td>
                 <td class="right nowrap">${escapeHtml(_checkFmt(r.sum))}</td>
                 <td class="right nowrap">${escapeHtml(_checkFmt(r.payed_sum))}</td>
-                <td>${escapeHtml(String(r.table_id || '—'))}</td>
+                <td class="nowrap">${escapeHtml(String(r.table_title || r.table_id || '—'))}</td>
                 <td class="muted">${escapeHtml(_statusLabel(status))}</td>
                 <td class="muted">${escapeHtml(payCol)}</td>
                 <td class="right">
@@ -277,6 +277,7 @@ function filterChecksList(needle) {
         String(r.transaction_id).includes(n)
         || String(r.receipt_number).includes(n)
         || String(r.waiter_name || '').toLowerCase().includes(n)
+        || String(r.table_title || '').toLowerCase().includes(n)
         || String(r.table_id || '').includes(n)
     );
     out.innerHTML = renderChecksTable(filtered);
