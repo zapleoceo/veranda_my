@@ -112,15 +112,28 @@ final class PosterCheckService implements PosterCheckServiceInterface
             }
 
             // Build a per-product line with VND-converted prices.
-            // `num` is the quantity (decimal), `product_sum` is in cents.
+            // `num` is the quantity (decimal). Poster's per-product
+            // sum field has been seen as product_sum / payed_sum /
+            // sum / amount on different tenants — fall through the
+            // list until we find one with a non-zero value.
             $productsOut = [];
             $productsIn  = is_array($row['products'] ?? null) ? $row['products'] : [];
             foreach ($productsIn as $pr) {
                 if (!is_array($pr)) continue;
                 $pid       = (int)($pr['product_id'] ?? 0);
-                $qty       = (float)($pr['num'] ?? 0);
-                $totalVnd  = Money::posterMinorToVnd($pr['product_sum'] ?? 0);
-                $unitVnd   = $qty > 0 && $totalVnd > 0 ? (int)floor($totalVnd / $qty) : 0;
+                $qty       = (float)($pr['num'] ?? $pr['quantity'] ?? 0);
+                $totalRaw  = $pr['product_sum']
+                          ?? $pr['payed_sum']
+                          ?? $pr['sum']
+                          ?? $pr['amount']
+                          ?? $pr['product_price_sum']
+                          ?? 0;
+                $totalVnd  = Money::posterMinorToVnd($totalRaw);
+                // Catalog per-unit price falls back to product_price
+                // (also in cents) when total is missing.
+                $unitVnd   = $qty > 0 && $totalVnd > 0
+                    ? (int)floor($totalVnd / $qty)
+                    : Money::posterMinorToVnd($pr['product_price'] ?? 0);
                 $productsOut[] = [
                     'product_id' => $pid,
                     'name'       => $pid > 0 ? ($names[$pid] ?? ('#' . $pid)) : '',

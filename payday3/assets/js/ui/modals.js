@@ -85,9 +85,13 @@ function renderKashShift(shifts) {
 
 function renderSupplies(supplies, accounts) {
     if (!supplies.length) return '<p class="muted">Поставок за период не найдено.</p>';
+    // Poster's finance.getAccounts returns the human-readable label
+    // under `name` — payday2 used the same key. The old code only
+    // looked at account_name/title, so every account label fell back
+    // to the raw "#<id>" instead of e.g. "Касса".
     const accLabel = (id) => {
         const a = accounts.find((x) => Number(x.account_id) === Number(id));
-        return a ? (a.account_name || a.title || ('#' + id)) : ('#' + id);
+        return a ? (a.name || a.account_name || a.title || ('#' + id)) : ('#' + id);
     };
     return `<table class="pd3-table" style="width:100%">
         <thead><tr><th>ID</th><th>Дата</th><th>Поставщик</th><th class="right">Сумма</th><th>Аккаунт</th></tr></thead>
