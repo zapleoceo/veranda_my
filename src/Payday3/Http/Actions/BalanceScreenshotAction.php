@@ -31,6 +31,31 @@ final class BalanceScreenshotAction
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        // Big base64 payloads + libcurl upload can spike memory and
+        // wall-time well past defaults. Lift them locally so a single
+        // screenshot send doesn't push PHP-FPM into OOM / segfault —
+        // when the worker dies, nginx returns an empty body and CF
+        // serves a generic 502 (origin_bad_gateway), masking the real
+        // cause.
+        @ini_set('memory_limit', '256M');
+        @set_time_limit(60);
+
+        try {
+            return $this->run($request, $response);
+        } catch (\Throwable $e) {
+            // Catch-all so any fatal still produces a proper JSON
+            // body — the front-end can show the message instead of
+            // falling back to "HTTP 502".
+            $this->log?->error('payday3 balance screenshot fatal', [
+                'message' => $e->getMessage(),
+                'file'    => $e->getFile() . ':' . $e->getLine(),
+            ]);
+            return JsonResponder::error($response, $e->getMessage(), 500);
+        }
+    }
+
+    private function run(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
         $payload = $request->getParsedBody();
         if (!is_array($payload)) {
             $raw     = (string)$request->getBody();
@@ -49,10 +74,6 @@ final class BalanceScreenshotAction
         $result = $this->tg->sendPhoto($bytes, $mime, 'Итоговый баланс');
         if (!($result['ok'] ?? false)) {
             $err = (string)($result['error'] ?? 'Telegram error');
-            // Log the actual Telegram response so we can debug the
-            // "thread not found / chat not found / bot kicked" class
-            // of errors without the operator needing to dig through
-            // network traces.
             $this->log?->warning('payday3 balance screenshot failed', [
                 'error'      => $err,
                 'image_kb'   => intdiv(strlen($bytes), 1024),

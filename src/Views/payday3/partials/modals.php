@@ -39,14 +39,21 @@ declare(strict_types=1);
 
             <details class="pd3-settings__group" open>
                 <summary>Telegram</summary>
+                <p class="pd3-settings__hint">
+                    Для супергрупп <code>chat_id</code> = <code>-100&lt;internal id&gt;</code>.
+                    Можно вставить ссылку на тему (<code>https://t.me/c/12345/678/…</code>) —
+                    распарсится в chat + thread автоматически.
+                </p>
                 <div class="pd3-form__row">
                     <label class="pd3-field">
-                        <span>chat_id</span>
-                        <input type="text" name="telegram_chat_id" required autocomplete="off">
+                        <span>chat_id (или t.me URL)</span>
+                        <input type="text" name="telegram_chat_id" required autocomplete="off"
+                               placeholder="-1003889942420">
                     </label>
                     <label class="pd3-field">
                         <span>message_thread_id</span>
-                        <input type="text" name="telegram_message_thread_id" autocomplete="off" placeholder="пусто = без темы">
+                        <input type="text" name="telegram_message_thread_id" autocomplete="off"
+                               placeholder="пусто = без темы">
                     </label>
                 </div>
             </details>
