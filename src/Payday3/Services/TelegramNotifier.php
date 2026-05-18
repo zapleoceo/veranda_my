@@ -101,9 +101,21 @@ final class TelegramNotifier implements TelegramNotifierInterface
             if ($resp === false) return ['ok' => false, 'error' => $err ?: 'Telegram request failed'];
             $j = json_decode((string)$resp, true);
             if (is_array($j) && ($j['ok'] ?? false)) return ['ok' => true];
-            return ['ok' => false, 'error' => is_array($j)
-                ? (string)($j['description'] ?? 'Telegram error')
-                : 'Telegram invalid response'];
+
+            // Build a descriptive error that always includes the
+            // error_code so misconfigured chat/thread surfaces as
+            // "400: Bad Request: message thread not found" instead
+            // of vanishing into a generic "HTTP 502".
+            $code = is_array($j) ? (int)($j['error_code']  ?? 0)  : 0;
+            $desc = is_array($j) ? trim((string)($j['description'] ?? '')) : '';
+            $rawTrimmed = trim((string)$resp);
+            if ($desc === '') {
+                $desc = $rawTrimmed !== ''
+                    ? 'Telegram: ' . mb_substr($rawTrimmed, 0, 120)
+                    : 'Telegram error';
+            }
+            $err = $code > 0 ? ($code . ': ' . $desc) : $desc;
+            return ['ok' => false, 'error' => $err];
         } finally {
             @unlink($tmpPath ?? $tmp);
         }

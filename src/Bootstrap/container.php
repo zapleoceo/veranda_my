@@ -251,6 +251,7 @@ return [
     ),
     BalanceScreenshotAction::class => fn($c) => new BalanceScreenshotAction(
         $c->get(TelegramNotifierInterface::class),
+        $c->get(LoggerInterface::class),
     ),
 
     // ─── Balance UPLD flow (Факт. − Poster → finance.createTransactions)
