@@ -1174,6 +1174,49 @@ body.pd3-help-mode [data-help-abs] {
 }
 .pd3-checkfinder__products-total strong { color: var(--accent); }
 
+/* ─── Кассовые смены modal — click row → expand transactions ── */
+.pd3-kashshift__row {
+    cursor: pointer;
+    border-top: 1px dashed rgba(255,255,255,0.04);
+}
+.pd3-kashshift__row:hover { background: rgba(255,255,255,0.03); }
+.pd3-kashshift__row--open { background: rgba(184,135,70,0.06); }
+.pd3-kashshift__details > td {
+    padding: 0;
+    background: rgba(0,0,0,0.22);
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.pd3-kashshift__details-inner { padding: 8px 10px; }
+.pd3-kashshift__empty { font-style: italic; opacity: 0.7; font-size: 11px; }
+.pd3-kashshift__txns { width: auto; font-size: 11px; }
+.pd3-kashshift__txns thead th {
+    padding: 2px 8px 3px;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    text-align: left;
+    background: transparent;
+    position: static;
+}
+.pd3-kashshift__txns tbody td {
+    padding: 2px 8px;
+    font-variant-numeric: tabular-nums;
+}
+/* Colour-coded transaction types so the operator can spot
+   inflows / outflows / shift open+close at a glance. */
+.pd3-kashshift__type.is-open  { color: #fbbf24; }
+.pd3-kashshift__type.is-in    { color: #4ade80; }
+.pd3-kashshift__type.is-out   { color: #f87171; }
+.pd3-kashshift__type.is-close { color: #fbbf24; }
+.pd3-kashshift__comment {
+    max-width: 320px;
+    white-space: normal;
+    word-break: break-word;
+    color: var(--muted);
+}
+
 /* "+" button on each OUT-mail row → opens Create-TX modal.
    Visible only on UNLINKED rows (row-red) — same rule as payday2.
    Linked rows already have a Poster counterpart, no point offering
