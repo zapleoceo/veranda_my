@@ -1136,6 +1136,22 @@ body.pd3-help-mode [data-help-abs]:hover::after {
     font-size: 11px;
     opacity: 0.7;
 }
+.pd3-checkfinder__summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 11px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px dashed rgba(255,255,255,0.06);
+}
+.pd3-checkfinder__summary strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.pd3-checkfinder__products tfoot td {
+    padding: 4px 8px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    background: rgba(184,135,70,0.04);
+}
+.pd3-checkfinder__products-total strong { color: var(--accent); }
 
 /* "+" button on each OUT-mail row → opens Create-TX modal.
    Visible only on UNLINKED rows (row-red) — same rule as payday2.

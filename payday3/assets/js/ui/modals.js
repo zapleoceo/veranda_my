@@ -125,19 +125,50 @@ function renderProductsTable(products) {
     if (!products || products.length === 0) {
         return '<div class="muted pd3-checkfinder__empty">Нет продуктов</div>';
     }
+    // Σ over the per-product totals so the operator can sanity-check
+    // that the products add up to the check's payed_sum / sum.
+    let sumTotal = 0;
+    let sumQty   = 0;
+    for (const p of products) {
+        sumTotal += Number(p.total) || 0;
+        sumQty   += Number(p.qty)   || 0;
+    }
     return `<table class="pd3-table pd3-checkfinder__products">
         <thead><tr>
             <th>Название</th>
             <th class="right">Цена</th>
             <th class="right">Кол-во</th>
-            <th class="right">Итог</th>
+            <th class="right">Сумма продажи</th>
         </tr></thead>
         <tbody>${products.map((p) => `<tr>
             <td>${escapeHtml(p.name || '')}</td>
             <td class="right nowrap">${escapeHtml(_checkFmt(p.unit_price))}</td>
             <td class="right nowrap">${escapeHtml(String(p.qty ?? ''))}</td>
             <td class="right nowrap"><strong>${escapeHtml(_checkFmt(p.total))}</strong></td>
-        </tr>`).join('')}</tbody></table>`;
+        </tr>`).join('')}</tbody>
+        <tfoot><tr class="pd3-checkfinder__products-total">
+            <td class="muted">Σ по позициям</td>
+            <td></td>
+            <td class="right nowrap muted">${escapeHtml(String(sumQty))}</td>
+            <td class="right nowrap"><strong>${escapeHtml(_checkFmt(sumTotal))}</strong></td>
+        </tr></tfoot>
+    </table>`;
+}
+
+function renderCheckSummary(r) {
+    // One-line header above the products table: shows the same
+    // money figures the parent row carries, but in a wider context
+    // where the operator can spot a discount (sum > payed_sum).
+    const date = r.date_close || '';
+    const sum    = _checkFmt(r.sum);
+    const payed  = _checkFmt(r.payed_sum);
+    const disc   = (Number(r.sum) || 0) - (Number(r.payed_sum) || 0);
+    const discTxt = disc > 0 ? `, скидка ${_checkFmt(disc)}` : '';
+    return `<div class="pd3-checkfinder__summary muted">
+        <span>${escapeHtml(date || '—')}</span>
+        <span>Сумма чека: <strong>${escapeHtml(sum)}</strong></span>
+        <span>Оплачено: <strong>${escapeHtml(payed)}</strong>${escapeHtml(discTxt)}</span>
+    </div>`;
 }
 
 function renderChecksTable(rows) {
@@ -170,6 +201,7 @@ function renderChecksTable(rows) {
             <tr class="pd3-checkfinder__details" data-tx-details="${id}" hidden>
                 <td colspan="8">
                     <div class="pd3-checkfinder__details-inner">
+                        ${renderCheckSummary(r)}
                         ${renderProductsTable(r.products || [])}
                     </div>
                 </td>
