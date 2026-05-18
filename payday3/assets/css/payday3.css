@@ -4,6 +4,56 @@
    mode-aware column visibility rules.
    No inline styles in templates. */
 
+/* ─── Dark scrollbars (page-wide, scoped to payday3) ──────────
+   layout.php doesn't include common.css, so the site-wide
+   scrollbar rules there don't reach this page. Re-declare them
+   here scoped to .pd3-page and its descendants so EVERY scroll
+   container on payday3 (panes, modals, accounts list,
+   horizontal graph scroller, code blocks, …) matches the page
+   palette instead of inheriting the bright OS default. */
+.pd3-page,
+.pd3-page * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+.pd3-page ::-webkit-scrollbar,
+.pd3-page::-webkit-scrollbar          { width: 10px; height: 10px; }
+.pd3-page ::-webkit-scrollbar-track,
+.pd3-page::-webkit-scrollbar-track    { background: transparent; }
+.pd3-page ::-webkit-scrollbar-thumb,
+.pd3-page::-webkit-scrollbar-thumb    {
+    background: var(--border);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+.pd3-page ::-webkit-scrollbar-thumb:hover,
+.pd3-page::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+.pd3-page ::-webkit-scrollbar-corner,
+.pd3-page::-webkit-scrollbar-corner   { background: transparent; }
+
+/* Modal scrollbars too — the modal host lives outside .pd3-page. */
+.pd3-modal,
+.pd3-modal-host,
+.pd3-modal *,
+.pd3-modal-host * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+.pd3-modal-host ::-webkit-scrollbar,
+.pd3-modal-host::-webkit-scrollbar    { width: 10px; height: 10px; }
+.pd3-modal-host ::-webkit-scrollbar-track,
+.pd3-modal-host::-webkit-scrollbar-track { background: transparent; }
+.pd3-modal-host ::-webkit-scrollbar-thumb,
+.pd3-modal-host::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+.pd3-modal-host ::-webkit-scrollbar-thumb:hover,
+.pd3-modal-host::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+
 /* ─── Page chrome ──────────────────────────────────────────── */
 
 .pd3-page { max-width: 100%; padding: 12px; }
