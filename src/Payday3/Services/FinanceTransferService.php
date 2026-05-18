@@ -52,6 +52,117 @@ final class FinanceTransferService implements FinanceTransferServiceInterface
         ];
     }
 
+    public function createTransfer(string $kind, DateRange $range, string $byLabel = ''): array
+    {
+        if (!in_array($kind, ['vietnam', 'tips'], true)) {
+            throw new \InvalidArgumentException('Unknown transfer kind: ' . $kind);
+        }
+        $cfg = $this->settings->load();
+        if ($cfg->accountAndreyId <= 0 || $cfg->serviceUserId <= 0) {
+            throw new \RuntimeException('Не настроены счета или service_user_id.');
+        }
+        $accountTo = $kind === 'vietnam' ? $cfg->accountVietnamId : $cfg->accountTipsId;
+        if ($accountTo <= 0) {
+            throw new \RuntimeException('Не настроен ' . ($kind === 'vietnam' ? 'accountVietnamId' : 'accountTipsId') . '.');
+        }
+        $amountVnd = $kind === 'vietnam'
+            ? $this->vietnamExpectedVnd($range)
+            : $this->tipsExpectedVnd($range);
+        if ($amountVnd === null || $amountVnd <= 0) {
+            throw new \RuntimeException($kind === 'vietnam'
+                ? 'Сумма = 0: нет чеков Vietnam Company за выбранный период.'
+                : 'Сумма = 0: нет типсов по связанным чекам за выбранный период.');
+        }
+
+        $targetDate = $range->to . ' 23:55:00';
+        $commentBase = $kind === 'vietnam'
+            ? 'Перевод чеков вьетнаской компании'
+            : 'Перевод типсов';
+        $comment = $commentBase . (trim($byLabel) !== '' ? ' by ' . trim($byLabel) : '');
+
+        // Idempotency — same flow as BalanceSyncService::commit().
+        // Walk the target account's same-day incomings; if any of
+        // them matches our (type, amount, comment-prefix), we
+        // consider the transfer already created.
+        if ($this->alreadyExistsToday($accountTo, $amountVnd, $commentBase, $range)) {
+            return [
+                'ok'         => true,
+                'already'    => true,
+                'amount_vnd' => $amountVnd,
+                'date'       => $targetDate,
+                'comment'    => $comment,
+                'user'       => '',
+            ];
+        }
+
+        $payload = [
+            'type'         => 2,            // 2 = transfer (Poster wire)
+            'user_id'      => $cfg->serviceUserId,
+            'account_from' => $cfg->accountAndreyId,
+            'account_to'   => $accountTo,
+            'amount_from'  => $amountVnd,
+            'amount_to'    => $amountVnd,
+            'date'         => $targetDate,
+            'comment'      => $comment,
+            // Legacy field names — payday2 sent both shapes to
+            // survive Poster API changes across tenants.
+            'account_id'   => $cfg->accountAndreyId,
+            'account_to_id'=> $accountTo,
+            'sum'          => $amountVnd,
+        ];
+        try {
+            $this->poster->client()->request('finance.createTransactions', $payload, 'POST');
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('Poster: ' . $e->getMessage(), 0, $e);
+        }
+        return [
+            'ok'         => true,
+            'already'    => false,
+            'amount_vnd' => $amountVnd,
+            'date'       => $targetDate,
+            'comment'    => $comment,
+            'user'       => $byLabel,
+        ];
+    }
+
+    private function alreadyExistsToday(int $accountTo, int $amountVnd, string $commentBase, DateRange $range): bool
+    {
+        $startTs = strtotime($range->to . ' 00:00:00');
+        $endTs   = strtotime($range->to . ' 23:59:59');
+        if ($startTs === false || $endTs === false) return false;
+
+        $rows = $this->safeFinanceRequest($this->poster->client(), [
+            'dateFrom'   => date('Ymd', $startTs),
+            'dateTo'     => date('Ymd', $endTs),
+            'account_id' => $accountTo,
+            'type'       => 1,
+            'timezone'   => 'client',
+        ]);
+        if ($rows === []) {
+            $rows = $this->safeFinanceRequest($this->poster->client(), [
+                'dateFrom'   => date('dmY', $startTs),
+                'dateTo'     => date('dmY', $endTs),
+                'account_id' => $accountTo,
+                'type'       => 1,
+                'timezone'   => 'client',
+            ]);
+        }
+        $needle = mb_strtolower($commentBase, 'UTF-8');
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            // Compare against our VND amount (Poster's amount comes
+            // through normMoneyMinor → posterCentsToVnd-equivalent).
+            $rawAmt = $row['amount'] ?? $row['amount_to'] ?? $row['amount_from'] ?? $row['sum'] ?? 0;
+            $sumVnd = (int)round(abs(self::normMoneyMinor($rawAmt)) / 100);
+            if ($sumVnd !== $amountVnd) continue;
+            $cmt = mb_strtolower((string)($row['comment'] ?? $row['description'] ?? ''), 'UTF-8');
+            if ($cmt !== '' && mb_strpos($cmt, $needle) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function vietnamExpectedVnd(DateRange $range): ?int
     {
         try {

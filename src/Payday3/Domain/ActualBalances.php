@@ -24,7 +24,12 @@ final class ActualBalances
 
     public static function fromRow(array $r): self
     {
-        $m = static fn($v) => $v === null || $v === '' ? null : Money::vnd((int)$v);
+        // payday2 wrote `bal_*` columns multiplied by 100 (it had
+        // a parseCents helper that did `digits * 100` before INSERT).
+        // The whole DB is still in that convention, so we divide
+        // back on read — and Repository::save() also × 100 to keep
+        // newly-saved rows compatible with whatever is already there.
+        $m = static fn($v) => $v === null || $v === '' ? null : Money::fromPosterCents((int)$v);
         return new self(
             targetDate: (string)($r['target_date'] ?? ''),
             andrey:     $m($r['bal_andrey']  ?? null),
