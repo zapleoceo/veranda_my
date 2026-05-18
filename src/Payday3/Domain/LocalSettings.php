@@ -37,7 +37,10 @@ final class LocalSettings
     {
         return new self(
             telegramChatId:       '-1003889942420',
-            telegramThreadId:     '1736',
+            // Telegram chat moved to forum/topics on 2026-05-17 —
+            // the "Балансы" thread is 5274. Operators can override
+            // via the ⚙ Settings modal in either /payday2 or /payday3.
+            telegramThreadId:     '5274',
             serviceUserId:        4,
             accountAndreyId:      1,
             accountTipsId:        8,
