@@ -106,43 +106,115 @@ function renderSupplies(supplies, accounts) {
 // rows older than the loaded page window.
 let checksCache = [];
 
-function renderChecksTable(rows) {
-    if (!rows.length) return '<p class="muted">Чеков за период не найдено.</p>';
-    const fmt = (n) => {
-        const v = Math.round(Number(n) || 0);
-        try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
-        catch (_) { return String(v); }
-    };
-    return `<table class="pd3-table pd3-checkfinder-table">
-        <thead><tr><th>№</th><th>Дата</th><th class="right">Сумма</th><th>Стол</th><th>Официант</th><th></th></tr></thead>
-        <tbody>${rows.map((r) => `<tr data-tx="${r.transaction_id}">
-            <td><strong>${escapeHtml(String(r.receipt_number || r.transaction_id))}</strong></td>
-            <td class="nowrap">${escapeHtml(String(r.date_close || ''))}</td>
-            <td class="right nowrap">${escapeHtml(fmt(r.sum))}</td>
-            <td>${escapeHtml(String(r.table_id || '—'))}</td>
-            <td>${escapeHtml(String(r.waiter_name || ''))}</td>
-            <td><button type="button" class="pd3-btn pd3-checkfinder-remove" data-tx="${r.transaction_id}">Удалить</button></td>
+const _checkFmt = (n) => {
+    if (n === null || n === undefined || n === '') return '';
+    const v = Math.round(Number(n) || 0);
+    try { return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v).replace(/,/g, ' '); }
+    catch (_) { return String(v); }
+};
+const _payTypeLabel = (v) => {
+    const n = Number(v || 0) || 0;
+    return ({ 0: 'без оплаты', 1: 'наличные', 2: 'безнал', 3: 'смешанная' })[n] ?? String(n);
+};
+const _statusLabel = (v) => {
+    const n = Number(v || 0) || 0;
+    return ({ 1: 'открыт', 2: 'закрыт', 3: 'удалён' })[n] ?? '';
+};
+
+function renderProductsTable(products) {
+    if (!products || products.length === 0) {
+        return '<div class="muted pd3-checkfinder__empty">Нет продуктов</div>';
+    }
+    return `<table class="pd3-table pd3-checkfinder__products">
+        <thead><tr>
+            <th>Название</th>
+            <th class="right">Цена</th>
+            <th class="right">Кол-во</th>
+            <th class="right">Итог</th>
+        </tr></thead>
+        <tbody>${products.map((p) => `<tr>
+            <td>${escapeHtml(p.name || '')}</td>
+            <td class="right nowrap">${escapeHtml(_checkFmt(p.unit_price))}</td>
+            <td class="right nowrap">${escapeHtml(String(p.qty ?? ''))}</td>
+            <td class="right nowrap"><strong>${escapeHtml(_checkFmt(p.total))}</strong></td>
         </tr>`).join('')}</tbody></table>`;
 }
 
-function wireRemoveButtons() {
+function renderChecksTable(rows) {
+    if (!rows.length) return '<p class="muted">Чеков за период не найдено.</p>';
+    return `<table class="pd3-table pd3-checkfinder-table">
+        <thead><tr>
+            <th>№</th><th>Дата</th>
+            <th class="right">Сумма</th><th class="right">Оплачено</th>
+            <th>Стол</th><th>Статус</th><th>Оплата</th><th></th>
+        </tr></thead>
+        <tbody>${rows.map((r) => {
+            const id     = Number(r.transaction_id) || 0;
+            const status = Number(r.status) || 0;
+            const cls    = ['pd3-checkfinder__row',
+                            status === 3 ? 'pd3-checkfinder__row--deleted' : '',
+                            status === 1 ? 'pd3-checkfinder__row--open'    : ''].filter(Boolean).join(' ');
+            const payCol = status === 2 ? _payTypeLabel(r.pay_type) : '';
+            return `<tr class="${cls}" data-tx="${id}">
+                <td><strong>${escapeHtml(String(r.receipt_number || id))}</strong></td>
+                <td class="nowrap muted">${escapeHtml(String(r.date_close || ''))}</td>
+                <td class="right nowrap">${escapeHtml(_checkFmt(r.sum))}</td>
+                <td class="right nowrap">${escapeHtml(_checkFmt(r.payed_sum))}</td>
+                <td>${escapeHtml(String(r.table_id || '—'))}</td>
+                <td class="muted">${escapeHtml(_statusLabel(status))}</td>
+                <td class="muted">${escapeHtml(payCol)}</td>
+                <td class="right">
+                    <button type="button" class="pd3-btn pd3-btn--sm pd3-checkfinder-remove" data-tx="${id}">Удалить</button>
+                </td>
+            </tr>
+            <tr class="pd3-checkfinder__details" data-tx-details="${id}" hidden>
+                <td colspan="8">
+                    <div class="pd3-checkfinder__details-inner">
+                        ${renderProductsTable(r.products || [])}
+                    </div>
+                </td>
+            </tr>`;
+        }).join('')}</tbody></table>`;
+}
+
+function wireCheckRowInteractions() {
     const out = document.getElementById('pd3CheckFinderResult');
-    if (!out) return;
-    out.querySelectorAll('.pd3-checkfinder-remove').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-            const id = Number(btn.dataset.tx);
+    if (!out || out.dataset.wired === '1') return;
+    out.dataset.wired = '1';
+
+    // One delegated listener handles BOTH the row-click (expand
+    // products) and the Delete button — saves re-binding after every
+    // re-render driven by the filter input.
+    out.addEventListener('click', async (e) => {
+        const delBtn = e.target.closest?.('.pd3-checkfinder-remove');
+        if (delBtn) {
+            e.stopPropagation();
+            const id = Number(delBtn.dataset.tx);
             if (!id) return;
             if (!confirm('Удалить чек #' + id + ' через Poster?')) return;
-            btn.disabled = true;
+            delBtn.disabled = true;
             try {
                 const r = await api.delete('/payday3/api/poster/checks/' + id);
-                btn.closest('tr')?.remove();
-                if (r.telegram_ok) console.info('[payday3] telegram audit sent for', id);
+                // Remove BOTH the row and its details twin.
+                const row = delBtn.closest('tr');
+                const det = out.querySelector(`[data-tx-details="${id}"]`);
+                row?.remove();
+                det?.remove();
+                if (r?.telegram_ok) console.info('[payday3] telegram audit sent for', id);
             } catch (err) {
-                btn.disabled = false;
+                delBtn.disabled = false;
                 alert('Ошибка удаления: ' + (err.message || 'request failed'));
             }
-        });
+            return;
+        }
+
+        const row = e.target.closest?.('.pd3-checkfinder__row');
+        if (!row) return;
+        const id  = row.dataset.tx;
+        const det = out.querySelector(`[data-tx-details="${id}"]`);
+        if (!det) return;
+        det.hidden = !det.hidden;
+        row.classList.toggle('pd3-checkfinder__row--open-detail', !det.hidden);
     });
 }
 
@@ -154,7 +226,7 @@ async function loadChecksList({ state }) {
         const data = await api.get('/payday3/api/poster/checks?' + qs(state.get('range')));
         checksCache = data.checks || [];
         out.innerHTML = renderChecksTable(checksCache);
-        wireRemoveButtons();
+        wireCheckRowInteractions();
     } catch (e) {
         out.innerHTML = `<p class="muted">Не удалось загрузить: ${escapeHtml(e.message || 'ошибка')}.</p>`;
     }
@@ -164,7 +236,7 @@ function filterChecksList(needle) {
     const out = document.getElementById('pd3CheckFinderResult');
     if (!out) return;
     const n = String(needle || '').toLowerCase().trim();
-    if (n === '') { out.innerHTML = renderChecksTable(checksCache); wireRemoveButtons(); return; }
+    if (n === '') { out.innerHTML = renderChecksTable(checksCache); wireCheckRowInteractions(); return; }
     const filtered = checksCache.filter((r) =>
         String(r.transaction_id).includes(n)
         || String(r.receipt_number).includes(n)
@@ -172,7 +244,7 @@ function filterChecksList(needle) {
         || String(r.table_id || '').includes(n)
     );
     out.innerHTML = renderChecksTable(filtered);
-    wireRemoveButtons();
+    wireCheckRowInteractions();
 }
 
 async function findCheckById(idStr, { state }) {
@@ -193,7 +265,7 @@ async function findCheckById(idStr, { state }) {
             table_id:       data.transaction?.table_id       || '',
             waiter_name:    data.transaction?.waiter_name    || data.transaction?.name || '',
         }]);
-        wireRemoveButtons();
+        wireCheckRowInteractions();
     } catch (e) {
         out.innerHTML = `<p class="muted">Ошибка: ${escapeHtml(e.message || 'request failed')}</p>`;
     }

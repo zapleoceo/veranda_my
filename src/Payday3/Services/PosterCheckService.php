@@ -73,6 +73,87 @@ final class PosterCheckService implements PosterCheckServiceInterface
     public function listRecent(DateRange $range, int $limit = 200): array
     {
         if ($limit <= 0) $limit = 200;
+        $api = $this->poster->client();
+
+        // dash.getTransactions returns open/closed/deleted checks in
+        // one shot WITH their products inline — exactly what payday2's
+        // ?ajax=poster_checks_list relied on for the expand-on-click
+        // feature. Falls back to the v3 paginated endpoint when the
+        // dash flavour is unavailable on this Poster tenant.
+        try {
+            $rows = $api->request('dash.getTransactions', [
+                'dateFrom'         => str_replace('-', '', $range->from),
+                'dateTo'           => str_replace('-', '', $range->to),
+                'include_products' => 'true',
+                'status'           => 0,
+            ], 'GET');
+        } catch (\Throwable $e) {
+            $rows = [];
+        }
+        if (!is_array($rows) || $rows === []) {
+            return $this->listRecentV3Fallback($range, $limit);
+        }
+
+        $names = $this->productNameMap($api);
+
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) continue;
+            $txId = (int)($row['transaction_id'] ?? $row['id'] ?? 0);
+            if ($txId <= 0) continue;
+
+            // Status: 1=open, 2=closed, 3=deleted — derive when Poster
+            // omits the explicit field (legacy responses).
+            $status = (int)($row['status'] ?? $row['transaction_status'] ?? 0);
+            if ($status <= 0) {
+                if ((int)($row['delete'] ?? 0) === 1)              $status = 3;
+                elseif ((string)($row['date_close'] ?? '') !== '') $status = 2;
+                else                                               $status = 1;
+            }
+
+            // Build a per-product line with VND-converted prices.
+            // `num` is the quantity (decimal), `product_sum` is in cents.
+            $productsOut = [];
+            $productsIn  = is_array($row['products'] ?? null) ? $row['products'] : [];
+            foreach ($productsIn as $pr) {
+                if (!is_array($pr)) continue;
+                $pid       = (int)($pr['product_id'] ?? 0);
+                $qty       = (float)($pr['num'] ?? 0);
+                $totalVnd  = Money::posterMinorToVnd($pr['product_sum'] ?? 0);
+                $unitVnd   = $qty > 0 && $totalVnd > 0 ? (int)floor($totalVnd / $qty) : 0;
+                $productsOut[] = [
+                    'product_id' => $pid,
+                    'name'       => $pid > 0 ? ($names[$pid] ?? ('#' . $pid)) : '',
+                    'qty'        => $qty,
+                    'unit_price' => $unitVnd > 0 ? $unitVnd : null,
+                    'total'      => $totalVnd > 0 ? $totalVnd : null,
+                ];
+            }
+
+            $out[] = [
+                'transaction_id' => $txId,
+                'receipt_number' => (int)($row['receipt_number'] ?? $txId),
+                'date_close'     => (string)($row['date_close'] ?? $row['date_close_date'] ?? ''),
+                'sum'            => Money::posterMinorToVnd($row['sum']       ?? 0),
+                'payed_sum'      => Money::posterMinorToVnd($row['payed_sum'] ?? $row['sum'] ?? 0),
+                'pay_type'       => (int)($row['pay_type'] ?? 0),
+                'status'         => $status,
+                'spot_id'        => (int)($row['spot_id'] ?? $row['spotId'] ?? 0),
+                'table_id'       => (int)($row['table_id'] ?? 0),
+                'waiter_name'    => (string)($row['waiter_name'] ?? $row['name'] ?? ''),
+                'products'       => $productsOut,
+            ];
+            if (count($out) >= $limit) break;
+        }
+        return $out;
+    }
+
+    /**
+     * Fallback when dash.getTransactions is unavailable on this Poster
+     * tenant — original v3 paginated endpoint without products.
+     */
+    private function listRecentV3Fallback(DateRange $range, int $limit): array
+    {
         $api  = $this->poster->client();
         $out  = [];
         $page = 1;
@@ -89,18 +170,19 @@ final class PosterCheckService implements PosterCheckServiceInterface
             if (!is_array($rows) || $rows === []) break;
             foreach ($rows as $row) {
                 if (!is_array($row)) continue;
-                // Poster returns `sum` / `payed_sum` in cents; convert
-                // here so the modal renders ₫ without trailing zeros.
                 $sumRaw = $row['sum'] ?? $row['payed_sum'] ?? 0;
                 $out[] = [
                     'transaction_id' => (int)($row['transaction_id'] ?? 0),
                     'receipt_number' => (int)($row['receipt_number'] ?? $row['transaction_id'] ?? 0),
                     'date_close'     => (string)($row['date_close'] ?? $row['date_close_date'] ?? ''),
                     'sum'            => Money::posterMinorToVnd($sumRaw),
+                    'payed_sum'      => Money::posterMinorToVnd($sumRaw),
                     'pay_type'       => (int)($row['pay_type'] ?? 0),
+                    'status'         => 2,
                     'spot_id'        => (int)($row['spot_id'] ?? 0),
                     'table_id'       => (int)($row['table_id'] ?? 0),
                     'waiter_name'    => (string)($row['waiter_name'] ?? $row['name'] ?? ''),
+                    'products'       => [],
                 ];
                 if (count($out) >= $limit) break;
             }
@@ -108,6 +190,41 @@ final class PosterCheckService implements PosterCheckServiceInterface
             $page++;
         }
         return $out;
+    }
+
+    /**
+     * id → product name map from menu.getProducts. Cached per session
+     * for 6 hours — same TTL payday2 used. Without this, each row's
+     * products would show as "#<id>" instead of human-readable
+     * names.
+     *
+     * @return array<int,string>
+     */
+    private function productNameMap($api): array
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        $cache = $_SESSION['pd3_products_cache'] ?? null;
+        if (is_array($cache) && (time() - (int)($cache['ts'] ?? 0)) < 6 * 3600 && is_array($cache['map'] ?? null)) {
+            return $cache['map'];
+        }
+        try {
+            $products = $api->request('menu.getProducts', [], 'GET');
+        } catch (\Throwable $e) {
+            return is_array($cache['map'] ?? null) ? $cache['map'] : [];
+        }
+        $map = [];
+        if (is_array($products)) {
+            foreach ($products as $p) {
+                if (!is_array($p)) continue;
+                $pid  = (int)($p['product_id'] ?? $p['id'] ?? 0);
+                $name = trim((string)($p['product_name'] ?? $p['name'] ?? ''));
+                if ($pid > 0 && $name !== '') $map[$pid] = $name;
+            }
+        }
+        $_SESSION['pd3_products_cache'] = ['ts' => time(), 'map' => $map];
+        return $map;
     }
 
     /**
