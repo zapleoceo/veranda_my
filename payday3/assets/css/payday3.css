@@ -1076,6 +1076,67 @@ body.pd3-help-mode [data-help-abs]:hover::after {
 }
 .pd3-fw-normal { font-weight: 400; }
 
+/* ─── Check-Finder modal — click-to-expand products ─────────── */
+
+.pd3-checkfinder-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pd3-checkfinder-table thead th {
+    padding: 4px 8px;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: left;
+    background: var(--card);
+    position: sticky;
+    top: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.pd3-checkfinder-table tbody td { padding: 4px 8px; vertical-align: middle; }
+.pd3-checkfinder__row {
+    cursor: pointer;
+    border-top: 1px dashed rgba(255,255,255,0.04);
+}
+.pd3-checkfinder__row:hover { background: rgba(255,255,255,0.03); }
+.pd3-checkfinder__row--open-detail {
+    background: rgba(184,135,70,0.06);   /* same hue as --accent2 */
+}
+.pd3-checkfinder__row--deleted {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+.pd3-checkfinder__row--open td {
+    color: var(--muted);
+    font-style: italic;
+}
+.pd3-checkfinder__details > td {
+    padding: 0;
+    background: rgba(0,0,0,0.22);
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.pd3-checkfinder__details-inner { padding: 10px 14px; }
+.pd3-checkfinder__products { width: auto; border-collapse: collapse; font-size: 11px; }
+.pd3-checkfinder__products thead th {
+    padding: 2px 8px;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    text-align: left;
+    background: transparent;
+    position: static;
+}
+.pd3-checkfinder__products tbody td {
+    padding: 2px 8px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.pd3-checkfinder__empty {
+    font-style: italic;
+    font-size: 11px;
+    opacity: 0.7;
+}
+
 /* "+" button on each OUT-mail row → opens Create-TX modal.
    Visible only on UNLINKED rows (row-red) — same rule as payday2.
    Linked rows already have a Poster counterpart, no point offering
