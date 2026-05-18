@@ -856,13 +856,15 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     padding-right: 4px;
 }
 .pd3-settings__cat {
-    display: grid;
-    grid-template-columns: auto 48px 1fr 1fr;
+    display: flex;
     align-items: center;
     gap: 8px;
     padding: 2px 4px;
     border-radius: 6px;
 }
+.pd3-settings__cat-cb { flex: 0 0 auto; }
+.pd3-settings__cat .pd3-settings__cat-name { flex: 1; min-width: 0; }
+.pd3-settings__cat .pd3-settings__cat-rename { flex: 1; min-width: 80px; }
 .pd3-settings__cat:hover { background: rgba(255,255,255,0.04); }
 .pd3-settings__cat-id   { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .pd3-settings__cat-name { font-size: 12px; }
