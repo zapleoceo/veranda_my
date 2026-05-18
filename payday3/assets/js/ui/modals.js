@@ -289,13 +289,21 @@ function renderCategories() {
 }
 
 function wireCategoriesLazy() {
-    const summary = document.querySelector('.pd3-settings__group:has(#pd3SettCategoriesList) > summary');
-    if (!summary || summary.dataset.bound === '1') return;
-    summary.dataset.bound = '1';
-    summary.addEventListener('click', () => {
-        // Wait for <details> to actually open
-        requestAnimationFrame(hydrateCategories);
+    // Don't rely on :has() — the older Edge / Safari builds don't
+    // support it. closest('details') is universally supported.
+    const wrap = document.getElementById('pd3SettCategoriesList');
+    const details = wrap?.closest('details');
+    if (!details || details.dataset.bound === '1') return;
+    details.dataset.bound = '1';
+    // Listen on the `toggle` event so we only fetch once the user
+    // actually opens the section. Fires both on open and close — we
+    // only act on open.
+    details.addEventListener('toggle', () => {
+        if (details.open) hydrateCategories();
     });
+    // Already open (e.g. user reopens modal mid-session with the
+    // section expanded) — hydrate immediately.
+    if (details.open) hydrateCategories();
 }
 
 async function saveSettings(event) {
