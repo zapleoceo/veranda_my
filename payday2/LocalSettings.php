@@ -16,7 +16,10 @@ final class LocalSettings
         }
         $defaults = [
             'telegram_chat_id' => '-1003889942420',
-            'telegram_message_thread_id' => '1736',
+            // Telegram chat moved to forum/topics on 2026-05-17 — the
+            // "Балансы" thread is 5274 (URL: t.me/c/3889942420/5274/...).
+            // Operators can still override via the ⚙ Settings modal.
+            'telegram_message_thread_id' => '5274',
             'service_user_id' => 4,
             'account_andrey_id' => Config::ACCOUNT_ANDREY,
             'account_tips_id' => Config::ACCOUNT_TIPS,
