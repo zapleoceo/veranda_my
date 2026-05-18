@@ -9,11 +9,19 @@
 
 'use strict';
 
-import { api }                from '../api.js';
-import { LineRenderer }       from '../ui/lineRenderer.js';
-import { renderOutMail,
-         renderOutFinance,
-         updateOutFooter }    from './renderTables.js';
+// nginx serves /payday3/assets/js/* with a 4-hour cache and ignores
+// our Cache-Control headers, so bare static imports like
+//   import { renderOutMail } from './renderTables.js';
+// land on a stale URL after every deploy. Cascade index.js's ?v=
+// query string through dynamic imports so every cross-module URL
+// changes on each commit.
+const _v = new URL(import.meta.url).searchParams.get('v') || '';
+const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
+const { api }                 = await import(new URL('../api.js'              + _qs, import.meta.url).href);
+const { LineRenderer }        = await import(new URL('../ui/lineRenderer.js'  + _qs, import.meta.url).href);
+const { renderOutMail,
+        renderOutFinance,
+        updateOutFooter }     = await import(new URL('./renderTables.js'      + _qs, import.meta.url).href);
 
 const fmt = (n) => {
     const v = Math.round(Number(n) || 0);

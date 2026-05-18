@@ -7,9 +7,14 @@
 
 'use strict';
 
-import { api } from '../api.js';
-import { renderSepay, renderPoster, updateInFooters } from './renderTables.js';
-import { refreshStats } from '../ui/stats.js';
+// Cache-bust cross-module imports — see comment in out/bootstrap.js.
+const _v = new URL(import.meta.url).searchParams.get('v') || '';
+const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
+const { api }              = await import(new URL('../api.js'        + _qs, import.meta.url).href);
+const { renderSepay,
+        renderPoster,
+        updateInFooters }  = await import(new URL('./renderTables.js' + _qs, import.meta.url).href);
+const { refreshStats }     = await import(new URL('../ui/stats.js'   + _qs, import.meta.url).href);
 
 function dateQuery(range) {
     const p = new URLSearchParams();
