@@ -16,13 +16,22 @@ async function request(method, url, body) {
     if (_csrf) init.headers['X-CSRF-Token'] = _csrf;
     if (body !== undefined) init.body = JSON.stringify(body);
     const res = await fetch(url, init);
+    // Always read the body — re-use the cloned response so we can
+    // inspect raw text when JSON parsing fails.
+    const rawText = await res.clone().text();
     let payload = null;
-    try { payload = await res.json(); } catch (_) { /* non-JSON */ }
+    try { payload = JSON.parse(rawText); } catch (_) { /* non-JSON */ }
     if (!res.ok || !payload || payload.ok === false) {
-        const msg = payload?.error || `HTTP ${res.status}`;
+        const msg = (payload && typeof payload.error === 'string' && payload.error)
+            ? payload.error
+            : `HTTP ${res.status}` + (rawText ? ' — ' + rawText.slice(0, 200) : '');
         const err = new Error(msg);
         err.status  = res.status;
         err.payload = payload;
+        err.raw     = rawText;
+        // Log the raw body to console so a curl-less debug is one
+        // click away (open DevTools → Console).
+        console.error('[api]', method, url, '→', res.status, payload ?? rawText);
         throw err;
     }
     return payload.data ?? null;

@@ -23,101 +23,154 @@ final class TelegramNotifier implements TelegramNotifierInterface
 
     public function sendText(string $text, ?string $chatId = null, ?string $threadId = null): array
     {
-        $token = trim((string)($_ENV['TELEGRAM_BOT_TOKEN']
-            ?? $_ENV['TG_BOT_TOKEN']
-            ?? Config::get('TELEGRAM_BOT_TOKEN')));
+        $token = self::token();
         if ($token === '') return ['ok' => false, 'error' => 'TELEGRAM_BOT_TOKEN missing'];
 
-        if ($chatId === null || $threadId === null) {
-            $cfg = $this->settings->load();
-            $chatId   = $chatId   ?? $cfg->telegramChatId;
-            $threadId = $threadId ?? $cfg->telegramThreadId;
-        }
+        [$chatId, $threadId] = $this->resolveTarget($chatId, $threadId);
         if ($chatId === '') return ['ok' => false, 'error' => 'telegram_chat_id missing'];
 
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, "https://api.telegram.org/bot{$token}/sendMessage");
-        curl_setopt($ch, CURLOPT_POST, true);
-        $fields = ['chat_id' => $chatId, 'text' => $text];
-        if ($threadId !== null && $threadId !== '') $fields['message_thread_id'] = $threadId;
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($fields));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        $resp = curl_exec($ch);
-        $err  = curl_error($ch);
-        curl_close($ch);
-
-        if ($resp === false) return ['ok' => false, 'error' => $err ?: 'Telegram request failed'];
-        $j = json_decode((string)$resp, true);
-        if (is_array($j) && ($j['ok'] ?? false)) return ['ok' => true];
-        $msg = is_array($j) ? (string)($j['description'] ?? 'Telegram error') : 'Telegram invalid response';
-        return ['ok' => false, 'error' => $msg];
+        // sendMessage is URL-encoded (no file payload); use the
+        // multipart helper anyway — curl handles either content type
+        // transparently, and we get the same error-formatting logic
+        // for free (DRY).
+        return $this->sendMultipart('sendMessage', $token, [
+            'chat_id'             => $chatId,
+            'text'                => $text,
+            'message_thread_id'   => $threadId,
+        ]);
     }
 
     public function sendPhoto(string $bytes, string $mime = 'image/png', string $caption = '', ?string $chatId = null, ?string $threadId = null): array
     {
-        $token = trim((string)($_ENV['TELEGRAM_BOT_TOKEN']
-            ?? $_ENV['TG_BOT_TOKEN']
-            ?? Config::get('TELEGRAM_BOT_TOKEN')));
-        if ($token === '') return ['ok' => false, 'error' => 'TELEGRAM_BOT_TOKEN missing'];
         if ($bytes === '') return ['ok' => false, 'error' => 'empty image'];
 
+        $token = self::token();
+        if ($token === '') return ['ok' => false, 'error' => 'TELEGRAM_BOT_TOKEN missing'];
+
+        [$chatId, $threadId] = $this->resolveTarget($chatId, $threadId);
+        if ($chatId === '') return ['ok' => false, 'error' => 'telegram_chat_id missing'];
+
+        $ext = $mime === 'image/jpeg' ? 'jpg' : 'png';
+        $tmpPath = self::materialise($bytes, $ext);
+        if ($tmpPath === null) return ['ok' => false, 'error' => 'tmp write failed'];
+        try {
+            // First try sendPhoto. Telegram rejects photos with too
+            // extreme aspect ratios / above 10MB / dimensions over
+            // 10000 px — a tall screenshot of the balance card hits
+            // those limits occasionally. We catch those classes of
+            // failure and retry as sendDocument, which has no such
+            // restrictions.
+            $photo = $this->sendMultipart('sendPhoto', $token, [
+                'chat_id'             => $chatId,
+                'photo'               => new \CURLFile($tmpPath, $mime, 'balance.' . $ext),
+                'caption'             => $caption,
+                'message_thread_id'   => $threadId,
+            ]);
+            if ($photo['ok']) return $photo;
+            if (self::isPhotoFormatError($photo['error'] ?? '')) {
+                $doc = $this->sendMultipart('sendDocument', $token, [
+                    'chat_id'             => $chatId,
+                    'document'            => new \CURLFile($tmpPath, $mime, 'balance.' . $ext),
+                    'caption'             => $caption,
+                    'message_thread_id'   => $threadId,
+                ]);
+                if ($doc['ok']) return ['ok' => true, 'fallback' => 'document'];
+                return ['ok' => false, 'error' => 'photo: ' . ($photo['error'] ?? '?') . ' / document: ' . ($doc['error'] ?? '?')];
+            }
+            return $photo;
+        } finally {
+            @unlink($tmpPath);
+        }
+    }
+
+    // ─── internals ──────────────────────────────────────────────
+
+    private static function token(): string
+    {
+        return trim((string)(
+            $_ENV['TELEGRAM_BOT_TOKEN']
+            ?? $_ENV['TG_BOT_TOKEN']
+            ?? Config::get('TELEGRAM_BOT_TOKEN')
+        ));
+    }
+
+    /** @return array{0:string,1:?string}  resolved chat / thread, settings as fallback */
+    private function resolveTarget(?string $chatId, ?string $threadId): array
+    {
         if ($chatId === null || $threadId === null) {
             $cfg = $this->settings->load();
             $chatId   = $chatId   ?? $cfg->telegramChatId;
             $threadId = $threadId ?? $cfg->telegramThreadId;
         }
-        if ($chatId === '') return ['ok' => false, 'error' => 'telegram_chat_id missing'];
+        return [$chatId, $threadId];
+    }
 
-        // sendPhoto needs multipart/form-data — we materialise the
-        // image to a tmp file so CURLFile can stream it. Cleaned up
-        // unconditionally in the finally branch.
-        $ext = $mime === 'image/jpeg' ? 'jpg' : 'png';
+    /** Materialise raw bytes into a tmp file with the right extension; returns the path or null. */
+    private static function materialise(string $bytes, string $ext): ?string
+    {
         $tmp = tempnam(sys_get_temp_dir(), 'pd3_tg_');
-        if ($tmp === false) return ['ok' => false, 'error' => 'tempnam failed'];
-        try {
-            $tmpPath = $tmp . '.' . $ext;
-            @rename($tmp, $tmpPath);
-            if (file_put_contents($tmpPath, $bytes) === false) {
-                return ['ok' => false, 'error' => 'tmp write failed'];
-            }
-            $fields = [
-                'chat_id' => $chatId,
-                'photo'   => new \CURLFile($tmpPath, $mime, 'balance.' . $ext),
-            ];
-            if ($caption !== '')                              $fields['caption']             = $caption;
-            if ($threadId !== null && $threadId !== '')       $fields['message_thread_id']   = $threadId;
-
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL,            "https://api.telegram.org/bot{$token}/sendPhoto");
-            curl_setopt($ch, CURLOPT_POST,           true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS,     $fields);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT,        30);
-            $resp = curl_exec($ch);
-            $err  = curl_error($ch);
-            curl_close($ch);
-
-            if ($resp === false) return ['ok' => false, 'error' => $err ?: 'Telegram request failed'];
-            $j = json_decode((string)$resp, true);
-            if (is_array($j) && ($j['ok'] ?? false)) return ['ok' => true];
-
-            // Build a descriptive error that always includes the
-            // error_code so misconfigured chat/thread surfaces as
-            // "400: Bad Request: message thread not found" instead
-            // of vanishing into a generic "HTTP 502".
-            $code = is_array($j) ? (int)($j['error_code']  ?? 0)  : 0;
-            $desc = is_array($j) ? trim((string)($j['description'] ?? '')) : '';
-            $rawTrimmed = trim((string)$resp);
-            if ($desc === '') {
-                $desc = $rawTrimmed !== ''
-                    ? 'Telegram: ' . mb_substr($rawTrimmed, 0, 120)
-                    : 'Telegram error';
-            }
-            $err = $code > 0 ? ($code . ': ' . $desc) : $desc;
-            return ['ok' => false, 'error' => $err];
-        } finally {
-            @unlink($tmpPath ?? $tmp);
+        if ($tmp === false) return null;
+        $tmpPath = $tmp . '.' . $ext;
+        @rename($tmp, $tmpPath);
+        if (@file_put_contents($tmpPath, $bytes) === false) {
+            @unlink($tmpPath);
+            @unlink($tmp);
+            return null;
         }
+        return $tmpPath;
+    }
+
+    /**
+     * POST multipart/form-data to a Telegram Bot API method.
+     * Drops empty fields so we don't accidentally send
+     * `message_thread_id=` (which Telegram interprets as 0).
+     *
+     * @return array{ok:bool, error?:string, response?:array}
+     */
+    private function sendMultipart(string $method, string $token, array $fields): array
+    {
+        foreach ($fields as $k => $v) {
+            if ($v === null || $v === '') unset($fields[$k]);
+        }
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL,            "https://api.telegram.org/bot{$token}/{$method}");
+        curl_setopt($ch, CURLOPT_POST,           true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS,     $fields);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT,        30);
+        $resp = curl_exec($ch);
+        $err  = curl_error($ch);
+        curl_close($ch);
+
+        if ($resp === false) return ['ok' => false, 'error' => $err ?: $method . ' request failed'];
+        $j = json_decode((string)$resp, true);
+        if (is_array($j) && ($j['ok'] ?? false)) return ['ok' => true, 'response' => $j];
+
+        $code = is_array($j) ? (int)($j['error_code']  ?? 0)  : 0;
+        $desc = is_array($j) ? trim((string)($j['description'] ?? '')) : '';
+        if ($desc === '') {
+            $rawTrimmed = trim((string)$resp);
+            $desc = $rawTrimmed !== ''
+                ? 'Telegram: ' . mb_substr($rawTrimmed, 0, 200)
+                : $method . ' error';
+        }
+        $err = $code > 0 ? ($code . ': ' . $desc) : $desc;
+        return ['ok' => false, 'error' => $err];
+    }
+
+    /**
+     * Heuristic: is this Telegram error about the image format /
+     * size / dimensions (i.e. retrying as sendDocument might
+     * succeed), or about chat permissions (where retry is pointless)?
+     */
+    private static function isPhotoFormatError(string $err): bool
+    {
+        $e = mb_strtolower($err, 'UTF-8');
+        return str_contains($e, 'photo')
+            || str_contains($e, 'dimension')
+            || str_contains($e, 'too big')
+            || str_contains($e, 'too large')
+            || str_contains($e, 'aspect')
+            || str_contains($e, 'wrong file');
     }
 }
