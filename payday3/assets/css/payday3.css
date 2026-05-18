@@ -1112,6 +1112,12 @@ body.pd3-help-mode [data-help-abs] {
     top: 0;
     border-bottom: 1px solid rgba(255,255,255,0.06);
 }
+.pd3-checkfinder__sort {
+    cursor: pointer;
+    user-select: none;
+}
+.pd3-checkfinder__sort:hover { color: var(--text); }
+.pd3-checkfinder__sort.right { text-align: right; }
 .pd3-checkfinder-table tbody td { padding: 4px 8px; vertical-align: middle; }
 .pd3-checkfinder__row {
     cursor: pointer;
