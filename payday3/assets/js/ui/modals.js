@@ -264,13 +264,61 @@ function renderCheckSummary(r) {
     </div>`;
 }
 
+// Sort state for the Check Finder table. Module-scoped so it
+// survives filter / search re-renders within the same modal open.
+// Default: newest first (the recent-checks list is naturally
+// reverse-chronological from Poster, but be explicit).
+let _checksSortCol = 'date_close';
+let _checksSortAsc = false;
+
+const _checksSortValue = (r, col) => {
+    switch (col) {
+        case 'num':       return Number(r.receipt_number || r.transaction_id || 0);
+        case 'date_close':return String(r.date_close || '');
+        case 'sum':       return Number(r.sum || 0);
+        case 'payed_sum': return Number(r.payed_sum || 0);
+        case 'table':     return String(r.table_title || r.table_id || '').toLowerCase();
+        case 'status':    return Number(r.status || 0);
+        case 'pay_type':  return Number(r.pay_type || 0);
+        default:          return 0;
+    }
+};
+
+function sortChecksInPlace(arr) {
+    const col = _checksSortCol, asc = _checksSortAsc;
+    arr.sort((a, b) => {
+        const va = _checksSortValue(a, col);
+        const vb = _checksSortValue(b, col);
+        const d = (typeof va === 'number' && typeof vb === 'number')
+            ? (va - vb)
+            : (va < vb ? -1 : va > vb ? 1 : 0);
+        return asc ? d : -d;
+    });
+    return arr;
+}
+
+const _sortArrow = (col) => {
+    if (_checksSortCol !== col) return '';
+    return _checksSortAsc ? ' ▲' : ' ▼';
+};
+
 function renderChecksTable(rows) {
     if (!rows.length) return '<p class="muted">Чеков за период не найдено.</p>';
+    // Always sort the rows we render — keeps the visible order
+    // consistent with whatever column the operator last clicked.
+    sortChecksInPlace(rows);
+    const th = (col, title, extra = '') =>
+        `<th class="pd3-checkfinder__sort ${extra}" data-sort="${col}">${escapeHtml(title)}${escapeHtml(_sortArrow(col))}</th>`;
     return `<table class="pd3-table pd3-checkfinder-table">
         <thead><tr>
-            <th>№</th><th>Дата</th>
-            <th class="right">Сумма</th><th class="right">Оплачено</th>
-            <th>Стол</th><th>Статус</th><th>Оплата</th><th></th>
+            ${th('num',        '№')}
+            ${th('date_close', 'Дата')}
+            ${th('sum',        'Сумма',    'right')}
+            ${th('payed_sum',  'Оплачено', 'right')}
+            ${th('table',      'Стол')}
+            ${th('status',     'Статус')}
+            ${th('pay_type',   'Оплата')}
+            <th></th>
         </tr></thead>
         <tbody>${rows.map((r) => {
             const id     = Number(r.transaction_id) || 0;
@@ -307,10 +355,26 @@ function wireCheckRowInteractions() {
     if (!out || out.dataset.wired === '1') return;
     out.dataset.wired = '1';
 
-    // One delegated listener handles BOTH the row-click (expand
-    // products) and the Delete button — saves re-binding after every
-    // re-render driven by the filter input.
+    // One delegated listener handles ALL Check Finder interactions
+    // (sort header click, row toggle, Delete button) — saves
+    // re-binding after every re-render driven by the filter input.
     out.addEventListener('click', async (e) => {
+        // Sort header → toggle direction on repeat, else switch
+        // column and reset to ascending. Re-render preserves the
+        // existing filter — we re-run filterChecksList which uses
+        // the search input as the source of truth.
+        const sortTh = e.target.closest?.('.pd3-checkfinder__sort');
+        if (sortTh) {
+            const col = sortTh.dataset.sort;
+            if (col) {
+                if (_checksSortCol === col) _checksSortAsc = !_checksSortAsc;
+                else { _checksSortCol = col; _checksSortAsc = true; }
+                const needle = document.getElementById('pd3CheckFinderInput')?.value || '';
+                filterChecksList(needle);
+            }
+            return;
+        }
+
         const delBtn = e.target.closest?.('.pd3-checkfinder-remove');
         if (delBtn) {
             e.stopPropagation();
