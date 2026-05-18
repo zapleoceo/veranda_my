@@ -252,6 +252,10 @@ return [
         $c->get(FinanceTransferServiceInterface::class),
         $c->get(LocalSettingsRepositoryInterface::class),
     ),
+    \App\Payday3\Http\Actions\FinanceTransferCreateAction::class => fn($c) =>
+        new \App\Payday3\Http\Actions\FinanceTransferCreateAction(
+            $c->get(FinanceTransferServiceInterface::class),
+        ),
     BalanceScreenshotAction::class => fn($c) => new BalanceScreenshotAction(
         $c->get(TelegramNotifierInterface::class),
         $c->get(LoggerInterface::class),

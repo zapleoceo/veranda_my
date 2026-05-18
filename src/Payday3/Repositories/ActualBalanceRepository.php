@@ -36,15 +36,21 @@ final class ActualBalanceRepository implements ActualBalanceRepositoryInterface
     public function save(ActualBalances $bal): int
     {
         $t = $this->db->t('payday_actual_balances');
+        // Store as cents (× 100) — matches payday2's parseCents
+        // convention so older rows displayed by `latestFor()` and
+        // newly-saved ones share one numeric scale. The `?->amount`
+        // value is in plain VND integer (no fractional unit), so
+        // we just multiply.
+        $toCents = static fn(?\App\Payday3\Domain\Money $m) => $m === null ? null : $m->amount * 100;
         $this->db->query(
             "INSERT INTO {$t} (target_date, bal_andrey, bal_vietnam, bal_cash, bal_total)
              VALUES (?, ?, ?, ?, ?)",
             [
                 $bal->targetDate,
-                $bal->andrey?->amount,
-                $bal->vietnam?->amount,
-                $bal->cash?->amount,
-                $bal->total?->amount,
+                $toCents($bal->andrey),
+                $toCents($bal->vietnam),
+                $toCents($bal->cash),
+                $toCents($bal->total),
             ]
         );
         return (int)$this->db->lastInsertId();

@@ -144,17 +144,37 @@ export function initFinanceTransfers({ state }) {
 
     document.getElementById('pd3FinanceReloadBtn')?.addEventListener('click', () => load(state));
 
-    // The "Создать транзакцию" buttons are intentionally inert here —
-    // payday3 doesn't yet own the finance.createTransaction mutation
-    // (that lives in payday2/ajax.php and is the next milestone). The
-    // UI surfaces the same status as payday2 so the operator sees the
-    // exact same workflow; clicking is a no-op until that endpoint
-    // lands.
+    // "Создать" buttons → POST /payday3/api/finance/transfers/create.
+    // Server walks today's finance.getTransactions for an idempotent
+    // duplicate first, then POSTs finance.createTransactions if not
+    // found. Status strip shows progress; on success we reload the
+    // card so the freshly-created transaction appears in the mini-
+    // table and the button disables itself.
     document.querySelectorAll('.pd3-finance__create').forEach((b) => {
-        b.addEventListener('click', () => {
+        b.addEventListener('click', async () => {
             const kind = b.dataset.kind;
             const status = document.getElementById('pd3FinanceStatus_' + kind);
-            if (status) status.innerHTML = '<span class="pd3-finance__empty">Создание транзакции пока выполняется через payday2.</span>';
+            if (!kind || b.disabled) return;
+            b.disabled = true;
+            if (status) status.innerHTML = '<span class="muted">Создаю в Poster…</span>';
+            try {
+                const range = state.get('range') || {};
+                const res = await api.post('/payday3/api/finance/transfers/create', {
+                    kind,
+                    dateFrom: range.from || '',
+                    dateTo:   range.to   || range.from || '',
+                });
+                if (status) {
+                    status.innerHTML = res?.already
+                        ? '<span class="muted">Уже была создана сегодня.</span>'
+                        : '<span class="muted">Создана в Poster. Обновляю…</span>';
+                }
+                await load(state);            // reload list so the new tx appears
+            } catch (err) {
+                if (status) status.innerHTML = '<span class="pd3-finance__empty">Ошибка: '
+                    + (err.message || 'не удалось создать').replace(/[<>&]/g, '') + '</span>';
+                b.disabled = false;
+            }
         });
     });
 

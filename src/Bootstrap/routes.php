@@ -217,6 +217,7 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->get(   '/data',                                        InDataAction::class);
         // Финансовые транзакции (Vietnam + Tips) card.
         $api->get(   '/finance/transfers',                           FinanceTransfersAction::class);
+        $api->post(  '/finance/transfers/create',                    \App\Payday3\Http\Actions\FinanceTransferCreateAction::class);
     });
 })->add(AuthMiddleware::class);
 
