@@ -40,6 +40,16 @@ function setStatus(msg, kind = '') {
     if (kind) el.classList.add(kind === 'ok' ? 'is-ok' : 'is-error');
 }
 
+// Colour the Δ cell:
+//   ≥ 0  → green (Факт covers Poster; surplus is fine)
+//   < 0  → red   (Факт is short of Poster; needs attention)
+// A separate helper keeps the logic in one place — the Total row
+// applies the same rule.
+function paintDiff(el, diff) {
+    el.classList.remove('is-ok', 'is-error');
+    el.classList.add(diff < 0 ? 'is-error' : 'is-ok');
+}
+
 function refreshDiffs(posterMap) {
     let actualTotal = 0;
     for (const k of ['andrey', 'vietnam', 'cash']) {
@@ -56,8 +66,7 @@ function refreshDiffs(posterMap) {
         }
         const diff = v - reported;
         diffEl.textContent = fmt(diff);
-        diffEl.classList.toggle('is-ok',    diff === 0);
-        diffEl.classList.toggle('is-error', diff !== 0);
+        paintDiff(diffEl, diff);
     }
     const tInput = document.getElementById('pd3BalActual_total');
     if (tInput) tInput.value = fmt(actualTotal);
@@ -65,8 +74,7 @@ function refreshDiffs(posterMap) {
     if (tDiff && posterMap?.total !== null && posterMap?.total !== undefined) {
         const diff = actualTotal - posterMap.total;
         tDiff.textContent = fmt(diff);
-        tDiff.classList.toggle('is-ok',    diff === 0);
-        tDiff.classList.toggle('is-error', diff !== 0);
+        paintDiff(tDiff, diff);
     }
 }
 
