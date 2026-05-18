@@ -72,14 +72,16 @@ async function loadSupplies({ state }) {
 
 function renderKashShift(shifts) {
     if (!shifts.length) return '<p class="muted">Смен за период не найдено.</p>';
-    return `<table class="pd3-table" style="width:100%">
+    // No inline width:100% — let the base .pd3-table (width: max-content)
+    // hug the data instead of stretching to the modal body.
+    return `<table class="pd3-table">
         <thead><tr><th>ID</th><th>Открыта</th><th>Закрыта</th><th class="right">Cash</th><th class="right">Card</th></tr></thead>
         <tbody>${shifts.map((s) => `<tr>
-            <td>${escapeHtml(String(s.id || s.shift_id || ''))}</td>
-            <td>${escapeHtml(String(s.date_start || s.opened || ''))}</td>
-            <td>${escapeHtml(String(s.date_close || s.closed || ''))}</td>
-            <td class="right">${escapeHtml(String(s.cash || s.payed_cash || ''))}</td>
-            <td class="right">${escapeHtml(String(s.card || s.payed_card || ''))}</td>
+            <td class="nowrap">${escapeHtml(String(s.id || s.shift_id || ''))}</td>
+            <td class="nowrap">${escapeHtml(String(s.date_start || s.opened || ''))}</td>
+            <td class="nowrap">${escapeHtml(String(s.date_close || s.closed || ''))}</td>
+            <td class="right nowrap">${escapeHtml(String(s.cash || s.payed_cash || ''))}</td>
+            <td class="right nowrap">${escapeHtml(String(s.card || s.payed_card || ''))}</td>
         </tr>`).join('')}</tbody></table>`;
 }
 
@@ -93,13 +95,13 @@ function renderSupplies(supplies, accounts) {
         const a = accounts.find((x) => Number(x.account_id) === Number(id));
         return a ? (a.name || a.account_name || a.title || ('#' + id)) : ('#' + id);
     };
-    return `<table class="pd3-table" style="width:100%">
+    return `<table class="pd3-table">
         <thead><tr><th>ID</th><th>Дата</th><th>Поставщик</th><th class="right">Сумма</th><th>Аккаунт</th></tr></thead>
         <tbody>${supplies.map((s) => `<tr>
-            <td>${escapeHtml(String(s.supply_id || s.id || ''))}</td>
-            <td>${escapeHtml(String(s.supply_date_start || s.date || ''))}</td>
+            <td class="nowrap">${escapeHtml(String(s.supply_id || s.id || ''))}</td>
+            <td class="nowrap">${escapeHtml(String(s.supply_date_start || s.date || ''))}</td>
             <td>${escapeHtml(String(s.supplier_name || s.supplier || ''))}</td>
-            <td class="right">${escapeHtml(String(s.supply_sum || s.sum || ''))}</td>
+            <td class="right nowrap">${escapeHtml(String(s.supply_sum || s.sum || ''))}</td>
             <td>${escapeHtml(accLabel(s.account_id))}</td>
         </tr>`).join('')}</tbody></table>`;
 }
