@@ -202,6 +202,10 @@ function escapeHtml(s) {
     })[c]);
 }
 
+// Cache of the categories list so we don't refetch every modal open.
+let _settingsData = null;
+let _categoriesCache = null;
+
 async function loadSettings() {
     const form = document.getElementById('pd3SettingsForm');
     if (!form) return;
@@ -209,6 +213,7 @@ async function loadSettings() {
     status && (status.textContent = '');
     try {
         const data = await api.get('/payday3/api/settings');
+        _settingsData = data || {};
         form.elements['telegram_chat_id'].value           = data.telegram_chat_id || '';
         form.elements['telegram_message_thread_id'].value = data.telegram_message_thread_id || '';
         form.elements['service_user_id'].value            = data.service_user_id || '';
@@ -217,9 +222,80 @@ async function loadSettings() {
         form.elements['accounts[tips]'].value    = acc.tips    || '';
         form.elements['accounts[vietnam]'].value = acc.vietnam || '';
         form.elements['balance_sinc_account_id'].value = data.balance_sinc_account_id || '';
+        const adm = data.poster_admin || {};
+        form.elements['poster_admin[account]'].value     = adm.account     || '';
+        form.elements['poster_admin[ssid]'].value        = adm.ssid        || '';
+        form.elements['poster_admin[csrf]'].value        = adm.csrf        || '';
+        form.elements['poster_admin[pos_session]'].value = adm.pos_session || '';
+        form.elements['poster_admin[user_agent]'].value  = adm.user_agent  || '';
+        // Categories pane is lazy — only hydrate when the user opens it.
+        const catDetails = form.querySelector('summary')?.parentElement; // no-op safe
+        wireCategoriesLazy();
     } catch (e) {
         status && (status.textContent = 'Ошибка загрузки: ' + (e.message || 'error'));
     }
+}
+
+// Cookie / cURL parser — pulls account_url, ssid, csrf_cookie_poster,
+// pos_session out of a "Cookie: a=1; b=2" string (or anything
+// containing those name=value pairs).
+function parseCookieIntoFields(raw) {
+    const form = document.getElementById('pd3SettingsForm');
+    if (!form) return;
+    const get = (k) => {
+        const m = String(raw || '').match(new RegExp('(?:^|[\\s;])' + k + '=([^;\\s]+)'));
+        return m ? decodeURIComponent(m[1]) : '';
+    };
+    const setIf = (name, val) => { if (val) form.elements[name].value = val; };
+    setIf('poster_admin[account]',     get('account_url'));
+    setIf('poster_admin[ssid]',        get('ssid'));
+    setIf('poster_admin[csrf]',        get('csrf_cookie_poster'));
+    setIf('poster_admin[pos_session]', get('pos_session'));
+}
+
+async function hydrateCategories() {
+    const wrap = document.getElementById('pd3SettCategoriesList');
+    if (!wrap) return;
+    if (_categoriesCache) return;
+    wrap.innerHTML = '<div class="muted">Загрузка категорий…</div>';
+    try {
+        const rows = await api.get('/payday3/api/poster/finance/categories');
+        _categoriesCache = Array.isArray(rows) ? rows : [];
+        renderCategories();
+    } catch (e) {
+        wrap.innerHTML = '<div class="muted">Не удалось загрузить категории: ' + escapeHtml(e.message || 'error') + '</div>';
+    }
+}
+
+function renderCategories() {
+    const wrap = document.getElementById('pd3SettCategoriesList');
+    if (!wrap || !_categoriesCache) return;
+    const allowed = new Set((_settingsData?.allowed_categories || []).map((n) => String(n)));
+    const custom  = _settingsData?.custom_category_names || {};
+    wrap.innerHTML = _categoriesCache.map((c) => {
+        const id   = Number(c.category_id ?? c.id ?? 0);
+        const name = String(c.category_name ?? c.name ?? '#' + id);
+        if (id <= 0) return '';
+        const checked = allowed.has(String(id)) ? 'checked' : '';
+        const cn = custom[id] != null ? String(custom[id]) : '';
+        return `<label class="pd3-settings__cat">
+            <input type="checkbox" class="pd3-settings__cat-cb" data-cat-id="${id}" ${checked}>
+            <span class="pd3-settings__cat-id">#${id}</span>
+            <span class="pd3-settings__cat-name">${escapeHtml(name)}</span>
+            <input type="text" class="pd3-settings__cat-rename" data-cat-id="${id}"
+                   placeholder="${escapeHtml(name)}" value="${escapeHtml(cn)}">
+        </label>`;
+    }).join('');
+}
+
+function wireCategoriesLazy() {
+    const summary = document.querySelector('.pd3-settings__group:has(#pd3SettCategoriesList) > summary');
+    if (!summary || summary.dataset.bound === '1') return;
+    summary.dataset.bound = '1';
+    summary.addEventListener('click', () => {
+        // Wait for <details> to actually open
+        requestAnimationFrame(hydrateCategories);
+    });
 }
 
 async function saveSettings(event) {
@@ -228,6 +304,21 @@ async function saveSettings(event) {
     const status = document.getElementById('pd3SettingsStatus');
     status && (status.textContent = 'Сохраняю…');
     const fd = new FormData(form);
+    // Collect category state from the rendered list (if it was opened).
+    const allowed = Array.from(form.querySelectorAll('.pd3-settings__cat-cb:checked'))
+        .map((el) => Number(el.dataset.catId) || 0).filter((n) => n > 0);
+    const custom = {};
+    form.querySelectorAll('.pd3-settings__cat-rename').forEach((el) => {
+        const id = Number(el.dataset.catId) || 0;
+        const v  = String(el.value || '').trim();
+        if (id > 0 && v !== '') custom[id] = v;
+    });
+    // If categories pane never opened, fall back to last-known server values.
+    const categories = _categoriesCache ? { allowed_categories: allowed, custom_category_names: custom } : {
+        allowed_categories:    _settingsData?.allowed_categories    || [],
+        custom_category_names: _settingsData?.custom_category_names || {},
+    };
+
     const body = {
         telegram_chat_id:           fd.get('telegram_chat_id'),
         telegram_message_thread_id: fd.get('telegram_message_thread_id'),
@@ -238,9 +329,18 @@ async function saveSettings(event) {
             vietnam: Number(fd.get('accounts[vietnam]')) || 0,
         },
         balance_sinc_account_id: Number(fd.get('balance_sinc_account_id')) || 0,
+        poster_admin: {
+            account:     fd.get('poster_admin[account]')     || '',
+            ssid:        fd.get('poster_admin[ssid]')        || '',
+            csrf:        fd.get('poster_admin[csrf]')        || '',
+            pos_session: fd.get('poster_admin[pos_session]') || '',
+            user_agent:  fd.get('poster_admin[user_agent]')  || '',
+        },
+        ...categories,
     };
     try {
         await api.post('/payday3/api/settings', body);
+        _settingsData = { ..._settingsData, ...body };
         status && (status.textContent = 'Сохранено.');
         status?.classList.add('is-ok');
         status?.classList.remove('is-error');
@@ -269,6 +369,10 @@ export function initModals({ state }) {
     }
 
     document.getElementById('pd3SettingsForm')?.addEventListener('submit', saveSettings);
+    document.getElementById('pd3SettCookieParseBtn')?.addEventListener('click', () => {
+        const el = document.getElementById('pd3SettCookie');
+        if (el) parseCookieIntoFields(el.value);
+    });
 
     // Check-finder: live filter while typing, exact-id search on submit.
     const finderInput = document.getElementById('pd3CheckFinderInput');

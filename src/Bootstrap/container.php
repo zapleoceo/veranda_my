@@ -67,6 +67,7 @@ use App\Payday3\Services\PosterSuppliesService;
 use App\Payday3\Services\PosterCheckService;
 use App\Payday3\Services\PosterLookupService;
 use App\Payday3\Services\JsonLocalSettingsRepository;
+use App\Payday3\Services\DbLocalSettingsRepository;
 use App\Payday3\Contracts\PosterLookupServiceInterface;
 use App\Payday3\Contracts\LocalSettingsRepositoryInterface;
 use App\Payday3\Http\Actions\PosterCashShiftListAction;
@@ -197,12 +198,18 @@ return [
     // ─── Payday3 Poster integrations (replaces payday2 fallbacks) ─
     PosterApiProviderInterface::class       => fn()   => new PosterApiProvider(),
 
-    // LocalSettings — payday3-owned JSON config, with one-time fallback
-    // to payday2/local_config.json so existing deploys keep tuned values.
-    LocalSettingsRepositoryInterface::class => fn() => new JsonLocalSettingsRepository(
-        primaryPath:  dirname(__DIR__, 2) . '/payday3/local_config.json',
-        fallbackPath: dirname(__DIR__, 2) . '/payday2/local_config.json',
-    ),
+    // LocalSettings — DB-backed (payday3_settings.config_json). On the
+    // first boot the table is empty so DbLocalSettingsRepository pulls
+    // values from the JSON repository (payday3/local_config.json with
+    // payday2 fallback) and writes them in — zero-touch migration for
+    // live deployments.
+    LocalSettingsRepositoryInterface::class => function ($c) {
+        $json = new JsonLocalSettingsRepository(
+            primaryPath:  dirname(__DIR__, 2) . '/payday3/local_config.json',
+            fallbackPath: dirname(__DIR__, 2) . '/payday2/local_config.json',
+        );
+        return new DbLocalSettingsRepository($c->get(Database::class), $json);
+    },
     TelegramNotifierInterface::class        => fn($c) => new TelegramNotifier($c->get(LocalSettingsRepositoryInterface::class)),
 
     PosterCashShiftServiceInterface::class  => fn($c) => new PosterCashShiftService($c->get(PosterApiProviderInterface::class)),
