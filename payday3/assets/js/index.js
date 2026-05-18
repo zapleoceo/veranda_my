@@ -83,6 +83,10 @@ initEyeToggles();
 initHelpMode();
 initDateForm();
 initModals({ state });
+// initOutMode FIRST so we can pass its reload() into createTx —
+// the "+" popup uses it to refresh the OUT-mode tables after
+// finance.createTransactions succeeds.
+const outMode = initOutMode({ state }) || {};
 // Import the modal host helpers AFTER initModals so initCreateTx can
 // route open/close through the same code path as the toolbar buttons.
 const { modalHost } = await _i('./ui/modals.js');
@@ -91,8 +95,8 @@ initCreateTx({
     host:       modalHost,
     openModal:  modalHost.open,
     closeModal: modalHost.close,
+    onCreated:  outMode.reload,
 });
-initOutMode({ state });
 initBalances({ state });
 refreshStats();
 

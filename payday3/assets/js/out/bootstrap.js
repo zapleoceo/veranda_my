@@ -246,4 +246,12 @@ export function initOutMode({ state }) {
             recomputeSelection();
         } catch (err) { alert(err.message); }
     });
+
+    // Public handle so other modules (createTx after a successful
+    // finance.createTransactions) can ask OUT to refetch without
+    // re-implementing the load logic. Returns the load() promise so
+    // callers can `await` it.
+    return {
+        reload: () => load(),
+    };
 }
