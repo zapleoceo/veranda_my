@@ -37,18 +37,22 @@ let _accountsMap = null;        // { <id>: <name> }
 let _categoriesMap = null;      // { <id>: { name, parent_id } }
 let _settings = null;
 
-async function loadOptionsOnce() {
-    const needAcc = !_accountsMap;
-    const needCat = !_categoriesMap;
-    const needSet = !_settings;
+async function loadOptions() {
+    // Poster accounts + categories rarely change at runtime, so we
+    // only fetch them on first open. LocalSettings (especially the
+    // category whitelist) *does* change whenever the operator hits
+    // Save in ⚙ — refetch every open so the popup picks up new
+    // entries without a hard page reload.
     const [acc, cat, set] = await Promise.all([
-        needAcc ? api.get('/payday3/api/poster/finance/accounts').catch(() => ({}))   : Promise.resolve(_accountsMap),
-        needCat ? api.get('/payday3/api/poster/finance/categories').catch(() => ({})) : Promise.resolve(_categoriesMap),
-        needSet ? api.get('/payday3/api/settings').catch(() => null)                  : Promise.resolve(_settings),
+        _accountsMap   ? Promise.resolve(_accountsMap)
+                       : api.get('/payday3/api/poster/finance/accounts').catch(() => ({})),
+        _categoriesMap ? Promise.resolve(_categoriesMap)
+                       : api.get('/payday3/api/poster/finance/categories').catch(() => ({})),
+        api.get('/payday3/api/settings').catch(() => _settings),
     ]);
-    if (needAcc) _accountsMap   = acc && typeof acc === 'object' ? acc : {};
-    if (needCat) _categoriesMap = cat && typeof cat === 'object' ? cat : {};
-    if (needSet) _settings      = set || {};
+    _accountsMap   = acc && typeof acc === 'object' ? acc : {};
+    _categoriesMap = cat && typeof cat === 'object' ? cat : {};
+    _settings      = set || _settings || {};
 }
 
 function fillAccountSelect(sel) {
@@ -124,7 +128,7 @@ function status(text, kind = '') {
     if (kind) el.classList.add(kind === 'ok' ? 'is-ok' : 'is-error');
 }
 
-export function initCreateTx({ state, host, openModal, closeModal }) {
+export function initCreateTx({ state, host, openModal, closeModal, onCreated }) {
     const form = document.getElementById('pd3CreateTxForm');
     if (!form) return { open: () => {} };
 
@@ -153,8 +157,14 @@ export function initCreateTx({ state, host, openModal, closeModal }) {
                 comment:      form.elements['comment'].value || '',
             };
             await api.post('/payday3/api/poster/finance/transactions', body);
-            status('Создана в Poster', 'ok');
-            setTimeout(() => closeModal?.('pd3CreateTxModal'), 700);
+            status('Создана в Poster, обновляю таблицу…', 'ok');
+            // Refresh the OUT-mode tables so the newly-created
+            // transaction shows up immediately on the Poster side
+            // (and auto-matchers can pick it up if it pairs with a
+            // mail row). The callback is fire-and-forget — we don't
+            // want a slow refetch to keep the modal open.
+            try { await onCreated?.(); } catch (_) { /* swallow */ }
+            setTimeout(() => closeModal?.('pd3CreateTxModal'), 500);
         } catch (err) {
             status(err.message || 'Ошибка', 'error');
         } finally {
@@ -191,7 +201,7 @@ export function initCreateTx({ state, host, openModal, closeModal }) {
 
         openModal?.('pd3CreateTxModal');
 
-        await loadOptionsOnce();
+        await loadOptions();
         fillAccountSelect(form.elements['account_from']);
         fillAccountSelect(form.elements['account_to']);
         fillCategorySelect(form.elements['category_id']);
