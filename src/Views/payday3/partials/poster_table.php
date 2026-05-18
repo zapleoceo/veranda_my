@@ -22,7 +22,10 @@ foreach ($poster as $p) $total = $total->plus($p->totalPayed());
             </button>
         </div>
         <div class="pd3-pane__actions">
-            <button type="button" class="pd3-eye" id="pd3VietnamToggle" title="Скрыть/показать Vietnam Company" aria-pressed="true">👁</button>
+            <button type="button" class="pd3-eye" id="pd3VietnamToggle"
+                    title="Скрыть/показать Vietnam Company"
+                    data-help-abs="Скрыть/показать чеки с методом оплаты Vietnam Company. Удобно когда нужно сверить только карточные приходы."
+                    aria-pressed="true">👁</button>
         </div>
     </header>
     <div class="pd3-pane__scroll" id="pd3PosterScroll">

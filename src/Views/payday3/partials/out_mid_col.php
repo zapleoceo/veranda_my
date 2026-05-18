@@ -17,13 +17,18 @@ declare(strict_types=1);
 
     <div class="pd3-mid__glass">
         <button type="button" class="pd3-mid__btn pd3-mid__btn--primary" id="pd3OutLinkMakeBtn"
-                title="Связать выбранные" disabled aria-disabled="true">🎯</button>
+                title="Связать выбранные"
+                data-help-abs="Создать ручную связь между выбранными чекбоксами писем и финансовых транзакций Poster."
+                disabled aria-disabled="true">🎯</button>
         <button type="button" class="pd3-mid__btn pd3-mid__btn--toggle" id="pd3OutHideLinkedBtn"
-                title="Скрыть связанные">👁</button>
+                title="Скрыть связанные"
+                data-help-abs="Скрыть/показать уже связанные строки в обеих таблицах OUT.">👁</button>
         <button type="button" class="pd3-mid__btn" id="pd3OutLinkAutoBtn"
-                title="Автосвязи">🧩</button>
+                title="Автосвязи"
+                data-help-abs="Автоматически связать совпадения по сумме/дате в OUT-режиме.">🧩</button>
         <button type="button" class="pd3-mid__btn" id="pd3OutLinkClearBtn"
-                title="Снять все связи">⛓️‍💥</button>
+                title="Снять все связи"
+                data-help-abs="Снять ВСЕ OUT-связи за выбранный период. Селект не нужен.">⛓️‍💥</button>
 
         <div class="pd3-mid__sums">
             <div class="pd3-mid__sum-row"><span class="muted">←</span><span id="pd3OutSelMailSum">0</span></div>

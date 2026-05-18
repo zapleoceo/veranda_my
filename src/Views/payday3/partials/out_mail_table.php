@@ -21,7 +21,10 @@ declare(strict_types=1);
             </button>
         </div>
         <div class="pd3-pane__actions">
-            <button type="button" class="pd3-eye" id="pd3OutMailHiddenToggle" title="Показать/скрыть скрытые" aria-pressed="false">👁</button>
+            <button type="button" class="pd3-eye" id="pd3OutMailHiddenToggle"
+                    title="Показать/скрыть скрытые"
+                    data-help-abs="Показать/скрыть письма BIDV, которые оператор пометил кнопкой − (не наш платёж)."
+                    aria-pressed="false">👁</button>
         </div>
     </header>
     <div class="pd3-pane__scroll" id="pd3OutMailScroll">
