@@ -6,7 +6,10 @@
 
 'use strict';
 
-import { api } from '../api.js';
+// Cache-bust cross-module imports — see comment in out/bootstrap.js.
+const _v = new URL(import.meta.url).searchParams.get('v') || '';
+const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
+const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
 
 const KINDS = ['vietnam', 'tips'];
 
