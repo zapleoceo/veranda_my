@@ -107,17 +107,6 @@
         return norm.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     };
     const fmtMoney = (n) => fmtSpaces(String(Math.round(Number(n || 0))));
-    const fmtMinor2 = (minor) => {
-        const m = Number(minor);
-        if (!isFinite(m)) return '';
-        const neg = m < 0;
-        const abs = Math.abs(m);
-        const s = (abs / 100).toFixed(2);
-        const parts = s.split('.');
-        const intPart = fmtSpaces(parts[0] || '0');
-        const frac = parts[1] || '00';
-        return (neg ? '-' : '') + intPart + '.' + frac;
-    };
     const calcSalary = (rate, hours) => Math.round(Number(rate || 0) * Number(hours || 0));
     const vndFromMinor = (minor) => Math.round(Number(minor || 0) / 100);
     const LS_KEY = 'employees_prefs_v1';
@@ -371,12 +360,21 @@
     const renderTipsBalanceTotals = () => {
         const tipsTableMinor = Number(lastTtpMinorTotal || 0) || 0;
         if (tipsTableSumEl) tipsTableSumEl.textContent = fmtMoney(vndFromMinor(tipsTableMinor));
+        // Poster's balance comes back in minor units (cents). VND
+        // has no fractional unit in everyday use, so render whole
+        // числами — the trailing ".00" the older fmtMinor2 emitted
+        // confused operators ("копейки не нужны").
         if (tipsAccBalanceEl) {
-            tipsAccBalanceEl.textContent = tipsAccBalanceMinor == null ? '—' : fmtMinor2(tipsAccBalanceMinor);
+            tipsAccBalanceEl.textContent = tipsAccBalanceMinor == null
+                ? '—'
+                : fmtMoney(vndFromMinor(tipsAccBalanceMinor));
         }
         if (tipsBalanceDiffEl) {
             if (tipsAccBalanceMinor == null) tipsBalanceDiffEl.textContent = '—';
-            else tipsBalanceDiffEl.textContent = fmtMinor2((Number(tipsAccBalanceMinor || 0) || 0) - tipsTableMinor);
+            else {
+                const diffMinor = (Number(tipsAccBalanceMinor || 0) || 0) - tipsTableMinor;
+                tipsBalanceDiffEl.textContent = fmtMoney(vndFromMinor(diffMinor));
+            }
         }
     };
 
