@@ -259,8 +259,10 @@ async function hydrateCategories() {
     if (_categoriesCache) return;
     wrap.innerHTML = '<div class="muted">Загрузка категорий…</div>';
     try {
-        const rows = await api.get('/payday3/api/poster/finance/categories');
-        _categoriesCache = Array.isArray(rows) ? rows : [];
+        // Server returns the same map shape as payday2:
+        //   { <category_id>: { name, parent_id }, ... }
+        const cats = await api.get('/payday3/api/poster/finance/categories');
+        _categoriesCache = (cats && typeof cats === 'object') ? cats : {};
         renderCategories();
     } catch (e) {
         wrap.innerHTML = '<div class="muted">Не удалось загрузить категории: ' + escapeHtml(e.message || 'error') + '</div>';
@@ -270,22 +272,44 @@ async function hydrateCategories() {
 function renderCategories() {
     const wrap = document.getElementById('pd3SettCategoriesList');
     if (!wrap || !_categoriesCache) return;
-    const allowed = new Set((_settingsData?.allowed_categories || []).map((n) => String(n)));
+    const allowed = new Set((_settingsData?.allowed_categories || []).map(Number));
     const custom  = _settingsData?.custom_category_names || {};
-    wrap.innerHTML = _categoriesCache.map((c) => {
-        const id   = Number(c.category_id ?? c.id ?? 0);
-        const name = String(c.category_name ?? c.name ?? '#' + id);
-        if (id <= 0) return '';
-        const checked = allowed.has(String(id)) ? 'checked' : '';
-        const cn = custom[id] != null ? String(custom[id]) : '';
-        return `<label class="pd3-settings__cat">
-            <input type="checkbox" class="pd3-settings__cat-cb" data-cat-id="${id}" ${checked}>
-            <span class="pd3-settings__cat-id">#${id}</span>
-            <span class="pd3-settings__cat-name">${escapeHtml(name)}</span>
-            <input type="text" class="pd3-settings__cat-rename" data-cat-id="${id}"
-                   placeholder="${escapeHtml(name)}" value="${escapeHtml(cn)}">
+
+    // Build a parent→children tree once, then render depth-first
+    // exactly like payday2_settings.js so the visual hierarchy
+    // matches what operators are used to.
+    const byId  = {};
+    const roots = [];
+    for (const [idStr, data] of Object.entries(_categoriesCache)) {
+        const id = Number(idStr);
+        byId[id] = { id, name: String(data?.name || ''), parent_id: Number(data?.parent_id || 0), children: [] };
+    }
+    for (const id in byId) {
+        const node = byId[id];
+        if (node.parent_id && byId[node.parent_id]) byId[node.parent_id].children.push(node);
+        else                                         roots.push(node);
+    }
+
+    const renderNode = (node, depth) => {
+        const checked = allowed.has(node.id) ? 'checked' : '';
+        const cn = custom[node.id] != null ? String(custom[node.id])
+                  : (custom[String(node.id)] != null ? String(custom[String(node.id)]) : '');
+        let html = `<label class="pd3-settings__cat" style="padding-left:${depth * 16}px">
+            <input type="checkbox" class="pd3-settings__cat-cb" data-cat-id="${node.id}" ${checked}>
+            <span class="pd3-settings__cat-id">#${node.id}</span>
+            <span class="pd3-settings__cat-name">${escapeHtml(node.name)}</span>
+            <input type="text" class="pd3-settings__cat-rename" data-cat-id="${node.id}"
+                   placeholder="${escapeHtml(node.name)}" value="${escapeHtml(cn)}">
         </label>`;
-    }).join('');
+        for (const child of node.children) html += renderNode(child, depth + 1);
+        return html;
+    };
+
+    if (roots.length === 0) {
+        wrap.innerHTML = '<div class="muted">Poster вернул пустой список категорий.</div>';
+        return;
+    }
+    wrap.innerHTML = roots.map((r) => renderNode(r, 0)).join('');
 }
 
 function wireCategoriesLazy() {
