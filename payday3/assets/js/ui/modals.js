@@ -383,6 +383,14 @@ async function saveSettings(event) {
     }
 }
 
+// Public so non-modal modules (createTx, link actions, etc.) can
+// open/close arbitrary modal panes without duplicating the host
+// wiring.
+export const modalHost = {
+    open:  (id) => open(id),
+    close: ()   => close(),
+};
+
 export function initModals({ state }) {
     _host = document.getElementById('pd3ModalHost');
     if (!_host) return;

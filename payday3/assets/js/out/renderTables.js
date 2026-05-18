@@ -51,7 +51,14 @@ export function renderOutMail(rows, links) {
             </td>
             <td class="pd3-col pd3-col--content">${esc(r.content)}</td>
             <td class="pd3-col pd3-col--time nowrap">${esc(time)}</td>
-            <td class="pd3-col pd3-col--sum  nowrap right">${esc(r.amount_fmt)}</td>
+            <td class="pd3-col pd3-col--sum  nowrap right">
+                <button type="button" class="pd3-out-mail-create"
+                        title="Создать транзакцию в Poster на эту сумму"
+                        data-mail-uid="${r.mail_uid}"
+                        data-amount="${r.amount}"
+                        data-date="${esc(r.date)}">+</button>
+                ${esc(r.amount_fmt)}
+            </td>
             <td class="pd3-col pd3-col--cb">
                 <input type="checkbox" class="pd3-cb pd3-cb--out-mail" data-mail-uid="${r.mail_uid}" data-sum="${r.amount}">
             </td>
