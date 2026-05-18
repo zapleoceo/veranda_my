@@ -386,7 +386,14 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-row.row-yellow { background: linear-gradient(90deg, rgba(245,158,11,0.08), transparent 60%); }
 .pd3-row.row-gray   { background: linear-gradient(90deg, rgba(255,255,255,0.05), transparent 60%); }
 .pd3-row.row-hidden { opacity: 0.45; }
-.pd3-row.row-hidden.is-hidden { display: none; }
+/* `is-hidden` is applied by eyeToggles.js to BOTH:
+   (a) soft-hidden sepay rows (row-hidden) — the 👁 hidden-toggle
+       starts pressed so they don't clutter the table by default.
+   (b) already-linked rows (row-green / row-yellow / row-gray) when
+       the operator presses the mid-col "Скрыть связанные" 👁
+       button — keeps the focus on what still needs work.
+   The old rule only matched (a); (b) silently did nothing. */
+.pd3-row.is-hidden { display: none; }
 .pd3-row:hover { background-color: rgba(255,255,255,0.04); }
 .pd3-row-hide {
     width: 18px; height: 18px;
