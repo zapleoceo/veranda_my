@@ -18,6 +18,10 @@ final class PosterFinanceCategoriesAction
     {
         try { $rows = $this->lookup->financeCategories(); }
         catch (\Throwable $e) { return JsonResponder::error($response, $e->getMessage(), 500); }
-        return JsonResponder::ok($response, ['categories' => $rows]);
+        // JsonResponder already wraps as {ok:true, data: ...} — no
+        // extra `categories` key, or the client would have to peek
+        // through {data:{categories:{...}}} which it expected as
+        // just the map.
+        return JsonResponder::ok($response, $rows);
     }
 }
