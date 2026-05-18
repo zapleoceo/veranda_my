@@ -69,6 +69,7 @@ const state = new State({
     range:     raw.range     || null,
     links:     raw.links     || [],
     csrf:      raw.csrf      || '',
+    userEmail: raw.userEmail || '',
     endpoints: raw.endpoints || {},
 });
 setCsrf(state.get('csrf'));
@@ -86,6 +87,7 @@ initModals({ state });
 // route open/close through the same code path as the toolbar buttons.
 const { modalHost } = await _i('./ui/modals.js');
 initCreateTx({
+    state,
     host:       modalHost,
     openModal:  modalHost.open,
     closeModal: modalHost.close,

@@ -804,6 +804,11 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-form { display: flex; flex-direction: column; gap: 10px; }
 .pd3-form__row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 .pd3-form__row .pd3-field { flex: 1 1 0; min-width: 100px; }
+/* `[hidden]` defaults to `display: none` but our `.pd3-form__row`
+   sets `display: flex`, which wins on selector specificity in the
+   cascade. Explicit override below — needed so the modal can hide
+   the account-from / account-to rows by type. */
+.pd3-form__row[hidden] { display: none; }
 .pd3-field { display: flex; flex-direction: column; gap: 4px; }
 .pd3-field span { font-size: 11px; color: var(--muted); }
 .pd3-field input,

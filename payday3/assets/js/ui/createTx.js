@@ -124,7 +124,7 @@ function status(text, kind = '') {
     if (kind) el.classList.add(kind === 'ok' ? 'is-ok' : 'is-error');
 }
 
-export function initCreateTx({ host, openModal, closeModal }) {
+export function initCreateTx({ state, host, openModal, closeModal }) {
     const form = document.getElementById('pd3CreateTxForm');
     if (!form) return { open: () => {} };
 
@@ -184,7 +184,10 @@ export function initCreateTx({ host, openModal, closeModal }) {
         form.elements['time'].value   = timePart;
         form.elements['type'].value   = '2';                     // Expense (matches payday2 default)
         form.elements['amount'].value = fmtVndInt(Number(amount) || 0);
-        form.elements['comment'].value = '';
+        // Default comment mirrors payday2 ("Created by <email>"); the
+        // email is shipped from server via pd3-bootstrap.userEmail.
+        const userEmail = (state?.get?.('userEmail')) || 'User';
+        form.elements['comment'].value = 'Created by ' + userEmail;
 
         openModal?.('pd3CreateTxModal');
 
@@ -192,6 +195,20 @@ export function initCreateTx({ host, openModal, closeModal }) {
         fillAccountSelect(form.elements['account_from']);
         fillAccountSelect(form.elements['account_to']);
         fillCategorySelect(form.elements['category_id']);
+
+        // Pre-select the Andrey account on the From side — that's
+        // the source for 99% of operator-created expenses. ID comes
+        // from LocalSettings (the same place the rest of the app
+        // reads it), with a sane fallback to account 1.
+        const andreyId = String(_settings?.accounts?.andrey || 1);
+        const hasOpt = (sel, v) => Array.from(sel?.options || []).some((o) => String(o.value) === String(v));
+        if (hasOpt(form.elements['account_from'], andreyId)) {
+            form.elements['account_from'].value = andreyId;
+        }
+        if (hasOpt(form.elements['account_to'], andreyId)) {
+            form.elements['account_to'].value = andreyId;
+        }
+
         applyTypeVisibility(form);
     }
 

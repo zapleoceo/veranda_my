@@ -63,6 +63,9 @@ declare(strict_types=1);
     'range'     => $range->asArray(),
     'links'     => $linksJson,
     'csrf'      => $_SESSION['payday2_csrf'] ?? '',
+    // Surfaced for create-transaction modal's default comment
+    // ("Created by <email>") — same shape as payday2's PAYDAY_CONFIG.
+    'userEmail' => (string)($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? ''),
     'endpoints' => [
         'links' => '/payday3/api/links',
     ],
