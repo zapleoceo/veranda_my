@@ -52,7 +52,7 @@ final class LocalSettingsCodec
     {
         $accIn = isset($payload['accounts']) && is_array($payload['accounts']) ? $payload['accounts'] : [];
         return [
-            'telegram_chat_id'           => trim((string)($payload['telegram_chat_id'] ?? '')),
+            'telegram_chat_id'           => self::normaliseChatId($payload['telegram_chat_id'] ?? ''),
             'telegram_message_thread_id' => trim((string)($payload['telegram_message_thread_id'] ?? '')),
             'service_user_id'            => (int)($payload['service_user_id'] ?? 0),
             'accounts' => [
@@ -94,6 +94,34 @@ final class LocalSettingsCodec
             return 'Неверный balance_sinc_account_id.';
         }
         return null;
+    }
+
+    /**
+     * Normalise the Telegram chat_id the operator typed.
+     *   "https://t.me/c/3889942420/5274/..."  → -1003889942420
+     *   "3889942420"  (supergroup id from URL)  → -1003889942420
+     *   "-1003889942420" (already canonical)    → -1003889942420
+     *   "-123456" (legacy group)                → -123456
+     *   "123456" (user / private chat)          → 123456
+     *
+     * The "looks like a stripped supergroup id" heuristic kicks in
+     * when the value is a positive integer ≥ 10 digits — supergroup
+     * internal IDs are 10+ digits, plain user IDs almost never are.
+     */
+    private static function normaliseChatId(mixed $raw): string
+    {
+        $s = trim((string)$raw);
+        if ($s === '') return '';
+        // Pasted t.me/c/<id>/... URL — extract the chat segment.
+        if (preg_match('#^https?://t\.me/c/(\d+)#', $s, $m)) {
+            return '-100' . $m[1];
+        }
+        // Already canonical or legacy negative-id group.
+        if (preg_match('/^-\d+$/', $s)) return $s;
+        // Bare supergroup id — prefix with -100.
+        if (preg_match('/^\d{10,}$/', $s)) return '-100' . $s;
+        // Anything else: pass through (username, small user id, etc.).
+        return $s;
     }
 
     private static function firstNonEmptyString(mixed $v, string $fallback): string

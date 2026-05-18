@@ -405,6 +405,17 @@ export function initModals({ state }) {
         const el = document.getElementById('pd3SettCookie');
         if (el) parseCookieIntoFields(el.value);
     });
+    // Paste a t.me URL into chat_id → split into chat + thread.
+    const chatInput = document.querySelector('input[name="telegram_chat_id"]');
+    chatInput?.addEventListener('input', () => {
+        const m = String(chatInput.value || '').match(/^https?:\/\/t\.me\/c\/(\d+)(?:\/(\d+))?/);
+        if (!m) return;
+        chatInput.value = '-100' + m[1];
+        if (m[2]) {
+            const th = document.querySelector('input[name="telegram_message_thread_id"]');
+            if (th) th.value = m[2];
+        }
+    });
 
     // Check-finder: live filter while typing, exact-id search on submit.
     const finderInput = document.getElementById('pd3CheckFinderInput');

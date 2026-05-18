@@ -284,11 +284,18 @@ async function sendBalancesToTelegram(state) {
         });
         try {
             const canvas = await html2canvas(card, {
-                scale: 2,
+                // scale: 1.5 keeps the screenshot crisp on retina
+                // displays without blowing up the base64 payload — a
+                // 2× scale was producing ~2 MB requests that
+                // pressured PHP-FPM memory on the origin.
+                scale: 1.5,
                 useCORS: true,
                 backgroundColor: getComputedStyle(document.body).backgroundColor || '#0f172a',
             });
-            const dataUrl = canvas.toDataURL('image/png');
+            // JPEG at q≈0.92 is ~4× smaller than PNG for the kind of
+            // anti-aliased text we have here; visually
+            // indistinguishable for the Telegram preview.
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
             setStatus('Отправка…');
             await api.post('/payday3/api/balances/telegram', { image: dataUrl });
             setStatus('Отправлено в Telegram', 'ok');
