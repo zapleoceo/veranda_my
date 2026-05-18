@@ -16,11 +16,11 @@ use App\Payday3\Domain\LocalSettings;
  *
  * Reading prefers payday3's file; if absent, the payday2 file is
  * used so existing deployments keep their tuned values. Writes
- * always go to payday3's file — once a save happens, the fallback
- * is no longer consulted.
+ * always go to payday3's file.
  *
- * The in-process cache is invalidated on save() to keep the next
- * load() consistent for callers within the same request.
+ * Kept around for compatibility / read-side fallbacks; the active
+ * repository is DbLocalSettingsRepository (settings now live in a
+ * single row of the `payday3_settings` table).
  */
 final class JsonLocalSettingsRepository implements LocalSettingsRepositoryInterface
 {
@@ -39,55 +39,15 @@ final class JsonLocalSettingsRepository implements LocalSettingsRepositoryInterf
         if (!is_array($raw)) {
             return $this->cache = LocalSettings::defaults();
         }
-
-        $d   = LocalSettings::defaults();
-        $acc = isset($raw['accounts']) && is_array($raw['accounts']) ? $raw['accounts'] : [];
-
-        $resolved = new LocalSettings(
-            telegramChatId:       self::firstNonEmptyString(
-                                       $raw['telegram_chat_id']           ?? null,
-                                       $d->telegramChatId),
-            telegramThreadId:     self::firstNonEmptyString(
-                                       $raw['telegram_message_thread_id'] ?? null,
-                                       $d->telegramThreadId),
-            serviceUserId:        self::positiveInt($raw['service_user_id']         ?? null, $d->serviceUserId),
-            accountAndreyId:      self::positiveInt($acc['andrey']  ?? ($raw['account_andrey_id']  ?? null), $d->accountAndreyId),
-            accountTipsId:        self::positiveInt($acc['tips']    ?? ($raw['account_tips_id']    ?? null), $d->accountTipsId),
-            accountVietnamId:     self::positiveInt($acc['vietnam'] ?? ($raw['account_vietnam_id'] ?? null), $d->accountVietnamId),
-            balanceSyncAccountId: self::positiveInt($raw['balance_sinc_account_id'] ?? null, $d->balanceSyncAccountId),
-            allowedCategories:    is_array($raw['allowed_categories']    ?? null)
-                                       ? array_values(array_map('intval', $raw['allowed_categories']))
-                                       : $d->allowedCategories,
-            customCategoryNames:  is_array($raw['custom_category_names'] ?? null)
-                                       ? self::normaliseCustomNames($raw['custom_category_names'])
-                                       : $d->customCategoryNames,
-            posterAdmin:          self::mergePosterAdmin($raw['poster_admin'] ?? [], $d->posterAdmin),
-        );
-
-        return $this->cache = $resolved;
+        return $this->cache = LocalSettingsCodec::fromArray($raw);
     }
 
     public function save(array $payload): array
     {
-        $err = self::validate($payload);
+        $err = LocalSettingsCodec::validate($payload);
         if ($err !== null) return ['ok' => false, 'error' => $err];
 
-        $accIn = $payload['accounts'] ?? [];
-        $out = [
-            'telegram_chat_id'           => trim((string)$payload['telegram_chat_id']),
-            'telegram_message_thread_id' => trim((string)($payload['telegram_message_thread_id'] ?? '')),
-            'service_user_id'            => (int)$payload['service_user_id'],
-            'accounts' => [
-                'andrey'  => (int)$accIn['andrey'],
-                'tips'    => (int)$accIn['tips'],
-                'vietnam' => (int)$accIn['vietnam'],
-            ],
-            'balance_sinc_account_id'    => (int)$payload['balance_sinc_account_id'],
-            'allowed_categories'         => array_values(array_map('intval', $payload['allowed_categories'] ?? [])),
-            'custom_category_names'      => self::normaliseCustomNames($payload['custom_category_names'] ?? []),
-            'poster_admin'               => self::mergePosterAdmin($payload['poster_admin'] ?? [], LocalSettings::emptyPosterAdmin()),
-        ];
-
+        $out = LocalSettingsCodec::toCanonicalArray($payload);
         $json = json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         if ($json === false) return ['ok' => false, 'error' => 'json_encode failed'];
 
@@ -106,7 +66,11 @@ final class JsonLocalSettingsRepository implements LocalSettingsRepositoryInterf
         return ['ok' => true];
     }
 
-    // ─── helpers ──────────────────────────────────────────────────
+    /** Read raw JSON shape from disk (or null on missing/invalid) — used by the DB repository for one-time migration. */
+    public function readRaw(): ?array
+    {
+        return $this->readJson($this->primaryPath) ?? $this->readJson($this->fallbackPath);
+    }
 
     private function readJson(string $path): ?array
     {
@@ -114,68 +78,5 @@ final class JsonLocalSettingsRepository implements LocalSettingsRepositoryInterf
         if (!is_string($s) || $s === '') return null;
         $j = json_decode($s, true);
         return is_array($j) ? $j : null;
-    }
-
-    private static function firstNonEmptyString(mixed $v, string $fallback): string
-    {
-        $s = $v === null ? '' : trim((string)$v);
-        return $s !== '' ? $s : $fallback;
-    }
-
-    private static function positiveInt(mixed $v, int $fallback): int
-    {
-        $n = (int)$v;
-        return $n > 0 ? $n : $fallback;
-    }
-
-    /** @return array<int,string> */
-    private static function normaliseCustomNames(array $in): array
-    {
-        $out = [];
-        foreach ($in as $k => $v) {
-            $id = (int)$k;
-            if ($id > 0 && is_string($v) && trim($v) !== '') {
-                $out[$id] = trim($v);
-            }
-        }
-        return $out;
-    }
-
-    /** @return array<string,string> */
-    private static function mergePosterAdmin(mixed $in, array $defaults): array
-    {
-        if (!is_array($in)) return $defaults;
-        $keys = ['account', 'pos_session', 'ssid', 'csrf', 'cookie', 'user_agent'];
-        $out = [];
-        foreach ($keys as $k) $out[$k] = trim((string)($in[$k] ?? $defaults[$k] ?? ''));
-        return $out;
-    }
-
-    private static function validate(array $p): ?string
-    {
-        $chat = isset($p['telegram_chat_id']) ? trim((string)$p['telegram_chat_id']) : '';
-        if ($chat === '' || mb_strlen($chat) > 80) {
-            return 'Укажите telegram_chat_id (1..80 символов).';
-        }
-        $thread = isset($p['telegram_message_thread_id']) ? trim((string)$p['telegram_message_thread_id']) : '';
-        if (mb_strlen($thread) > 32) {
-            return 'telegram_message_thread_id слишком длинный.';
-        }
-        $svc = isset($p['service_user_id']) ? (int)$p['service_user_id'] : 0;
-        if ($svc <= 0 || $svc > 999_999_999) {
-            return 'Неверный service_user_id.';
-        }
-        $acc = isset($p['accounts']) && is_array($p['accounts']) ? $p['accounts'] : [];
-        foreach (['andrey', 'tips', 'vietnam'] as $label) {
-            $n = (int)($acc[$label] ?? 0);
-            if ($n <= 0 || $n > 999_999_999) {
-                return 'Неверный ID счёта: ' . $label;
-            }
-        }
-        $bs = (int)($p['balance_sinc_account_id'] ?? 0);
-        if ($bs <= 0 || $bs > 999_999_999) {
-            return 'Неверный balance_sinc_account_id.';
-        }
-        return null;
     }
 }

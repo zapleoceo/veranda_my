@@ -241,16 +241,22 @@ async function runUpld(state) {
 
 // ─── Telegram screenshot ───────────────────────────────────────
 
-async function loadHtml2Canvas() {
-    if (window.html2canvas) return window.html2canvas;
-    await new Promise((resolve, reject) => {
+let _h2cPromise = null;
+function loadHtml2Canvas() {
+    if (window.html2canvas) return Promise.resolve(window.html2canvas);
+    if (_h2cPromise) return _h2cPromise;
+    _h2cPromise = new Promise((resolve, reject) => {
         const s = document.createElement('script');
         s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        s.onload = resolve;
-        s.onerror = () => reject(new Error('html2canvas load failed'));
+        s.crossOrigin = 'anonymous';
+        s.onload  = () => resolve(window.html2canvas);
+        s.onerror = () => {
+            _h2cPromise = null;
+            reject(new Error('html2canvas CDN заблокирован — проверь сеть/блокировщики'));
+        };
         document.head.appendChild(s);
     });
-    return window.html2canvas;
+    return _h2cPromise;
 }
 
 async function sendBalancesToTelegram(state) {
@@ -334,4 +340,10 @@ export function initBalances({ state }) {
     });
 
     reloadPoster().then(() => loadActual(state)).then(syncBtnRefresh);
+
+    // Pre-warm html2canvas in the background so the very first
+    // Telegram click doesn't feel sluggish while the CDN script loads.
+    // Failures here are silent — the actual click will retry and
+    // surface the error in the status strip.
+    setTimeout(() => { loadHtml2Canvas().catch(() => {}); }, 1500);
 }

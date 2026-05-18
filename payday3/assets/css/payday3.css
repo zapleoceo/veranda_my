@@ -104,7 +104,13 @@
     border-radius: 12px;
     padding: 8px;
 }
-.pd3-graph-card { padding: 0; overflow: hidden; }
+.pd3-graph-card {
+    padding: 0;
+    overflow: hidden;
+    /* Hug the tables — no empty card chrome to the right of narrow data. */
+    width: max-content;
+    max-width: 100%;
+}
 
 /* IN / OUT section toggle — driven by body.pd3-mode-in / body.pd3-mode-out. */
 .pd3-section { display: none; }
@@ -128,6 +134,13 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     position: relative;
     overflow-x: auto;
     overflow-y: visible;
+    /* Shrink to the grid's natural width so we don't get a wide empty
+       gutter on the right when the tables are narrow. Clamps at the
+       parent width so the overflow-x: auto still kicks in for wide
+       data (long content / many columns) — the scrollbar only appears
+       when it's actually needed. */
+    width: max-content;
+    max-width: 100%;
 }
 .pd3-graph__grid {
     display: grid;
@@ -135,7 +148,7 @@ body.pd3-mode-out .pd3-section--out { display: block; }
        fixed minimum (the icon buttons + glass panel). The container's
        overflow-x:auto handles the case when content overflows. */
     grid-template-columns: max-content min-content max-content;
-    min-width: max-content;
+    width: max-content;
     gap: 0;
     align-items: stretch;
     position: relative;
@@ -479,15 +492,17 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 /* ─── Totals (bottom block) ────────────────────────────────── */
 
 .pd3-totals {
-    display: flex;
-    gap: 24px;
-    margin-top: 12px;
-    padding: 10px 14px;
+    display: inline-flex;
+    gap: 16px;
+    margin-top: 10px;
+    padding: 6px 10px;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 10px;
     flex-wrap: wrap;
-    font-size: 13px;
+    font-size: 12px;
+    /* Container is inline-flex so it shrinks to its 3 spans; flex
+       wrap kicks in only when the viewport really cannot hold them. */
 }
 .pd3-totals .ok     { color: #10b981; }
 .pd3-totals .warn   { color: #f59e0b; }
@@ -787,7 +802,7 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-modal__result { margin-top: 12px; }
 
 .pd3-form { display: flex; flex-direction: column; gap: 10px; }
-.pd3-form__row { display: flex; gap: 10px; flex-wrap: wrap; }
+.pd3-form__row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 .pd3-form__row .pd3-field { flex: 1 1 0; min-width: 100px; }
 .pd3-field { display: flex; flex-direction: column; gap: 4px; }
 .pd3-field span { font-size: 11px; color: var(--muted); }
@@ -798,6 +813,75 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     border-radius: 9px;
     padding: 7px 10px;
     font: inherit;
+}
+
+/* Settings modal — collapsible groups for telegram / poster / admin /
+   categories. <details> kept open by default for the two everyday
+   sections; admin + categories are off-by-default since they're rare. */
+.pd3-settings__note  { font-size: 11px; margin: 0 0 6px; }
+.pd3-settings__hint  { font-size: 11px; margin: 0 0 8px; }
+.pd3-settings__group {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.015);
+}
+.pd3-settings__group + .pd3-settings__group { margin-top: 8px; }
+.pd3-settings__group > summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 4px 0;
+    list-style: none;
+}
+.pd3-settings__group[open] > summary { color: var(--text); margin-bottom: 6px; }
+.pd3-settings__group > summary::-webkit-details-marker { display: none; }
+.pd3-settings__group > summary::before {
+    content: '▸';
+    display: inline-block;
+    margin-right: 6px;
+    transition: transform .12s ease;
+}
+.pd3-settings__group[open] > summary::before { transform: rotate(90deg); }
+
+.pd3-settings__categories {
+    max-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-right: 4px;
+}
+.pd3-settings__cat {
+    display: grid;
+    grid-template-columns: auto 48px 1fr 1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 4px;
+    border-radius: 6px;
+}
+.pd3-settings__cat:hover { background: rgba(255,255,255,0.04); }
+.pd3-settings__cat-id   { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.pd3-settings__cat-name { font-size: 12px; }
+.pd3-settings__cat-rename {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 6px;
+    font: inherit;
+    font-size: 11px;
+}
+.pd3-settings__footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
 }
 
 /* Soft-reset button under the mid-col glass — payday2's clearDayBtn. */
@@ -869,9 +953,11 @@ body.pd3-help-mode [data-help-abs]:hover::after {
 
 .pd3-finance {
     padding: 0;
-    flex: 1 1 360px;
-    min-width: 320px;
-    max-width: 760px;
+    /* Hug content — no min/max flex basis. Sits next to Итоговый
+       баланс in .pd3-bottom-row; on narrow viewports the row wraps. */
+    flex: 0 0 auto;
+    align-self: flex-start;
+    max-width: 100%;
 }
 .pd3-finance__row {
     padding: 4px 10px 6px;
