@@ -24,8 +24,20 @@ final class PosterLookupService implements PosterLookupServiceInterface
 
     public function financeAccounts(): array
     {
+        // Mirror payday2's `?ajax=finance_accounts`: id → name map.
+        // The create-transaction modal renders these as <option>s and
+        // never needs the rest of the account row (balance, type, etc.)
         $rows = $this->poster->client()->request('finance.getAccounts', []);
-        return is_array($rows) ? $rows : [];
+        $out  = [];
+        if (is_array($rows)) {
+            foreach ($rows as $r) {
+                if (!is_array($r)) continue;
+                $aid  = (int)($r['account_id'] ?? $r['accountId'] ?? 0);
+                $name = trim((string)($r['name'] ?? ''));
+                if ($aid > 0 && $name !== '') $out[$aid] = $name;
+            }
+        }
+        return $out;
     }
 
     public function financeCategories(): array

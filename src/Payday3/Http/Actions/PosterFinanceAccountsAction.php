@@ -18,6 +18,8 @@ final class PosterFinanceAccountsAction
     {
         try { $rows = $this->lookup->financeAccounts(); }
         catch (\Throwable $e) { return JsonResponder::error($response, $e->getMessage(), 500); }
-        return JsonResponder::ok($response, ['accounts' => $rows]);
+        // JsonResponder already wraps as {ok:true, data: ...} — no
+        // extra `accounts` envelope, the JS receives the map directly.
+        return JsonResponder::ok($response, $rows);
     }
 }

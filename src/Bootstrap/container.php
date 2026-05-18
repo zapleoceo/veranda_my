@@ -89,6 +89,9 @@ use App\Payday3\Http\Actions\BalanceSyncPlanAction;
 use App\Payday3\Http\Actions\BalanceSyncCommitAction;
 use App\Payday3\Contracts\BalanceSyncServiceInterface;
 use App\Payday3\Services\BalanceSyncService;
+use App\Payday3\Http\Actions\PosterTransactionCreateAction;
+use App\Payday3\Contracts\PosterTransactionCreateServiceInterface;
+use App\Payday3\Services\PosterTransactionCreateService;
 use App\Payday3\Contracts\FinanceTransferServiceInterface;
 use App\Payday3\Services\FinanceTransferService;
 use App\Payday3\Contracts\PosterBalanceServiceInterface;
@@ -264,5 +267,13 @@ return [
     ),
     BalanceSyncCommitAction::class => fn($c) => new BalanceSyncCommitAction(
         $c->get(BalanceSyncServiceInterface::class),
+    ),
+
+    // ─── "+" create Poster transaction from an OUT-mail row ───
+    PosterTransactionCreateServiceInterface::class => fn($c) => new PosterTransactionCreateService(
+        $c->get(PosterApiProviderInterface::class),
+    ),
+    PosterTransactionCreateAction::class => fn($c) => new PosterTransactionCreateAction(
+        $c->get(PosterTransactionCreateServiceInterface::class),
     ),
 ];

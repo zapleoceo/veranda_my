@@ -806,7 +806,8 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-form__row .pd3-field { flex: 1 1 0; min-width: 100px; }
 .pd3-field { display: flex; flex-direction: column; gap: 4px; }
 .pd3-field span { font-size: 11px; color: var(--muted); }
-.pd3-field input {
+.pd3-field input,
+.pd3-field select {
     background: var(--card);
     color: var(--text);
     border: 1px solid var(--border);
@@ -814,6 +815,7 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     padding: 7px 10px;
     font: inherit;
 }
+.pd3-field select { padding: 6px 8px; }
 
 /* Settings modal — collapsible groups for telegram / poster / admin /
    categories. <details> kept open by default for the two everyday
@@ -1018,6 +1020,31 @@ body.pd3-help-mode [data-help-abs]:hover::after {
     color: var(--muted);
 }
 .pd3-fw-normal { font-weight: 400; }
+
+/* "+" button on each OUT-mail row → opens Create-TX modal.
+   Visible only on UNLINKED rows (row-red) — same rule as payday2.
+   Linked rows already have a Poster counterpart, no point offering
+   the create-from-scratch action there. */
+.pd3-out-mail-create {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1;
+    padding: 0;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.pd3-out-mail-create:hover { background: rgba(255,255,255,0.08); }
+tr.row-red .pd3-out-mail-create { display: inline-flex; }
 
 /* ─── Responsive ─────────────────────────────────────────── */
 

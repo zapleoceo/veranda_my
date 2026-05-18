@@ -154,6 +154,63 @@ declare(strict_types=1);
         </div>
     </div>
 
+    <div class="pd3-modal" id="pd3CreateTxModal" role="dialog" aria-modal="true" aria-labelledby="pd3CreateTxTitle" hidden>
+        <header class="pd3-modal__header">
+            <h2 id="pd3CreateTxTitle">Новая транзакция Poster</h2>
+            <button type="button" class="pd3-modal__close" data-pd3-modal-close aria-label="Закрыть">×</button>
+        </header>
+        <form class="pd3-modal__body pd3-form" id="pd3CreateTxForm">
+            <div class="pd3-form__row">
+                <label class="pd3-field">
+                    <span>Дата</span>
+                    <input type="date" name="date" required>
+                </label>
+                <label class="pd3-field">
+                    <span>Время</span>
+                    <input type="time" name="time" required>
+                </label>
+                <label class="pd3-field">
+                    <span>Тип</span>
+                    <select name="type" required>
+                        <option value="2">Расход</option>
+                        <option value="1">Доход</option>
+                        <option value="3">Перевод</option>
+                    </select>
+                </label>
+            </div>
+            <div class="pd3-form__row" id="pd3CreateTxAccFromWrap">
+                <label class="pd3-field">
+                    <span>Счёт списания</span>
+                    <select name="account_from"></select>
+                </label>
+            </div>
+            <div class="pd3-form__row" id="pd3CreateTxAccToWrap" hidden>
+                <label class="pd3-field">
+                    <span>Счёт зачисления</span>
+                    <select name="account_to"></select>
+                </label>
+            </div>
+            <div class="pd3-form__row">
+                <label class="pd3-field">
+                    <span>Сумма (₫)</span>
+                    <input type="text" name="amount" inputmode="numeric" required placeholder="0">
+                </label>
+                <label class="pd3-field">
+                    <span>Категория</span>
+                    <select name="category_id"><option value="">Без категории</option></select>
+                </label>
+            </div>
+            <label class="pd3-field">
+                <span>Комментарий</span>
+                <input type="text" name="comment" autocomplete="off">
+            </label>
+            <footer class="pd3-settings__footer">
+                <button type="submit" class="pd3-btn">Создать в Poster</button>
+                <span class="pd3-balances__status muted" id="pd3CreateTxStatus"></span>
+            </footer>
+        </form>
+    </div>
+
     <div class="pd3-modal pd3-modal--wide" id="pd3CheckFinderModal" role="dialog" aria-modal="true" aria-labelledby="pd3CheckFinderTitle" hidden>
         <header class="pd3-modal__header">
             <h2 id="pd3CheckFinderTitle">Поиск чека Poster</h2>

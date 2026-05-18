@@ -38,6 +38,7 @@ use App\Payday3\Http\Actions\FinanceTransfersAction;
 use App\Payday3\Http\Actions\BalanceScreenshotAction;
 use App\Payday3\Http\Actions\BalanceSyncPlanAction;
 use App\Payday3\Http\Actions\BalanceSyncCommitAction;
+use App\Payday3\Http\Actions\PosterTransactionCreateAction;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -205,6 +206,10 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->get(   '/poster/employees',                            PosterEmployeesAction::class);
         $api->get(   '/poster/finance/accounts',                     PosterFinanceAccountsAction::class);
         $api->get(   '/poster/finance/categories',                   PosterFinanceCategoriesAction::class);
+        // "+" button on OUT-mail rows → create a Poster finance tx
+        // (income / expense / transfer). Direct port of payday2's
+        // ?ajax=create_poster_transaction.
+        $api->post(  '/poster/finance/transactions',                 PosterTransactionCreateAction::class);
         // Settings (replaces /payday2/?ajax=save_local_config).
         $api->get(   '/settings',                                    SettingsAction::class);
         $api->post(  '/settings',                                    SettingsAction::class);

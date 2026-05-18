@@ -35,6 +35,7 @@ const [
     { initBalances },
     { makeInLoader },
     { initFinanceTransfers },
+    { initCreateTx },
 ] = await Promise.all([
     _i('./state.js'),
     _i('./api.js'),
@@ -54,6 +55,7 @@ const [
     _i('./ui/balances.js'),
     _i('./in/bootstrap.js'),
     _i('./ui/financeTransfers.js'),
+    _i('./ui/createTx.js'),
 ]);
 
 const bootstrapEl = document.getElementById('pd3-bootstrap');
@@ -80,6 +82,14 @@ initEyeToggles();
 initHelpMode();
 initDateForm();
 initModals({ state });
+// Import the modal host helpers AFTER initModals so initCreateTx can
+// route open/close through the same code path as the toolbar buttons.
+const { modalHost } = await _i('./ui/modals.js');
+initCreateTx({
+    host:       modalHost,
+    openModal:  modalHost.open,
+    closeModal: modalHost.close,
+});
 initOutMode({ state });
 initBalances({ state });
 refreshStats();
