@@ -56,7 +56,7 @@
 
 /* ─── Page chrome ──────────────────────────────────────────── */
 
-.pd3-page { max-width: 100%; padding: 12px; }
+.pd3-page { max-width: 100%; padding: 8px; }
 
 /* ─── Toolbar ──────────────────────────────────────────────── */
 
@@ -225,8 +225,8 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: 6px;
+    padding: 4px 8px;
     border-bottom: 1px solid var(--border);
     background: rgba(255,255,255,0.02);
 }
@@ -239,12 +239,12 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-pane__actions { display: inline-flex; align-items: center; gap: 6px; }
 .pd3-pane__scroll { flex: 1; overflow: auto; max-height: 70vh; }
 .pd3-pane__footer {
-    padding: 6px 12px;
+    padding: 3px 8px;
     border-top: 1px solid var(--border);
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    font-size: 12px;
+    gap: 10px;
+    font-size: 11px;
 }
 
 .pd3-pill {
@@ -294,13 +294,17 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 /* ─── Tables ───────────────────────────────────────────────── */
 
 .pd3-table {
-    width: auto;                    /* don't stretch to pane width */
+    /* `max-content` shrinks the table to the sum of its column
+       widths — `width: auto` was letting the inner cells grow to
+       fill any pane the table was nested into. */
+    width: max-content;
+    max-width: 100%;
     border-collapse: collapse;
     font-size: 12px;
 }
 .pd3-table th,
 .pd3-table td {
-    padding: 3px 6px;               /* tight cells */
+    padding: 2px 6px;               /* even tighter cells */
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
 }
@@ -316,7 +320,7 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     background: var(--card);
     z-index: 2;
     user-select: none;
-    padding: 4px 6px;
+    padding: 3px 6px;
 }
 .pd3-table td.right,
 .pd3-table th.right { text-align: right; }
@@ -347,10 +351,11 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-col--method,
 .pd3-col--waiter,
 .pd3-col--table { width: 1%; white-space: nowrap; }
-/* Content (sepay description) capped at 250 px — anything longer is
-   ellipsised. payday2 had a similar cap so the table stays narrow. */
+/* Content (sepay description) capped at 200 px — anything longer is
+   ellipsised. Lower than the historic 250px so the rows stay tight
+   even when the bank sends a short transfer descriptor. */
 .pd3-col--content {
-    max-width: 250px;
+    max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
