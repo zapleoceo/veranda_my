@@ -55,6 +55,7 @@ use App\Controllers\BanyaController;
 use App\Controllers\RomaController;
 use App\Controllers\ZaparaController;
 use App\Controllers\EmployeesController;
+use App\Controllers\ScheduleController;
 use App\Controllers\MenuPublicController;
 use App\Controllers\Tr3Controller;
 use App\Controllers\ReservationsController;
@@ -136,6 +137,8 @@ $app->map(['GET', 'POST'], '/roma[/]', [RomaController::class, 'index'])
 $app->map(['GET', 'POST'], '/zapara[/]', [ZaparaController::class, 'index'])
     ->add(AuthMiddleware::class);
 $app->map(['GET', 'POST'], '/employees[/]', [EmployeesController::class, 'index'])
+    ->add(AuthMiddleware::class);
+$app->map(['GET', 'POST'], '/schedule[/]', [ScheduleController::class, 'index'])
     ->add(AuthMiddleware::class);
 
 // Phase 4: public links landing + menu
