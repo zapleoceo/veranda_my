@@ -176,7 +176,13 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->post(  '/sepay/sync',                                  SepaySyncAction::class);
         $api->post(  '/poster/sync',                                 PosterSyncAction::class);
         // OUT-direction reconciliation (BIDV mail ↔ Poster finance).
+        // /out/data kept for back-compat (single bundled response);
+        // /out/mail + /out/finance + /out/links are the new
+        // fan-out endpoints the front-end calls in parallel.
         $api->get(   '/out/data',                                    OutDataAction::class);
+        $api->get(   '/out/mail',                                    \App\Payday3\Http\Actions\OutMailAction::class);
+        $api->get(   '/out/finance',                                 \App\Payday3\Http\Actions\OutFinanceAction::class);
+        $api->get(   '/out/links',                                   \App\Payday3\Http\Actions\OutLinksAction::class);
         $api->post(  '/out/links/auto',                              OutAutoLinkAction::class);
         $api->post(  '/out/links/manual',                            OutManualLinkAction::class);
         $api->post(  '/out/links/clear',                             OutClearLinksAction::class);
