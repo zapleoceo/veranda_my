@@ -18,6 +18,7 @@ class UserPermissionsService
         'roma'           => false,
         'banya'          => false,
         'employees'      => false,
+        'schedule'       => false,
         'reservations'   => false,
         'vposter_button' => false,
         'exclude_toggle' => true,
@@ -76,6 +77,7 @@ class UserPermissionsService
             $out['roma']         = true;
             $out['banya']        = true;
             $out['employees']    = true;
+            $out['schedule']     = true;
             $out['errors']       = true;
             $out['zapara']       = true;
             $out['reservations'] = true;
