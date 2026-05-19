@@ -242,17 +242,140 @@
     });
 
 
-    // ════════════════ Heatmap bucket size selector ════════════════
+    // ════════════════ Heatmap rebucketization (live, no AJAX) ════════════════
+    // PHP в шаблоне эмитит #schStatsData (JSON: per-day per-block per-hour counts).
+    // На смену селектов «шаг» / «считать» — JS пересчитывает и перерисовывает
+    // и матрицу-heatmap, и горизонтальную гистограмму ниже.
+    const statsEl = document.getElementById('schStatsData');
     const bucketSel = document.getElementById('schBucketSize');
-    if (bucketSel) {
-        bucketSel.addEventListener('change', () => {
-            console.info('[schedule:demo] bucket changed to', bucketSel.value);
-            // Полноценная перерисовка heatmap-а под другой шаг — задача
-            // следующей итерации (когда DA подключим через AJAX и SSR
-            // заменим клиентским рендером). Пока шаг прибит на 2 часа
-            // (рассчитывается в PHP в schedule_content.php).
-            alert('Шаг heatmap = ' + bucketSel.value + ' час.\nДемо: серверный рендер сейчас фиксирован на 2 часа. Перебуцкетизация на лету — следующий этап.');
-        });
+    const filterSel = document.getElementById('schCoverageFilter');
+    const covGrid   = document.getElementById('schCovGrid');
+
+    if (statsEl && bucketSel && filterSel && covGrid) {
+        let stats;
+        try { stats = JSON.parse(statsEl.textContent); }
+        catch (e) { stats = null; }
+        if (stats) initHeatmap(stats);
+    }
+
+    function initHeatmap(stats) {
+        const startH = stats.hourStart || 8;
+        const endH   = stats.hourEnd   || 24;
+
+        function pad2(n) { return String(n).padStart(2, '0'); }
+
+        // total[h] = filtered sum for hour h across whole period
+        // perDayHours[i][h] = filtered count for hour h on day i
+        function applyFilter(filter) {
+            const totals = new Array(24).fill(0);
+            const perDay = stats.days.map((d) => {
+                const h = new Array(24).fill(0);
+                for (let i = 0; i < 24; i++) {
+                    if (filter === 'all') {
+                        h[i] = (d.hours.senior?.[i] || 0)
+                             + (d.hours.main?.[i]   || 0)
+                             + (d.hours.banya?.[i]  || 0)
+                             + (d.hours.custom?.[i] || 0);
+                    } else {
+                        h[i] = d.hours[filter]?.[i] || 0;
+                    }
+                    totals[i] += h[i];
+                }
+                return h;
+            });
+            return { perDay, totals };
+        }
+
+        function bucketize(hours, size) {
+            const out = [];
+            for (let h = startH; h < endH; h += size) {
+                let max = 0, sum = 0, cnt = 0;
+                for (let k = 0; k < size && h + k < endH; k++) {
+                    max = Math.max(max, hours[h + k]);
+                    sum += hours[h + k];
+                    cnt++;
+                }
+                out.push({
+                    from: h,
+                    to:   Math.min(h + size, endH),
+                    max,
+                    avg:  cnt > 0 ? +(sum / cnt).toFixed(1) : 0,
+                });
+            }
+            return out;
+        }
+
+        function redrawMatrix(perDay, bucketSize) {
+            const dayBuckets = perDay.map((h) => bucketize(h, bucketSize));
+            // Global max for color normalization
+            let globalMax = 0;
+            dayBuckets.forEach((dayBs) => dayBs.forEach((b) => { if (b.max > globalMax) globalMax = b.max; }));
+            if (globalMax < 1) globalMax = 1;
+
+            const cols = dayBuckets[0]?.length || 0;
+            covGrid.style.setProperty('--cov-cols', cols);
+
+            // Build HTML
+            let html = '<div class="sch-cov-corner">День \\ Час</div>';
+            if (dayBuckets.length > 0) {
+                dayBuckets[0].forEach((b) => {
+                    html += `<div class="sch-cov-col-head">${pad2(b.from)}–${pad2(b.to)}</div>`;
+                });
+            }
+            stats.days.forEach((d, idx) => {
+                const weekend = d.weekend ? ' weekend' : '';
+                html += `<div class="sch-cov-row-head${weekend}">${escapeHtml(d.dow)} ${escapeHtml(d.date)}.05</div>`;
+                dayBuckets[idx].forEach((b) => {
+                    const intensity = b.max / globalMax;
+                    const alpha = b.max > 0 ? 0.05 + intensity * 0.90 : 0;
+                    const txt   = intensity > 0.55 ? '#0f1117' : 'var(--text)';
+                    const label = b.max > 0 ? b.max : '·';
+                    const title = `пик ${b.max} чел/ч в окне ${pad2(b.from)}–${pad2(b.to)}`;
+                    html += `<div class="sch-cov-cell" data-count="${b.max}" data-from="${b.from}" data-to="${b.to}" data-day-idx="${idx}" style="background: rgba(184,135,70,${alpha}); color: ${txt};" title="${escapeHtml(title)}">${label}</div>`;
+                });
+            });
+            covGrid.innerHTML = html;
+        }
+
+        function redrawHistogram(totals) {
+            const wrap = document.querySelector('.sch-agg-histogram');
+            if (!wrap) return;
+            const grid = wrap.querySelector('.sch-bar-grid');
+            const h4 = wrap.querySelector('h4');
+            if (!grid) return;
+
+            const avgs = totals.map((v) => v / Math.max(1, stats.dayCount));
+            const max = Math.max(1, ...avgs);
+
+            let html = '';
+            for (let h = startH; h < endH; h++) {
+                const avg = +avgs[h].toFixed(1);
+                const w = max > 0 ? Math.round((avg / max) * 1000) / 10 : 0;
+                html += `
+                    <div class="sch-bar-label">${pad2(h)}:00</div>
+                    <div class="sch-bar-track"><div class="sch-bar-fill" style="width: ${w}%;"></div></div>
+                    <div class="sch-bar-value">${avg} чел</div>`;
+            }
+            grid.innerHTML = html;
+            if (h4) {
+                const filterLabel = filterSel.options[filterSel.selectedIndex]?.textContent || '';
+                h4.textContent = `Средняя загрузка по часам за период (${stats.dayCount} дней) · ${filterLabel}`;
+            }
+        }
+
+        function redraw() {
+            const filter = filterSel.value;
+            const bucketSize = parseInt(bucketSel.value, 10) || 2;
+            const { perDay, totals } = applyFilter(filter);
+            redrawMatrix(perDay, bucketSize);
+            redrawHistogram(totals);
+        }
+
+        bucketSel.addEventListener('change', redraw);
+        filterSel.addEventListener('change', redraw);
+        // первая отрисовка перетирает server-side HTML — но мы рендерим то же
+        // самое в дефолтных настройках (шаг=2, фильтр=all), пиксель-в-пиксель.
+        redraw();
     }
 
 
