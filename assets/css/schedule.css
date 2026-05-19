@@ -777,3 +777,33 @@ body.sch-help-mode [data-help-abs] {
     color: var(--muted); font-size: 11px;
     line-height: 1.5; margin-top: 2px;
 }
+
+
+/* ═══════════════════════════════════════════════════════
+   TOAST — save/load feedback
+   ═══════════════════════════════════════════════════════ */
+.sch-toast {
+    position: fixed;
+    z-index: 99999;
+    bottom: 24px; right: 24px;
+    padding: 10px 16px;
+    background: var(--accent);
+    color: #0f1117;
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    pointer-events: none;
+    max-width: 380px;
+}
+.sch-toast.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.sch-toast[data-kind="err"] {
+    background: var(--danger);
+    color: #fff;
+}
