@@ -114,19 +114,33 @@ export function initOutMode({ state }) {
     // attempt aborts (no queue — the user gets the freshest data
     // from whichever click wins).
     let loading = false;
-    async function load() {
+    async function load(opts = {}) {
         if (loading) return;
         loading = true;
+        const includeHidden = opts.includeHidden ? '1' : '0';
         const reloadButtons = [
             document.getElementById('pd3OutMailReloadBtn'),
             document.getElementById('pd3OutFinanceReloadBtn'),
         ].filter(Boolean);
         reloadButtons.forEach((b) => { b.disabled = true; b.classList.add('is-busy'); });
         try {
-            const data = await api.get('/payday3/api/out/data?' + rangeQs(state));
-            mailRows = data.mail    || [];
-            finRows  = data.finance || [];
-            links    = data.links   || [];
+            // Fan out — IMAP, Poster API and the DB link query each
+            // hit a dedicated endpoint. AuthMiddleware releases the
+            // PHP session lock for /payday3/* so the three really
+            // do run concurrently on the server. Total wait drops
+            // from sum (~2.5 s) to max (~IMAP ≈ 2 s).
+            const qs = rangeQs(state);
+            const [mailRes, finRes, linkRes] = await Promise.allSettled([
+                api.get(`/payday3/api/out/mail?include_hidden=${includeHidden}&${qs}`),
+                api.get(`/payday3/api/out/finance?${qs}`),
+                api.get(`/payday3/api/out/links?${qs}`),
+            ]);
+            // Partial failures are surfaced inline but don't sink the
+            // whole render — e.g. IMAP can flake but the operator
+            // still gets to see Poster txs and existing links.
+            mailRows = mailRes.status === 'fulfilled' ? (mailRes.value?.mail    || []) : [];
+            finRows  = finRes .status === 'fulfilled' ? (finRes .value?.finance || []) : [];
+            links    = linkRes.status === 'fulfilled' ? (linkRes.value?.links   || []) : [];
             renderOutMail(mailRows, links);
             renderOutFinance(finRows, links);
             updateOutFooter(mailRows, finRows);
@@ -136,6 +150,11 @@ export function initOutMode({ state }) {
             selFin.clear();
             recomputeSelection();
             loaded = true;
+            // If any leg rejected, log AND show a footnote — useful
+            // when IMAP creds are wrong but Poster works.
+            for (const [name, p] of [['mail', mailRes], ['finance', finRes], ['links', linkRes]]) {
+                if (p.status === 'rejected') console.error('[payday3-out] /' + name, p.reason);
+            }
         } catch (e) {
             const tb = document.querySelector('#pd3OutMailTable tbody');
             if (tb) tb.innerHTML = `<tr class="pd3-empty"><td colspan="6">Не удалось загрузить: ${e.message || 'ошибка'}</td></tr>`;
@@ -229,22 +248,16 @@ export function initOutMode({ state }) {
         });
     }
 
-    // Hidden-mail eye toggle on the mail card — reloads with include_hidden.
+    // Hidden-mail eye toggle on the mail card — reloads everything
+    // through the same fan-out load() helper with includeHidden set
+    // so the request stays parallel and we reuse one code path.
     let showHiddenMail = false;
     document.getElementById('pd3OutMailHiddenToggle')?.addEventListener('click', async (e) => {
         showHiddenMail = !showHiddenMail;
         e.currentTarget.setAttribute('aria-pressed', showHiddenMail ? 'true' : 'false');
-        try {
-            const data = await api.get('/payday3/api/out/data?include_hidden=' + (showHiddenMail ? '1' : '0') + '&' + rangeQs(state));
-            mailRows = data.mail    || [];
-            finRows  = data.finance || [];
-            links    = data.links   || [];
-            renderOutMail(mailRows, links);
-            renderOutFinance(finRows, links);
-            updateOutFooter(mailRows, finRows);
-            renderer?.setLinks(links);
-            recomputeSelection();
-        } catch (err) { alert(err.message); }
+        loaded = false;                       // force a fresh fetch
+        try { await load({ includeHidden: showHiddenMail }); }
+        catch (err) { alert(err.message); }
     });
 
     // Public handle so other modules (createTx after a successful

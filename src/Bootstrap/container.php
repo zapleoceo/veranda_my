@@ -177,6 +177,18 @@ return [
         $c->get(FinanceServiceInterface::class),
         $c->get(OutLinkRepositoryInterface::class),
     ),
+    // Split OutDataAction into three so the JS can fan out — IMAP
+    // ( ~2s ), Poster finance ( ~500ms ) and the DB link query
+    // ( ~50ms ) now run concurrently instead of summing.
+    \App\Payday3\Http\Actions\OutMailAction::class    => fn($c) => new \App\Payday3\Http\Actions\OutMailAction(
+        $c->get(MailServiceInterface::class),
+    ),
+    \App\Payday3\Http\Actions\OutFinanceAction::class => fn($c) => new \App\Payday3\Http\Actions\OutFinanceAction(
+        $c->get(FinanceServiceInterface::class),
+    ),
+    \App\Payday3\Http\Actions\OutLinksAction::class   => fn($c) => new \App\Payday3\Http\Actions\OutLinksAction(
+        $c->get(OutLinkRepositoryInterface::class),
+    ),
     OutAutoLinkAction::class   => fn($c) => new OutAutoLinkAction(
         $c->get(OutReconciliationServiceInterface::class),
         $c->get(OutLinkRepositoryInterface::class),
