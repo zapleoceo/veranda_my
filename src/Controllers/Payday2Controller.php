@@ -11,6 +11,13 @@ class Payday2Controller
 {
     public function dispatch(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        // Reopen the session — AuthMiddleware closed it to let
+        // concurrent AJAX run in parallel, but payday2's legacy code
+        // (ajax.php caches: payday2_products_cache, _tables_cache_v2,
+        // _poster_admin_lock_until, ...) writes back to $_SESSION
+        // and would silently lose those writes otherwise.
+        \App\Infrastructure\Session::start();
+
         $GLOBALS['_PAYDAY2_SLIM_MODE']    = true;
         $GLOBALS['_PAYDAY2_USE_LAYOUT']  = true;
         $GLOBALS['_PAYDAY2_HEAD_EXTRA']  = '';

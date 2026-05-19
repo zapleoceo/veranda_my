@@ -54,6 +54,24 @@ class AuthMiddleware implements MiddlewareInterface
         }
 
         $this->permissions->loadIntoSession((string) $_SESSION['user_email']);
+
+        // Release the session file lock so concurrent AJAX from the
+        // same operator can run in parallel — PHP's default file
+        // session handler holds an exclusive lock until script end,
+        // which otherwise serialises every fetch() coming from one
+        // browser tab. Scoped to /payday3/* (page + API) because
+        // those paths' code is known: RequestThrottle, BalanceSync
+        // and PosterCheckService all call Session::start() themselves
+        // when they need to write, and the read-only actions stay
+        // happy with the in-memory $_SESSION array.
+        //
+        // Legacy modules (/payday2, /employees, /banya, …) still
+        // hold the lock for their entire request to avoid silently
+        // dropping their own session writes.
+        if (str_starts_with($request->getUri()->getPath(), '/payday3')) {
+            Session::close();
+        }
+
         return $handler->handle($request->withAttribute('user_email', $_SESSION['user_email']));
     }
 
