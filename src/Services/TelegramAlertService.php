@@ -168,11 +168,24 @@ class TelegramAlertService
 
             $lastSync   = $this->meta->get('poster_last_sync_at', $now);
             $srvTag     = trim((string) (php_uname('n') ?: ''));
+
+            // Daily ignore counter (midnight-to-midnight, spot-local TZ).
+            // PHP's default tz is set by the cron entry-point to spot TZ, so
+            // date('Y-m-d') here is the right "today" for the manager.
+            $today      = date('Y-m-d');
+            $tomorrow   = date('Y-m-d', strtotime('+1 day'));
+            $ignores    = \App\Actions\IgnoreLog::countBetween(
+                $this->db,
+                $today    . ' 00:00:00',
+                $tomorrow . ' 00:00:00'
+            );
+
             $statusText = "Открыто чеков: {$m->openChecksDisplay}\n"
                 . "Лимит времени: {$m->waitLimitMinutes} мин\n"
                 . "В очереди: 🍸{$m->queueBar} / 🍔{$m->queueKitchen}\n"
                 . "Долгих блюд: 🍸{$m->overdueBar} / 🍔{$m->overdueKitchen}\n"
-                . "Время обновления: {$lastSync}"
+                . "Время обновления: {$lastSync}\n"
+                . "Игноры: {$ignores['items']}|{$ignores['tx']}"
                 . ($srvTag !== '' ? "\nSrv: {$srvTag}" : '');
 
             $prevId   = (int) $this->meta->get('telegram_status_msg_id', '0');

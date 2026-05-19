@@ -14,6 +14,8 @@ class IgnoreItemAction implements ActionInterface
             [$ctx->actionId]
         );
 
+        IgnoreLog::record($ctx->db, 'item', $ctx->actionId, $ctx->username);
+
         $deleted = $ctx->bot->deleteMessage($ctx->messageId);
         if ($deleted) {
             return 'Игнор блюда установлен. Сообщение удалено.';

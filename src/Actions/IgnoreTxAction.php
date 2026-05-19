@@ -28,6 +28,8 @@ class IgnoreTxAction implements ActionInterface
             [$txDate, $txId]
         );
 
+        IgnoreLog::record($ctx->db, 'tx', $txId, $ctx->username);
+
         // Collect all alert message IDs for this transaction
         $msgRows = $ctx->db->query(
             "SELECT DISTINCT message_id FROM {$txItems}
