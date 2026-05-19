@@ -392,36 +392,58 @@
 .sch-snap-pill.current { border-color: var(--accent); color: var(--accent); }
 .sch-snap-pill:hover:not(.current) { border-color: var(--accent); }
 
-/* ─── Help mode overlay (toggle via #schHelpBtn) ─────────── */
+/* ─── Help mode overlay (toggle via #schHelpBtn) ───────────
+   Подсвечиваем элементы — pure CSS. Сам тултип рисуется JS-ом
+   в body через .sch-help-tip (см. ниже), чтобы не клипался
+   контейнерами с overflow:auto/hidden (грид со скроллом и т.п.).
+*/
 body.sch-help-mode [data-help],
 body.sch-help-mode [data-help-abs] {
     outline: 2px dashed rgba(184,135,70,0.6);
     outline-offset: 2px;
-    position: relative;
 }
-body.sch-help-mode [data-help-abs]:hover::after {
-    content: attr(data-help-abs);
-    position: absolute;
-    bottom: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 8px 12px;
-    background: rgba(0,0,0,0.95);
+body.sch-help-mode [data-help-abs] {
+    cursor: help;
+}
+
+/* JS-rendered tooltip, appended to <body> so it never clips. */
+.sch-help-tip {
+    position: fixed;
+    z-index: 99999;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.96);
     color: #fff;
     border: 1px solid var(--accent);
-    border-radius: 6px;
-    font-size: 12px;
-    line-height: 1.45;
-    white-space: pre-line;
-    max-width: 280px;
-    min-width: 160px;
-    text-align: left;
-    z-index: 999;
-    pointer-events: none;
-    text-transform: none;
-    letter-spacing: 0;
+    border-radius: 8px;
+    font-size: 12.5px;
+    line-height: 1.5;
     font-weight: 500;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+    max-width: 320px;
+    min-width: 180px;
+    text-align: left;
+    pointer-events: none;
+    white-space: pre-line;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.7);
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+.sch-help-tip.visible { opacity: 1; }
+.sch-help-tip::before {
+    content: '';
+    position: absolute;
+    width: 10px; height: 10px;
+    background: rgba(0,0,0,0.96);
+    border-left: 1px solid var(--accent);
+    border-top: 1px solid var(--accent);
+    transform: rotate(45deg);
+    left: 50%; margin-left: -5px;
+}
+.sch-help-tip[data-arrow="below"]::before { top: -6px; }
+.sch-help-tip[data-arrow="above"]::before {
+    bottom: -6px;
+    border-left: 0; border-top: 0;
+    border-right: 1px solid var(--accent);
+    border-bottom: 1px solid var(--accent);
 }
 
 /* Notice banner that page is a prototype */

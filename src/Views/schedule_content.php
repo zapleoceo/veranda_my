@@ -350,4 +350,4 @@
 
 </div>
 
-<script src="/assets/js/schedule.js?v=20260517_v3" defer></script>
+<script src="/assets/js/schedule.js?v=20260517_v4_floating_tip" defer></script>
