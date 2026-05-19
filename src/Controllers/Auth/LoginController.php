@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Auth;
 
 use App\Infrastructure\Config;
+use App\Infrastructure\Session;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -12,12 +13,22 @@ class LoginController
 {
     public function show(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+        Session::start();
+
+        // Honour ?next=/path passed by either AuthMiddleware (when an
+        // unauthenticated user hit a protected route) or by the
+        // operator pasting a deep link before signing in. Only
+        // internal paths are accepted — never absolute URLs / //host
+        // tricks.
+        $qNext = (string) ($request->getQueryParams()['next'] ?? '');
+        if ($qNext !== '' && self::isSafeReturnPath($qNext)) {
+            $_SESSION['auth_next'] = $qNext;
         }
 
         if (!empty($_SESSION['user_email'])) {
-            return $response->withHeader('Location', '/admin')->withStatus(302);
+            $next = (string) ($_SESSION['auth_next'] ?? '/admin');
+            unset($_SESSION['auth_next']);
+            return $response->withHeader('Location', $next)->withStatus(302);
         }
 
         $params = [
@@ -60,11 +71,34 @@ class LoginController
 
     public function logout(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+        Session::start();
+        // Drop both the in-memory data and the cookie itself —
+        // session_destroy alone leaves the cookie behind on some
+        // browsers and they reattach to the killed session id.
+        $_SESSION = [];
+        if (!headers_sent()) {
+            $name = session_name();
+            $p = session_get_cookie_params();
+            @setcookie($name !== false ? $name : 'PHPSESSID', '', [
+                'expires'  => time() - 3600,
+                'path'     => $p['path']     ?? '/',
+                'domain'   => $p['domain']   ?? '',
+                'secure'   => $p['secure']   ?? false,
+                'httponly' => $p['httponly'] ?? true,
+                'samesite' => $p['samesite'] ?? 'Lax',
+            ]);
         }
-        session_destroy();
+        @session_destroy();
 
         return $response->withHeader('Location', '/login')->withStatus(302);
+    }
+
+    /** Only redirect back to internal paths (no open-redirect risk). */
+    private static function isSafeReturnPath(string $path): bool
+    {
+        if ($path === '' || $path[0] !== '/') return false;
+        if (str_starts_with($path, '//'))     return false;
+        if (str_starts_with($path, '/login')) return false;
+        return true;
     }
 }

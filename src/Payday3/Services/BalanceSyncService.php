@@ -200,8 +200,6 @@ final class BalanceSyncService implements BalanceSyncServiceInterface
 
     private static function sessionStart(): void
     {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            @session_start();
-        }
+        \App\Infrastructure\Session::start();
     }
 }

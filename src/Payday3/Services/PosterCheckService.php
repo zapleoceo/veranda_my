@@ -244,7 +244,7 @@ final class PosterCheckService implements PosterCheckServiceInterface
     private function tableTitleMap($api, array $spotIds): array
     {
         if ($spotIds === []) return [];
-        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        \App\Infrastructure\Session::start();
 
         $cache = $_SESSION['pd3_tables_cache'] ?? null;
         $cacheTs    = is_array($cache) ? (int)($cache['ts']    ?? 0)    : 0;
@@ -324,9 +324,7 @@ final class PosterCheckService implements PosterCheckServiceInterface
      */
     private function productNameMap($api): array
     {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            @session_start();
-        }
+        \App\Infrastructure\Session::start();
         $cache = $_SESSION['pd3_products_cache'] ?? null;
         if (is_array($cache) && (time() - (int)($cache['ts'] ?? 0)) < 6 * 3600 && is_array($cache['map'] ?? null)) {
             return $cache['map'];
