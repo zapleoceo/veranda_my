@@ -790,6 +790,107 @@
     }
 
 
+    // ════════════════ Staff modal ════════════════
+    const staffModal     = document.getElementById('schModalStaff');
+    const staffTableBody = staffModal?.querySelector('tbody');
+
+    function renderStaffTable() {
+        if (!staffTableBody) return;
+        let html = '';
+        App.employees.forEach((e) => {
+            html += `
+                <tr data-uid="${e.id}" style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 10px;"><strong>${esc(e.name)}</strong><br>
+                        <span style="color: var(--muted); font-size: 10px;">user_id ${e.id}</span></td>
+                    <td style="padding: 8px 10px; color: var(--muted);">${esc(e.poster_role || '')}</td>
+                    <td style="padding: 8px 10px;">
+                        <input type="text" class="staff-tag" value="${esc(e.tag || '')}"
+                               style="width: 110px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 8px; font-family: inherit;">
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center;">
+                        <input type="checkbox" class="staff-active" ${e.in_schedule ? 'checked' : ''}
+                               style="width: 18px; height: 18px; accent-color: var(--accent);">
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center;">
+                        <button type="button" class="staff-senior" data-on="${e.can_be_senior ? '1' : '0'}"
+                                style="background: transparent; border: 0; cursor: pointer; font-size: 18px; color: ${e.can_be_senior ? 'var(--accent)' : 'var(--border)'}; padding: 0;">
+                            ${e.can_be_senior ? '★' : '☆'}
+                        </button>
+                    </td>
+                    <td style="padding: 8px 10px; text-align: right;">
+                        <input type="number" class="staff-rate" value="${e.rate_per_hour || 0}" step="1000" min="0"
+                               style="width: 100px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 8px; font-family: inherit; text-align: right;">
+                    </td>
+                </tr>`;
+        });
+        staffTableBody.innerHTML = html;
+
+        staffTableBody.querySelectorAll('.staff-senior').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const on = btn.getAttribute('data-on') === '1';
+                const next = !on;
+                btn.setAttribute('data-on', next ? '1' : '0');
+                btn.textContent = next ? '★' : '☆';
+                btn.style.color = next ? 'var(--accent)' : 'var(--border)';
+            });
+        });
+    }
+
+    document.getElementById('schStaffBtn')?.addEventListener('click', () => {
+        renderStaffTable();
+        staffModal?.classList.add('visible');
+    });
+    document.getElementById('schModalStaffClose')?.addEventListener('click', () => {
+        staffModal?.classList.remove('visible');
+    });
+    staffModal?.addEventListener('click', (e) => {
+        if (e.target === staffModal) staffModal.classList.remove('visible');
+    });
+
+    document.getElementById('schModalStaffSave')?.addEventListener('click', async () => {
+        if (!staffTableBody) return;
+        const tags = [];
+        staffTableBody.querySelectorAll('tr[data-uid]').forEach((tr) => {
+            tags.push({
+                user_id:       parseInt(tr.dataset.uid, 10),
+                in_schedule:   tr.querySelector('.staff-active')?.checked || false,
+                can_be_senior: tr.querySelector('.staff-senior')?.getAttribute('data-on') === '1',
+                custom_tag:    tr.querySelector('.staff-tag')?.value || '',
+                rate_per_hour: parseInt(tr.querySelector('.staff-rate')?.value, 10) || 0,
+                only_in_blocks: '',
+            });
+        });
+        try {
+            const j = await api('save_staff_tags', { method: 'POST', body: { tags } });
+            App.employees = j.employees;
+            App.employees.forEach((e) => empById.set(e.id, e));
+            toast('Теги сохранены ✓');
+            staffModal?.classList.remove('visible');
+            // Re-render cells so star/name updates pick up immediately
+            document.querySelectorAll('.sch-cell[data-day-iso][data-block]').forEach((cell) => {
+                const sh = getShift(cell.dataset.dayIso, cell.dataset.block, cell.dataset.slot);
+                if (sh) renderChip(cell, sh);
+            });
+        } catch (e) {
+            toast('Ошибка: ' + e.message, 'err');
+        }
+    });
+
+    document.getElementById('schReloadPoster')?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+            const j = await api('reload_poster');
+            App.employees = j.employees;
+            App.halls     = j.halls;
+            App.employees.forEach((emp) => empById.set(emp.id, emp));
+            renderStaffTable();
+            toast('Кэш сброшен, данные перезагружены');
+        } catch (err) {
+            toast('Ошибка: ' + err.message, 'err');
+        }
+    });
+
+
     // ════════════════ Drag-n-drop ════════════════
     let dragSrc = null;
     document.addEventListener('dragstart', (e) => {

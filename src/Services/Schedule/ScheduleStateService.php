@@ -235,6 +235,190 @@ class ScheduleStateService
     }
 
     // ────────────────────────────────────────────────────────────────
+    //  Poster passthrough (with system_meta caching)
+    // ────────────────────────────────────────────────────────────────
+
+    /**
+     * Fetch employees from Poster `access.getEmployees` with cache.
+     * Returns normalized rows ready for the schedule UI; overlays
+     * staff_tags from DB so 'in_schedule'/'can_be_senior'/'rate' reflect
+     * the admin's tagging.
+     */
+    public function fetchPosterEmployees(string $posterToken, int $cacheMinutes = 30): array
+    {
+        $cacheKey = 'schedule_poster_employees_v1';
+        $cached = $this->_metaGet($cacheKey, $cacheMinutes * 60);
+        if (is_array($cached)) {
+            return $this->_overlayStaffTags($cached);
+        }
+        if ($posterToken === '') {
+            return $this->_overlayStaffTags($this->_hardcodedEmployees());
+        }
+        try {
+            $api = new \App\Classes\PosterAPI($posterToken);
+            $raw = $api->request('access.getEmployees', [], 'GET');
+            $rows = [];
+            foreach (is_array($raw) ? $raw : [] as $r) {
+                $uid = (int)($r['user_id'] ?? 0);
+                if ($uid <= 0) continue;
+                $rows[] = [
+                    'id'             => $uid,
+                    'name'           => trim((string)($r['name'] ?? '')),
+                    'poster_role'    => (string)($r['role_name'] ?? ''),
+                    'tag'            => (string)($r['role_name'] ?? ''),
+                    'in_schedule'    => true,
+                    'can_be_senior'  => false,
+                    'only_in_blocks' => '',
+                    'rate_per_hour'  => 0,
+                ];
+            }
+            if (!empty($rows)) {
+                $this->_metaSet($cacheKey, $rows);
+                return $this->_overlayStaffTags($rows);
+            }
+        } catch (\Throwable $e) {
+            // Fall through to hardcoded
+        }
+        return $this->_overlayStaffTags($this->_hardcodedEmployees());
+    }
+
+    /**
+     * Fetch halls from Poster `spots.getSpotTablesHalls` per spot, deduplicated.
+     */
+    public function fetchPosterHalls(string $posterToken, int $cacheHours = 12): array
+    {
+        $cacheKey = 'schedule_poster_halls_v1';
+        $cached = $this->_metaGet($cacheKey, $cacheHours * 3600);
+        if (is_array($cached) && !empty($cached)) return $cached;
+
+        $fallback = [
+            ['id' => 1, 'name' => 'Главный зал', 'icon' => '🏛'],
+            ['id' => 2, 'name' => 'Баня',        'icon' => '♨'],
+            ['id' => 3, 'name' => 'Roma',        'icon' => '🌿'],
+            ['id' => 4, 'name' => 'Терраса',     'icon' => '🏖'],
+            ['id' => 5, 'name' => 'VIP-зал',     'icon' => '🍷'],
+        ];
+        if ($posterToken === '') return $fallback;
+
+        try {
+            $api = new \App\Classes\PosterAPI($posterToken);
+            // Walk spots 1..5 (usually one or two)
+            $halls = [];
+            foreach ([1, 2, 3, 4, 5] as $spotId) {
+                try {
+                    $rows = $api->request('spots.getSpotTablesHalls', ['spot_id' => $spotId], 'GET');
+                } catch (\Throwable) {
+                    $rows = null;
+                }
+                if (!is_array($rows)) continue;
+                foreach ($rows as $r) {
+                    if (!is_array($r)) continue;
+                    $id   = (int)($r['hall_id'] ?? $r['id'] ?? 0);
+                    $name = trim((string)($r['hall_name'] ?? $r['name'] ?? ''));
+                    if ($id <= 0 || $name === '' || isset($halls[$id])) continue;
+                    $halls[$id] = [
+                        'id'   => $id,
+                        'name' => $name,
+                        'icon' => $this->_guessIcon($name),
+                    ];
+                }
+            }
+            if (!empty($halls)) {
+                $list = array_values($halls);
+                $this->_metaSet($cacheKey, $list);
+                return $list;
+            }
+        } catch (\Throwable) {
+        }
+        return $fallback;
+    }
+
+    private function _guessIcon(string $name): string
+    {
+        $n = mb_strtolower($name, 'UTF-8');
+        if (str_contains($n, 'баня') || str_contains($n, 'sauna')) return '♨';
+        if (str_contains($n, 'тер') || str_contains($n, 'веран')) return '🏖';
+        if (str_contains($n, 'vip')) return '🍷';
+        if (str_contains($n, 'беседка') || str_contains($n, 'roma')) return '🌿';
+        return '🏛';
+    }
+
+    private function _overlayStaffTags(array $employees): array
+    {
+        $tags = $this->getStaffTags();
+        foreach ($employees as &$e) {
+            $uid = (int)$e['id'];
+            $t = $tags[$uid] ?? null;
+            if ($t) {
+                $e['in_schedule']    = $t['in_schedule'];
+                $e['can_be_senior']  = $t['can_be_senior'];
+                $e['only_in_blocks'] = $t['only_in_blocks'];
+                $e['tag']            = $t['custom_tag'] !== '' ? $t['custom_tag'] : ($e['tag'] ?? '');
+                if ($t['rate_per_hour'] > 0) $e['rate_per_hour'] = $t['rate_per_hour'];
+            }
+        }
+        unset($e);
+        return $employees;
+    }
+
+    /**
+     * Hardcoded fallback (used pre-DB and when Poster API is unreachable).
+     * Must mirror the demo cells from the early mockup so first visit works.
+     */
+    private function _hardcodedEmployees(): array
+    {
+        return [
+            ['id' => 5,  'name' => 'Султан', 'poster_role' => 'bartender', 'tag' => 'Бар',      'in_schedule' => true, 'can_be_senior' => true,  'only_in_blocks' => '', 'rate_per_hour' => 65000],
+            ['id' => 7,  'name' => 'Оля',    'poster_role' => 'host',      'tag' => 'Хост',     'in_schedule' => true, 'can_be_senior' => false, 'only_in_blocks' => '', 'rate_per_hour' => 55000],
+            ['id' => 12, 'name' => 'Лёша',   'poster_role' => 'host',      'tag' => 'Хост',     'in_schedule' => true, 'can_be_senior' => true,  'only_in_blocks' => '', 'rate_per_hour' => 60000],
+            ['id' => 18, 'name' => 'Phai',   'poster_role' => 'waiter',    'tag' => 'Официант', 'in_schedule' => true, 'can_be_senior' => true,  'only_in_blocks' => '', 'rate_per_hour' => 50000],
+            ['id' => 19, 'name' => 'Long',   'poster_role' => 'waiter',    'tag' => 'Официант', 'in_schedule' => true, 'can_be_senior' => false, 'only_in_blocks' => '', 'rate_per_hour' => 48000],
+            ['id' => 22, 'name' => 'An',     'poster_role' => 'waiter',    'tag' => 'Баня',     'in_schedule' => true, 'can_be_senior' => false, 'only_in_blocks' => '', 'rate_per_hour' => 55000],
+            ['id' => 25, 'name' => 'Саша',   'poster_role' => 'waiter',    'tag' => 'Официант', 'in_schedule' => true, 'can_be_senior' => false, 'only_in_blocks' => '', 'rate_per_hour' => 52000],
+            ['id' => 26, 'name' => 'Вася',   'poster_role' => 'waiter',    'tag' => 'Официант', 'in_schedule' => true, 'can_be_senior' => false, 'only_in_blocks' => '', 'rate_per_hour' => 50000],
+        ];
+    }
+
+    private function _metaGet(string $key, int $ttlSec): mixed
+    {
+        try {
+            $t = $this->db->t('system_meta');
+            $row = $this->db->query("SELECT meta_value, updated_at FROM {$t} WHERE meta_key = ? LIMIT 1", [$key])->fetch();
+            if (!$row || empty($row['meta_value'])) return null;
+            $age = time() - (int)strtotime((string)$row['updated_at']);
+            if ($age > $ttlSec) return null;
+            $decoded = json_decode((string)$row['meta_value'], true);
+            return is_array($decoded) ? $decoded : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+    private function _metaSet(string $key, mixed $value): void
+    {
+        try {
+            $t = $this->db->t('system_meta');
+            $this->db->query(
+                "INSERT INTO {$t} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = CURRENT_TIMESTAMP",
+                [$key, json_encode($value, JSON_UNESCAPED_UNICODE)]
+            );
+        } catch (\Throwable) {
+        }
+    }
+
+    public function purgePosterCache(): void
+    {
+        try {
+            $t = $this->db->t('system_meta');
+            $this->db->query(
+                "DELETE FROM {$t} WHERE meta_key IN (?, ?)",
+                ['schedule_poster_employees_v1', 'schedule_poster_halls_v1']
+            );
+        } catch (\Throwable) {
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
     //  Default state — структура без смен (4 базовых блока)
     // ────────────────────────────────────────────────────────────────
 
