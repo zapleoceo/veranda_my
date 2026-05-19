@@ -1,82 +1,65 @@
-// /schedule — full UI скрипт с persistence.
+// /schedule — full state-driven UI.
+// Phase 2B: structure mutations (slot add/del, block add/del), period live,
+// real save/load via AJAX, snapshots, custom zones.
 //
-// Что внутри:
-//   • Boot из server-emitted #schBootData (state + employees + halls + zones + snapshots)
-//   • Hydrate state from DOM (only когда state.shifts пустой — для первой
-//     визуальной сессии с демо-данными)
-//   • Cell click → inline popover (employee select из state.employees) →
-//     save обновляет state + DOM + POST /schedule?ajax=save
-//   • Slot ×, + slot (демо-лог; реальное изменение blocks/slots — Phase 2B)
-//   • + add block → modal (демо POST → real /schedule?ajax=add_zone для custom)
-//   • Heatmap rebucketization live
-//   • Drag-n-drop chips между ячейками
-//   • Snapshot pills: click → load /schedule?ajax=snapshot&id=N → apply to DOM
-//   • Save button → manual POST current state
-//   • Toast for save/load feedback
-//   • help-mode toggle + floating tooltip (без клипа)
+// Architecture:
+//   1. Boot data from #schBootData → App.{state, period, employees, halls, zones, snapshots}
+//   2. Cell edits update App.state.shifts, debounced save POSTs to server
+//   3. Structure changes (add/del slot or block) → POST → reload page so server
+//      re-renders the new grid template (avoids client-side grid rebuild)
+//   4. Period changes → reload with new ?from=&to= query
 
 'use strict';
 
 (() => {
 
-    // ════════════════ Boot — load state from server-emitted JSON ════════════════
+    // ════════════════ Boot ════════════════
     const boot = (() => {
-        try {
-            const el = document.getElementById('schBootData');
-            return el ? JSON.parse(el.textContent) : null;
-        } catch (e) { return null; }
+        try { return JSON.parse(document.getElementById('schBootData').textContent); }
+        catch (e) { return null; }
     })();
-    if (!boot) {
-        console.warn('[schedule] no boot data — page is in read-only demo mode');
-    }
+    if (!boot) { console.warn('[schedule] no boot data'); return; }
 
     const App = {
-        state:     boot?.state     || { blocks: [], shifts: {}, templates: [] },
-        period:    boot?.period    || { from: '', to: '' },
-        employees: boot?.employees || [],
-        halls:     boot?.halls     || [],
-        zones:     boot?.zones     || [],
-        snapshots: boot?.snapshots || [],
+        state:     boot.state     || { blocks: [], shifts: {}, templates: [] },
+        period:    boot.period    || { from: '', to: '' },
+        employees: boot.employees || [],
+        halls:     boot.halls     || [],
+        zones:     boot.zones     || [],
+        snapshots: boot.snapshots || [],
         dirty:     false,
         saving:    false,
     };
-
-    // shifts can be {} or [] from server (json_encode of stdClass / empty array)
     if (Array.isArray(App.state.shifts)) App.state.shifts = {};
     if (!App.state.shifts || typeof App.state.shifts !== 'object') App.state.shifts = {};
 
-    // empId → employee lookup
-    const employeesById = new Map();
-    App.employees.forEach((e) => employeesById.set(e.id, e));
-    const employeesByName = new Map();
-    App.employees.forEach((e) => employeesByName.set(e.name, e));
+    const empById = new Map();
+    App.employees.forEach((e) => empById.set(e.id, e));
 
 
     // ════════════════ Helpers ════════════════
     function pad2(n) { return String(n).padStart(2, '0'); }
-    function escapeHtml(s) {
+    function esc(s) {
         return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
     }
-    function parseTimeRange(str) {
-        // accepts "09:00-17:00", "09-17", "09–17"
-        if (!str) return null;
-        const m = String(str).match(/(\d{1,2})(?::(\d{2}))?[\s\-–—]+(\d{1,2})(?::(\d{2}))?/);
-        if (!m) return null;
-        return {
-            start: `${pad2(m[1])}:${m[2] || '00'}`,
-            end:   `${pad2(m[3])}:${m[4] || '00'}`,
-        };
-    }
     function fmtShortTime(hhmm) {
-        // 09:00 → 09 ; 09:30 → 09:30
         if (!hhmm) return '';
         return hhmm.endsWith(':00') ? hhmm.slice(0, 2) : hhmm;
     }
-    function fmtTimeRange(start, end) {
-        return `${fmtShortTime(start)}–${fmtShortTime(end)}`;
+    function fmtTimeRange(s, e) {
+        return `${fmtShortTime(s)}–${fmtShortTime(e)}`;
+    }
+    function blockColor(block) {
+        const c = block?.color;
+        if (['senior', 'main', 'banya', 'custom'].includes(c)) return c;
+        if (block?.type === 'senior') return 'senior';
+        if (block?.type === 'custom') return 'custom';
+        if (block?.id === 'hall:2') return 'banya';
+        return 'main';
     }
 
-    // Toast
+
+    // ════════════════ Toast ════════════════
     let toastEl;
     function toast(msg, kind = 'ok') {
         if (!toastEl) {
@@ -88,7 +71,7 @@
         toastEl.dataset.kind = kind;
         toastEl.classList.add('visible');
         clearTimeout(toast._t);
-        toast._t = setTimeout(() => toastEl.classList.remove('visible'), 2200);
+        toast._t = setTimeout(() => toastEl.classList.remove('visible'), 2400);
     }
 
 
@@ -105,10 +88,7 @@
         const txt = await res.text();
         let j;
         try { j = JSON.parse(txt); }
-        catch (e) {
-            console.error('[schedule] non-JSON response', { url, txt: txt.slice(0, 200) });
-            throw new Error('Bad JSON response (' + res.status + ')');
-        }
+        catch (_) { throw new Error('Bad JSON response (' + res.status + ')'); }
         if (!res.ok || !j.ok) throw new Error(j.error || `HTTP ${res.status}`);
         return j;
     }
@@ -131,59 +111,25 @@
     }
 
 
-    // ════════════════ Hydrate state from DOM (only if state empty) ════════════════
-    // Server рендерит демо-смены. Если в БД ещё нет ни одного snapshot'а —
-    // state.shifts пустой; вытащим визуальные демо-смены из DOM в state,
-    // чтобы при первом save-е они сохранились.
-    function hydrateFromDom() {
-        if (Object.keys(App.state.shifts).length > 0) return; // state уже есть
-        document.querySelectorAll('.sch-cell[data-day-iso][data-block]').forEach((cell) => {
-            const chip = cell.querySelector('.sch-shift');
-            if (!chip) return;
-            const name = (chip.querySelector('.sch-name')?.textContent || '').replace('★', '').trim();
-            const time = chip.querySelector('.sch-time')?.textContent || '';
-            const range = parseTimeRange(time);
-            if (!name || !range) return;
-            const emp = employeesByName.get(name);
-            setShift(cell.dataset.dayIso, cell.dataset.block, cell.dataset.slot, {
-                emp_id:   emp?.id || 0,
-                emp_name: name,
-                start:    range.start,
-                end:      range.end,
-            });
-        });
-        App.dirty = false; // hydration ≠ user edit
-    }
-
-
-    // ════════════════ Cell rendering (state → DOM) ════════════════
+    // ════════════════ Render chip into cell ════════════════
     function renderChip(cell, shift) {
+        const blockId = cell.dataset.block;
+        const blk = App.state.blocks.find((b) => b.id === blockId);
+        const color = blk ? blockColor(blk) : 'main';
         if (!shift) {
-            const blockId = cell.dataset.block;
-            const empty = (blockId === 'hall:2' || blockId.startsWith('zone:')) ? '—' : '+';
+            const empty = (color === 'banya' || color === 'custom') ? '—' : '+';
             cell.innerHTML = `<span class="sch-empty">${empty}</span>`;
             return;
         }
-        const block = cell.dataset.block;
-        const cls = block === 'senior' ? 'senior'
-                  : block === 'hall:2' ? 'banya'
-                  : block.startsWith('zone:') ? 'custom'
-                  : 'main';
-        const emp = shift.emp_id ? employeesById.get(shift.emp_id) : null;
+        const emp = shift.emp_id ? empById.get(shift.emp_id) : null;
         const name = emp?.name || shift.emp_name || '?';
-        const star = (block === 'senior' && emp?.can_be_senior) ? ' ★' : '';
+        const star = (color === 'senior' && emp?.can_be_senior) ? ' ★' : '';
         const time = fmtTimeRange(shift.start, shift.end);
-        cell.innerHTML = `<div class="sch-shift ${cls}" draggable="true"><span class="sch-name">${escapeHtml(name)}${star}</span><span class="sch-time">${escapeHtml(time)}</span></div>`;
-    }
-    function applyStateToDom() {
-        document.querySelectorAll('.sch-cell[data-day-iso][data-block]').forEach((cell) => {
-            const shift = getShift(cell.dataset.dayIso, cell.dataset.block, cell.dataset.slot);
-            renderChip(cell, shift);
-        });
+        cell.innerHTML = `<div class="sch-shift ${color}" draggable="true"><span class="sch-name">${esc(name)}${star}</span><span class="sch-time">${esc(time)}</span></div>`;
     }
 
 
-    // ════════════════ Help mode + tooltip (preserved from v6) ════════════════
+    // ════════════════ Help mode + floating tooltip ════════════════
     const helpBtn = document.getElementById('schHelpBtn');
     if (helpBtn) {
         let helpOn = false;
@@ -196,7 +142,6 @@
     }
     const tip = document.createElement('div');
     tip.className = 'sch-help-tip';
-    tip.setAttribute('role', 'tooltip');
     document.body.appendChild(tip);
     let tipTarget = null;
     function showTip(el) {
@@ -214,8 +159,7 @@
         if (left < margin) left = margin;
         if (left + tw > vw - margin) left = vw - tw - margin;
         let top, arrow;
-        const spaceAbove = r.top, spaceBelow = vh - r.bottom;
-        if (spaceAbove >= th + gap || spaceAbove >= spaceBelow) {
+        if (r.top >= th + gap || r.top >= vh - r.bottom) {
             top = r.top - th - gap; arrow = 'above';
             if (top < margin) top = margin;
         } else {
@@ -223,8 +167,7 @@
             if (top + th > vh - margin) top = vh - th - margin;
         }
         tip.setAttribute('data-arrow', arrow);
-        tip.style.left = left + 'px';
-        tip.style.top  = top + 'px';
+        tip.style.left = left + 'px'; tip.style.top = top + 'px';
     }
     function hideTip() { tip.classList.remove('visible'); tipTarget = null; }
     document.addEventListener('mouseover', (e) => {
@@ -244,61 +187,118 @@
     window.addEventListener('resize', hideTip);
 
 
-    // ════════════════ Inline popover ════════════════
-    const popover = document.getElementById('schPopover');
-    const popoverMeta = document.getElementById('schPopoverMeta');
-    const popoverEmp  = document.getElementById('schPopoverEmp');
-    const popoverFrom = document.getElementById('schPopoverFrom');
-    const popoverTo   = document.getElementById('schPopoverTo');
-    const popoverHall = document.getElementById('schPopoverHall');
-    let popoverAnchor = null;
+    // ════════════════ Save (debounced + manual) ════════════════
+    let saveTimer = null;
+    function saveDebounced() {
+        return new Promise((resolve) => {
+            if (saveTimer) clearTimeout(saveTimer);
+            saveTimer = setTimeout(async () => {
+                await saveNow().catch(() => {});
+                resolve();
+            }, 800);
+        });
+    }
+    async function saveNow(label = 'auto') {
+        if (App.saving) return;
+        App.saving = true;
+        try {
+            const j = await api('save', { method: 'POST', body: { state: App.state, label } });
+            App.snapshots = j.snapshots || App.snapshots;
+            App.dirty = false;
+            renderSnapshots();
+            toast('Сохранено ✓');
+        } catch (e) {
+            toast('Ошибка сохранения: ' + e.message, 'err');
+            console.error(e);
+        } finally {
+            App.saving = false;
+        }
+    }
 
-    // Populate employee/hall dropdowns from real data
-    function populateEmployeeDropdown(filterSenior = false) {
-        if (!popoverEmp) return;
+    document.getElementById('schSaveBtn')?.addEventListener('click', () => saveNow('manual'));
+    document.getElementById('schSaveSnapBtn')?.addEventListener('click', () => {
+        const label = prompt('Название версии:', 'Версия ' + new Date().toLocaleDateString('ru-RU'));
+        if (label) saveNow(label);
+    });
+
+
+    // ════════════════ Save+reload (for structure mutations) ════════════════
+    async function saveAndReload(reason) {
+        if (App.saving) return;
+        App.saving = true;
+        try {
+            await api('save', { method: 'POST', body: { state: App.state, label: 'auto' } });
+            toast(reason + ' ✓');
+            // Give toast a moment, then reload page (server re-renders grid structure)
+            setTimeout(() => location.reload(), 400);
+        } catch (e) {
+            App.saving = false;
+            toast('Ошибка: ' + e.message, 'err');
+            console.error(e);
+        }
+    }
+
+
+    // ════════════════ Cell popover ════════════════
+    const popover = document.getElementById('schPopover');
+    const popMeta = document.getElementById('schPopoverMeta');
+    const popEmp  = document.getElementById('schPopoverEmp');
+    const popFrom = document.getElementById('schPopoverFrom');
+    const popTo   = document.getElementById('schPopoverTo');
+    const popHall = document.getElementById('schPopoverHall');
+    let popAnchor = null;
+
+    function populatePopoverDropdowns(forSenior) {
+        // Employees: filter by in_schedule + (can_be_senior if senior block)
         let html = '<option value="">— не назначен —</option>';
         App.employees
             .filter((e) => e.in_schedule)
-            .filter((e) => !filterSenior || e.can_be_senior)
+            .filter((e) => !forSenior || e.can_be_senior)
             .forEach((e) => {
                 const star = e.can_be_senior ? ' ★' : '';
-                html += `<option value="${e.id}">${escapeHtml(e.name)}${star} (${escapeHtml(e.tag)})</option>`;
+                html += `<option value="${e.id}">${esc(e.name)}${star} (${esc(e.tag)})</option>`;
             });
-        popoverEmp.innerHTML = html;
-    }
-    function populateHallDropdown() {
-        if (!popoverHall) return;
-        let html = '<option value="">— любой —</option>';
+        popEmp.innerHTML = html;
+
+        // Halls + custom zones
+        let hhtml = '<option value="">— любой —</option>';
         App.halls.forEach((h) => {
-            html += `<option value="${h.id}">${escapeHtml(h.icon || '')} ${escapeHtml(h.name)}</option>`;
+            hhtml += `<option value="${h.id}">${esc(h.icon || '')} ${esc(h.name)}</option>`;
         });
         App.zones.forEach((z) => {
-            html += `<option value="zone:${z.id}">${escapeHtml(z.icon || '🌿')} ${escapeHtml(z.name)}</option>`;
+            hhtml += `<option value="zone:${z.id}">${esc(z.icon || '🌿')} ${esc(z.name)}</option>`;
         });
-        popoverHall.innerHTML = html;
+        popHall.innerHTML = hhtml;
     }
 
     function showPopover(cell) {
-        popoverAnchor = cell;
-        const block = cell.dataset.block || '—';
-        const slot  = cell.dataset.slot  || '—';
-        const iso   = cell.dataset.dayIso || '—';
-        popoverMeta.textContent = `Блок: ${block} · Слот: ${parseInt(slot, 10) + 1} · Дата: ${iso}`;
+        popAnchor = cell;
+        const blockId = cell.dataset.block || '';
+        const slotIdx = parseInt(cell.dataset.slot, 10) || 0;
+        const iso     = cell.dataset.dayIso || '';
+        const block   = App.state.blocks.find((b) => b.id === blockId);
+        const isSenior = block && blockColor(block) === 'senior';
 
-        populateEmployeeDropdown(block === 'senior');
-        populateHallDropdown();
+        popMeta.textContent = `${block?.icon || ''} ${block?.name || ''} · слот ${slotIdx + 1} · ${iso}`;
+        populatePopoverDropdowns(isSenior);
 
-        const existing = getShift(iso, block, slot);
+        const existing = getShift(iso, blockId, slotIdx);
+        // Parse default time from slot if no existing
+        let dStart = '09:00', dEnd = '17:00';
+        const dt = block?.slots?.[slotIdx]?.defaultTime || '';
+        const dmm = dt.match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
+        if (dmm) { dStart = dmm[1]; dEnd = dmm[2]; }
+
         if (existing) {
-            popoverEmp.value  = existing.emp_id || '';
-            popoverFrom.value = existing.start || '09:00';
-            popoverTo.value   = existing.end   || '17:00';
-            popoverHall.value = existing.hall_id ? String(existing.hall_id) : '';
+            popEmp.value  = existing.emp_id || '';
+            popFrom.value = existing.start || dStart;
+            popTo.value   = existing.end   || dEnd;
+            popHall.value = existing.hall_id ? String(existing.hall_id) : '';
         } else {
-            popoverEmp.value = '';
-            popoverFrom.value = '09:00';
-            popoverTo.value   = '17:00';
-            popoverHall.value = '';
+            popEmp.value  = '';
+            popFrom.value = dStart;
+            popTo.value   = dEnd;
+            popHall.value = '';
         }
 
         popover.classList.add('visible');
@@ -319,185 +319,182 @@
             if (top < margin) top = margin;
         }
         popover.setAttribute('data-arrow', arrow);
-        popover.style.left = left + 'px';
-        popover.style.top  = top + 'px';
+        popover.style.left = left + 'px'; popover.style.top = top + 'px';
     }
     function hidePopover() {
         popover.classList.remove('visible');
-        popoverAnchor = null;
+        popAnchor = null;
     }
 
-    // Save handler (Save inside popover)
-    popover?.querySelector('.actions .save')?.addEventListener('click', async () => {
-        if (!popoverAnchor) return;
-        const empId = parseInt(popoverEmp.value, 10) || 0;
-        const start = popoverFrom.value || '09:00';
-        const end   = popoverTo.value   || '17:00';
-        const hall  = popoverHall.value || '';
+    document.getElementById('schPopoverSave')?.addEventListener('click', async () => {
+        if (!popAnchor) return;
+        const empId = parseInt(popEmp.value, 10) || 0;
+        const start = popFrom.value || '09:00';
+        const end   = popTo.value   || '17:00';
+        const hall  = popHall.value || '';
         if (empId === 0) {
-            // empty value = delete
-            delShift(popoverAnchor.dataset.dayIso, popoverAnchor.dataset.block, popoverAnchor.dataset.slot);
-            renderChip(popoverAnchor, null);
+            delShift(popAnchor.dataset.dayIso, popAnchor.dataset.block, popAnchor.dataset.slot);
+            renderChip(popAnchor, null);
         } else {
-            const emp = employeesById.get(empId);
-            const shift = {
-                emp_id:   empId,
-                emp_name: emp?.name || '',
-                start, end,
-                ...(hall ? { hall_id: hall } : {}),
-            };
-            setShift(popoverAnchor.dataset.dayIso, popoverAnchor.dataset.block, popoverAnchor.dataset.slot, shift);
-            renderChip(popoverAnchor, shift);
+            const emp = empById.get(empId);
+            const sh = { emp_id: empId, emp_name: emp?.name || '', start, end };
+            if (hall) sh.hall_id = hall;
+            setShift(popAnchor.dataset.dayIso, popAnchor.dataset.block, popAnchor.dataset.slot, sh);
+            renderChip(popAnchor, sh);
         }
         hidePopover();
         await saveDebounced();
     });
-
-    popover?.querySelector('.actions .del')?.addEventListener('click', async () => {
-        if (!popoverAnchor) return;
-        delShift(popoverAnchor.dataset.dayIso, popoverAnchor.dataset.block, popoverAnchor.dataset.slot);
-        renderChip(popoverAnchor, null);
+    document.getElementById('schPopoverDel')?.addEventListener('click', async () => {
+        if (!popAnchor) return;
+        delShift(popAnchor.dataset.dayIso, popAnchor.dataset.block, popAnchor.dataset.slot);
+        renderChip(popAnchor, null);
         hidePopover();
         await saveDebounced();
     });
-
-    document.querySelector('[data-demo-noop="popover-cancel"]')?.addEventListener('click', hidePopover);
+    document.getElementById('schPopoverCancel')?.addEventListener('click', hidePopover);
 
     document.addEventListener('click', (e) => {
         if (document.body.classList.contains('sch-help-mode')) return;
         if (e.target.closest('.sch-slot-del')) return;
+        if (e.target.closest('.sch-block-del')) return;
+        if (e.target.closest('.sch-block-add-slot')) return;
         if (e.target.closest('#schPopover')) return;
         const cell = e.target.closest('.sch-cell[data-block]');
-        if (cell) {
-            e.preventDefault();
-            showPopover(cell);
-            return;
-        }
-        if (popoverAnchor) hidePopover();
+        if (cell) { e.preventDefault(); showPopover(cell); return; }
+        if (popAnchor) hidePopover();
     });
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            hidePopover();
-            closeAddBlockModal();
-        }
+        if (e.key === 'Escape') { hidePopover(); closeAddBlockModal(); }
     });
 
 
-    // ════════════════ Save (debounced + manual) ════════════════
-    let saveTimer = null;
-    function saveDebounced() {
-        return new Promise((resolve) => {
-            if (saveTimer) clearTimeout(saveTimer);
-            saveTimer = setTimeout(async () => {
-                await saveNow().catch(() => {});
-                resolve();
-            }, 800);
-        });
-    }
-    async function saveNow(label = 'auto') {
-        if (App.saving) return;
-        App.saving = true;
-        try {
-            const j = await api('save', {
-                method: 'POST',
-                body: { state: App.state, label },
-            });
-            App.snapshots = j.snapshots || App.snapshots;
-            App.dirty = false;
-            renderSnapshots();
-            toast('Сохранено ✓');
-        } catch (e) {
-            console.error('[schedule] save failed', e);
-            toast('Ошибка сохранения: ' + e.message, 'err');
-        } finally {
-            App.saving = false;
-        }
-    }
+    // ════════════════ Structure mutations ════════════════
 
-    // Header "Сохранить" button
-    document.querySelectorAll('[data-demo-noop="save"]').forEach((b) => {
-        b.removeAttribute('data-demo-noop');
-        b.addEventListener('click', () => saveNow('manual'));
-    });
-    // "Сохранить текущую версию" in snapshots row
-    document.querySelectorAll('[data-demo-noop="save-snapshot"]').forEach((b) => {
-        b.removeAttribute('data-demo-noop');
-        b.addEventListener('click', () => {
-            const label = prompt('Название версии:', 'Версия ' + new Date().toLocaleDateString('ru-RU'));
-            if (label) saveNow(label);
-        });
-    });
-
-
-    // ════════════════ Snapshot pills ════════════════
-    function renderSnapshots() {
-        const wrap = document.querySelector('.sch-snapshots');
-        if (!wrap) return;
-        const label = wrap.querySelector('.sch-snap-label');
-        const saveBtn = wrap.querySelector('button.sch-btn');
-        // remove existing pills + filler
-        wrap.querySelectorAll('.sch-snap-pill, .sch-snap-filler').forEach((el) => el.remove());
-
-        App.snapshots.forEach((s) => {
-            const pill = document.createElement('span');
-            pill.className = 'sch-snap-pill' + (s.is_current ? ' current' : '');
-            pill.dataset.snapId = s.id;
-            const when = (s.created_at || '').replace(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}).*$/, '$3.$2 $4');
-            pill.innerHTML = `${escapeHtml(s.label || 'auto')} <span class="when">${escapeHtml(when)}</span>`;
-            if (!s.is_current) {
-                pill.addEventListener('click', () => loadSnapshot(s.id));
-            }
-            wrap.insertBefore(pill, saveBtn || null);
-        });
-
-        const filler = document.createElement('span');
-        filler.className = 'sch-snap-filler';
-        filler.style.flex = '1';
-        if (saveBtn) wrap.insertBefore(filler, saveBtn);
-    }
-
-    async function loadSnapshot(id) {
-        try {
-            const j = await api('snapshot', { query: 'id=' + id });
-            App.state = j.state;
-            if (Array.isArray(App.state.shifts)) App.state.shifts = {};
-            if (!App.state.shifts || typeof App.state.shifts !== 'object') App.state.shifts = {};
-            applyStateToDom();
-            toast('Версия загружена');
-        } catch (e) {
-            console.error('[schedule] load snapshot failed', e);
-            toast('Не удалось загрузить версию', 'err');
-        }
-    }
-
-
-    // ════════════════ Slot × delete ════════════════
-    document.addEventListener('click', (e) => {
+    // × on individual slot
+    document.addEventListener('click', async (e) => {
         const del = e.target.closest('.sch-slot-del');
         if (!del) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const id = del.getAttribute('data-demo-noop') || '';
-        if (!confirm('Удалить эту колонку-слот?\nЕсли в ней есть смены — они исчезнут.\n\n(' + id + ')')) return;
-        // TODO Phase 2B: actually mutate state.blocks[N].slots, save, re-render structure.
-        console.info('[schedule] del-slot (structure mutation pending Phase 2B)', id);
-        toast('Удаление слота → Phase 2B', 'err');
+        e.preventDefault(); e.stopPropagation();
+        const blkIdx = parseInt(del.dataset.blockIdx, 10);
+        const sIdx   = parseInt(del.dataset.slotIdx, 10);
+        const block  = App.state.blocks[blkIdx];
+        if (!block) return;
+        if (block.slots.length <= 1) {
+            toast('Это единственный слот в блоке. Удалите блок целиком через ⋮.', 'err');
+            return;
+        }
+        // Count shifts in this slot
+        let count = 0;
+        Object.values(App.state.shifts).forEach((day) => {
+            if (day[`${block.id}:${sIdx}`]) count++;
+        });
+        const warn = count > 0 ? `\nВ этом слоте ${count} смен(ы) — они исчезнут.` : '';
+        if (!confirm(`Удалить слот ${sIdx + 1} блока «${block.name}»?${warn}`)) return;
+
+        // Remove the slot and shift all higher-indexed slot shifts down by one
+        block.slots.splice(sIdx, 1);
+        Object.keys(App.state.shifts).forEach((iso) => {
+            const day = App.state.shifts[iso];
+            // Delete the removed slot's shifts
+            delete day[`${block.id}:${sIdx}`];
+            // Shift down keys above the removed index
+            for (let k = sIdx + 1; k <= 20; k++) {
+                if (day[`${block.id}:${k}`]) {
+                    day[`${block.id}:${k - 1}`] = day[`${block.id}:${k}`];
+                    delete day[`${block.id}:${k}`];
+                }
+            }
+        });
+
+        await saveAndReload(`Слот удалён`);
+    });
+
+    // + slot in block header
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.sch-block-add-slot');
+        if (!btn) return;
+        e.preventDefault(); e.stopPropagation();
+        const blkIdx = parseInt(btn.dataset.blockIdx, 10);
+        const block = App.state.blocks[blkIdx];
+        if (!block) return;
+        if (block.slots.length >= 12) {
+            toast('Максимум 12 слотов в блоке', 'err');
+            return;
+        }
+        // Inherit default time from last slot
+        const lastTime = block.slots[block.slots.length - 1]?.defaultTime || '09:00-17:00';
+        block.slots.push({ label: '', defaultTime: lastTime });
+        await saveAndReload(`Слот добавлен`);
+    });
+
+    // ⋮ delete block
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.sch-block-del');
+        if (!btn) return;
+        e.preventDefault(); e.stopPropagation();
+        const blkIdx = parseInt(btn.dataset.blockIdx, 10);
+        const block = App.state.blocks[blkIdx];
+        if (!block) return;
+        if (App.state.blocks.length <= 1) {
+            toast('Нельзя удалить последний блок', 'err');
+            return;
+        }
+        // Count shifts in this block
+        let count = 0;
+        Object.values(App.state.shifts).forEach((day) => {
+            Object.keys(day).forEach((k) => { if (k.startsWith(block.id + ':')) count++; });
+        });
+        const warn = count > 0 ? `\nВ этом блоке ${count} смен — они исчезнут.` : '';
+        if (!confirm(`Удалить блок «${block.name}» целиком?${warn}`)) return;
+
+        // Remove block + all its shifts
+        App.state.blocks.splice(blkIdx, 1);
+        Object.keys(App.state.shifts).forEach((iso) => {
+            const day = App.state.shifts[iso];
+            Object.keys(day).forEach((k) => {
+                if (k.startsWith(block.id + ':')) delete day[k];
+            });
+            if (Object.keys(day).length === 0) delete App.state.shifts[iso];
+        });
+
+        // For custom blocks, also soft-delete the zone in DB
+        if (block.type === 'custom' && block.zone_id) {
+            try { await api('del_zone', { method: 'POST', body: { id: block.zone_id } }); }
+            catch (_) {}
+        }
+
+        await saveAndReload(`Блок удалён`);
     });
 
 
-    // ════════════════ Add block modal ════════════════
+    // ════════════════ Add-block modal ════════════════
     const modal = document.getElementById('schModalAddBlock');
     const modalCloseBtn = document.getElementById('schModalAddBlockClose');
     const radioCards = document.querySelectorAll('#schBlockTypeRadio .card');
     const hallGroup   = document.getElementById('schBlockHallGroup');
     const customGroup = document.getElementById('schBlockCustomGroup');
+    const hallSelect  = document.getElementById('schBlockHallSelect');
 
-    function openAddBlockModal() { modal?.classList.add('visible'); }
+    function openAddBlockModal() {
+        modal?.classList.add('visible');
+        // Populate hall select with halls not already used
+        const usedHallIds = new Set(
+            App.state.blocks
+                .filter((b) => b.type === 'hall' && b.hall_id)
+                .map((b) => parseInt(b.hall_id, 10))
+        );
+        let html = '';
+        App.halls.forEach((h) => {
+            const used = usedHallIds.has(h.id);
+            html += `<option value="${h.id}" ${used ? 'disabled' : ''}>${esc(h.icon || '')} ${esc(h.name)} (hall_id ${h.id})${used ? ' — уже добавлен' : ''}</option>`;
+        });
+        if (hallSelect) hallSelect.innerHTML = html;
+    }
     function closeAddBlockModal() { modal?.classList.remove('visible'); }
 
-    document.querySelector('.sch-add-block-btn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        openAddBlockModal();
+    document.getElementById('schAddBlockBtn')?.addEventListener('click', (e) => {
+        e.preventDefault(); openAddBlockModal();
     });
     modalCloseBtn?.addEventListener('click', closeAddBlockModal);
     modal?.addEventListener('click', (e) => { if (e.target === modal) closeAddBlockModal(); });
@@ -511,54 +508,217 @@
         });
     });
 
-    document.querySelectorAll('[data-demo-noop="modal-add-block-save"]').forEach((b) => {
-        b.removeAttribute('data-demo-noop');
-        b.addEventListener('click', async () => {
-            const activeType = document.querySelector('#schBlockTypeRadio .card.active')?.dataset.type || 'hall';
-            if (activeType === 'custom') {
-                const name = document.getElementById('schBlockCustomName')?.value?.trim();
-                const icon = document.getElementById('schBlockCustomIcon')?.value?.trim() || '🌿';
-                if (!name) { toast('Введи название зоны', 'err'); return; }
-                try {
-                    const j = await api('add_zone', { method: 'POST', body: { name, icon } });
-                    App.zones = j.zones;
-                    toast(`Зона «${name}» добавлена → перезагрузи страницу чтобы блок появился`);
-                    closeAddBlockModal();
-                } catch (e) {
-                    toast('Ошибка: ' + e.message, 'err');
-                }
-            } else {
-                toast('Добавление Hall-блока в state.blocks → Phase 2B', 'err');
-                closeAddBlockModal();
+    document.getElementById('schModalAddBlockSave')?.addEventListener('click', async () => {
+        const activeType = document.querySelector('#schBlockTypeRadio .card.active')?.dataset.type || 'hall';
+        const slotCount = Math.max(1, Math.min(10, parseInt(document.getElementById('schBlockSlots')?.value, 10) || 1));
+
+        let newBlock;
+        if (activeType === 'custom') {
+            const name = document.getElementById('schBlockCustomName')?.value?.trim();
+            const icon = (document.getElementById('schBlockCustomIcon')?.value?.trim()) || '🌿';
+            if (!name) { toast('Введи название зоны', 'err'); return; }
+            try {
+                const j = await api('add_zone', { method: 'POST', body: { name, icon } });
+                App.zones = j.zones;
+                const newZone = j.zones.find((z) => z.name === name);
+                newBlock = {
+                    id:    'zone:' + j.id,
+                    type:  'custom',
+                    color: 'custom',
+                    zone_id: j.id,
+                    name, icon,
+                    slots: makeSlots(slotCount, '18:00-23:00', 'по брони'),
+                };
+            } catch (e) { toast('Ошибка: ' + e.message, 'err'); return; }
+        } else {
+            const hallId = parseInt(hallSelect?.value, 10);
+            if (!hallId) { toast('Выбери зал', 'err'); return; }
+            const hall = App.halls.find((h) => h.id === hallId);
+            if (!hall) { toast('Зал не найден', 'err'); return; }
+            const color = hall.id === 2 ? 'banya' : 'main';
+            newBlock = {
+                id:    'hall:' + hallId,
+                type:  'hall',
+                color,
+                hall_id: hallId,
+                name: hall.name,
+                icon: hall.icon || '🏛',
+                slots: makeSlots(slotCount, color === 'banya' ? '10:00-18:00' : '09:00-17:00', ''),
+            };
+        }
+
+        App.state.blocks.push(newBlock);
+        closeAddBlockModal();
+        await saveAndReload('Блок добавлен');
+    });
+
+    function makeSlots(count, defaultTime, label) {
+        const slots = [];
+        for (let i = 0; i < count; i++) slots.push({ label, defaultTime });
+        return slots;
+    }
+
+
+    // ════════════════ Period selector ════════════════
+    const periodFromInput = document.getElementById('schPeriodFrom');
+    const periodToInput   = document.getElementById('schPeriodTo');
+
+    function navigateToPeriod(from, to) {
+        const u = new URL(location.href);
+        u.searchParams.set('from', from);
+        u.searchParams.set('to', to);
+        location.href = u.toString();
+    }
+    periodFromInput?.addEventListener('change', () => {
+        if (periodFromInput.value && periodToInput.value) {
+            navigateToPeriod(periodFromInput.value, periodToInput.value);
+        }
+    });
+    periodToInput?.addEventListener('change', () => {
+        if (periodFromInput.value && periodToInput.value) {
+            navigateToPeriod(periodFromInput.value, periodToInput.value);
+        }
+    });
+    document.getElementById('schPeriodPrev')?.addEventListener('click', () => {
+        const from = new Date(App.period.from);
+        const to   = new Date(App.period.to);
+        const days = Math.round((to - from) / 86400000) + 1;
+        from.setDate(from.getDate() - days);
+        to.setDate(to.getDate() - days);
+        navigateToPeriod(from.toISOString().slice(0, 10), to.toISOString().slice(0, 10));
+    });
+    document.getElementById('schPeriodNext')?.addEventListener('click', () => {
+        const from = new Date(App.period.from);
+        const to   = new Date(App.period.to);
+        const days = Math.round((to - from) / 86400000) + 1;
+        from.setDate(from.getDate() + days);
+        to.setDate(to.getDate() + days);
+        navigateToPeriod(from.toISOString().slice(0, 10), to.toISOString().slice(0, 10));
+    });
+    document.querySelectorAll('[data-period-preset]').forEach((b) => {
+        b.addEventListener('click', () => {
+            const preset = b.getAttribute('data-period-preset');
+            if (preset === 'custom') {
+                periodFromInput?.focus();
+                return;
             }
+            const days = parseInt(preset, 10) || 14;
+            const from = new Date(App.period.from);
+            const to = new Date(from);
+            to.setDate(to.getDate() + days - 1);
+            navigateToPeriod(from.toISOString().slice(0, 10), to.toISOString().slice(0, 10));
         });
     });
 
 
-    // ════════════════ Heatmap rebucketization (preserved from v6) ════════════════
-    const statsEl = document.getElementById('schStatsData');
+    // ════════════════ Clear period / copy week ════════════════
+    document.getElementById('schClearPeriod')?.addEventListener('click', async () => {
+        if (!confirm('Удалить все смены за выбранный период?')) return;
+        // Iterate over period days, delete shifts on each
+        const from = new Date(App.period.from);
+        const to   = new Date(App.period.to);
+        for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+            const iso = d.toISOString().slice(0, 10);
+            delete App.state.shifts[iso];
+        }
+        App.dirty = true;
+        await saveNow('clear');
+        location.reload();
+    });
+
+    document.getElementById('schCopyWeek')?.addEventListener('click', async () => {
+        const from = new Date(App.period.from);
+        const to   = new Date(App.period.to);
+        const days = Math.round((to - from) / 86400000) + 1;
+        if (days !== 7) {
+            toast('Кнопка работает только для недельного периода. Сейчас ' + days + ' дней.', 'err');
+            return;
+        }
+        // Copy each day's shifts to next week
+        let copied = 0;
+        for (let i = 0; i < 7; i++) {
+            const src = new Date(from); src.setDate(src.getDate() + i);
+            const dst = new Date(src);  dst.setDate(dst.getDate() + 7);
+            const srcIso = src.toISOString().slice(0, 10);
+            const dstIso = dst.toISOString().slice(0, 10);
+            if (App.state.shifts[srcIso]) {
+                App.state.shifts[dstIso] = JSON.parse(JSON.stringify(App.state.shifts[srcIso]));
+                copied += Object.keys(App.state.shifts[srcIso]).length;
+            }
+        }
+        if (copied === 0) {
+            toast('Нет смен для копирования', 'err');
+            return;
+        }
+        App.dirty = true;
+        await saveNow('copy-week');
+        toast(`Скопировано ${copied} смен на следующую неделю`);
+        // Navigate to the next week
+        const nextFrom = new Date(from); nextFrom.setDate(nextFrom.getDate() + 7);
+        const nextTo   = new Date(to);   nextTo.setDate(nextTo.getDate() + 7);
+        navigateToPeriod(nextFrom.toISOString().slice(0, 10), nextTo.toISOString().slice(0, 10));
+    });
+
+
+    // ════════════════ Snapshots ════════════════
+    function renderSnapshots() {
+        const wrap = document.querySelector('.sch-snapshots');
+        if (!wrap) return;
+        const saveBtn = document.getElementById('schSaveSnapBtn');
+        wrap.querySelectorAll('.sch-snap-pill').forEach((el) => el.remove());
+        App.snapshots.forEach((s) => {
+            const pill = document.createElement('span');
+            pill.className = 'sch-snap-pill' + (s.is_current ? ' current' : '');
+            pill.dataset.snapId = s.id;
+            const when = (s.created_at || '').replace(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}).*$/, '$3.$2 $4');
+            pill.innerHTML = `${esc(s.label || 'auto')} <span class="when">${esc(when)}</span>`;
+            if (!s.is_current) pill.addEventListener('click', () => loadSnapshot(s.id));
+            wrap.insertBefore(pill, saveBtn?.previousElementSibling || saveBtn);
+        });
+    }
+    async function loadSnapshot(id) {
+        if (!confirm('Загрузить эту версию? Текущие несохранённые изменения пропадут.')) return;
+        try {
+            const j = await api('snapshot', { query: 'id=' + id });
+            App.state = j.state;
+            if (Array.isArray(App.state.shifts)) App.state.shifts = {};
+            if (!App.state.shifts || typeof App.state.shifts !== 'object') App.state.shifts = {};
+            await api('save', { method: 'POST', body: { state: App.state, label: 'restored-' + id } });
+            toast('Версия загружена');
+            setTimeout(() => location.reload(), 400);
+        } catch (e) {
+            toast('Ошибка: ' + e.message, 'err');
+        }
+    }
+    // Wire existing snapshot pills (server-rendered)
+    document.querySelectorAll('.sch-snap-pill[data-snap-id]:not(.current)').forEach((pill) => {
+        pill.addEventListener('click', () => loadSnapshot(parseInt(pill.dataset.snapId, 10)));
+    });
+
+
+    // ════════════════ Heatmap rebucketization ════════════════
+    const statsEl   = document.getElementById('schStatsData');
     const bucketSel = document.getElementById('schBucketSize');
     const filterSel = document.getElementById('schCoverageFilter');
     const covGrid   = document.getElementById('schCovGrid');
     if (statsEl && bucketSel && filterSel && covGrid) {
         let stats;
-        try { stats = JSON.parse(statsEl.textContent); } catch (e) { stats = null; }
+        try { stats = JSON.parse(statsEl.textContent); } catch (_) { stats = null; }
         if (stats) initHeatmap(stats);
     }
     function initHeatmap(stats) {
         const startH = stats.hourStart || 8;
         const endH   = stats.hourEnd   || 24;
-
         function applyFilter(filter) {
             const totals = new Array(24).fill(0);
             const perDay = stats.days.map((d) => {
                 const h = new Array(24).fill(0);
                 for (let i = 0; i < 24; i++) {
                     if (filter === 'all') {
-                        h[i] = (d.hours.senior?.[i] || 0) + (d.hours.main?.[i] || 0)
-                             + (d.hours.banya?.[i]  || 0) + (d.hours.custom?.[i] || 0);
+                        h[i] = (d.hours?.senior?.[i] || 0) + (d.hours?.main?.[i] || 0)
+                             + (d.hours?.banya?.[i]  || 0) + (d.hours?.custom?.[i] || 0);
                     } else {
-                        h[i] = d.hours[filter]?.[i] || 0;
+                        h[i] = d.hours?.[filter]?.[i] || 0;
                     }
                     totals[i] += h[i];
                 }
@@ -569,47 +729,40 @@
         function bucketize(hours, size) {
             const out = [];
             for (let h = startH; h < endH; h += size) {
-                let max = 0, sum = 0, cnt = 0;
-                for (let k = 0; k < size && h + k < endH; k++) {
-                    max = Math.max(max, hours[h + k]);
-                    sum += hours[h + k]; cnt++;
-                }
-                out.push({ from: h, to: Math.min(h + size, endH), max, avg: cnt > 0 ? +(sum / cnt).toFixed(1) : 0 });
+                let max = 0;
+                for (let k = 0; k < size && h + k < endH; k++) max = Math.max(max, hours[h + k]);
+                out.push({ from: h, to: Math.min(h + size, endH), max });
             }
             return out;
         }
-        function redrawMatrix(perDay, bucketSize) {
-            const dayBuckets = perDay.map((h) => bucketize(h, bucketSize));
+        function redrawMatrix(perDay, bs) {
+            const buckets = perDay.map((h) => bucketize(h, bs));
             let globalMax = 0;
-            dayBuckets.forEach((dayBs) => dayBs.forEach((b) => { if (b.max > globalMax) globalMax = b.max; }));
+            buckets.forEach((b) => b.forEach((c) => { if (c.max > globalMax) globalMax = c.max; }));
             if (globalMax < 1) globalMax = 1;
-            const cols = dayBuckets[0]?.length || 0;
+            const cols = buckets[0]?.length || 0;
             covGrid.style.setProperty('--cov-cols', cols);
             let html = '<div class="sch-cov-corner">День \\ Час</div>';
-            if (dayBuckets.length > 0) {
-                dayBuckets[0].forEach((b) => {
-                    html += `<div class="sch-cov-col-head">${pad2(b.from)}–${pad2(b.to)}</div>`;
+            if (buckets.length > 0) {
+                buckets[0].forEach((c) => {
+                    html += `<div class="sch-cov-col-head">${pad2(c.from)}–${pad2(c.to)}</div>`;
                 });
             }
             stats.days.forEach((d, idx) => {
-                const weekend = d.weekend ? ' weekend' : '';
-                html += `<div class="sch-cov-row-head${weekend}">${escapeHtml(d.dow)} ${escapeHtml(d.date)}.05</div>`;
-                dayBuckets[idx].forEach((b) => {
-                    const intensity = b.max / globalMax;
-                    const alpha = b.max > 0 ? 0.05 + intensity * 0.90 : 0;
+                const wk = d.weekend ? ' weekend' : '';
+                html += `<div class="sch-cov-row-head${wk}">${esc(d.dow)} ${esc(d.date)}</div>`;
+                buckets[idx].forEach((c) => {
+                    const intensity = c.max / globalMax;
+                    const alpha = c.max > 0 ? 0.05 + intensity * 0.9 : 0;
                     const txt   = intensity > 0.55 ? '#0f1117' : 'var(--text)';
-                    const label = b.max > 0 ? b.max : '·';
-                    const title = `пик ${b.max} чел/ч в окне ${pad2(b.from)}–${pad2(b.to)}`;
-                    html += `<div class="sch-cov-cell" data-count="${b.max}" data-from="${b.from}" data-to="${b.to}" data-day-idx="${idx}" style="background: rgba(184,135,70,${alpha}); color: ${txt};" title="${escapeHtml(title)}">${label}</div>`;
+                    html += `<div class="sch-cov-cell" style="background: rgba(184,135,70,${alpha}); color: ${txt};" title="пик ${c.max} чел/ч в ${pad2(c.from)}–${pad2(c.to)}">${c.max > 0 ? c.max : '·'}</div>`;
                 });
             });
             covGrid.innerHTML = html;
         }
         function redrawHistogram(totals) {
-            const wrap = document.querySelector('.sch-agg-histogram');
-            if (!wrap) return;
-            const grid = wrap.querySelector('.sch-bar-grid');
-            const h4 = wrap.querySelector('h4');
+            const grid = document.querySelector('.sch-agg-histogram .sch-bar-grid');
+            const h4 = document.querySelector('.sch-agg-histogram h4');
             if (!grid) return;
             const avgs = totals.map((v) => v / Math.max(1, stats.dayCount));
             const max = Math.max(1, ...avgs);
@@ -621,41 +774,39 @@
             }
             grid.innerHTML = html;
             if (h4) {
-                const filterLabel = filterSel.options[filterSel.selectedIndex]?.textContent || '';
-                h4.textContent = `Средняя загрузка по часам за период (${stats.dayCount} дней) · ${filterLabel}`;
+                const filter = filterSel.options[filterSel.selectedIndex]?.textContent || '';
+                h4.textContent = `Средняя загрузка по часам за период (${stats.dayCount} дней) · ${filter}`;
             }
         }
         function redraw() {
             const filter = filterSel.value;
-            const bucketSize = parseInt(bucketSel.value, 10) || 2;
+            const bs = parseInt(bucketSel.value, 10) || 2;
             const { perDay, totals } = applyFilter(filter);
-            redrawMatrix(perDay, bucketSize);
+            redrawMatrix(perDay, bs);
             redrawHistogram(totals);
         }
         bucketSel.addEventListener('change', redraw);
         filterSel.addEventListener('change', redraw);
-        redraw();
     }
 
 
-    // ════════════════ Drag & drop (preserved) ════════════════
-    let dragSource = null;
+    // ════════════════ Drag-n-drop ════════════════
+    let dragSrc = null;
     document.addEventListener('dragstart', (e) => {
         const chip = e.target.closest('.sch-shift');
         if (!chip) return;
-        dragSource = chip.closest('.sch-cell');
+        dragSrc = chip.closest('.sch-cell');
         chip.style.opacity = '0.4';
         e.dataTransfer.effectAllowed = 'move';
-        try { e.dataTransfer.setData('text/plain', dragSource.dataset.block + ':' + dragSource.dataset.slot); } catch (_) {}
     });
     document.addEventListener('dragend', (e) => {
         const chip = e.target.closest('.sch-shift');
         if (chip) chip.style.opacity = '';
-        dragSource = null;
+        dragSrc = null;
     });
     document.addEventListener('dragover', (e) => {
         const cell = e.target.closest('.sch-cell[data-block]');
-        if (!cell || !dragSource || cell === dragSource) return;
+        if (!cell || !dragSrc || cell === dragSrc) return;
         e.preventDefault();
         cell.style.outline = '2px dashed var(--accent)';
     });
@@ -665,48 +816,25 @@
     });
     document.addEventListener('drop', async (e) => {
         const cell = e.target.closest('.sch-cell[data-block]');
-        if (!cell || !dragSource || cell === dragSource) return;
+        if (!cell || !dragSrc || cell === dragSrc) return;
         e.preventDefault();
         cell.style.outline = '';
-        const srcIso  = dragSource.dataset.dayIso;
-        const srcBlk  = dragSource.dataset.block;
-        const srcSlot = dragSource.dataset.slot;
-        const dstIso  = cell.dataset.dayIso;
-        const dstBlk  = cell.dataset.block;
-        const dstSlot = cell.dataset.slot;
-        const srcShift = getShift(srcIso, srcBlk, srcSlot);
-        const dstShift = getShift(dstIso, dstBlk, dstSlot);
-        if (!srcShift) { dragSource = null; return; }
-        // Move (or swap if target has shift)
-        if (dstShift) {
-            setShift(srcIso, srcBlk, srcSlot, dstShift);
-            renderChip(dragSource, dstShift);
+        const sIso = dragSrc.dataset.dayIso, sBlk = dragSrc.dataset.block, sSlot = dragSrc.dataset.slot;
+        const dIso = cell.dataset.dayIso,    dBlk = cell.dataset.block,    dSlot = cell.dataset.slot;
+        const sShift = getShift(sIso, sBlk, sSlot);
+        const dShift = getShift(dIso, dBlk, dSlot);
+        if (!sShift) { dragSrc = null; return; }
+        if (dShift) {
+            setShift(sIso, sBlk, sSlot, dShift);
+            renderChip(dragSrc, dShift);
         } else {
-            delShift(srcIso, srcBlk, srcSlot);
-            renderChip(dragSource, null);
+            delShift(sIso, sBlk, sSlot);
+            renderChip(dragSrc, null);
         }
-        setShift(dstIso, dstBlk, dstSlot, srcShift);
-        renderChip(cell, srcShift);
-        dragSource = null;
+        setShift(dIso, dBlk, dSlot, sShift);
+        renderChip(cell, sShift);
+        dragSrc = null;
         await saveDebounced();
     });
 
-
-    // ════════════════ Demo-noop wiring for remaining controls ════════════════
-    document.querySelectorAll('[data-demo-noop]').forEach((el) => {
-        if (el.classList.contains('sch-slot-del')) return;
-        if (el.id === 'schModalAddBlockClose') return;
-        if (el.closest('#schPopover .actions')) return;
-        el.addEventListener('click', (e) => {
-            e.preventDefault();
-            const label = el.getAttribute('data-demo-noop') || el.textContent.trim();
-            console.info(`[schedule:demo] noop: ${label}`);
-        });
-    });
-
-
-    // ════════════════ Boot sequence ════════════════
-    hydrateFromDom();    // если state пустой — берём демо с DOM
-    applyStateToDom();   // если state непустой — заменяем демо на сохранённое
-    renderSnapshots();   // обновляем pill'ы из bootstrap snapshots
 })();

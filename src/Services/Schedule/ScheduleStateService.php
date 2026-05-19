@@ -244,7 +244,7 @@ class ScheduleStateService
             'version' => 1,
             'blocks' => [
                 [
-                    'id'    => 'senior', 'type' => 'senior',
+                    'id'    => 'senior', 'type' => 'senior', 'color' => 'senior',
                     'name'  => 'Старшие смены', 'icon' => '⭐',
                     'slots' => [
                         ['label' => 'день',  'defaultTime' => '09:00-17:00'],
@@ -253,7 +253,7 @@ class ScheduleStateService
                     ],
                 ],
                 [
-                    'id'    => 'hall:1', 'type' => 'hall', 'hall_id' => 1,
+                    'id'    => 'hall:1', 'type' => 'hall', 'hall_id' => 1, 'color' => 'main',
                     'name'  => 'Главный зал', 'icon' => '🏛',
                     'slots' => [
                         ['label' => 'утро',  'defaultTime' => '09:00-17:00'],
@@ -263,14 +263,14 @@ class ScheduleStateService
                     ],
                 ],
                 [
-                    'id'    => 'hall:2', 'type' => 'hall', 'hall_id' => 2,
+                    'id'    => 'hall:2', 'type' => 'hall', 'hall_id' => 2, 'color' => 'banya',
                     'name'  => 'Баня', 'icon' => '♨',
                     'slots' => [
                         ['label' => 'весь день', 'defaultTime' => '10:00-18:00'],
                     ],
                 ],
                 [
-                    'id'    => 'zone:1', 'type' => 'custom', 'zone_id' => 1,
+                    'id'    => 'zone:1', 'type' => 'custom', 'zone_id' => 1, 'color' => 'custom',
                     'name'  => 'Беседка', 'icon' => '🌿',
                     'slots' => [
                         ['label' => 'по брони', 'defaultTime' => '18:00-23:00'],
