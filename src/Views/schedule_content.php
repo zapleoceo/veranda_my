@@ -78,26 +78,44 @@ $schHourStart = 8;   // буду рисовать heatmap с 08:00
 $schHourEnd   = 24;  // до 24:00
 $schBucket    = 2;   // дефолтный шаг — 2 часа (выбирается селектом)
 
-$schPerDayHours = [];   // [rowIdx][hour 0..23] = count
-$schAggHourTotal = array_fill(0, 24, 0);
+// Per-day per-block per-hour counts. Эту структуру JS читает и пересчитывает
+// при смене шага и фильтра без AJAX (см. assets/js/schedule.js).
+//   $schPerDayByBlock[dayIdx]['senior'|'main'|'banya'|'custom'][hour 0..23] = count
+$schPerDayByBlock = [];
+$schPerDayHours   = [];     // total per day per hour (filter=all)
+$schAggHourTotal  = array_fill(0, 24, 0);
+
 foreach ($rows as $idx => $r) {
-    $hourly = array_fill(0, 24, 0);
-    $blocks = array_merge($r['senior'], $r['main'], $r['banya'], $r['custom']);
-    foreach ($blocks as $s) {
-        if (!$s) continue;
-        $range = $schParseRange((string)($s[1] ?? ''));
-        if (!$range) continue;
-        [$from, $to] = $range;
-        $from = (int)floor($from);
-        $to   = (int)ceil($to);
-        for ($h = $from; $h < $to; $h++) {
-            if ($h < 0 || $h > 23) continue;
-            $hourly[$h]++;
-            $schAggHourTotal[$h]++;
+    $perBlock = [
+        'senior' => array_fill(0, 24, 0),
+        'main'   => array_fill(0, 24, 0),
+        'banya'  => array_fill(0, 24, 0),
+        'custom' => array_fill(0, 24, 0),
+    ];
+    foreach (['senior', 'main', 'banya', 'custom'] as $block) {
+        foreach ($r[$block] ?? [] as $s) {
+            if (!$s) continue;
+            $range = $schParseRange((string)($s[1] ?? ''));
+            if (!$range) continue;
+            [$from, $to] = $range;
+            $from = (int)floor($from);
+            $to   = (int)ceil($to);
+            for ($h = $from; $h < $to; $h++) {
+                if ($h < 0 || $h > 23) continue;
+                $perBlock[$block][$h]++;
+            }
         }
     }
-    $schPerDayHours[$idx] = $hourly;
+    $hourly = array_fill(0, 24, 0);
+    for ($h = 0; $h < 24; $h++) {
+        $hourly[$h] = $perBlock['senior'][$h] + $perBlock['main'][$h]
+                    + $perBlock['banya'][$h]  + $perBlock['custom'][$h];
+        $schAggHourTotal[$h] += $hourly[$h];
+    }
+    $schPerDayByBlock[$idx] = $perBlock;
+    $schPerDayHours[$idx]   = $hourly;
 }
+
 $schDayCount = count($rows) ?: 1;
 $schAggHourAvg = array_map(static fn($v) => round($v / $schDayCount, 1), $schAggHourTotal);
 $schMaxCount = max(array_map('max', $schPerDayHours)) ?: 1;
@@ -514,6 +532,28 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
     </div>
   </section>
 
+  <?php
+  // ─── Stats payload for JS heatmap rebucketization (no AJAX needed) ───
+  // JS читает этот JSON и пересчитывает heatmap + histogram при смене
+  // селектов «шаг» / «считать» без перезагрузки.
+  $schStatsPayload = [
+      'hourStart' => $schHourStart,
+      'hourEnd'   => $schHourEnd,
+      'dayCount'  => $schDayCount,
+      'days'      => [],
+  ];
+  foreach ($rows as $idx => $r) {
+      $schStatsPayload['days'][] = [
+          'date'    => $r['date'],
+          'dow'     => $r['dow'],
+          'mon'     => $r['mon'],
+          'weekend' => $r['weekend'],
+          'hours'   => $schPerDayByBlock[$idx],   // ['senior'=>[24], 'main'=>[24], 'banya'=>[24], 'custom'=>[24]]
+      ];
+  }
+  ?>
+  <script id="schStatsData" type="application/json"><?= json_encode($schStatsPayload, JSON_UNESCAPED_UNICODE) ?></script>
+
   <!-- Senior shifts summary -->
   <div class="sch-senior-block" data-help-abs="Сводка по старшим за период — кто и когда был старшим. ⚠ на днях без назначенного старшего.">
     <h3>⭐ Старшие смены недели (13–19 мая)</h3>
@@ -636,4 +676,4 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
   </div>
 </div>
 
-<script src="/assets/js/schedule.js?v=20260517_v5_full" defer></script>
+<script src="/assets/js/schedule.js?v=20260517_v6_heatmap_live" defer></script>
