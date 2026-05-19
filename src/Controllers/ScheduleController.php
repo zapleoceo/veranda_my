@@ -69,7 +69,7 @@ class ScheduleController
         $pageTitle    = 'График смен';
         $currentPath  = '/schedule';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">' . "\n"
-                      . '<link rel="stylesheet" href="/assets/css/schedule.css?v=20260517_v7_persistence">';
+                      . '<link rel="stylesheet" href="/assets/css/schedule.css?v=20260517_v8_phase2b">';
 
         ob_start();
         require __DIR__ . '/../Views/schedule_content.php';

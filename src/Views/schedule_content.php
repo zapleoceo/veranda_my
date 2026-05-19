@@ -1,29 +1,20 @@
 <?php
 /**
- * /schedule — view (демо-каркас).
+ * /schedule — view (state-driven).
  *
- * Все интерактивные элементы помечены атрибутом `data-help-abs="…"`:
- * клик по кнопке `?` (#schHelpBtn) включает body.sch-help-mode, и
- * наведение на элемент показывает всплывающую подсказку (как на /payday3).
+ * Provided by ScheduleController::_handlePage():
+ *   $state      — current snapshot (or default scaffold) — blocks + shifts + templates
+ *   $employees  — roster from staff_tags overlay
+ *   $halls      — Poster halls (id, name, icon)
+ *   $zones      — schedule_zones rows
+ *   $snapshots  — history pills
+ *   $periodFrom — 'YYYY-MM-DD'
+ *   $periodTo   — 'YYYY-MM-DD'
  *
- * Данные ниже — статические демо-значения для визуальной проверки UX.
- * Когда блочная модель утверждена, $rows / $blocks / $employees
- * подтягиваются через сервис и snapshot из БД.
+ * Help-mode tooltips: [data-help-abs="…"] on every meaningful element.
+ * The `?` button (#schHelpBtn) toggles body.sch-help-mode.
  */
 
-// ─── Variables provided by ScheduleController::_handlePage() ───
-// $state      — current snapshot (or default) loaded from ScheduleStateService
-// $employees  — roster (id, name, tag, can_be_senior, rate_per_hour, …)
-// $halls      — Poster halls list
-// $zones      — user-defined custom zones from schedule_zones
-// $snapshots  — recent snapshots for the pills row
-// $periodFrom — ISO 'YYYY-MM-DD'
-// $periodTo   — ISO 'YYYY-MM-DD'
-//
-// Демо $rows ниже используется только когда $state['shifts'] пустой —
-// чтобы первая визуальная сессия не была пустым гридом. На первом
-// сохранении JS отправит сервер тот state, который у него на руках,
-// и при следующей загрузке demo заменится на реальные сохранённые смены.
 $periodFrom ??= date('Y-m-d', strtotime('monday this week'));
 $periodTo   ??= date('Y-m-d', strtotime($periodFrom . ' +13 days'));
 $state      ??= ['blocks' => [], 'shifts' => new \stdClass(), 'templates' => []];
@@ -32,162 +23,145 @@ $halls      ??= [];
 $zones      ??= [];
 $snapshots  ??= [];
 
-// ISO dates for the demo grid — synced with $periodFrom so every cell can be
-// addressed by 'data-day-iso="2026-05-19"' and JS reconciles state↔DOM.
 $schDowRu = ['вс','пн','вт','ср','чт','пт','сб'];
-$schMonRu = ['', 'янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+$schMonRu = ['','янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
 
-// ─── Demo schedule data (used both for grid and hourly heatmap) ───
-$rows = [
-    ['date' => '13', 'mon' => 'мая', 'dow' => 'пн', 'weekend' => false,
-     'senior' => [['Лёша ★', '09–17', 'senior'], null, ['Phai ★', '16–23', 'senior']],
-     'main'   => [['Султан', '09–22'], ['Оля', '09–22'], ['Саша', '17–23'], ['Вася', '17–23']],
-     'banya'  => [['An', '10–18']],
-     'custom' => [null],
-     'warn' => null, 'budget' => '1.32M'],
-    ['date' => '14', 'mon' => 'мая', 'dow' => 'вт', 'weekend' => false,
-     'senior' => [null, null, null],
-     'main'   => [['Phai', '09–17'], ['Long', '09–17'], ['Саша', '17–23'], ['Вася', '17–23']],
-     'banya'  => [null],
-     'custom' => [null],
-     'warn' => 'Нет старшего!', 'budget' => '0.98M'],
-    ['date' => '15', 'mon' => 'мая', 'dow' => 'ср', 'weekend' => false,
-     'senior' => [['Султан ★', '09–17', 'senior'], null, null],
-     'main'   => [['Оля', '09–17'], ['Лёша', '14–22'], ['Long', '16–23'], ['Вася', '17–23']],
-     'banya'  => [['Phai', '09–23']],
-     'custom' => [null],
-     'warn' => null, 'budget' => '1.45M'],
-    ['date' => '16', 'mon' => 'мая', 'dow' => 'чт', 'weekend' => false,
-     'senior' => [['Лёша ★', '09–17', 'senior'], ['Phai ★', '09–17', 'senior'], null],
-     'main'   => [null, ['Оля', '16–23'], ['Саша', '17–23'], null],
-     'banya'  => [['An', '10–18']],
-     'custom' => [['Long', '18–22']],
-     'warn' => null, 'budget' => '1.28M'],
-    ['date' => '17', 'mon' => 'мая', 'dow' => 'пт', 'weekend' => false,
-     'senior' => [null, ['Лёша ★', '16–23', 'senior'], ['Phai ★', '16–23', 'senior']],
-     'main'   => [['Султан', '16–23'], ['Саша', '09–17'], ['Long', '09–22'], ['Вася', '17–23']],
-     'banya'  => [null],
-     'custom' => [['Оля', '19–23']],
-     'warn' => null, 'budget' => '1.62M'],
-    ['date' => '18', 'mon' => 'мая', 'dow' => 'сб', 'weekend' => true,
-     'senior' => [['Long ★', '16–23', 'senior'], null, null],
-     'main'   => [['Султан', '09–22'], ['Лёша', '09–22'], null, ['Вася', '17–23']],
-     'banya'  => [['An', '10–18']],
-     'custom' => [['Phai', '16–23']],
-     'warn' => null, 'budget' => '1.51M'],
-    ['date' => '19', 'mon' => 'мая', 'dow' => 'вс', 'weekend' => true,
-     'senior' => [null, null, null],
-     'main'   => [['Оля', '09–22'], ['Саша', '17–23'], ['Long', '09–17'], null],
-     'banya'  => [null],
-     'custom' => [null],
-     'warn' => 'Нет старшего и мало людей', 'budget' => '0.92M'],
-    ['date' => '20', 'mon' => 'мая', 'dow' => 'пн', 'weekend' => false,
-     'senior' => [['Султан ★', '09–17', 'senior'], null, ['Лёша ★', '16–23', 'senior']],
-     'main'   => [['Оля', '09–22'], ['Long', '09–17'], ['Саша', '17–23'], ['Вася', '17–23']],
-     'banya'  => [['Phai', '10–18']],
-     'custom' => [null],
-     'warn' => null, 'budget' => '1.38M'],
-];
-
-// Re-anchor demo dates to the requested period so 'data-day-iso' matches
-// real calendar dates — без этого state.shifts (которые keyed by ISO) не
-// нашли бы свои ячейки.
-$periodTs = (int) strtotime($periodFrom);
-foreach ($rows as $i => &$_r) {
-    $ts = strtotime("+{$i} days", $periodTs);
-    if ($ts === false) continue;
-    $_r['iso']     = date('Y-m-d', $ts);
-    $_r['date']    = (string) date('j', $ts);
-    $_r['mon']     = $schMonRu[(int) date('n', $ts)];
-    $_r['dow']     = $schDowRu[(int) date('w', $ts)];
-    $_r['weekend'] = in_array((int) date('w', $ts), [0, 6], true);
-}
-unset($_r);
-
-// ─── Hourly coverage computation (for heatmap + aggregate bar chart) ───
-$schParseRange = static function (?string $s): ?array {
-    if (!$s) return null;
-    if (!preg_match('/^(\d{1,2})(?::(\d{2}))?[\s\-–—]+(\d{1,2})(?::(\d{2}))?$/u', $s, $m)) {
-        return null;
+// ─── Build $days array from period ───
+$days = [];
+$cur  = (int) strtotime($periodFrom);
+$end  = (int) strtotime($periodTo);
+if ($cur === false || $end === false || $cur > $end) {
+    $days = [];
+} else {
+    $i = 0;
+    while ($cur <= $end && $i < 366) {
+        $days[] = [
+            'idx'     => $i,
+            'iso'     => date('Y-m-d', $cur),
+            'date'    => (string) date('j', $cur),
+            'mon'     => $schMonRu[(int) date('n', $cur)],
+            'dow'     => $schDowRu[(int) date('w', $cur)],
+            'weekend' => in_array((int) date('w', $cur), [0, 6], true),
+        ];
+        $cur = (int) strtotime('+1 day', $cur);
+        $i++;
     }
-    $start = (int)$m[1] + ((int)($m[2] ?? 0)) / 60;
-    $end   = (int)$m[3] + ((int)($m[4] ?? 0)) / 60;
-    return [$start, $end];
+}
+
+// ─── Normalize shifts (server-side stdClass becomes [] in PHP via decode) ───
+$shifts = $state['shifts'] ?? [];
+if (!is_array($shifts)) $shifts = [];
+
+// ─── employees lookup ───
+$empById = [];
+foreach ($employees as $e) {
+    $empById[(int)$e['id']] = $e;
+}
+
+// ─── Helper: get shift for a cell ───
+$schGetShift = static function (string $iso, string $blockId, int $slotIdx) use (&$shifts): ?array {
+    $key = $blockId . ':' . $slotIdx;
+    return $shifts[$iso][$key] ?? null;
 };
 
-$schHourStart = 8;   // буду рисовать heatmap с 08:00
-$schHourEnd   = 24;  // до 24:00
-$schBucket    = 2;   // дефолтный шаг — 2 часа (выбирается селектом)
+// ─── Helper: compute color css for block ───
+$schBlockColor = static function (array $block): string {
+    $c = $block['color'] ?? '';
+    if (in_array($c, ['senior','main','banya','custom'], true)) return $c;
+    if (($block['type'] ?? '') === 'senior') return 'senior';
+    if (($block['type'] ?? '') === 'custom') return 'custom';
+    // Heuristic fallback for hall by id
+    if (($block['id'] ?? '') === 'hall:2') return 'banya';
+    return 'main';
+};
 
-// Per-day per-block per-hour counts. Эту структуру JS читает и пересчитывает
-// при смене шага и фильтра без AJAX (см. assets/js/schedule.js).
-//   $schPerDayByBlock[dayIdx]['senior'|'main'|'banya'|'custom'][hour 0..23] = count
+// ─── Helper: parse time range "HH:MM" → [h, m] ───
+$schTimeToHours = static function (string $hhmm): float {
+    if (!preg_match('/^(\d{1,2}):(\d{2})$/', $hhmm, $m)) return 0.0;
+    return (int)$m[1] + ((int)$m[2]) / 60;
+};
+
+// ─── Compute heatmap stats per day per block-color ───
+$schHourStart = 8;
+$schHourEnd   = 24;
 $schPerDayByBlock = [];
-$schPerDayHours   = [];     // total per day per hour (filter=all)
 $schAggHourTotal  = array_fill(0, 24, 0);
 
-foreach ($rows as $idx => $r) {
+foreach ($days as $d) {
     $perBlock = [
         'senior' => array_fill(0, 24, 0),
         'main'   => array_fill(0, 24, 0),
         'banya'  => array_fill(0, 24, 0),
         'custom' => array_fill(0, 24, 0),
     ];
-    foreach (['senior', 'main', 'banya', 'custom'] as $block) {
-        foreach ($r[$block] ?? [] as $s) {
-            if (!$s) continue;
-            $range = $schParseRange((string)($s[1] ?? ''));
-            if (!$range) continue;
-            [$from, $to] = $range;
-            $from = (int)floor($from);
-            $to   = (int)ceil($to);
-            for ($h = $from; $h < $to; $h++) {
+    foreach ($state['blocks'] as $block) {
+        $color = $schBlockColor($block);
+        foreach ($block['slots'] as $slotIdx => $slot) {
+            $sh = $schGetShift($d['iso'], $block['id'], $slotIdx);
+            if (!$sh) continue;
+            $sH = (int)floor($schTimeToHours($sh['start'] ?? ''));
+            $eH = (int)ceil($schTimeToHours($sh['end']   ?? ''));
+            for ($h = $sH; $h < $eH; $h++) {
                 if ($h < 0 || $h > 23) continue;
-                $perBlock[$block][$h]++;
+                $perBlock[$color][$h]++;
+                $schAggHourTotal[$h]++;
             }
         }
     }
-    $hourly = array_fill(0, 24, 0);
-    for ($h = 0; $h < 24; $h++) {
-        $hourly[$h] = $perBlock['senior'][$h] + $perBlock['main'][$h]
-                    + $perBlock['banya'][$h]  + $perBlock['custom'][$h];
-        $schAggHourTotal[$h] += $hourly[$h];
+    $schPerDayByBlock[$d['idx']] = $perBlock;
+}
+$schDayCount   = max(1, count($days));
+$schAggHourAvg = array_map(static fn($v) => round($v / $schDayCount, 1), $schAggHourTotal);
+
+// ─── Compute total slot count + grid-template-columns ───
+$blocks = $state['blocks'];
+$blockCount = count($blocks);
+$gridColsArr = ['72px', '36px'];          // date + dow
+foreach ($blocks as $block) {
+    foreach ($block['slots'] as $_) $gridColsArr[] = '92px';
+    $gridColsArr[] = '14px';              // divider after each block
+}
+$gridColsArr[] = '38px';                  // + add-block btn column
+$gridColsArr[] = '56px';                  // warn
+$gridColsArr[] = '70px';                  // budget
+$gridCols = implode(' ', $gridColsArr);
+$totalCols = count($gridColsArr);
+
+// Per-block stats for totals
+$blockShiftCounts = [];
+foreach ($blocks as $blkIdx => $block) {
+    $perSlot = array_fill(0, count($block['slots']), 0);
+    foreach ($days as $d) {
+        foreach ($block['slots'] as $sIdx => $_) {
+            if ($schGetShift($d['iso'], $block['id'], $sIdx)) $perSlot[$sIdx]++;
+        }
     }
-    $schPerDayByBlock[$idx] = $perBlock;
-    $schPerDayHours[$idx]   = $hourly;
+    $blockShiftCounts[$blkIdx] = $perSlot;
 }
 
-$schDayCount = count($rows) ?: 1;
-$schAggHourAvg = array_map(static fn($v) => round($v / $schDayCount, 1), $schAggHourTotal);
-$schMaxCount = max(array_map('max', $schPerDayHours)) ?: 1;
-
-// Хелпер: считает шкалу интенсивности 0..1 для cell coloring.
-$schIntensity = static function (int $count, int $max): float {
-    if ($count <= 0) return 0.0;
-    return min(1.0, $count / $max);
-};
-
-// Helper: bucketize per-hour into chunks
-$schBucketize = static function (array $hours, int $bucketSize, int $startH, int $endH): array {
-    $out = [];
-    for ($h = $startH; $h < $endH; $h += $bucketSize) {
-        $sum = 0; $cnt = 0; $maxCnt = 0;
-        for ($k = 0; $k < $bucketSize && $h + $k < $endH; $k++) {
-            $sum   += $hours[$h + $k];
-            $maxCnt = max($maxCnt, $hours[$h + $k]);
-            $cnt++;
+// ─── Forecast: total hours + ZP ───
+$totalHours = 0.0;
+$totalSalary = 0.0;
+$warningDays = 0;
+foreach ($days as $d) {
+    $dayHasSenior = false;
+    foreach ($blocks as $block) {
+        foreach ($block['slots'] as $sIdx => $_) {
+            $sh = $schGetShift($d['iso'], $block['id'], $sIdx);
+            if (!$sh) continue;
+            $hrs = $schTimeToHours($sh['end'] ?? '') - $schTimeToHours($sh['start'] ?? '');
+            if ($hrs > 0) {
+                $totalHours += $hrs;
+                $rate = (int)($empById[(int)($sh['emp_id'] ?? 0)]['rate_per_hour'] ?? 0);
+                $totalSalary += $hrs * $rate;
+            }
+            if ($schBlockColor($block) === 'senior') $dayHasSenior = true;
         }
-        $out[] = [
-            'from'  => $h,
-            'to'    => min($h + $bucketSize, $endH),
-            'avg'   => $cnt > 0 ? round($sum / $cnt, 1) : 0,
-            'max'   => $maxCnt,
-            'sum'   => $sum,
-        ];
     }
-    return $out;
-};
+    if (!$dayHasSenior && count($blocks) > 0) $warningDays++;
+}
 ?>
+
 <div class="container sch-wrap">
 
   <div class="sch-pagehead">
@@ -200,293 +174,267 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
             data-help-abs="Включить/выключить режим подсказок. Когда включён — все важные элементы обведены пунктиром, при наведении показывается описание.">?</button>
   </div>
 
-  <div class="sch-notice"
-       data-help-abs="Страница — рабочий каркас UX. Сохранение, drag-n-drop и привязка к Poster Hall_ID появятся, как только утвердим эту модель. Данные ниже — демо.">
-    <strong>📐 Прототип:</strong> страница показывает финальную UX-модель, но сохранение/drag-n-drop пока не подключены — это для согласования с партнёрами. Включите справку <code>?</code>, наводите на элементы.
-  </div>
-
-  <!-- ════════ Period picker ════════ -->
-  <div class="sch-periodbar" data-help-abs="Период просмотра. Стрелки сдвигают окно сохраняя его длину. Date-инпуты задают любой диапазон руками. Пресеты справа — быстрые шаблоны (неделя / 2 недели / месяц).">
-    <button class="sch-period-arrow" data-demo-noop="period-prev" title="Сдвинуть период назад">◀</button>
+  <!-- Period picker -->
+  <div class="sch-periodbar" data-help-abs="Период просмотра. Стрелки сдвигают окно сохраняя его длину. Date-инпуты задают любой диапазон руками. Пресеты — быстрые шаблоны.">
+    <button class="sch-period-arrow" id="schPeriodPrev" title="Сдвинуть период назад">◀</button>
     <div class="sch-period-range">
-      <input type="date" value="2026-05-13" class="sch-date-input">
+      <input type="date" id="schPeriodFrom" class="sch-date-input" value="<?= htmlspecialchars($periodFrom) ?>">
       <span style="color: var(--muted)">→</span>
-      <input type="date" value="2026-05-26" class="sch-date-input">
+      <input type="date" id="schPeriodTo" class="sch-date-input" value="<?= htmlspecialchars($periodTo) ?>">
     </div>
-    <button class="sch-period-arrow" data-demo-noop="period-next" title="Сдвинуть период вперёд">▶</button>
-    <span class="sch-period-stats">14 дней · 21–22 неделя</span>
+    <button class="sch-period-arrow" id="schPeriodNext" title="Сдвинуть период вперёд">▶</button>
+    <span class="sch-period-stats"><?= count($days) ?> дней</span>
 
     <div class="sch-period-presets">
-      <button data-demo-noop="period-week">Неделя</button>
-      <button class="active" data-demo-noop="period-2weeks">2 недели</button>
-      <button data-demo-noop="period-month">Месяц</button>
-      <button data-demo-noop="period-custom">Произвольный</button>
+      <button data-period-preset="7">Неделя</button>
+      <button data-period-preset="14" class="active">2 недели</button>
+      <button data-period-preset="30">Месяц</button>
+      <button data-period-preset="custom">Произвольный</button>
     </div>
   </div>
 
-  <!-- ════════ Summary ════════ -->
+  <!-- Summary -->
   <div class="sch-summarybar">
     <div class="sch-metric" data-help-abs="Сумма часов всех назначенных смен в выбранном периоде.">
       <span class="sch-metric-label">Часы</span>
-      <span class="sch-metric-value">712ч</span>
+      <span class="sch-metric-value"><?= number_format((int)round($totalHours), 0, '.', ' ') ?>ч</span>
     </div>
-    <div class="sch-metric" data-help-abs="Прогноз ФОТ: ставка из /employees × часы каждого сотрудника. Пересчёт live при любом изменении.">
+    <div class="sch-metric" data-help-abs="Прогноз ФОТ: ставка из staff_tags × часы. Пересчёт при каждом изменении.">
       <span class="sch-metric-label">Прогноз ЗП</span>
-      <span class="sch-metric-value gold">18.4M ₫</span>
+      <span class="sch-metric-value gold"><?= $totalSalary > 0 ? number_format($totalSalary/1_000_000, 2, '.', '') . 'M ₫' : '— ₫' ?></span>
     </div>
-    <div class="sch-metric" data-help-abs="Количество разных сотрудников, у которых хоть одна смена в периоде.">
+    <div class="sch-metric" data-help-abs="Количество разных сотрудников, у которых есть хотя бы одна смена в периоде.">
       <span class="sch-metric-label">Сотрудников</span>
-      <span class="sch-metric-value">9</span>
+      <span class="sch-metric-value"><?php
+        $empSet = [];
+        foreach ($days as $d) {
+            foreach ($blocks as $block) {
+                foreach ($block['slots'] as $sIdx => $_) {
+                    $sh = $schGetShift($d['iso'], $block['id'], $sIdx);
+                    if ($sh && !empty($sh['emp_id'])) $empSet[(int)$sh['emp_id']] = true;
+                }
+            }
+        }
+        echo count($empSet);
+      ?></span>
     </div>
-    <div class="sch-metric" data-help-abs="Дни с предупреждениями: нет старшего, мало людей на смене, конфликты по времени.">
+    <div class="sch-metric" data-help-abs="Дни без назначенного старшего смены или с другими проблемами.">
       <span class="sch-metric-label">Предупреждений</span>
-      <span class="sch-metric-value warn">3 ⚠</span>
+      <span class="sch-metric-value <?= $warningDays > 0 ? 'warn' : '' ?>"><?= $warningDays ?> ⚠</span>
     </div>
     <div></div>
-    <button class="sch-btn" data-demo-noop="copy-week"
+    <button class="sch-btn" id="schCopyWeek"
             data-help-abs="Скопировать смены прошлой недели в следующую — экономит 80% времени при еженедельном планировании.">↳ Скопировать неделю</button>
-    <button class="sch-btn primary" data-demo-noop="save"
+    <button class="sch-btn primary" id="schSaveBtn"
             data-help-abs="Сохранить текущий график как версию (snapshot). История версий внизу страницы — можно откатиться.">Сохранить</button>
   </div>
 
-  <!-- ════════ Toolbar ════════ -->
+  <!-- Toolbar -->
   <div class="sch-toolbar">
     <span class="sch-tool-label">Шаблоны времени (drag в ячейку):</span>
-    <span class="sch-chip" data-help-abs="Drag в любую ячейку → автоматически заполнит время этого шаблона. Шаблоны редактируются в настройках.">Д 09–17</span>
-    <span class="sch-chip">В 16–23</span>
-    <span class="sch-chip">У 09–14</span>
-    <span class="sch-chip">Полный 09–23</span>
-    <span class="sch-chip add" data-demo-noop="add-template"
-          data-help-abs="Добавить свой шаблон времени (например «обед 12–16»).">+ Шаблон</span>
+    <?php foreach (($state['templates'] ?? []) as $tIdx => $tpl): ?>
+      <span class="sch-chip" data-template-idx="<?= $tIdx ?>"
+            data-template-start="<?= htmlspecialchars($tpl['start'] ?? '') ?>"
+            data-template-end="<?= htmlspecialchars($tpl['end'] ?? '') ?>"
+            data-help-abs="Drag в любую ячейку → автоматически заполнит время этого шаблона.">
+        <?= htmlspecialchars(($tpl['name'] ?? '') . ' ' . str_replace(':00', '', ($tpl['start'] ?? '')) . '–' . str_replace(':00', '', ($tpl['end'] ?? ''))) ?>
+      </span>
+    <?php endforeach; ?>
+    <span class="sch-chip add" id="schAddTemplate" data-help-abs="Добавить свой шаблон времени (Phase 3).">+ Шаблон</span>
     <span style="flex:1"></span>
-    <button class="sch-btn ghost" data-demo-noop="clear-period"
-            data-help-abs="Очистить все смены за выбранный период. Запрашивает подтверждение.">Очистить период</button>
+    <button class="sch-btn ghost" id="schClearPeriod"
+            data-help-abs="Удалить все смены за выбранный период. С подтверждением.">Очистить период</button>
   </div>
 
-  <!-- ════════ THE GRID ════════ -->
-  <div class="sch-grid-scroll" data-help-abs="Сетка дней (вниз) × слотов в блоках. Hover на шапку блока → справа кнопки + / − для управления слотами. Клик в ячейку → форма назначения сотрудника + времени.">
-    <div class="sch-grid">
+  <!-- THE GRID — state-driven structure -->
+  <div class="sch-grid-scroll" data-help-abs="Сетка дней (вниз) × слотов в блоках. Hover на шапку блока → справа кнопка +. × на каждом слоте — точечное удаление колонки. Клик в ячейку → форма назначения сотрудника + времени.">
+    <div class="sch-grid" style="grid-template-columns: <?= $gridCols ?>;">
 
-      <!-- Block headers row -->
+      <!-- ────── Block headers row ────── -->
       <div class="sch-block-head" style="grid-column: span 2; background: rgba(255,255,255,.025); border-bottom: 1.5px solid var(--border);">
         <span class="sch-block-name" style="color: var(--muted); font-size: 11px;">Дата</span>
       </div>
 
-      <div class="sch-block-head senior" style="grid-column: span 3;"
-           data-help-abs="Блок «Старшие смены». Сюда попадают сотрудники, у которых на странице «Настройка персонала» включена ★. На день обычно нужен 1, иногда 2 старших (на смену день + смена вечер).">
-        <span class="sch-block-icon">⭐</span>
-        <span class="sch-block-name">Старшие смены</span>
-        <span class="sch-block-meta">· 3 слота</span>
-        <span class="sch-col-actions">
-          <button title="Добавить слот" data-demo-noop="add-slot-senior" data-help-abs="Добавить ещё один слот старшего (новая колонка в правом краю блока).">+</button>
-          <button title="Настройки блока" data-demo-noop="cfg-senior" data-help-abs="Настройки блока: переименовать, изменить иконку, удалить блок целиком.">⋮</button>
-        </span>
-      </div>
-      <div class="sch-divider senior head-row"></div>
-
-      <div class="sch-block-head hall-main" style="grid-column: span 4;"
-           data-help-abs="Главный зал ресторана (hall_id 1 из Poster). 4 слота — типичное число официантов в смене.">
-        <span class="sch-block-icon">🏛</span>
-        <span class="sch-block-name">Главный зал</span>
-        <span class="sch-block-meta">· hall_id 1 · 4 слота</span>
-        <span class="sch-col-actions">
-          <button title="Добавить слот" data-demo-noop="add-slot-main">+</button>
-          <button title="Настройки блока" data-demo-noop="cfg-main">⋮</button>
-        </span>
-      </div>
-      <div class="sch-divider main head-row"></div>
-
-      <div class="sch-block-head hall-banya" style="grid-column: span 1;"
-           data-help-abs="Баня (hall_id 2 из Poster). Один слот — обычно работает 1 человек.">
-        <span class="sch-block-icon">♨</span>
-        <span class="sch-block-name">Баня</span>
-        <span class="sch-col-actions">
-          <button title="Добавить слот" data-demo-noop="add-slot-banya">+</button>
-          <button title="Настройки блока" data-demo-noop="cfg-banya">⋮</button>
-        </span>
-      </div>
-      <div class="sch-divider banya head-row"></div>
-
-      <div class="sch-block-head hall-custom" style="grid-column: span 1;"
-           data-help-abs="Кастомная зона — например «Беседка» для аренды. Не привязана к Hall_ID в Poster, хранится в schedule_zones.">
-        <span class="sch-block-icon">🌿</span>
-        <span class="sch-block-name">Беседка</span>
-        <span class="sch-col-actions">
-          <button title="Добавить слот" data-demo-noop="add-slot-besedka">+</button>
-          <button title="Настройки блока" data-demo-noop="cfg-besedka">⋮</button>
-        </span>
-      </div>
-      <div class="sch-divider custom head-row"></div>
+      <?php foreach ($blocks as $blkIdx => $block):
+          $color    = $schBlockColor($block);
+          $headCls  = $color === 'senior' ? 'senior'
+                    : ($color === 'banya'  ? 'hall-banya'
+                    : ($color === 'custom' ? 'hall-custom'
+                    : 'hall-main'));
+          $divCls   = $color === 'main' ? 'main' : $color;
+          $slotsCnt = count($block['slots']);
+          $meta     = '· ' . $slotsCnt . ' слот' . ($slotsCnt === 1 ? '' : ($slotsCnt < 5 ? 'а' : 'ов'));
+          if (($block['type'] ?? '') === 'hall' && !empty($block['hall_id'])) {
+              $meta = '· hall_id ' . (int)$block['hall_id'] . $meta;
+          }
+      ?>
+        <div class="sch-block-head <?= $headCls ?>" style="grid-column: span <?= $slotsCnt ?>;"
+             data-block-id="<?= htmlspecialchars($block['id']) ?>"
+             data-help-abs="<?= htmlspecialchars($block['name']) ?>. Внутри <?= $slotsCnt ?> слот(а/ов) — это типичное число людей в этой зоне. Hover — кнопки + слот и настройки блока.">
+          <span class="sch-block-icon"><?= htmlspecialchars($block['icon'] ?? '') ?></span>
+          <span class="sch-block-name"><?= htmlspecialchars($block['name']) ?></span>
+          <span class="sch-block-meta"><?= htmlspecialchars($meta) ?></span>
+          <span class="sch-col-actions">
+            <button title="Добавить слот" class="sch-block-add-slot"
+                    data-block-idx="<?= $blkIdx ?>"
+                    data-help-abs="Добавить новый слот (колонку) в конец блока «<?= htmlspecialchars($block['name']) ?>».">+</button>
+            <button title="Удалить блок" class="sch-block-del"
+                    data-block-idx="<?= $blkIdx ?>"
+                    data-help-abs="Удалить блок целиком. Все смены в нём пропадут.">⋮</button>
+          </span>
+        </div>
+        <div class="sch-divider <?= $divCls ?> head-row"></div>
+      <?php endforeach; ?>
 
       <div class="sch-add-block-cell" data-help-abs="Добавить целый блок: либо новый Hall из Poster, либо кастомная зона (Беседка / Терраса / VIP).">
-        <button class="sch-add-block-btn" title="Добавить новый блок"
-                data-demo-noop="add-block">+</button>
+        <button class="sch-add-block-btn" title="Добавить новый блок" id="schAddBlockBtn">+</button>
       </div>
 
       <div class="sch-block-head" style="grid-column: span 2; background: rgba(255,255,255,.025); border-bottom: 1.5px solid var(--border);"
-           data-help-abs="Сводка дня: красный ⚠ если есть проблемы (нет старшего, мало людей), и прогноз ЗП этого дня.">
+           data-help-abs="Сводка дня: красный ⚠ если нет старшего, и прогноз ЗП этого дня.">
         <span class="sch-block-name" style="color: var(--muted); font-size: 10px; text-align: center; width: 100%;">Сводка дня</span>
       </div>
 
-      <!-- Slot sub-headers row -->
+      <!-- ────── Slot sub-headers row ────── -->
       <div class="sch-slot-head"></div>
       <div class="sch-slot-head"></div>
 
-      <div class="sch-slot-head" data-help-abs="Слот 1 блока «Старшие». × справа сверху — удалить именно эту колонку (с конфирмом, если внутри есть смены).">
-        <span class="sch-slot-num">1</span><span class="sch-slot-default">день</span>
-        <button class="sch-slot-del" title="Удалить этот слот" data-demo-noop="del-slot:senior:0">×</button>
-      </div>
-      <div class="sch-slot-head">
-        <span class="sch-slot-num">2</span><span class="sch-slot-default">день</span>
-        <button class="sch-slot-del" title="Удалить этот слот" data-demo-noop="del-slot:senior:1">×</button>
-      </div>
-      <div class="sch-slot-head">
-        <span class="sch-slot-num">3</span><span class="sch-slot-default">вечер</span>
-        <button class="sch-slot-del" title="Удалить этот слот" data-demo-noop="del-slot:senior:2">×</button>
-      </div>
-      <div class="sch-divider senior"></div>
-
-      <div class="sch-slot-head">
-        <span class="sch-slot-num">1</span><span class="sch-slot-default">09–17</span>
-        <button class="sch-slot-del" title="Удалить этот слот" data-demo-noop="del-slot:main:0">×</button>
-      </div>
-      <div class="sch-slot-head">
-        <span class="sch-slot-num">2</span><span class="sch-slot-default">09–17</span>
-        <button class="sch-slot-del" title="Удалить этот слот" data-demo-noop="del-slot:main:1">×</button>
-      </div>
-      <div class="sch-slot-head">
-        <span class="sch-slot-num">3</span><span class="sch-slot-default">16–23</span>
-        <button class="sch-slot-del" title="Удалить этот слот" data-demo-noop="del-slot:main:2">×</button>
-      </div>
-      <div class="sch-slot-head">
-        <span class="sch-slot-num">4</span><span class="sch-slot-default">16–23</span>
-        <button class="sch-slot-del" title="Удалить этот слот" data-demo-noop="del-slot:main:3">×</button>
-      </div>
-      <div class="sch-divider main"></div>
-
-      <div class="sch-slot-head">
-        <span class="sch-slot-num">1</span><span class="sch-slot-default">10–18</span>
-        <button class="sch-slot-del" title="Удалить этот слот" data-demo-noop="del-slot:banya:0">×</button>
-      </div>
-      <div class="sch-divider banya"></div>
-
-      <div class="sch-slot-head"
-           data-help-abs="Слот по бронированию — заполняется только когда беседка арендована.">
-        <span class="sch-slot-num">1</span><span class="sch-slot-default">по брони</span>
-        <button class="sch-slot-del" title="Удалить этот слот" data-demo-noop="del-slot:custom:0">×</button>
-      </div>
-      <div class="sch-divider custom"></div>
+      <?php foreach ($blocks as $blkIdx => $block):
+          $color  = $schBlockColor($block);
+          $divCls = $color === 'main' ? 'main' : $color;
+          foreach ($block['slots'] as $sIdx => $slot):
+              $defaultLabel = $slot['label'] ?? '';
+              if ($defaultLabel === '' && !empty($slot['defaultTime'])) {
+                  $defaultLabel = str_replace(':00', '', $slot['defaultTime']);
+              }
+      ?>
+        <div class="sch-slot-head" data-help-abs="Слот <?= $sIdx + 1 ?> блока «<?= htmlspecialchars($block['name']) ?>». × справа — удалить именно эту колонку (с конфирмом, если внутри есть смены).">
+          <span class="sch-slot-num"><?= $sIdx + 1 ?></span>
+          <?php if ($defaultLabel !== ''): ?>
+            <span class="sch-slot-default"><?= htmlspecialchars($defaultLabel) ?></span>
+          <?php endif; ?>
+          <button class="sch-slot-del" title="Удалить этот слот"
+                  data-block-idx="<?= $blkIdx ?>" data-slot-idx="<?= $sIdx ?>">×</button>
+        </div>
+      <?php endforeach; ?>
+        <div class="sch-divider <?= $divCls ?>"></div>
+      <?php endforeach; ?>
 
       <div class="sch-add-block-cell" style="border-bottom: 1px solid var(--border);"></div>
 
-      <div class="sch-slot-head" data-help-abs="Предупреждения дня: ⚠ нет старшего, ⚠ мало людей, ⚠ конфликт расписания.">⚠</div>
+      <div class="sch-slot-head" data-help-abs="Предупреждения дня: ⚠ нет старшего, ⚠ мало людей.">⚠</div>
       <div class="sch-slot-head" data-help-abs="Прогноз ФОТ за этот день.">₫/день</div>
 
 
+      <!-- ────── Data rows ────── -->
       <?php
-      // $rows is defined at the top of this file (used here + by the heatmap below).
-      foreach ($rows as $rIdx => $r):
-          $weekendCls = $r['weekend'] ? ' weekend' : '';
-          $cellCls    = $r['weekend'] ? ' weekend' : '';
+      $emptyDays = empty($days);
+      if ($emptyDays):
+      ?>
+        <div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--muted);">
+          Выбран некорректный период. Скорректируйте даты в селекторе сверху.
+        </div>
+      <?php endif; ?>
+
+      <?php foreach ($days as $d):
+          $weekendCls = $d['weekend'] ? ' weekend' : '';
+          $dayHasSenior = false;
+          $daySalary = 0.0;
       ?>
         <div class="sch-row<?= $weekendCls ?> sch-date-cell">
-          <span class="sch-day-num"><?= $r['date'] ?></span>
-          <span class="sch-day-mon"><?= $r['mon'] ?></span>
+          <span class="sch-day-num"><?= htmlspecialchars($d['date']) ?></span>
+          <span class="sch-day-mon"><?= htmlspecialchars($d['mon']) ?></span>
         </div>
-        <div class="sch-row<?= $weekendCls ?> sch-dow-cell"><?= $r['dow'] ?></div>
+        <div class="sch-row<?= $weekendCls ?> sch-dow-cell"><?= htmlspecialchars($d['dow']) ?></div>
 
-        <?php foreach ($r['senior'] as $slotIdx => $s): ?>
-          <div class="sch-cell<?= $cellCls ?>"
-               data-block="senior" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>" data-day-iso="<?= htmlspecialchars($r['iso'] ?? '') ?>"
-               data-help-abs="Кликни → форма «выбрать сотрудника (только с ★) + время + опционально зал». Drag — перенос смены.">
-            <?php if ($s): ?>
-              <div class="sch-shift senior" draggable="true"><span class="sch-name"><?= htmlspecialchars($s[0]) ?></span><span class="sch-time"><?= htmlspecialchars($s[1]) ?></span></div>
+        <?php foreach ($blocks as $block):
+            $color  = $schBlockColor($block);
+            $divCls = $color === 'main' ? 'main' : $color;
+            foreach ($block['slots'] as $sIdx => $slot):
+                $sh = $schGetShift($d['iso'], $block['id'], $sIdx);
+                if ($sh) {
+                    $hrs = $schTimeToHours($sh['end'] ?? '') - $schTimeToHours($sh['start'] ?? '');
+                    if ($hrs > 0) {
+                        $rate = (int)($empById[(int)($sh['emp_id'] ?? 0)]['rate_per_hour'] ?? 0);
+                        $daySalary += $hrs * $rate;
+                    }
+                    if ($color === 'senior') $dayHasSenior = true;
+                }
+        ?>
+          <div class="sch-cell<?= $weekendCls ?>"
+               data-block="<?= htmlspecialchars($block['id']) ?>"
+               data-slot="<?= $sIdx ?>"
+               data-day-iso="<?= htmlspecialchars($d['iso']) ?>"
+               data-day-idx="<?= $d['idx'] ?>">
+            <?php if ($sh):
+                $emp = $empById[(int)($sh['emp_id'] ?? 0)] ?? null;
+                $name = $emp['name'] ?? ($sh['emp_name'] ?? '?');
+                $star = ($color === 'senior' && ($emp['can_be_senior'] ?? false)) ? ' ★' : '';
+                $time = str_replace(':00', '', $sh['start'] ?? '') . '–' . str_replace(':00', '', $sh['end'] ?? '');
+            ?>
+              <div class="sch-shift <?= $color ?>" draggable="true">
+                <span class="sch-name"><?= htmlspecialchars($name . $star) ?></span>
+                <span class="sch-time"><?= htmlspecialchars($time) ?></span>
+              </div>
             <?php else: ?>
-              <span class="sch-empty">+</span>
+              <span class="sch-empty"><?= ($color === 'banya' || $color === 'custom') ? '—' : '+' ?></span>
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
-        <div class="sch-divider senior"></div>
-
-        <?php foreach ($r['main'] as $slotIdx => $s): ?>
-          <div class="sch-cell<?= $cellCls ?>" data-block="hall:1" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>" data-day-iso="<?= htmlspecialchars($r['iso'] ?? '') ?>">
-            <?php if ($s): ?>
-              <div class="sch-shift main" draggable="true"><span class="sch-name"><?= htmlspecialchars($s[0]) ?></span><span class="sch-time"><?= htmlspecialchars($s[1]) ?></span></div>
-            <?php else: ?>
-              <span class="sch-empty">+</span>
-            <?php endif; ?>
-          </div>
+          <div class="sch-divider <?= $divCls ?>"></div>
         <?php endforeach; ?>
-        <div class="sch-divider main"></div>
-
-        <?php foreach ($r['banya'] as $slotIdx => $s): ?>
-          <div class="sch-cell<?= $cellCls ?>" data-block="hall:2" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>" data-day-iso="<?= htmlspecialchars($r['iso'] ?? '') ?>">
-            <?php if ($s): ?>
-              <div class="sch-shift banya" draggable="true"><span class="sch-name"><?= htmlspecialchars($s[0]) ?></span><span class="sch-time"><?= htmlspecialchars($s[1]) ?></span></div>
-            <?php else: ?>
-              <span class="sch-empty">—</span>
-            <?php endif; ?>
-          </div>
-        <?php endforeach; ?>
-        <div class="sch-divider banya"></div>
-
-        <?php foreach ($r['custom'] as $slotIdx => $s): ?>
-          <div class="sch-cell<?= $cellCls ?>" data-block="zone:1" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>" data-day-iso="<?= htmlspecialchars($r['iso'] ?? '') ?>">
-            <?php if ($s): ?>
-              <div class="sch-shift custom" draggable="true"><span class="sch-name"><?= htmlspecialchars($s[0]) ?></span><span class="sch-time"><?= htmlspecialchars($s[1]) ?></span></div>
-            <?php else: ?>
-              <span class="sch-empty">—</span>
-            <?php endif; ?>
-          </div>
-        <?php endforeach; ?>
-        <div class="sch-divider custom"></div>
 
         <div class="sch-add-block-cell"></div>
 
-        <?php if ($r['warn']): ?>
-          <div class="sch-warn-cell bad" title="<?= htmlspecialchars($r['warn']) ?>">⚠</div>
+        <?php if (!$dayHasSenior && count($blocks) > 0): ?>
+          <div class="sch-warn-cell bad" title="Нет старшего!">⚠</div>
         <?php else: ?>
           <div class="sch-warn-cell ok">✓</div>
         <?php endif; ?>
-        <div class="sch-budget-cell"><?= $r['budget'] ?></div>
+        <div class="sch-budget-cell">
+          <?= $daySalary > 0 ? number_format($daySalary / 1_000_000, 2, '.', '') . 'M' : '—' ?>
+        </div>
       <?php endforeach; ?>
 
-      <!-- ИТОГО row -->
-      <div class="sch-totals-cell" style="grid-column: span 2;" data-help-abs="Итог за период по каждому слоту: количество назначенных смен (для слотов) и сумма часов / ФОТ (справа).">Итого</div>
-      <div class="sch-totals-cell">5 шифтов</div>
-      <div class="sch-totals-cell">1</div>
-      <div class="sch-totals-cell">4</div>
-      <div class="sch-divider"></div>
-      <div class="sch-totals-cell">14</div>
-      <div class="sch-totals-cell">14</div>
-      <div class="sch-totals-cell">12</div>
-      <div class="sch-totals-cell">10</div>
-      <div class="sch-divider"></div>
-      <div class="sch-totals-cell">5</div>
-      <div class="sch-divider"></div>
-      <div class="sch-totals-cell">3</div>
-      <div class="sch-divider"></div>
-      <div class="sch-add-block-cell"></div>
-      <div class="sch-warn-cell bad" style="background: rgba(184,135,70,.08); font-weight: 700;">3 ⚠</div>
-      <div class="sch-totals-cell" style="font-size: 12px;">18.4M ₫</div>
+
+      <!-- ────── Totals row ────── -->
+      <?php if (!empty($days)): ?>
+        <div class="sch-totals-cell" style="grid-column: span 2;"
+             data-help-abs="Итого за период: количество назначенных смен в каждом слоте + общий ФОТ.">Итого</div>
+        <?php foreach ($blocks as $blkIdx => $block):
+            $divCls = $schBlockColor($block) === 'main' ? 'main' : $schBlockColor($block);
+            foreach ($block['slots'] as $sIdx => $_):
+        ?>
+          <div class="sch-totals-cell"><?= $blockShiftCounts[$blkIdx][$sIdx] ?? 0 ?></div>
+        <?php endforeach; ?>
+          <div class="sch-divider"></div>
+        <?php endforeach; ?>
+        <div class="sch-add-block-cell"></div>
+        <div class="sch-warn-cell bad" style="background: rgba(184,135,70,.08); font-weight: 700;"><?= $warningDays ?> ⚠</div>
+        <div class="sch-totals-cell" style="font-size: 12px;">
+          <?= $totalSalary > 0 ? number_format($totalSalary / 1_000_000, 2, '.', '') . 'M' : '—' ?>
+        </div>
+      <?php endif; ?>
+
     </div>
   </div>
 
+
   <!-- ════════ Coverage by hour — heatmap + aggregate histogram ════════ -->
   <section class="sch-coverage-section"
-           data-help-abs="Загрузка по часам: сколько людей одновременно работает в каждом временном интервале. Сверху — heatmap (день × час, цвет = плотность). Снизу — горизонтальная гистограмма средней нагрузки по часам за весь период. Шаг настраивается селектом справа.">
+           data-help-abs="Загрузка по часам: сколько людей одновременно работает в каждом временном интервале. Сверху — heatmap, снизу — горизонтальная гистограмма средней нагрузки по часам за весь период. Шаг и фильтр меняются live.">
     <div class="sch-coverage-head">
       <h3>📊 Загрузка по часам</h3>
       <div class="sch-coverage-controls">
         <label>Шаг:</label>
-        <select id="schBucketSize" data-help-abs="Размер интервала. 1 час даёт детальную картину но тонкие колонки; 2-3 часа агрегируют для общего обзора.">
+        <select id="schBucketSize" data-help-abs="1 час даёт детальную картину, 2-3 часа агрегируют.">
           <option value="1">1 час</option>
           <option value="2" selected>2 часа</option>
           <option value="3">3 часа</option>
           <option value="4">4 часа</option>
         </select>
         <label>Считать:</label>
-        <select id="schCoverageFilter" data-help-abs="Фильтр: показывать всех / только старших / только официантов / только определённый блок.">
+        <select id="schCoverageFilter" data-help-abs="Фильтр: всех / только старших / только определённый блок.">
           <option value="all">Всех</option>
           <option value="senior">Только старших</option>
           <option value="main">Главный зал</option>
@@ -504,69 +452,74 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
       </div>
     </div>
 
+    <!-- Server-rendered initial heatmap; JS overrides on bucket/filter change. -->
     <?php
-    // ─── Heatmap matrix: bucketize per-day hours into chunks ───
-    $buckets = $schBucketize($schAggHourTotal, $schBucket, $schHourStart, $schHourEnd);
-    $colCount = count($buckets);
-    // Find max bucket value across whole grid for color normalization
-    $bucketMaxValue = 0;
-    foreach ($rows as $rIdx => $r) {
-        $rowBuckets = $schBucketize($schPerDayHours[$rIdx], $schBucket, $schHourStart, $schHourEnd);
-        foreach ($rowBuckets as $b) $bucketMaxValue = max($bucketMaxValue, $b['max']);
+    // Default: 2h buckets, all-blocks filter — same as JS default
+    $schBucket = 2;
+    $maxCount = 0;
+    foreach ($schPerDayByBlock as $blocksByH) {
+        $sum = array_fill(0, 24, 0);
+        foreach (['senior','main','banya','custom'] as $k) {
+            foreach ($blocksByH[$k] as $h => $c) $sum[$h] += $c;
+        }
+        for ($h = $schHourStart; $h < $schHourEnd; $h += $schBucket) {
+            $bucketMax = 0;
+            for ($k = 0; $k < $schBucket && $h + $k < $schHourEnd; $k++) {
+                $bucketMax = max($bucketMax, $sum[$h + $k]);
+            }
+            $maxCount = max($maxCount, $bucketMax);
+        }
     }
-    if ($bucketMaxValue < 1) $bucketMaxValue = 1;
+    $maxCount = max(1, $maxCount);
+    $colCount = (int) ceil(($schHourEnd - $schHourStart) / $schBucket);
     ?>
-
     <div class="sch-cov-grid" id="schCovGrid" style="--cov-cols: <?= $colCount ?>;">
       <div class="sch-cov-corner">День \ Час</div>
-      <?php foreach ($buckets as $b): ?>
-        <div class="sch-cov-col-head">
-          <?= sprintf('%02d–%02d', $b['from'], $b['to']) ?>
-        </div>
-      <?php endforeach; ?>
+      <?php for ($h = $schHourStart; $h < $schHourEnd; $h += $schBucket): ?>
+        <div class="sch-cov-col-head"><?= sprintf('%02d–%02d', $h, min($h + $schBucket, $schHourEnd)) ?></div>
+      <?php endfor; ?>
 
-      <?php foreach ($rows as $rIdx => $r):
-          $rowBuckets = $schBucketize($schPerDayHours[$rIdx], $schBucket, $schHourStart, $schHourEnd);
-          $weekendCls = $r['weekend'] ? ' weekend' : '';
+      <?php foreach ($days as $d):
+          $weekendCls = $d['weekend'] ? ' weekend' : '';
+          $perBlock = $schPerDayByBlock[$d['idx']] ?? null;
       ?>
-        <div class="sch-cov-row-head<?= $weekendCls ?>">
-          <?= htmlspecialchars($r['dow']) ?> <?= $r['date'] ?>.05
-        </div>
-        <?php foreach ($rowBuckets as $b):
-            $count = $b['max'];
-            $intensity = $schIntensity($count, $bucketMaxValue);
-            $alpha = $count > 0 ? 0.05 + $intensity * 0.90 : 0;
-            $textColor = $intensity > 0.55 ? '#0f1117' : 'var(--text)';
-            $titleAttr = "Дни: пик " . $count . " чел/ч в окне " . sprintf('%02d–%02d', $b['from'], $b['to']);
+        <div class="sch-cov-row-head<?= $weekendCls ?>"><?= htmlspecialchars($d['dow']) ?> <?= htmlspecialchars($d['date']) ?></div>
+        <?php
+        $sum = array_fill(0, 24, 0);
+        if ($perBlock) {
+            foreach (['senior','main','banya','custom'] as $k) {
+                foreach ($perBlock[$k] as $h => $c) $sum[$h] += $c;
+            }
+        }
+        for ($h = $schHourStart; $h < $schHourEnd; $h += $schBucket):
+            $bMax = 0;
+            for ($k = 0; $k < $schBucket && $h + $k < $schHourEnd; $k++) {
+                $bMax = max($bMax, $sum[$h + $k]);
+            }
+            $intensity = $bMax / $maxCount;
+            $alpha = $bMax > 0 ? 0.05 + $intensity * 0.90 : 0;
+            $txt = $intensity > 0.55 ? '#0f1117' : 'var(--text)';
+            $label = $bMax > 0 ? $bMax : '·';
         ?>
           <div class="sch-cov-cell"
-               data-count="<?= $count ?>"
-               data-from="<?= $b['from'] ?>"
-               data-to="<?= $b['to'] ?>"
-               data-day-idx="<?= $rIdx ?>"
-               style="background: rgba(184,135,70,<?= $alpha ?>); color: <?= $textColor ?>;"
-               title="<?= htmlspecialchars($titleAttr) ?>">
-            <?= $count > 0 ? $count : '·' ?>
-          </div>
-        <?php endforeach; ?>
+               data-count="<?= $bMax ?>"
+               style="background: rgba(184,135,70,<?= $alpha ?>); color: <?= $txt ?>;"><?= $label ?></div>
+        <?php endfor; ?>
       <?php endforeach; ?>
     </div>
 
-    <!-- Aggregate horizontal bar chart: avg per hour bucket across all days -->
     <div class="sch-agg-histogram"
-         data-help-abs="Средняя нагрузка по часам за весь выбранный период. Длина бара — среднее количество человек одновременно в этом часе.">
-      <h4>Средняя загрузка по часам за период (<?= count($rows) ?> дней)</h4>
+         data-help-abs="Средняя нагрузка по часам за весь период. Длина бара — среднее количество человек в этом часе.">
+      <h4>Средняя загрузка по часам за период (<?= count($days) ?> дней)</h4>
       <div class="sch-bar-grid">
         <?php
-        $aggMax = max(1, max($schAggHourAvg));
+        $aggMax = max(1, ...$schAggHourAvg);
         for ($h = $schHourStart; $h < $schHourEnd; $h++):
             $avg = $schAggHourAvg[$h];
-            $w = $aggMax > 0 ? round(($avg / $aggMax) * 100, 1) : 0;
+            $w = $aggMax > 0 ? round(($avg / $aggMax) * 1000) / 10 : 0;
         ?>
           <div class="sch-bar-label"><?= sprintf('%02d:00', $h) ?></div>
-          <div class="sch-bar-track">
-            <div class="sch-bar-fill" style="width: <?= $w ?>%;"></div>
-          </div>
+          <div class="sch-bar-track"><div class="sch-bar-fill" style="width: <?= $w ?>%;"></div></div>
           <div class="sch-bar-value"><?= $avg ?> чел</div>
         <?php endfor; ?>
       </div>
@@ -574,22 +527,20 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
   </section>
 
   <?php
-  // ─── Stats payload for JS heatmap rebucketization (no AJAX needed) ───
-  // JS читает этот JSON и пересчитывает heatmap + histogram при смене
-  // селектов «шаг» / «считать» без перезагрузки.
+  // ─── Stats payload for JS heatmap rebucketization ───
   $schStatsPayload = [
       'hourStart' => $schHourStart,
       'hourEnd'   => $schHourEnd,
-      'dayCount'  => $schDayCount,
+      'dayCount'  => count($days),
       'days'      => [],
   ];
-  foreach ($rows as $idx => $r) {
+  foreach ($days as $d) {
       $schStatsPayload['days'][] = [
-          'date'    => $r['date'],
-          'dow'     => $r['dow'],
-          'mon'     => $r['mon'],
-          'weekend' => $r['weekend'],
-          'hours'   => $schPerDayByBlock[$idx],   // ['senior'=>[24], 'main'=>[24], 'banya'=>[24], 'custom'=>[24]]
+          'date'    => $d['date'],
+          'dow'     => $d['dow'],
+          'mon'     => $d['mon'],
+          'weekend' => $d['weekend'],
+          'hours'   => $schPerDayByBlock[$d['idx']] ?? null,
       ];
   }
   ?>
@@ -597,9 +548,6 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
 
   <?php
   // ─── Boot payload for JS state machine ───
-  // state    — loaded snapshot (or default scaffold from ScheduleStateService)
-  // period   — current date range
-  // employees + halls + zones + snapshots — reference data for popover/modal
   $schBootPayload = [
       'state'     => $state,
       'period'    => ['from' => $periodFrom, 'to' => $periodTo],
@@ -607,33 +555,71 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
       'halls'     => $halls,
       'zones'     => $zones,
       'snapshots' => $snapshots,
-      'csrf'      => $_SESSION['user_email'] ?? '',
   ];
   ?>
   <script id="schBootData" type="application/json"><?= json_encode($schBootPayload, JSON_UNESCAPED_UNICODE) ?></script>
 
+
   <!-- Senior shifts summary -->
   <div class="sch-senior-block" data-help-abs="Сводка по старшим за период — кто и когда был старшим. ⚠ на днях без назначенного старшего.">
-    <h3>⭐ Старшие смены недели (13–19 мая)</h3>
-    <div class="sch-senior-list">
-      <div class="sch-senior-row"><span class="who">Султан</span><span class="days">ср 09–17, пн (20.05) 09–17</span></div>
-      <div class="sch-senior-row"><span class="who">Лёша</span><span class="days">пн 09–17, чт 09–17, пт 16–23, пн (20.05) 16–23</span></div>
-      <div class="sch-senior-row"><span class="who">Phai</span><span class="days">пн 16–23, чт 09–17, пт 16–23</span></div>
-      <div class="sch-senior-row"><span class="who">Long</span><span class="days">сб 16–23</span></div>
-      <div class="sch-senior-row" style="color: var(--danger);"><span class="who">⚠ вт</span><span class="days">нет старшего на смену</span></div>
-      <div class="sch-senior-row" style="color: var(--danger);"><span class="who">⚠ вс</span><span class="days">нет старшего на смену</span></div>
+    <h3>⭐ Старшие смены периода</h3>
+    <div class="sch-senior-list" id="schSeniorList">
+      <?php
+      // Group senior shifts by employee
+      $seniorByEmp = [];
+      $daysWithoutSenior = [];
+      foreach ($days as $d) {
+          $hasSr = false;
+          foreach ($blocks as $block) {
+              if ($schBlockColor($block) !== 'senior') continue;
+              foreach ($block['slots'] as $sIdx => $_) {
+                  $sh = $schGetShift($d['iso'], $block['id'], $sIdx);
+                  if (!$sh) continue;
+                  $hasSr = true;
+                  $key = (int)($sh['emp_id'] ?? 0);
+                  $seniorByEmp[$key] ??= ['name' => $empById[$key]['name'] ?? ($sh['emp_name'] ?? '?'), 'days' => []];
+                  $seniorByEmp[$key]['days'][] = $d['dow'] . ' ' . str_replace(':00', '', $sh['start']) . '–' . str_replace(':00', '', $sh['end']);
+              }
+          }
+          if (!$hasSr) $daysWithoutSenior[] = $d['dow'] . ' ' . $d['date'];
+      }
+      ?>
+      <?php foreach ($seniorByEmp as $e): ?>
+        <div class="sch-senior-row">
+          <span class="who"><?= htmlspecialchars($e['name']) ?></span>
+          <span class="days"><?= htmlspecialchars(implode(', ', $e['days'])) ?></span>
+        </div>
+      <?php endforeach; ?>
+      <?php if (empty($seniorByEmp) && empty($daysWithoutSenior)): ?>
+        <div style="color: var(--muted); font-size: 12px;">Старшие пока не назначены — кликни в любую ячейку «Старшие смены» и выбери сотрудника с ★.</div>
+      <?php endif; ?>
+      <?php foreach ($daysWithoutSenior as $dy): ?>
+        <div class="sch-senior-row" style="color: var(--danger);">
+          <span class="who">⚠ <?= htmlspecialchars($dy) ?></span>
+          <span class="days">нет старшего на смену</span>
+        </div>
+      <?php endforeach; ?>
     </div>
   </div>
 
+
   <!-- Snapshots -->
-  <div class="sch-snapshots" data-help-abs="Версии графика. Кнопкой «Сохранить версию» создаётся snapshot — можно вернуться к любой прошлой версии (если поменяли черновик и хотите откатить).">
+  <div class="sch-snapshots" data-help-abs="Версии графика. Кнопкой «Сохранить версию» создаётся snapshot — можно вернуться к любой прошлой версии.">
     <span class="sch-snap-label">Версии:</span>
-    <span class="sch-snap-pill current">текущая <span class="when">17.05 14:30</span></span>
-    <span class="sch-snap-pill" data-demo-noop="load-snapshot">Май чистовая <span class="when">15.05 09:12</span></span>
-    <span class="sch-snap-pill" data-demo-noop="load-snapshot">авто-бэкап <span class="when">16.05 11:40</span></span>
-    <span class="sch-snap-pill" data-demo-noop="load-snapshot">черновик-март <span class="when">28.04 17:55</span></span>
+    <?php foreach ($snapshots as $snap):
+        $cls = $snap['is_current'] ? ' current' : '';
+        $when = preg_replace('/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}).*$/', '$3.$2 $4', (string)$snap['created_at']);
+    ?>
+      <span class="sch-snap-pill<?= $cls ?>" data-snap-id="<?= (int)$snap['id'] ?>">
+        <?= htmlspecialchars($snap['label'] ?: 'auto') ?>
+        <span class="when"><?= htmlspecialchars($when) ?></span>
+      </span>
+    <?php endforeach; ?>
+    <?php if (empty($snapshots)): ?>
+      <span style="color: var(--muted); font-size: 12px;">Нет сохранённых версий. Первое сохранение создаст snapshot.</span>
+    <?php endif; ?>
     <span style="flex:1"></span>
-    <button class="sch-btn" data-demo-noop="save-snapshot">Сохранить текущую версию</button>
+    <button class="sch-btn" id="schSaveSnapBtn">Сохранить версию</button>
   </div>
 
 </div>
@@ -647,14 +633,6 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
     <label>Сотрудник</label>
     <select id="schPopoverEmp">
       <option value="">— не назначен —</option>
-      <option value="5">Султан ★ (Бар)</option>
-      <option value="7">Оля (Хост)</option>
-      <option value="12">Лёша ★ (Хост)</option>
-      <option value="18">Phai ★ (Официант)</option>
-      <option value="19">Long (Официант)</option>
-      <option value="22">An (Баня)</option>
-      <option value="25">Саша (Официант)</option>
-      <option value="26">Вася (Официант)</option>
     </select>
   </div>
   <div>
@@ -669,16 +647,12 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
     <label>Зал (опционально)</label>
     <select id="schPopoverHall">
       <option value="">— любой —</option>
-      <option value="1">🏛 Главный зал</option>
-      <option value="2">♨ Баня</option>
-      <option value="3">🌿 Roma</option>
-      <option value="custom:besedka">🌿 Беседка</option>
     </select>
   </div>
   <div class="actions">
-    <button class="del" data-demo-noop="popover-delete">×</button>
-    <button data-demo-noop="popover-cancel">Отмена</button>
-    <button class="save" data-demo-noop="popover-save">Сохранить</button>
+    <button class="del" id="schPopoverDel">×</button>
+    <button id="schPopoverCancel">Отмена</button>
+    <button class="save" id="schPopoverSave">Сохранить</button>
   </div>
 </div>
 
@@ -704,14 +678,8 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
 
     <div class="sch-modal-group" id="schBlockHallGroup">
       <label>Зал из Poster</label>
-      <select id="schBlockHallSelect">
-        <option value="1" disabled>🏛 Главный зал (hall_id 1) — уже добавлен</option>
-        <option value="2" disabled>♨ Баня (hall_id 2) — уже добавлен</option>
-        <option value="3" selected>🌿 Roma (hall_id 3)</option>
-        <option value="4">🏖 Терраса (hall_id 4)</option>
-        <option value="5">🍷 VIP-зал (hall_id 5)</option>
-      </select>
-      <p class="sch-modal-hint">Список тянется из Poster `spots.getList`. Уже использованные залы недоступны (нельзя добавить дубль).</p>
+      <select id="schBlockHallSelect"></select>
+      <p class="sch-modal-hint">Список тянется из Poster. Уже использованные залы недоступны.</p>
     </div>
 
     <div class="sch-modal-group" id="schBlockCustomGroup" style="display:none">
@@ -719,7 +687,7 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
       <input type="text" id="schBlockCustomName" placeholder="Например: «Беседка», «VIP-зал», «Веранда»">
       <label style="margin-top:10px">Иконка (эмодзи)</label>
       <input type="text" id="schBlockCustomIcon" placeholder="🌿" maxlength="4">
-      <p class="sch-modal-hint">Кастомные зоны сохраняются в `schedule_zones` — потом доступны во всех графиках.</p>
+      <p class="sch-modal-hint">Кастомные зоны сохраняются в schedule_zones — потом доступны во всех графиках.</p>
     </div>
 
     <div class="sch-modal-group">
@@ -729,9 +697,9 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
 
     <div class="sch-modal-actions">
       <button class="sch-btn ghost" id="schModalAddBlockClose">Отмена</button>
-      <button class="sch-btn primary" data-demo-noop="modal-add-block-save">Добавить</button>
+      <button class="sch-btn primary" id="schModalAddBlockSave">Добавить</button>
     </div>
   </div>
 </div>
 
-<script src="/assets/js/schedule.js?v=20260517_v7_persistence" defer></script>
+<script src="/assets/js/schedule.js?v=20260517_v8_phase2b" defer></script>
