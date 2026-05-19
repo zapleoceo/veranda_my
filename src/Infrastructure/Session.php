@@ -91,6 +91,26 @@ final class Session
         ]);
     }
 
+    /**
+     * Release the session file lock so concurrent requests from the
+     * same client can run in parallel. PHP's default file session
+     * handler holds an exclusive lock from session_start() until
+     * either session_write_close() OR script end — that's why two
+     * AJAX requests from the same operator run sequentially even
+     * when the server is otherwise idle.
+     *
+     * Idempotent: safe to call multiple times. After close, $_SESSION
+     * stays readable in-memory; only **new writes** are silently
+     * dropped unless start() reopens the session first.
+     */
+    public static function close(): void
+    {
+        if (PHP_SAPI === 'cli') return;
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            @session_write_close();
+        }
+    }
+
     private static function isHttps(): bool
     {
         if (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') return true;
