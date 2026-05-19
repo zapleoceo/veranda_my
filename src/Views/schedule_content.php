@@ -11,6 +11,32 @@
  * подтягиваются через сервис и snapshot из БД.
  */
 
+// ─── Variables provided by ScheduleController::_handlePage() ───
+// $state      — current snapshot (or default) loaded from ScheduleStateService
+// $employees  — roster (id, name, tag, can_be_senior, rate_per_hour, …)
+// $halls      — Poster halls list
+// $zones      — user-defined custom zones from schedule_zones
+// $snapshots  — recent snapshots for the pills row
+// $periodFrom — ISO 'YYYY-MM-DD'
+// $periodTo   — ISO 'YYYY-MM-DD'
+//
+// Демо $rows ниже используется только когда $state['shifts'] пустой —
+// чтобы первая визуальная сессия не была пустым гридом. На первом
+// сохранении JS отправит сервер тот state, который у него на руках,
+// и при следующей загрузке demo заменится на реальные сохранённые смены.
+$periodFrom ??= date('Y-m-d', strtotime('monday this week'));
+$periodTo   ??= date('Y-m-d', strtotime($periodFrom . ' +13 days'));
+$state      ??= ['blocks' => [], 'shifts' => new \stdClass(), 'templates' => []];
+$employees  ??= [];
+$halls      ??= [];
+$zones      ??= [];
+$snapshots  ??= [];
+
+// ISO dates for the demo grid — synced with $periodFrom so every cell can be
+// addressed by 'data-day-iso="2026-05-19"' and JS reconciles state↔DOM.
+$schDowRu = ['вс','пн','вт','ср','чт','пт','сб'];
+$schMonRu = ['', 'янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+
 // ─── Demo schedule data (used both for grid and hourly heatmap) ───
 $rows = [
     ['date' => '13', 'mon' => 'мая', 'dow' => 'пн', 'weekend' => false,
@@ -62,6 +88,21 @@ $rows = [
      'custom' => [null],
      'warn' => null, 'budget' => '1.38M'],
 ];
+
+// Re-anchor demo dates to the requested period so 'data-day-iso' matches
+// real calendar dates — без этого state.shifts (которые keyed by ISO) не
+// нашли бы свои ячейки.
+$periodTs = (int) strtotime($periodFrom);
+foreach ($rows as $i => &$_r) {
+    $ts = strtotime("+{$i} days", $periodTs);
+    if ($ts === false) continue;
+    $_r['iso']     = date('Y-m-d', $ts);
+    $_r['date']    = (string) date('j', $ts);
+    $_r['mon']     = $schMonRu[(int) date('n', $ts)];
+    $_r['dow']     = $schDowRu[(int) date('w', $ts)];
+    $_r['weekend'] = in_array((int) date('w', $ts), [0, 6], true);
+}
+unset($_r);
 
 // ─── Hourly coverage computation (for heatmap + aggregate bar chart) ───
 $schParseRange = static function (?string $s): ?array {
@@ -356,7 +397,7 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
 
         <?php foreach ($r['senior'] as $slotIdx => $s): ?>
           <div class="sch-cell<?= $cellCls ?>"
-               data-block="senior" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>"
+               data-block="senior" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>" data-day-iso="<?= htmlspecialchars($r['iso'] ?? '') ?>"
                data-help-abs="Кликни → форма «выбрать сотрудника (только с ★) + время + опционально зал». Drag — перенос смены.">
             <?php if ($s): ?>
               <div class="sch-shift senior" draggable="true"><span class="sch-name"><?= htmlspecialchars($s[0]) ?></span><span class="sch-time"><?= htmlspecialchars($s[1]) ?></span></div>
@@ -368,7 +409,7 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
         <div class="sch-divider senior"></div>
 
         <?php foreach ($r['main'] as $slotIdx => $s): ?>
-          <div class="sch-cell<?= $cellCls ?>" data-block="main" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>">
+          <div class="sch-cell<?= $cellCls ?>" data-block="hall:1" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>" data-day-iso="<?= htmlspecialchars($r['iso'] ?? '') ?>">
             <?php if ($s): ?>
               <div class="sch-shift main" draggable="true"><span class="sch-name"><?= htmlspecialchars($s[0]) ?></span><span class="sch-time"><?= htmlspecialchars($s[1]) ?></span></div>
             <?php else: ?>
@@ -379,7 +420,7 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
         <div class="sch-divider main"></div>
 
         <?php foreach ($r['banya'] as $slotIdx => $s): ?>
-          <div class="sch-cell<?= $cellCls ?>" data-block="banya" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>">
+          <div class="sch-cell<?= $cellCls ?>" data-block="hall:2" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>" data-day-iso="<?= htmlspecialchars($r['iso'] ?? '') ?>">
             <?php if ($s): ?>
               <div class="sch-shift banya" draggable="true"><span class="sch-name"><?= htmlspecialchars($s[0]) ?></span><span class="sch-time"><?= htmlspecialchars($s[1]) ?></span></div>
             <?php else: ?>
@@ -390,7 +431,7 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
         <div class="sch-divider banya"></div>
 
         <?php foreach ($r['custom'] as $slotIdx => $s): ?>
-          <div class="sch-cell<?= $cellCls ?>" data-block="custom" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>">
+          <div class="sch-cell<?= $cellCls ?>" data-block="zone:1" data-slot="<?= $slotIdx ?>" data-day-idx="<?= $rIdx ?>" data-day-iso="<?= htmlspecialchars($r['iso'] ?? '') ?>">
             <?php if ($s): ?>
               <div class="sch-shift custom" draggable="true"><span class="sch-name"><?= htmlspecialchars($s[0]) ?></span><span class="sch-time"><?= htmlspecialchars($s[1]) ?></span></div>
             <?php else: ?>
@@ -554,6 +595,23 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
   ?>
   <script id="schStatsData" type="application/json"><?= json_encode($schStatsPayload, JSON_UNESCAPED_UNICODE) ?></script>
 
+  <?php
+  // ─── Boot payload for JS state machine ───
+  // state    — loaded snapshot (or default scaffold from ScheduleStateService)
+  // period   — current date range
+  // employees + halls + zones + snapshots — reference data for popover/modal
+  $schBootPayload = [
+      'state'     => $state,
+      'period'    => ['from' => $periodFrom, 'to' => $periodTo],
+      'employees' => $employees,
+      'halls'     => $halls,
+      'zones'     => $zones,
+      'snapshots' => $snapshots,
+      'csrf'      => $_SESSION['user_email'] ?? '',
+  ];
+  ?>
+  <script id="schBootData" type="application/json"><?= json_encode($schBootPayload, JSON_UNESCAPED_UNICODE) ?></script>
+
   <!-- Senior shifts summary -->
   <div class="sch-senior-block" data-help-abs="Сводка по старшим за период — кто и когда был старшим. ⚠ на днях без назначенного старшего.">
     <h3>⭐ Старшие смены недели (13–19 мая)</h3>
@@ -676,4 +734,4 @@ $schBucketize = static function (array $hours, int $bucketSize, int $startH, int
   </div>
 </div>
 
-<script src="/assets/js/schedule.js?v=20260517_v6_heatmap_live" defer></script>
+<script src="/assets/js/schedule.js?v=20260517_v7_persistence" defer></script>
