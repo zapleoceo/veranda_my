@@ -223,6 +223,8 @@ foreach ($days as $d) {
       <span class="sch-metric-value <?= $warningDays > 0 ? 'warn' : '' ?>"><?= $warningDays ?> ⚠</span>
     </div>
     <div></div>
+    <button class="sch-btn" id="schStaffBtn"
+            data-help-abs="Управление персоналом: кто появляется в графике, кто может быть старшим, какая ставка ₫/час. Список тянется из Poster `access.getEmployees`, локальные теги хранятся в schedule_staff_tags.">👥 Персонал</button>
     <button class="sch-btn" id="schCopyWeek"
             data-help-abs="Скопировать смены прошлой недели в следующую — экономит 80% времени при еженедельном планировании.">↳ Скопировать неделю</button>
     <button class="sch-btn primary" id="schSaveBtn"
@@ -702,4 +704,38 @@ foreach ($days as $d) {
   </div>
 </div>
 
-<script src="/assets/js/schedule.js?v=20260517_v8_phase2b" defer></script>
+<!-- ════════ Staff management modal ════════ -->
+<div id="schModalStaff" class="sch-modal-backdrop" role="dialog" aria-modal="true">
+  <div class="sch-modal" style="width: 760px; max-width: calc(100vw - 32px);">
+    <h3>👥 Управление персоналом графика</h3>
+    <p class="sch-modal-hint" style="margin-bottom: 14px;">
+      Источник списка — Poster <code>access.getEmployees</code> (кэш 30 мин).
+      Локальные теги (в графике / может быть старшим / ставка ₫/ч) сохраняются
+      в <code>schedule_staff_tags</code>.
+      <a href="#" id="schReloadPoster" style="color: var(--accent);">⟳ Перезагрузить из Poster</a>
+    </p>
+
+    <div style="max-height: 60vh; overflow: auto; border: 1px solid var(--border); border-radius: 10px;">
+      <table class="sch-staff-table" id="schStaffTable" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+        <thead>
+          <tr style="background: rgba(255,255,255,.02);">
+            <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border);">Сотрудник</th>
+            <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border);">Poster роль</th>
+            <th style="padding: 10px; text-align: left; border-bottom: 1px solid var(--border);">Тег</th>
+            <th style="padding: 10px; text-align: center; border-bottom: 1px solid var(--border);">В графике</th>
+            <th style="padding: 10px; text-align: center; border-bottom: 1px solid var(--border);">Старший</th>
+            <th style="padding: 10px; text-align: right;  border-bottom: 1px solid var(--border);">₫/час</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="sch-modal-actions">
+      <button class="sch-btn ghost" id="schModalStaffClose">Закрыть</button>
+      <button class="sch-btn primary" id="schModalStaffSave">Сохранить теги</button>
+    </div>
+  </div>
+</div>
+
+<script src="/assets/js/schedule.js?v=20260517_v9_final" defer></script>

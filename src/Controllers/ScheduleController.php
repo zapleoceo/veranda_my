@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Infrastructure\Config;
 use App\Services\Schedule\ScheduleStateService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -69,7 +70,7 @@ class ScheduleController
         $pageTitle    = 'График смен';
         $currentPath  = '/schedule';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">' . "\n"
-                      . '<link rel="stylesheet" href="/assets/css/schedule.css?v=20260517_v8_phase2b">';
+                      . '<link rel="stylesheet" href="/assets/css/schedule.css?v=20260517_v9_final">';
 
         ob_start();
         require __DIR__ . '/../Views/schedule_content.php';
@@ -92,14 +93,16 @@ class ScheduleController
         $method = $request->getMethod();
 
         return match ($ajax) {
-            'load'      => $this->_ajaxLoad($request, $response),
-            'save'      => $this->_ajaxSave($request, $response),
-            'snapshots' => $this->_ajaxListSnapshots($response),
-            'snapshot'  => $this->_ajaxLoadSnapshot($request, $response),
-            'del_snap'  => $this->_ajaxDeleteSnapshot($request, $response),
-            'add_zone'  => $this->_ajaxAddZone($request, $response),
-            'del_zone'  => $this->_ajaxDelZone($request, $response),
-            default     => $this->_json($response, ['ok' => false, 'error' => 'Unknown ajax: ' . $ajax], 400),
+            'load'            => $this->_ajaxLoad($request, $response),
+            'save'            => $this->_ajaxSave($request, $response),
+            'snapshots'       => $this->_ajaxListSnapshots($response),
+            'snapshot'        => $this->_ajaxLoadSnapshot($request, $response),
+            'del_snap'        => $this->_ajaxDeleteSnapshot($request, $response),
+            'add_zone'        => $this->_ajaxAddZone($request, $response),
+            'del_zone'        => $this->_ajaxDelZone($request, $response),
+            'save_staff_tags' => $this->_ajaxSaveStaffTags($request, $response),
+            'reload_poster'   => $this->_ajaxReloadPoster($response),
+            default           => $this->_json($response, ['ok' => false, 'error' => 'Unknown ajax: ' . $ajax], 400),
         };
     }
 
@@ -218,54 +221,62 @@ class ScheduleController
     // ────────────────────────────────────────────────────────────────
 
     /**
-     * TODO: replace with PosterApiClient `access.getEmployees` JOIN со staff_tags.
-     * Сейчас отдаёт hardcoded список соответствующий демо-данным мокапа +
-     * накладывает staff_tags из БД, если они есть.
+     * Employees roster — live Poster access.getEmployees overlaid with
+     * schedule_staff_tags from DB. Cached 30 min via system_meta.
      */
     private function _buildEmployeeRoster(): array
     {
-        $hardcoded = [
-            ['id' => 5,  'name' => 'Султан', 'poster_role' => 'bartender', 'tag' => 'Бар',       'can_senior_default' => true,  'rate' => 65000],
-            ['id' => 7,  'name' => 'Оля',    'poster_role' => 'host',      'tag' => 'Хост',      'can_senior_default' => false, 'rate' => 55000],
-            ['id' => 12, 'name' => 'Лёша',   'poster_role' => 'host',      'tag' => 'Хост',      'can_senior_default' => true,  'rate' => 60000],
-            ['id' => 18, 'name' => 'Phai',   'poster_role' => 'waiter',    'tag' => 'Официант',  'can_senior_default' => true,  'rate' => 50000],
-            ['id' => 19, 'name' => 'Long',   'poster_role' => 'waiter',    'tag' => 'Официант',  'can_senior_default' => false, 'rate' => 48000],
-            ['id' => 22, 'name' => 'An',     'poster_role' => 'waiter',    'tag' => 'Баня',      'can_senior_default' => false, 'rate' => 55000],
-            ['id' => 25, 'name' => 'Саша',   'poster_role' => 'waiter',    'tag' => 'Официант',  'can_senior_default' => false, 'rate' => 52000],
-            ['id' => 26, 'name' => 'Вася',   'poster_role' => 'waiter',    'tag' => 'Официант',  'can_senior_default' => false, 'rate' => 50000],
-        ];
-        $tags = $this->service->getStaffTags();
-        $out = [];
-        foreach ($hardcoded as $e) {
-            $uid = (int)$e['id'];
-            $userTag = $tags[$uid] ?? null;
-            $out[] = [
-                'id'             => $uid,
-                'name'           => $e['name'],
-                'poster_role'    => $e['poster_role'],
-                'tag'            => $userTag['custom_tag'] !== '' ? $userTag['custom_tag'] : $e['tag'],
-                'in_schedule'    => $userTag ? $userTag['in_schedule']    : true,
-                'can_be_senior'  => $userTag ? $userTag['can_be_senior']  : $e['can_senior_default'],
-                'only_in_blocks' => $userTag['only_in_blocks'] ?? '',
-                'rate_per_hour'  => $userTag && $userTag['rate_per_hour'] > 0 ? $userTag['rate_per_hour'] : $e['rate'],
-            ];
-        }
-        return $out;
+        $token = Config::get('POSTER_API_TOKEN', '');
+        return $this->service->fetchPosterEmployees($token);
     }
 
     /**
-     * TODO: replace with Poster `dash.getHalls` / `spots.getList`.
-     * Сейчас hardcoded — три зала, два уже в дефолтных блоках.
+     * Halls — live Poster spots.getSpotTablesHalls across spot_ids 1..5,
+     * dedupe by hall_id. Cached 12h via system_meta. Falls back to
+     * hardcoded list if Poster API token is missing.
      */
     private function _buildHallList(): array
     {
-        return [
-            ['id' => 1, 'name' => 'Главный зал', 'icon' => '🏛'],
-            ['id' => 2, 'name' => 'Баня',        'icon' => '♨'],
-            ['id' => 3, 'name' => 'Roma',        'icon' => '🌿'],
-            ['id' => 4, 'name' => 'Терраса',     'icon' => '🏖'],
-            ['id' => 5, 'name' => 'VIP-зал',     'icon' => '🍷'],
-        ];
+        $token = Config::get('POSTER_API_TOKEN', '');
+        return $this->service->fetchPosterHalls($token);
+    }
+
+    private function _ajaxSaveStaffTags(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        if ($request->getMethod() !== 'POST') {
+            return $this->_json($response, ['ok' => false, 'error' => 'POST required'], 405);
+        }
+        $body = json_decode((string)$request->getBody(), true);
+        $tags = is_array($body['tags'] ?? null) ? $body['tags'] : null;
+        if (!$tags) {
+            return $this->_json($response, ['ok' => false, 'error' => 'tags array required'], 400);
+        }
+        foreach ($tags as $t) {
+            $uid = (int)($t['user_id'] ?? 0);
+            if ($uid <= 0) continue;
+            $this->service->saveStaffTag($uid, [
+                'in_schedule'    => (bool)($t['in_schedule']    ?? true),
+                'can_be_senior'  => (bool)($t['can_be_senior']  ?? false),
+                'only_in_blocks' => (string)($t['only_in_blocks'] ?? ''),
+                'custom_tag'     => (string)($t['custom_tag']     ?? ''),
+                'rate_per_hour'  => (int)($t['rate_per_hour']   ?? 0),
+            ]);
+        }
+        return $this->_json($response, [
+            'ok'        => true,
+            'employees' => $this->_buildEmployeeRoster(),
+        ]);
+    }
+
+    /** Force-refresh Poster caches (employees + halls). */
+    private function _ajaxReloadPoster(ResponseInterface $response): ResponseInterface
+    {
+        $this->service->purgePosterCache();
+        return $this->_json($response, [
+            'ok'        => true,
+            'employees' => $this->_buildEmployeeRoster(),
+            'halls'     => $this->_buildHallList(),
+        ]);
     }
 
     // ────────────────────────────────────────────────────────────────
