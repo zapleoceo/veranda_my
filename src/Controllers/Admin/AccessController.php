@@ -17,6 +17,7 @@ class AccessController
         'errors'         => 'Cooked (errors)',
         'zapara'         => 'Zapara',
         'employees'      => 'ЗП сотрудников',
+        'schedule'       => 'График смен',
         'payday'         => 'Payday',
         'admin'          => 'УПРАВЛЕНИЕ',
         'roma'           => 'Roma (кальяны)',
