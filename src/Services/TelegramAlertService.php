@@ -180,12 +180,29 @@ class TelegramAlertService
                 $tomorrow . ' 00:00:00'
             );
 
+            // Auto-closed dishes today: items that the kitchen NEVER pressed
+            // ready on, but the system auto-excluded because the parent
+            // receipt got closed (setClose / setProb rules in
+            // KitchenSyncService::_applyAutoExclude). Hookah (cat 47) is
+            // excluded — its exclude_auto=1 comes from a different rule and
+            // shouldn't pad this counter.
+            $autoClosed = (int) $this->db->query(
+                "SELECT COUNT(*) FROM {$this->db->t('kitchen_stats')}
+                 WHERE transaction_date = ?
+                   AND exclude_auto = 1
+                   AND ready_pressed_at IS NULL
+                   AND COALESCE(was_deleted, 0) = 0
+                   AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)",
+                [$today]
+            )->fetchColumn();
+
             $statusText = "Открыто чеков: {$m->openChecksDisplay}\n"
                 . "Лимит времени: {$m->waitLimitMinutes} мин\n"
                 . "В очереди: 🍸{$m->queueBar} / 🍔{$m->queueKitchen}\n"
                 . "Долгих блюд: 🍸{$m->overdueBar} / 🍔{$m->overdueKitchen}\n"
                 . "Время обновления: {$lastSync}\n"
-                . "Игноры: {$ignores['items']}|{$ignores['tx']}"
+                . "Игноры: {$ignores['items']}|{$ignores['tx']}\n"
+                . "⚙️ Авто-закрытия: {$autoClosed}"
                 . ($srvTag !== '' ? "\nSrv: {$srvTag}" : '');
 
             $prevId   = (int) $this->meta->get('telegram_status_msg_id', '0');
