@@ -238,11 +238,43 @@
     flex-direction: column; gap: 1px;
     justify-content: center; align-items: center;
     min-height: 38px; padding: 4px 6px;
+    position: relative;
 }
 .sch-slot-head .sch-slot-num { font-size: 11px; color: var(--text); font-weight: 700; }
 .sch-slot-head .sch-slot-default {
     font-size: 9px; color: var(--muted); font-variant-numeric: tabular-nums;
 }
+
+/* × button on each slot column header — точечное удаление колонки */
+.sch-slot-del {
+    position: absolute;
+    top: 2px; right: 2px;
+    width: 16px; height: 16px;
+    font-size: 12px; line-height: 14px;
+    border: 0; background: transparent;
+    color: var(--muted);
+    border-radius: 4px; cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+    font-family: inherit;
+    padding: 0;
+}
+.sch-slot-head:hover .sch-slot-del { opacity: 0.6; }
+.sch-slot-del:hover {
+    background: rgba(239,68,68,0.18);
+    color: var(--danger);
+    opacity: 1;
+}
+
+/* «+ добавить слот» — последняя колонка-кнопка в блоке */
+.sch-slot-add {
+    background: rgba(184,135,70,.06);
+    cursor: pointer;
+    font-size: 16px; font-weight: 700;
+    color: var(--accent);
+    transition: background 0.15s;
+}
+.sch-slot-add:hover { background: rgba(184,135,70,.18); }
 
 /* Date column (sticky) */
 .sch-date-cell {
@@ -457,3 +489,291 @@ body.sch-help-mode [data-help-abs] {
     font-size: 12.5px;
 }
 .sch-notice strong { color: var(--accent); }
+
+
+/* ═══════════════════════════════════════════════════════
+   COVERAGE BY HOUR — Heatmap matrix + aggregate histogram
+   ═══════════════════════════════════════════════════════ */
+
+.sch-coverage-section {
+    margin-top: 16px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 22px;
+}
+.sch-coverage-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px; gap: 16px; flex-wrap: wrap;
+}
+.sch-coverage-head h3 {
+    margin: 0; font-size: 14px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    display: flex; align-items: center; gap: 8px;
+}
+.sch-coverage-controls {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.sch-coverage-controls label {
+    color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+}
+.sch-coverage-controls select {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 10px; font-size: 12px; font-family: inherit;
+}
+.sch-coverage-legend {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; color: var(--muted);
+}
+.sch-coverage-legend .swatch {
+    display: inline-block; width: 16px; height: 12px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+}
+
+/* Heatmap matrix */
+.sch-cov-grid {
+    display: grid;
+    grid-template-columns: 80px repeat(var(--cov-cols, 9), minmax(46px, 1fr));
+    gap: 2px;
+    font-size: 11px;
+    margin-bottom: 22px;
+}
+.sch-cov-corner {
+    padding: 6px 8px;
+    color: var(--muted); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    font-weight: 600;
+    display: flex; align-items: center;
+}
+.sch-cov-col-head {
+    padding: 6px 4px;
+    text-align: center;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    background: rgba(255,255,255,.02);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 30px;
+    font-size: 10.5px;
+}
+.sch-cov-row-head {
+    padding: 6px 8px;
+    color: var(--text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    background: rgba(255,255,255,.025);
+    border-radius: 4px;
+    display: flex; align-items: center;
+    font-size: 11px;
+}
+.sch-cov-row-head.weekend { color: var(--danger); }
+.sch-cov-cell {
+    padding: 6px 4px;
+    text-align: center;
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 30px;
+    cursor: default;
+    /* интенсивность задаётся inline через background-color */
+    background: rgba(184,135,70,0);
+    color: var(--text);
+    transition: transform 0.1s;
+}
+.sch-cov-cell[data-count="0"] {
+    background: rgba(255,255,255,.02);
+    color: var(--muted); opacity: 0.4;
+}
+.sch-cov-cell:hover {
+    transform: scale(1.08);
+    outline: 1px solid var(--accent);
+    z-index: 2;
+}
+
+/* Horizontal aggregate histogram (per hour, period avg) */
+.sch-agg-histogram {
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+    margin-top: 4px;
+}
+.sch-agg-histogram h4 {
+    margin: 0 0 10px; font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
+}
+.sch-bar-grid {
+    display: grid;
+    grid-template-columns: 80px 1fr 50px;
+    gap: 6px 10px;
+    align-items: center;
+    font-size: 11px;
+}
+.sch-bar-label {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+.sch-bar-track {
+    height: 14px;
+    background: rgba(255,255,255,.03);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+.sch-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, rgba(184,135,70,.4), var(--accent));
+    border-radius: 4px;
+    transition: width 0.2s;
+}
+.sch-bar-value {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 11px;
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   INLINE POPOVER — edit cell
+   ═══════════════════════════════════════════════════════ */
+
+.sch-popover {
+    position: fixed;
+    z-index: 1000;
+    background: var(--surface);
+    border: 1.5px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 14px 36px rgba(0,0,0,0.75);
+    width: 260px;
+    display: none;
+    grid-template-rows: auto auto auto auto auto;
+    gap: 10px;
+    font-size: 12px;
+}
+.sch-popover.visible { display: grid; }
+.sch-popover-arrow {
+    position: absolute;
+    width: 12px; height: 12px;
+    background: var(--surface);
+    border-left: 1.5px solid var(--accent);
+    border-top: 1.5px solid var(--accent);
+    transform: rotate(45deg);
+}
+.sch-popover[data-arrow="above"] .sch-popover-arrow { top: -7px; }
+.sch-popover[data-arrow="below"] .sch-popover-arrow {
+    bottom: -7px;
+    border-left: 0; border-top: 0;
+    border-right: 1.5px solid var(--accent);
+    border-bottom: 1.5px solid var(--accent);
+}
+.sch-popover label {
+    color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    display: block; margin-bottom: 4px;
+    font-weight: 600;
+}
+.sch-popover .field-row {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    gap: 6px; align-items: center;
+}
+.sch-popover input[type=time],
+.sch-popover select {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 8px; font-size: 12px;
+    font-family: inherit;
+    width: 100%;
+}
+.sch-popover .actions {
+    display: flex; gap: 6px; margin-top: 4px;
+}
+.sch-popover .actions button {
+    flex: 1; padding: 7px 0; font-size: 12px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text); border-radius: 6px; cursor: pointer;
+    font-family: inherit; font-weight: 600;
+}
+.sch-popover .actions .save {
+    background: var(--accent); border-color: var(--accent); color: #0f1117;
+}
+.sch-popover .actions .del {
+    color: var(--danger); border-color: rgba(239,68,68,.4);
+    flex: 0.6;
+}
+.sch-popover-meta {
+    color: var(--muted); font-size: 10.5px;
+    padding-bottom: 4px; border-bottom: 1px solid var(--border);
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   MODAL — Add block
+   ═══════════════════════════════════════════════════════ */
+
+.sch-modal-backdrop {
+    position: fixed; inset: 0; z-index: 900;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center; justify-content: center;
+}
+.sch-modal-backdrop.visible { display: flex; }
+.sch-modal {
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 14px;
+    padding: 22px 24px;
+    width: 460px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 64px);
+    overflow: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+}
+.sch-modal h3 {
+    margin: 0 0 18px; color: var(--accent);
+    font-size: 16px;
+    display: flex; align-items: center; gap: 8px;
+}
+.sch-modal-group { margin-bottom: 14px; }
+.sch-modal-group > label {
+    color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    display: block; margin-bottom: 6px; font-weight: 600;
+}
+.sch-modal-group select,
+.sch-modal-group input[type=text],
+.sch-modal-group input[type=number] {
+    width: 100%;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 11px; font-size: 13px; font-family: inherit;
+}
+.sch-modal-radio { display: flex; gap: 8px; }
+.sch-modal-radio .card {
+    flex: 1; padding: 12px 14px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; cursor: pointer;
+    display: flex; flex-direction: column; gap: 3px;
+    font-size: 12px;
+    transition: border-color 0.15s, background 0.15s;
+}
+.sch-modal-radio .card:hover { border-color: var(--muted); }
+.sch-modal-radio .card.active {
+    border-color: var(--accent);
+    background: rgba(184,135,70,.07);
+}
+.sch-modal-radio .card .title { font-weight: 700; color: var(--text); }
+.sch-modal-radio .card .sub { color: var(--muted); font-size: 11px; }
+.sch-modal-actions {
+    display: flex; gap: 8px; justify-content: flex-end;
+    margin-top: 18px; padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+.sch-modal-hint {
+    color: var(--muted); font-size: 11px;
+    line-height: 1.5; margin-top: 2px;
+}
