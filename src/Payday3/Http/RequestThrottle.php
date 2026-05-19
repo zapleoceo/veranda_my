@@ -26,9 +26,7 @@ final class RequestThrottle
      */
     public static function guard(string $key, int $cooldownSeconds): void
     {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            @session_start();
-        }
+        \App\Infrastructure\Session::start();
         $bucketKey = '__pd3_throttle__';
         $now    = time();
         $bucket = $_SESSION[$bucketKey] ?? [];

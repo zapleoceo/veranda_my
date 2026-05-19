@@ -6,6 +6,7 @@ namespace App\Controllers\Auth;
 
 use App\Infrastructure\Config;
 use App\Infrastructure\Database;
+use App\Infrastructure\Session;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -15,9 +16,7 @@ class CallbackController
 
     public function handle(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        Session::start();
 
         $params = $request->getQueryParams();
         $code   = $params['code'] ?? '';

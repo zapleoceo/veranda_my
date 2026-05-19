@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Infrastructure\Session;
 use App\Services\UserPermissionsService;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -20,17 +21,61 @@ class AuthMiddleware implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        Session::start();
 
         if (empty($_SESSION['user_email'])) {
+            // Stash the path the user actually wanted so CallbackController
+            // can land them back there after Google sign-in. Don't loop
+            // /login / /logout / /auth/callback back through here.
+            $uri  = $request->getUri();
+            $path = $uri->getPath();
+            $next = $path . (($q = $uri->getQuery()) !== '' ? '?' . $q : '');
+            if (self::isSafeReturnPath($path)) {
+                $_SESSION['auth_next'] = $next;
+            }
+
+            // AJAX / fetch / JSON callers get a 401 JSON envelope so
+            // their client code can redirect cleanly instead of trying
+            // to parse the HTML login page that a 302 would yield.
+            if (self::wantsJson($request)) {
+                $body = json_encode([
+                    'ok'        => false,
+                    'error'     => 'Auth required',
+                    'login_url' => '/login',
+                ], JSON_UNESCAPED_UNICODE);
+                $r = $this->responseFactory->createResponse(401)
+                    ->withHeader('Content-Type', 'application/json; charset=utf-8')
+                    ->withHeader('Cache-Control', 'no-store');
+                $r->getBody()->write($body !== false ? $body : '{"ok":false,"error":"Auth required"}');
+                return $r;
+            }
             return $this->responseFactory->createResponse(302)
                 ->withHeader('Location', '/login');
         }
 
         $this->permissions->loadIntoSession((string) $_SESSION['user_email']);
-
         return $handler->handle($request->withAttribute('user_email', $_SESSION['user_email']));
+    }
+
+    /** True for fetch()/XHR/JSON clients (they get a 401 JSON, not a 302). */
+    private static function wantsJson(ServerRequestInterface $r): bool
+    {
+        $accept = strtolower($r->getHeaderLine('Accept'));
+        if ($accept !== '' && str_contains($accept, 'application/json')) return true;
+        if (strcasecmp($r->getHeaderLine('X-Requested-With'), 'XMLHttpRequest') === 0) return true;
+        $ct = strtolower($r->getHeaderLine('Content-Type'));
+        if ($ct !== '' && str_contains($ct, 'application/json')) return true;
+        return false;
+    }
+
+    /** Only redirect back to internal paths (no open-redirect risk). */
+    private static function isSafeReturnPath(string $path): bool
+    {
+        if ($path === '' || $path[0] !== '/') return false;
+        if (str_starts_with($path, '//'))     return false;
+        if (str_starts_with($path, '/login')) return false;
+        if (str_starts_with($path, '/logout')) return false;
+        if (str_starts_with($path, '/auth/')) return false;
+        return true;
     }
 }
