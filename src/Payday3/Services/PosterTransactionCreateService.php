@@ -40,6 +40,12 @@ final class PosterTransactionCreateService implements PosterTransactionCreateSer
             'type'    => $type === 1 ? 1 : ($type === 2 ? 0 : 2), // UI → Poster wire
             'date'    => $date,
             'comment' => $comment,
+            // The form sends a wall-clock string ('Y-m-d H:i:s') in the
+            // operator's local timezone, which we declare as the account's
+            // configured timezone (Vietnam) via `timezone=client`. Without
+            // this Poster interprets the string in its server timezone
+            // (~Moscow), shifting everything by 3–4 hours.
+            'timezone' => 'client',
         ];
         if ($categoryId > 0) {
             $payload['category'] = $categoryId;
