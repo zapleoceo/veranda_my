@@ -96,6 +96,19 @@ use App\Payday3\Contracts\FinanceTransferServiceInterface;
 use App\Payday3\Services\FinanceTransferService;
 use App\Payday3\Contracts\PosterBalanceServiceInterface;
 use App\Payday3\Services\PosterBalanceService;
+use App\Schedule\Contracts\EmployeeRateRepositoryInterface;
+use App\Schedule\Contracts\EmployeesProviderInterface;
+use App\Schedule\Contracts\HallsProviderInterface;
+use App\Schedule\Contracts\SnapshotRepositoryInterface;
+use App\Schedule\Contracts\StaffTagRepositoryInterface;
+use App\Schedule\Contracts\ZoneRepositoryInterface;
+use App\Schedule\Repositories\EmployeeRateRepository;
+use App\Schedule\Repositories\MetaCache;
+use App\Schedule\Repositories\SnapshotRepository;
+use App\Schedule\Repositories\StaffTagRepository;
+use App\Schedule\Repositories\ZoneRepository;
+use App\Schedule\Services\PosterEmployeesProvider;
+use App\Schedule\Services\PosterHallsProvider;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -291,5 +304,23 @@ return [
     ),
     PosterTransactionCreateAction::class => fn($c) => new PosterTransactionCreateAction(
         $c->get(PosterTransactionCreateServiceInterface::class),
+    ),
+
+    // ─── Schedule (shift planner) ─────────────────────────────
+    MetaCache::class                         => fn($c) => new MetaCache($c->get(Database::class)),
+    SnapshotRepositoryInterface::class       => fn($c) => new SnapshotRepository($c->get(Database::class)),
+    ZoneRepositoryInterface::class           => fn($c) => new ZoneRepository($c->get(Database::class)),
+    StaffTagRepositoryInterface::class       => fn($c) => new StaffTagRepository($c->get(Database::class)),
+    // Hourly-rate store shared with the /employees/ page (employee_rates).
+    EmployeeRateRepositoryInterface::class   => fn($c) => new EmployeeRateRepository($c->get(Database::class)),
+    EmployeesProviderInterface::class        => fn($c) => new PosterEmployeesProvider(
+        $c->get(StaffTagRepositoryInterface::class),
+        $c->get(EmployeeRateRepositoryInterface::class),
+        $c->get(MetaCache::class),
+        Config::get('POSTER_API_TOKEN', ''),
+    ),
+    HallsProviderInterface::class            => fn($c) => new PosterHallsProvider(
+        $c->get(MetaCache::class),
+        Config::get('POSTER_API_TOKEN', ''),
     ),
 ];

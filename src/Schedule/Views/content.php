@@ -738,4 +738,4 @@ foreach ($days as $d) {
   </div>
 </div>
 
-<script src="/assets/js/schedule.js?v=20260517_v9_final" defer></script>
+<script src="/schedule/assets/js/schedule.js?v=20260518_solid" defer></script>
