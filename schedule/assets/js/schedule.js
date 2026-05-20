@@ -155,6 +155,55 @@
         return Math.max(0, b - a);
     }
 
+    // Day warning reasons — mirror of PHP $schDayWarnReasons.
+    // Three checks: no senior, double-booking, off-roster employee.
+    function dayWarnReasons(iso) {
+        const reasons = [];
+        const blocks  = App.state.blocks || [];
+        let anyShift = false, hasSenior = false;
+        const empTimes = new Map();  // empId → [[startH, endH], …]
+        blocks.forEach((blk) => {
+            const isSenior = blockColor(blk) === 'senior';
+            (blk.slots || []).forEach((_, sIdx) => {
+                const sh = getShift(iso, blk.id, sIdx);
+                if (!sh) return;
+                anyShift = true;
+                if (isSenior) hasSenior = true;
+                const empId = parseInt(sh.emp_id, 10) || 0;
+                if (empId <= 0) return;
+                const sH = parseHHMM(sh.start), eH = parseHHMM(sh.end);
+                if (eH > sH) {
+                    if (!empTimes.has(empId)) empTimes.set(empId, []);
+                    empTimes.get(empId).push([sH, eH]);
+                }
+                const emp = empById.get(empId);
+                if (emp && emp.in_schedule === false) {
+                    const r = `Не в графике: ${emp.name || ('uid:' + empId)}`;
+                    if (!reasons.includes(r)) reasons.push(r);
+                }
+            });
+        });
+        if (anyShift && !hasSenior) reasons.unshift('Нет старшего');
+        empTimes.forEach((intervals, empId) => {
+            if (intervals.length < 2) return;
+            intervals.sort((a, b) => a[0] - b[0]);
+            for (let i = 1; i < intervals.length; i++) {
+                if (intervals[i][0] < intervals[i - 1][1]) {
+                    const emp = empById.get(empId);
+                    const r = `Двойное бронирование: ${emp?.name || ('uid:' + empId)}`;
+                    if (!reasons.includes(r)) reasons.push(r);
+                    break;
+                }
+            }
+        });
+        return reasons;
+    }
+    function parseHHMM(s) {
+        if (!s) return 0;
+        const [h, m = '0'] = String(s).split(':');
+        return (parseInt(h, 10) || 0) + ((parseInt(m, 10) || 0) / 60);
+    }
+
     function recomputeSummaries() {
         const blocks = App.state.blocks || [];
         const isos   = new Set();
@@ -164,41 +213,36 @@
         let warnDays = 0, totalSalary = 0;
 
         isos.forEach((iso) => {
-            let hasSenior = false;
             let daySalary = 0;
             blocks.forEach((blk) => {
-                const isSenior = blockColor(blk) === 'senior';
                 (blk.slots || []).forEach((_, sIdx) => {
                     const sh = getShift(iso, blk.id, sIdx);
                     if (!sh) return;
                     const hrs  = hoursBetween(sh.start, sh.end);
                     const rate = (empById.get(sh.emp_id)?.rate_per_hour) || 0;
                     if (hrs > 0) daySalary += hrs * rate;
-                    if (isSenior) hasSenior = true;
                     const k = `${blk.id}:${sIdx}`;
                     slotCounts.set(k, (slotCounts.get(k) || 0) + 1);
                 });
             });
             totalSalary += daySalary;
 
-            // Per-day warn cell
+            const reasons = dayWarnReasons(iso);
             const warn = document.querySelector(`.sch-warn-cell[data-day-iso="${iso}"]`);
             if (warn) {
-                const bad = blocks.length > 0 && !hasSenior;
+                const bad = reasons.length > 0;
                 warn.classList.toggle('bad', bad);
                 warn.classList.toggle('ok',  !bad);
                 warn.textContent = bad ? '⚠' : '✓';
-                warn.title       = bad ? 'Нет старшего!' : '';
+                warn.title       = bad ? reasons.join('\n') : 'Всё в порядке';
                 if (bad) warnDays++;
             }
-            // Per-day budget cell
             const budget = document.querySelector(`.sch-budget-cell[data-day-iso="${iso}"]`);
             if (budget) {
                 budget.textContent = daySalary > 0 ? (daySalary / 1_000_000).toFixed(2) + 'M' : '—';
             }
         });
 
-        // Totals row — one count per slot + total warn count + total salary
         document.querySelectorAll('.sch-totals-cell[data-totals-slot]').forEach((c) => {
             c.textContent = String(slotCounts.get(c.dataset.totalsSlot) || 0);
         });
@@ -549,6 +593,42 @@
         }
 
         await saveAndReload(`Блок удалён`);
+    });
+
+
+    // ════════════════ Templates: add + delete ════════════════
+    // The "+ Шаблон" chip prompts for name+time and pushes into state.templates.
+    // The × on each existing chip soft-deletes (no DB row, just array splice).
+    function normalizeTime(s) {
+        // Accepts "9", "9:00", "09:00", "9.00" → "09:00"; "" on parse fail.
+        const m = String(s || '').trim().match(/^(\d{1,2})[:.]?(\d{0,2})$/);
+        if (!m) return '';
+        const h = Math.min(23, Math.max(0, parseInt(m[1], 10) || 0));
+        const mi = Math.min(59, Math.max(0, parseInt(m[2] || '0', 10) || 0));
+        return `${String(h).padStart(2,'0')}:${String(mi).padStart(2,'0')}`;
+    }
+    document.getElementById('schAddTemplate')?.addEventListener('click', async () => {
+        const name = (prompt('Название (коротко — Д / В / У / Бранч…):', '') || '').trim();
+        if (!name) return;
+        const start = normalizeTime(prompt('Начало (например, 09:00):', '09:00'));
+        if (!start) { toast('Не понял время начала', 'err'); return; }
+        const end = normalizeTime(prompt('Конец (например, 17:00):', '17:00'));
+        if (!end)   { toast('Не понял время конца',  'err'); return; }
+        App.state.templates = App.state.templates || [];
+        App.state.templates.push({ name, start, end });
+        await saveAndReload('Шаблон добавлен');
+    });
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.sch-chip-del');
+        if (!btn) return;
+        e.preventDefault(); e.stopPropagation();
+        const idx = parseInt(btn.dataset.templateIdx, 10);
+        if (!Number.isInteger(idx)) return;
+        const tpl = (App.state.templates || [])[idx];
+        if (!tpl) return;
+        if (!confirm(`Удалить шаблон «${tpl.name} ${tpl.start}–${tpl.end}»?`)) return;
+        App.state.templates.splice(idx, 1);
+        await saveAndReload('Шаблон удалён');
     });
 
 
