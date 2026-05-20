@@ -1,7 +1,39 @@
 .card { position: relative; }
-.filters { display:flex; gap: 10px; align-items:end; flex-wrap: wrap; }
+.filters { display:flex; gap: 10px; align-items:flex-end; flex-wrap: wrap; }
         .filters label { font-size: 12px; color: var(--muted); display:flex; flex-direction: column; gap: 6px; }
         .filters input[type="date"] { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card); }
+        /* Two date-range fieldsets ("Период работы" / "Период выплат") —
+           grouped visually so it's obvious which dates control which
+           data. Second one auto-defaults to work+3d but can be edited
+           independently. */
+        .filters .period-group {
+            margin: 0; padding: 6px 10px 8px;
+            border: 1px solid var(--border); border-radius: 10px;
+            background: rgba(255,255,255,0.02);
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .filters .period-group legend {
+            font-size: 11px; color: var(--muted); font-weight: 800;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            padding: 0 6px; margin-left: 4px;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .filters .period-group[data-period="paid"] {
+            background: rgba(184,135,70,0.04);
+            border-color: rgba(184,135,70,0.25);
+        }
+        .filters .period-group input[type="date"] {
+            padding: 5px 8px; font-size: 13px; min-width: 130px;
+        }
+        .filters .period-sep { color: var(--muted); font-size: 14px; }
+        .filters .period-resync {
+            background: transparent; border: 1px solid var(--border);
+            color: var(--muted); cursor: pointer; border-radius: 6px;
+            width: 18px; height: 18px; padding: 0; line-height: 16px;
+            font-size: 12px; font-weight: 700;
+        }
+        .filters .period-resync:hover { color: var(--accent); border-color: var(--accent); }
+        .filters .period-resync.is-manual { color: var(--accent); border-color: var(--accent); }
         .filters button { padding: 10px 16px; border-radius: 8px; border: 0; background: var(--accent); color: #fffaf4; font-weight: 800; cursor: pointer; }
         .filters button:disabled { opacity: 0.65; cursor: default; }
         .loader { display:none; align-items:center; gap: 10px; }

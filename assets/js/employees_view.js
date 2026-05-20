@@ -1,6 +1,9 @@
 (() => {
     const dateFrom = document.getElementById('dateFrom');
     const dateTo = document.getElementById('dateTo');
+    const paidFrom = document.getElementById('paidFrom');
+    const paidTo   = document.getElementById('paidTo');
+    const paidResyncBtn = document.getElementById('paidResyncBtn');
     const btn = document.getElementById('loadBtn');
     const loader = document.getElementById('loader');
     const err = document.getElementById('err');
@@ -126,6 +129,45 @@
     const prefs = loadPrefs();
     if (prefs.date_from) dateFrom.value = prefs.date_from;
     if (prefs.date_to) dateTo.value = prefs.date_to;
+
+    // ─── Paid period (выплаты): auto = work + 3 days, manual override allowed ─
+    // Persisted separately. `paid_manual` flag tells us whether to keep user's
+    // override when they change the work period (otherwise we resync).
+    let paidManual = !!prefs.paid_manual;
+    function resyncPaidPeriod() {
+        if (!paidFrom || !paidTo) return;
+        const pf = addDays(dateFrom.value, 3);
+        const pt = addDays(dateTo.value,   3);
+        if (pf) paidFrom.value = pf;
+        if (pt) paidTo.value   = pt;
+        paidManual = false;
+        if (paidResyncBtn) paidResyncBtn.classList.remove('is-manual');
+        const p = loadPrefs();
+        p.paid_from = pf; p.paid_to = pt; p.paid_manual = false;
+        savePrefs(p);
+    }
+    if (paidFrom && paidTo) {
+        if (paidManual && prefs.paid_from && prefs.paid_to) {
+            paidFrom.value = prefs.paid_from;
+            paidTo.value   = prefs.paid_to;
+            if (paidResyncBtn) paidResyncBtn.classList.add('is-manual');
+        } else {
+            // First load OR auto-sync — derive from work period.
+            paidFrom.value = addDays(dateFrom.value, 3) || dateFrom.value;
+            paidTo.value   = addDays(dateTo.value,   3) || dateTo.value;
+        }
+        paidFrom.addEventListener('change', () => {
+            paidManual = true;
+            if (paidResyncBtn) paidResyncBtn.classList.add('is-manual');
+            const p = loadPrefs(); p.paid_from = paidFrom.value; p.paid_manual = true; savePrefs(p);
+        });
+        paidTo.addEventListener('change', () => {
+            paidManual = true;
+            if (paidResyncBtn) paidResyncBtn.classList.add('is-manual');
+            const p = loadPrefs(); p.paid_to = paidTo.value; p.paid_manual = true; savePrefs(p);
+        });
+        if (paidResyncBtn) paidResyncBtn.addEventListener('click', resyncPaidPeriod);
+    }
     let hideZero = (prefs.hide_zero === undefined) ? true : !!prefs.hide_zero;
     if (hideZeroCb) hideZeroCb.checked = !hideZero;
     const COLS_KEY = 'employees_cols_v1';
@@ -264,8 +306,15 @@
     applyCols();
     renderColsMenu();
     renderRolesMenu();
-    dateFrom.addEventListener('change', () => { const p = loadPrefs(); p.date_from = dateFrom.value; savePrefs(p); });
-    dateTo.addEventListener('change', () => { const p = loadPrefs(); p.date_to = dateTo.value; savePrefs(p); });
+    dateFrom.addEventListener('change', () => {
+        const p = loadPrefs(); p.date_from = dateFrom.value; savePrefs(p);
+        // Keep paid period in sync while the user hasn't manually overridden it.
+        if (!paidManual && paidFrom) paidFrom.value = addDays(dateFrom.value, 3) || dateFrom.value;
+    });
+    dateTo.addEventListener('change', () => {
+        const p = loadPrefs(); p.date_to = dateTo.value; savePrefs(p);
+        if (!paidManual && paidTo) paidTo.value = addDays(dateTo.value, 3) || dateTo.value;
+    });
     if (hideZeroCb) hideZeroCb.addEventListener('change', () => {
         hideZero = !hideZeroCb.checked;
         const p = loadPrefs(); p.hide_zero = hideZero; savePrefs(p);
@@ -953,8 +1002,13 @@
                 progDesc.textContent = 'Загрузка LTP…';
                 const urlLtp = new URL(location.href);
                 urlLtp.searchParams.set('ajax', 'ltp_load');
+                // Paid period — drives where ltpLoad looks for finance txs.
+                // Server now uses these verbatim (no implicit +3 shift).
+                // We also pass the work period for back-compat / display.
                 urlLtp.searchParams.set('date_from', dateFrom.value);
-                urlLtp.searchParams.set('date_to', dateTo.value);
+                urlLtp.searchParams.set('date_to',   dateTo.value);
+                if (paidFrom && paidFrom.value) urlLtp.searchParams.set('paid_from', paidFrom.value);
+                if (paidTo   && paidTo.value)   urlLtp.searchParams.set('paid_to',   paidTo.value);
                 const { signal, cleanup } = withTimeout(20000);
                 const resLtp = await fetch(urlLtp.toString(), { headers: { 'Accept': 'application/json' }, signal });
                 const txtLtp = await resLtp.text();
