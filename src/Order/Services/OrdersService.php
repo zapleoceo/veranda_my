@@ -28,6 +28,8 @@ final class OrdersService implements OrdersServiceInterface
 {
     private string $token;
     private int    $defaultSpotId;
+    private int    $waiterId;
+    private int    $clientId;
 
     public function __construct(private readonly PosterApiProviderInterface $poster)
     {
@@ -40,6 +42,18 @@ final class OrdersService implements OrdersServiceInterface
         ));
         $envSpot             = Config::get('POSTER_SPOT_ID') ?: ($_ENV['POSTER_SPOT_ID'] ?? getenv('POSTER_SPOT_ID'));
         $this->defaultSpotId = is_numeric($envSpot) ? max(1, (int)$envSpot) : 1;
+
+        // Poster's Incoming Orders API REQUIRES a waiterId and rejects
+        // the call otherwise. The legacy /neworder code hardcoded 10
+        // (the "operator" waiter) and 71 (a generic walk-in client) —
+        // those are RestPublica's actual ids in Poster. Allow override
+        // via env so future shops / staff changes don't need a code
+        // edit, but default to the values that have been working in
+        // production for months.
+        $envWaiter        = Config::get('NEWORDER_WAITER_ID') ?: ($_ENV['NEWORDER_WAITER_ID'] ?? getenv('NEWORDER_WAITER_ID'));
+        $envClient        = Config::get('NEWORDER_CLIENT_ID') ?: ($_ENV['NEWORDER_CLIENT_ID'] ?? getenv('NEWORDER_CLIENT_ID'));
+        $this->waiterId   = is_numeric($envWaiter) ? max(0, (int)$envWaiter) : 10;
+        $this->clientId   = is_numeric($envClient) ? max(0, (int)$envClient) : 71;
     }
 
     public function createOrder(int $spotId, int $tableId, string $comment, array $lines): array
@@ -55,12 +69,18 @@ final class OrdersService implements OrdersServiceInterface
         $payload = [
             'spotId'      => $spotId > 0 ? $spotId : $this->defaultSpotId,
             'tableId'     => $tableId > 0 ? $tableId : 0,
+            'waiterId'    => $this->waiterId,         // required by Poster
             'guestsCount' => 1,
             'serviceMode' => 1,                       // dine-in
             'products'    => array_map(fn(CartLine $l) => $this->lineToOrderProduct($l), $lines),
         ];
         $comment = trim($comment);
         if ($comment !== '') $payload['comment'] = $comment;
+        // Poster expects an explicit client object; the generic walk-in
+        // client (id 71 in RestPublica) is the operator-side fallback.
+        if ($this->clientId > 0) {
+            $payload['client'] = ['id' => $this->clientId];
+        }
 
         $url = 'https://joinposter.com/api/orders?token=' . rawurlencode($this->token);
         [$httpCode, $body] = $this->postJson($url, $payload);
