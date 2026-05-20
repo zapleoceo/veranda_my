@@ -819,6 +819,18 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     padding: 7px 10px; font: inherit;
 }
 
+/* Modal tables (Поставки, Кассовая смена) — the base 12px from .pd3-table
+   is hard to read in the modal's wider layout. Bump body cells to 13px
+   and headers to 11px. Check finder keeps its own size via its rule. */
+#pd3SuppliesBody .pd3-table,
+#pd3KashShiftBody .pd3-table { font-size: 13px; }
+#pd3SuppliesBody .pd3-table th,
+#pd3KashShiftBody .pd3-table th { font-size: 11px; }
+#pd3SuppliesBody .pd3-table th,
+#pd3SuppliesBody .pd3-table td,
+#pd3KashShiftBody .pd3-table th,
+#pd3KashShiftBody .pd3-table td { padding: 4px 8px; }
+
 .pd3-checkfinder-table { width: 100%; font-size: 12px; }
 .pd3-checkfinder-table .pd3-btn { padding: 4px 10px; font-size: 11px; }
 .pd3-checkfinder-table tr:hover { background: rgba(255,255,255,0.04); }
