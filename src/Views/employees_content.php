@@ -1,14 +1,20 @@
 <div class="container">
     <div class="card">
         <div class="filters">
-            <label>
-                Дата начала
-                <input type="date" id="dateFrom" value="<?= htmlspecialchars($firstOfMonth) ?>">
-            </label>
-            <label>
-                Дата конца
-                <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>">
-            </label>
+            <fieldset class="period-group" data-period="work">
+                <legend>1. Период работы (расчёт ЗП)</legend>
+                <input type="date" id="dateFrom" value="<?= htmlspecialchars($firstOfMonth) ?>" title="Начало рабочего периода">
+                <span class="period-sep">→</span>
+                <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>" title="Конец рабочего периода">
+            </fieldset>
+            <fieldset class="period-group" data-period="paid">
+                <legend>2. Период выплат (поиск транзакций)
+                    <button type="button" id="paidResyncBtn" class="period-resync" title="Сбросить = период работы + 3 дня">↻</button>
+                </legend>
+                <input type="date" id="paidFrom" value="" title="Начало периода поиска выплат">
+                <span class="period-sep">→</span>
+                <input type="date" id="paidTo" value="" title="Конец периода поиска выплат">
+            </fieldset>
             <div class="emp-style-8">
                 <button type="button" id="loadBtn">ЗАГРУЗИТЬ</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
@@ -178,7 +184,9 @@
             <div class="emp-style-4"><b>Сортировка</b> — клик по заголовку колонки сортирует таблицу.</div>
             <div class="emp-style-4"><b>PAY</b> — создаёт финансовую транзакцию выплаты (Tips или Salary) на сумму "к выплате" по выбранному сотруднику. Перед созданием нужно подтвердить чекбоксом "да проверил".</div>
             <div class="emp-style-4"><b>TipsPaid / SlrPaid</b> — список прошлых выплат: слева дата/время, справа тип выплаты/сумма выплаты.</div>
-            <div class="emp-style-4"><b>Учет выплат</b> — для расчёта TipsPaid/SlrPaid выплаты берутся по смещённому периоду. Смещение сделано, чтобы не захватывать выплаты прошлой недели и полностью захватить выплаты текущей недели.</div>
+            <div class="emp-style-4"><b>Два периода</b> — на странице два независимых диапазона дат:
+                <br>• <b>Период работы</b> — за какой период считаем Tips, Salary, Чеки, Часы (т.е. за какие смены платим).
+                <br>• <b>Период выплат</b> — где искать уже сделанные выплаты (TipsPaid/SlrPaid). По умолчанию = период работы + 3 дня (так как платим с задержкой). Кнопка «↻» сбрасывает к этому значению. Можно вручную задать любой диапазон.</div>
             <div class="emp-style-4"><b>PayExtra</b> — ручная выплата (Tips/Salary) с выбором сотрудника, счета и комментарием.</div>
             <div class="emp-style-4"><b>ИТОГО</b> — сумма по колонкам внизу таблицы.</div>
             <div class="emp-style-5">Пояснения по колонкам</div>
@@ -206,4 +214,4 @@
 window.__USER_EMAIL__ = <?= json_encode((string) ($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 window.__EMPLOYEES_CSRF__ = <?= json_encode($employeesCsrf, JSON_UNESCAPED_UNICODE) ?>;
 </script>
-<script src="/assets/js/employees_view.js?v=20260516" defer></script>
+<script src="/assets/js/employees_view.js?v=20260520_2periods" defer></script>

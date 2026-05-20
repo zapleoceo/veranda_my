@@ -501,23 +501,34 @@ class EmployeesModel {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
 
+    // Two-period model:
+    //   • date_from / date_to  — work period (Tips/Salary calculation;
+    //     kept for back-compat / response payload; not used for the
+    //     finance.getTransactions query window).
+    //   • paid_from / paid_to  — payment-search window (what THIS
+    //     endpoint actually queries). Optional — when not supplied,
+    //     fall back to work-period + 3 days (legacy behaviour).
     $dateFrom0 = $this->parseDate((string)($_GET['date_from'] ?? ''));
-    $dateTo0 = $this->parseDate((string)($_GET['date_to'] ?? ''));
+    $dateTo0   = $this->parseDate((string)($_GET['date_to']   ?? ''));
     if ($dateFrom0 === null || $dateTo0 === null || $dateFrom0 > $dateTo0) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Некорректный период'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    $shift3 = function (string $d): ?string {
-        $ts = strtotime($d . ' +3 days');
-        if ($ts === false) return null;
-        return date('Y-m-d', $ts);
-    };
-    $dateFrom = $shift3($dateFrom0);
-    $dateTo = $shift3($dateTo0);
+    $paidFromIn = $this->parseDate((string)($_GET['paid_from'] ?? ''));
+    $paidToIn   = $this->parseDate((string)($_GET['paid_to']   ?? ''));
+    if ($paidFromIn !== null && $paidToIn !== null && $paidFromIn <= $paidToIn) {
+        $dateFrom = $paidFromIn;
+        $dateTo   = $paidToIn;
+    } else {
+        // Legacy fallback — search window = work + 3 days.
+        $shift3   = static fn (string $d): ?string => (($ts = strtotime($d . ' +3 days')) === false) ? null : date('Y-m-d', $ts);
+        $dateFrom = $shift3($dateFrom0);
+        $dateTo   = $shift3($dateTo0);
+    }
     if ($dateFrom === null || $dateTo === null || $dateFrom > $dateTo) {
         http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Некорректный период'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => false, 'error' => 'Некорректный период выплат'], JSON_UNESCAPED_UNICODE);
         exit;
     }
     try {
