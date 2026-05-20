@@ -696,9 +696,19 @@
             App.snapshots = j.snapshots || App.snapshots;
             renderSnapshots();
             toast(`Версия «${label}» сохранена ✓`);
+            // Bring the new pill into view and pulse it briefly so the
+            // user clearly sees that the version appeared.
+            highlightSnapshot(j.id);
         } catch (e) {
             toast('Ошибка: ' + e.message, 'err');
         }
+    }
+    function highlightSnapshot(id) {
+        const pill = document.querySelector(`.sch-snap-pill[data-snap-id="${id}"]`);
+        if (!pill) return;
+        pill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        pill.classList.add('just-added');
+        setTimeout(() => pill.classList.remove('just-added'), 1500);
     }
     document.getElementById('schSaveSnapBtn')?.addEventListener('click', saveAsVersion);
 
