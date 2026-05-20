@@ -1183,7 +1183,23 @@
         const startH     = stats.hourStart || 8;
         const endH       = stats.hourEnd   || 24;
         const COLOR_KEYS = ['senior', 'main', 'banya', 'custom'];
-        const COLOR_LABELS = { senior: 'старшие', main: 'главный', banya: 'баня', custom: 'кастомные' };
+        // Default fallback labels — overridden by data-color-names on the
+        // grid, which carries the actual block names (Poster hall overlay
+        // applied). Updated live whenever blocks change (saveAndReload).
+        const FALLBACK_LABELS = { senior: 'старшие', main: 'главный', banya: 'баня', custom: 'кастомные' };
+        function labelFor(color) {
+            const map = colorNameMap();
+            return map[color] || FALLBACK_LABELS[color] || color;
+        }
+        function colorNameMap() {
+            const raw = (covGrid.dataset.colorNames || '').split(',').filter(Boolean);
+            const out = {};
+            raw.forEach((entry) => {
+                const i = entry.indexOf(':');
+                if (i > 0) out[entry.slice(0, i)] = entry.slice(i + 1);
+            });
+            return out;
+        }
 
         // ─── Pure helpers — mirror of PHP-side $schBucketize /
         // $schCovCellAttrs / $schFormatCellLabel in content.php. ─────
@@ -1280,7 +1296,7 @@
             covGrid.style.setProperty('--cov-cols', colCount);
             covGrid.dataset.colorOrder = colors.join(',');
 
-            const hint = colors.map((c) => COLOR_LABELS[c]).join(' | ');
+            const hint = colors.map(labelFor).join(' | ');
             let html = `<div class="sch-cov-corner" title="В ячейке: ${esc(hint)}">День \\ Час<br><small>${esc(hint)}</small></div>`;
             // Column headers — pull from any colour's buckets (they all share columns).
             const headBuckets = avgPerColor[colors[0]] || [];
