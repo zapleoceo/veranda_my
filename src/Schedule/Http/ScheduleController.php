@@ -4,28 +4,26 @@ declare(strict_types=1);
 
 namespace App\Schedule\Http;
 
-use App\Schedule\Http\Actions\AddZoneAction;
-use App\Schedule\Http\Actions\DebugPosterAction;
-use App\Schedule\Http\Actions\DeleteSnapshotAction;
-use App\Schedule\Http\Actions\DeleteZoneAction;
-use App\Schedule\Http\Actions\ListSnapshotsAction;
-use App\Schedule\Http\Actions\LoadAction;
-use App\Schedule\Http\Actions\LoadSnapshotAction;
-use App\Schedule\Http\Actions\ReloadPosterAction;
-use App\Schedule\Http\Actions\RenameSnapshotAction;
-use App\Schedule\Http\Actions\SaveAction;
-use App\Schedule\Http\Actions\SaveStaffTagsAction;
-use App\Schedule\Http\Actions\SaveVersionAction;
 use App\Schedule\Services\HeatmapBuilder;
 use App\Schedule\Services\PeriodBuilder;
 use App\Schedule\Services\ScheduleStateService;
+use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
- * Thin controller: page render or AJAX-dispatch. Every AJAX endpoint is its
- * own Action class (Single Responsibility) — they're constructed via the
- * DI container. The controller's job is just to choose the right one.
+ * Thin controller — two responsibilities:
+ *   1. Decide between AJAX dispatch and HTML page render based on the
+ *      query string.
+ *   2. Resolve the right Action class for an AJAX command from the
+ *      action map.
+ *
+ * Each AJAX endpoint is its own Action class (Single Responsibility).
+ * Actions are NOT injected into the constructor — only their map of
+ * names → class FQCNs is. The actual Action instance is resolved
+ * lazily through the container on dispatch (Open/Closed: adding a new
+ * AJAX endpoint = new class + one entry in the container, controller
+ * untouched).
  */
 final class ScheduleController
 {
@@ -34,19 +32,9 @@ final class ScheduleController
         private readonly PeriodBuilder        $periodBuilder,
         private readonly HeatmapBuilder       $heatmapBuilder,
         private readonly JsonResponder        $json,
-        // Actions: one per AJAX command
-        private readonly LoadAction            $loadAction,
-        private readonly SaveAction            $saveAction,
-        private readonly ListSnapshotsAction   $listSnapshotsAction,
-        private readonly LoadSnapshotAction    $loadSnapshotAction,
-        private readonly DeleteSnapshotAction  $deleteSnapshotAction,
-        private readonly AddZoneAction         $addZoneAction,
-        private readonly DeleteZoneAction      $deleteZoneAction,
-        private readonly SaveStaffTagsAction   $saveStaffTagsAction,
-        private readonly SaveVersionAction     $saveVersionAction,
-        private readonly RenameSnapshotAction  $renameSnapshotAction,
-        private readonly ReloadPosterAction    $reloadPosterAction,
-        private readonly DebugPosterAction     $debugPosterAction,
+        private readonly ContainerInterface   $container,
+        /** @var array<string, class-string> ajax-name → Action FQCN */
+        private readonly array                $ajaxActionMap,
     ) {}
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -121,24 +109,11 @@ final class ScheduleController
 
     private function dispatchAjax(string $ajax, ServerRequestInterface $req, ResponseInterface $res): ResponseInterface
     {
-        $action = match ($ajax) {
-            'load'            => $this->loadAction,
-            'save'            => $this->saveAction,
-            'snapshots'       => $this->listSnapshotsAction,
-            'snapshot'        => $this->loadSnapshotAction,
-            'del_snap'        => $this->deleteSnapshotAction,
-            'add_zone'        => $this->addZoneAction,
-            'del_zone'        => $this->deleteZoneAction,
-            'save_staff_tags' => $this->saveStaffTagsAction,
-            'save_version'    => $this->saveVersionAction,
-            'rename_snap'     => $this->renameSnapshotAction,
-            'reload_poster'   => $this->reloadPosterAction,
-            'debug_poster'    => $this->debugPosterAction,
-            default           => null,
-        };
-        if ($action === null) {
+        $cls = $this->ajaxActionMap[$ajax] ?? null;
+        if ($cls === null) {
             return $this->json->fail($res, 'Unknown ajax: ' . $ajax, 404);
         }
+        $action = $this->container->get($cls);  // lazy resolution
         return $action($req, $res);
     }
 
@@ -165,7 +140,7 @@ final class ScheduleController
         $pageTitle    = 'График смен';
         $currentPath  = '/schedule';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">' . "\n"
-                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260520_btnstate">';
+                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260520_perf">';
 
         // Variables exposed to the view template
         $viewVars = compact(

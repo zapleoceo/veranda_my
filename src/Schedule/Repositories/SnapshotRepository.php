@@ -6,14 +6,18 @@ namespace App\Schedule\Repositories;
 
 use App\Infrastructure\Database;
 use App\Schedule\Contracts\SnapshotRepositoryInterface;
+use App\Schedule\Infrastructure\SchemaManager;
+use App\Schedule\Infrastructure\ShareCode;
 
 final class SnapshotRepository implements SnapshotRepositoryInterface
 {
     private const TABLE = 'schedule_snapshots';
 
-    public function __construct(private readonly Database $db)
-    {
-        $this->ensureTable();
+    public function __construct(
+        private readonly Database $db,
+        SchemaManager $schema,
+    ) {
+        $schema->ensure();
     }
 
     public function loadCurrent(): ?array
@@ -37,6 +41,11 @@ final class SnapshotRepository implements SnapshotRepositoryInterface
     {
         $t       = $this->db->t(self::TABLE);
         $payload = json_encode($state, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        // SELECT then UPDATE keeps the single draft row in-place. The
+        // single-row invariant is preserved by saveNamedVersion (which
+        // always inserts is_current=0) — no extra cleanup UPDATE on every
+        // save (was firing a round-trip per autosave for an inv ariant
+        // that's already true).
         $row     = $this->db->query("SELECT id FROM {$t} WHERE is_current = 1 ORDER BY id DESC LIMIT 1")->fetch();
         if ($row) {
             $id = (int) $row['id'];
@@ -44,8 +53,6 @@ final class SnapshotRepository implements SnapshotRepositoryInterface
                 "UPDATE {$t} SET json_data = ?, label = '', created_by = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?",
                 [$payload, $email, $id]
             );
-            // Also ensure no other rows accidentally claim is_current — single-row invariant.
-            $this->db->query("UPDATE {$t} SET is_current = 0 WHERE id <> ?", [$id]);
             return $id;
         }
         $this->db->query(
@@ -62,7 +69,7 @@ final class SnapshotRepository implements SnapshotRepositoryInterface
             throw new \InvalidArgumentException('Named version requires a non-empty label');
         }
         $t    = $this->db->t(self::TABLE);
-        $code = $this->generateUniqueShareCode();
+        $code = ShareCode::generateUnique($this->db, $t);
         $this->db->query(
             "INSERT INTO {$t} (label, json_data, is_current, created_by, share_code) VALUES (?, ?, 0, ?, ?)",
             [
@@ -137,6 +144,9 @@ final class SnapshotRepository implements SnapshotRepositoryInterface
         //   • empty labels (would mean an orphaned draft)
         //   • legacy auto-save / manual / restored-N labels from before
         //     the model split — they're noise in the UI now
+        //
+        // Pure read: share_code backfill for legacy rows now lives in
+        // SchemaManager (runs once per deploy).
         $rows = $this->db->query(
             "SELECT id, label, is_current, created_at, created_by, share_code
              FROM {$t}
@@ -146,17 +156,6 @@ final class SnapshotRepository implements SnapshotRepositoryInterface
                AND label NOT LIKE 'restored-%'
              ORDER BY id DESC LIMIT {$limit}"
         )->fetchAll();
-        // Lazy backfill: legacy rows from before share_code existed get
-        // a code on first listing so existing versions become shareable
-        // without a manual migration.
-        foreach ($rows ?: [] as &$r) {
-            if (empty($r['share_code'])) {
-                $code = $this->generateUniqueShareCode();
-                $this->db->query("UPDATE {$t} SET share_code = ? WHERE id = ?", [$code, (int) $r['id']]);
-                $r['share_code'] = $code;
-            }
-        }
-        unset($r);
         return array_map(static fn($r) => [
             'id'         => (int) $r['id'],
             'label'      => (string) ($r['label'] ?? ''),
@@ -185,31 +184,4 @@ final class SnapshotRepository implements SnapshotRepositoryInterface
         return true;
     }
 
-    private function ensureTable(): void
-    {
-        $t = $this->db->t(self::TABLE);
-        $this->db->query("
-            CREATE TABLE IF NOT EXISTS {$t} (
-                id          INT AUTO_INCREMENT PRIMARY KEY,
-                label       VARCHAR(100) NOT NULL DEFAULT '',
-                json_data   MEDIUMTEXT NOT NULL,
-                is_current  TINYINT(1) NOT NULL DEFAULT 0,
-                created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                created_by  VARCHAR(255) NOT NULL DEFAULT '',
-                share_code  VARCHAR(32) DEFAULT NULL,
-                UNIQUE KEY uniq_share (share_code),
-                KEY idx_current (is_current),
-                KEY idx_created (created_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ");
-        // ALTER for legacy installs that pre-date share_code. ADD COLUMN
-        // IF NOT EXISTS isn't portable enough — swallow the "duplicate
-        // column" error and move on.
-        try {
-            $this->db->query("ALTER TABLE {$t} ADD COLUMN share_code VARCHAR(32) DEFAULT NULL");
-            $this->db->query("ALTER TABLE {$t} ADD UNIQUE KEY uniq_share (share_code)");
-        } catch (\Throwable) {
-            // column / key already exists — fine
-        }
-    }
 }

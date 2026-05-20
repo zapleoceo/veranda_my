@@ -6,14 +6,17 @@ namespace App\Schedule\Repositories;
 
 use App\Infrastructure\Database;
 use App\Schedule\Contracts\ZoneRepositoryInterface;
+use App\Schedule\Infrastructure\SchemaManager;
 
 final class ZoneRepository implements ZoneRepositoryInterface
 {
     private const TABLE = 'schedule_zones';
 
-    public function __construct(private readonly Database $db)
-    {
-        $this->ensureTable();
+    public function __construct(
+        private readonly Database $db,
+        SchemaManager $schema,
+    ) {
+        $schema->ensure();
     }
 
     public function listActive(): array
@@ -45,21 +48,5 @@ final class ZoneRepository implements ZoneRepositoryInterface
     {
         $t = $this->db->t(self::TABLE);
         $this->db->query("UPDATE {$t} SET is_active = 0 WHERE id = ?", [$id]);
-    }
-
-    private function ensureTable(): void
-    {
-        $t = $this->db->t(self::TABLE);
-        $this->db->query("
-            CREATE TABLE IF NOT EXISTS {$t} (
-                id          INT AUTO_INCREMENT PRIMARY KEY,
-                name        VARCHAR(100) NOT NULL,
-                icon        VARCHAR(20)  NOT NULL DEFAULT '🌿',
-                sort_order  INT          NOT NULL DEFAULT 0,
-                is_active   TINYINT(1)   NOT NULL DEFAULT 1,
-                created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                KEY idx_active (is_active, sort_order)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ");
     }
 }

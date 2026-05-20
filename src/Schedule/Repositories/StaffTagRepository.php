@@ -6,14 +6,17 @@ namespace App\Schedule\Repositories;
 
 use App\Infrastructure\Database;
 use App\Schedule\Contracts\StaffTagRepositoryInterface;
+use App\Schedule\Infrastructure\SchemaManager;
 
 final class StaffTagRepository implements StaffTagRepositoryInterface
 {
     private const TABLE = 'schedule_staff_tags';
 
-    public function __construct(private readonly Database $db)
-    {
-        $this->ensureTable();
+    public function __construct(
+        private readonly Database $db,
+        SchemaManager $schema,
+    ) {
+        $schema->ensure();
     }
 
     public function all(): array
@@ -56,22 +59,4 @@ final class StaffTagRepository implements StaffTagRepositoryInterface
         );
     }
 
-    private function ensureTable(): void
-    {
-        $t = $this->db->t(self::TABLE);
-        // The rate_per_hour column is intentionally NOT created here — rates
-        // live in `employee_rates` (canonical store, shared with /employees/).
-        // On legacy installs the column may still exist from earlier builds;
-        // it is ignored.
-        $this->db->query("
-            CREATE TABLE IF NOT EXISTS {$t} (
-                user_id          INT PRIMARY KEY,
-                in_schedule      TINYINT(1) NOT NULL DEFAULT 1,
-                can_be_senior    TINYINT(1) NOT NULL DEFAULT 0,
-                only_in_blocks   VARCHAR(255) NOT NULL DEFAULT '',
-                custom_tag       VARCHAR(50)  NOT NULL DEFAULT '',
-                updated_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        ");
-    }
 }
