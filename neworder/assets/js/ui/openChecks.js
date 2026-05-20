@@ -13,6 +13,7 @@ const _self = new URL(import.meta.url);
 const _v    = _self.searchParams.get('v') || '';
 const _qs   = _v ? '?v=' + encodeURIComponent(_v) : '';
 const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
+const { t }   = await import(new URL('../i18n.js' + _qs, import.meta.url).href);
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -34,20 +35,23 @@ function render(state) {
     }
     wrap.hidden = false;
     const newSelected = state.s.appendToTx === 0;
+    const headline = checks.length === 1
+        ? t('openCheckOne')
+        : t('openCheckMany', { n: checks.length });
     wrap.innerHTML = `
-        <h4>На столе уже открыт ${checks.length === 1 ? 'чек' : checks.length + ' чека/-ов'}</h4>
+        <h4>${esc(headline)}</h4>
         <div class="no-radios">
             <label class="no-radio ${newSelected ? 'is-active' : ''}">
                 <input type="radio" name="no-openchk" value="0" ${newSelected ? 'checked' : ''}>
                 <div>
-                    <div class="no-radio__title">Новый отдельный заказ</div>
+                    <div class="no-radio__title">${esc(t('newSeparateOrder'))}</div>
                 </div>
             </label>
             ${checks.map((c) => `
                 <label class="no-radio ${state.s.appendToTx === c.transaction_id ? 'is-active' : ''}">
                     <input type="radio" name="no-openchk" value="${c.transaction_id}" ${state.s.appendToTx === c.transaction_id ? 'checked' : ''}>
                     <div>
-                        <div class="no-radio__title">Добавить к чеку #${c.transaction_id} · ${esc(fmtVnd(c.sum))}</div>
+                        <div class="no-radio__title">${esc(t('addToCheckTpl', { id: c.transaction_id, sum: fmtVnd(c.sum) }))}</div>
                         ${c.items?.length ? `<div class="no-radio__sub">${esc(c.items.slice(0, 3).join(' · '))}${c.items.length > 3 ? '…' : ''}</div>` : ''}
                     </div>
                 </label>

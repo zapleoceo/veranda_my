@@ -11,6 +11,7 @@ const _self = new URL(import.meta.url);
 const _v    = _self.searchParams.get('v') || '';
 const _qs   = _v ? '?v=' + encodeURIComponent(_v) : '';
 const { toast } = await import(new URL('./toast.js' + _qs, import.meta.url).href);
+const { t }     = await import(new URL('../i18n.js' + _qs, import.meta.url).href);
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -56,7 +57,7 @@ function render(product) {
 
     const blocks = [];
     for (const g of (product.modifier_groups || [])) {
-        const groupName = g.name || 'Выбор';
+        const groupName = g.name || t('add');
         blocks.push(`
             <div class="no-modif__group" data-group-id="${g.id}">
                 <h4>${esc(groupName)}${g.required ? '<span class="req">*</span>' : ''}</h4>
@@ -72,7 +73,7 @@ function render(product) {
     // Add-on modifications — grouped by group_name for readability.
     const addonGroups = new Map();
     for (const m of (product.modifications || [])) {
-        const key = m.group_name || 'Дополнительно';
+        const key = m.group_name || t('modifExtras');
         const arr = addonGroups.get(key) || [];
         arr.push(m);
         addonGroups.set(key, arr);
@@ -94,7 +95,7 @@ function render(product) {
                 `).join('')}
             </div>`);
     }
-    root.innerHTML = blocks.join('') || '<div class="no-empty">Без опций</div>';
+    root.innerHTML = blocks.join('') || `<div class="no-empty">${esc(t('modifNoOptions'))}</div>`;
     recomputeTotal();
 }
 

@@ -60,8 +60,30 @@ final class PosterMenuProvider implements PosterMenuProviderInterface
         $items = [];
         foreach ($rows as $r) {
             if (!is_array($r)) continue;
-            if ((string)($r['hidden']  ?? '0') === '1') continue;
-            if ((string)($r['deleted'] ?? '0') === '1') continue;
+            if ((string)($r['hidden']      ?? '0') === '1') continue;
+            if ((string)($r['deleted']     ?? '0') === '1') continue;
+            // Some Poster shops mark soft-removed items via `out_of_menu`
+            // / `archive` / `is_deleted` instead of `deleted`. Belt and
+            // suspenders — drop anything that looks archived.
+            if ((string)($r['out_of_menu'] ?? '0') === '1') continue;
+            if ((string)($r['archive']     ?? '0') === '1') continue;
+            if ((string)($r['is_deleted']  ?? '0') === '1') continue;
+
+            // Per-spot visibility — Poster's menu.getProducts returns a
+            // spots[] array describing per-location overrides; a product
+            // can be globally non-hidden yet hidden in our specific spot
+            // (the operator removed it from this venue's menu). Honour
+            // the spot's `visible` flag when present.
+            if (!empty($r['spots']) && is_array($r['spots'])) {
+                $thisSpot = null;
+                foreach ($r['spots'] as $sp) {
+                    if (is_array($sp) && (int)($sp['spot_id'] ?? 0) === $this->spotId) {
+                        $thisSpot = $sp;
+                        break;
+                    }
+                }
+                if ($thisSpot !== null && (string)($thisSpot['visible'] ?? '1') === '0') continue;
+            }
 
             $id = (int)($r['product_id'] ?? 0);
             if ($id <= 0) continue;

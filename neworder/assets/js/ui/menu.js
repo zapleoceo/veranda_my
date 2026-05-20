@@ -12,8 +12,9 @@
 const _self = new URL(import.meta.url);
 const _v    = _self.searchParams.get('v') || '';
 const _qs   = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
+const { api }   = await import(new URL('../api.js'  + _qs, import.meta.url).href);
 const { toast } = await import(new URL('./toast.js' + _qs, import.meta.url).href);
+const { t }     = await import(new URL('../i18n.js' + _qs, import.meta.url).href);
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -42,7 +43,7 @@ function render(state) {
     const products   = state.s.products;
     const categories = state.s.categories;
     if (!products.length) {
-        root.innerHTML = '<div class="no-empty">Меню пусто.</div>';
+        root.innerHTML = `<div class="no-empty">${esc(t('menuEmpty'))}</div>`;
         return;
     }
 
@@ -55,7 +56,7 @@ function render(state) {
         byCat.set(p.category_id, arr);
     }
     if (byCat.size === 0) {
-        root.innerHTML = `<div class="no-empty">Ничего не найдено по запросу «${esc(q)}».</div>`;
+        root.innerHTML = `<div class="no-empty">${esc(t('searchEmptyTpl', { q }))}</div>`;
         return;
     }
 
@@ -75,7 +76,7 @@ function render(state) {
         if (!list || !list.length) continue;
         blocks.push(renderCategory(c.name, list, inCart, q));
     }
-    if (orphans.length) blocks.push(renderCategory('Прочее', orphans, inCart, q));
+    if (orphans.length) blocks.push(renderCategory(t('categoryOther'), orphans, inCart, q));
 
     root.innerHTML = blocks.join('');
 }
@@ -94,7 +95,7 @@ function renderItem(p, isInCart, q) {
     const hasOptions =
         (p.modifier_groups && p.modifier_groups.length) ||
         (p.modifications   && p.modifications.length);
-    const priceLabel = hasOptions ? 'от ' + fmtVnd(p.price) : fmtVnd(p.price);
+    const priceLabel = hasOptions ? t('priceFrom') + ' ' + fmtVnd(p.price) : fmtVnd(p.price);
     return `
         <button type="button" class="no-item ${isInCart ? 'is-in-cart' : ''}" data-product-id="${p.id}">
             <div class="no-item__name">${highlight(p.name, q)}</div>
@@ -114,8 +115,8 @@ export async function initMenu({ state }) {
             state.setLocations(locRes.spots || [], locRes.halls || [], locRes.tables || []);
         } catch (e) {
             const root = document.getElementById('noMenu');
-            if (root) root.innerHTML = `<div class="no-error">${esc(e.message || 'Не удалось загрузить меню')}</div>`;
-            toast(e.message || 'Ошибка загрузки', { error: true });
+            if (root) root.innerHTML = `<div class="no-error">${esc(e.message || t('menuLoadError'))}</div>`;
+            toast(e.message || t('menuLoadError'), { error: true });
         }
     }
     await refresh();

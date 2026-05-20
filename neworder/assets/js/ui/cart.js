@@ -9,6 +9,7 @@ const _self = new URL(import.meta.url);
 const _v    = _self.searchParams.get('v') || '';
 const _qs   = _v ? '?v=' + encodeURIComponent(_v) : '';
 const { toast } = await import(new URL('./toast.js' + _qs, import.meta.url).href);
+const { t }     = await import(new URL('../i18n.js' + _qs, import.meta.url).href);
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -54,7 +55,7 @@ function renderItems(state) {
     if (!root || !totalEl) return;
 
     if (!state.cart.length) {
-        root.innerHTML = '<div class="no-empty" style="padding:24px 0">Корзина пуста</div>';
+        root.innerHTML = `<div class="no-empty" style="padding:24px 0">${esc(t('cartEmpty'))}</div>`;
         totalEl.textContent = '0 ₫';
         submitBtn.disabled = true;
         return;
@@ -153,10 +154,10 @@ export function initCart({ state, onSubmit }) {
     // Submit forward to bootstrap-provided handler.
     document.getElementById('noSubmitBtn')?.addEventListener('click', async () => {
         if (!state.cart.length) {
-            toast('Корзина пуста', { error: true });
+            toast(t('cartEmpty'), { error: true });
             return;
         }
-        try { await onSubmit?.(); } catch (e) { toast(e.message || 'Ошибка', { error: true }); }
+        try { await onSubmit?.(); } catch (e) { toast(e.message || t('errorGeneric'), { error: true }); }
     });
 
     // Public open hook for the cart bar.

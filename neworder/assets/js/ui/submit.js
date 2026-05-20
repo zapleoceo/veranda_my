@@ -6,8 +6,9 @@
 const _self = new URL(import.meta.url);
 const _v    = _self.searchParams.get('v') || '';
 const _qs   = _v ? '?v=' + encodeURIComponent(_v) : '';
-const { api }   = await import(new URL('../api.js' + _qs, import.meta.url).href);
+const { api }   = await import(new URL('../api.js'  + _qs, import.meta.url).href);
 const { toast } = await import(new URL('./toast.js' + _qs, import.meta.url).href);
+const { t }     = await import(new URL('../i18n.js' + _qs, import.meta.url).href);
 
 function showSuccess(text) {
     const $s   = document.getElementById('noSuccess');
@@ -39,11 +40,11 @@ export function initSubmit({ state, openCart }) {
     return async function submit() {
         // Pre-flight.
         if (!state.cart.length) {
-            toast('Корзина пуста', { error: true });
+            toast(t('cartEmpty'), { error: true });
             return;
         }
         if (!state.s.tableId) {
-            toast('Выберите стол', { error: true });
+            toast(t('selectTable'), { error: true });
             // Open the location picker for them.
             document.getElementById('noLocationBtn')?.click();
             return;
@@ -75,10 +76,10 @@ export function initSubmit({ state, openCart }) {
                     spot_tablet_id: state.s.spotTabletId,
                     transaction_id: state.s.appendToTx,
                 });
-                message = `Добавлено ${result.added} поз. к чеку #${state.s.appendToTx}`;
+                message = t('orderAppendedTpl', { n: result.added, id: state.s.appendToTx });
             } else {
                 result = await api.createOrder(payload);
-                message = `Заказ #${result.order_id} принят в Poster`;
+                message = t('orderAcceptedTpl', { id: result.order_id });
             }
             // Clear cart but keep the location — next order on the same
             // table starts in one tap.
@@ -86,9 +87,9 @@ export function initSubmit({ state, openCart }) {
             closeCart();
             showSuccess(message);
         } catch (e) {
-            errBox.textContent = e.message || 'Ошибка';
+            errBox.textContent = e.message || t('errorGeneric');
             errBox.hidden = false;
-            toast(e.message || 'Ошибка', { error: true });
+            toast(e.message || t('errorGeneric'), { error: true });
         } finally {
             btn.classList.remove('is-busy');
             btn.disabled = false;
