@@ -104,6 +104,37 @@
 .sch-btn.primary { background: var(--accent); border-color: var(--accent); color: #0f1117; }
 .sch-btn.primary:hover { background: #d4a062; color: #0f1117; }
 .sch-btn.ghost { background: transparent; color: var(--muted); }
+.sch-btn[disabled] { cursor: not-allowed; opacity: 0.85; }
+/* Pending → success/error feedback states for save buttons (driven by
+   withBtnPending() in schedule.js). Visual cycle:
+     idle → pending (yellow/dim) → success (green) → idle
+                                 ↘ error (red)    ↗
+*/
+.sch-btn.is-pending {
+    background: rgba(184,135,70,.20) !important;
+    border-color: var(--accent);
+    color: var(--accent) !important;
+}
+.sch-btn.is-pending::before {
+    content: ''; display: inline-block;
+    width: 9px; height: 9px; margin-right: 7px;
+    border: 1.5px solid currentColor; border-radius: 50%;
+    border-top-color: transparent;
+    vertical-align: -1px;
+    animation: sch-spin 0.7s linear infinite;
+}
+@keyframes sch-spin { to { transform: rotate(360deg); } }
+.sch-btn.is-success {
+    background: #10b981 !important;
+    border-color: #10b981 !important;
+    color: #0f1117 !important;
+    transition: background 0.15s;
+}
+.sch-btn.is-error {
+    background: #f87171 !important;
+    border-color: #f87171 !important;
+    color: #0f1117 !important;
+}
 
 /* Toolbar (templates + add block) */
 .sch-toolbar {
