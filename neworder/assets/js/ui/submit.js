@@ -48,11 +48,10 @@ export function initSubmit({ state, openCart }) {
             document.getElementById('noLocationBtn')?.click();
             return;
         }
-        // For append-mode we need a tablet id.
-        if (state.s.appendToTx > 0 && !state.s.spotTabletId) {
-            toast('Не удалось определить tablet_id заведения', { error: true });
-            return;
-        }
+        // We used to bail here when state.s.spotTabletId was 0, but
+        // spots.getSpot doesn't actually expose spot_tablet_id — the
+        // backend now falls back to a configured default so we just
+        // forward whatever value we have (0 ⇒ backend default).
 
         const btn = document.getElementById('noSubmitBtn');
         const errBox = document.getElementById('noCartError');

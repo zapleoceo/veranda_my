@@ -28,6 +28,7 @@ final class OrdersService implements OrdersServiceInterface
 {
     private string $token;
     private int    $defaultSpotId;
+    private int    $defaultTabletId;
     private int    $waiterId;
     private int    $clientId;
 
@@ -43,17 +44,22 @@ final class OrdersService implements OrdersServiceInterface
         $envSpot             = Config::get('POSTER_SPOT_ID') ?: ($_ENV['POSTER_SPOT_ID'] ?? getenv('POSTER_SPOT_ID'));
         $this->defaultSpotId = is_numeric($envSpot) ? max(1, (int)$envSpot) : 1;
 
-        // Poster's Incoming Orders API REQUIRES a waiterId and rejects
-        // the call otherwise. The legacy /neworder code hardcoded 10
-        // (the "operator" waiter) and 71 (a generic walk-in client) —
-        // those are RestPublica's actual ids in Poster. Allow override
-        // via env so future shops / staff changes don't need a code
-        // edit, but default to the values that have been working in
-        // production for months.
-        $envWaiter        = Config::get('NEWORDER_WAITER_ID') ?: ($_ENV['NEWORDER_WAITER_ID'] ?? getenv('NEWORDER_WAITER_ID'));
-        $envClient        = Config::get('NEWORDER_CLIENT_ID') ?: ($_ENV['NEWORDER_CLIENT_ID'] ?? getenv('NEWORDER_CLIENT_ID'));
-        $this->waiterId   = is_numeric($envWaiter) ? max(0, (int)$envWaiter) : 10;
-        $this->clientId   = is_numeric($envClient) ? max(0, (int)$envClient) : 71;
+        // Hardcoded fallbacks for fields Poster's APIs require but that
+        // aren't easily discoverable per-spot at runtime. These match
+        // the legacy /neworder/assets/app.js constants that have been
+        // shipping in production for months:
+        //   waiterId   = 10   (operator waiter)
+        //   clientId   = 71   (generic walk-in client)
+        //   tabletId   = 1    (the single Poster tablet on spot 1)
+        // spots.getSpot does NOT return spot_tablet_id, so when the
+        // operator appends to an existing check we fall back to this
+        // default instead of erroring out.
+        $envWaiter         = Config::get('NEWORDER_WAITER_ID')      ?: ($_ENV['NEWORDER_WAITER_ID']      ?? getenv('NEWORDER_WAITER_ID'));
+        $envClient         = Config::get('NEWORDER_CLIENT_ID')      ?: ($_ENV['NEWORDER_CLIENT_ID']      ?? getenv('NEWORDER_CLIENT_ID'));
+        $envTablet         = Config::get('NEWORDER_SPOT_TABLET_ID') ?: ($_ENV['NEWORDER_SPOT_TABLET_ID'] ?? getenv('NEWORDER_SPOT_TABLET_ID'));
+        $this->waiterId        = is_numeric($envWaiter) ? max(0, (int)$envWaiter) : 10;
+        $this->clientId        = is_numeric($envClient) ? max(0, (int)$envClient) : 71;
+        $this->defaultTabletId = is_numeric($envTablet) ? max(1, (int)$envTablet) : 1;
     }
 
     public function createOrder(int $spotId, int $tableId, string $comment, array $lines): array
@@ -133,7 +139,10 @@ final class OrdersService implements OrdersServiceInterface
     public function appendToTransaction(int $spotId, int $tabletId, int $transactionId, string $comment, array $lines): array
     {
         if ($transactionId <= 0) throw new \InvalidArgumentException('transaction_id required');
-        if ($tabletId      <= 0) throw new \InvalidArgumentException('spot_tablet_id required');
+        // spots.getSpot doesn't expose spot_tablet_id, so the frontend
+        // can't fetch it. Fall back to the configured default — same
+        // hardcoded "1" the legacy /neworder used.
+        if ($tabletId <= 0) $tabletId = $this->defaultTabletId;
         $lines = array_values(array_filter($lines, fn(CartLine $l) => $l->isValid()));
         if (!$lines) throw new \InvalidArgumentException('Корзина пуста');
 
