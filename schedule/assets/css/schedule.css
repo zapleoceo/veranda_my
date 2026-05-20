@@ -11,7 +11,11 @@
     --sch-hall-banya:  #f59e0b;
     --sch-hall-roma:   #60a5fa;
     --sch-hall-custom: #a78bfa;
-    --sch-weekend:     rgba(239,68,68,.06);
+    /* Weekend rows = Пт/Сб/Вс — warm amber tint across the whole row.
+       Red was reading as "warning" rather than "weekend"; amber leans
+       into the "праздничный день" mood while staying low-contrast. */
+    --sch-weekend:     rgba(245,158,11,.14);
+    --sch-weekend-row: rgba(245,158,11,.05);
 }
 
 .sch-wrap { padding: 0; }
@@ -288,10 +292,17 @@
     justify-content: center; text-transform: uppercase;
     position: sticky; left: 72px; z-index: 2;
 }
-.sch-row.weekend .sch-date-cell,
-.sch-row.weekend .sch-dow-cell { background: var(--sch-weekend); }
-.sch-row.weekend .sch-dow-cell { color: var(--danger); }
-.sch-row.weekend .sch-cell { background: rgba(239,68,68,.025); }
+/* Pure ".weekend" class on every per-day cell across the row (date /
+   dow / cell / divider / add-block / warn / budget). Tints the entire
+   horizontal band so weekends stand out at a glance. */
+.weekend.sch-date-cell,
+.weekend.sch-dow-cell    { background: var(--sch-weekend); }
+.weekend.sch-dow-cell    { color: #f59e0b; font-weight: 700; }
+.weekend.sch-cell,
+.weekend.sch-divider,
+.weekend.sch-add-block-cell,
+.weekend.sch-warn-cell,
+.weekend.sch-budget-cell { background: var(--sch-weekend-row); }
 
 /* Divider columns */
 .sch-divider {
