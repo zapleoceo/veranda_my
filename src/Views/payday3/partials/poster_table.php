@@ -17,6 +17,7 @@ $total       = Money::vnd(0);
 $bybitTotal  = Money::vnd(0);
 $vietnamTotal = Money::vnd(0);
 foreach ($poster as $p) {
+    // payday2's Итого/BB/VC include Tips (Card+Third+Tip per row).
     $sum = $p->totalPayed()->plus($p->tipSum);
     $pmId = (int)$p->posterPaymentMethodId;
     if ($pmId === METHOD_VIETNAM) {
@@ -67,7 +68,12 @@ foreach ($poster as $p) {
             </thead>
             <tbody>
                 <?php foreach ($poster as $p):
-                    $total_ = $p->totalPayed();
+                    // payday2 column convention:
+                    //   "Card"      = payed_card + payed_third_party
+                    //   "Card+Tips" = card + third + tip_sum
+                    // PosterTransaction::totalPayed() already returns card+third.
+                    $cardCombined = $p->totalPayed();                      // payday2 "Card"
+                    $cardPlusTip  = $cardCombined->plus($p->tipSum);       // payday2 "Card+Tips"
                     $time   = $p->dateClose !== '' ? substr($p->dateClose, 11, 8) : '';
                     $rowClass = $rowStateByPoster[$p->transactionId] ?? 'row-red';
                 ?>
@@ -76,23 +82,23 @@ foreach ($poster as $p) {
                         data-poster-id="<?= $p->transactionId ?>"
                         data-num="<?= $p->receiptNumber !== '' ? htmlspecialchars($p->receiptNumber) : (string)$p->transactionId ?>"
                         data-ts="<?= htmlspecialchars($p->dateClose) ?>"
-                        data-card="<?= $p->payedCard->amount ?>"
+                        data-card="<?= $cardCombined->amount ?>"
                         data-tips="<?= $p->tipSum->amount ?>"
-                        data-total="<?= $total_->amount ?>"
+                        data-total="<?= $cardPlusTip->amount ?>"
                         data-method="<?= htmlspecialchars((string)($p->paymentMethodDisplay ?? '')) ?>"
                         data-waiter="<?= htmlspecialchars($p->waiterName) ?>"
                         data-table="<?= $p->tableId ?>">
                         <td class="pd3-col pd3-col--lead">
                             <div class="pd3-lead">
                                 <span class="pd3-anchor" id="pd3-poster-anchor-<?= $p->transactionId ?>"></span>
-                                <input type="checkbox" class="pd3-cb pd3-cb--poster" data-poster-id="<?= $p->transactionId ?>" data-sum="<?= $total_->amount ?>">
+                                <input type="checkbox" class="pd3-cb pd3-cb--poster" data-poster-id="<?= $p->transactionId ?>" data-sum="<?= $cardPlusTip->amount ?>">
                             </div>
                         </td>
                         <td class="pd3-col pd3-col--num    nowrap"><?= htmlspecialchars($p->receiptNumber !== '' ? $p->receiptNumber : (string)$p->transactionId) ?></td>
                         <td class="pd3-col pd3-col--time   nowrap"><?= htmlspecialchars($time) ?></td>
-                        <td class="pd3-col pd3-col--card   nowrap right"><?= htmlspecialchars($p->payedCard->format()) ?></td>
+                        <td class="pd3-col pd3-col--card   nowrap right"><?= htmlspecialchars($cardCombined->format()) ?></td>
                         <td class="pd3-col pd3-col--tips   nowrap right"><?= htmlspecialchars($p->tipSum->format()) ?></td>
-                        <td class="pd3-col pd3-col--total  nowrap right"><strong><?= htmlspecialchars($total_->format()) ?></strong></td>
+                        <td class="pd3-col pd3-col--total  nowrap right"><strong><?= htmlspecialchars($cardPlusTip->format()) ?></strong></td>
                         <td class="pd3-col pd3-col--method">
                             <?php
                                 $pmFull = (string)($p->paymentMethodDisplay ?? '—');
@@ -119,7 +125,7 @@ foreach ($poster as $p) {
     <footer class="pd3-pane__footer muted">
         <span>Итого: <strong id="pd3PosterTotal"><?= htmlspecialchars($total->format()) ?></strong></span>
         <span>• Tips: <span id="pd3PosterTipsLinked">—</span></span>
-        <span>• в таблице связи: <span id="pd3PosterLinked">—</span></span>
+        <span>• связи: <span id="pd3PosterLinked">—</span></span>
         <span>• несвязи: <span id="pd3PosterUnlinked">—</span></span>
         <span>• BB: <span id="pd3PosterBybit"><?= htmlspecialchars($bybitTotal->format()) ?></span></span>
         <span>• VC: <span id="pd3PosterVietnam"><?= htmlspecialchars($vietnamTotal->format()) ?></span></span>

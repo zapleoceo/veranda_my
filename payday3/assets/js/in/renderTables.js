@@ -155,21 +155,25 @@ export function updateInFooters(sepayOpen, sepayHidden, posterRows) {
  * + row state classes so it works after server-side render,
  * after a JS re-render, and after a link/unlink mutation.
  *
- *   Итого            sum(card+third+tip)            EXCLUDING Vietnam Company
- *   Tips             sum(tip)                       on LINKED non-Vietnam rows
- *   в таблице связи  sum(card+third+tip)            on LINKED non-Vietnam rows
- *   несвязи          sum(card+third+tip)            on UNLINKED non-Vietnam rows
- *   BB               sum(card+third+tip)            for Bybit method
- *   VC               sum(card+third+tip)            for Vietnam Company method
+ *   Итого   sum(card+third+tip)   EXCLUDING Vietnam Company
+ *   Tips    sum(tip)               on LINKED non-Vietnam rows
+ *   связи   sum(card+third+tip)   on LINKED non-Vietnam rows
+ *   несвязи sum(card+third+tip)   on UNLINKED non-Vietnam rows
+ *   BB      sum(card+third+tip)   for Bybit method
+ *   VC      sum(card+third+tip)   for Vietnam Company method
  *
  * "Linked" = any of row-green / row-yellow / row-gray (auto / yellow
  * / manual). row-red is unlinked. row-hidden rows are skipped.
+ *
+ * `data-total` already encodes card+third+tip (server- and JS-render
+ * both mirror payday2's "Card+Tips" column convention), so we read it
+ * directly instead of summing data-total+data-tips.
  */
 export function recomputePosterFooter() {
     const rows = document.querySelectorAll('#pd3PosterTable tr.pd3-row');
     let total = 0, bb = 0, vc = 0, linked = 0, unlinked = 0, tipsLinked = 0;
     for (const tr of rows) {
-        const sum  = (Number(tr.dataset.total) || 0) + (Number(tr.dataset.tips) || 0);
+        const sum  = Number(tr.dataset.total) || 0;
         const tip  = Number(tr.dataset.tips) || 0;
         const pm   = String(tr.dataset.method || '').toLowerCase();
 

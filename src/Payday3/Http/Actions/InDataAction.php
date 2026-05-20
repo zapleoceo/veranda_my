@@ -81,7 +81,11 @@ final class InDataAction
 
     private static function posterShape(PosterTransaction $p): array
     {
-        $total = $p->totalPayed();
+        // payday2 column convention:
+        //   "Card"      = payed_card + payed_third_party  (PosterTransaction::totalPayed)
+        //   "Card+Tips" = card + third + tip_sum
+        $cardCombined = $p->totalPayed();
+        $cardPlusTip  = $cardCombined->plus($p->tipSum);
         $time  = $p->dateClose !== '' ? substr($p->dateClose, 11, 8) : '';
         $pmFull = (string)($p->paymentMethodDisplay ?? '—');
         $pmLite = $pmFull;
@@ -92,12 +96,12 @@ final class InDataAction
             'receipt_number'    => $p->receiptNumber,
             'date_close'        => $p->dateClose,
             'time'              => $time,
-            'payed_card'        => $p->payedCard->amount,
-            'payed_card_fmt'    => $p->payedCard->format(),
+            'payed_card'        => $cardCombined->amount,
+            'payed_card_fmt'    => $cardCombined->format(),
             'tip_sum'           => $p->tipSum->amount,
             'tip_sum_fmt'       => $p->tipSum->format(),
-            'total'             => $total->amount,
-            'total_fmt'         => $total->format(),
+            'total'             => $cardPlusTip->amount,
+            'total_fmt'         => $cardPlusTip->format(),
             'payment_method'    => $pmFull,
             'payment_method_lite' => $pmLite,
             'waiter_name'       => $p->waiterName,
