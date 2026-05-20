@@ -5,8 +5,27 @@ declare(strict_types=1);
 
 use App\Payday3\Domain\Money;
 
-$total = Money::vnd(0);
-foreach ($poster as $p) $total = $total->plus($p->totalPayed());
+// Sum buckets so the footer mirrors payday2:
+//   Итого  — total of card+third+tip EXCLUDING Vietnam Company
+//   BB     — same total but only for poster_payment_method_id = 12 (Bybit)
+//   VC     — same total but only for poster_payment_method_id = 11 (Vietnam)
+// Linked / unlinked / tips-on-linked are computed client-side in
+// updateInFooters() because they depend on the live row state.
+const METHOD_VIETNAM = 11;
+const METHOD_BYBIT   = 12;
+$total       = Money::vnd(0);
+$bybitTotal  = Money::vnd(0);
+$vietnamTotal = Money::vnd(0);
+foreach ($poster as $p) {
+    $sum = $p->totalPayed()->plus($p->tipSum);
+    $pmId = (int)$p->posterPaymentMethodId;
+    if ($pmId === METHOD_VIETNAM) {
+        $vietnamTotal = $vietnamTotal->plus($sum);
+        continue;                              // doesn't roll into Итого
+    }
+    if ($pmId === METHOD_BYBIT) $bybitTotal = $bybitTotal->plus($sum);
+    $total = $total->plus($sum);
+}
 ?>
 <div class="pd3-pane pd3-pane--poster" data-pane="poster" data-help="Чеки Poster, оплаченные картой или 3-rd party. Сюда же попадают чаевые.">
     <header class="pd3-pane__header">
@@ -99,8 +118,10 @@ foreach ($poster as $p) $total = $total->plus($p->totalPayed());
     </div>
     <footer class="pd3-pane__footer muted">
         <span>Итого: <strong id="pd3PosterTotal"><?= htmlspecialchars($total->format()) ?></strong></span>
-        <span>• чеков: <span id="pd3PosterCount"><?= count($poster) ?></span></span>
-        <span>• связанные: <span id="pd3PosterLinked">—</span></span>
-        <span>• несвязанные: <span id="pd3PosterUnlinked">—</span></span>
+        <span>• Tips: <span id="pd3PosterTipsLinked">—</span></span>
+        <span>• в таблице связи: <span id="pd3PosterLinked">—</span></span>
+        <span>• несвязи: <span id="pd3PosterUnlinked">—</span></span>
+        <span>• BB: <span id="pd3PosterBybit"><?= htmlspecialchars($bybitTotal->format()) ?></span></span>
+        <span>• VC: <span id="pd3PosterVietnam"><?= htmlspecialchars($vietnamTotal->format()) ?></span></span>
     </footer>
 </div>
