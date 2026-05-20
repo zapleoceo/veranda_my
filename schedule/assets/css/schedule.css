@@ -414,10 +414,22 @@
 .sch-shift {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    width: 100%; gap: 1px;
+    /* min-width:0 lets the inner spans actually shrink — without it
+       flex children refuse to go below their content width and the row
+       wraps to two lines. */
+    width: 100%; min-width: 0; gap: 1px;
     padding: 3px 4px;
     border-radius: 5px;
     cursor: grab; user-select: none;
+}
+.sch-shift .sch-name,
+.sch-shift .sch-time {
+    /* Single line, ellipsis on overflow — long names like
+       "Alexey Pavlov [KITCHEN]" don't break the cell height anymore. */
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .sch-shift .sch-name { font-weight: 600; font-size: 11px; color: var(--text); line-height: 1.2; }
 .sch-shift .sch-time { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -442,8 +454,9 @@
     box-shadow: 0 0 0 1px rgba(184,135,70,.4), 0 2px 6px rgba(184,135,70,.25);
 }
 .sch-shift.senior .sch-name {
+    /* No flex here — would break ellipsis on the span. The " ★" suffix
+       is just text inside the same node, no need to lay it out as a row. */
     color: #0f1117; font-weight: 700;
-    display: flex; align-items: center; gap: 2px;
 }
 .sch-shift.senior .sch-time { color: rgba(15,17,23,.65); font-weight: 600; }
 
