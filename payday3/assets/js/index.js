@@ -123,9 +123,11 @@ if (renderer) {
     console.warn('[payday3] grid not found, LineRenderer disabled');
 }
 
-// Font-scale widget (а / А / А). Mounts after renderer is built so it
-// can request a line-overlay redraw on scale change.
-initFontScale({ renderer });
+// Font-scale widget — single «Aa» button that cycles 1 / 1.2 / 1.5×.
+// Renderer redraws happen via a window event ('pd3:font-scale-changed'),
+// so IN-mode and OUT-mode LineRenderer instances both pick it up
+// regardless of which one is currently visible.
+initFontScale();
 
 // AJAX IN-mode refresh — replaces window.location.reload() after sync.
 const loadInData = makeInLoader({ state, renderer });
