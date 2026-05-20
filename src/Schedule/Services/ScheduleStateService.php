@@ -50,9 +50,21 @@ final class ScheduleStateService
         return $raw;
     }
 
-    public function saveSnapshot(array $state, string $label, string $email): int
+    /** Auto-save / regular save — overwrites the single draft row. */
+    public function saveCurrent(array $state, string $email): int
     {
-        return $this->snapshots->save($state, $label, $email);
+        return $this->snapshots->saveCurrent($state, $email);
+    }
+
+    /** Manual "Save as version" — creates a new named snapshot row. */
+    public function saveNamedVersion(array $state, string $label, string $email): int
+    {
+        return $this->snapshots->saveNamedVersion($state, $label, $email);
+    }
+
+    public function renameSnapshot(int $id, string $label): bool
+    {
+        return $this->snapshots->rename($id, $label);
     }
 
     public function listSnapshots(int $limit = 25): array

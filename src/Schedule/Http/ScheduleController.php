@@ -12,8 +12,10 @@ use App\Schedule\Http\Actions\ListSnapshotsAction;
 use App\Schedule\Http\Actions\LoadAction;
 use App\Schedule\Http\Actions\LoadSnapshotAction;
 use App\Schedule\Http\Actions\ReloadPosterAction;
+use App\Schedule\Http\Actions\RenameSnapshotAction;
 use App\Schedule\Http\Actions\SaveAction;
 use App\Schedule\Http\Actions\SaveStaffTagsAction;
+use App\Schedule\Http\Actions\SaveVersionAction;
 use App\Schedule\Services\HeatmapBuilder;
 use App\Schedule\Services\PeriodBuilder;
 use App\Schedule\Services\ScheduleStateService;
@@ -41,6 +43,8 @@ final class ScheduleController
         private readonly AddZoneAction         $addZoneAction,
         private readonly DeleteZoneAction      $deleteZoneAction,
         private readonly SaveStaffTagsAction   $saveStaffTagsAction,
+        private readonly SaveVersionAction     $saveVersionAction,
+        private readonly RenameSnapshotAction  $renameSnapshotAction,
         private readonly ReloadPosterAction    $reloadPosterAction,
         private readonly DebugPosterAction     $debugPosterAction,
     ) {}
@@ -77,6 +81,8 @@ final class ScheduleController
             'add_zone'        => $this->addZoneAction,
             'del_zone'        => $this->deleteZoneAction,
             'save_staff_tags' => $this->saveStaffTagsAction,
+            'save_version'    => $this->saveVersionAction,
+            'rename_snap'     => $this->renameSnapshotAction,
             'reload_poster'   => $this->reloadPosterAction,
             'debug_poster'    => $this->debugPosterAction,
             default           => null,
@@ -110,7 +116,7 @@ final class ScheduleController
         $pageTitle    = 'График смен';
         $currentPath  = '/schedule';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">' . "\n"
-                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260520_ellipsis">';
+                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260520_versions">';
 
         // Variables exposed to the view template
         $viewVars = compact(
