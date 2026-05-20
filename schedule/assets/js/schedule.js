@@ -561,23 +561,18 @@
     //                     POST is already in flight, sets `pending=true` so
     //                     a follow-up POST fires the moment the first one
     //                     finishes — no edits get dropped.
-    //   flushSave(lbl)  — manual / structural save. Drains the debounce
+    //   flushSave()     — manual / structural save. Drains the debounce
     //                     timer immediately, awaits the POST AND any
     //                     follow-up POSTs queued during it. Returns when
     //                     state on the server matches App.state.
     //
-    // Why not a real FIFO of N requests? Every POST sends App.state in
-    // full, so two queued saves would carry identical bodies — one
-    // follow-up is enough to capture every edit that landed during the
-    // in-flight POST. Anything later becomes the NEXT follow-up.
-    //
-    // The user can keep editing while a save runs: cells update locally
-    // via renderChip + recomputeSummaries immediately; the network round-
-    // trip happens in the background and never blocks the UI.
+    // Every POST hits ajax=save which UPSERTs the single is_current=1
+    // draft row — no new snapshot history rows are created. Named
+    // versions go through saveAsVersion() → ajax=save_version, a
+    // separate endpoint.
     let saveTimer = null;
     let saveInFlight = false;
     let savePending  = false;   // edits arrived during in-flight POST
-    let saveLabel    = 'auto';  // sticky label until next manual save
 
     function scheduleSave() {
         savePending = true;
@@ -585,9 +580,8 @@
         saveTimer = setTimeout(() => { saveTimer = null; runSave(); }, 800);
     }
 
-    async function flushSave(label = 'auto') {
+    async function flushSave() {
         if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-        if (label) saveLabel = label;
         savePending = true;
         await runSave();
         // Drain follow-ups too (state may have changed during the await).
@@ -599,10 +593,10 @@
         if (!savePending) return;
         saveInFlight = true;
         savePending  = false;        // anything new from now on sets it again
-        const label  = saveLabel;
-        saveLabel    = 'auto';       // one-shot label
         try {
-            const j = await api('save', { method: 'POST', body: { state: App.state, label } });
+            // No label — ajax=save always upserts the current draft.
+            // Named versions go through saveAsVersion() below.
+            const j = await api('save', { method: 'POST', body: { state: App.state } });
             App.snapshots = j.snapshots || App.snapshots;
             App.dirty = false;
             renderSnapshots();
@@ -616,11 +610,28 @@
         }
     }
 
-    document.getElementById('schSaveBtn')?.addEventListener('click', () => flushSave('manual'));
-    document.getElementById('schSaveSnapBtn')?.addEventListener('click', () => {
-        const label = prompt('Название версии:', 'Версия ' + new Date().toLocaleDateString('ru-RU'));
-        if (label) flushSave(label);
-    });
+    document.getElementById('schSaveBtn')?.addEventListener('click', () => flushSave());
+
+    // Create a new NAMED version — separate endpoint, never updates draft.
+    async function saveAsVersion() {
+        const label = (prompt('Название версии:', 'Версия ' + new Date().toLocaleDateString('ru-RU')) || '').trim();
+        if (!label) return;
+        // First make sure the draft is fully persisted, so the version
+        // snapshots exactly what's on screen.
+        await flushSave();
+        try {
+            const j = await api('save_version', {
+                method: 'POST',
+                body:   { state: App.state, label },
+            });
+            App.snapshots = j.snapshots || App.snapshots;
+            renderSnapshots();
+            toast(`Версия «${label}» сохранена ✓`);
+        } catch (e) {
+            toast('Ошибка: ' + e.message, 'err');
+        }
+    }
+    document.getElementById('schSaveSnapBtn')?.addEventListener('click', saveAsVersion);
 
 
     // ════════════════ Save+reload (for structure mutations) ════════════════
@@ -628,7 +639,7 @@
     // grid template-columns rebuild correctly. Drain the queue first so the
     // reload sees the latest state, then reload.
     async function saveAndReload(reason) {
-        await flushSave('auto');
+        await flushSave();
         toast(reason + ' ✓');
         setTimeout(() => location.reload(), 400);
     }
@@ -1023,7 +1034,7 @@
             delete App.state.shifts[iso];
         }
         App.dirty = true;
-        await flushSave('clear');
+        await flushSave();
         location.reload();
     });
 
@@ -1052,7 +1063,7 @@
             return;
         }
         App.dirty = true;
-        await flushSave('copy-week');
+        await flushSave();
         toast(`Скопировано ${copied} смен на следующую неделю`);
         // Navigate to the next week
         const nextFrom = new Date(from); nextFrom.setDate(nextFrom.getDate() + 7);
@@ -1061,39 +1072,96 @@
     });
 
 
-    // ════════════════ Snapshots ════════════════
+    // ════════════════ Named versions (snapshots) ════════════════
+    // The "current draft" is implicit — `ajax=save` upserts it on every
+    // edit. The list rendered here is named-versions only.
     function renderSnapshots() {
         const wrap = document.querySelector('.sch-snapshots');
         if (!wrap) return;
         const saveBtn = document.getElementById('schSaveSnapBtn');
-        wrap.querySelectorAll('.sch-snap-pill').forEach((el) => el.remove());
+        wrap.querySelectorAll('.sch-snap-pill, .sch-snap-empty').forEach((el) => el.remove());
+        const insertBefore = saveBtn?.previousElementSibling || saveBtn;
+        if (!App.snapshots || App.snapshots.length === 0) {
+            const empty = document.createElement('span');
+            empty.className = 'sch-snap-empty';
+            empty.style.cssText = 'color: var(--muted); font-size: 12px;';
+            empty.textContent = 'Именованных версий пока нет. «Сохранить версию» создаст первую.';
+            wrap.insertBefore(empty, insertBefore);
+            return;
+        }
         App.snapshots.forEach((s) => {
             const pill = document.createElement('span');
-            pill.className = 'sch-snap-pill' + (s.is_current ? ' current' : '');
+            pill.className = 'sch-snap-pill';
             pill.dataset.snapId = s.id;
+            pill.dataset.snapLabel = s.label || '';
             const when = (s.created_at || '').replace(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}).*$/, '$3.$2 $4');
-            pill.innerHTML = `${esc(s.label || 'auto')} <span class="when">${esc(when)}</span>`;
-            if (!s.is_current) pill.addEventListener('click', () => loadSnapshot(s.id));
-            wrap.insertBefore(pill, saveBtn?.previousElementSibling || saveBtn);
+            pill.innerHTML = `
+                <span class="sch-snap-name">${esc(s.label)}</span>
+                <span class="when">${esc(when)}</span>
+                <button class="sch-snap-btn sch-snap-rename" title="Переименовать" data-snap-id="${s.id}">✏</button>
+                <button class="sch-snap-btn sch-snap-del"    title="Удалить"        data-snap-id="${s.id}">×</button>
+            `;
+            wrap.insertBefore(pill, insertBefore);
         });
     }
+
     async function loadSnapshot(id) {
-        if (!confirm('Загрузить эту версию? Текущие несохранённые изменения пропадут.')) return;
+        if (!confirm('Загрузить эту версию? Текущий черновик перепишется.')) return;
         try {
             const j = await api('snapshot', { query: 'id=' + id });
             App.state = j.state;
             if (Array.isArray(App.state.shifts)) App.state.shifts = {};
             if (!App.state.shifts || typeof App.state.shifts !== 'object') App.state.shifts = {};
-            await api('save', { method: 'POST', body: { state: App.state, label: 'restored-' + id } });
+            // Push loaded state into the current draft (no new version row).
+            await api('save', { method: 'POST', body: { state: App.state } });
             toast('Версия загружена');
             setTimeout(() => location.reload(), 400);
         } catch (e) {
             toast('Ошибка: ' + e.message, 'err');
         }
     }
-    // Wire existing snapshot pills (server-rendered)
-    document.querySelectorAll('.sch-snap-pill[data-snap-id]:not(.current)').forEach((pill) => {
-        pill.addEventListener('click', () => loadSnapshot(parseInt(pill.dataset.snapId, 10)));
+    async function renameSnap(id, currentLabel) {
+        const next = (prompt('Новое название версии:', currentLabel || '') || '').trim();
+        if (!next || next === currentLabel) return;
+        try {
+            const j = await api('rename_snap', { method: 'POST', body: { id, label: next } });
+            App.snapshots = j.snapshots || App.snapshots;
+            renderSnapshots();
+            toast('Переименовано ✓');
+        } catch (e) {
+            toast('Ошибка: ' + e.message, 'err');
+        }
+    }
+    async function deleteSnap(id, currentLabel) {
+        if (!confirm(`Удалить версию «${currentLabel || id}»?`)) return;
+        try {
+            const j = await api('del_snap', { method: 'POST', body: { id } });
+            App.snapshots = j.snapshots || App.snapshots;
+            renderSnapshots();
+            toast('Версия удалена ✓');
+        } catch (e) {
+            toast('Ошибка: ' + e.message, 'err');
+        }
+    }
+
+    // Single delegated handler — works for server-rendered AND JS-rerendered pills.
+    document.addEventListener('click', (e) => {
+        const renameBtn = e.target.closest('.sch-snap-rename');
+        if (renameBtn) {
+            e.preventDefault(); e.stopPropagation();
+            const pill = renameBtn.closest('.sch-snap-pill');
+            renameSnap(parseInt(renameBtn.dataset.snapId, 10), pill?.dataset.snapLabel || '');
+            return;
+        }
+        const delBtn = e.target.closest('.sch-snap-del');
+        if (delBtn) {
+            e.preventDefault(); e.stopPropagation();
+            const pill = delBtn.closest('.sch-snap-pill');
+            deleteSnap(parseInt(delBtn.dataset.snapId, 10), pill?.dataset.snapLabel || '');
+            return;
+        }
+        const pill = e.target.closest('.sch-snap-pill[data-snap-id]');
+        if (pill) loadSnapshot(parseInt(pill.dataset.snapId, 10));
     });
 
 

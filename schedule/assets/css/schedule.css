@@ -518,14 +518,25 @@
     font-weight: 600; margin-right: 8px;
 }
 .sch-snap-pill {
-    padding: 6px 12px; border-radius: 999px;
+    padding: 6px 8px 6px 12px; border-radius: 999px;
     border: 1px solid var(--border); background: rgba(255,255,255,.04);
     font-size: 12px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 8px;
+    display: inline-flex; align-items: center; gap: 6px;
 }
+.sch-snap-pill .sch-snap-name { font-weight: 600; }
 .sch-snap-pill .when { color: var(--muted); font-size: 11px; }
-.sch-snap-pill.current { border-color: var(--accent); color: var(--accent); }
-.sch-snap-pill:hover:not(.current) { border-color: var(--accent); }
+.sch-snap-pill:hover { border-color: var(--accent); }
+.sch-snap-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; padding: 0; margin-left: 2px;
+    background: transparent; border: 0; border-radius: 50%;
+    color: var(--muted); font-size: 12px; line-height: 1;
+    cursor: pointer; opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.sch-snap-pill:hover .sch-snap-btn { opacity: 0.8; }
+.sch-snap-rename:hover { background: rgba(184,135,70,.20); color: var(--accent); opacity: 1; }
+.sch-snap-del:hover    { background: rgba(248,113,113,.20); color: #f87171; opacity: 1; }
 
 /* ─── Help mode overlay (toggle via #schHelpBtn) ───────────
    Подсвечиваем элементы — pure CSS. Сам тултип рисуется JS-ом
