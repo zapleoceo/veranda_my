@@ -22,6 +22,7 @@ const [
     { initOpenChecks },
     { initSubmit },
     { toast },
+    { t },
 ] = await Promise.all([
     _i('./state.js'),
     _i('./api.js'),
@@ -33,6 +34,7 @@ const [
     _i('./ui/openChecks.js'),
     _i('./ui/submit.js'),
     _i('./ui/toast.js'),
+    _i('./i18n.js'),
 ]);
 
 // Single source of truth for the running state — held in memory + mirrored
@@ -59,7 +61,7 @@ document.getElementById('noLocationBtn')?.addEventListener('click', () => openLo
 // Manual refresh of the menu (top-right icon).
 document.getElementById('noMenuRefreshBtn')?.addEventListener('click', () => {
     refreshMenu();
-    toast('Меню обновляется…');
+    toast(t('menuRefreshing'));
 });
 
 // Hook item-click globally (event delegation) — modifier sheet decides

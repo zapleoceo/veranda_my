@@ -82,6 +82,42 @@ button { cursor: pointer; }
     font-weight: 700;
     letter-spacing: 0.01em;
 }
+
+/* Language switcher — sits where the page title used to. Three
+   chip-buttons, the active one painted in the accent. Anchor reloads
+   the page with ?lang=, which the controller persists to the cookie. */
+.no-langsw {
+    flex: 1;
+    display: inline-flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--no-r-pill);
+    overflow: hidden;
+    align-self: center;
+    padding: 2px;
+}
+.no-langsw__btn {
+    appearance: none;
+    background: transparent;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: var(--no-fs-sm);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 6px 10px;
+    border-radius: var(--no-r-pill);
+    min-width: 36px;
+    text-align: center;
+    transition: background .15s, color .15s;
+}
+.no-langsw__btn:hover { color: var(--text); }
+.no-langsw__btn.is-active {
+    background: var(--accent);
+    color: #0f1117;
+}
 .no-iconbtn {
     display: inline-flex;
     align-items: center;

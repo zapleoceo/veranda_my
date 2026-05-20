@@ -5,6 +5,11 @@
 
 'use strict';
 
+const _self = new URL(import.meta.url);
+const _v    = _self.searchParams.get('v') || '';
+const _qs   = _v ? '?v=' + encodeURIComponent(_v) : '';
+const { t } = await import(new URL('../i18n.js' + _qs, import.meta.url).href);
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 })[c]);
@@ -18,12 +23,12 @@ function render(state) {
 
     const spots = state.s.spots;
     $spotWrap.hidden = spots.length <= 1;
-    $spot.innerHTML = ['<option value="">Выберите заведение…</option>',
+    $spot.innerHTML = [`<option value="">${esc(t('spot'))}…</option>`,
         ...spots.map((s) => `<option value="${s.id}" ${s.id === state.s.spotId ? 'selected' : ''}>${esc(s.name)}</option>`)].join('');
 
     // Halls scoped to the chosen spot.
     const halls = state.s.halls.filter((h) => !state.s.spotId || h.spot_id === state.s.spotId);
-    $hall.innerHTML = ['<option value="">Все залы</option>',
+    $hall.innerHTML = [`<option value="">${esc(t('hallAll'))}</option>`,
         ...halls.map((h) => `<option value="${h.id}" ${h.id === state.s.hallId ? 'selected' : ''}>${esc(h.name)}</option>`)].join('');
 
     // Tables scoped to spot+hall.
@@ -33,9 +38,10 @@ function render(state) {
         if (state.s.hallId && t.hall_id !== state.s.hallId) return false;
         return true;
     });
+    // Rename the iter var so we don't shadow our `t()` translation helper.
     $tables.innerHTML = tables.length
-        ? tables.map((t) => `<button type="button" class="no-table-btn ${t.id === state.s.tableId ? 'is-active' : ''}" data-table-id="${t.id}">${esc(t.name)}</button>`).join('')
-        : '<div class="no-empty" style="padding:16px 0">Нет столов</div>';
+        ? tables.map((tbl) => `<button type="button" class="no-table-btn ${tbl.id === state.s.tableId ? 'is-active' : ''}" data-table-id="${tbl.id}">${esc(tbl.name)}</button>`).join('')
+        : `<div class="no-empty" style="padding:16px 0">${esc(t('noTables'))}</div>`;
 
     // Sync the top-bar label.
     const $label = document.getElementById('noLocationLabel');
@@ -45,8 +51,8 @@ function render(state) {
         const sp  = state.findSpot(state.s.spotId);
         const parts = [];
         if (sp) parts.push(sp.name);
-        if (tbl) parts.push('Стол ' + tbl.name);
-        const label = parts.length ? parts.join(' · ') : 'Стол';
+        if (tbl) parts.push(t('locationDefault') + ' ' + tbl.name);
+        const label = parts.length ? parts.join(' · ') : t('locationDefault');
         $label.textContent = label;
         $btn.classList.toggle('is-set', state.s.tableId > 0);
     }
