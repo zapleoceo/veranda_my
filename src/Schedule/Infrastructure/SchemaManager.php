@@ -36,18 +36,36 @@ final class SchemaManager
         if (self::$checkedThisRequest) return;
         self::$checkedThisRequest = true;
 
+        // The whole bootstrap is best-effort. Any failure (e.g. missing
+        // system_meta table, denied ALTER privilege, transient lock) is
+        // swallowed — the page MUST render even when DDL can't run.
+        // Tables we CREATE IF NOT EXISTS will just be retried on the
+        // next request.
         try {
-            if ($this->readVersion() === self::VERSION) return;
-        } catch (\Throwable) {
-            // system_meta missing on a brand-new install — run DDL anyway.
-        }
+            try {
+                if ($this->readVersion() === self::VERSION) return;
+            } catch (\Throwable) {
+                // system_meta missing on a brand-new install — proceed.
+            }
 
-        $this->createSnapshots();
-        $this->createZones();
-        $this->createStaffTags();
-        $this->createEmployeeRates();
-        $this->backfillShareCodes();
-        $this->writeVersion();
+            $this->createSnapshots();
+            $this->createZones();
+            $this->createStaffTags();
+            $this->createEmployeeRates();
+            $this->backfillShareCodes();
+
+            try {
+                $this->writeVersion();
+            } catch (\Throwable) {
+                // system_meta isn't writable — fine, just skip the stamp;
+                // next request will re-run DDL (cheap because CREATE TABLE
+                // IF NOT EXISTS is a metadata-only no-op when up to date).
+            }
+        } catch (\Throwable) {
+            // Any other surprise — never let schema bootstrap take the
+            // whole page down. Errors get logged elsewhere via the Slim
+            // error middleware if they recur in business logic.
+        }
     }
 
     // ─── persistence of the schema version ───────────────────────────

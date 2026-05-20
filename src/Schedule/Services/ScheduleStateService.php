@@ -108,10 +108,13 @@ final class ScheduleStateService
     // ─── Staff tags + rate ─────────────────────────────────────────
 
     /**
-     * Saves schedule-only flags via StaffTagRepository AND the hourly rate
-     * via the canonical EmployeeRateRepository (the same table the
-     * /employees/ page writes to). Splitting the persistence avoids
-     * duplicating the rate in two places.
+     * Saves schedule-only flags via StaffTagRepository.
+     *
+     * Hourly rate is NOT written here even though the modal shows a
+     * ₫/ч column — rates are owned by the /employees/ page and stored
+     * in `employee_rates`. The schedule modal displays the current
+     * value read-only-ish; if the user types a new number it's
+     * deliberately ignored so the two UIs never disagree.
      *
      * `$actorEmail` is passed in explicitly so the service stays free of
      * HTTP/session context (Single Responsibility — the Action knows about
@@ -120,8 +123,6 @@ final class ScheduleStateService
     public function saveStaffTag(int $userId, array $tag, string $actorEmail = ''): void
     {
         $this->staffTags->save($userId, $tag);
-        $rate = (int) ($tag['rate_per_hour'] ?? 0);
-        $this->rates->save($userId, $rate, $actorEmail !== '' ? $actorEmail : null);
     }
 
     // ─── Providers (Poster passthrough) ────────────────────────────

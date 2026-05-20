@@ -1543,8 +1543,11 @@
                         </button>
                     </td>
                     <td style="padding: 8px 10px; text-align: right;">
-                        <input type="number" class="staff-rate" value="${e.rate_per_hour || 0}" step="1000" min="0"
-                               style="width: 100px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 8px; font-family: inherit; text-align: right;">
+                        <!-- ₫/ч is read-only here — owned by /employees/, displayed
+                             for context. Service ignores any new value on save. -->
+                        <input type="number" class="staff-rate" value="${e.rate_per_hour || 0}" readonly
+                               title="Изменяется на странице «ЗП сотрудников» (/employees)"
+                               style="width: 100px; background: rgba(255,255,255,.025); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 4px 8px; font-family: inherit; text-align: right; cursor: not-allowed;">
                     </td>
                 </tr>`;
         });
