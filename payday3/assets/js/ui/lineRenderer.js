@@ -88,6 +88,10 @@ export class LineRenderer {
             el.removeEventListener('scroll', fn);
         }
         this._scrollListeners = [];
+        if (this._fontScaleListener) {
+            window.removeEventListener('pd3:font-scale-changed', this._fontScaleListener);
+            this._fontScaleListener = null;
+        }
         try { this._svg?.remove(); } catch (_) {}
         for (const btn of this._buttons.values()) btn.remove();
         this._buttons.clear();
@@ -140,6 +144,13 @@ export class LineRenderer {
             el.addEventListener('scroll', fn, { passive: true });
             this._scrollListeners.push({ el, fn });
         }
+
+        // Font-scale changes (.pd3-page zoom toggle). ResizeObserver
+        // doesn't reliably fire under CSS `zoom` so we listen for an
+        // explicit event from fontScale.js — both IN and OUT mode
+        // renderers receive it.
+        this._fontScaleListener = () => this._schedule();
+        window.addEventListener('pd3:font-scale-changed', this._fontScaleListener);
     }
 
     _schedule() {
@@ -151,13 +162,37 @@ export class LineRenderer {
         });
     }
 
+    /**
+     * Read the active CSS-zoom factor on .pd3-page.
+     *
+     * Under Chromium's `zoom`, both `getBoundingClientRect().width` and
+     * `offsetWidth` return already-scaled values, so a vis/layout ratio
+     * doesn't reveal the factor. The reliable source of truth is the
+     * class on <html> that fontScale.js sets — pd3-scale-1-2 / -1-5.
+     * Falls back to 1 (no zoom) when no class is present.
+     */
+    _getScale() {
+        const cls = document.documentElement.className || '';
+        if (cls.indexOf('pd3-scale-1-5') !== -1) return 1.5;
+        if (cls.indexOf('pd3-scale-1-2') !== -1) return 1.2;
+        return 1;
+    }
+
     _redraw() {
+        const scale = this._getScale();
         const rootRect = this._container.getBoundingClientRect();
-        const w = this._container.scrollWidth  || rootRect.width;
-        const h = this._container.scrollHeight || rootRect.height;
+        // BCR returns visual (post-zoom) pixels — same coord system every
+        // anchor BCR below is read in, so path coordinates lie in visual
+        // px and the viewBox uses that same unit.
+        const w = rootRect.width  || this._container.scrollWidth;
+        const h = rootRect.height || this._container.scrollHeight;
         this._svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-        this._svg.style.width  = w + 'px';
-        this._svg.style.height = h + 'px';
+        // The SVG element lives INSIDE the zoomed .pd3-page, so any CSS
+        // pixel value we set on it is multiplied by `scale` on paint.
+        // Dividing the visual dimensions by `scale` cancels that out and
+        // the element ends up exactly covering the container visually.
+        this._svg.style.width  = (w / scale) + 'px';
+        this._svg.style.height = (h / scale) + 'px';
 
         // Clear paths but keep close-button nodes for reuse — we hide
         // them and re-show only the ones we actually re-render.
@@ -226,8 +261,14 @@ export class LineRenderer {
         const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
         const t   = Math.min(0.98, Math.max(0.92, 1 - (10 / len)));
         const pt  = cubicPoint(a, b, t);
-        btn.style.left = Math.round(pt.x - 8) + 'px';
-        btn.style.top  = Math.round(pt.y - 8) + 'px';
+        // pt is in visual (post-zoom) px because a/b were derived from
+        // BCR readings. The button is a real DOM node inside the zoomed
+        // .pd3-page, so the CSS px we set here are re-multiplied by the
+        // active scale on paint — divide by it to keep the button on
+        // the line.
+        const scale = this._getScale();
+        btn.style.left = Math.round((pt.x - 8) / scale) + 'px';
+        btn.style.top  = Math.round((pt.y - 8) / scale) + 'px';
         btn.style.display = 'flex';
     }
 
