@@ -39,6 +39,13 @@ use App\Payday3\Http\Actions\BalanceScreenshotAction;
 use App\Payday3\Http\Actions\BalanceSyncPlanAction;
 use App\Payday3\Http\Actions\BalanceSyncCommitAction;
 use App\Payday3\Http\Actions\PosterTransactionCreateAction;
+use App\Order\Http\NewOrderController;
+use App\Order\Http\Actions\MenuAction              as NewOrderMenuAction;
+use App\Order\Http\Actions\LocationsAction         as NewOrderLocationsAction;
+use App\Order\Http\Actions\OpenChecksAction        as NewOrderOpenChecksAction;
+use App\Order\Http\Actions\OrderCreateAction       as NewOrderCreateAction;
+use App\Order\Http\Actions\OrderAppendAction       as NewOrderAppendAction;
+use App\Order\Http\Middleware\CsrfMiddleware       as NewOrderCsrfMiddleware;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -234,6 +241,24 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->post(  '/finance/transfers/create',                    \App\Payday3\Http\Actions\FinanceTransferCreateAction::class);
     });
 })->add(AuthMiddleware::class);
+
+// /neworder — operator-facing order page (live Poster menu, create
+// new order or append to an open check). Public (no auth yet) but
+// every mutation endpoint is CSRF-gated and Origin-locked. Will get
+// a proper login layer in a later iteration.
+$app->group('/neworder', function (RouteCollectorProxy $g) {
+    $g->get('[/]', [NewOrderController::class, 'index']);
+    $g->group('/api', function (RouteCollectorProxy $api) {
+        // GETs are read-only Poster proxies — no mutation guard.
+        $api->get('/menu',         NewOrderMenuAction::class);
+        $api->get('/locations',    NewOrderLocationsAction::class);
+        $api->get('/open-checks',  NewOrderOpenChecksAction::class);
+        // POSTs go through CsrfMiddleware (token + origin check).
+        $api->post('/orders',          NewOrderCreateAction::class)->add(NewOrderCsrfMiddleware::class);
+        $api->post('/orders/append',   NewOrderAppendAction::class)->add(NewOrderCsrfMiddleware::class);
+    });
+});
+$app->get('/neworder/assets/{file:.+}', [StaticController::class, 'neworderAssets']);
 
 // Static assets from directories outside public/
 $app->get('/assets/{file:.+}',              [StaticController::class, 'globalAssets']);
