@@ -345,29 +345,8 @@ return [
         $c->get(MetaCache::class),
         Config::get('POSTER_API_TOKEN', ''),
     ),
-    // Thin controller — actions are resolved lazily through the
-    // container by class name (see ScheduleController::dispatchAjax).
-    // Adding a new AJAX endpoint = new Action class + one entry in
-    // this map; controller stays untouched (Open/Closed).
-    ScheduleController::class                => fn($c) => new ScheduleController(
-        $c->get(ScheduleStateService::class),
-        $c->get(PeriodBuilder::class),
-        $c->get(HeatmapBuilder::class),
-        $c->get(JsonResponder::class),
-        $c,
-        [
-            'load'            => LoadAction::class,
-            'save'            => SaveAction::class,
-            'save_version'    => SaveVersionAction::class,
-            'snapshots'       => ListSnapshotsAction::class,
-            'snapshot'        => LoadSnapshotAction::class,
-            'del_snap'        => DeleteSnapshotAction::class,
-            'rename_snap'     => RenameSnapshotAction::class,
-            'add_zone'        => AddZoneAction::class,
-            'del_zone'        => DeleteZoneAction::class,
-            'save_staff_tags' => SaveStaffTagsAction::class,
-            'reload_poster'   => ReloadPosterAction::class,
-            'debug_poster'    => DebugPosterAction::class,
-        ],
-    ),
+    // ScheduleController is auto-wired by PHP-DI: each constructor arg
+    // (services + 12 action instances) gets resolved by type-hint.
+    // No explicit factory — keeps DI graph simple and avoids the
+    // ContainerInterface-injection issue that broke prod earlier.
 ];
