@@ -41,7 +41,8 @@ if ($cur === false || $end === false || $cur > $end) {
             'date'    => (string) date('j', $cur),
             'mon'     => $schMonRu[(int) date('n', $cur)],
             'dow'     => $schDowRu[(int) date('w', $cur)],
-            'weekend' => in_array((int) date('w', $cur), [0, 6], true),
+            // Пт/Сб/Вс — выделяем как «уикенд» (5/6/0 в PHP date('w')).
+            'weekend' => in_array((int) date('w', $cur), [0, 5, 6], true),
         ];
         $cur = (int) strtotime('+1 day', $cur);
         $i++;
@@ -450,19 +451,19 @@ Hover на ⚠ в конкретном дне покажет причины.">�
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
-          <div class="sch-divider <?= $divCls ?>"></div>
+          <div class="sch-divider <?= $divCls ?><?= $weekendCls ?>"></div>
         <?php endforeach; ?>
 
-        <div class="sch-add-block-cell"></div>
+        <div class="sch-add-block-cell<?= $weekendCls ?>"></div>
 
         <?php if (!empty($dayReasons)): ?>
-          <div class="sch-warn-cell bad"
+          <div class="sch-warn-cell bad<?= $weekendCls ?>"
                data-day-iso="<?= htmlspecialchars($d['iso']) ?>"
                title="<?= htmlspecialchars(implode("\n", $dayReasons)) ?>">⚠</div>
         <?php else: ?>
-          <div class="sch-warn-cell ok" data-day-iso="<?= htmlspecialchars($d['iso']) ?>" title="Всё в порядке">✓</div>
+          <div class="sch-warn-cell ok<?= $weekendCls ?>" data-day-iso="<?= htmlspecialchars($d['iso']) ?>" title="Всё в порядке">✓</div>
         <?php endif; ?>
-        <div class="sch-budget-cell" data-day-iso="<?= htmlspecialchars($d['iso']) ?>">
+        <div class="sch-budget-cell<?= $weekendCls ?>" data-day-iso="<?= htmlspecialchars($d['iso']) ?>">
           <?= $daySalary > 0 ? number_format($daySalary / 1_000_000, 2, '.', '') . 'M' : '—' ?>
         </div>
       <?php endforeach; ?>
@@ -807,4 +808,4 @@ Hover на ⚠ в конкретном дне покажет причины.">�
   </div>
 </div>
 
-<script src="/schedule/assets/js/schedule.js?v=20260520_savequeue" defer></script>
+<script src="/schedule/assets/js/schedule.js?v=20260520_weekend" defer></script>

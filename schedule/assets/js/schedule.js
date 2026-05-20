@@ -438,11 +438,15 @@
         populatePopoverDropdowns(isSenior);
 
         const existing = getShift(iso, blockId, slotIdx);
-        // Parse default time from slot if no existing
-        let dStart = '09:00', dEnd = '17:00';
-        const dt = block?.slots?.[slotIdx]?.defaultTime || '';
-        const dmm = dt.match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
-        if (dmm) { dStart = dmm[1]; dEnd = dmm[2]; }
+        // Defaults for a brand-new shift depend on the day of week:
+        //   • Пт / Сб / Вс  → 10:00–23:00 (длиннее за счёт уикенд-трафика)
+        //   • Пн–Чт         → 10:00–22:00
+        // Existing shift's stored times always win — we only fall back
+        // to these for empty cells / unset start/end.
+        const dow = new Date(iso + 'T00:00:00').getDay();   // 0=Sun … 6=Sat
+        const weekend = dow === 5 || dow === 6 || dow === 0;
+        const dStart = '10:00';
+        const dEnd   = weekend ? '23:00' : '22:00';
 
         if (existing) {
             popEmp.value  = existing.emp_id || '';
