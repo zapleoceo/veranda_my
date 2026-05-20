@@ -192,9 +192,35 @@
             padding: 16px;
         }
         #payExtraModal.loading .payextra-overlay { display: flex; }
-        .help-btn { width: 24px; height: 24px; border-radius: 999px; border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: var(--accent); font-weight: 900; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; line-height: 1; padding: 0; animation: helpPulse 1200ms ease-in-out infinite; position: absolute; top: 2px; right: 2px; }
-        .help-btn:hover { box-shadow: 0 0 0 2px rgba(26,115,232,0.35); }
-        @keyframes helpPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+        .help-btn { width: 28px; height: 28px; border-radius: 999px; border: 1px solid rgba(184,135,70,0.45); background: rgba(184,135,70,0.10); color: var(--accent); font-weight: 900; cursor: pointer; display:inline-flex; align-items:center; justify-content:center; line-height: 1; padding: 0; font-size: 14px; position: absolute; top: 4px; right: 4px; transition: box-shadow 0.15s, background 0.15s; }
+        .help-btn:hover { box-shadow: 0 0 0 2px rgba(184,135,70,0.35); }
+        .help-btn[aria-pressed="true"] {
+            background: var(--accent); border-color: var(--accent); color: #fffaf4;
+        }
+        /* Help mode — payday3-style overlay. Click "?" → body.emp-help-mode.
+           Every [data-help-abs] gets a dashed accent outline; a single
+           floating tooltip lives at body root (position:fixed) so it never
+           gets clipped by table-wrap's overflow:auto or modal stacks. */
+        body.emp-help-mode [data-help-abs] {
+            outline: 2px dashed rgba(184,135,70,0.6);
+            outline-offset: 2px;
+            position: relative;
+            cursor: help !important;
+        }
+        .emp-help-tip {
+            position: fixed; top: 0; left: 0;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.92); color: #fff;
+            border-radius: 8px;
+            font-size: 12px; line-height: 1.4; font-weight: 500;
+            white-space: pre-line;
+            max-width: 360px;
+            z-index: 9999;
+            pointer-events: none;
+            text-transform: none; letter-spacing: 0;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.45);
+        }
+        .emp-help-tip[hidden] { display: none; }
 
         @media (max-width: 560px) {
             .container { padding: 5px; }

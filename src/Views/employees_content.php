@@ -1,13 +1,15 @@
 <div class="container">
     <div class="card">
         <div class="filters">
-            <fieldset class="period-group" data-period="work">
+            <fieldset class="period-group" data-period="work"
+                      data-help-abs="Период работы. За эти даты считаются Часы, Чеки, Tips, Salary — т.е. за какие смены платим. Меняй через date-инпуты.">
                 <legend>1. Период работы (расчёт ЗП)</legend>
                 <input type="date" id="dateFrom" value="<?= htmlspecialchars($firstOfMonth) ?>" title="Начало рабочего периода">
                 <span class="period-sep">→</span>
                 <input type="date" id="dateTo" value="<?= htmlspecialchars($today) ?>" title="Конец рабочего периода">
             </fieldset>
-            <fieldset class="period-group" data-period="paid">
+            <fieldset class="period-group" data-period="paid"
+                      data-help-abs="Период выплат — где искать уже сделанные выплаты Tips/Salary в finance.getTransactions. По умолчанию = период работы + 3 дня (платим с задержкой). Можно менять руками — кнопка ↻ загорится и автосинк выключится. Клик по ↻ — вернуть автосинк.">
                 <legend>2. Период выплат (поиск транзакций)
                     <button type="button" id="paidResyncBtn" class="period-resync" title="Сбросить = период работы + 3 дня">↻</button>
                 </legend>
@@ -16,23 +18,29 @@
                 <input type="date" id="paidTo" value="" title="Конец периода поиска выплат">
             </fieldset>
             <div class="emp-style-8">
-                <button type="button" id="loadBtn">ЗАГРУЗИТЬ</button>
+                <button type="button" id="loadBtn"
+                        data-help-abs="Загружает данные за выбранный период работы: dash.getWaitersSales (часы/чеки) + dash.getTransactions (tips). Затем подтягивает выплаты за период выплат через finance.getTransactions.">ЗАГРУЗИТЬ</button>
                 <div class="loader" id="loader"><span class="spinner"></span><span class="muted">Загрузка…</span></div>
-                <button type="button" class="secondary emp-style-1" id="cancelBtn">Отменить</button>
+                <button type="button" class="secondary emp-style-1" id="cancelBtn"
+                        data-help-abs="Останавливает текущую загрузку. Появляется только пока идёт прогресс.">Отменить</button>
                 <div class="progress" id="prog">
                     <div class="bar"><span id="progBar"></span></div>
                     <div class="label" id="progLabel">0%</div>
                     <div class="desc" id="progDesc"></div>
                 </div>
-                <button type="button" class="secondary" id="payExtraBtn">PayExtra</button>
-                <button type="button" class="secondary" id="fixBtn">FIX</button>
+                <button type="button" class="secondary" id="payExtraBtn"
+                        data-help-abs="Ручная выплата (Tips/Salary). Выбор сотрудника, типа, счёта и суммы. Перед выполнением — обязательная галочка «да проверил».">PayExtra</button>
+                <button type="button" class="secondary" id="fixBtn"
+                        data-help-abs="FIX — список SLR транзакций за 30 дней. Можно переназначить сотрудника в комментарии транзакции, если в Poster выплату оформили не на того.">FIX</button>
             </div>
-            <button type="button" class="help-btn" id="helpBtn" title="Инструкция">?</button>
+            <button type="button" class="help-btn" id="helpBtn" title="Подсказки по интерфейсу"
+                    aria-pressed="false"
+                    data-help-abs="Включить/выключить режим подсказок. Когда включён — все важные элементы обведены пунктиром, при наведении показывается описание.">?</button>
         </div>
         <div class="error emp-style-1" id="err"></div>
-        <div class="muted emp-style-3" id="ltpRangeNote"></div>
+        <div class="muted emp-style-3" id="ltpRangeNote" data-help-abs="Подсказка какие именно даты использовались для поиска выплат TipsPaid/SlrPaid в Poster finance."></div>
         <div class="emp-style-7">
-            <div class="cols-dd">
+            <div class="cols-dd" data-help-abs="Выбор видимых колонок таблицы. Настройка сохраняется в браузере (localStorage).">
                 <button type="button" class="secondary" id="colsBtn">
                     <svg class="cols-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M4 5h16M7 12h10M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -41,7 +49,7 @@
                 </button>
                 <div class="cols-menu" id="colsMenu" hidden></div>
             </div>
-            <div class="cols-dd">
+            <div class="cols-dd" data-help-abs="Фильтр по должностям (ролям из Poster). Появляется список после первой загрузки. Настройка сохраняется в браузере.">
                 <button type="button" class="secondary" id="rolesBtn">
                     <svg class="cols-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                         <path d="M4 5h16M7 12h10M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -50,7 +58,7 @@
                 </button>
                 <div class="cols-menu" id="rolesMenu" hidden></div>
             </div>
-            <label class="muted emp-style-14">
+            <label class="muted emp-style-14" data-help-abs="Показывать ли строки сотрудников без активности (0 чеков, 0 часов).">
                 <input type="checkbox" id="hideZero">
                 Пустые
             </label>
@@ -60,18 +68,30 @@
                 <table id="empTable">
                     <thead>
                     <tr>
-                        <th id="thUid" class="col-id emp-style-12" data-sort="user_id" title="ID сотрудника в Poster">ID</th>
-                        <th id="thName" class="col-name emp-style-12" data-sort="name" title="Имя">Имя</th>
-                        <th id="thRate" class="col-rate emp-style-2" data-sort="rate" title="Ставка ₫/час">Ставка</th>
-                        <th id="thRole" class="col-role emp-style-12" data-sort="role_name" title="Должность">Роль</th>
-                        <th id="thChecks" class="col-checks emp-style-2" data-sort="checks" title="Количество чеков">Чеки</th>
-                        <th id="thHours" class="col-hours emp-style-2" data-sort="worked_hours" title="Отработанные часы">Часы</th>
-                        <th id="thTips" class="col-tips emp-style-2" data-sort="tips_minor" title="Чаевые по данным Poster">Tips</th>
-                        <th id="thTipsPaid" class="col-paid emp-style-2" data-sort="tips_paid_minor" title="Уже выплаченные чаевые">Tips ✓</th>
-                        <th id="thTtp" class="col-ttp emp-style-2" data-sort="tips_to_pay_minor" title="Осталось выплатить чаевых">Tips →</th>
-                        <th id="thSalary" class="col-salary emp-style-2" data-sort="salary_minor" title="Зарплата = Ставка × Часы">ЗП</th>
-                        <th id="thSlrPaid" class="col-slr emp-style-2" data-sort="slr_paid_minor" title="Уже выплаченная зарплата">ЗП ✓</th>
-                        <th id="thSalaryToPay" class="col-salarytopay emp-style-2" data-sort="salary_to_pay_vnd" title="Осталось выплатить зарплаты">ЗП →</th>
+                        <th id="thUid" class="col-id emp-style-12" data-sort="user_id"
+                            data-help-abs="ID сотрудника в Poster. Клик — сортировка.">ID</th>
+                        <th id="thName" class="col-name emp-style-12" data-sort="name"
+                            data-help-abs="Имя сотрудника из access.getEmployees. Клик — сортировка по алфавиту.">Имя</th>
+                        <th id="thRate" class="col-rate emp-style-2" data-sort="rate"
+                            data-help-abs="Ставка ₫/час. Можно править прямо в ячейке — сохраняется на blur или Enter в таблицу employee_rates (используется и на странице График смен).">Ставка</th>
+                        <th id="thRole" class="col-role emp-style-12" data-sort="role_name"
+                            data-help-abs="Должность из Poster (role_name). По ней работает фильтр «Роли».">Роль</th>
+                        <th id="thChecks" class="col-checks emp-style-2" data-sort="checks"
+                            data-help-abs="Количество закрытых чеков за период работы.">Чеки</th>
+                        <th id="thHours" class="col-hours emp-style-2" data-sort="worked_hours"
+                            data-help-abs="Отработанные часы за период работы (worked_time из dash.getWaitersSales). Клик по числу в строке — разбивка по дням.">Часы</th>
+                        <th id="thTips" class="col-tips emp-style-2" data-sort="tips_minor"
+                            data-help-abs="Чаевые за период работы. Сумма tips_card из dash.getTransactions.">Tips</th>
+                        <th id="thTipsPaid" class="col-paid emp-style-2" data-sort="tips_paid_minor"
+                            data-help-abs="Уже выплаченные чаевые из finance.getTransactions с комментарием TIPS ID=N за период выплат. Под суммой — детализация по каждой транзакции.">Tips ✓</th>
+                        <th id="thTtp" class="col-ttp emp-style-2" data-sort="tips_to_pay_minor"
+                            data-help-abs="Сколько осталось выплатить чаевых: Tips − TipsPaid (минимум 0). Кнопка PAY рядом создаёт транзакцию на эту сумму.">Tips →</th>
+                        <th id="thSalary" class="col-salary emp-style-2" data-sort="salary_minor"
+                            data-help-abs="Зарплата по ставке: Ставка × Часы.">ЗП</th>
+                        <th id="thSlrPaid" class="col-slr emp-style-2" data-sort="slr_paid_minor"
+                            data-help-abs="Уже выплаченная зарплата (SLR ID=N в finance.getTransactions за период выплат). Под суммой — детализация по транзакциям.">ЗП ✓</th>
+                        <th id="thSalaryToPay" class="col-salarytopay emp-style-2" data-sort="salary_to_pay_vnd"
+                            data-help-abs="Сколько осталось выплатить ЗП: Salary − SlrPaid (минимум 0). Кнопка PAY рядом создаёт транзакцию на эту сумму.">ЗП →</th>
                     </tr>
                     </thead>
                     <tbody id="tbody"></tbody>
@@ -214,4 +234,4 @@
 window.__USER_EMAIL__ = <?= json_encode((string) ($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 window.__EMPLOYEES_CSRF__ = <?= json_encode($employeesCsrf, JSON_UNESCAPED_UNICODE) ?>;
 </script>
-<script src="/assets/js/employees_view.js?v=20260520_2periods" defer></script>
+<script src="/assets/js/employees_view.js?v=20260520_help" defer></script>

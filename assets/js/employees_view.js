@@ -1093,14 +1093,74 @@
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && paidModal.style.display === 'flex') closePaidConfirm(false); });
     }
 
-    const openHelp = () => { if (helpModal) helpModal.style.display = 'flex'; };
-    const closeHelp = () => { if (helpModal) helpModal.style.display = 'none'; };
-    if (helpBtn) helpBtn.addEventListener('click', openHelp);
-    if (helpClose) helpClose.addEventListener('click', closeHelp);
-    if (helpModal) {
-        helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeHelp(); });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && helpModal.style.display === 'flex') closeHelp(); });
+    // ─── Help mode (payday3-style) ────────────────────────────────────
+    // "?" toggles body.emp-help-mode. CSS draws a dashed outline around
+    // every [data-help-abs] element; a single floating tooltip lives in
+    // <body> via position:fixed so it never clips on overflow:hidden
+    // ancestors. Tooltip flips above/below + clamps to viewport.
+    const helpTip = (() => {
+        let el = document.getElementById('empHelpTip');
+        if (el) return el;
+        el = document.createElement('div');
+        el.id = 'empHelpTip';
+        el.className = 'emp-help-tip';
+        el.hidden = true;
+        document.body.appendChild(el);
+        return el;
+    })();
+    let helpTipTarget = null;
+    const HELP_TIP_GAP = 8;
+    function positionHelpTip(target) {
+        const text = target.getAttribute('data-help-abs');
+        if (!text) return;
+        helpTip.textContent = text;
+        helpTip.hidden = false;
+        helpTipTarget = target;
+        const r  = target.getBoundingClientRect();
+        const tr = helpTip.getBoundingClientRect();
+        const vw = window.innerWidth, vh = window.innerHeight;
+        // Default: above the element, centred horizontally on its mid-X.
+        let top  = r.top - tr.height - HELP_TIP_GAP;
+        let left = r.left + r.width / 2 - tr.width / 2;
+        if (top < 4) top = r.bottom + HELP_TIP_GAP;                  // flip below if no room
+        left = Math.max(4, Math.min(left, vw - tr.width - 4));        // clamp horizontally
+        if (top + tr.height > vh - 4) top = vh - tr.height - 4;       // clamp vertically
+        helpTip.style.top  = Math.round(top)  + 'px';
+        helpTip.style.left = Math.round(left) + 'px';
     }
+    let helpOn = false;
+    if (helpBtn) {
+        helpBtn.addEventListener('click', () => {
+            helpOn = !helpOn;
+            document.body.classList.toggle('emp-help-mode', helpOn);
+            helpBtn.setAttribute('aria-pressed', helpOn ? 'true' : 'false');
+            if (!helpOn) { helpTip.hidden = true; helpTipTarget = null; }
+        });
+    }
+    document.addEventListener('mouseover', (e) => {
+        if (!helpOn) return;
+        const t = e.target instanceof Element ? e.target.closest('[data-help-abs]') : null;
+        if (!t) return;
+        positionHelpTip(t);
+    });
+    document.addEventListener('mouseout', (e) => {
+        if (!helpOn) return;
+        const t = e.target instanceof Element ? e.target.closest('[data-help-abs]') : null;
+        if (!t) return;
+        const r = e.relatedTarget;
+        if (r instanceof Element && r.closest('[data-help-abs]') === t) return;
+        helpTip.hidden = true; helpTipTarget = null;
+    });
+    window.addEventListener('scroll', () => {
+        if (!helpOn || helpTip.hidden) return;
+        if (helpTipTarget && document.contains(helpTipTarget)) positionHelpTip(helpTipTarget);
+        else { helpTip.hidden = true; helpTipTarget = null; }
+    }, { passive: true });
+    window.addEventListener('resize', () => {
+        if (!helpOn || helpTip.hidden) return;
+        if (helpTipTarget && document.contains(helpTipTarget)) positionHelpTip(helpTipTarget);
+    });
+    if (helpClose) helpClose.addEventListener('click', () => { if (helpModal) helpModal.style.display = 'none'; });
 
     const loadPayMeta = async () => {
         if (payMeta) return payMeta;
