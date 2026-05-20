@@ -588,90 +588,94 @@ body.sch-help-mode [data-help-abs] {
 .sch-coverage-section {
     margin-top: 16px;
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 14px; padding: 18px 22px;
+    border-radius: 14px; padding: 14px 16px;
+    /* Shrink-wrap to content — heatmap is naturally narrow (≤24 hour-
+       columns × ~38 px), no point stretching the card to viewport width. */
+    width: max-content; max-width: 100%;
 }
 .sch-coverage-head {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 14px; gap: 16px; flex-wrap: wrap;
+    /* Title + both dropdowns + legend on a single row, no labels — the
+       dropdown options speak for themselves. Wraps only on very narrow
+       screens. */
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 12px;
 }
 .sch-coverage-head h3 {
     margin: 0; font-size: 14px; color: var(--accent);
     text-transform: uppercase; letter-spacing: 0.06em;
     display: flex; align-items: center; gap: 8px;
+    margin-right: 4px;
 }
-.sch-coverage-controls {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-}
-.sch-coverage-controls label {
-    color: var(--muted); font-size: 11px;
-    text-transform: uppercase; letter-spacing: 0.06em;
-}
-.sch-coverage-controls select {
+.sch-coverage-head select {
     background: var(--bg); color: var(--text);
-    border: 1px solid var(--border); border-radius: 8px;
-    padding: 5px 10px; font-size: 12px; font-family: inherit;
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 8px; font-size: 12px; font-family: inherit;
+    width: auto;   /* hug content */
 }
 .sch-coverage-legend {
     display: inline-flex; align-items: center; gap: 4px;
     font-size: 11px; color: var(--muted);
+    margin-left: auto;
 }
 .sch-coverage-legend .swatch {
-    display: inline-block; width: 16px; height: 12px;
-    border-radius: 3px;
-    border: 1px solid var(--border);
+    display: inline-block; width: 14px; height: 10px;
+    border-radius: 2px; border: 1px solid var(--border);
 }
 
-/* Heatmap matrix */
+/* Heatmap matrix — hour columns sized to content, not stretched. */
 .sch-cov-grid {
     display: grid;
-    grid-template-columns: 80px repeat(var(--cov-cols, 9), minmax(46px, 1fr));
+    grid-template-columns: auto repeat(var(--cov-cols, 9), 38px);
     gap: 2px;
     font-size: 11px;
-    margin-bottom: 22px;
+    margin-bottom: 18px;
+    width: max-content;       /* table = sum(cols), not section width */
 }
 .sch-cov-corner {
-    padding: 6px 8px;
+    padding: 4px 8px;
     color: var(--muted); font-size: 10px;
     text-transform: uppercase; letter-spacing: 0.06em;
     font-weight: 600;
     display: flex; align-items: center;
 }
 .sch-cov-col-head {
-    padding: 6px 4px;
+    padding: 4px 2px;
     text-align: center;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     background: rgba(255,255,255,.02);
-    border-radius: 4px;
+    border-radius: 3px;
     display: flex; align-items: center; justify-content: center;
-    min-height: 30px;
-    font-size: 10.5px;
+    min-height: 24px;
+    font-size: 10px;
 }
 .sch-cov-row-head {
-    padding: 6px 8px;
+    padding: 4px 8px;
     color: var(--text);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     background: rgba(255,255,255,.025);
-    border-radius: 4px;
+    border-radius: 3px;
     display: flex; align-items: center;
     font-size: 11px;
+    white-space: nowrap;
 }
 .sch-cov-row-head.weekend { color: var(--danger); }
 .sch-cov-cell {
-    padding: 6px 4px;
+    padding: 4px 2px;
     text-align: center;
-    border-radius: 4px;
+    border-radius: 3px;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     display: flex; align-items: center; justify-content: center;
-    min-height: 30px;
+    min-height: 24px;
     cursor: default;
     /* интенсивность задаётся inline через background-color */
     background: rgba(184,135,70,0);
     color: var(--text);
     transition: transform 0.1s;
+    font-size: 11px;
 }
 .sch-cov-cell[data-count="0"] {
     background: rgba(255,255,255,.02);
