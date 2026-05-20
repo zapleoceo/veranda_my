@@ -509,6 +509,16 @@
 .sch-snap-rename:hover { background: rgba(184,135,70,.20); color: var(--accent); opacity: 1; }
 .sch-snap-share:hover  { background: rgba(96,165,250,.20); color: #60a5fa; opacity: 1; }
 .sch-snap-del:hover    { background: rgba(248,113,113,.20); color: #f87171; opacity: 1; }
+/* Brief gold pulse on a freshly-created version pill so the user
+   clearly notices the new entry appeared without a page reload. */
+@keyframes sch-snap-pulse {
+    0%   { background: rgba(184,135,70,.45); transform: scale(1.05); }
+    100% { background: rgba(255,255,255,.04); transform: scale(1); }
+}
+.sch-snap-pill.just-added {
+    animation: sch-snap-pulse 1.5s ease-out;
+    border-color: var(--accent);
+}
 
 /* Payroll forecast — per-employee table under the grid. */
 .sch-payroll-section {
