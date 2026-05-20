@@ -193,10 +193,6 @@
     letter-spacing: 0.06em; text-transform: uppercase;
     flex: 1;
 }
-.sch-block-head .sch-block-meta {
-    color: var(--muted); font-size: 11px; font-weight: 400;
-    text-transform: none; letter-spacing: 0;
-}
 .sch-col-actions {
     /* Top-right of the header: small, always visible, sits ABOVE the name. */
     display: inline-flex; gap: 3px;

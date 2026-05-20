@@ -351,11 +351,6 @@ foreach ($days as $d) {
           $hallRow  = $isHall ? ($hallById[(int)$block['hall_id']] ?? null) : null;
           $blkName  = $hallRow['name'] ?? ($block['name'] ?? '');
           $blkIcon  = $hallRow['icon'] ?? ($block['icon'] ?? '');
-
-          $meta = '· ' . $slotsCnt . ' слот' . ($slotsCnt === 1 ? '' : ($slotsCnt < 5 ? 'а' : 'ов'));
-          if ($isHall) {
-              $meta = '· hall_id ' . (int)$block['hall_id'] . $meta;
-          }
       ?>
         <div class="sch-block-head <?= $headCls ?>" style="grid-column: span <?= $slotsCnt ?>;"
              data-block-id="<?= htmlspecialchars($block['id']) ?>"
@@ -371,7 +366,6 @@ foreach ($days as $d) {
           <span class="sch-block-head-main">
             <span class="sch-block-icon"><?= htmlspecialchars($blkIcon) ?></span>
             <span class="sch-block-name"><?= htmlspecialchars($blkName) ?></span>
-            <span class="sch-block-meta"><?= htmlspecialchars($meta) ?></span>
           </span>
         </div>
         <div class="sch-divider <?= $divCls ?> head-row"></div>
