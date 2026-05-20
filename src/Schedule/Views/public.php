@@ -45,11 +45,12 @@ $schHourStart = $heatmap['hourStart'] ?? 8;
 $schHourEnd   = $heatmap['hourEnd']   ?? 24;
 $perDayBlock  = $heatmap['perDayBlock'] ?? [];
 
+// Order = first appearance in $blocks so the heatmap legend matches
+// the visual order of blocks in the grid above.
 $schColorsPresent = [];
-foreach (BlockColor::ALL as $c) {
-    foreach ($blocks as $b) {
-        if (BlockColor::of($b) === $c) { $schColorsPresent[] = $c; break; }
-    }
+foreach ($blocks as $b) {
+    $c = BlockColor::of($b);
+    if (!in_array($c, $schColorsPresent, true)) $schColorsPresent[] = $c;
 }
 $schColorBlockNames = [];
 foreach ($schColorsPresent as $c) {
