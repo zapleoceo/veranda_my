@@ -35,6 +35,13 @@
 }
 
 /* ─── Reset / base ──────────────────────────────────────────────── */
+/* Browser default `[hidden] { display: none }` has specificity 0,0,1,0
+   — the same as our `.no-cart`/`.no-success` class rules below. Last
+   rule wins in that tie, so without this override the sheets paint
+   themselves on page load. Forcing !important here keeps `hidden`
+   authoritative no matter what display the panel class declares. */
+[hidden] { display: none !important; }
+
 * { box-sizing: border-box; }
 html, body {
     margin: 0;
