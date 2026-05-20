@@ -328,6 +328,9 @@
         if (salTotal) salTotal.textContent = totalSalary > 0
             ? (totalSalary / 1_000_000).toFixed(2) + 'M'
             : '—';
+
+        // Heatmap is downstream of the same state — keep it in sync.
+        heatmap?.recomputeFromState();
     }
 
 
@@ -1094,7 +1097,11 @@
     });
 
 
-    // ════════════════ Heatmap rebucketization ════════════════
+    // ════════════════ Heatmap rebucketization + live recompute ═══════
+    // initHeatmap returns { redraw, recomputeFromState } — the IIFE keeps
+    // a reference in `heatmap` so other handlers (popover save/del,
+    // drop, rule toggle) can force a refresh after editing shifts.
+    let heatmap = null;
     const statsEl   = document.getElementById('schStatsData');
     const bucketSel = document.getElementById('schBucketSize');
     const filterSel = document.getElementById('schCoverageFilter');
@@ -1102,7 +1109,7 @@
     if (statsEl && bucketSel && filterSel && covGrid) {
         let stats;
         try { stats = JSON.parse(statsEl.textContent); } catch (_) { stats = null; }
-        if (stats) initHeatmap(stats);
+        if (stats) heatmap = initHeatmap(stats);
     }
     function initHeatmap(stats) {
         const startH = stats.hourStart || 8;
@@ -1185,6 +1192,41 @@
         }
         bucketSel.addEventListener('change', redraw);
         filterSel.addEventListener('change', redraw);
+
+        // Rebuild stats.days[*].hours from the live App.state — call this
+        // any time shifts change so the matrix + histogram reflect the
+        // current grid without a page reload.
+        function recomputeFromState() {
+            const blocks = App.state.blocks || [];
+            stats.days.forEach((d) => {
+                const iso = d.iso;
+                if (!iso) return;
+                const buckets = {
+                    senior: new Array(24).fill(0),
+                    main:   new Array(24).fill(0),
+                    banya:  new Array(24).fill(0),
+                    custom: new Array(24).fill(0),
+                };
+                blocks.forEach((blk) => {
+                    const color = blockColor(blk);
+                    if (!buckets[color]) return;
+                    (blk.slots || []).forEach((_, sIdx) => {
+                        const sh = getShift(iso, blk.id, sIdx);
+                        if (!sh) return;
+                        const sH = Math.floor(parseHHMM(sh.start));
+                        const eH = Math.ceil(parseHHMM(sh.end));
+                        for (let h = sH; h < eH; h++) {
+                            if (h < 0 || h > 23) continue;
+                            buckets[color][h]++;
+                        }
+                    });
+                });
+                d.hours = buckets;
+            });
+            redraw();
+        }
+
+        return { redraw, recomputeFromState };
     }
 
 
