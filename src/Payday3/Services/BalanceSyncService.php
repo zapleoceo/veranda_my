@@ -118,7 +118,13 @@ final class BalanceSyncService implements BalanceSyncServiceInterface
             'type'     => $type,
             'category' => self::CATEGORY_ID,
             'user_id'  => $cfg->serviceUserId,
+            // Generate the timestamp in Vietnam time and explicitly tell
+            // Poster to read it as the account's timezone (=client). The
+            // app sets Asia/Ho_Chi_Minh globally in Bootstrap so date()
+            // returns Vietnam-local already; the 'timezone' flag is
+            // defence-in-depth in case bootstrap is bypassed (CLI tools).
             'date'     => date('Y-m-d H:i:s'),
+            'timezone' => 'client',
             'comment'  => $comment,
         ];
         if ($type === 1) {

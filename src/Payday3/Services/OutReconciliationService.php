@@ -12,20 +12,28 @@ use App\Payday3\Domain\DateRange;
 use App\Payday3\Domain\OutLink;
 
 /**
- * Auto-match algorithm for OUT-direction (mail → Poster finance):
+ * Auto-match algorithm for OUT-direction (mail ↔ Poster finance).
  *
- *   GREEN  exactly one open mail row and one open finance row with the
- *          same absolute amount on the same calendar day.
- *   YELLOW amounts match but multiple candidates on either side.
+ * Three-pass greedy matcher — mirror of ReconciliationService for IN:
+ *   GREEN tight          amount matches and |Δt| ≤ 600 s; pick the
+ *                        finance row with the smallest time diff.
+ *   GREEN interpolation  Finance row is sandwiched between two
+ *                        already-GREEN-linked rows on the date-sorted
+ *                        list — accept the matching-amount mail
+ *                        regardless of Δt.
+ *   YELLOW loose         Amount matches but no time-window. Best by
+ *                        Δt; flagged for human review.
  *
  * Mail rows never persist — every autoLink invocation re-fetches IMAP.
- * Finance rows also fetched live. The output edges are written to
- * out_links.
+ * Finance rows fetched live. Edges go to out_links.
  *
  * Manual / unlink / clearLinks delegate to the repository.
  */
 final class OutReconciliationService implements OutReconciliationServiceInterface
 {
+    /** ±10 minutes — same window as IN-mode / payday2. */
+    private const GREEN_WINDOW_SECONDS = 600;
+
     public function __construct(
         private readonly MailServiceInterface       $mail,
         private readonly FinanceServiceInterface    $finance,
@@ -35,52 +43,141 @@ final class OutReconciliationService implements OutReconciliationServiceInterfac
     public function autoLink(DateRange $range): array
     {
         $existing = $this->links->listInRange($range);
-        $takenM   = [];
-        $takenF   = [];
+        $linkedM  = [];
+        $linkedF  = [];
         foreach ($existing as $e) {
-            $takenM[$e->mailUid]   = true;
-            $takenF[$e->financeId] = true;
+            $linkedM[$e->mailUid]   = true;
+            $linkedF[$e->financeId] = true;
         }
 
-        $mails   = array_values(array_filter(
-            $this->mail->fetch($range, includeHidden: false),
-            static fn($m) => !isset($takenM[$m->mailUid]) && !$m->isHidden,
-        ));
-        $fins    = array_values(array_filter(
-            $this->finance->fetch($range),
-            static fn($f) => !isset($takenF[$f->transactionId]),
-        ));
-
-        $byMail = [];
-        foreach ($mails as $m) {
-            $day = substr($m->date, 0, 10);
-            $key = $day . '|' . abs($m->amount->amount);
-            $byMail[$key][] = $m;
+        // ─── Candidate pools ───────────────────────────────────────
+        // Mail rows index by amount → list of [uid, ts]. abs() because
+        // bank email notifies positive value, finance row is negative
+        // for an expense.
+        $mailRows = $this->mail->fetch($range, includeHidden: false);
+        $mailByAmount = [];
+        foreach ($mailRows as $m) {
+            if (isset($linkedM[$m->mailUid])) continue;
+            if ($m->isHidden) continue;
+            $amt = abs($m->amount->amount);
+            if ($amt <= 0) continue;
+            $mailByAmount[$amt][] = [
+                'uid' => $m->mailUid,
+                'ts'  => $this->ts($m->date),
+            ];
         }
-        $byFin = [];
-        foreach ($fins as $f) {
-            $day = substr($f->date, 0, 10);
-            $key = $day . '|' . abs($f->amount->amount);
-            $byFin[$key][] = $f;
+
+        // Finance rows in date_close ASC order (the API returns them
+        // chronologically; we don't re-sort).
+        $finRows = $this->finance->fetch($range);
+        $finance = [];
+        foreach ($finRows as $f) {
+            $amount = abs($f->amount->amount);
+            $ts     = $this->ts($f->date);
+            $finance[] = [
+                'fid'      => $f->transactionId,
+                'amount'   => $amount,
+                'ts'       => $ts,
+                'eligible' => $amount > 0 && $ts > 0 && !isset($linkedF[$f->transactionId]),
+            ];
         }
 
         $added = 0;
-        foreach ($byMail as $key => $mList) {
-            if (!isset($byFin[$key])) continue;
-            $fList = $byFin[$key];
-            $type  = (count($mList) === 1 && count($fList) === 1) ? 'auto_green' : 'auto_yellow';
-            $n     = min(count($mList), count($fList));
-            for ($i = 0; $i < $n; $i++) {
-                $this->links->add(new OutLink(
-                    mailUid:   $mList[$i]->mailUid,
-                    financeId: $fList[$i]->transactionId,
-                    linkType:  $type,
-                    isManual:  false,
-                ), $range->to);
-                $added++;
+        $greenFins = []; // finance rows that got a green link in this run
+
+        // ─── Pass 1: GREEN (amount + ±10 min) ──────────────────────
+        foreach ($finance as $i => &$f) {
+            if (!$f['eligible']) continue;
+            $best = $this->pickBestMail($mailByAmount[$f['amount']] ?? [], $linkedM, $f['ts'], self::GREEN_WINDOW_SECONDS);
+            if ($best === null) continue;
+            $this->links->add(new OutLink(
+                mailUid:   $best,
+                financeId: $f['fid'],
+                linkType:  'auto_green',
+                isManual:  false,
+            ), $range->to);
+            $linkedM[$best]  = true;
+            $linkedF[$f['fid']] = true;
+            $greenFins[$f['fid']] = true;
+            $f['eligible']   = false;
+            $added++;
+        }
+        unset($f);
+
+        // ─── Pass 2: GREEN by interpolation ────────────────────────
+        for ($i = 1; $i < count($finance) - 1; $i++) {
+            $f = &$finance[$i];
+            if (!$f['eligible']) continue;
+            $prev = $finance[$i - 1]['fid'];
+            $next = $finance[$i + 1]['fid'];
+            if (empty($greenFins[$prev]) || empty($greenFins[$next])) continue;
+
+            $best = $this->pickBestMail($mailByAmount[$f['amount']] ?? [], $linkedM, $f['ts'], PHP_INT_MAX);
+            if ($best === null) continue;
+            $this->links->add(new OutLink(
+                mailUid:   $best,
+                financeId: $f['fid'],
+                linkType:  'auto_green',
+                isManual:  false,
+            ), $range->to);
+            $linkedM[$best]    = true;
+            $linkedF[$f['fid']] = true;
+            $greenFins[$f['fid']] = true;
+            $f['eligible']     = false;
+            $added++;
+            unset($f);
+        }
+
+        // ─── Pass 3: YELLOW (amount, no time window) ───────────────
+        foreach ($finance as &$f) {
+            if (!$f['eligible']) continue;
+            $best = $this->pickBestMail($mailByAmount[$f['amount']] ?? [], $linkedM, $f['ts'], PHP_INT_MAX);
+            if ($best === null) continue;
+            $this->links->add(new OutLink(
+                mailUid:   $best,
+                financeId: $f['fid'],
+                linkType:  'auto_yellow',
+                isManual:  false,
+            ), $range->to);
+            $linkedM[$best]    = true;
+            $linkedF[$f['fid']] = true;
+            $f['eligible']     = false;
+            $added++;
+        }
+        unset($f);
+
+        return ['added' => $added, 'total' => count($existing) + $added];
+    }
+
+    /**
+     * Pick the not-yet-linked mail with the smallest |Δt| from the
+     * candidate list (already pre-filtered by amount), within the
+     * given window. Returns the mail uid or null.
+     */
+    private function pickBestMail(array $candidates, array $linkedM, int $finTs, int $windowSeconds): ?int
+    {
+        $best = null;
+        $bestDiff = PHP_INT_MAX;
+        foreach ($candidates as $cand) {
+            if (isset($linkedM[$cand['uid']])) continue;
+            $mt = $cand['ts'];
+            if ($mt <= 0) continue;
+            $diff = abs($mt - $finTs);
+            if ($diff > $windowSeconds) continue;
+            if ($diff < $bestDiff) {
+                $best     = $cand['uid'];
+                $bestDiff = $diff;
             }
         }
-        return ['added' => $added, 'total' => count($existing) + $added];
+        return $best;
+    }
+
+    /** Tolerant timestamp parse — accepts 'Y-m-d H:i:s' or anything strtotime grasps. */
+    private function ts(string $raw): int
+    {
+        if ($raw === '') return 0;
+        $t = strtotime($raw);
+        return $t === false ? 0 : $t;
     }
 
     public function manualLink(int $mailUid, int $financeId, string $dateTo): void
