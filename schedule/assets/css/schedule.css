@@ -682,46 +682,21 @@ body.sch-help-mode [data-help-abs] {
     z-index: 2;
 }
 
-/* Horizontal aggregate histogram (per hour, period avg) */
-.sch-agg-histogram {
-    border-top: 1px solid var(--border);
-    padding-top: 14px;
+/* Footer "average" row in the same matrix grid — was a separate
+   histogram block. Visually distinct (italic, top border) so it reads
+   as a summary, not just another day. */
+.sch-cov-row-head.avg,
+.sch-cov-cell.avg {
     margin-top: 4px;
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 3px 3px;
+    font-style: italic;
 }
-.sch-agg-histogram h4 {
-    margin: 0 0 10px; font-size: 11px; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
-}
-.sch-bar-grid {
-    display: grid;
-    grid-template-columns: 80px 1fr 50px;
-    gap: 6px 10px;
-    align-items: center;
-    font-size: 11px;
-}
-.sch-bar-label {
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-}
-.sch-bar-track {
-    height: 14px;
-    background: rgba(255,255,255,.03);
-    border-radius: 4px;
-    overflow: hidden;
-    position: relative;
-}
-.sch-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, rgba(184,135,70,.4), var(--accent));
-    border-radius: 4px;
-    transition: width 0.2s;
-}
-.sch-bar-value {
-    font-variant-numeric: tabular-nums;
-    font-weight: 700;
+.sch-cov-row-head.avg {
     color: var(--accent);
-    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 10px;
 }
 
 
