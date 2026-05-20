@@ -140,6 +140,38 @@ initDataActions({
     },
 });
 
+// First-paint auto-fill. When the operator opens the page (or picks a
+// fresh date) we don't want either tab to greet them with empty tables.
+//
+//   IN  — server-rendered from DB. If both tables came back empty, fire
+//         Sepay + Poster sync in parallel. The sync buttons already own
+//         the busy spinner + refresh-on-success flow, so we just simulate
+//         the clicks. Buttons no-op while busy, so this is safe even if
+//         the operator races us with a manual click.
+//
+//   OUT — always lives off live IMAP + Poster API (never cached), so it
+//         can't be "pre-rendered". out/bootstrap loads on tab activation
+//         by default. We additionally kick off that load right now, in
+//         the background, so when the operator clicks the OUT tab the
+//         data is already there. Delayed by a beat so IN sync gets the
+//         browser's HTTP slot first.
+(function autoFillTables() {
+    const inEmpty =
+        document.querySelector('#pd3SepayTable .pd3-empty') &&
+        document.querySelector('#pd3PosterTable .pd3-empty');
+    if (inEmpty) {
+        document.getElementById('pd3SepaySyncBtn')?.click();
+        document.getElementById('pd3PosterSyncBtn')?.click();
+    }
+    // Pre-warm OUT. setTimeout(0) yields to the event loop so the IN
+    // sync clicks above start their fetches first; the IMAP call inside
+    // OUT can be slow (~2 s) and we don't want it competing for the
+    // browser's first paint.
+    if (typeof outMode?.reload === 'function') {
+        setTimeout(() => { outMode.reload(); }, 0);
+    }
+})();
+
 console.info('[payday3] ready', {
     v:     _v || '(none)',
     range: state.get('range'),
