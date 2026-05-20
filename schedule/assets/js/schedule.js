@@ -135,7 +135,8 @@
         const name = emp?.name || shift.emp_name || '?';
         const star = (color === 'senior' && emp?.can_be_senior) ? ' ★' : '';
         const time = fmtTimeRange(shift.start, shift.end);
-        cell.innerHTML = `<div class="sch-shift ${color}" draggable="true"><span class="sch-name">${esc(name)}${star}</span><span class="sch-time">${esc(time)}</span></div>`;
+        const fullText = `${name}${star} · ${time}`;
+        cell.innerHTML = `<div class="sch-shift ${color}" draggable="true" title="${esc(fullText)}"><span class="sch-name">${esc(name)}${star}</span><span class="sch-time">${esc(time)}</span></div>`;
     }
 
 
