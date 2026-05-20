@@ -4,38 +4,79 @@ declare(strict_types=1);
 
 namespace App\Schedule\Http;
 
+use App\Schedule\Http\Actions\AddZoneAction;
+use App\Schedule\Http\Actions\DebugPosterAction;
+use App\Schedule\Http\Actions\DeleteSnapshotAction;
+use App\Schedule\Http\Actions\DeleteZoneAction;
+use App\Schedule\Http\Actions\ListSnapshotsAction;
+use App\Schedule\Http\Actions\LoadAction;
+use App\Schedule\Http\Actions\LoadSnapshotAction;
+use App\Schedule\Http\Actions\ReloadPosterAction;
+use App\Schedule\Http\Actions\RenameSnapshotAction;
+use App\Schedule\Http\Actions\SaveAction;
+use App\Schedule\Http\Actions\SaveStaffTagsAction;
+use App\Schedule\Http\Actions\SaveVersionAction;
 use App\Schedule\Services\HeatmapBuilder;
 use App\Schedule\Services\PeriodBuilder;
 use App\Schedule\Services\ScheduleStateService;
-use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
- * Thin controller — two responsibilities:
- *   1. Decide between AJAX dispatch and HTML page render based on the
- *      query string.
- *   2. Resolve the right Action class for an AJAX command from the
- *      action map.
+ * Thin controller — page render or AJAX-dispatch. Every AJAX endpoint
+ * is its own Action class (Single Responsibility); the controller's
+ * dispatchAjax just routes to the right one via a name→action map
+ * assembled from the constructor-injected instances.
  *
- * Each AJAX endpoint is its own Action class (Single Responsibility).
- * Actions are NOT injected into the constructor — only their map of
- * names → class FQCNs is. The actual Action instance is resolved
- * lazily through the container on dispatch (Open/Closed: adding a new
- * AJAX endpoint = new class + one entry in the container, controller
- * untouched).
+ * Adding a new AJAX endpoint:
+ *   1. New `App\Schedule\Http\Actions\XxxAction` class.
+ *   2. Add the property in the constructor (or to the wider DI
+ *      container if you want it lazy).
+ *   3. Add one entry to `$this->ajaxActions` initialiser below.
+ *
+ * (Earlier iteration injected `ContainerInterface` + a class-string
+ * map for lazy resolution, but PHP-DI's autowiring of the controller
+ * via the factory was unreliable in production — fell back to the
+ * boring eager-inject pattern that works.)
  */
 final class ScheduleController
 {
+    /** @var array<string, callable> */
+    private readonly array $ajaxActions;
+
     public function __construct(
         private readonly ScheduleStateService $service,
         private readonly PeriodBuilder        $periodBuilder,
         private readonly HeatmapBuilder       $heatmapBuilder,
         private readonly JsonResponder        $json,
-        private readonly ContainerInterface   $container,
-        /** @var array<string, class-string> ajax-name → Action FQCN */
-        private readonly array                $ajaxActionMap,
-    ) {}
+        LoadAction            $load,
+        SaveAction            $save,
+        SaveVersionAction     $saveVersion,
+        ListSnapshotsAction   $listSnapshots,
+        LoadSnapshotAction    $loadSnapshot,
+        DeleteSnapshotAction  $deleteSnapshot,
+        RenameSnapshotAction  $renameSnapshot,
+        AddZoneAction         $addZone,
+        DeleteZoneAction      $deleteZone,
+        SaveStaffTagsAction   $saveStaffTags,
+        ReloadPosterAction    $reloadPoster,
+        DebugPosterAction     $debugPoster,
+    ) {
+        $this->ajaxActions = [
+            'load'            => $load,
+            'save'            => $save,
+            'save_version'    => $saveVersion,
+            'snapshots'       => $listSnapshots,
+            'snapshot'        => $loadSnapshot,
+            'del_snap'        => $deleteSnapshot,
+            'rename_snap'     => $renameSnapshot,
+            'add_zone'        => $addZone,
+            'del_zone'        => $deleteZone,
+            'save_staff_tags' => $saveStaffTags,
+            'reload_poster'   => $reloadPoster,
+            'debug_poster'    => $debugPoster,
+        ];
+    }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
@@ -109,11 +150,10 @@ final class ScheduleController
 
     private function dispatchAjax(string $ajax, ServerRequestInterface $req, ResponseInterface $res): ResponseInterface
     {
-        $cls = $this->ajaxActionMap[$ajax] ?? null;
-        if ($cls === null) {
+        $action = $this->ajaxActions[$ajax] ?? null;
+        if ($action === null) {
             return $this->json->fail($res, 'Unknown ajax: ' . $ajax, 404);
         }
-        $action = $this->container->get($cls);  // lazy resolution
         return $action($req, $res);
     }
 
@@ -140,7 +180,7 @@ final class ScheduleController
         $pageTitle    = 'График смен';
         $currentPath  = '/schedule';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">' . "\n"
-                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260520_perf">';
+                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260520_perf2">';
 
         // Variables exposed to the view template
         $viewVars = compact(
