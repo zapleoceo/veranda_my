@@ -58,6 +58,18 @@ foreach ($employees as $e) {
     $empById[(int)$e['id']] = $e;
 }
 
+// ─── halls lookup (live from Poster) ───────────────────────────────
+// Blocks of type=hall reference a Poster hall_id. The block's stored
+// `name` is captured at creation time and may go stale if the hall is
+// renamed in Poster — overlay the live name/icon here so the UI always
+// matches what the Poster admin sees.
+$hallById = [];
+foreach ($halls as $h) {
+    if (!is_array($h)) continue;
+    $hid = (int)($h['id'] ?? 0);
+    if ($hid > 0) $hallById[$hid] = $h;
+}
+
 // ─── Helper: get shift for a cell ───
 $schGetShift = static function (string $iso, string $blockId, int $slotIdx) use (&$shifts): ?array {
     $key = $blockId . ':' . $slotIdx;
@@ -267,25 +279,35 @@ foreach ($days as $d) {
                     : 'hall-main'));
           $divCls   = $color === 'main' ? 'main' : $color;
           $slotsCnt = count($block['slots']);
-          $meta     = '· ' . $slotsCnt . ' слот' . ($slotsCnt === 1 ? '' : ($slotsCnt < 5 ? 'а' : 'ов'));
-          if (($block['type'] ?? '') === 'hall' && !empty($block['hall_id'])) {
+
+          // Live overlay: if this block is bound to a Poster hall, prefer
+          // the live hall name/icon over whatever was stored on the block.
+          // Falls back to stored values when the hall is missing (e.g.
+          // deleted in Poster or cache miss).
+          $isHall   = ($block['type'] ?? '') === 'hall' && !empty($block['hall_id']);
+          $hallRow  = $isHall ? ($hallById[(int)$block['hall_id']] ?? null) : null;
+          $blkName  = $hallRow['name'] ?? ($block['name'] ?? '');
+          $blkIcon  = $hallRow['icon'] ?? ($block['icon'] ?? '');
+
+          $meta = '· ' . $slotsCnt . ' слот' . ($slotsCnt === 1 ? '' : ($slotsCnt < 5 ? 'а' : 'ов'));
+          if ($isHall) {
               $meta = '· hall_id ' . (int)$block['hall_id'] . $meta;
           }
       ?>
         <div class="sch-block-head <?= $headCls ?>" style="grid-column: span <?= $slotsCnt ?>;"
              data-block-id="<?= htmlspecialchars($block['id']) ?>"
-             data-help-abs="<?= htmlspecialchars($block['name']) ?>. Внутри <?= $slotsCnt ?> слот(а/ов) — это типичное число людей в этой зоне. В верхней строке шапки — маленькие кнопки + слот и удалить блок.">
+             data-help-abs="<?= htmlspecialchars($blkName) ?>. Внутри <?= $slotsCnt ?> слот(а/ов) — это типичное число людей в этой зоне. В верхней строке шапки — маленькие кнопки + слот и удалить блок.">
           <span class="sch-col-actions">
             <button title="Добавить слот" class="sch-block-add-slot"
                     data-block-idx="<?= $blkIdx ?>"
-                    data-help-abs="Добавить новый слот (колонку) в конец блока «<?= htmlspecialchars($block['name']) ?>».">+</button>
+                    data-help-abs="Добавить новый слот (колонку) в конец блока «<?= htmlspecialchars($blkName) ?>».">+</button>
             <button title="Удалить блок" class="sch-block-del"
                     data-block-idx="<?= $blkIdx ?>"
                     data-help-abs="Удалить блок целиком. Все смены в нём пропадут.">⋮</button>
           </span>
           <span class="sch-block-head-main">
-            <span class="sch-block-icon"><?= htmlspecialchars($block['icon'] ?? '') ?></span>
-            <span class="sch-block-name"><?= htmlspecialchars($block['name']) ?></span>
+            <span class="sch-block-icon"><?= htmlspecialchars($blkIcon) ?></span>
+            <span class="sch-block-name"><?= htmlspecialchars($blkName) ?></span>
             <span class="sch-block-meta"><?= htmlspecialchars($meta) ?></span>
           </span>
         </div>
@@ -742,4 +764,4 @@ foreach ($days as $d) {
   </div>
 </div>
 
-<script src="/schedule/assets/js/schedule.js?v=20260520_livesum" defer></script>
+<script src="/schedule/assets/js/schedule.js?v=20260520_hallname" defer></script>

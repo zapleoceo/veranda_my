@@ -57,6 +57,17 @@
         if (block?.id === 'hall:2') return 'banya';
         return 'main';
     }
+    // Live hall-name overlay: for hall-bound blocks, prefer the current
+    // Poster hall name over whatever was stored on the block. Matches the
+    // server-side overlay in content.php so confirms / toasts read the
+    // same name the user sees in the grid header.
+    function blockDisplayName(block) {
+        if (block?.type === 'hall' && block?.hall_id) {
+            const hall = App.halls.find((h) => h.id === block.hall_id);
+            if (hall?.name) return hall.name;
+        }
+        return block?.name || '';
+    }
 
 
     // ════════════════ Toast ════════════════
@@ -463,7 +474,7 @@
             if (day[`${block.id}:${sIdx}`]) count++;
         });
         const warn = count > 0 ? `\nВ этом слоте ${count} смен(ы) — они исчезнут.` : '';
-        if (!confirm(`Удалить слот ${sIdx + 1} блока «${block.name}»?${warn}`)) return;
+        if (!confirm(`Удалить слот ${sIdx + 1} блока «${blockDisplayName(block)}»?${warn}`)) return;
 
         // Remove the slot and shift all higher-indexed slot shifts down by one
         block.slots.splice(sIdx, 1);
@@ -519,7 +530,7 @@
             Object.keys(day).forEach((k) => { if (k.startsWith(block.id + ':')) count++; });
         });
         const warn = count > 0 ? `\nВ этом блоке ${count} смен — они исчезнут.` : '';
-        if (!confirm(`Удалить блок «${block.name}» целиком?${warn}`)) return;
+        if (!confirm(`Удалить блок «${blockDisplayName(block)}» целиком?${warn}`)) return;
 
         // Remove block + all its shifts
         App.state.blocks.splice(blkIdx, 1);
