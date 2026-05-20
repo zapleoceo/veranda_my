@@ -42,6 +42,11 @@ final class ScheduleStateService
         $raw['blocks']    ??= $defaults['blocks'];
         $raw['shifts']    ??= [];
         $raw['templates'] ??= $defaults['templates'];
+        // Rules are new — seed defaults on legacy snapshots so the rule
+        // engine has something to evaluate on first load after upgrade.
+        if (empty($raw['rules']) || !is_array($raw['rules'])) {
+            $raw['rules'] = $defaults['rules'];
+        }
         return $raw;
     }
 
