@@ -8,6 +8,7 @@
 const _v = new URL(import.meta.url).searchParams.get('v') || '';
 const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
 const { api } = await import(new URL('../api.js' + _qs, import.meta.url).href);
+const { recomputePosterFooter } = await import(new URL('../in/renderTables.js' + _qs, import.meta.url).href);
 
 function dateQuery(range) {
     const p = new URLSearchParams();
@@ -67,6 +68,10 @@ function refreshFooterStats() {
     const $u = document.getElementById('pd3SepayUnlinked');
     if ($l) $l.textContent = String(linked);
     if ($u) $u.textContent = String(unlinked);
+
+    // Poster footer (Tips / в таблице связи / несвязи) is link-state
+    // dependent — recompute it from the freshly-reclassified rows.
+    recomputePosterFooter();
 }
 
 function uncheckAll(selection) {

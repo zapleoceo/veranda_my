@@ -8,6 +8,11 @@
 
 'use strict';
 
+// Cache-bust cross-module imports — see comment in out/bootstrap.js.
+const _v = new URL(import.meta.url).searchParams.get('v') || '';
+const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
+const { recomputePosterFooter } = await import(new URL('../in/renderTables.js' + _qs, import.meta.url).href);
+
 function makeToggle(btnId, getRows, initialPressed = false) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
@@ -15,6 +20,8 @@ function makeToggle(btnId, getRows, initialPressed = false) {
     const apply = () => {
         btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
         getRows().forEach((row) => row.classList.toggle('is-hidden', pressed));
+        // Hiding rows changes Итого / связи / несвязи — refresh.
+        recomputePosterFooter();
     };
     apply();
     btn.addEventListener('click', () => { pressed = !pressed; apply(); });

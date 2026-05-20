@@ -1,10 +1,16 @@
-// Compute "linked / unlinked" counters on the sepay pane footer from
-// the row classes we already rendered server-side.
-// Runs once on boot; Phase 3 will re-run it after any link mutation.
+// Recompute pane footers (Sepay link counts + the full Poster
+// summary) from the DOM after any render or link mutation.
 
 'use strict';
 
+// Cache-bust cross-module imports — see comment in out/bootstrap.js.
+const _v = new URL(import.meta.url).searchParams.get('v') || '';
+const _qs = _v ? '?v=' + encodeURIComponent(_v) : '';
+const { recomputePosterFooter } = await import(new URL('../in/renderTables.js' + _qs, import.meta.url).href);
+
 export function refreshStats() {
+    // Sepay footer — linked / unlinked counts. Sum is server-rendered
+    // in the partial; we just refresh the link counters.
     const rows = document.querySelectorAll('#pd3SepayTable tr.pd3-row');
     let linked = 0;
     let unlinked = 0;
@@ -17,4 +23,10 @@ export function refreshStats() {
     const $unlinked = document.getElementById('pd3SepayUnlinked');
     if ($linked)   $linked.textContent   = String(linked);
     if ($unlinked) $unlinked.textContent = String(unlinked);
+
+    // Poster footer — Итого / Tips / связи / несвязи / BB / VC. All
+    // bucket sums are walked off the DOM so this works after the
+    // server-rendered first paint AND after every later
+    // re-render/mutation.
+    recomputePosterFooter();
 }

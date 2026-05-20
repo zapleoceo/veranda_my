@@ -119,17 +119,19 @@ export function renderPoster(rows, links) {
 
 export function updateInFooters(sepayOpen, sepayHidden, posterRows) {
     const sepayTotal = sepayOpen.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
-    const posterTotal = posterRows.reduce((acc, p) => acc + (Number(p.total) || 0), 0);
     const allSepay = sepayTotal + sepayHidden.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
 
     const $st = document.getElementById('pd3SepayTotal');
-    const $pt = document.getElementById('pd3PosterTotal');
-    const $pc = document.getElementById('pd3PosterCount');
     if ($st) $st.textContent = fmt(sepayTotal);
-    if ($pt) $pt.textContent = fmt(posterTotal);
-    if ($pc) $pc.textContent = String(posterRows.length);
+
+    // Poster footer (Итого / Tips / связи / несвязи / BB / VC)
+    // is recomputed from the live DOM so it stays consistent with
+    // server-side render, JS-side re-render, and post-link-mutation
+    // state without us having to thread row data through every call site.
+    recomputePosterFooter();
 
     // Top totals card (Sepay/Poster/Δ).
+    const posterTotal = readPosterFooterValue('pd3PosterTotal');
     const totals = document.querySelector('.pd3-totals');
     if (totals) {
         const cells = totals.querySelectorAll('strong');
@@ -145,4 +147,65 @@ export function updateInFooters(sepayOpen, sepayHidden, posterRows) {
             }
         }
     }
+}
+
+/**
+ * Walks every visible Poster row and bucket-sums into the six
+ * spans in the pane footer. Reads everything from data-* attributes
+ * + row state classes so it works after server-side render,
+ * after a JS re-render, and after a link/unlink mutation.
+ *
+ *   Итого            sum(card+third+tip)            EXCLUDING Vietnam Company
+ *   Tips             sum(tip)                       on LINKED non-Vietnam rows
+ *   в таблице связи  sum(card+third+tip)            on LINKED non-Vietnam rows
+ *   несвязи          sum(card+third+tip)            on UNLINKED non-Vietnam rows
+ *   BB               sum(card+third+tip)            for Bybit method
+ *   VC               sum(card+third+tip)            for Vietnam Company method
+ *
+ * "Linked" = any of row-green / row-yellow / row-gray (auto / yellow
+ * / manual). row-red is unlinked. row-hidden rows are skipped.
+ */
+export function recomputePosterFooter() {
+    const rows = document.querySelectorAll('#pd3PosterTable tr.pd3-row');
+    let total = 0, bb = 0, vc = 0, linked = 0, unlinked = 0, tipsLinked = 0;
+    for (const tr of rows) {
+        const sum  = (Number(tr.dataset.total) || 0) + (Number(tr.dataset.tips) || 0);
+        const tip  = Number(tr.dataset.tips) || 0;
+        const pm   = String(tr.dataset.method || '').toLowerCase();
+
+        // BB / VC are visibility-independent — they're "this is what
+        // Poster reported for the period". Toggling the 👁 hides
+        // Vietnam rows from the operator's view but doesn't change
+        // the underlying number.
+        if (pm.startsWith('vietnam')) { vc += sum; continue; }   // VC excluded from Итого
+        if (pm.startsWith('bybit'))   { bb += sum; }
+
+        // Итого / Tips / связи / несвязи respect the visibility
+        // toggles (hidden rows aren't part of the live total).
+        const hidden = tr.classList.contains('row-hidden') || tr.classList.contains('is-hidden');
+        if (hidden) continue;
+
+        total += sum;
+        const isLinked = tr.classList.contains('row-green')
+            || tr.classList.contains('row-yellow')
+            || tr.classList.contains('row-gray');
+        if (isLinked) { linked += sum; tipsLinked += tip; }
+        else          { unlinked += sum; }
+    }
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmt(v); };
+    set('pd3PosterTotal',       total);
+    set('pd3PosterTipsLinked',  tipsLinked);
+    set('pd3PosterLinked',      linked);
+    set('pd3PosterUnlinked',    unlinked);
+    set('pd3PosterBybit',       bb);
+    set('pd3PosterVietnam',     vc);
+}
+
+// Read a numeric span from the Poster footer (used by the top totals
+// card so it doesn't have to duplicate the bucket logic).
+function readPosterFooterValue(id) {
+    const el = document.getElementById(id);
+    if (!el) return 0;
+    const cleaned = String(el.textContent || '').replace(/[^\d\-]/g, '');
+    return Number(cleaned) || 0;
 }
