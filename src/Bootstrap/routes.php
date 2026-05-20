@@ -55,7 +55,7 @@ use App\Controllers\BanyaController;
 use App\Controllers\RomaController;
 use App\Controllers\ZaparaController;
 use App\Controllers\EmployeesController;
-use App\Controllers\ScheduleController;
+use App\Schedule\Http\ScheduleController;
 use App\Controllers\MenuPublicController;
 use App\Controllers\Tr3Controller;
 use App\Controllers\ReservationsController;
@@ -238,6 +238,7 @@ $app->get('/reservations/assets/{file:.+}', [StaticController::class, 'reservati
 $app->get('/reservations/{file:[\w.-]+}',   [StaticController::class, 'reservationsRoot']);
 $app->get('/payday2/assets/{file:.+}',      [StaticController::class, 'payday2Assets']);
 $app->get('/payday3/assets/{file:.+}',      [StaticController::class, 'payday3Assets']);
+$app->get('/schedule/assets/{file:.+}',     [StaticController::class, 'scheduleAssets']);
 $app->get('/banya/{file:[\w.-]+}',          [StaticController::class, 'banyaStatic']);
 $app->get('/roma/{file:[\w.-]+}',           [StaticController::class, 'romaStatic']);
 $app->get('/employees/{file:[\w.-]+}',      [StaticController::class, 'employeesStatic']);
