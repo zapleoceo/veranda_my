@@ -560,77 +560,92 @@ Hover на ⚠ в конкретном дне покажет причины.">�
       </span>
     </div>
 
-    <!-- Server-rendered initial heatmap; JS overrides on bucket/filter change. -->
     <?php
+    // ─── Heatmap helpers (PHP + JS use the same model — keep aligned with
+    // schedule.js bucketize / covCellAttrs / sumPerDayBlock). ───
+    $schSumPerDay = static function (?array $perBlock): array {
+        $sum = array_fill(0, 24, 0);
+        if (!$perBlock) return $sum;
+        foreach (['senior','main','banya','custom'] as $k) {
+            foreach (($perBlock[$k] ?? []) as $h => $c) $sum[$h] += $c;
+        }
+        return $sum;
+    };
+    /** @return list<array{from:int, to:int, value:float}> max per bucket. */
+    $schBucketize = static function (array $hours24, int $start, int $end, int $size): array {
+        $out = [];
+        for ($h = $start; $h < $end; $h += $size) {
+            $max = 0.0;
+            for ($k = 0; $k < $size && $h + $k < $end; $k++) {
+                $max = max($max, (float) ($hours24[$h + $k] ?? 0));
+            }
+            $out[] = ['from' => $h, 'to' => min($h + $size, $end), 'value' => $max];
+        }
+        return $out;
+    };
+    /** Cell visual attributes: alpha (0..1) + text colour. */
+    $schCovCellAttrs = static function (float $value, float $maxValue): array {
+        $intensity = $maxValue > 0 ? $value / $maxValue : 0.0;
+        return [
+            'alpha' => $value > 0 ? 0.05 + $intensity * 0.90 : 0,
+            'text'  => $intensity > 0.55 ? '#0f1117' : 'var(--text)',
+        ];
+    };
+
     // Default: 2h buckets, all-blocks filter — same as JS default
     $schBucket = 2;
-    $maxCount = 0;
-    foreach ($schPerDayByBlock as $blocksByH) {
-        $sum = array_fill(0, 24, 0);
-        foreach (['senior','main','banya','custom'] as $k) {
-            foreach ($blocksByH[$k] as $h => $c) $sum[$h] += $c;
-        }
-        for ($h = $schHourStart; $h < $schHourEnd; $h += $schBucket) {
-            $bucketMax = 0;
-            for ($k = 0; $k < $schBucket && $h + $k < $schHourEnd; $k++) {
-                $bucketMax = max($bucketMax, $sum[$h + $k]);
-            }
-            $maxCount = max($maxCount, $bucketMax);
-        }
+    $colCount  = (int) ceil(($schHourEnd - $schHourStart) / $schBucket);
+    $dayCount  = max(1, count($days));
+
+    // Pre-compute per-day buckets + global max so the avg row uses the
+    // same colour scale as the data rows.
+    $schDayBuckets = [];
+    $maxCount = 0.0;
+    foreach ($days as $d) {
+        $sum    = $schSumPerDay($schPerDayByBlock[$d['idx']] ?? null);
+        $bucks  = $schBucketize($sum, $schHourStart, $schHourEnd, $schBucket);
+        $schDayBuckets[$d['idx']] = $bucks;
+        foreach ($bucks as $b) $maxCount = max($maxCount, $b['value']);
     }
-    $maxCount = max(1, $maxCount);
-    $colCount = (int) ceil(($schHourEnd - $schHourStart) / $schBucket);
+    // Avg row across all days, per hour, then bucketized.
+    $schAvgHour    = array_map(static fn ($v) => $v / $dayCount, $schAggHourTotal);
+    $schAvgBuckets = $schBucketize($schAvgHour, $schHourStart, $schHourEnd, $schBucket);
+    $maxCount      = max(1.0, $maxCount);
     ?>
+    <!-- Heatmap matrix — one continuous grid: corner + col-heads +
+         per-day rows + the merged "Сред." footer row that used to be a
+         separate <div class="sch-agg-histogram"> block below. -->
     <div class="sch-cov-grid" id="schCovGrid" style="--cov-cols: <?= $colCount ?>;">
       <div class="sch-cov-corner">День \ Час</div>
-      <?php for ($h = $schHourStart; $h < $schHourEnd; $h += $schBucket): ?>
-        <div class="sch-cov-col-head"><?= sprintf('%02d–%02d', $h, min($h + $schBucket, $schHourEnd)) ?></div>
-      <?php endfor; ?>
+      <?php foreach ($schAvgBuckets as $b): ?>
+        <div class="sch-cov-col-head"><?= sprintf('%02d–%02d', $b['from'], $b['to']) ?></div>
+      <?php endforeach; ?>
 
       <?php foreach ($days as $d):
           $weekendCls = $d['weekend'] ? ' weekend' : '';
-          $perBlock = $schPerDayByBlock[$d['idx']] ?? null;
       ?>
         <div class="sch-cov-row-head<?= $weekendCls ?>"><?= htmlspecialchars($d['dow']) ?> <?= htmlspecialchars($d['date']) ?></div>
-        <?php
-        $sum = array_fill(0, 24, 0);
-        if ($perBlock) {
-            foreach (['senior','main','banya','custom'] as $k) {
-                foreach ($perBlock[$k] as $h => $c) $sum[$h] += $c;
-            }
-        }
-        for ($h = $schHourStart; $h < $schHourEnd; $h += $schBucket):
-            $bMax = 0;
-            for ($k = 0; $k < $schBucket && $h + $k < $schHourEnd; $k++) {
-                $bMax = max($bMax, $sum[$h + $k]);
-            }
-            $intensity = $bMax / $maxCount;
-            $alpha = $bMax > 0 ? 0.05 + $intensity * 0.90 : 0;
-            $txt = $intensity > 0.55 ? '#0f1117' : 'var(--text)';
-            $label = $bMax > 0 ? $bMax : '·';
+        <?php foreach ($schDayBuckets[$d['idx']] as $b):
+            $v = (int) $b['value'];
+            $a = $schCovCellAttrs($b['value'], $maxCount);
         ?>
           <div class="sch-cov-cell"
-               data-count="<?= $bMax ?>"
-               style="background: rgba(184,135,70,<?= $alpha ?>); color: <?= $txt ?>;"><?= $label ?></div>
-        <?php endfor; ?>
+               data-count="<?= $v ?>"
+               style="background: rgba(184,135,70,<?= $a['alpha'] ?>); color: <?= $a['text'] ?>;"><?= $v > 0 ? $v : '·' ?></div>
+        <?php endforeach; ?>
       <?php endforeach; ?>
-    </div>
 
-    <div class="sch-agg-histogram"
-         data-help-abs="Средняя нагрузка по часам за весь период. Длина бара — среднее количество человек в этом часе.">
-      <h4>Средняя загрузка по часам за период (<?= count($days) ?> дней)</h4>
-      <div class="sch-bar-grid">
-        <?php
-        $aggMax = max(1, ...$schAggHourAvg);
-        for ($h = $schHourStart; $h < $schHourEnd; $h++):
-            $avg = $schAggHourAvg[$h];
-            $w = $aggMax > 0 ? round(($avg / $aggMax) * 1000) / 10 : 0;
-        ?>
-          <div class="sch-bar-label"><?= sprintf('%02d:00', $h) ?></div>
-          <div class="sch-bar-track"><div class="sch-bar-fill" style="width: <?= $w ?>%;"></div></div>
-          <div class="sch-bar-value"><?= $avg ?> чел</div>
-        <?php endfor; ?>
-      </div>
+      <!-- Footer "average" row — same column model, lighter text style. -->
+      <div class="sch-cov-row-head avg" title="Среднее по всем дням периода (<?= count($days) ?> д)">Сред.</div>
+      <?php foreach ($schAvgBuckets as $b):
+          $v = round($b['value'], 1);
+          $a = $schCovCellAttrs($b['value'], $maxCount);
+      ?>
+        <div class="sch-cov-cell avg"
+             data-count="<?= $v ?>"
+             style="background: rgba(184,135,70,<?= $a['alpha'] ?>); color: <?= $a['text'] ?>;"
+             title="Среднее за период"><?= $b['value'] > 0 ? $v : '·' ?></div>
+      <?php endforeach; ?>
     </div>
   </section>
 
@@ -808,4 +823,4 @@ Hover на ⚠ в конкретном дне покажет причины.">�
   </div>
 </div>
 
-<script src="/schedule/assets/js/schedule.js?v=20260520_versions" defer></script>
+<script src="/schedule/assets/js/schedule.js?v=20260520_heatmerge" defer></script>

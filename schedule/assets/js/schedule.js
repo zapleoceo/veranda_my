@@ -1180,24 +1180,22 @@
         if (stats) heatmap = initHeatmap(stats);
     }
     function initHeatmap(stats) {
-        const startH = stats.hourStart || 8;
-        const endH   = stats.hourEnd   || 24;
-        function applyFilter(filter) {
-            const totals = new Array(24).fill(0);
-            const perDay = stats.days.map((d) => {
-                const h = new Array(24).fill(0);
-                for (let i = 0; i < 24; i++) {
-                    if (filter === 'all') {
-                        h[i] = (d.hours?.senior?.[i] || 0) + (d.hours?.main?.[i] || 0)
-                             + (d.hours?.banya?.[i]  || 0) + (d.hours?.custom?.[i] || 0);
-                    } else {
-                        h[i] = d.hours?.[filter]?.[i] || 0;
-                    }
-                    totals[i] += h[i];
+        const startH    = stats.hourStart || 8;
+        const endH      = stats.hourEnd   || 24;
+        const COLOR_KEYS = ['senior', 'main', 'banya', 'custom'];
+
+        // ─── Pure helpers (no DOM, no globals) — pair with the PHP-side
+        // $schSumPerDay / $schBucketize / $schCovCellAttrs in content.php. ─
+        function sumHoursForFilter(d, filter) {
+            const h = new Array(24).fill(0);
+            for (let i = 0; i < 24; i++) {
+                if (filter === 'all') {
+                    for (const k of COLOR_KEYS) h[i] += d.hours?.[k]?.[i] || 0;
+                } else {
+                    h[i] = d.hours?.[filter]?.[i] || 0;
                 }
-                return h;
-            });
-            return { perDay, totals };
+            }
+            return h;
         }
         function bucketize(hours, size) {
             const out = [];
@@ -1208,84 +1206,81 @@
             }
             return out;
         }
-        function redrawMatrix(perDay, bs) {
-            const buckets = perDay.map((h) => bucketize(h, bs));
-            let globalMax = 0;
-            buckets.forEach((b) => b.forEach((c) => { if (c.max > globalMax) globalMax = c.max; }));
-            if (globalMax < 1) globalMax = 1;
-            const cols = buckets[0]?.length || 0;
-            covGrid.style.setProperty('--cov-cols', cols);
-            let html = '<div class="sch-cov-corner">День \\ Час</div>';
-            if (buckets.length > 0) {
-                buckets[0].forEach((c) => {
-                    html += `<div class="sch-cov-col-head">${pad2(c.from)}–${pad2(c.to)}</div>`;
-                });
-            }
-            stats.days.forEach((d, idx) => {
-                const wk = d.weekend ? ' weekend' : '';
-                html += `<div class="sch-cov-row-head${wk}">${esc(d.dow)} ${esc(d.date)}</div>`;
-                buckets[idx].forEach((c) => {
-                    const intensity = c.max / globalMax;
-                    const alpha = c.max > 0 ? 0.05 + intensity * 0.9 : 0;
-                    const txt   = intensity > 0.55 ? '#0f1117' : 'var(--text)';
-                    html += `<div class="sch-cov-cell" style="background: rgba(184,135,70,${alpha}); color: ${txt};" title="пик ${c.max} чел/ч в ${pad2(c.from)}–${pad2(c.to)}">${c.max > 0 ? c.max : '·'}</div>`;
-                });
-            });
-            covGrid.innerHTML = html;
+        function covCellAttrs(value, maxValue) {
+            const intensity = maxValue > 0 ? value / maxValue : 0;
+            return {
+                alpha: value > 0 ? 0.05 + intensity * 0.9 : 0,
+                text:  intensity > 0.55 ? '#0f1117' : 'var(--text)',
+            };
         }
-        function redrawHistogram(totals) {
-            const grid = document.querySelector('.sch-agg-histogram .sch-bar-grid');
-            const h4 = document.querySelector('.sch-agg-histogram h4');
-            if (!grid) return;
-            const avgs = totals.map((v) => v / Math.max(1, stats.dayCount));
-            const max = Math.max(1, ...avgs);
-            let html = '';
-            for (let h = startH; h < endH; h++) {
-                const avg = +avgs[h].toFixed(1);
-                const w = max > 0 ? Math.round((avg / max) * 1000) / 10 : 0;
-                html += `<div class="sch-bar-label">${pad2(h)}:00</div><div class="sch-bar-track"><div class="sch-bar-fill" style="width: ${w}%;"></div></div><div class="sch-bar-value">${avg} чел</div>`;
-            }
-            grid.innerHTML = html;
-            if (h4) {
-                const filter = filterSel.options[filterSel.selectedIndex]?.textContent || '';
-                h4.textContent = `Средняя загрузка по часам за период (${stats.dayCount} дней) · ${filter}`;
-            }
+        function cellHtml(value, maxValue, extra = '', title = '') {
+            const { alpha, text } = covCellAttrs(value, maxValue);
+            const display = value > 0 ? (Number.isInteger(value) ? value : value.toFixed(1)) : '·';
+            const t = title ? ` title="${esc(title)}"` : '';
+            return `<div class="sch-cov-cell ${extra}" data-count="${value}" style="background: rgba(184,135,70,${alpha}); color: ${text};"${t}>${display}</div>`;
+        }
+
+        // ─── Render pipeline ──────────────────────────────────────────
+        function buildRows(filter, bs) {
+            const perDayHours = stats.days.map((d) => sumHoursForFilter(d, filter));
+            const totals      = new Array(24).fill(0);
+            perDayHours.forEach((h) => { for (let i = 0; i < 24; i++) totals[i] += h[i]; });
+            const dayCount  = Math.max(1, stats.dayCount || perDayHours.length);
+            const avgHours  = totals.map((v) => v / dayCount);
+
+            const dayBuckets = perDayHours.map((h) => bucketize(h, bs));
+            const avgBuckets = bucketize(avgHours, bs);
+
+            let max = 0;
+            dayBuckets.forEach((b) => b.forEach((c) => { if (c.max > max) max = c.max; }));
+            avgBuckets.forEach((c) => { if (c.max > max) max = c.max; });
+            return { dayBuckets, avgBuckets, max: Math.max(1, max) };
         }
         function redraw() {
             const filter = filterSel.value;
-            const bs = parseInt(bucketSel.value, 10) || 2;
-            const { perDay, totals } = applyFilter(filter);
-            redrawMatrix(perDay, bs);
-            redrawHistogram(totals);
+            const bs     = parseInt(bucketSel.value, 10) || 2;
+            const { dayBuckets, avgBuckets, max } = buildRows(filter, bs);
+            covGrid.style.setProperty('--cov-cols', avgBuckets.length);
+
+            let html = '<div class="sch-cov-corner">День \\ Час</div>';
+            avgBuckets.forEach((c) => {
+                html += `<div class="sch-cov-col-head">${pad2(c.from)}–${pad2(c.to)}</div>`;
+            });
+            stats.days.forEach((d, idx) => {
+                const wk = d.weekend ? ' weekend' : '';
+                html += `<div class="sch-cov-row-head${wk}">${esc(d.dow)} ${esc(d.date)}</div>`;
+                dayBuckets[idx].forEach((c) => {
+                    html += cellHtml(c.max, max, '', `пик ${c.max} чел/ч в ${pad2(c.from)}–${pad2(c.to)}`);
+                });
+            });
+            // Footer avg row — same colour scale as data rows.
+            html += `<div class="sch-cov-row-head avg" title="Среднее по всем дням периода (${stats.dayCount} д)">Сред.</div>`;
+            avgBuckets.forEach((c) => {
+                const v = +c.max.toFixed(1);
+                html += cellHtml(v, max, 'avg', `Среднее в ${pad2(c.from)}–${pad2(c.to)}: ${v}`);
+            });
+            covGrid.innerHTML = html;
         }
-        bucketSel.addEventListener('change', redraw);
-        filterSel.addEventListener('change', redraw);
 
         // Rebuild stats.days[*].hours from the live App.state — call this
-        // any time shifts change so the matrix + histogram reflect the
-        // current grid without a page reload.
+        // after any shift mutation so the heatmap stays in sync without
+        // a page reload.
         function recomputeFromState() {
             const blocks = App.state.blocks || [];
             stats.days.forEach((d) => {
-                const iso = d.iso;
-                if (!iso) return;
-                const buckets = {
-                    senior: new Array(24).fill(0),
-                    main:   new Array(24).fill(0),
-                    banya:  new Array(24).fill(0),
-                    custom: new Array(24).fill(0),
-                };
+                if (!d.iso) return;
+                const buckets = { senior: new Array(24).fill(0), main: new Array(24).fill(0),
+                                  banya:  new Array(24).fill(0), custom: new Array(24).fill(0) };
                 blocks.forEach((blk) => {
                     const color = blockColor(blk);
                     if (!buckets[color]) return;
                     (blk.slots || []).forEach((_, sIdx) => {
-                        const sh = getShift(iso, blk.id, sIdx);
+                        const sh = getShift(d.iso, blk.id, sIdx);
                         if (!sh) return;
                         const sH = Math.floor(parseHHMM(sh.start));
                         const eH = Math.ceil(parseHHMM(sh.end));
                         for (let h = sH; h < eH; h++) {
-                            if (h < 0 || h > 23) continue;
-                            buckets[color][h]++;
+                            if (h >= 0 && h <= 23) buckets[color][h]++;
                         }
                     });
                 });
@@ -1294,6 +1289,8 @@
             redraw();
         }
 
+        bucketSel.addEventListener('change', redraw);
+        filterSel.addEventListener('change', redraw);
         return { redraw, recomputeFromState };
     }
 
