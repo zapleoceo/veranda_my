@@ -154,53 +154,129 @@
         return Math.max(0, b - a);
     }
 
-    // Day warning reasons — mirror of PHP $schDayWarnReasons.
-    // Three checks: no senior, double-booking, off-roster employee.
-    function dayWarnReasons(iso) {
-        const reasons = [];
-        const blocks  = App.state.blocks || [];
-        let anyShift = false, hasSenior = false;
-        const empTimes = new Map();  // empId → [[startH, endH], …]
-        blocks.forEach((blk) => {
-            const isSenior = blockColor(blk) === 'senior';
-            (blk.slots || []).forEach((_, sIdx) => {
-                const sh = getShift(iso, blk.id, sIdx);
-                if (!sh) return;
-                anyShift = true;
-                if (isSenior) hasSenior = true;
-                const empId = parseInt(sh.emp_id, 10) || 0;
-                if (empId <= 0) return;
-                const sH = parseHHMM(sh.start), eH = parseHHMM(sh.end);
-                if (eH > sH) {
-                    if (!empTimes.has(empId)) empTimes.set(empId, []);
-                    empTimes.get(empId).push([sH, eH]);
-                }
-                const emp = empById.get(empId);
-                if (emp && emp.in_schedule === false) {
-                    const r = `Не в графике: ${emp.name || ('uid:' + empId)}`;
-                    if (!reasons.includes(r)) reasons.push(r);
-                }
-            });
-        });
-        if (anyShift && !hasSenior) reasons.unshift('Нет старшего');
-        empTimes.forEach((intervals, empId) => {
-            if (intervals.length < 2) return;
-            intervals.sort((a, b) => a[0] - b[0]);
-            for (let i = 1; i < intervals.length; i++) {
-                if (intervals[i][0] < intervals[i - 1][1]) {
-                    const emp = empById.get(empId);
-                    const r = `Двойное бронирование: ${emp?.name || ('uid:' + empId)}`;
-                    if (!reasons.includes(r)) reasons.push(r);
-                    break;
-                }
-            }
-        });
-        return reasons;
-    }
     function parseHHMM(s) {
         if (!s) return 0;
         const [h, m = '0'] = String(s).split(':');
         return (parseInt(h, 10) || 0) + ((parseInt(m, 10) || 0) / 60);
+    }
+    function ruleScopeMatches(rule, block) {
+        const s = rule.scope || 'all';
+        if (s === 'all') return true;
+        return blockColor(block) === s;
+    }
+    function empName(id) {
+        return empById.get(id)?.name || ('uid:' + id);
+    }
+
+    // ════════════════ Rule engine ════════════════
+    // Returns reasons[] for one day. Iterates enabled rules from
+    // App.state.rules and accumulates human-readable strings. Each rule
+    // type has its own evaluator; new types added here without touching
+    // anything else.
+    function dayWarnReasons(iso) {
+        const reasons = [];
+        const blocks  = App.state.blocks || [];
+        const rules   = App.state.rules  || [];
+        const dow     = new Date(iso + 'T00:00:00').getDay();
+        const weekend = dow === 5 || dow === 6 || dow === 0;
+
+        rules.filter((r) => r && r.enabled !== false).forEach((rule) => {
+            switch (rule.type) {
+
+                case 'needSenior': {
+                    let anyShift = false, hasSenior = false;
+                    blocks.forEach((blk) => {
+                        const isSenior = blockColor(blk) === 'senior';
+                        (blk.slots || []).forEach((_, sIdx) => {
+                            if (getShift(iso, blk.id, sIdx)) {
+                                anyShift = true;
+                                if (isSenior) hasSenior = true;
+                            }
+                        });
+                    });
+                    if (anyShift && !hasSenior) reasons.push(rule.name || 'Нет старшего');
+                    break;
+                }
+
+                case 'doubleBooking': {
+                    const empTimes = new Map();
+                    blocks.forEach((blk) => {
+                        (blk.slots || []).forEach((_, sIdx) => {
+                            const sh = getShift(iso, blk.id, sIdx);
+                            if (!sh) return;
+                            const id = parseInt(sh.emp_id, 10) || 0;
+                            if (id <= 0) return;
+                            const sH = parseHHMM(sh.start), eH = parseHHMM(sh.end);
+                            if (eH > sH) {
+                                if (!empTimes.has(id)) empTimes.set(id, []);
+                                empTimes.get(id).push([sH, eH]);
+                            }
+                        });
+                    });
+                    empTimes.forEach((intervals, id) => {
+                        if (intervals.length < 2) return;
+                        intervals.sort((a, b) => a[0] - b[0]);
+                        for (let i = 1; i < intervals.length; i++) {
+                            if (intervals[i][0] < intervals[i - 1][1]) {
+                                reasons.push(`Двойное бронирование: ${empName(id)}`);
+                                break;
+                            }
+                        }
+                    });
+                    break;
+                }
+
+                case 'offRoster': {
+                    const seen = new Set();
+                    blocks.forEach((blk) => {
+                        (blk.slots || []).forEach((_, sIdx) => {
+                            const sh = getShift(iso, blk.id, sIdx);
+                            if (!sh) return;
+                            const id = parseInt(sh.emp_id, 10) || 0;
+                            if (id <= 0) return;
+                            const emp = empById.get(id);
+                            if (emp && emp.in_schedule === false && !seen.has(id)) {
+                                seen.add(id);
+                                reasons.push(`Не в графике: ${empName(id)}`);
+                            }
+                        });
+                    });
+                    break;
+                }
+
+                case 'startTime': {
+                    const expected = rule.value || '';
+                    if (!expected) break;
+                    blocks.forEach((blk) => {
+                        if (!ruleScopeMatches(rule, blk)) return;
+                        (blk.slots || []).forEach((_, sIdx) => {
+                            const sh = getShift(iso, blk.id, sIdx);
+                            if (!sh || !sh.start || sh.start === expected) return;
+                            const id = parseInt(sh.emp_id, 10) || 0;
+                            reasons.push(`${rule.name || 'Старт ≠ ' + expected}: ${empName(id)} в ${sh.start}`);
+                        });
+                    });
+                    break;
+                }
+
+                case 'endTime': {
+                    const expected = (weekend && rule.weekendValue) ? rule.weekendValue : (rule.value || '');
+                    if (!expected) break;
+                    blocks.forEach((blk) => {
+                        if (!ruleScopeMatches(rule, blk)) return;
+                        (blk.slots || []).forEach((_, sIdx) => {
+                            const sh = getShift(iso, blk.id, sIdx);
+                            if (!sh || !sh.end || sh.end === expected) return;
+                            const id = parseInt(sh.emp_id, 10) || 0;
+                            reasons.push(`${rule.name || 'Конец ≠ ' + expected}: ${empName(id)} до ${sh.end}`);
+                        });
+                    });
+                    break;
+                }
+            }
+        });
+
+        return reasons;
     }
 
     function recomputeSummaries() {
@@ -310,6 +386,166 @@
     });
     window.addEventListener('scroll', hideTip, true);
     window.addEventListener('resize', hideTip);
+
+
+    // ════════════════ Rule constructor UI ════════════════
+    // List, toggle, delete + inline form for adding a new rule. The form
+    // shows/hides time fields based on type. New rule -> pushed into
+    // App.state.rules, recomputeSummaries() updates the ⚠ column live,
+    // scheduleSave() persists.
+    const RULE_TYPE_LABELS = {
+        needSenior:    'Нет старшего',
+        doubleBooking: 'Двойное бронирование',
+        offRoster:     'Назначен «не в графике»',
+        startTime:     'Старт смены',
+        endTime:       'Конец смены',
+    };
+    const SCOPE_LABELS = {
+        all:    'Все блоки',
+        senior: 'Старшие',
+        main:   'Главный зал',
+        banya:  'Баня',
+        custom: 'Кастомные',
+    };
+
+    function renderRulesList() {
+        const list = document.getElementById('schRulesList');
+        const cnt  = document.getElementById('schRulesCount');
+        if (!list) return;
+        const rules = App.state.rules || [];
+        const on = rules.filter((r) => r.enabled !== false).length;
+        if (cnt) cnt.textContent = `${on} из ${rules.length} включено`;
+        let html = '';
+        rules.forEach((r, i) => {
+            const enabled = r.enabled !== false;
+            const sys     = r.system ? ' system' : '';
+            const dis     = enabled ? '' : ' disabled';
+            const typeLbl = RULE_TYPE_LABELS[r.type] || r.type;
+            const scopeLbl = SCOPE_LABELS[r.scope || 'all'];
+            const valueChip = (r.type === 'startTime' || r.type === 'endTime')
+                ? `<span class="sch-rules-chip">${esc(r.value || '?')}${r.weekendValue ? ' / ' + esc(r.weekendValue) : ''}</span>`
+                : '';
+            html += `
+              <div class="sch-rules-item${sys}${dis}" data-idx="${i}">
+                <input type="checkbox" class="sch-rules-toggle" ${enabled ? 'checked' : ''} data-idx="${i}">
+                <span class="sch-rules-name">${esc(r.name || typeLbl)}</span>
+                <span class="sch-rules-chip">${esc(typeLbl)}</span>
+                <span class="sch-rules-chip scope">${esc(scopeLbl)}</span>
+                ${valueChip}
+                <button class="sch-rules-del" data-idx="${i}" title="Удалить правило">×</button>
+              </div>`;
+        });
+        list.innerHTML = html;
+    }
+
+    document.addEventListener('change', (e) => {
+        const cb = e.target.closest('.sch-rules-toggle');
+        if (!cb) return;
+        const i = parseInt(cb.dataset.idx, 10);
+        const r = (App.state.rules || [])[i];
+        if (!r) return;
+        r.enabled = cb.checked;
+        renderRulesList();
+        recomputeSummaries();
+        scheduleSave();
+    });
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.sch-rules-del');
+        if (!btn) return;
+        e.preventDefault();
+        const i = parseInt(btn.dataset.idx, 10);
+        const r = (App.state.rules || [])[i];
+        if (!r || r.system) return;
+        if (!confirm(`Удалить правило «${r.name || r.type}»?`)) return;
+        App.state.rules.splice(i, 1);
+        renderRulesList();
+        recomputeSummaries();
+        scheduleSave();
+    });
+
+    // ─── Inline "add rule" form ───
+    const ruleForm     = document.getElementById('schRulesForm');
+    const ruleAddBtn   = document.getElementById('schRulesAddBtn');
+    const ruleType     = document.getElementById('schRuleType');
+    const ruleScope    = document.getElementById('schRuleScope');
+    const ruleValue    = document.getElementById('schRuleValue');
+    const ruleWeekend  = document.getElementById('schRuleWeekendValue');
+    const ruleName     = document.getElementById('schRuleName');
+    const ruleCancel   = document.getElementById('schRuleCancel');
+
+    function refreshFormFields() {
+        const t = ruleType?.value;
+        const needsValue   = t === 'startTime' || t === 'endTime';
+        const needsWeekend = t === 'endTime';
+        const tf = document.querySelector('.sch-rules-time-field');
+        const wf = document.querySelector('.sch-rules-weekend-field');
+        if (tf) tf.style.display = needsValue   ? '' : 'none';
+        if (wf) wf.style.display = needsWeekend ? '' : 'none';
+        // Auto-suggest name if user hasn't customised it
+        if (ruleName && !ruleName.dataset.custom) {
+            const scope = SCOPE_LABELS[ruleScope?.value] || 'все блоки';
+            if (t === 'startTime')    ruleName.value = `${scope}: старт в ${ruleValue?.value || 'HH:MM'}`;
+            else if (t === 'endTime') ruleName.value = `${scope}: конец в ${ruleValue?.value || 'HH:MM'}${ruleWeekend?.value ? ' (' + ruleWeekend.value + ' Пт/Сб/Вс)' : ''}`;
+            else ruleName.value = RULE_TYPE_LABELS[t] || '';
+        }
+    }
+    ruleAddBtn?.addEventListener('click', () => {
+        ruleForm.hidden = false;
+        ruleAddBtn.hidden = true;
+        if (ruleName) { ruleName.value = ''; delete ruleName.dataset.custom; }
+        if (ruleValue)   ruleValue.value   = '10:00';
+        if (ruleWeekend) ruleWeekend.value = '23:00';
+        refreshFormFields();
+    });
+    ruleCancel?.addEventListener('click', () => {
+        ruleForm.hidden = true;
+        ruleAddBtn.hidden = false;
+    });
+    [ruleType, ruleScope, ruleValue, ruleWeekend].forEach((el) => {
+        el?.addEventListener('input',  refreshFormFields);
+        el?.addEventListener('change', refreshFormFields);
+    });
+    ruleName?.addEventListener('input', () => { ruleName.dataset.custom = '1'; });
+
+    ruleForm?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const t = ruleType.value;
+        const rule = {
+            id:      'r-' + Date.now().toString(36),
+            type:    t,
+            scope:   ruleScope.value || 'all',
+            enabled: true,
+            name:    (ruleName.value || RULE_TYPE_LABELS[t] || t).trim(),
+        };
+        if (t === 'startTime' || t === 'endTime') {
+            rule.value = (ruleValue.value || '').trim();
+            if (!/^\d{1,2}:\d{2}$/.test(rule.value)) {
+                toast('Некорректное время', 'err'); return;
+            }
+        }
+        if (t === 'endTime' && ruleWeekend.value.trim()) {
+            const w = ruleWeekend.value.trim();
+            if (!/^\d{1,2}:\d{2}$/.test(w)) {
+                toast('Некорректное время Пт/Сб/Вс', 'err'); return;
+            }
+            rule.weekendValue = w;
+        }
+        App.state.rules = App.state.rules || [];
+        App.state.rules.push(rule);
+        ruleForm.hidden = true;
+        ruleAddBtn.hidden = false;
+        renderRulesList();
+        recomputeSummaries();
+        scheduleSave();
+        toast('Правило добавлено ✓');
+    });
+
+    // Initial render of the panel + summaries.
+    renderRulesList();
+    // After DOM is fully wired, compute warnings from the rule engine so
+    // the ⚠ column reflects the current rules (PHP's initial render uses
+    // a simpler subset).
+    setTimeout(() => recomputeSummaries(), 0);
 
 
     // ════════════════ Save queue ════════════════
