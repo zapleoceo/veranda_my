@@ -1310,6 +1310,54 @@ body.pd3-help-mode [data-help-abs] {
 .pd3-out-mail-create:hover { background: rgba(255,255,255,0.08); }
 tr.row-red .pd3-out-mail-create { display: inline-flex; }
 
+/* ─── Font-scale toolbar widget ───────────────────────────────
+   Three buttons («а» / «А» / «А») that cycle the .pd3-page zoom
+   level. The actual zoom is applied via the [data-scale="…"]
+   attribute below; this rule block only styles the toggle UI. */
+.pd3-fontscale {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: var(--pd3-r-lg);
+    overflow: hidden;
+    background: var(--card);
+}
+.pd3-fontscale__btn {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    border-left: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0 var(--pd3-s-4);
+    line-height: 1;
+    min-width: 22px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+.pd3-fontscale__btn:first-child { border-left: 0; }
+.pd3-fontscale__btn:nth-child(1) { font-size: var(--pd3-fs-md);  }
+.pd3-fontscale__btn:nth-child(2) { font-size: var(--pd3-fs-lg);  }
+.pd3-fontscale__btn:nth-child(3) { font-size: var(--pd3-fs-2xl); }
+.pd3-fontscale__btn:hover       { color: var(--text); background: rgba(255,255,255,0.04); }
+.pd3-fontscale__btn.is-active   { color: var(--accent); background: rgba(26,115,232,0.10); }
+
+/* ─── Page zoom — driven by the toolbar widget ──────────────────
+   `zoom` is layout-level (unlike transform:scale), so it reflows
+   the page correctly and every px-based value — tokens, icon
+   dimensions, SVG line overlay, modal sizes — scales in step.
+   The hook is a class on <html> (documentElement) so the persisted
+   choice can be applied by a tiny inline script BEFORE any body
+   content paints. Both .pd3-page and the modal host (which lives
+   outside .pd3-page) are scaled together. */
+html.pd3-scale-1-2 .pd3-page,
+html.pd3-scale-1-2 .pd3-modal-host { zoom: 1.2; }
+html.pd3-scale-1-5 .pd3-page,
+html.pd3-scale-1-5 .pd3-modal-host { zoom: 1.5; }
+
 /* ─── Responsive ─────────────────────────────────────────── */
 
 @media (max-width: 1100px) {

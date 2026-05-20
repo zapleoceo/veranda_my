@@ -22,6 +22,16 @@ declare(strict_types=1);
         <button type="button" class="pd3-icon-btn" id="pd3CheckFinderBtn" title="Поиск чека" data-help-abs="Поиск/удаление чека Poster по номеру.">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M6 2h12v20l-2-1-2 1-2-1-2 1-2-1-2 1V2Zm2 4v2h8V6H8Zm0 4v2h8v-2H8Zm0 4v2h6v-2H8Z"/></svg>
         </button>
+
+        <!-- Font-scale: cycles current/larger/largest. zoom on .pd3-page
+             rescales the entire UI (typography + spacing + radii + line
+             overlay) because every layout-affecting value goes through
+             --pd3-* tokens. Choice persists in localStorage. -->
+        <div class="pd3-fontscale" role="group" aria-label="Размер шрифта" data-help-abs="Размер шрифта: текущий / крупнее / очень крупный.">
+            <button type="button" class="pd3-fontscale__btn is-active" data-scale="1"   title="Размер шрифта: обычный">а</button>
+            <button type="button" class="pd3-fontscale__btn"           data-scale="1.2" title="Размер шрифта: крупнее">А</button>
+            <button type="button" class="pd3-fontscale__btn"           data-scale="1.5" title="Размер шрифта: очень крупный">А</button>
+        </div>
     </div>
 
     <nav class="pd3-tabs" aria-label="Режим сверки">
