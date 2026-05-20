@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Order\Services;
 
+use App\Infrastructure\Config;
+use App\Infrastructure\Logger;
 use App\Order\Contracts\OrdersServiceInterface;
 use App\Order\Domain\CartLine;
 use App\Payday3\Contracts\PosterApiProviderInterface;
@@ -29,8 +31,14 @@ final class OrdersService implements OrdersServiceInterface
 
     public function __construct(private readonly PosterApiProviderInterface $poster)
     {
-        $this->token         = trim((string)($_ENV['POSTER_API_TOKEN'] ?? getenv('POSTER_API_TOKEN') ?: ''));
-        $envSpot             = $_ENV['POSTER_SPOT_ID'] ?? getenv('POSTER_SPOT_ID');
+        // Read token via Config first (which Bootstrap loaded from .env)
+        // then $_ENV / getenv as fallbacks for CLI / test contexts.
+        $this->token = trim((string)(
+            Config::get('POSTER_API_TOKEN')
+            ?: ($_ENV['POSTER_API_TOKEN'] ?? '')
+            ?: (getenv('POSTER_API_TOKEN') ?: '')
+        ));
+        $envSpot             = Config::get('POSTER_SPOT_ID') ?: ($_ENV['POSTER_SPOT_ID'] ?? getenv('POSTER_SPOT_ID'));
         $this->defaultSpotId = is_numeric($envSpot) ? max(1, (int)$envSpot) : 1;
     }
 
@@ -57,18 +65,49 @@ final class OrdersService implements OrdersServiceInterface
         $url = 'https://joinposter.com/api/orders?token=' . rawurlencode($this->token);
         [$httpCode, $body] = $this->postJson($url, $payload);
 
+        // Every Poster response goes to the error log when something
+        // looks off — visible via Logger output / Apache error_log, so
+        // 502s in production become diagnosable without re-deploying
+        // with extra logging each time.
+        $logCtx = [
+            'spot_id'  => $spotId,
+            'table_id' => $tableId,
+            'items'    => count($lines),
+            'http'     => $httpCode,
+        ];
+
         $j = json_decode($body, true);
         if (!is_array($j)) {
+            $this->logErr('createOrder: non-JSON response', $logCtx + ['body' => mb_substr($body, 0, 500)]);
             throw new \RuntimeException('Poster API: invalid JSON (http=' . $httpCode . ')');
         }
         if ($httpCode < 200 || $httpCode > 299) {
-            throw new \RuntimeException('Poster API: ' . $this->extractError($j, $httpCode, $body));
+            $err = $this->extractError($j, $httpCode, $body);
+            $this->logErr('createOrder: http error', $logCtx + ['err' => $err, 'body' => mb_substr($body, 0, 500)]);
+            throw new \RuntimeException('Poster API: ' . $err);
+        }
+        // Poster sometimes returns 200 but with an `error` field
+        // populated (validation errors), in which case `response.id`
+        // is absent — surface that explicitly.
+        if (isset($j['error']) && $j['error']) {
+            $err = $this->extractError($j, $httpCode, $body);
+            $this->logErr('createOrder: payload error', $logCtx + ['err' => $err, 'body' => mb_substr($body, 0, 500)]);
+            throw new \RuntimeException('Poster API: ' . $err);
         }
         $orderId = (int)($j['response']['id'] ?? 0);
         if ($orderId <= 0) {
-            throw new \RuntimeException('Не удалось создать заказ в Poster');
+            $this->logErr('createOrder: no order_id', $logCtx + ['body' => mb_substr($body, 0, 500)]);
+            throw new \RuntimeException('Poster API: пустой ответ (заказ не создан)');
         }
         return ['order_id' => $orderId];
+    }
+
+    private function logErr(string $msg, array $ctx): void
+    {
+        // Tolerant: if Logger isn't booted in this request, fall back to
+        // error_log. Either way the operator gets a server-side trail.
+        try { Logger::get()->error('[neworder/orders] ' . $msg, $ctx); }
+        catch (\Throwable $_) { error_log('[neworder/orders] ' . $msg . ' ' . json_encode($ctx, JSON_UNESCAPED_UNICODE)); }
     }
 
     public function appendToTransaction(int $spotId, int $tabletId, int $transactionId, string $comment, array $lines): array
