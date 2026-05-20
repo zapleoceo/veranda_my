@@ -507,7 +507,59 @@
 }
 .sch-snap-pill:hover .sch-snap-btn { opacity: 0.8; }
 .sch-snap-rename:hover { background: rgba(184,135,70,.20); color: var(--accent); opacity: 1; }
+.sch-snap-share:hover  { background: rgba(96,165,250,.20); color: #60a5fa; opacity: 1; }
 .sch-snap-del:hover    { background: rgba(248,113,113,.20); color: #f87171; opacity: 1; }
+
+/* Payroll forecast — per-employee table under the grid. */
+.sch-payroll-section {
+    margin-top: 16px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    width: max-content; max-width: 100%;
+}
+.sch-payroll-head {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 10px;
+}
+.sch-payroll-head h3 {
+    margin: 0; font-size: 14px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    display: flex; align-items: center; gap: 8px;
+}
+.sch-payroll-period { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.sch-payroll-table {
+    border-collapse: collapse; font-size: 12px;
+    min-width: 480px;
+}
+.sch-payroll-table th,
+.sch-payroll-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+}
+.sch-payroll-table th {
+    color: var(--muted); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    font-weight: 600;
+    border-bottom-color: var(--border);
+}
+.sch-payroll-table td.num,
+.sch-payroll-table th.num { text-align: right; }
+.sch-payroll-table td.tag { color: var(--muted); font-size: 11px; }
+.sch-payroll-table td.who { font-weight: 600; }
+.sch-payroll-table td.zp,
+.sch-payroll-table th.num:last-child { color: var(--accent); font-weight: 700; }
+.sch-payroll-table tfoot td {
+    border-bottom: 0; border-top: 2px solid var(--border);
+    font-weight: 700; font-size: 13px;
+    padding-top: 10px;
+}
+.sch-payroll-table tbody tr:hover { background: rgba(184,135,70,.03); }
+.sch-payroll-table .empty {
+    text-align: center !important; color: var(--muted);
+    padding: 20px; font-style: italic;
+}
 
 /* ─── Help mode overlay (toggle via #schHelpBtn) ───────────
    Подсвечиваем элементы — pure CSS. Сам тултип рисуется JS-ом
