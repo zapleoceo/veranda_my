@@ -19,61 +19,62 @@
 }
 
 .sch-wrap { padding: 0; }
-.sch-wrap h1 { font-size: 22px; margin: 0 0 4px; }
-.sch-wrap .sch-sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
 
-/* Header row of the page (title + help button) */
-.sch-pagehead {
-    display: flex; align-items: flex-start; justify-content: space-between;
-    gap: 16px; margin-bottom: 14px;
-}
+/* Help button — small round badge that lives inline in the topbar. */
 .sch-help-btn {
-    width: 36px; height: 36px; border-radius: 50%;
+    width: 26px; height: 26px; border-radius: 50%;
     border: 1px solid var(--border); background: transparent;
-    color: var(--text); cursor: pointer; font-size: 16px; font-weight: 700;
+    color: var(--text); cursor: pointer; font-size: 13px; font-weight: 700;
     font-family: inherit;
     display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
 }
 .sch-help-btn:hover, .sch-help-btn[aria-pressed="true"] {
     background: var(--accent); border-color: var(--accent); color: #0f1117;
 }
 
-/* Period picker */
-.sch-periodbar {
-    display: flex; align-items: center; gap: 14px;
+/* Single compact top bar — period selector + inline metrics + actions. */
+.sch-topbar {
+    display: flex; align-items: center; gap: 8px;
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 18px;
-    margin-bottom: 14px;
+    border-radius: 10px;
+    padding: 6px 10px;
+    margin-bottom: 10px;
     flex-wrap: wrap;
 }
+.sch-topbar-sep {
+    width: 1px; align-self: stretch;
+    background: var(--border);
+    margin: 2px 4px;
+}
 .sch-period-range {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 6px 10px;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 6px;
     background: rgba(255,255,255,.03);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 6px;
 }
 .sch-date-input {
     background: transparent; border: 0; color: var(--text);
-    font-family: inherit; font-size: 14px; font-weight: 600;
-    padding: 2px 0;
-    width: 110px;
+    font-family: inherit; font-size: 12px; font-weight: 600;
+    padding: 1px 0;
+    width: 95px;
 }
 .sch-date-input:focus { outline: 0; color: var(--accent); }
 .sch-period-arrow {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 30px; height: 30px;
-    border: 1px solid var(--border); border-radius: 8px;
+    width: 26px; height: 26px;
+    border: 1px solid var(--border); border-radius: 6px;
     color: var(--text); cursor: pointer; background: transparent;
+    font-size: 11px;
 }
 .sch-period-arrow:hover { border-color: var(--accent); color: var(--accent); }
-.sch-period-stats { color: var(--muted); font-size: 13px; }
-.sch-period-presets { display: flex; gap: 4px; margin-left: auto; }
+.sch-period-stats { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.sch-period-presets { display: flex; gap: 3px; }
 .sch-period-presets button {
-    padding: 5px 12px; font-size: 12px;
+    padding: 3px 8px; font-size: 11px;
     background: transparent; border: 1px solid var(--border);
-    color: var(--muted); border-radius: 8px;
+    color: var(--muted); border-radius: 6px;
     cursor: pointer; font-family: inherit;
 }
 .sch-period-presets button:hover { color: var(--text); border-color: var(--text); }
@@ -81,32 +82,22 @@
     background: var(--accent); color: #0f1117;
     border-color: var(--accent); font-weight: 700;
 }
-
-/* Summary bar */
-.sch-summarybar {
-    display: grid;
-    grid-template-columns: auto auto auto auto 1fr auto auto;
-    gap: 18px;
-    align-items: center;
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 18px;
-    margin-bottom: 14px;
+.sch-metric-inline {
+    display: inline-flex; align-items: baseline; gap: 4px;
+    font-size: 12px;
 }
-.sch-metric { display: flex; flex-direction: column; gap: 2px; padding-right: 18px; border-right: 1px solid var(--border); }
-.sch-metric:last-of-type { border-right: 0; }
-.sch-metric-label {
-    color: var(--muted); font-size: 11px;
-    letter-spacing: 0.08em; text-transform: uppercase;
+.sch-metric-inline .lbl {
+    color: var(--muted); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.04em;
 }
-.sch-metric-value { font-weight: 700; font-size: 15px; }
-.sch-metric-value.gold { color: var(--accent); }
-.sch-metric-value.warn { color: var(--danger); }
+.sch-metric-inline b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.sch-metric-inline.gold b { color: var(--accent); }
+.sch-metric-inline.warn b { color: var(--danger); }
 
 .sch-btn {
-    padding: 8px 14px; border-radius: 8px;
+    padding: 5px 10px; border-radius: 6px;
     border: 1px solid var(--border); background: transparent;
-    color: var(--text); font-weight: 600; cursor: pointer; font-size: 13px;
+    color: var(--text); font-weight: 600; cursor: pointer; font-size: 12px;
     font-family: inherit; white-space: nowrap;
 }
 .sch-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -484,26 +475,6 @@
     justify-content: center;
     font-variant-numeric: tabular-nums;
 }
-
-/* Senior block summary below grid */
-.sch-senior-block {
-    margin-top: 16px;
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 14px; padding: 16px 20px;
-}
-.sch-senior-block h3 {
-    font-size: 13px; color: var(--accent);
-    letter-spacing: 0.06em; text-transform: uppercase;
-    margin: 0 0 10px;
-    display: flex; align-items: center; gap: 8px;
-}
-.sch-senior-list {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 8px;
-}
-.sch-senior-row { display: flex; gap: 10px; align-items: center; }
-.sch-senior-row .who { font-weight: 600; min-width: 80px; }
-.sch-senior-row .days { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* Snapshots */
 .sch-snapshots {
