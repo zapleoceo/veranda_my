@@ -12,6 +12,17 @@
 
 declare(strict_types=1);
 ?>
+<!-- Apply persisted font-scale class to <html> BEFORE the page paints
+     so we don't flash the default size and then jump. The matching CSS
+     rule is `html.pd3-scale-1-2 .pd3-page { zoom: 1.2 }` etc. -->
+<script>(function () {
+    try {
+        var s = localStorage.getItem('pd3.fontScale');
+        if (s === '1.2' || s === '1.5') {
+            document.documentElement.classList.add('pd3-scale-' + s.replace('.', '-'));
+        }
+    } catch (_) { /* private mode — ignore */ }
+})();</script>
 <div class="container pd3-page" id="pd3Root">
 
     <?php require __DIR__ . '/partials/toolbar.php'; ?>

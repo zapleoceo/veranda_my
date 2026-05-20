@@ -36,6 +36,7 @@ const [
     { makeInLoader },
     { initFinanceTransfers },
     { initCreateTx },
+    { initFontScale },
 ] = await Promise.all([
     _i('./state.js'),
     _i('./api.js'),
@@ -56,6 +57,7 @@ const [
     _i('./in/bootstrap.js'),
     _i('./ui/financeTransfers.js'),
     _i('./ui/createTx.js'),
+    _i('./ui/fontScale.js'),
 ]);
 
 const bootstrapEl = document.getElementById('pd3-bootstrap');
@@ -120,6 +122,10 @@ if (renderer) {
 } else {
     console.warn('[payday3] grid not found, LineRenderer disabled');
 }
+
+// Font-scale widget (а / А / А). Mounts after renderer is built so it
+// can request a line-overlay redraw on scale change.
+initFontScale({ renderer });
 
 // AJAX IN-mode refresh — replaces window.location.reload() after sync.
 const loadInData = makeInLoader({ state, renderer });
