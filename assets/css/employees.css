@@ -9,8 +9,39 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .error { margin-top: 10px; color: #b91c1c; font-weight: 800; }
         .table-wrap { overflow-x: auto; overflow-y: visible; }
-        #empTable { width: max-content; }
+        #empTable { width: max-content; border-collapse: collapse; font-size: 13px; }
         #empTable thead th { background: transparent; }
+        /* Compact cell padding — was browser default (~1px), now tight
+           but breathable. Headers shrunk so short data columns
+           (Чеки/Часы/ID) no longer have empty space dictated by long
+           header text. */
+        #empTable th, #empTable td { padding: 6px 8px; vertical-align: middle; }
+        #empTable thead th {
+            font-size: 10px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            color: var(--muted);
+            white-space: nowrap;
+            border-bottom: 1px solid var(--border);
+        }
+        /* Numeric / fixed-width columns: nowrap so they hug content. */
+        #empTable .col-id,
+        #empTable .col-rate,
+        #empTable .col-checks,
+        #empTable .col-hours,
+        #empTable .col-tips,
+        #empTable .col-ttp,
+        #empTable .col-salary,
+        #empTable .col-salarytopay {
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+        #empTable .col-id { color: var(--muted); font-size: 11px; }
+        #empTable .col-name { font-weight: 700; }
+        #empTable .col-role { color: var(--muted); font-size: 12px; }
+        /* Pay-history columns (TipsPaid/SlrPaid) — let their inner grid
+           shrink to content rather than pinning to a wide minimum. */
+        #empTable .col-paid,
+        #empTable .col-slr { padding-left: 4px; padding-right: 4px; }
         .sticky-head-wrap {
             position: fixed;
             top: 0;
@@ -31,7 +62,7 @@
             border-bottom: 1px solid var(--border);
         }
         .sticky-head-wrap th, .sticky-head-wrap td { padding: 12px 10px; vertical-align: top; box-sizing: border-box; }
-        .rate-input { width: 58px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; text-align: right; font-variant-numeric: tabular-nums; }
+        .rate-input { width: 64px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
         .progress { display:none; align-items:center; gap: 10px; margin-left: 10px; }
         .progress .bar { width: 160px; height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; }
         .progress .bar > span { display:block; height: 100%; width: 0; background: var(--accent); transition: width 0.15s ease; }
@@ -57,7 +88,7 @@
         .amt-cell { font-weight: 900; color: var(--text); text-align: left; }
         
         .paid-tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border); background: var(--card2); color: var(--text); font-weight: 900; font-size: 10px; line-height: 1.2; }
-        .paid-btn { border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: var(--accent); border-radius: 8px; padding: 2px 7px; font-weight: 900; font-size: 11px; cursor: pointer; line-height: 1.2; }
+        .paid-btn { border: 1px solid rgba(26,115,232,0.35); background: rgba(26,115,232,0.08); color: var(--accent); border-radius: 6px; padding: 2px 6px; font-weight: 900; font-size: 10px; cursor: pointer; line-height: 1.2; }
         .paid-btn:disabled { opacity: 0.2; cursor: default; }
         .modal-backdrop { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.55); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
         .modal { width: 100%; max-width: 460px; background: var(--card); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 18px 45px rgba(0,0,0,0.22); padding: 14px; }

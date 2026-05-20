@@ -54,18 +54,18 @@
                 <table id="empTable">
                     <thead>
                     <tr>
-                        <th id="thUid" class="col-id emp-style-12" data-sort="user_id">ID</th>
-                        <th id="thName" class="col-name emp-style-12" data-sort="name">name</th>
-                        <th id="thRate" class="col-rate emp-style-2" data-sort="rate">Rate</th>
-                        <th id="thRole" class="col-role emp-style-12" data-sort="role_name">role_name</th>
-                        <th id="thChecks" class="col-checks emp-style-2" data-sort="checks">Чеков</th>
-                        <th id="thHours" class="col-hours emp-style-2" data-sort="worked_hours">ЧасыРаботы</th>
-                        <th id="thTips" class="col-tips emp-style-2" data-sort="tips_minor">Tips</th>
-                        <th id="thTipsPaid" class="col-paid emp-style-2" data-sort="tips_paid_minor">TipsPaid</th>
-                        <th id="thTtp" class="col-ttp emp-style-2" data-sort="tips_to_pay_minor">TipsToPay</th>
-                        <th id="thSalary" class="col-salary emp-style-2" data-sort="salary_minor">Salary</th>
-                        <th id="thSlrPaid" class="col-slr emp-style-2" data-sort="slr_paid_minor">SlrPaid</th>
-                        <th id="thSalaryToPay" class="col-salarytopay emp-style-2" data-sort="salary_to_pay_vnd">SalaryToPay</th>
+                        <th id="thUid" class="col-id emp-style-12" data-sort="user_id" title="ID сотрудника в Poster">ID</th>
+                        <th id="thName" class="col-name emp-style-12" data-sort="name" title="Имя">Имя</th>
+                        <th id="thRate" class="col-rate emp-style-2" data-sort="rate" title="Ставка ₫/час">Ставка</th>
+                        <th id="thRole" class="col-role emp-style-12" data-sort="role_name" title="Должность">Роль</th>
+                        <th id="thChecks" class="col-checks emp-style-2" data-sort="checks" title="Количество чеков">Чеки</th>
+                        <th id="thHours" class="col-hours emp-style-2" data-sort="worked_hours" title="Отработанные часы">Часы</th>
+                        <th id="thTips" class="col-tips emp-style-2" data-sort="tips_minor" title="Чаевые по данным Poster">Tips</th>
+                        <th id="thTipsPaid" class="col-paid emp-style-2" data-sort="tips_paid_minor" title="Уже выплаченные чаевые">Tips ✓</th>
+                        <th id="thTtp" class="col-ttp emp-style-2" data-sort="tips_to_pay_minor" title="Осталось выплатить чаевых">Tips →</th>
+                        <th id="thSalary" class="col-salary emp-style-2" data-sort="salary_minor" title="Зарплата = Ставка × Часы">ЗП</th>
+                        <th id="thSlrPaid" class="col-slr emp-style-2" data-sort="slr_paid_minor" title="Уже выплаченная зарплата">ЗП ✓</th>
+                        <th id="thSalaryToPay" class="col-salarytopay emp-style-2" data-sort="salary_to_pay_vnd" title="Осталось выплатить зарплаты">ЗП →</th>
                     </tr>
                     </thead>
                     <tbody id="tbody"></tbody>
