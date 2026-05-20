@@ -331,6 +331,75 @@
 
         // Heatmap is downstream of the same state — keep it in sync.
         heatmap?.recomputeFromState();
+        // Payroll table likewise — re-build whole rows from state.
+        recomputePayroll();
+    }
+
+    // ════════════════ Payroll forecast — per-employee live recompute ═════
+    //
+    // PHP renders the initial table; JS rebuilds it on every shift edit so
+    // the totals don't go stale until F5. Same model — sum(hours) × rate
+    // per emp_id, sorted by ЗП DESC.
+    function fmtMoneyMln(v)  { return v > 0 ? (v / 1_000_000).toFixed(2) + 'M' : '—'; }
+    function fmtRate(v)      { return v > 0 ? new Intl.NumberFormat('ru-RU').format(v) : '—'; }
+    function fmtHours(v)     { return v.toFixed(1); }
+
+    function recomputePayroll() {
+        const tbl = document.getElementById('schPayrollTable');
+        if (!tbl) return;
+        const blocks = App.state.blocks || [];
+        const acc = new Map();   // empId → {id,name,tag,rate,hours,zp}
+        blocks.forEach((blk) => {
+            (blk.slots || []).forEach((_, sIdx) => {
+                Object.keys(App.state.shifts || {}).forEach((iso) => {
+                    const sh = getShift(iso, blk.id, sIdx);
+                    if (!sh) return;
+                    const hrs = hoursBetween(sh.start, sh.end);
+                    if (hrs <= 0) return;
+                    const eid = parseInt(sh.emp_id, 10) || 0;
+                    if (eid <= 0) return;
+                    const emp = empById.get(eid);
+                    let row = acc.get(eid);
+                    if (!row) {
+                        row = {
+                            id:    eid,
+                            name:  emp?.name || sh.emp_name || ('uid:' + eid),
+                            tag:   emp?.tag  || '',
+                            rate:  emp?.rate_per_hour || 0,
+                            hours: 0,
+                        };
+                        acc.set(eid, row);
+                    }
+                    row.hours += hrs;
+                });
+            });
+        });
+        const rows = Array.from(acc.values()).map((r) => ({ ...r, zp: r.hours * r.rate }));
+        rows.sort((a, b) => b.zp - a.zp);
+
+        const tbody = tbl.querySelector('tbody');
+        let html = '';
+        if (rows.length === 0) {
+            html = '<tr><td colspan="5" class="empty">Нет смен за выбранный период.</td></tr>';
+        } else {
+            rows.forEach((r) => {
+                html += `
+                  <tr data-emp-id="${r.id}">
+                    <td class="who">${esc(r.name)}</td>
+                    <td class="tag">${esc(r.tag)}</td>
+                    <td class="num"><span class="hours">${fmtHours(r.hours)}</span></td>
+                    <td class="num"><span class="rate">${fmtRate(r.rate)}</span></td>
+                    <td class="num zp"><span class="zp-val">${fmtMoneyMln(r.zp)}</span></td>
+                  </tr>`;
+            });
+        }
+        tbody.innerHTML = html;
+        const totalHours = rows.reduce((s, r) => s + r.hours, 0);
+        const totalZp    = rows.reduce((s, r) => s + r.zp,    0);
+        const hSpan = tbl.querySelector('[data-total="hours"]');
+        const zSpan = tbl.querySelector('[data-total="zp"]');
+        if (hSpan) hSpan.textContent = fmtHours(totalHours);
+        if (zSpan) zSpan.textContent = fmtMoneyMln(totalZp);
     }
 
 
@@ -1094,10 +1163,16 @@
             pill.className = 'sch-snap-pill';
             pill.dataset.snapId = s.id;
             pill.dataset.snapLabel = s.label || '';
+            const shareUrl = s.share_code ? `/schedule/v/${s.share_code}` : '';
+            if (shareUrl) pill.dataset.shareUrl = shareUrl;
             const when = (s.created_at || '').replace(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2}).*$/, '$3.$2 $4');
+            const shareBtn = shareUrl
+                ? `<button class="sch-snap-btn sch-snap-share" title="Скопировать публичную ссылку" data-share-url="${esc(shareUrl)}">🔗</button>`
+                : '';
             pill.innerHTML = `
                 <span class="sch-snap-name">${esc(s.label)}</span>
                 <span class="when">${esc(when)}</span>
+                ${shareBtn}
                 <button class="sch-snap-btn sch-snap-rename" title="Переименовать" data-snap-id="${s.id}">✏</button>
                 <button class="sch-snap-btn sch-snap-del"    title="Удалить"        data-snap-id="${s.id}">×</button>
             `;
@@ -1144,8 +1219,26 @@
         }
     }
 
+    async function copyShareLink(relativeUrl) {
+        const absolute = new URL(relativeUrl, location.origin).toString();
+        try {
+            await navigator.clipboard.writeText(absolute);
+            toast(`Ссылка скопирована: ${absolute}`);
+        } catch (_) {
+            // Fallback for older browsers / non-HTTPS contexts: show the URL
+            // in a prompt so the user can Ctrl+C it manually.
+            prompt('Публичная ссылка (read-only):', absolute);
+        }
+    }
+
     // Single delegated handler — works for server-rendered AND JS-rerendered pills.
     document.addEventListener('click', (e) => {
+        const shareBtn = e.target.closest('.sch-snap-share');
+        if (shareBtn) {
+            e.preventDefault(); e.stopPropagation();
+            copyShareLink(shareBtn.dataset.shareUrl || '');
+            return;
+        }
         const renameBtn = e.target.closest('.sch-snap-rename');
         if (renameBtn) {
             e.preventDefault(); e.stopPropagation();

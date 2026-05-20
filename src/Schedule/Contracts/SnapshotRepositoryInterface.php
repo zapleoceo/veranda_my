@@ -34,6 +34,12 @@ interface SnapshotRepositoryInterface
     /** Single snapshot's JSON by id, or null if missing. */
     public function loadById(int $id): ?array;
 
+    /**
+     * Looks up a named version by its public share code. Returns
+     * ['id','label','created_at','share_code','state'] or null.
+     */
+    public function loadByShareCode(string $code): ?array;
+
     /** Soft-deletes (skips if it's the current draft). True on success. */
     public function delete(int $id): bool;
 }

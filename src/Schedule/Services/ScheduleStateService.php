@@ -77,6 +77,12 @@ final class ScheduleStateService
         return $this->snapshots->loadById($id);
     }
 
+    /** For the public /schedule/v/{code} route — no auth required. */
+    public function loadByShareCode(string $code): ?array
+    {
+        return $this->snapshots->loadByShareCode($code);
+    }
+
     public function deleteSnapshot(int $id): bool
     {
         return $this->snapshots->delete($id);

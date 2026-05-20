@@ -138,6 +138,11 @@ $app->map(['GET', 'POST'], '/zapara[/]', [ZaparaController::class, 'index'])
     ->add(AuthMiddleware::class);
 $app->map(['GET', 'POST'], '/employees[/]', [EmployeesController::class, 'index'])
     ->add(AuthMiddleware::class);
+// Public read-only view of a named version — no auth (anyone with the
+// share-code URL can view). MUST be declared BEFORE the auth-protected
+// /schedule route so Slim matches the specific path first.
+$app->get('/schedule/v/{code:[A-Za-z0-9_-]+}', [ScheduleController::class, 'publicVersion']);
+
 $app->map(['GET', 'POST'], '/schedule[/]', [ScheduleController::class, 'index'])
     ->add(AuthMiddleware::class);
 
