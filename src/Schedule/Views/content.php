@@ -235,10 +235,12 @@ foreach ($days as $d) {
   <div class="sch-toolbar">
     <span class="sch-tool-label">Шаблоны времени (drag в ячейку):</span>
     <?php foreach (($state['templates'] ?? []) as $tIdx => $tpl): ?>
-      <span class="sch-chip" data-template-idx="<?= $tIdx ?>"
+      <span class="sch-chip" draggable="true"
+            data-template-idx="<?= $tIdx ?>"
             data-template-start="<?= htmlspecialchars($tpl['start'] ?? '') ?>"
             data-template-end="<?= htmlspecialchars($tpl['end'] ?? '') ?>"
-            data-help-abs="Drag в любую ячейку → автоматически заполнит время этого шаблона.">
+            data-template-name="<?= htmlspecialchars($tpl['name'] ?? '') ?>"
+            data-help-abs="Drag в ячейку: если там уже есть смена — поменяет ей время; если пусто — откроет форму с подставленным временем.">
         <?= htmlspecialchars(($tpl['name'] ?? '') . ' ' . str_replace(':00', '', ($tpl['start'] ?? '')) . '–' . str_replace(':00', '', ($tpl['end'] ?? ''))) ?>
       </span>
     <?php endforeach; ?>
@@ -389,11 +391,11 @@ foreach ($days as $d) {
         <div class="sch-add-block-cell"></div>
 
         <?php if (!$dayHasSenior && count($blocks) > 0): ?>
-          <div class="sch-warn-cell bad" title="Нет старшего!">⚠</div>
+          <div class="sch-warn-cell bad" data-day-iso="<?= htmlspecialchars($d['iso']) ?>" title="Нет старшего!">⚠</div>
         <?php else: ?>
-          <div class="sch-warn-cell ok">✓</div>
+          <div class="sch-warn-cell ok" data-day-iso="<?= htmlspecialchars($d['iso']) ?>">✓</div>
         <?php endif; ?>
-        <div class="sch-budget-cell">
+        <div class="sch-budget-cell" data-day-iso="<?= htmlspecialchars($d['iso']) ?>">
           <?= $daySalary > 0 ? number_format($daySalary / 1_000_000, 2, '.', '') . 'M' : '—' ?>
         </div>
       <?php endforeach; ?>
@@ -407,13 +409,13 @@ foreach ($days as $d) {
             $divCls = $schBlockColor($block) === 'main' ? 'main' : $schBlockColor($block);
             foreach ($block['slots'] as $sIdx => $_):
         ?>
-          <div class="sch-totals-cell"><?= $blockShiftCounts[$blkIdx][$sIdx] ?? 0 ?></div>
+          <div class="sch-totals-cell" data-totals-slot="<?= htmlspecialchars($block['id']) ?>:<?= $sIdx ?>"><?= $blockShiftCounts[$blkIdx][$sIdx] ?? 0 ?></div>
         <?php endforeach; ?>
           <div class="sch-divider"></div>
         <?php endforeach; ?>
         <div class="sch-add-block-cell"></div>
-        <div class="sch-warn-cell bad" style="background: rgba(184,135,70,.08); font-weight: 700;"><?= $warningDays ?> ⚠</div>
-        <div class="sch-totals-cell" style="font-size: 12px;">
+        <div class="sch-warn-cell bad" data-totals="warn" style="background: rgba(184,135,70,.08); font-weight: 700;"><?= $warningDays ?> ⚠</div>
+        <div class="sch-totals-cell" data-totals="salary" style="font-size: 12px;">
           <?= $totalSalary > 0 ? number_format($totalSalary / 1_000_000, 2, '.', '') . 'M' : '—' ?>
         </div>
       <?php endif; ?>
@@ -738,4 +740,4 @@ foreach ($days as $d) {
   </div>
 </div>
 
-<script src="/schedule/assets/js/schedule.js?v=20260518_solid" defer></script>
+<script src="/schedule/assets/js/schedule.js?v=20260520_livesum" defer></script>

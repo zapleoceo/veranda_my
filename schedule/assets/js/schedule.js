@@ -129,6 +129,77 @@
     }
 
 
+    // ════════════════ Live summary recompute ════════════════
+    // After any shift change (popover save/del, drag-n-drop, template drop)
+    // we recompute the per-day warn/budget cells AND the totals row in JS
+    // so they stay in sync without a full page reload. The initial values
+    // come from PHP at render time; afterwards JS owns them until the next
+    // F5 / structure change.
+    function hoursBetween(start, end) {
+        if (!start || !end) return 0;
+        const [h1, m1 = '0'] = start.split(':');
+        const [h2, m2 = '0'] = end.split(':');
+        const a = parseInt(h1, 10) + (parseInt(m1, 10) || 0) / 60;
+        const b = parseInt(h2, 10) + (parseInt(m2, 10) || 0) / 60;
+        return Math.max(0, b - a);
+    }
+
+    function recomputeSummaries() {
+        const blocks = App.state.blocks || [];
+        const isos   = new Set();
+        document.querySelectorAll('.sch-warn-cell[data-day-iso]').forEach((c) => isos.add(c.dataset.dayIso));
+
+        const slotCounts = new Map();   // "blockId:sIdx" → count
+        let warnDays = 0, totalSalary = 0;
+
+        isos.forEach((iso) => {
+            let hasSenior = false;
+            let daySalary = 0;
+            blocks.forEach((blk) => {
+                const isSenior = blockColor(blk) === 'senior';
+                (blk.slots || []).forEach((_, sIdx) => {
+                    const sh = getShift(iso, blk.id, sIdx);
+                    if (!sh) return;
+                    const hrs  = hoursBetween(sh.start, sh.end);
+                    const rate = (empById.get(sh.emp_id)?.rate_per_hour) || 0;
+                    if (hrs > 0) daySalary += hrs * rate;
+                    if (isSenior) hasSenior = true;
+                    const k = `${blk.id}:${sIdx}`;
+                    slotCounts.set(k, (slotCounts.get(k) || 0) + 1);
+                });
+            });
+            totalSalary += daySalary;
+
+            // Per-day warn cell
+            const warn = document.querySelector(`.sch-warn-cell[data-day-iso="${iso}"]`);
+            if (warn) {
+                const bad = blocks.length > 0 && !hasSenior;
+                warn.classList.toggle('bad', bad);
+                warn.classList.toggle('ok',  !bad);
+                warn.textContent = bad ? '⚠' : '✓';
+                warn.title       = bad ? 'Нет старшего!' : '';
+                if (bad) warnDays++;
+            }
+            // Per-day budget cell
+            const budget = document.querySelector(`.sch-budget-cell[data-day-iso="${iso}"]`);
+            if (budget) {
+                budget.textContent = daySalary > 0 ? (daySalary / 1_000_000).toFixed(2) + 'M' : '—';
+            }
+        });
+
+        // Totals row — one count per slot + total warn count + total salary
+        document.querySelectorAll('.sch-totals-cell[data-totals-slot]').forEach((c) => {
+            c.textContent = String(slotCounts.get(c.dataset.totalsSlot) || 0);
+        });
+        const warnTotal = document.querySelector('[data-totals="warn"]');
+        if (warnTotal) warnTotal.textContent = `${warnDays} ⚠`;
+        const salTotal = document.querySelector('[data-totals="salary"]');
+        if (salTotal) salTotal.textContent = totalSalary > 0
+            ? (totalSalary / 1_000_000).toFixed(2) + 'M'
+            : '—';
+    }
+
+
     // ════════════════ Help mode + floating tooltip ════════════════
     const helpBtn = document.getElementById('schHelpBtn');
     if (helpBtn) {
@@ -343,6 +414,7 @@
             renderChip(popAnchor, sh);
         }
         hidePopover();
+        recomputeSummaries();
         await saveDebounced();
     });
     document.getElementById('schPopoverDel')?.addEventListener('click', async () => {
@@ -350,6 +422,7 @@
         delShift(popAnchor.dataset.dayIso, popAnchor.dataset.block, popAnchor.dataset.slot);
         renderChip(popAnchor, null);
         hidePopover();
+        recomputeSummaries();
         await saveDebounced();
     });
     document.getElementById('schPopoverCancel')?.addEventListener('click', hidePopover);
@@ -892,22 +965,48 @@
 
 
     // ════════════════ Drag-n-drop ════════════════
-    let dragSrc = null;
+    // Two drag sources, distinguished by `dragKind`:
+    //   • 'shift'    — existing shift chip in the grid → swap/move to target cell
+    //   • 'template' — time-template chip from the toolbar → set or pre-fill time
+    let dragKind = null;       // 'shift' | 'template' | null
+    let dragSrc  = null;       // source cell (for 'shift')
+    let dragTpl  = null;       // {start, end, name} for 'template'
+
     document.addEventListener('dragstart', (e) => {
-        const chip = e.target.closest('.sch-shift');
-        if (!chip) return;
-        dragSrc = chip.closest('.sch-cell');
-        chip.style.opacity = '0.4';
-        e.dataTransfer.effectAllowed = 'move';
+        const shiftChip = e.target.closest('.sch-shift');
+        if (shiftChip) {
+            dragKind = 'shift';
+            dragSrc  = shiftChip.closest('.sch-cell');
+            shiftChip.style.opacity = '0.4';
+            e.dataTransfer.effectAllowed = 'move';
+            return;
+        }
+        const tplChip = e.target.closest('.sch-chip[data-template-idx]');
+        if (tplChip) {
+            dragKind = 'template';
+            dragTpl  = {
+                start: tplChip.dataset.templateStart || '',
+                end:   tplChip.dataset.templateEnd   || '',
+                name:  tplChip.dataset.templateName  || '',
+            };
+            tplChip.style.opacity = '0.6';
+            e.dataTransfer.effectAllowed = 'copy';
+            // Firefox needs SOMETHING in the data transfer to start a drag.
+            try { e.dataTransfer.setData('text/plain', dragTpl.start + '-' + dragTpl.end); } catch (_) {}
+        }
     });
     document.addEventListener('dragend', (e) => {
-        const chip = e.target.closest('.sch-shift');
+        const chip = e.target.closest('.sch-shift, .sch-chip[data-template-idx]');
         if (chip) chip.style.opacity = '';
-        dragSrc = null;
+        dragKind = null;
+        dragSrc  = null;
+        dragTpl  = null;
     });
     document.addEventListener('dragover', (e) => {
         const cell = e.target.closest('.sch-cell[data-block]');
-        if (!cell || !dragSrc || cell === dragSrc) return;
+        if (!cell) return;
+        if (dragKind === 'shift' && (!dragSrc || cell === dragSrc)) return;
+        if (dragKind !== 'shift' && dragKind !== 'template') return;
         e.preventDefault();
         cell.style.outline = '2px dashed var(--accent)';
     });
@@ -917,25 +1016,52 @@
     });
     document.addEventListener('drop', async (e) => {
         const cell = e.target.closest('.sch-cell[data-block]');
-        if (!cell || !dragSrc || cell === dragSrc) return;
-        e.preventDefault();
+        if (!cell) return;
         cell.style.outline = '';
-        const sIso = dragSrc.dataset.dayIso, sBlk = dragSrc.dataset.block, sSlot = dragSrc.dataset.slot;
-        const dIso = cell.dataset.dayIso,    dBlk = cell.dataset.block,    dSlot = cell.dataset.slot;
-        const sShift = getShift(sIso, sBlk, sSlot);
-        const dShift = getShift(dIso, dBlk, dSlot);
-        if (!sShift) { dragSrc = null; return; }
-        if (dShift) {
-            setShift(sIso, sBlk, sSlot, dShift);
-            renderChip(dragSrc, dShift);
-        } else {
-            delShift(sIso, sBlk, sSlot);
-            renderChip(dragSrc, null);
+
+        if (dragKind === 'shift' && dragSrc && cell !== dragSrc) {
+            e.preventDefault();
+            const sIso = dragSrc.dataset.dayIso, sBlk = dragSrc.dataset.block, sSlot = dragSrc.dataset.slot;
+            const dIso = cell.dataset.dayIso,    dBlk = cell.dataset.block,    dSlot = cell.dataset.slot;
+            const sShift = getShift(sIso, sBlk, sSlot);
+            const dShift = getShift(dIso, dBlk, dSlot);
+            if (sShift) {
+                if (dShift) {
+                    setShift(sIso, sBlk, sSlot, dShift);
+                    renderChip(dragSrc, dShift);
+                } else {
+                    delShift(sIso, sBlk, sSlot);
+                    renderChip(dragSrc, null);
+                }
+                setShift(dIso, dBlk, dSlot, sShift);
+                renderChip(cell, sShift);
+                recomputeSummaries();
+                await saveDebounced();
+            }
+        } else if (dragKind === 'template' && dragTpl) {
+            e.preventDefault();
+            const iso = cell.dataset.dayIso, blk = cell.dataset.block, slot = cell.dataset.slot;
+            const existing = getShift(iso, blk, slot);
+            if (existing) {
+                // Cell has a shift — just retime it, keep the employee.
+                const next = { ...existing, start: dragTpl.start, end: dragTpl.end };
+                setShift(iso, blk, slot, next);
+                renderChip(cell, next);
+                recomputeSummaries();
+                await saveDebounced();
+                toast(`Время → ${fmtTimeRange(dragTpl.start, dragTpl.end)}`);
+            } else {
+                // Empty cell — open popover with the template time prefilled
+                // so the user just picks an employee and saves.
+                showPopover(cell);
+                if (popFrom) popFrom.value = dragTpl.start;
+                if (popTo)   popTo.value   = dragTpl.end;
+            }
         }
-        setShift(dIso, dBlk, dSlot, sShift);
-        renderChip(cell, sShift);
-        dragSrc = null;
-        await saveDebounced();
+
+        dragKind = null;
+        dragSrc  = null;
+        dragTpl  = null;
     });
 
 })();
