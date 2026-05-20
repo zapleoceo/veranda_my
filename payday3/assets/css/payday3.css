@@ -1021,6 +1021,19 @@ body.pd3-mode-out .pd3-section--out { display: block; }
     border-top: 1px solid var(--border);
 }
 
+/* CreateTx success summary — populated by createTx.js after a successful
+   finance.createTransactions call. Mirrors payday2's createTxSuccessDetails. */
+.pd3-tx-success {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pd3-s-4);
+    font-size: var(--pd3-fs-base);
+}
+.pd3-tx-success__row { display: flex; gap: var(--pd3-s-4); }
+.pd3-tx-success__label { color: var(--muted); min-width: 110px; }
+.pd3-tx-success__value { color: var(--text); }
+.pd3-tx-success__value strong { color: var(--accent); }
+
 /* Soft-reset button under the mid-col glass — payday2's clearDayBtn. */
 .pd3-soft-reset {
     margin-top: auto;               /* push to the bottom of the mid column */
