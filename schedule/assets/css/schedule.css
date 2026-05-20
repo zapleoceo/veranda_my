@@ -115,34 +115,6 @@
     display: flex; align-items: center; gap: 8px;
     margin-bottom: 14px; flex-wrap: wrap;
 }
-.sch-tool-label {
-    color: var(--muted); font-size: 11px;
-    text-transform: uppercase; letter-spacing: 0.08em; margin-right: 4px;
-}
-.sch-chip {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 12px; border-radius: 999px;
-    border: 1px solid var(--border); background: rgba(255,255,255,.04);
-    font-size: 12px; color: var(--text);
-    cursor: grab; user-select: none;
-}
-.sch-chip.add {
-    color: var(--accent); border-color: var(--accent);
-    background: transparent; cursor: pointer;
-}
-.sch-chip.add:hover { background: rgba(184,135,70,.12); }
-.sch-chip-del {
-    /* × on template chips, visible-on-hover so it doesn't clutter the row. */
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 16px; height: 16px; margin-left: 2px; padding: 0;
-    background: transparent; border: 0; border-radius: 50%;
-    color: var(--muted); font-size: 14px; line-height: 1;
-    cursor: pointer; opacity: 0;
-    transition: opacity 0.15s, background 0.15s, color 0.15s;
-}
-.sch-chip:hover .sch-chip-del { opacity: 1; }
-.sch-chip-del:hover { background: rgba(248, 113, 113, .15); color: #f87171; }
-
 /* ─── Grid ─── */
 .sch-grid-scroll {
     background: var(--card); border: 1px solid var(--border);
