@@ -115,7 +115,10 @@ function fillAccountSelect(sel) {
 
 function fillCategorySelect(sel) {
     if (!sel) return;
-    sel.innerHTML = '<option value="">Без категории</option>';
+    // Empty-value placeholder forces a real choice — submit handler
+    // refuses to POST if catId === 0. Matches the modal's `required`
+    // attribute and the inline validation in the submit listener.
+    sel.innerHTML = '<option value="">Выберите категорию…</option>';
     const allowed = new Set((_settings?.allowed_categories || []).map(Number));
     const custom  = _settings?.custom_category_names || {};
 
@@ -187,18 +190,33 @@ export function initCreateTx({ state, host, openModal, closeModal, onCreated }) 
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        // Parse values up-front so we can validate without doing the
+        // work twice. Reads are cheap; bail early on bad input.
+        const type   = Number(form.elements['type'].value) || 0;
+        const date   = form.elements['date'].value;
+        const time   = form.elements['time'].value || '00:00';
+        const dt     = `${date} ${time.length === 5 ? time + ':00' : time}`;
+        const amount = parseVndInt(amountEl.value);
+        const accFromId = Number(form.elements['account_from'].value) || 0;
+        const accToId   = Number(form.elements['account_to'].value)   || 0;
+        const catId     = Number(form.elements['category_id'].value)  || 0;
+
+        // Client-side validation — surfaces problems instantly without
+        // a round-trip to Poster (which would just reject with a vague
+        // 400). All checks set status to red and focus the offending
+        // field so the next click goes straight to it.
+        const catEl = form.elements['category_id'];
+        if (!catId) {
+            status('Выберите категорию', 'error');
+            catEl?.focus?.();
+            return;
+        }
+
         status('Создаю…');
         const submitBtn = form.querySelector('button[type=submit]');
         if (submitBtn) submitBtn.disabled = true;
         try {
-            const type   = Number(form.elements['type'].value) || 0;
-            const date   = form.elements['date'].value;
-            const time   = form.elements['time'].value || '00:00';
-            const dt     = `${date} ${time.length === 5 ? time + ':00' : time}`;
-            const amount = parseVndInt(amountEl.value);
-            const accFromId = Number(form.elements['account_from'].value) || 0;
-            const accToId   = Number(form.elements['account_to'].value)   || 0;
-            const catId     = Number(form.elements['category_id'].value)  || 0;
             const body = {
                 type, amount, date: dt,
                 account_from: accFromId,

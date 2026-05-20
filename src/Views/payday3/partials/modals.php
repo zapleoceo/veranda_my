@@ -197,7 +197,7 @@ declare(strict_types=1);
                 </label>
                 <label class="pd3-field">
                     <span>Категория</span>
-                    <select name="category_id"><option value="">Без категории</option></select>
+                    <select name="category_id" required><option value="">Выберите категорию…</option></select>
                 </label>
             </div>
             <label class="pd3-field">
