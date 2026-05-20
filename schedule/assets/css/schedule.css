@@ -161,12 +161,20 @@
 
 /* Block headers */
 .sch-block-head {
+    /* Two-row block header: small action buttons on top, icon+name+meta below.
+       The actions row sits above the name so it's never hidden under a chip
+       or covered by the hover area of an adjacent slot. */
     background: rgba(255,255,255,.025);
-    padding: 10px 12px;
+    padding: 4px 10px 8px;
     min-height: 44px;
-    display: flex; align-items: center; gap: 8px;
+    display: flex; flex-direction: column;
+    align-items: stretch; gap: 2px;
     border-bottom: 1.5px solid var(--accent);
     position: relative;
+}
+.sch-block-head-main {
+    display: flex; align-items: center; gap: 8px;
+    min-height: 22px;
 }
 .sch-block-head .sch-block-icon { font-size: 16px; }
 .sch-block-head .sch-block-name {
@@ -179,29 +187,26 @@
     text-transform: none; letter-spacing: 0;
 }
 .sch-col-actions {
-    /* Always visible — hiding on hover-only made these click targets
-       impossible to land on: the slightest mouse drift off the header
-       bounds fades the buttons before the user can click. */
-    display: inline-flex; gap: 4px;
-    opacity: 0.55; transition: opacity 0.15s;
+    /* Top-right of the header: small, always visible, sits ABOVE the name. */
+    display: inline-flex; gap: 3px;
+    align-self: flex-end;
+    opacity: 0.6; transition: opacity 0.15s;
 }
 .sch-block-head:hover .sch-col-actions,
 .sch-col-actions:hover,
 .sch-col-actions:focus-within { opacity: 1; }
 .sch-col-actions button {
-    /* 26×26 — enough for a comfortable click target without ballooning
-       the header. Vertical-align middle so the glyphs sit on the same
-       baseline as the block name. */
-    width: 26px; height: 26px; padding: 0;
+    /* 16×16 — tiny chrome that doesn't compete with the name. */
+    width: 16px; height: 16px; padding: 0;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 6px; color: var(--text);
-    cursor: pointer; font-size: 16px;
+    border-radius: 4px; color: var(--muted);
+    cursor: pointer; font-size: 11px;
     font-family: inherit; line-height: 1;
     display: inline-flex; align-items: center; justify-content: center;
 }
 .sch-col-actions button:hover {
     border-color: var(--accent); color: var(--accent);
-    background: rgba(184,135,70,.10);
+    background: rgba(184,135,70,.12);
 }
 
 .sch-block-head.senior {

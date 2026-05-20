@@ -274,10 +274,7 @@ foreach ($days as $d) {
       ?>
         <div class="sch-block-head <?= $headCls ?>" style="grid-column: span <?= $slotsCnt ?>;"
              data-block-id="<?= htmlspecialchars($block['id']) ?>"
-             data-help-abs="<?= htmlspecialchars($block['name']) ?>. Внутри <?= $slotsCnt ?> слот(а/ов) — это типичное число людей в этой зоне. Hover — кнопки + слот и настройки блока.">
-          <span class="sch-block-icon"><?= htmlspecialchars($block['icon'] ?? '') ?></span>
-          <span class="sch-block-name"><?= htmlspecialchars($block['name']) ?></span>
-          <span class="sch-block-meta"><?= htmlspecialchars($meta) ?></span>
+             data-help-abs="<?= htmlspecialchars($block['name']) ?>. Внутри <?= $slotsCnt ?> слот(а/ов) — это типичное число людей в этой зоне. В верхней строке шапки — маленькие кнопки + слот и удалить блок.">
           <span class="sch-col-actions">
             <button title="Добавить слот" class="sch-block-add-slot"
                     data-block-idx="<?= $blkIdx ?>"
@@ -285,6 +282,11 @@ foreach ($days as $d) {
             <button title="Удалить блок" class="sch-block-del"
                     data-block-idx="<?= $blkIdx ?>"
                     data-help-abs="Удалить блок целиком. Все смены в нём пропадут.">⋮</button>
+          </span>
+          <span class="sch-block-head-main">
+            <span class="sch-block-icon"><?= htmlspecialchars($block['icon'] ?? '') ?></span>
+            <span class="sch-block-name"><?= htmlspecialchars($block['name']) ?></span>
+            <span class="sch-block-meta"><?= htmlspecialchars($meta) ?></span>
           </span>
         </div>
         <div class="sch-divider <?= $divCls ?> head-row"></div>
