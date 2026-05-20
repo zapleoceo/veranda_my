@@ -1180,28 +1180,18 @@
         if (stats) heatmap = initHeatmap(stats);
     }
     function initHeatmap(stats) {
-        const startH    = stats.hourStart || 8;
-        const endH      = stats.hourEnd   || 24;
+        const startH     = stats.hourStart || 8;
+        const endH       = stats.hourEnd   || 24;
         const COLOR_KEYS = ['senior', 'main', 'banya', 'custom'];
+        const COLOR_LABELS = { senior: 'старшие', main: 'главный', banya: 'баня', custom: 'кастомные' };
 
-        // ─── Pure helpers (no DOM, no globals) — pair with the PHP-side
-        // $schSumPerDay / $schBucketize / $schCovCellAttrs in content.php. ─
-        function sumHoursForFilter(d, filter) {
-            const h = new Array(24).fill(0);
-            for (let i = 0; i < 24; i++) {
-                if (filter === 'all') {
-                    for (const k of COLOR_KEYS) h[i] += d.hours?.[k]?.[i] || 0;
-                } else {
-                    h[i] = d.hours?.[filter]?.[i] || 0;
-                }
-            }
-            return h;
-        }
+        // ─── Pure helpers — mirror of PHP-side $schBucketize /
+        // $schCovCellAttrs / $schFormatCellLabel in content.php. ─────
         function bucketize(hours, size) {
             const out = [];
             for (let h = startH; h < endH; h += size) {
                 let max = 0;
-                for (let k = 0; k < size && h + k < endH; k++) max = Math.max(max, hours[h + k]);
+                for (let k = 0; k < size && h + k < endH; k++) max = Math.max(max, hours[h + k] || 0);
                 out.push({ from: h, to: Math.min(h + size, endH), max });
             }
             return out;
@@ -1213,52 +1203,112 @@
                 text:  intensity > 0.55 ? '#0f1117' : 'var(--text)',
             };
         }
-        function cellHtml(value, maxValue, extra = '', title = '') {
-            const { alpha, text } = covCellAttrs(value, maxValue);
-            const display = value > 0 ? (Number.isInteger(value) ? value : value.toFixed(1)) : '·';
+        function formatLabel(values, asAvg) {
+            if (!values.some((v) => v > 0.05)) return '·';
+            return values.map((v) => {
+                if (asAvg) {
+                    const r = (Math.round(v * 10) / 10).toString();
+                    return r.endsWith('.0') ? r.slice(0, -2) : r;
+                }
+                return String(Math.round(v));
+            }).join('|');
+        }
+        function cellHtml(values, totalForColor, max, extra = '', title = '', asAvg = false) {
+            const { alpha, text } = covCellAttrs(totalForColor, max);
+            const label = formatLabel(values, asAvg);
             const t = title ? ` title="${esc(title)}"` : '';
-            return `<div class="sch-cov-cell ${extra}" data-count="${value}" style="background: rgba(184,135,70,${alpha}); color: ${text};"${t}>${display}</div>`;
+            return `<div class="sch-cov-cell ${extra}" data-count="${asAvg ? totalForColor.toFixed(1) : Math.round(totalForColor)}" style="background: rgba(184,135,70,${alpha}); color: ${text};"${t}>${label}</div>`;
+        }
+
+        // Which colours actually have data — taken from server-rendered
+        // <div data-color-order="..."> (computed from blocks); fall back
+        // to all if missing.
+        function activeColors(filter) {
+            if (filter && filter !== 'all') {
+                return COLOR_KEYS.includes(filter) ? [filter] : COLOR_KEYS;
+            }
+            const raw = (covGrid.dataset.colorOrder || '').split(',').filter(Boolean);
+            return raw.length ? raw : COLOR_KEYS;
         }
 
         // ─── Render pipeline ──────────────────────────────────────────
         function buildRows(filter, bs) {
-            const perDayHours = stats.days.map((d) => sumHoursForFilter(d, filter));
-            const totals      = new Array(24).fill(0);
-            perDayHours.forEach((h) => { for (let i = 0; i < 24; i++) totals[i] += h[i]; });
-            const dayCount  = Math.max(1, stats.dayCount || perDayHours.length);
-            const avgHours  = totals.map((v) => v / dayCount);
+            const colors = activeColors(filter);
+            const dayCount = Math.max(1, stats.dayCount || stats.days.length);
 
-            const dayBuckets = perDayHours.map((h) => bucketize(h, bs));
-            const avgBuckets = bucketize(avgHours, bs);
+            // Per-day, per-colour bucket arrays + sum totals for the
+            // colour-intensity scale.
+            const dayPerColor = stats.days.map((d) => {
+                const out = {};
+                colors.forEach((c) => {
+                    out[c] = bucketize(d.hours?.[c] || new Array(24).fill(0), bs);
+                });
+                return out;
+            });
 
+            // Avg per colour: sum over days / dayCount, then bucketize.
+            const avgPerColor = {};
+            colors.forEach((c) => {
+                const hourly = new Array(24).fill(0);
+                stats.days.forEach((d) => {
+                    const src = d.hours?.[c] || [];
+                    for (let h = 0; h < 24; h++) hourly[h] += src[h] || 0;
+                });
+                const avg = hourly.map((v) => v / dayCount);
+                avgPerColor[c] = bucketize(avg, bs);
+            });
+
+            const colCount = avgPerColor[colors[0]]?.length || 0;
             let max = 0;
-            dayBuckets.forEach((b) => b.forEach((c) => { if (c.max > max) max = c.max; }));
-            avgBuckets.forEach((c) => { if (c.max > max) max = c.max; });
-            return { dayBuckets, avgBuckets, max: Math.max(1, max) };
+            for (let i = 0; i < colCount; i++) {
+                let totalDay = 0, totalAvg = 0;
+                dayPerColor.forEach((row) => colors.forEach((c) => { totalDay += row[c][i].max; }));
+                // We compare *per-cell* totals, not aggregate across days.
+                dayPerColor.forEach((row) => {
+                    let t = 0; colors.forEach((c) => { t += row[c][i].max; });
+                    if (t > max) max = t;
+                });
+                colors.forEach((c) => { totalAvg += avgPerColor[c][i].max; });
+                if (totalAvg > max) max = totalAvg;
+            }
+            return { dayPerColor, avgPerColor, colors, max: Math.max(1, max), colCount };
         }
         function redraw() {
             const filter = filterSel.value;
             const bs     = parseInt(bucketSel.value, 10) || 2;
-            const { dayBuckets, avgBuckets, max } = buildRows(filter, bs);
-            covGrid.style.setProperty('--cov-cols', avgBuckets.length);
+            const { dayPerColor, avgPerColor, colors, max, colCount } = buildRows(filter, bs);
+            covGrid.style.setProperty('--cov-cols', colCount);
+            covGrid.dataset.colorOrder = colors.join(',');
 
-            let html = '<div class="sch-cov-corner">День \\ Час</div>';
-            avgBuckets.forEach((c) => {
+            const hint = colors.map((c) => COLOR_LABELS[c]).join(' | ');
+            let html = `<div class="sch-cov-corner" title="В ячейке: ${esc(hint)}">День \\ Час<br><small>${esc(hint)}</small></div>`;
+            // Column headers — pull from any colour's buckets (they all share columns).
+            const headBuckets = avgPerColor[colors[0]] || [];
+            headBuckets.forEach((c) => {
                 html += `<div class="sch-cov-col-head">${pad2(c.from)}–${pad2(c.to)}</div>`;
             });
+            // Day rows
             stats.days.forEach((d, idx) => {
                 const wk = d.weekend ? ' weekend' : '';
                 html += `<div class="sch-cov-row-head${wk}">${esc(d.dow)} ${esc(d.date)}</div>`;
-                dayBuckets[idx].forEach((c) => {
-                    html += cellHtml(c.max, max, '', `пик ${c.max} чел/ч в ${pad2(c.from)}–${pad2(c.to)}`);
-                });
+                const row = dayPerColor[idx];
+                for (let i = 0; i < colCount; i++) {
+                    const values = colors.map((c) => row[c][i].max);
+                    const total  = values.reduce((s, v) => s + v, 0);
+                    html += cellHtml(values, total, max, '',
+                        `${hint}: ${formatLabel(values, false)} (${pad2(headBuckets[i].from)}–${pad2(headBuckets[i].to)})`,
+                        false);
+                }
             });
-            // Footer avg row — same colour scale as data rows.
+            // Avg row
             html += `<div class="sch-cov-row-head avg" title="Среднее по всем дням периода (${stats.dayCount} д)">Сред.</div>`;
-            avgBuckets.forEach((c) => {
-                const v = +c.max.toFixed(1);
-                html += cellHtml(v, max, 'avg', `Среднее в ${pad2(c.from)}–${pad2(c.to)}: ${v}`);
-            });
+            for (let i = 0; i < colCount; i++) {
+                const values = colors.map((c) => avgPerColor[c][i].max);
+                const total  = values.reduce((s, v) => s + v, 0);
+                html += cellHtml(values, total, max, 'avg',
+                    `Сред. ${hint}: ${formatLabel(values, true)}`,
+                    true);
+            }
             covGrid.innerHTML = html;
         }
 
