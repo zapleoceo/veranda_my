@@ -561,12 +561,14 @@ Hover на ⚠ в конкретном дне покажет причины.">�
     </div>
 
     <?php
-    // ─── Heatmap helpers (PHP + JS use the same model — keep aligned with
-    // schedule.js bucketize / covCellAttrs / sumPerDayBlock). ───
-    $schSumPerDay = static function (?array $perBlock): array {
+    // ─── Heatmap helpers (mirror of schedule.js initHeatmap helpers) ───
+    $SCH_COLOR_ORDER = ['senior','main','banya','custom'];
+
+    /** Sums per-block hours into 1×24. */
+    $schSumPerDay = static function (?array $perBlock) use ($SCH_COLOR_ORDER): array {
         $sum = array_fill(0, 24, 0);
         if (!$perBlock) return $sum;
-        foreach (['senior','main','banya','custom'] as $k) {
+        foreach ($SCH_COLOR_ORDER as $k) {
             foreach (($perBlock[$k] ?? []) as $h => $c) $sum[$h] += $c;
         }
         return $sum;
@@ -591,61 +593,128 @@ Hover на ⚠ в конкретном дне покажет причины.">�
             'text'  => $intensity > 0.55 ? '#0f1117' : 'var(--text)',
         ];
     };
+    /** Render cell label: "1|3|2" for breakdown, single number otherwise. */
+    $schFormatCellLabel = static function (array $values, bool $asAvg): string {
+        $nonZero = false; foreach ($values as $v) if ($v > 0.05) { $nonZero = true; break; }
+        if (!$nonZero) return '·';
+        return implode('|', array_map(static function ($v) use ($asAvg) {
+            if ($asAvg) {
+                $r = round($v, 1);
+                return rtrim(rtrim(sprintf('%.1f', $r), '0'), '.');
+            }
+            return (string) (int) round($v);
+        }, $values));
+    };
+
+    // Which block colours actually have blocks? Drives how many numbers
+    // we squeeze into each cell. Order is canonical (senior → custom).
+    $schColorsPresent = [];
+    foreach ($SCH_COLOR_ORDER as $c) {
+        foreach ($blocks as $b) {
+            if ($schBlockColor($b) === $c) { $schColorsPresent[] = $c; break; }
+        }
+    }
 
     // Default: 2h buckets, all-blocks filter — same as JS default
     $schBucket = 2;
     $colCount  = (int) ceil(($schHourEnd - $schHourStart) / $schBucket);
     $dayCount  = max(1, count($days));
 
-    // Pre-compute per-day buckets + global max so the avg row uses the
-    // same colour scale as the data rows.
-    $schDayBuckets = [];
-    $maxCount = 0.0;
+    // Per-day, per-colour buckets. Sum of per-cell colour values drives
+    // intensity (so colour reflects total simultaneous people).
+    $schDayBuckets = [];   // [day_idx][colour] → list of {from,to,value}
+    $maxCount      = 0.0;
     foreach ($days as $d) {
-        $sum    = $schSumPerDay($schPerDayByBlock[$d['idx']] ?? null);
-        $bucks  = $schBucketize($sum, $schHourStart, $schHourEnd, $schBucket);
-        $schDayBuckets[$d['idx']] = $bucks;
-        foreach ($bucks as $b) $maxCount = max($maxCount, $b['value']);
+        $perColor = [];
+        $perBlock = $schPerDayByBlock[$d['idx']] ?? null;
+        foreach ($schColorsPresent as $c) {
+            $hours = $perBlock[$c] ?? array_fill(0, 24, 0);
+            $perColor[$c] = $schBucketize($hours, $schHourStart, $schHourEnd, $schBucket);
+        }
+        $schDayBuckets[$d['idx']] = $perColor;
+        for ($i = 0; $i < $colCount; $i++) {
+            $total = 0.0;
+            foreach ($schColorsPresent as $c) $total += $perColor[$c][$i]['value'];
+            $maxCount = max($maxCount, $total);
+        }
     }
-    // Avg row across all days, per hour, then bucketized.
-    $schAvgHour    = array_map(static fn ($v) => $v / $dayCount, $schAggHourTotal);
-    $schAvgBuckets = $schBucketize($schAvgHour, $schHourStart, $schHourEnd, $schBucket);
-    $maxCount      = max(1.0, $maxCount);
+    // Avg row: sum per-hour over days / dayCount, per colour, then bucket.
+    $schAvgBuckets = [];
+    foreach ($schColorsPresent as $c) {
+        $hourly = array_fill(0, 24, 0);
+        foreach ($days as $d) {
+            $hours = $schPerDayByBlock[$d['idx']][$c] ?? [];
+            foreach ($hours as $h => $v) $hourly[$h] += $v;
+        }
+        $hourly = array_map(static fn ($v) => $v / $dayCount, $hourly);
+        $schAvgBuckets[$c] = $schBucketize($hourly, $schHourStart, $schHourEnd, $schBucket);
+    }
+    for ($i = 0; $i < $colCount; $i++) {
+        $total = 0.0;
+        foreach ($schColorsPresent as $c) $total += $schAvgBuckets[$c][$i]['value'];
+        $maxCount = max($maxCount, $total);
+    }
+    $maxCount = max(1.0, $maxCount);
+
+    // Pretty colour-order label for the help tooltip and corner cell.
+    $schColorLabels = ['senior' => 'старшие', 'main' => 'главный', 'banya' => 'баня', 'custom' => 'кастомные'];
+    $schBreakdownHint = implode(' | ', array_map(static fn ($c) => $schColorLabels[$c], $schColorsPresent));
     ?>
     <!-- Heatmap matrix — one continuous grid: corner + col-heads +
-         per-day rows + the merged "Сред." footer row that used to be a
-         separate <div class="sch-agg-histogram"> block below. -->
-    <div class="sch-cov-grid" id="schCovGrid" style="--cov-cols: <?= $colCount ?>;">
-      <div class="sch-cov-corner">День \ Час</div>
-      <?php foreach ($schAvgBuckets as $b): ?>
+         per-day rows + a merged "Сред." footer row.
+         Cell format: per-colour breakdown joined by "|" (senior|main|
+         banya|custom), only colours that actually have blocks. Colour
+         intensity = sum of all the displayed numbers. -->
+    <div class="sch-cov-grid" id="schCovGrid"
+         style="--cov-cols: <?= $colCount ?>;"
+         data-color-order="<?= htmlspecialchars(implode(',', $schColorsPresent)) ?>"
+         title="В ячейке: <?= htmlspecialchars($schBreakdownHint) ?>">
+      <div class="sch-cov-corner" title="Разбивка по блокам: <?= htmlspecialchars($schBreakdownHint) ?>">День \ Час<br><small><?= htmlspecialchars($schBreakdownHint) ?></small></div>
+      <?php foreach ($schAvgBuckets[$schColorsPresent[0] ?? 'main'] as $b): ?>
         <div class="sch-cov-col-head"><?= sprintf('%02d–%02d', $b['from'], $b['to']) ?></div>
       <?php endforeach; ?>
 
       <?php foreach ($days as $d):
           $weekendCls = $d['weekend'] ? ' weekend' : '';
+          $perColor   = $schDayBuckets[$d['idx']];
       ?>
         <div class="sch-cov-row-head<?= $weekendCls ?>"><?= htmlspecialchars($d['dow']) ?> <?= htmlspecialchars($d['date']) ?></div>
-        <?php foreach ($schDayBuckets[$d['idx']] as $b):
-            $v = (int) $b['value'];
-            $a = $schCovCellAttrs($b['value'], $maxCount);
+        <?php for ($i = 0; $i < $colCount; $i++):
+            $values = [];
+            $total  = 0.0;
+            foreach ($schColorsPresent as $c) {
+                $v = $perColor[$c][$i]['value'];
+                $values[] = $v;
+                $total   += $v;
+            }
+            $a = $schCovCellAttrs($total, $maxCount);
+            $label = $schFormatCellLabel($values, false);
         ?>
           <div class="sch-cov-cell"
-               data-count="<?= $v ?>"
-               style="background: rgba(184,135,70,<?= $a['alpha'] ?>); color: <?= $a['text'] ?>;"><?= $v > 0 ? $v : '·' ?></div>
-        <?php endforeach; ?>
+               data-count="<?= (int) $total ?>"
+               style="background: rgba(184,135,70,<?= $a['alpha'] ?>); color: <?= $a['text'] ?>;"
+               title="<?= htmlspecialchars($schBreakdownHint . ': ' . $label) ?>"><?= $label ?></div>
+        <?php endfor; ?>
       <?php endforeach; ?>
 
       <!-- Footer "average" row — same column model, lighter text style. -->
       <div class="sch-cov-row-head avg" title="Среднее по всем дням периода (<?= count($days) ?> д)">Сред.</div>
-      <?php foreach ($schAvgBuckets as $b):
-          $v = round($b['value'], 1);
-          $a = $schCovCellAttrs($b['value'], $maxCount);
+      <?php for ($i = 0; $i < $colCount; $i++):
+          $values = [];
+          $total  = 0.0;
+          foreach ($schColorsPresent as $c) {
+              $v = $schAvgBuckets[$c][$i]['value'];
+              $values[] = $v;
+              $total   += $v;
+          }
+          $a = $schCovCellAttrs($total, $maxCount);
+          $label = $schFormatCellLabel($values, true);
       ?>
         <div class="sch-cov-cell avg"
-             data-count="<?= $v ?>"
+             data-count="<?= round($total, 1) ?>"
              style="background: rgba(184,135,70,<?= $a['alpha'] ?>); color: <?= $a['text'] ?>;"
-             title="Среднее за период"><?= $b['value'] > 0 ? $v : '·' ?></div>
-      <?php endforeach; ?>
+             title="<?= htmlspecialchars('Сред. ' . $schBreakdownHint . ': ' . $label) ?>"><?= $label ?></div>
+      <?php endfor; ?>
     </div>
   </section>
 
@@ -823,4 +892,4 @@ Hover на ⚠ в конкретном дне покажет причины.">�
   </div>
 </div>
 
-<script src="/schedule/assets/js/schedule.js?v=20260520_heatmerge" defer></script>
+<script src="/schedule/assets/js/schedule.js?v=20260520_breakdown" defer></script>
