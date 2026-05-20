@@ -113,6 +113,11 @@ class StaticController
         return $this->serve($response, __DIR__ . '/../../payday3/assets', $args['file']);
     }
 
+    public function neworderAssets(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        return $this->serve($response, __DIR__ . '/../../neworder/assets', $args['file']);
+    }
+
     public function scheduleAssets(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         return $this->serve($response, __DIR__ . '/../../schedule/assets', $args['file']);

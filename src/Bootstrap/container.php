@@ -323,6 +323,34 @@ return [
         $c->get(PosterTransactionCreateServiceInterface::class),
     ),
 
+    // ─── /neworder (live Poster menu → create incoming order) ───
+    // SOLID separation: one provider per Poster API concern (menu,
+    // locations, open checks), one service for writes (orders). All
+    // injected via interfaces so future tests can swap fakes in.
+    \App\Order\Contracts\PosterMenuProviderInterface::class    => fn($c) =>
+        new \App\Order\Services\PosterMenuProvider($c->get(PosterApiProviderInterface::class)),
+    \App\Order\Contracts\PosterLocationProviderInterface::class => fn($c) =>
+        new \App\Order\Services\PosterLocationProvider($c->get(PosterApiProviderInterface::class)),
+    \App\Order\Contracts\OpenChecksProviderInterface::class    => fn($c) =>
+        new \App\Order\Services\OpenChecksProvider($c->get(PosterApiProviderInterface::class)),
+    \App\Order\Contracts\OrdersServiceInterface::class         => fn($c) =>
+        new \App\Order\Services\OrdersService($c->get(PosterApiProviderInterface::class)),
+
+    \App\Order\Http\NewOrderController::class                  => fn()  =>
+        new \App\Order\Http\NewOrderController(),
+    \App\Order\Http\Actions\MenuAction::class                  => fn($c) =>
+        new \App\Order\Http\Actions\MenuAction($c->get(\App\Order\Contracts\PosterMenuProviderInterface::class)),
+    \App\Order\Http\Actions\LocationsAction::class             => fn($c) =>
+        new \App\Order\Http\Actions\LocationsAction($c->get(\App\Order\Contracts\PosterLocationProviderInterface::class)),
+    \App\Order\Http\Actions\OpenChecksAction::class            => fn($c) =>
+        new \App\Order\Http\Actions\OpenChecksAction($c->get(\App\Order\Contracts\OpenChecksProviderInterface::class)),
+    \App\Order\Http\Actions\OrderCreateAction::class           => fn($c) =>
+        new \App\Order\Http\Actions\OrderCreateAction($c->get(\App\Order\Contracts\OrdersServiceInterface::class)),
+    \App\Order\Http\Actions\OrderAppendAction::class           => fn($c) =>
+        new \App\Order\Http\Actions\OrderAppendAction($c->get(\App\Order\Contracts\OrdersServiceInterface::class)),
+    \App\Order\Http\Middleware\CsrfMiddleware::class           => fn()  =>
+        new \App\Order\Http\Middleware\CsrfMiddleware(),
+
     // ─── Schedule (shift planner) ─────────────────────────────
     // SchemaManager is a singleton — all schedule repos receive it and
     // call ensure() in their constructor. ensure() is gated by a static
