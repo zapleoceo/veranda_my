@@ -302,20 +302,6 @@ foreach ($days as $d) {
 
   <!-- Toolbar -->
   <div class="sch-toolbar">
-    <span class="sch-tool-label">Шаблоны времени (drag в ячейку):</span>
-    <?php foreach (($state['templates'] ?? []) as $tIdx => $tpl): ?>
-      <span class="sch-chip" draggable="true"
-            data-template-idx="<?= $tIdx ?>"
-            data-template-start="<?= htmlspecialchars($tpl['start'] ?? '') ?>"
-            data-template-end="<?= htmlspecialchars($tpl['end'] ?? '') ?>"
-            data-template-name="<?= htmlspecialchars($tpl['name'] ?? '') ?>"
-            data-help-abs="Drag в ячейку: если там уже есть смена — поменяет ей время; если пусто — откроет форму с подставленным временем. × справа — удалить этот шаблон.">
-        <?= htmlspecialchars(($tpl['name'] ?? '') . ' ' . str_replace(':00', '', ($tpl['start'] ?? '')) . '–' . str_replace(':00', '', ($tpl['end'] ?? ''))) ?>
-        <button class="sch-chip-del" title="Удалить шаблон"
-                data-template-idx="<?= $tIdx ?>" draggable="false">×</button>
-      </span>
-    <?php endforeach; ?>
-    <span class="sch-chip add" id="schAddTemplate" data-help-abs="Добавить свой шаблон времени. Запросит название (короткое — Д/В/У/Полный/Бранч…) и время начала/конца.">+ Шаблон</span>
     <span style="flex:1"></span>
     <button class="sch-btn ghost" id="schClearPeriod"
             data-help-abs="Удалить все смены за выбранный период. С подтверждением.">Очистить период</button>
@@ -821,4 +807,4 @@ Hover на ⚠ в конкретном дне покажет причины.">�
   </div>
 </div>
 
-<script src="/schedule/assets/js/schedule.js?v=20260520_ctrldrag" defer></script>
+<script src="/schedule/assets/js/schedule.js?v=20260520_savequeue" defer></script>

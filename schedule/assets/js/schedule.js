@@ -28,7 +28,6 @@
         zones:     boot.zones     || [],
         snapshots: boot.snapshots || [],
         dirty:     false,
-        saving:    false,
     };
     if (Array.isArray(App.state.shifts)) App.state.shifts = {};
     if (!App.state.shifts || typeof App.state.shifts !== 'object') App.state.shifts = {};
@@ -313,55 +312,85 @@
     window.addEventListener('resize', hideTip);
 
 
-    // ════════════════ Save (debounced + manual) ════════════════
+    // ════════════════ Save queue ════════════════
+    //
+    // Pattern: debounce + single-flight + pending follow-up.
+    //
+    //   scheduleSave()  — call after every edit. Fire-and-forget. Coalesces
+    //                     rapid bursts via an 800 ms debounce timer. If a
+    //                     POST is already in flight, sets `pending=true` so
+    //                     a follow-up POST fires the moment the first one
+    //                     finishes — no edits get dropped.
+    //   flushSave(lbl)  — manual / structural save. Drains the debounce
+    //                     timer immediately, awaits the POST AND any
+    //                     follow-up POSTs queued during it. Returns when
+    //                     state on the server matches App.state.
+    //
+    // Why not a real FIFO of N requests? Every POST sends App.state in
+    // full, so two queued saves would carry identical bodies — one
+    // follow-up is enough to capture every edit that landed during the
+    // in-flight POST. Anything later becomes the NEXT follow-up.
+    //
+    // The user can keep editing while a save runs: cells update locally
+    // via renderChip + recomputeSummaries immediately; the network round-
+    // trip happens in the background and never blocks the UI.
     let saveTimer = null;
-    function saveDebounced() {
-        return new Promise((resolve) => {
-            if (saveTimer) clearTimeout(saveTimer);
-            saveTimer = setTimeout(async () => {
-                await saveNow().catch(() => {});
-                resolve();
-            }, 800);
-        });
+    let saveInFlight = false;
+    let savePending  = false;   // edits arrived during in-flight POST
+    let saveLabel    = 'auto';  // sticky label until next manual save
+
+    function scheduleSave() {
+        savePending = true;
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => { saveTimer = null; runSave(); }, 800);
     }
-    async function saveNow(label = 'auto') {
-        if (App.saving) return;
-        App.saving = true;
+
+    async function flushSave(label = 'auto') {
+        if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+        if (label) saveLabel = label;
+        savePending = true;
+        await runSave();
+        // Drain follow-ups too (state may have changed during the await).
+        while (savePending) await runSave();
+    }
+
+    async function runSave() {
+        if (saveInFlight) { savePending = true; return; }
+        if (!savePending) return;
+        saveInFlight = true;
+        savePending  = false;        // anything new from now on sets it again
+        const label  = saveLabel;
+        saveLabel    = 'auto';       // one-shot label
         try {
             const j = await api('save', { method: 'POST', body: { state: App.state, label } });
             App.snapshots = j.snapshots || App.snapshots;
             App.dirty = false;
             renderSnapshots();
-            toast('Сохранено ✓');
+            if (!savePending) toast('Сохранено ✓');   // suppress mid-burst toasts
         } catch (e) {
             toast('Ошибка сохранения: ' + e.message, 'err');
             console.error(e);
+            savePending = true;       // retry on next runSave()
         } finally {
-            App.saving = false;
+            saveInFlight = false;
         }
     }
 
-    document.getElementById('schSaveBtn')?.addEventListener('click', () => saveNow('manual'));
+    document.getElementById('schSaveBtn')?.addEventListener('click', () => flushSave('manual'));
     document.getElementById('schSaveSnapBtn')?.addEventListener('click', () => {
         const label = prompt('Название версии:', 'Версия ' + new Date().toLocaleDateString('ru-RU'));
-        if (label) saveNow(label);
+        if (label) flushSave(label);
     });
 
 
     // ════════════════ Save+reload (for structure mutations) ════════════════
+    // Slot / block add/del / template CRUD need a server re-render so the
+    // grid template-columns rebuild correctly. Drain the queue first so the
+    // reload sees the latest state, then reload.
     async function saveAndReload(reason) {
-        if (App.saving) return;
-        App.saving = true;
-        try {
-            await api('save', { method: 'POST', body: { state: App.state, label: 'auto' } });
-            toast(reason + ' ✓');
-            // Give toast a moment, then reload page (server re-renders grid structure)
-            setTimeout(() => location.reload(), 400);
-        } catch (e) {
-            App.saving = false;
-            toast('Ошибка: ' + e.message, 'err');
-            console.error(e);
-        }
+        await flushSave('auto');
+        toast(reason + ' ✓');
+        setTimeout(() => location.reload(), 400);
     }
 
 
@@ -452,7 +481,7 @@
         popAnchor = null;
     }
 
-    document.getElementById('schPopoverSave')?.addEventListener('click', async () => {
+    document.getElementById('schPopoverSave')?.addEventListener('click', () => {
         if (!popAnchor) return;
         const empId = parseInt(popEmp.value, 10) || 0;
         const start = popFrom.value || '09:00';
@@ -470,15 +499,15 @@
         }
         hidePopover();
         recomputeSummaries();
-        await saveDebounced();
+        scheduleSave();
     });
-    document.getElementById('schPopoverDel')?.addEventListener('click', async () => {
+    document.getElementById('schPopoverDel')?.addEventListener('click', () => {
         if (!popAnchor) return;
         delShift(popAnchor.dataset.dayIso, popAnchor.dataset.block, popAnchor.dataset.slot);
         renderChip(popAnchor, null);
         hidePopover();
         recomputeSummaries();
-        await saveDebounced();
+        scheduleSave();
     });
     document.getElementById('schPopoverCancel')?.addEventListener('click', hidePopover);
 
@@ -593,42 +622,6 @@
         }
 
         await saveAndReload(`Блок удалён`);
-    });
-
-
-    // ════════════════ Templates: add + delete ════════════════
-    // The "+ Шаблон" chip prompts for name+time and pushes into state.templates.
-    // The × on each existing chip soft-deletes (no DB row, just array splice).
-    function normalizeTime(s) {
-        // Accepts "9", "9:00", "09:00", "9.00" → "09:00"; "" on parse fail.
-        const m = String(s || '').trim().match(/^(\d{1,2})[:.]?(\d{0,2})$/);
-        if (!m) return '';
-        const h = Math.min(23, Math.max(0, parseInt(m[1], 10) || 0));
-        const mi = Math.min(59, Math.max(0, parseInt(m[2] || '0', 10) || 0));
-        return `${String(h).padStart(2,'0')}:${String(mi).padStart(2,'0')}`;
-    }
-    document.getElementById('schAddTemplate')?.addEventListener('click', async () => {
-        const name = (prompt('Название (коротко — Д / В / У / Бранч…):', '') || '').trim();
-        if (!name) return;
-        const start = normalizeTime(prompt('Начало (например, 09:00):', '09:00'));
-        if (!start) { toast('Не понял время начала', 'err'); return; }
-        const end = normalizeTime(prompt('Конец (например, 17:00):', '17:00'));
-        if (!end)   { toast('Не понял время конца',  'err'); return; }
-        App.state.templates = App.state.templates || [];
-        App.state.templates.push({ name, start, end });
-        await saveAndReload('Шаблон добавлен');
-    });
-    document.addEventListener('click', async (e) => {
-        const btn = e.target.closest('.sch-chip-del');
-        if (!btn) return;
-        e.preventDefault(); e.stopPropagation();
-        const idx = parseInt(btn.dataset.templateIdx, 10);
-        if (!Number.isInteger(idx)) return;
-        const tpl = (App.state.templates || [])[idx];
-        if (!tpl) return;
-        if (!confirm(`Удалить шаблон «${tpl.name} ${tpl.start}–${tpl.end}»?`)) return;
-        App.state.templates.splice(idx, 1);
-        await saveAndReload('Шаблон удалён');
     });
 
 
@@ -786,7 +779,7 @@
             delete App.state.shifts[iso];
         }
         App.dirty = true;
-        await saveNow('clear');
+        await flushSave('clear');
         location.reload();
     });
 
@@ -815,7 +808,7 @@
             return;
         }
         App.dirty = true;
-        await saveNow('copy-week');
+        await flushSave('copy-week');
         toast(`Скопировано ${copied} смен на следующую неделю`);
         // Navigate to the next week
         const nextFrom = new Date(from); nextFrom.setDate(nextFrom.getDate() + 7);
@@ -1055,127 +1048,68 @@
     });
 
 
-    // ════════════════ Drag-n-drop ════════════════
-    // Two drag sources, distinguished by `dragKind`:
-    //   • 'shift'    — existing shift chip in the grid → swap/move to target cell
-    //   • 'template' — time-template chip from the toolbar → set or pre-fill time
-    let dragKind = null;       // 'shift' | 'template' | null
-    let dragSrc  = null;       // source cell (for 'shift')
-    let dragTpl  = null;       // {start, end, name} for 'template'
-
-    // Ctrl (Win/Linux) / Cmd (macOS) held during the drop → copy instead of
-    // move. Checked on the `drop` event itself, since modifier state can flip
-    // between dragstart and drop.
+    // ════════════════ Drag-n-drop (shifts) ════════════════
+    // Drag a shift chip into another cell:
+    //   • plain drag        → move (swap if target occupied)
+    //   • Ctrl/Cmd + drag   → copy (source stays, target overwritten)
+    let dragSrc = null;   // source cell while a shift is being dragged
     const isCopyModifier = (e) => !!(e && (e.ctrlKey || e.metaKey));
 
     document.addEventListener('dragstart', (e) => {
-        const shiftChip = e.target.closest('.sch-shift');
-        if (shiftChip) {
-            dragKind = 'shift';
-            dragSrc  = shiftChip.closest('.sch-cell');
-            shiftChip.style.opacity = '0.4';
-            // Allow both — final action decided in drop based on modifier.
-            e.dataTransfer.effectAllowed = 'copyMove';
-            return;
-        }
-        const tplChip = e.target.closest('.sch-chip[data-template-idx]');
-        if (tplChip) {
-            dragKind = 'template';
-            dragTpl  = {
-                start: tplChip.dataset.templateStart || '',
-                end:   tplChip.dataset.templateEnd   || '',
-                name:  tplChip.dataset.templateName  || '',
-            };
-            tplChip.style.opacity = '0.6';
-            e.dataTransfer.effectAllowed = 'copy';
-            // Firefox needs SOMETHING in the data transfer to start a drag.
-            try { e.dataTransfer.setData('text/plain', dragTpl.start + '-' + dragTpl.end); } catch (_) {}
-        }
+        const chip = e.target.closest('.sch-shift');
+        if (!chip) return;
+        dragSrc = chip.closest('.sch-cell');
+        chip.style.opacity = '0.4';
+        e.dataTransfer.effectAllowed = 'copyMove';
     });
     document.addEventListener('dragend', (e) => {
-        const chip = e.target.closest('.sch-shift, .sch-chip[data-template-idx]');
+        const chip = e.target.closest('.sch-shift');
         if (chip) chip.style.opacity = '';
-        dragKind = null;
-        dragSrc  = null;
-        dragTpl  = null;
+        dragSrc = null;
     });
     document.addEventListener('dragover', (e) => {
         const cell = e.target.closest('.sch-cell[data-block]');
-        if (!cell) return;
-        if (dragKind === 'shift' && (!dragSrc || cell === dragSrc)) return;
-        if (dragKind !== 'shift' && dragKind !== 'template') return;
+        if (!cell || !dragSrc || cell === dragSrc) return;
         e.preventDefault();
-        const copyMode = dragKind === 'template' || isCopyModifier(e);
-        // OS cursor indicator: + for copy, arrow for move.
+        const copyMode = isCopyModifier(e);
         e.dataTransfer.dropEffect = copyMode ? 'copy' : 'move';
-        // Visual outline: green for copy, accent for move.
-        cell.style.outline = copyMode
-            ? '2px dashed #10b981'
-            : '2px dashed var(--accent)';
+        cell.style.outline = copyMode ? '2px dashed #10b981' : '2px dashed var(--accent)';
     });
     document.addEventListener('dragleave', (e) => {
         const cell = e.target.closest('.sch-cell[data-block]');
         if (cell) cell.style.outline = '';
     });
-    document.addEventListener('drop', async (e) => {
+    document.addEventListener('drop', (e) => {
         const cell = e.target.closest('.sch-cell[data-block]');
         if (!cell) return;
         cell.style.outline = '';
+        if (!dragSrc || cell === dragSrc) return;
+        e.preventDefault();
 
-        if (dragKind === 'shift' && dragSrc && cell !== dragSrc) {
-            e.preventDefault();
-            const sIso = dragSrc.dataset.dayIso, sBlk = dragSrc.dataset.block, sSlot = dragSrc.dataset.slot;
-            const dIso = cell.dataset.dayIso,    dBlk = cell.dataset.block,    dSlot = cell.dataset.slot;
-            const sShift = getShift(sIso, sBlk, sSlot);
-            if (!sShift) { dragKind = null; dragSrc = null; return; }
+        const sIso = dragSrc.dataset.dayIso, sBlk = dragSrc.dataset.block, sSlot = dragSrc.dataset.slot;
+        const dIso = cell.dataset.dayIso,    dBlk = cell.dataset.block,    dSlot = cell.dataset.slot;
+        const sShift = getShift(sIso, sBlk, sSlot);
+        if (!sShift) { dragSrc = null; return; }
 
-            if (isCopyModifier(e)) {
-                // COPY — source stays, target gets a deep clone. If the
-                // target already had a shift, the copy overwrites it (the
-                // user explicitly opted in to that drop target).
-                setShift(dIso, dBlk, dSlot, { ...sShift });
-                renderChip(cell, { ...sShift });
-                toast('Скопировано ✓');
+        if (isCopyModifier(e)) {
+            setShift(dIso, dBlk, dSlot, { ...sShift });
+            renderChip(cell, { ...sShift });
+            toast('Скопировано ✓');
+        } else {
+            const dShift = getShift(dIso, dBlk, dSlot);
+            if (dShift) {
+                setShift(sIso, sBlk, sSlot, dShift);
+                renderChip(dragSrc, dShift);
             } else {
-                // MOVE — original behaviour (swap if target occupied,
-                // otherwise leave source empty).
-                const dShift = getShift(dIso, dBlk, dSlot);
-                if (dShift) {
-                    setShift(sIso, sBlk, sSlot, dShift);
-                    renderChip(dragSrc, dShift);
-                } else {
-                    delShift(sIso, sBlk, sSlot);
-                    renderChip(dragSrc, null);
-                }
-                setShift(dIso, dBlk, dSlot, sShift);
-                renderChip(cell, sShift);
+                delShift(sIso, sBlk, sSlot);
+                renderChip(dragSrc, null);
             }
-            recomputeSummaries();
-            await saveDebounced();
-        } else if (dragKind === 'template' && dragTpl) {
-            e.preventDefault();
-            const iso = cell.dataset.dayIso, blk = cell.dataset.block, slot = cell.dataset.slot;
-            const existing = getShift(iso, blk, slot);
-            if (existing) {
-                // Cell has a shift — just retime it, keep the employee.
-                const next = { ...existing, start: dragTpl.start, end: dragTpl.end };
-                setShift(iso, blk, slot, next);
-                renderChip(cell, next);
-                recomputeSummaries();
-                await saveDebounced();
-                toast(`Время → ${fmtTimeRange(dragTpl.start, dragTpl.end)}`);
-            } else {
-                // Empty cell — open popover with the template time prefilled
-                // so the user just picks an employee and saves.
-                showPopover(cell);
-                if (popFrom) popFrom.value = dragTpl.start;
-                if (popTo)   popTo.value   = dragTpl.end;
-            }
+            setShift(dIso, dBlk, dSlot, sShift);
+            renderChip(cell, sShift);
         }
-
-        dragKind = null;
-        dragSrc  = null;
-        dragTpl  = null;
+        recomputeSummaries();
+        scheduleSave();
+        dragSrc = null;
     });
 
 })();
