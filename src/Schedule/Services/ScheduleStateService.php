@@ -112,13 +112,16 @@ final class ScheduleStateService
      * via the canonical EmployeeRateRepository (the same table the
      * /employees/ page writes to). Splitting the persistence avoids
      * duplicating the rate in two places.
+     *
+     * `$actorEmail` is passed in explicitly so the service stays free of
+     * HTTP/session context (Single Responsibility — the Action knows about
+     * $_SESSION, the service doesn't).
      */
-    public function saveStaffTag(int $userId, array $tag): void
+    public function saveStaffTag(int $userId, array $tag, string $actorEmail = ''): void
     {
         $this->staffTags->save($userId, $tag);
         $rate = (int) ($tag['rate_per_hour'] ?? 0);
-        $by   = (string) ($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? '');
-        $this->rates->save($userId, $rate, $by !== '' ? $by : null);
+        $this->rates->save($userId, $rate, $actorEmail !== '' ? $actorEmail : null);
     }
 
     // ─── Providers (Poster passthrough) ────────────────────────────

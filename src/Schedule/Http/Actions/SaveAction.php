@@ -31,10 +31,13 @@ final class SaveAction
                 $body['state'],
                 (string) ($_SESSION['user_email'] ?? ''),
             );
-            return $this->json->ok($response, [
-                'id'        => $id,
-                'snapshots' => $this->service->listSnapshots(),
-            ]);
+            // No `snapshots` in the response — draft-save doesn't touch
+            // the named-version list. The frontend already keeps its
+            // local App.snapshots in sync; this saves one SELECT + a
+            // JSON serialization per autosave (fires after every cell
+            // edit). Only save_version / rename_snap / del_snap need
+            // to return the refreshed list.
+            return $this->json->ok($response, ['id' => $id]);
         } catch (\Throwable $e) {
             return $this->json->fail($response, $e->getMessage(), 500);
         }

@@ -86,6 +86,10 @@ final class HeatmapBuilder
         ];
         foreach ($days as $d) {
             $payload['days'][] = [
+                // `iso` is required by JS recomputeFromState() to walk
+                // App.state.shifts[iso] when rebuilding the heatmap from
+                // live state on every shift edit.
+                'iso'     => $d['iso'],
                 'date'    => $d['date'],
                 'dow'     => $d['dow'],
                 'mon'     => $d['mon'],
@@ -94,5 +98,48 @@ final class HeatmapBuilder
             ];
         }
         return $payload;
+    }
+
+    // ─── Static helpers shared by content.php / public.php (mirror of
+    // the parallel JS in schedule.js initHeatmap). Keeps the rendering
+    // model in lockstep on both sides. ────────────────────────────────
+
+    /** @return list<array{from:int, to:int, value:float}> max per bucket. */
+    public static function bucketize(array $hours24, int $start, int $end, int $size): array
+    {
+        $out = [];
+        for ($h = $start; $h < $end; $h += $size) {
+            $max = 0.0;
+            for ($k = 0; $k < $size && $h + $k < $end; $k++) {
+                $max = max($max, (float) ($hours24[$h + $k] ?? 0));
+            }
+            $out[] = ['from' => $h, 'to' => min($h + $size, $end), 'value' => $max];
+        }
+        return $out;
+    }
+
+    /** @return array{alpha:float, text:string} */
+    public static function cellAttrs(float $value, float $maxValue): array
+    {
+        $intensity = $maxValue > 0 ? $value / $maxValue : 0.0;
+        return [
+            'alpha' => $value > 0 ? 0.05 + $intensity * 0.90 : 0,
+            'text'  => $intensity > 0.55 ? '#0f1117' : 'var(--text)',
+        ];
+    }
+
+    /** "1|3|2" for integer breakdown, "1.5|3" for avg row, "·" when all empty. */
+    public static function formatCellLabel(array $values, bool $asAvg): string
+    {
+        $nonZero = false;
+        foreach ($values as $v) if ($v > 0.05) { $nonZero = true; break; }
+        if (!$nonZero) return '·';
+        return implode('|', array_map(static function ($v) use ($asAvg) {
+            if ($asAvg) {
+                $r = round($v, 1);
+                return rtrim(rtrim(sprintf('%.1f', $r), '0'), '.');
+            }
+            return (string) (int) round($v);
+        }, $values));
     }
 }

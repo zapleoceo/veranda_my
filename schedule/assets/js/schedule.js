@@ -364,6 +364,14 @@
         });
         const warnTotal = document.querySelector('[data-totals="warn"]');
         if (warnTotal) warnTotal.textContent = `${warnDays} ⚠`;
+        // Topbar "Предупреждений" metric — server renders placeholder 0;
+        // JS owns the live count (which uses the full rule engine).
+        const warnMetric = document.querySelector('[data-metric="warn-days"]');
+        if (warnMetric) {
+            warnMetric.classList.toggle('warn', warnDays > 0);
+            const b = warnMetric.querySelector('b');
+            if (b) b.textContent = `${warnDays} ⚠`;
+        }
         const salTotal = document.querySelector('[data-totals="salary"]');
         if (salTotal) salTotal.textContent = totalSalary > 0
             ? (totalSalary / 1_000_000).toFixed(2) + 'M'

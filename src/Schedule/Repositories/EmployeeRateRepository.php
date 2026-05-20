@@ -6,6 +6,7 @@ namespace App\Schedule\Repositories;
 
 use App\Infrastructure\Database;
 use App\Schedule\Contracts\EmployeeRateRepositoryInterface;
+use App\Schedule\Infrastructure\SchemaManager;
 
 /**
  * Reads & writes the `employee_rates` table — same table the /employees/
@@ -19,9 +20,11 @@ final class EmployeeRateRepository implements EmployeeRateRepositoryInterface
 {
     private const TABLE = 'employee_rates';
 
-    public function __construct(private readonly Database $db)
-    {
-        $this->ensureTable();
+    public function __construct(
+        private readonly Database $db,
+        SchemaManager $schema,
+    ) {
+        $schema->ensure();
     }
 
     public function all(): array
@@ -48,19 +51,4 @@ final class EmployeeRateRepository implements EmployeeRateRepositoryInterface
         );
     }
 
-    private function ensureTable(): void
-    {
-        $t = $this->db->t(self::TABLE);
-        // Same DDL as employees/Model.php::initDb — duplicated here so the
-        // schedule page works on a fresh install before /employees/ is hit.
-        $this->db->query(
-            "CREATE TABLE IF NOT EXISTS {$t} (
-                user_id    INT NOT NULL,
-                rate       BIGINT NOT NULL DEFAULT 0,
-                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                updated_by VARCHAR(255) NULL,
-                PRIMARY KEY (user_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
-        );
-    }
 }

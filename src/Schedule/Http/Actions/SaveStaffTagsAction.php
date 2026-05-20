@@ -26,6 +26,9 @@ final class SaveStaffTagsAction
         $tags = is_array($body['tags'] ?? null) ? $body['tags'] : null;
         if (!$tags) return $this->json->fail($response, 'tags array required', 400);
 
+        // Read session here — the HTTP-layer (Action) owns auth context,
+        // not the service. Pass the actor down as a value.
+        $actor = (string) ($_SESSION['user_email'] ?? $_SESSION['user_name'] ?? '');
         foreach ($tags as $t) {
             $uid = (int) ($t['user_id'] ?? 0);
             if ($uid <= 0) continue;
@@ -35,7 +38,7 @@ final class SaveStaffTagsAction
                 'only_in_blocks' => (string) ($t['only_in_blocks'] ?? ''),
                 'custom_tag'     => (string) ($t['custom_tag']     ?? ''),
                 'rate_per_hour'  => (int)    ($t['rate_per_hour']  ?? 0),
-            ]);
+            ], $actor);
         }
         return $this->json->ok($response, ['employees' => $this->service->fetchEmployees()]);
     }

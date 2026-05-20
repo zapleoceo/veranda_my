@@ -102,6 +102,23 @@ use App\Schedule\Contracts\HallsProviderInterface;
 use App\Schedule\Contracts\SnapshotRepositoryInterface;
 use App\Schedule\Contracts\StaffTagRepositoryInterface;
 use App\Schedule\Contracts\ZoneRepositoryInterface;
+use App\Schedule\Http\Actions\AddZoneAction;
+use App\Schedule\Http\Actions\DebugPosterAction;
+use App\Schedule\Http\Actions\DeleteSnapshotAction;
+use App\Schedule\Http\Actions\DeleteZoneAction;
+use App\Schedule\Http\Actions\ListSnapshotsAction;
+use App\Schedule\Http\Actions\LoadAction;
+use App\Schedule\Http\Actions\LoadSnapshotAction;
+use App\Schedule\Http\Actions\ReloadPosterAction;
+use App\Schedule\Http\Actions\RenameSnapshotAction;
+use App\Schedule\Http\Actions\SaveAction;
+use App\Schedule\Http\Actions\SaveStaffTagsAction;
+use App\Schedule\Http\Actions\SaveVersionAction;
+use App\Schedule\Http\JsonResponder;
+use App\Schedule\Http\ScheduleController;
+use App\Schedule\Infrastructure\SchemaManager;
+use App\Schedule\Services\HeatmapBuilder;
+use App\Schedule\Services\PeriodBuilder;
 use App\Schedule\Repositories\EmployeeRateRepository;
 use App\Schedule\Repositories\MetaCache;
 use App\Schedule\Repositories\SnapshotRepository;
@@ -307,12 +324,17 @@ return [
     ),
 
     // ─── Schedule (shift planner) ─────────────────────────────
+    // SchemaManager is a singleton — all schedule repos receive it and
+    // call ensure() in their constructor. ensure() is gated by a static
+    // flag + version stamp in system_meta, so DDL runs at most once per
+    // deploy + once per process.
+    SchemaManager::class                     => fn($c) => new SchemaManager($c->get(Database::class)),
     MetaCache::class                         => fn($c) => new MetaCache($c->get(Database::class)),
-    SnapshotRepositoryInterface::class       => fn($c) => new SnapshotRepository($c->get(Database::class)),
-    ZoneRepositoryInterface::class           => fn($c) => new ZoneRepository($c->get(Database::class)),
-    StaffTagRepositoryInterface::class       => fn($c) => new StaffTagRepository($c->get(Database::class)),
+    SnapshotRepositoryInterface::class       => fn($c) => new SnapshotRepository($c->get(Database::class), $c->get(SchemaManager::class)),
+    ZoneRepositoryInterface::class           => fn($c) => new ZoneRepository($c->get(Database::class), $c->get(SchemaManager::class)),
+    StaffTagRepositoryInterface::class       => fn($c) => new StaffTagRepository($c->get(Database::class), $c->get(SchemaManager::class)),
     // Hourly-rate store shared with the /employees/ page (employee_rates).
-    EmployeeRateRepositoryInterface::class   => fn($c) => new EmployeeRateRepository($c->get(Database::class)),
+    EmployeeRateRepositoryInterface::class   => fn($c) => new EmployeeRateRepository($c->get(Database::class), $c->get(SchemaManager::class)),
     EmployeesProviderInterface::class        => fn($c) => new PosterEmployeesProvider(
         $c->get(StaffTagRepositoryInterface::class),
         $c->get(EmployeeRateRepositoryInterface::class),
@@ -322,5 +344,30 @@ return [
     HallsProviderInterface::class            => fn($c) => new PosterHallsProvider(
         $c->get(MetaCache::class),
         Config::get('POSTER_API_TOKEN', ''),
+    ),
+    // Thin controller — actions are resolved lazily through the
+    // container by class name (see ScheduleController::dispatchAjax).
+    // Adding a new AJAX endpoint = new Action class + one entry in
+    // this map; controller stays untouched (Open/Closed).
+    ScheduleController::class                => fn($c) => new ScheduleController(
+        $c->get(ScheduleStateService::class),
+        $c->get(PeriodBuilder::class),
+        $c->get(HeatmapBuilder::class),
+        $c->get(JsonResponder::class),
+        $c,
+        [
+            'load'            => LoadAction::class,
+            'save'            => SaveAction::class,
+            'save_version'    => SaveVersionAction::class,
+            'snapshots'       => ListSnapshotsAction::class,
+            'snapshot'        => LoadSnapshotAction::class,
+            'del_snap'        => DeleteSnapshotAction::class,
+            'rename_snap'     => RenameSnapshotAction::class,
+            'add_zone'        => AddZoneAction::class,
+            'del_zone'        => DeleteZoneAction::class,
+            'save_staff_tags' => SaveStaffTagsAction::class,
+            'reload_poster'   => ReloadPosterAction::class,
+            'debug_poster'    => DebugPosterAction::class,
+        ],
     ),
 ];
