@@ -130,19 +130,28 @@ export function updateInFooters(sepayOpen, sepayHidden, posterRows) {
     // state without us having to thread row data through every call site.
     recomputePosterFooter();
 
-    // Top totals card (Sepay/Poster/Δ).
-    const posterTotal = readPosterFooterValue('pd3PosterTotal');
+    // Top totals card (Sepay / Poster / VC / Δ).
+    //
+    // Poster value mirrors the pane-footer "Итого" — non-Vietnam checks
+    // including tips. VC is the Vietnam Company bucket (cash collected
+    // by the company, NOT routed through the bank). Sepay is all bank
+    // deposits, so the reconciliation identity is:
+    //     Sepay = Poster + VC  →  Δ = Sepay − Poster − VC
+    // Δ is zero when the day reconciles perfectly.
+    const posterTotal  = readPosterFooterValue('pd3PosterTotal');
+    const vietnamTotal = readPosterFooterValue('pd3PosterVietnam');
     const totals = document.querySelector('.pd3-totals');
     if (totals) {
         const cells = totals.querySelectorAll('strong');
-        if (cells.length >= 3) {
+        if (cells.length >= 4) {
             cells[0].textContent = fmt(allSepay);
             cells[1].textContent = fmt(posterTotal);
-            cells[2].textContent = fmt(allSepay - posterTotal);
-            const diffWrap = cells[2].parentElement;
+            cells[2].textContent = fmt(vietnamTotal);
+            const diff = allSepay - posterTotal - vietnamTotal;
+            cells[3].textContent = fmt(diff);
+            const diffWrap = cells[3].parentElement;
             if (diffWrap) {
                 diffWrap.classList.remove('ok', 'warn', 'danger');
-                const diff = allSepay - posterTotal;
                 diffWrap.classList.add(diff === 0 ? 'ok' : (diff < 0 ? 'danger' : 'warn'));
             }
         }
