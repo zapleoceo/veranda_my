@@ -73,10 +73,21 @@ final class PosterLocationProvider implements PosterLocationProviderInterface
                 $tid = (int)($t['table_id'] ?? 0);
                 $hid = (int)($t['hall_id']  ?? 0);
                 if ($tid <= 0 || $hid <= 0) continue;
+                // Poster gives two label-ish fields: `table_num` (short
+                // number/code) and `table_title` (longer human name).
+                // We compose them the way the legacy /neworder UI did
+                // — title preferred, num as prefix when both exist —
+                // so the operator sees the exact label they're used to.
+                $num   = trim((string)($t['table_num']   ?? $t['num']   ?? ''));
+                $title = trim((string)($t['table_title'] ?? $t['title'] ?? ''));
+                if ($title !== '' && $num !== '') $name = $num . '. ' . $title;
+                elseif ($title !== '')            $name = $title;
+                elseif ($num !== '')              $name = $num;
+                else                              $name = (string)$tid;
                 $tables[] = new TableDef(
                     id:     $tid,
                     hallId: $hid,
-                    name:   trim((string)($t['table_title'] ?? $t['table_num'] ?? ('Стол ' . $tid))),
+                    name:   $name,
                     sort:   (int)($t['table_order'] ?? 0),
                 );
             }
