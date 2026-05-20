@@ -151,12 +151,68 @@ foreach ($blocks as $blkIdx => $block) {
     $blockShiftCounts[$blkIdx] = $perSlot;
 }
 
-// ─── Forecast: total hours + ZP ───
+// ─── Day-level warnings (parallel JS impl in schedule.js::dayWarnReasons) ─
+// Returns a string[] of human-readable reasons. Empty array == OK day.
+//
+// Three checks, in order of severity:
+//   1. "Нет старшего"         — day has some shifts but no senior block shift
+//   2. "Двойное бронирование: <emp>" — same employee in overlapping ranges that day
+//   3. "Не в графике: <emp>"  — assigned employee has in_schedule=false in tags
+//
+// Empty day (no shifts at all) is OK — it's an off day, not a warning.
+$schDayWarnReasons = static function (string $iso) use (
+    $blocks, $schGetShift, $schBlockColor, $schTimeToHours, $empById
+): array {
+    $reasons   = [];
+    $anyShift  = false;
+    $hasSenior = false;
+    $empTimes  = []; // empId → [[startH, endH], …]
+    foreach ($blocks as $block) {
+        $isSenior = $schBlockColor($block) === 'senior';
+        foreach ($block['slots'] as $sIdx => $_) {
+            $sh = $schGetShift($iso, $block['id'], $sIdx);
+            if (!$sh) continue;
+            $anyShift = true;
+            if ($isSenior) $hasSenior = true;
+            $empId = (int)($sh['emp_id'] ?? 0);
+            if ($empId <= 0) continue;
+            $sH = $schTimeToHours($sh['start'] ?? '');
+            $eH = $schTimeToHours($sh['end']   ?? '');
+            if ($eH > $sH) {
+                $empTimes[$empId] = $empTimes[$empId] ?? [];
+                $empTimes[$empId][] = [$sH, $eH];
+            }
+            $emp = $empById[$empId] ?? null;
+            if ($emp && array_key_exists('in_schedule', $emp) && $emp['in_schedule'] === false) {
+                $name = (string)($emp['name'] ?? "uid:$empId");
+                $r = "Не в графике: $name";
+                if (!in_array($r, $reasons, true)) $reasons[] = $r;
+            }
+        }
+    }
+    if ($anyShift && !$hasSenior) array_unshift($reasons, 'Нет старшего');
+    foreach ($empTimes as $empId => $intervals) {
+        if (count($intervals) < 2) continue;
+        usort($intervals, static fn($a, $b) => $a[0] <=> $b[0]);
+        for ($i = 1, $n = count($intervals); $i < $n; $i++) {
+            if ($intervals[$i][0] < $intervals[$i - 1][1]) {
+                $emp  = $empById[$empId] ?? null;
+                $name = (string)($emp['name'] ?? "uid:$empId");
+                $r    = "Двойное бронирование: $name";
+                if (!in_array($r, $reasons, true)) $reasons[] = $r;
+                break;
+            }
+        }
+    }
+    return $reasons;
+};
+
+// ─── Forecast: total hours + ZP + warnings ───
 $totalHours = 0.0;
 $totalSalary = 0.0;
 $warningDays = 0;
+$warnByDay   = [];   // iso → reasons[] (also passed to JS via boot)
 foreach ($days as $d) {
-    $dayHasSenior = false;
     foreach ($blocks as $block) {
         foreach ($block['slots'] as $sIdx => $_) {
             $sh = $schGetShift($d['iso'], $block['id'], $sIdx);
@@ -167,10 +223,11 @@ foreach ($days as $d) {
                 $rate = (int)($empById[(int)($sh['emp_id'] ?? 0)]['rate_per_hour'] ?? 0);
                 $totalSalary += $hrs * $rate;
             }
-            if ($schBlockColor($block) === 'senior') $dayHasSenior = true;
         }
     }
-    if (!$dayHasSenior && count($blocks) > 0) $warningDays++;
+    $reasons = $schDayWarnReasons($d['iso']);
+    $warnByDay[$d['iso']] = $reasons;
+    if (!empty($reasons)) $warningDays++;
 }
 ?>
 
@@ -230,7 +287,7 @@ foreach ($days as $d) {
         echo count($empSet);
       ?></span>
     </div>
-    <div class="sch-metric" data-help-abs="Дни без назначенного старшего смены или с другими проблемами.">
+    <div class="sch-metric" data-help-abs="Сколько дней в периоде имеют хотя бы одну проблему: нет старшего, двойное бронирование сотрудника или назначен сотрудник «не в графике». Hover на ⚠ в строке дня покажет конкретную причину.">
       <span class="sch-metric-label">Предупреждений</span>
       <span class="sch-metric-value <?= $warningDays > 0 ? 'warn' : '' ?>"><?= $warningDays ?> ⚠</span>
     </div>
@@ -252,11 +309,13 @@ foreach ($days as $d) {
             data-template-start="<?= htmlspecialchars($tpl['start'] ?? '') ?>"
             data-template-end="<?= htmlspecialchars($tpl['end'] ?? '') ?>"
             data-template-name="<?= htmlspecialchars($tpl['name'] ?? '') ?>"
-            data-help-abs="Drag в ячейку: если там уже есть смена — поменяет ей время; если пусто — откроет форму с подставленным временем.">
+            data-help-abs="Drag в ячейку: если там уже есть смена — поменяет ей время; если пусто — откроет форму с подставленным временем. × справа — удалить этот шаблон.">
         <?= htmlspecialchars(($tpl['name'] ?? '') . ' ' . str_replace(':00', '', ($tpl['start'] ?? '')) . '–' . str_replace(':00', '', ($tpl['end'] ?? ''))) ?>
+        <button class="sch-chip-del" title="Удалить шаблон"
+                data-template-idx="<?= $tIdx ?>" draggable="false">×</button>
       </span>
     <?php endforeach; ?>
-    <span class="sch-chip add" id="schAddTemplate" data-help-abs="Добавить свой шаблон времени (Phase 3).">+ Шаблон</span>
+    <span class="sch-chip add" id="schAddTemplate" data-help-abs="Добавить свой шаблон времени. Запросит название (короткое — Д/В/У/Полный/Бранч…) и время начала/конца.">+ Шаблон</span>
     <span style="flex:1"></span>
     <button class="sch-btn ghost" id="schClearPeriod"
             data-help-abs="Удалить все смены за выбранный период. С подтверждением.">Очистить период</button>
@@ -331,16 +390,9 @@ foreach ($days as $d) {
           $color  = $schBlockColor($block);
           $divCls = $color === 'main' ? 'main' : $color;
           foreach ($block['slots'] as $sIdx => $slot):
-              $defaultLabel = $slot['label'] ?? '';
-              if ($defaultLabel === '' && !empty($slot['defaultTime'])) {
-                  $defaultLabel = str_replace(':00', '', $slot['defaultTime']);
-              }
       ?>
-        <div class="sch-slot-head" data-help-abs="Слот <?= $sIdx + 1 ?> блока «<?= htmlspecialchars($block['name']) ?>». × справа — удалить именно эту колонку (с конфирмом, если внутри есть смены).">
+        <div class="sch-slot-head" data-help-abs="Слот <?= $sIdx + 1 ?>. Это просто колонка-«позиция» — показывает, сколько человек одновременно работает в этом блоке. Время каждой смены задаётся в ячейке. × справа — удалить эту колонку (с конфирмом, если внутри есть смены).">
           <span class="sch-slot-num"><?= $sIdx + 1 ?></span>
-          <?php if ($defaultLabel !== ''): ?>
-            <span class="sch-slot-default"><?= htmlspecialchars($defaultLabel) ?></span>
-          <?php endif; ?>
           <button class="sch-slot-del" title="Удалить этот слот"
                   data-block-idx="<?= $blkIdx ?>" data-slot-idx="<?= $sIdx ?>">×</button>
         </div>
@@ -350,7 +402,11 @@ foreach ($days as $d) {
 
       <div class="sch-add-block-cell" style="border-bottom: 1px solid var(--border);"></div>
 
-      <div class="sch-slot-head" data-help-abs="Предупреждения дня: ⚠ нет старшего, ⚠ мало людей.">⚠</div>
+      <div class="sch-slot-head" data-help-abs="Предупреждения дня. Три проверки:
+1) Нет старшего — день с любыми сменами, но без смены в блоке «Старшие смены».
+2) Двойное бронирование — один и тот же сотрудник в перекрывающихся сменах в этот день.
+3) Не в графике — назначен сотрудник, у которого в модалке «Персонал» снят флажок «В графике».
+Hover на ⚠ в конкретном дне покажет причины.">⚠</div>
       <div class="sch-slot-head" data-help-abs="Прогноз ФОТ за этот день.">₫/день</div>
 
 
@@ -368,6 +424,7 @@ foreach ($days as $d) {
           $weekendCls = $d['weekend'] ? ' weekend' : '';
           $dayHasSenior = false;
           $daySalary = 0.0;
+          $dayReasons = $warnByDay[$d['iso']] ?? [];
       ?>
         <div class="sch-row<?= $weekendCls ?> sch-date-cell">
           <span class="sch-day-num"><?= htmlspecialchars($d['date']) ?></span>
@@ -414,10 +471,12 @@ foreach ($days as $d) {
 
         <div class="sch-add-block-cell"></div>
 
-        <?php if (!$dayHasSenior && count($blocks) > 0): ?>
-          <div class="sch-warn-cell bad" data-day-iso="<?= htmlspecialchars($d['iso']) ?>" title="Нет старшего!">⚠</div>
+        <?php if (!empty($dayReasons)): ?>
+          <div class="sch-warn-cell bad"
+               data-day-iso="<?= htmlspecialchars($d['iso']) ?>"
+               title="<?= htmlspecialchars(implode("\n", $dayReasons)) ?>">⚠</div>
         <?php else: ?>
-          <div class="sch-warn-cell ok" data-day-iso="<?= htmlspecialchars($d['iso']) ?>">✓</div>
+          <div class="sch-warn-cell ok" data-day-iso="<?= htmlspecialchars($d['iso']) ?>" title="Всё в порядке">✓</div>
         <?php endif; ?>
         <div class="sch-budget-cell" data-day-iso="<?= htmlspecialchars($d['iso']) ?>">
           <?= $daySalary > 0 ? number_format($daySalary / 1_000_000, 2, '.', '') . 'M' : '—' ?>
@@ -764,4 +823,4 @@ foreach ($days as $d) {
   </div>
 </div>
 
-<script src="/schedule/assets/js/schedule.js?v=20260520_hallname" defer></script>
+<script src="/schedule/assets/js/schedule.js?v=20260520_warns" defer></script>
