@@ -33,6 +33,53 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 })[c]);
 
+/** Read the visible text of the currently-selected option in a <select>. */
+function labelOf(sel) {
+    if (!sel || sel.selectedIndex < 0) return '';
+    const opt = sel.options[sel.selectedIndex];
+    return opt ? String(opt.textContent || opt.text || '').trim() : '';
+}
+
+const TYPE_LABEL = { 1: 'Доход', 2: 'Расход', 3: 'Перевод' };
+
+/**
+ * Open the success-summary modal after a transaction was created.
+ * Mirrors payday2's createTxSuccessModal flow — title names the
+ * operation, body lists the key fields.
+ */
+function showSuccess({ type, amount, accFromLabel, accToLabel, catLabel, openModal }) {
+    const wrap = document.getElementById('pd3CreateTxSuccessDetails');
+    const titleEl = document.getElementById('pd3CreateTxSuccessTitle');
+    if (!wrap || !titleEl) return;
+
+    // Title — same pattern as payday2: name the kind of operation + account.
+    let title = 'Транзакция создана';
+    if      (type === 1 && accToLabel)   title = `Приход на счёт «${accToLabel}» создан`;
+    else if (type === 2 && accFromLabel) title = `Расход со счёта «${accFromLabel}» создан`;
+    else if (type === 3 && accFromLabel && accToLabel) title = `Перевод «${accFromLabel}» → «${accToLabel}» создан`;
+    titleEl.textContent = title;
+
+    const row = (label, value) => `
+        <div class="pd3-tx-success__row">
+            <div class="pd3-tx-success__label">${esc(label)}</div>
+            <div class="pd3-tx-success__value">${value}</div>
+        </div>`;
+
+    const lines = [];
+    lines.push(row('Тип', `<strong>${esc(TYPE_LABEL[type] || '—')}</strong>`));
+    lines.push(row('Сумма', `<strong>${esc(fmtVndInt(amount))} ₫</strong>`));
+    if (type === 1) lines.push(row('На счёт',  esc(accToLabel)));
+    if (type === 2) lines.push(row('Со счёта', esc(accFromLabel)));
+    if (type === 3) {
+        lines.push(row('Со счёта', esc(accFromLabel)));
+        lines.push(row('На счёт',  esc(accToLabel)));
+    }
+    if (catLabel) lines.push(row('Категория', esc(catLabel)));
+    wrap.innerHTML = lines.join('');
+
+    openModal?.('pd3CreateTxSuccessModal');
+}
+
 let _accountsMap = null;        // { <id>: <name> }
 let _categoriesMap = null;      // { <id>: { name, parent_id } }
 let _settings = null;
@@ -144,27 +191,41 @@ export function initCreateTx({ state, host, openModal, closeModal, onCreated }) 
         const submitBtn = form.querySelector('button[type=submit]');
         if (submitBtn) submitBtn.disabled = true;
         try {
+            const type   = Number(form.elements['type'].value) || 0;
             const date   = form.elements['date'].value;
             const time   = form.elements['time'].value || '00:00';
             const dt     = `${date} ${time.length === 5 ? time + ':00' : time}`;
+            const amount = parseVndInt(amountEl.value);
+            const accFromId = Number(form.elements['account_from'].value) || 0;
+            const accToId   = Number(form.elements['account_to'].value)   || 0;
+            const catId     = Number(form.elements['category_id'].value)  || 0;
             const body = {
-                type:         Number(form.elements['type'].value) || 0,
-                amount:       parseVndInt(amountEl.value),
-                date:         dt,
-                account_from: Number(form.elements['account_from'].value) || 0,
-                account_to:   Number(form.elements['account_to'].value)   || 0,
-                category_id:  Number(form.elements['category_id'].value)  || 0,
+                type, amount, date: dt,
+                account_from: accFromId,
+                account_to:   accToId,
+                category_id:  catId,
                 comment:      form.elements['comment'].value || '',
             };
             await api.post('/payday3/api/poster/finance/transactions', body);
-            status('Создана в Poster, обновляю таблицу…', 'ok');
+            // Switch straight to the success modal — openModal hides all
+            // other .pd3-modal panes before showing its target, so the
+            // form vanishes in the same paint as the summary appears.
+            // Mirrors payday2's createTxSuccessModal flow.
+            showSuccess({
+                type, amount,
+                accFromLabel: labelOf(form.elements['account_from']),
+                accToLabel:   labelOf(form.elements['account_to']),
+                catLabel:     catId ? labelOf(form.elements['category_id']) : '',
+                openModal,
+            });
+            // Clear status so a stale "Создаю…" doesn't appear on next open.
+            status('');
             // Refresh the OUT-mode tables so the newly-created
             // transaction shows up immediately on the Poster side
             // (and auto-matchers can pick it up if it pairs with a
-            // mail row). The callback is fire-and-forget — we don't
-            // want a slow refetch to keep the modal open.
-            try { await onCreated?.(); } catch (_) { /* swallow */ }
-            setTimeout(() => closeModal?.('pd3CreateTxModal'), 500);
+            // mail row). Fire-and-forget — the user is already looking
+            // at the success modal, no need to block on the refetch.
+            try { onCreated?.(); } catch (_) { /* swallow */ }
         } catch (err) {
             status(err.message || 'Ошибка', 'error');
         } finally {

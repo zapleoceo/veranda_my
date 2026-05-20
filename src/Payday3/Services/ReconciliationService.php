@@ -12,14 +12,24 @@ use App\Payday3\Domain\DateRange;
 use App\Payday3\Domain\ReconciliationLink;
 
 /**
- * Auto-match algorithm:
+ * Auto-match algorithm — direct port of payday2/ajax.php?ajax=auto_link.
  *
- *   GREEN  — exactly one unlinked sepay row and one unlinked poster row
- *            match on amount (sepay.transfer_amount == poster.payed_card +
- *            poster.payed_third_party) AND share the same calendar day.
- *   YELLOW — amounts match but there are multiple candidates on either
- *            side, so the matcher cannot decide. We still record the
- *            edge but flag it for human review.
+ * Eligibility (same as payday2):
+ *   - Poster check is candidate if it has card+third > 0 AND its payment
+ *     method is NOT Vietnam Company. Tips are INCLUDED in the comparison
+ *     amount (card + third + tip — matches the "Card+Tips" column).
+ *   - Sepay row is candidate if it's open (not hidden) AND not already
+ *     linked. Hidden + payment_method filtering is enforced by the repo.
+ *
+ * Three-pass greedy matcher:
+ *   GREEN (tight)         amount matches and |Δtimestamp| ≤ 600s, pick
+ *                          the sepay with the smallest time diff.
+ *   GREEN (interpolation) Poster check i is sandwiched between two
+ *                          already-GREEN checks (i-1 and i+1) — accept
+ *                          the matching-amount sepay regardless of Δt
+ *                          (the surrounding context vouches for it).
+ *   YELLOW (loose)        amount matches but no time-window — best by
+ *                          closest timestamp; flagged for human review.
  *
  * Already-linked rows are skipped — auto-link is additive, not
  * destructive. Use clearLinks() to wipe first if you want a fresh pass.
@@ -28,6 +38,11 @@ use App\Payday3\Domain\ReconciliationLink;
  */
 final class ReconciliationService implements ReconciliationServiceInterface
 {
+    /** Poster payment-method id for «Vietnam Company» — excluded from auto-match. */
+    private const METHOD_VIETNAM = 11;
+    /** ±10 minutes — same window as payday2. */
+    private const GREEN_WINDOW_SECONDS = 600;
+
     public function __construct(
         private readonly SepayRepositoryInterface  $sepay,
         private readonly PosterRepositoryInterface $poster,
@@ -36,60 +51,143 @@ final class ReconciliationService implements ReconciliationServiceInterface
 
     public function autoLink(DateRange $range): array
     {
-        $existing  = $this->links->listInRange($range);
-        $takenS    = []; // sepay_id  → true
-        $takenP    = []; // poster_id → true
+        $existing = $this->links->listInRange($range);
+        $linkedS  = []; // sepay_id  → true
+        $linkedP  = []; // poster_id → true
         foreach ($existing as $e) {
-            $takenS[$e->sepayId]             = true;
-            $takenP[$e->posterTransactionId] = true;
+            $linkedS[$e->sepayId]             = true;
+            $linkedP[$e->posterTransactionId] = true;
         }
 
-        $sepayRows  = array_values(array_filter(
-            $this->sepay->listOpenInRange($range),
-            static fn($s) => !isset($takenS[$s->id]),
-        ));
-        $posterRows = array_values(array_filter(
-            $this->poster->listClosedInRange($range),
-            static fn($p) => !isset($takenP[$p->transactionId]),
-        ));
-
-        // Bucket both sides by (date, amount).
-        $bySepay = [];
+        // ─── Candidate pools ───────────────────────────────────────
+        // Sepay: order by timestamp asc; index by amount (VND int).
+        $sepayRows = $this->sepay->listOpenInRange($range);
+        $sepayByAmount = [];
         foreach ($sepayRows as $s) {
-            $day = substr($s->transactionDate, 0, 10);
-            $key = $day . '|' . $s->amount->amount;
-            $bySepay[$key][] = $s;
+            if (isset($linkedS[$s->id])) continue;
+            $amt = $s->amount->amount;
+            if ($amt <= 0) continue;
+            $sepayByAmount[$amt][] = [
+                'id'   => $s->id,
+                'ts'   => $this->ts($s->transactionDate),
+            ];
         }
-        $byPoster = [];
+
+        // Poster: ordered by date_close ASC (the repo already does it).
+        $posterRows = $this->poster->listClosedInRange($range);
+
+        // Per-poster snapshot: amount (card+third+tip), close-ts, eligibility.
+        $checks = [];
         foreach ($posterRows as $p) {
-            $day = substr($p->dateClose, 0, 10);
-            $key = $day . '|' . $p->totalPayed()->amount;
-            $byPoster[$key][] = $p;
+            $pid = $p->transactionId;
+            $amount = $p->payedCard->plus($p->payedThirdParty)->plus($p->tipSum)->amount;
+            $ts     = $this->ts($p->dateClose);
+            $eligible = $amount > 0
+                && $p->posterPaymentMethodId !== self::METHOD_VIETNAM
+                && !isset($linkedP[$pid])
+                && $ts > 0;
+            $checks[] = ['pid' => $pid, 'amount' => $amount, 'ts' => $ts, 'eligible' => $eligible];
         }
 
         $added = 0;
-        foreach ($bySepay as $key => $sList) {
-            if (!isset($byPoster[$key])) continue;
-            $pList = $byPoster[$key];
-            $type = (count($sList) === 1 && count($pList) === 1) ? 'auto_green' : 'auto_yellow';
+        $greenPosters = []; // posters that got a green link in this run (used by pass 2)
 
-            // Pair them in order. With YELLOW we accept that the pairing
-            // may not be the right one, that's why the row is flagged.
-            $n = min(count($sList), count($pList));
-            for ($i = 0; $i < $n; $i++) {
-                $s = $sList[$i];
-                $p = $pList[$i];
-                $this->links->add(new ReconciliationLink(
-                    sepayId:             $s->id,
-                    posterTransactionId: $p->transactionId,
-                    linkType:            $type,
-                    isManual:            false,
-                ));
-                $added++;
-            }
+        // ─── Pass 1: GREEN (amount + ±10 min) ──────────────────────
+        foreach ($checks as $i => &$c) {
+            if (!$c['eligible']) continue;
+            $best = $this->pickBestSepay($sepayByAmount[$c['amount']] ?? [], $linkedS, $c['ts'], self::GREEN_WINDOW_SECONDS);
+            if ($best === null) continue;
+            $this->links->add(new ReconciliationLink(
+                sepayId:             $best,
+                posterTransactionId: $c['pid'],
+                linkType:            'auto_green',
+                isManual:            false,
+            ));
+            $linkedS[$best] = true;
+            $linkedP[$c['pid']] = true;
+            $greenPosters[$c['pid']] = true;
+            $c['eligible'] = false;
+            $added++;
+        }
+        unset($c);
+
+        // ─── Pass 2: GREEN by interpolation ────────────────────────
+        // A poster check sandwiched between two already-green checks
+        // (in the close-time-ordered list) is matched without a time
+        // window — the neighbours vouch for it.
+        for ($i = 1; $i < count($checks) - 1; $i++) {
+            $c = &$checks[$i];
+            if (!$c['eligible']) continue;
+            $prev = $checks[$i - 1]['pid'];
+            $next = $checks[$i + 1]['pid'];
+            if (empty($greenPosters[$prev]) || empty($greenPosters[$next])) continue;
+
+            $best = $this->pickBestSepay($sepayByAmount[$c['amount']] ?? [], $linkedS, $c['ts'], PHP_INT_MAX);
+            if ($best === null) continue;
+            $this->links->add(new ReconciliationLink(
+                sepayId:             $best,
+                posterTransactionId: $c['pid'],
+                linkType:            'auto_green',
+                isManual:            false,
+            ));
+            $linkedS[$best] = true;
+            $linkedP[$c['pid']] = true;
+            $greenPosters[$c['pid']] = true;
+            $c['eligible'] = false;
+            $added++;
+            unset($c);
         }
 
+        // ─── Pass 3: YELLOW (amount, no time window) ───────────────
+        foreach ($checks as &$c) {
+            if (!$c['eligible']) continue;
+            $best = $this->pickBestSepay($sepayByAmount[$c['amount']] ?? [], $linkedS, $c['ts'], PHP_INT_MAX);
+            if ($best === null) continue;
+            $this->links->add(new ReconciliationLink(
+                sepayId:             $best,
+                posterTransactionId: $c['pid'],
+                linkType:            'auto_yellow',
+                isManual:            false,
+            ));
+            $linkedS[$best] = true;
+            $linkedP[$c['pid']] = true;
+            $c['eligible'] = false;
+            $added++;
+        }
+        unset($c);
+
         return ['added' => $added, 'total' => count($existing) + $added];
+    }
+
+    /**
+     * Pick the not-yet-linked sepay row with the smallest |Δt| from
+     * the candidate list (already pre-filtered by amount), within the
+     * given window. Returns the sepay id or null.
+     */
+    private function pickBestSepay(array $candidates, array $linkedS, int $posterTs, int $windowSeconds): ?int
+    {
+        $best = null;
+        $bestDiff = PHP_INT_MAX;
+        foreach ($candidates as $cand) {
+            if (isset($linkedS[$cand['id']])) continue;
+            $st = $cand['ts'];
+            if ($st <= 0) continue;
+            $diff = abs($st - $posterTs);
+            if ($diff > $windowSeconds) continue;
+            if ($diff < $bestDiff) {
+                $best     = $cand['id'];
+                $bestDiff = $diff;
+            }
+        }
+        return $best;
+    }
+
+    /** Tolerant timestamp parse — accepts 'Y-m-d H:i:s' or anything strtotime grasps. */
+    private function ts(string $raw): int
+    {
+        if ($raw === '') return 0;
+        $t = strtotime($raw);
+        return $t === false ? 0 : $t;
     }
 
     public function manualLink(int $sepayId, int $posterTransactionId): void

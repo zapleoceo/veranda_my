@@ -211,6 +211,24 @@ declare(strict_types=1);
         </form>
     </div>
 
+    <!-- Success summary shown after a finance.createTransactions succeeds.
+         Mirrors payday2's #createTxSuccessModal: title that names the
+         operation ("Расход со счёта «…» успешно создан!"), a body block
+         with the key fields (type / amount / accounts / category), and
+         a single «OK» button that closes it. -->
+    <div class="pd3-modal" id="pd3CreateTxSuccessModal" role="dialog" aria-modal="true" aria-labelledby="pd3CreateTxSuccessTitle" hidden>
+        <header class="pd3-modal__header">
+            <h2 id="pd3CreateTxSuccessTitle">Транзакция создана</h2>
+            <button type="button" class="pd3-modal__close" data-pd3-modal-close aria-label="Закрыть">×</button>
+        </header>
+        <div class="pd3-modal__body">
+            <div class="pd3-tx-success" id="pd3CreateTxSuccessDetails"></div>
+            <footer class="pd3-settings__footer">
+                <button type="button" class="pd3-btn" data-pd3-modal-close>OK</button>
+            </footer>
+        </div>
+    </div>
+
     <div class="pd3-modal pd3-modal--wide" id="pd3CheckFinderModal" role="dialog" aria-modal="true" aria-labelledby="pd3CheckFinderTitle" hidden>
         <header class="pd3-modal__header">
             <h2 id="pd3CheckFinderTitle">Поиск чека Poster</h2>
