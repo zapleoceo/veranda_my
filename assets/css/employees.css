@@ -36,8 +36,26 @@
             font-variant-numeric: tabular-nums;
         }
         #empTable .col-id { color: var(--muted); font-size: 11px; }
-        #empTable .col-name { font-weight: 700; }
-        #empTable .col-role { color: var(--muted); font-size: 12px; }
+        /* Имя и Роль — позволяем перенос по словам, чтобы длинные значения
+           ("Alexey Pavlov [KITCHEN]", "Officiant хороший 60") не вытягивали
+           колонку в одну длинную строку. max-width триггерит wrap;
+           word-break: break-word ловит редкие очень длинные одиночные слова. */
+        #empTable .col-name {
+            font-weight: 700;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            max-width: 140px;
+            line-height: 1.25;
+        }
+        #empTable .col-role {
+            color: var(--muted); font-size: 12px;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            max-width: 120px;
+            line-height: 1.25;
+        }
         /* Pay-history columns (TipsPaid/SlrPaid) — let their inner grid
            shrink to content rather than pinning to a wide minimum. */
         #empTable .col-paid,
