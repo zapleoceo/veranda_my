@@ -1063,13 +1063,19 @@
     let dragSrc  = null;       // source cell (for 'shift')
     let dragTpl  = null;       // {start, end, name} for 'template'
 
+    // Ctrl (Win/Linux) / Cmd (macOS) held during the drop → copy instead of
+    // move. Checked on the `drop` event itself, since modifier state can flip
+    // between dragstart and drop.
+    const isCopyModifier = (e) => !!(e && (e.ctrlKey || e.metaKey));
+
     document.addEventListener('dragstart', (e) => {
         const shiftChip = e.target.closest('.sch-shift');
         if (shiftChip) {
             dragKind = 'shift';
             dragSrc  = shiftChip.closest('.sch-cell');
             shiftChip.style.opacity = '0.4';
-            e.dataTransfer.effectAllowed = 'move';
+            // Allow both — final action decided in drop based on modifier.
+            e.dataTransfer.effectAllowed = 'copyMove';
             return;
         }
         const tplChip = e.target.closest('.sch-chip[data-template-idx]');
@@ -1099,7 +1105,13 @@
         if (dragKind === 'shift' && (!dragSrc || cell === dragSrc)) return;
         if (dragKind !== 'shift' && dragKind !== 'template') return;
         e.preventDefault();
-        cell.style.outline = '2px dashed var(--accent)';
+        const copyMode = dragKind === 'template' || isCopyModifier(e);
+        // OS cursor indicator: + for copy, arrow for move.
+        e.dataTransfer.dropEffect = copyMode ? 'copy' : 'move';
+        // Visual outline: green for copy, accent for move.
+        cell.style.outline = copyMode
+            ? '2px dashed #10b981'
+            : '2px dashed var(--accent)';
     });
     document.addEventListener('dragleave', (e) => {
         const cell = e.target.closest('.sch-cell[data-block]');
@@ -1115,8 +1127,19 @@
             const sIso = dragSrc.dataset.dayIso, sBlk = dragSrc.dataset.block, sSlot = dragSrc.dataset.slot;
             const dIso = cell.dataset.dayIso,    dBlk = cell.dataset.block,    dSlot = cell.dataset.slot;
             const sShift = getShift(sIso, sBlk, sSlot);
-            const dShift = getShift(dIso, dBlk, dSlot);
-            if (sShift) {
+            if (!sShift) { dragKind = null; dragSrc = null; return; }
+
+            if (isCopyModifier(e)) {
+                // COPY — source stays, target gets a deep clone. If the
+                // target already had a shift, the copy overwrites it (the
+                // user explicitly opted in to that drop target).
+                setShift(dIso, dBlk, dSlot, { ...sShift });
+                renderChip(cell, { ...sShift });
+                toast('Скопировано ✓');
+            } else {
+                // MOVE — original behaviour (swap if target occupied,
+                // otherwise leave source empty).
+                const dShift = getShift(dIso, dBlk, dSlot);
                 if (dShift) {
                     setShift(sIso, sBlk, sSlot, dShift);
                     renderChip(dragSrc, dShift);
@@ -1126,9 +1149,9 @@
                 }
                 setShift(dIso, dBlk, dSlot, sShift);
                 renderChip(cell, sShift);
-                recomputeSummaries();
-                await saveDebounced();
             }
+            recomputeSummaries();
+            await saveDebounced();
         } else if (dragKind === 'template' && dragTpl) {
             e.preventDefault();
             const iso = cell.dataset.dayIso, blk = cell.dataset.block, slot = cell.dataset.slot;
