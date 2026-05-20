@@ -179,17 +179,30 @@
     text-transform: none; letter-spacing: 0;
 }
 .sch-col-actions {
-    display: inline-flex; gap: 4px; opacity: 0; transition: opacity 0.2s;
+    /* Always visible — hiding on hover-only made these click targets
+       impossible to land on: the slightest mouse drift off the header
+       bounds fades the buttons before the user can click. */
+    display: inline-flex; gap: 4px;
+    opacity: 0.55; transition: opacity 0.15s;
 }
-.sch-block-head:hover .sch-col-actions { opacity: 1; }
+.sch-block-head:hover .sch-col-actions,
+.sch-col-actions:hover,
+.sch-col-actions:focus-within { opacity: 1; }
 .sch-col-actions button {
-    width: 22px; height: 22px; padding: 0;
+    /* 26×26 — enough for a comfortable click target without ballooning
+       the header. Vertical-align middle so the glyphs sit on the same
+       baseline as the block name. */
+    width: 26px; height: 26px; padding: 0;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 5px; color: var(--text);
-    cursor: pointer; font-size: 14px;
+    border-radius: 6px; color: var(--text);
+    cursor: pointer; font-size: 16px;
     font-family: inherit; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
 }
-.sch-col-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.sch-col-actions button:hover {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(184,135,70,.10);
+}
 
 .sch-block-head.senior {
     background: linear-gradient(180deg, rgba(184,135,70,.20), rgba(184,135,70,.05));
