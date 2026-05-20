@@ -84,6 +84,46 @@
         toast._t = setTimeout(() => toastEl.classList.remove('visible'), 2400);
     }
 
+    // ════════════════ Button "pending → success/error" state machine ═════
+    // Helper for save buttons that take a few hundred ms to respond. Cycles
+    // the button through three states so the user clearly sees the result:
+    //   1. Pending — text → "Сохраняем…", disabled, .is-pending class
+    //   2. Success — text → "Сохранено ✓",  .is-success class, ~1.1 s
+    //   3. Error   — text → "Ошибка",       .is-error   class, ~1.5 s
+    // After the success/error window the button is restored to its
+    // original label so a repeat click works.
+    async function withBtnPending(btn, fn, labels = {}) {
+        if (!btn) return await fn();
+        const origText     = btn.textContent;
+        const origDisabled = btn.disabled;
+        btn.disabled = true;
+        btn.classList.remove('is-success', 'is-error');
+        btn.classList.add('is-pending');
+        btn.textContent = labels.pending || 'Сохраняем…';
+        try {
+            const result = await fn();
+            btn.classList.remove('is-pending');
+            btn.classList.add('is-success');
+            btn.textContent = labels.success || 'Сохранено ✓';
+            setTimeout(() => {
+                btn.classList.remove('is-success');
+                btn.textContent = origText;
+                btn.disabled = origDisabled;
+            }, 1100);
+            return result;
+        } catch (err) {
+            btn.classList.remove('is-pending');
+            btn.classList.add('is-error');
+            btn.textContent = labels.error || 'Ошибка';
+            setTimeout(() => {
+                btn.classList.remove('is-error');
+                btn.textContent = origText;
+                btn.disabled = origDisabled;
+            }, 1500);
+            throw err;
+        }
+    }
+
 
     // ════════════════ AJAX ════════════════
     async function api(action, opts = {}) {
@@ -679,20 +719,23 @@
         }
     }
 
-    document.getElementById('schSaveBtn')?.addEventListener('click', () => flushSave());
+    document.getElementById('schSaveBtn')?.addEventListener('click', (ev) =>
+        withBtnPending(ev.currentTarget, () => flushSave(),
+            { pending: 'Сохраняем…', success: 'Сохранено ✓' }).catch(() => {}));
 
     // Create a new NAMED version — separate endpoint, never updates draft.
-    async function saveAsVersion() {
+    async function saveAsVersion(ev) {
+        const btn = ev?.currentTarget || document.getElementById('schSaveSnapBtn');
         const label = (prompt('Название версии:', 'Версия ' + new Date().toLocaleDateString('ru-RU')) || '').trim();
         if (!label) return;
         // First make sure the draft is fully persisted, so the version
         // snapshots exactly what's on screen.
         await flushSave();
         try {
-            const j = await api('save_version', {
-                method: 'POST',
-                body:   { state: App.state, label },
-            });
+            const j = await withBtnPending(btn,
+                () => api('save_version', { method: 'POST', body: { state: App.state, label } }),
+                { pending: 'Сохраняем версию…', success: 'Версия сохранена ✓' },
+            );
             App.snapshots = j.snapshots || App.snapshots;
             renderSnapshots();
             toast(`Версия «${label}» сохранена ✓`);
@@ -1521,8 +1564,9 @@
         if (e.target === staffModal) staffModal.classList.remove('visible');
     });
 
-    document.getElementById('schModalStaffSave')?.addEventListener('click', async () => {
+    document.getElementById('schModalStaffSave')?.addEventListener('click', async (ev) => {
         if (!staffTableBody) return;
+        const btn  = ev.currentTarget;
         const tags = [];
         staffTableBody.querySelectorAll('tr[data-uid]').forEach((tr) => {
             tags.push({
@@ -1535,16 +1579,22 @@
             });
         });
         try {
-            const j = await api('save_staff_tags', { method: 'POST', body: { tags } });
+            const j = await withBtnPending(btn,
+                () => api('save_staff_tags', { method: 'POST', body: { tags } }),
+                { pending: 'Сохраняем…', success: 'Сохранено ✓' },
+            );
             App.employees = j.employees;
             App.employees.forEach((e) => empById.set(e.id, e));
             toast('Теги сохранены ✓');
-            staffModal?.classList.remove('visible');
+            // Keep modal open ~1.1 s so the green "Сохранено ✓" button
+            // state is visible, then close.
+            setTimeout(() => staffModal?.classList.remove('visible'), 1100);
             // Re-render cells so star/name updates pick up immediately
             document.querySelectorAll('.sch-cell[data-day-iso][data-block]').forEach((cell) => {
                 const sh = getShift(cell.dataset.dayIso, cell.dataset.block, cell.dataset.slot);
                 if (sh) renderChip(cell, sh);
             });
+            recomputeSummaries();
         } catch (e) {
             toast('Ошибка: ' + e.message, 'err');
         }
