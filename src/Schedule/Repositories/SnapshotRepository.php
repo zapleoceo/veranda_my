@@ -27,39 +27,51 @@ final class SnapshotRepository implements SnapshotRepositoryInterface
         // latest by id to survive legacy DBs where no row was ever marked
         // as current.
         $row = $this->db->query(
-            "SELECT json_data FROM {$t} WHERE is_current = 1 ORDER BY id DESC LIMIT 1"
+            "SELECT json_data, version FROM {$t} WHERE is_current = 1 ORDER BY id DESC LIMIT 1"
         )->fetch();
         if (!$row) {
-            $row = $this->db->query("SELECT json_data FROM {$t} ORDER BY id DESC LIMIT 1")->fetch();
+            $row = $this->db->query("SELECT json_data, version FROM {$t} ORDER BY id DESC LIMIT 1")->fetch();
         }
         if (!$row || empty($row['json_data'])) return null;
         $decoded = json_decode((string) $row['json_data'], true);
-        return is_array($decoded) ? $decoded : null;
+        if (!is_array($decoded)) return null;
+        return [
+            'state'   => $decoded,
+            'version' => (int) ($row['version'] ?? 0),
+        ];
     }
 
-    public function saveCurrent(array $state, string $email): int
+    public function saveCurrent(array $state, string $email, ?int $expectedVersion = null): array
     {
         $t       = $this->db->t(self::TABLE);
         $payload = json_encode($state, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-        // SELECT then UPDATE keeps the single draft row in-place. The
-        // single-row invariant is preserved by saveNamedVersion (which
-        // always inserts is_current=0) — no extra cleanup UPDATE on every
-        // save (was firing a round-trip per autosave for an inv ariant
-        // that's already true).
-        $row     = $this->db->query("SELECT id FROM {$t} WHERE is_current = 1 ORDER BY id DESC LIMIT 1")->fetch();
+        $row     = $this->db->query("SELECT id, version, json_data FROM {$t} WHERE is_current = 1 ORDER BY id DESC LIMIT 1")->fetch();
         if ($row) {
-            $id = (int) $row['id'];
+            $id          = (int) $row['id'];
+            $currentVer  = (int) ($row['version'] ?? 0);
+            // Optimistic-concurrency check. expectedVersion=null means
+            // "I don't care" (legacy callers / first call before client
+            // even knows the version). Otherwise must match exactly.
+            if ($expectedVersion !== null && $expectedVersion !== $currentVer) {
+                $stored = json_decode((string) $row['json_data'], true);
+                return [
+                    'conflict' => true,
+                    'version'  => $currentVer,
+                    'state'    => is_array($stored) ? $stored : null,
+                ];
+            }
+            $newVer = $currentVer + 1;
             $this->db->query(
-                "UPDATE {$t} SET json_data = ?, label = '', created_by = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?",
-                [$payload, $email, $id]
+                "UPDATE {$t} SET json_data = ?, label = '', created_by = ?, created_at = CURRENT_TIMESTAMP, version = ? WHERE id = ?",
+                [$payload, $email, $newVer, $id]
             );
-            return $id;
+            return ['id' => $id, 'version' => $newVer];
         }
         $this->db->query(
-            "INSERT INTO {$t} (label, json_data, is_current, created_by) VALUES ('', ?, 1, ?)",
+            "INSERT INTO {$t} (label, json_data, is_current, created_by, version) VALUES ('', ?, 1, ?, 1)",
             [$payload, $email]
         );
-        return (int) $this->db->lastInsertId();
+        return ['id' => (int) $this->db->lastInsertId(), 'version' => 1];
     }
 
     public function saveNamedVersion(array $state, string $label, string $email): int

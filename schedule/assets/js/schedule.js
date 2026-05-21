@@ -22,6 +22,10 @@
 
     const App = {
         state:     boot.state     || { blocks: [], shifts: {}, templates: [] },
+        // Optimistic-concurrency version. Sent on every ajax=save; the
+        // server rejects with 409 if another operator has bumped it in
+        // the meantime. Updated on every successful save response.
+        stateVer:  boot.stateVer  || 0,
         period:    boot.period    || { from: '', to: '' },
         employees: boot.employees || [],
         halls:     boot.halls     || [],
@@ -138,9 +142,41 @@
         const txt = await res.text();
         let j;
         try { j = JSON.parse(txt); }
-        catch (_) { throw new Error('Bad JSON response (' + res.status + ')'); }
+        catch (_) {
+            // Non-JSON usually means we hit the auth redirect page
+            // (Accept: application/json normally avoids this — but if
+            // the server returned HTML anyway, the session is dead).
+            throw new SessionExpiredError();
+        }
+        // Optimistic-concurrency conflict — surface with a typed error
+        // so callers can refetch + reload (handled by runSave).
+        if (res.status === 409 && j && j.conflict) {
+            const err = new Error(j.error || 'Конфликт версий');
+            err.code  = 'CONFLICT';
+            err.state = j.state || null;
+            throw err;
+        }
+        if (res.status === 401) {
+            throw new SessionExpiredError(j.login_url || '/login');
+        }
         if (!res.ok || !j.ok) throw new Error(j.error || `HTTP ${res.status}`);
         return j;
+    }
+
+    class SessionExpiredError extends Error {
+        constructor(loginUrl = '/login') {
+            super('Сессия истекла');
+            this.code     = 'SESSION_EXPIRED';
+            this.loginUrl = loginUrl;
+        }
+    }
+    let sessionRedirectFired = false;
+    function handleSessionExpired(err) {
+        if (sessionRedirectFired) return true;
+        sessionRedirectFired = true;
+        toast('Сессия истекла. Открываю /login…', 'err');
+        setTimeout(() => { location.href = err.loginUrl || '/login'; }, 1500);
+        return true;
     }
 
 
@@ -191,8 +227,11 @@
         const [h1, m1 = '0'] = start.split(':');
         const [h2, m2 = '0'] = end.split(':');
         const a = parseInt(h1, 10) + (parseInt(m1, 10) || 0) / 60;
-        const b = parseInt(h2, 10) + (parseInt(m2, 10) || 0) / 60;
-        return Math.max(0, b - a);
+        let   b = parseInt(h2, 10) + (parseInt(m2, 10) || 0) / 60;
+        // Overnight shift (e.g. 22:00-02:00): wrap end past midnight.
+        // Returns positive hours instead of silently zero-ing.
+        if (b <= a) b += 24;
+        return b - a;
     }
 
     function parseHHMM(s) {
@@ -247,7 +286,12 @@
                             if (!sh) return;
                             const id = parseInt(sh.emp_id, 10) || 0;
                             if (id <= 0) return;
-                            const sH = parseHHMM(sh.start), eH = parseHHMM(sh.end);
+                            const sH = parseHHMM(sh.start);
+                            // Wrap overnight shift past midnight so it has
+                            // positive length and double-booking can still
+                            // detect overlaps (e.g. 22-02 + 23-01 overlap).
+                            let eH = parseHHMM(sh.end);
+                            if (eH <= sH) eH += 24;
                             if (eH > sH) {
                                 if (!empTimes.has(id)) empTimes.set(id, []);
                                 empTimes.get(id).push([sH, eH]);
@@ -715,6 +759,7 @@
         while (savePending) await runSave();
     }
 
+    let saveFailures = 0;             // consecutive runSave failures
     async function runSave() {
         if (saveInFlight) { savePending = true; return; }
         if (!savePending) return;
@@ -722,16 +767,37 @@
         savePending  = false;        // anything new from now on sets it again
         try {
             // No label — ajax=save always upserts the current draft.
-            // Named versions go through saveAsVersion() below.
-            const j = await api('save', { method: 'POST', body: { state: App.state } });
+            // Sends the version we last saw for optimistic-concurrency.
+            const j = await api('save', {
+                method: 'POST',
+                body:   { state: App.state, version: App.stateVer },
+            });
+            App.stateVer = j.version || App.stateVer;
             App.snapshots = j.snapshots || App.snapshots;
             App.dirty = false;
+            saveFailures = 0;
             renderSnapshots();
             if (!savePending) toast('Сохранено ✓');   // suppress mid-burst toasts
         } catch (e) {
-            toast('Ошибка сохранения: ' + e.message, 'err');
+            if (e.code === 'SESSION_EXPIRED') { handleSessionExpired(e); return; }
+            if (e.code === 'CONFLICT') {
+                // Another operator saved between our load and this POST.
+                // Force a reload — overlay first so the user can't keep
+                // typing into a soon-to-be-replaced grid.
+                toast('Другой пользователь изменил график. Перезагружаю…', 'err');
+                document.body.classList.add('sch-blocking-overlay');
+                setTimeout(() => location.reload(), 1500);
+                return;
+            }
+            saveFailures++;
+            toast('Ошибка сохранения: ' + e.message + (saveFailures > 1 ? ` (попытка ${saveFailures})` : ''), 'err');
             console.error(e);
-            savePending = true;       // retry on next runSave()
+            // Mark dirty + auto-retry with exponential backoff (up to 30s).
+            // Without this, a transient network blip would lose every edit
+            // that landed during the failed save.
+            savePending = true;
+            const delay = Math.min(30000, 2000 * Math.pow(2, saveFailures - 1));
+            setTimeout(() => runSave(), delay);
         } finally {
             saveInFlight = false;
         }
@@ -781,6 +847,10 @@
     async function saveAndReload(reason) {
         await flushSave();
         toast(reason + ' ✓');
+        // Block further input during the 400 ms toast-then-reload window
+        // — without this overlay a popover edit + scheduleSave (800 ms
+        // debounce) would land AFTER the reload, silently lost.
+        document.body.classList.add('sch-blocking-overlay');
         setTimeout(() => location.reload(), 400);
     }
 
@@ -794,16 +864,28 @@
     const popHall = document.getElementById('schPopoverHall');
     let popAnchor = null;
 
-    function populatePopoverDropdowns(forSenior) {
+    function populatePopoverDropdowns(forSenior, existingEmpId = 0) {
         // Employees: filter by in_schedule + (can_be_senior if senior block)
         let html = '<option value="">— не назначен —</option>';
+        const includedIds = new Set();
         App.employees
             .filter((e) => e.in_schedule)
             .filter((e) => !forSenior || e.can_be_senior)
             .forEach((e) => {
                 const star = e.can_be_senior ? ' ★' : '';
                 html += `<option value="${e.id}">${esc(e.name)}${star} (${esc(e.tag)})</option>`;
+                includedIds.add(e.id);
             });
+        // Если в ячейке уже стоит сотрудник, не попадающий под фильтр
+        // (снят флаг can_be_senior или in_schedule), всё равно покажем
+        // его в списке (с ⚠) — иначе .value=existingEmpId не находил бы
+        // option и при сохранении смену молча удаляло (emp_id → 0).
+        if (existingEmpId && !includedIds.has(existingEmpId)) {
+            const emp = empById.get(existingEmpId);
+            if (emp) {
+                html += `<option value="${emp.id}">⚠ ${esc(emp.name)} (не подходит фильтру)</option>`;
+            }
+        }
         popEmp.innerHTML = html;
 
         // Halls + custom zones
@@ -826,9 +908,10 @@
         const isSenior = block && blockColor(block) === 'senior';
 
         popMeta.textContent = `${block?.icon || ''} ${block?.name || ''} · слот ${slotIdx + 1} · ${iso}`;
-        populatePopoverDropdowns(isSenior);
-
         const existing = getShift(iso, blockId, slotIdx);
+        // Pass existing emp_id so populate() preserves the option even
+        // if the employee got filtered out (e.g. flag toggled later).
+        populatePopoverDropdowns(isSenior, parseInt(existing?.emp_id, 10) || 0);
         // Defaults for a brand-new shift depend on the day of week:
         //   • Пт / Сб / Вс  → 10:00–23:00 (длиннее за счёт уикенд-трафика)
         //   • Пн–Чт         → 10:00–22:00
@@ -1261,8 +1344,11 @@
             // Push loaded state into the current draft (no new version row).
             await api('save', { method: 'POST', body: { state: App.state } });
             toast('Версия загружена');
+            // Block further input — same reason as saveAndReload.
+            document.body.classList.add('sch-blocking-overlay');
             setTimeout(() => location.reload(), 400);
         } catch (e) {
+            if (e.code === 'SESSION_EXPIRED') return handleSessionExpired(e);
             toast('Ошибка: ' + e.message, 'err');
         }
     }
@@ -1508,9 +1594,14 @@
                         const sh = getShift(d.iso, blk.id, sIdx);
                         if (!sh) return;
                         const sH = Math.floor(parseHHMM(sh.start));
-                        const eH = Math.ceil(parseHHMM(sh.end));
+                        let   eH = Math.ceil(parseHHMM(sh.end));
+                        // Wrap overnight shifts (end <= start). Hours past
+                        // midnight are tallied modulo 24 — they still
+                        // belong to the same start-day's coverage column.
+                        if (eH <= sH) eH += 24;
                         for (let h = sH; h < eH; h++) {
-                            if (h >= 0 && h <= 23) buckets[color][h]++;
+                            const hr = h % 24;
+                            if (hr >= 0 && hr <= 23) buckets[color][hr]++;
                         }
                     });
                 });

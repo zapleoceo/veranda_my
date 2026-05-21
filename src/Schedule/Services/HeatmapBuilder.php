@@ -52,10 +52,15 @@ final class HeatmapBuilder
                     if (!$shift) continue;
                     $sH = (int) floor(TimeRange::toHours((string) ($shift['start'] ?? '')));
                     $eH = (int) ceil (TimeRange::toHours((string) ($shift['end']   ?? '')));
+                    // Overnight (end <= start) — wrap past midnight; hours
+                    // after 24:00 wrap modulo 24 and still count under the
+                    // start-day's coverage column. Mirror of JS impl.
+                    if ($eH <= $sH) $eH += 24;
                     for ($h = $sH; $h < $eH; $h++) {
-                        if ($h < 0 || $h > 23) continue;
-                        $perBlock[$color][$h]++;
-                        $aggHourTotal[$h]++;
+                        $hr = $h % 24;
+                        if ($hr < 0 || $hr > 23) continue;
+                        $perBlock[$color][$hr]++;
+                        $aggHourTotal[$hr]++;
                     }
                 }
             }

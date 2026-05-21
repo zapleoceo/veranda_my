@@ -32,7 +32,12 @@ final class PeriodBuilder
                 'date'    => (string) date('j', $cur),
                 'mon'     => self::MON_RU[(int) date('n', $cur)],
                 'dow'     => self::DOW_RU[(int) date('w', $cur)],
-                'weekend' => in_array((int) date('w', $cur), [0, 6], true),
+                // Пт/Сб/Вс (5/6/0) — выделяем как «уикенд». Должно
+                // совпадать с JS (schedule.js dayWarnReasons + popover
+                // defaults), иначе пятница в сетке будет будним днём,
+                // но получит выходные правила. Раньше было [0, 6] —
+                // источник рассинхрона.
+                'weekend' => in_array((int) date('w', $cur), [0, 5, 6], true),
             ];
             $cur = (int) strtotime('+1 day', $cur);
             $i++;

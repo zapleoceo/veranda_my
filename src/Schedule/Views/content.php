@@ -109,7 +109,9 @@ foreach ($days as $d) {
         foreach ($block['slots'] as $sIdx => $_) {
             $sh = $shifts[$d['iso']][$block['id'] . ':' . $sIdx] ?? null;
             if (!$sh) continue;
-            $hrs = TimeRange::toHours((string)($sh['end'] ?? '')) - TimeRange::toHours((string)($sh['start'] ?? ''));
+            $sH  = TimeRange::toHours((string)($sh['start'] ?? ''));
+            $eH  = TimeRange::toHours((string)($sh['end']   ?? ''));
+            $hrs = $eH > $sH ? $eH - $sH : ($eH + 24) - $sH;  // overnight-aware
             if ($hrs > 0) {
                 $totalHours  += $hrs;
                 $rate = (int) ($empById[(int)($sh['emp_id'] ?? 0)]['rate_per_hour'] ?? 0);
@@ -614,6 +616,9 @@ Hover на ⚠ в конкретном дне покажет причины.">�
   // ─── Boot payload for JS state machine ───
   $schBootPayload = [
       'state'     => $state,
+      // Optimistic-concurrency cursor — JS sends it back on each save;
+      // server rejects with 409 if another operator bumped it.
+      'stateVer'  => (int) ($stateVer ?? 0),
       'period'    => ['from' => $periodFrom, 'to' => $periodTo],
       'employees' => $employees,
       'halls'     => $halls,
@@ -765,4 +770,4 @@ Hover на ⚠ в конкретном дне покажет причины.">�
   </div>
 </div>
 
-<script src="/schedule/assets/js/schedule.js?v=20260521_payroll_period" defer></script>
+<script src="/schedule/assets/js/schedule.js?v=20260521_concurrency" defer></script>
