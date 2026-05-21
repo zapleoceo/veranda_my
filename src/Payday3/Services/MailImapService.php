@@ -51,14 +51,25 @@ final class MailImapService implements MailServiceInterface
                 throw new \RuntimeException('Bad date range');
             }
 
+            // IMAP-side date filter uses the SERVER's day (Gmail = UTC).
+            // We widen the SINCE bound by one day on the lower edge so a
+            // VN-local mail from early-morning hours (= late-prev-day UTC)
+            // still reaches the post-filter step. The post-filter compares
+            // calendar dates from the body where possible, so this widening
+            // never produces false-positives on the user-facing side.
+            $sinceTs = strtotime($range->from . ' -1 day');
             $query = 'FROM "bidvsmartbanking@bidv.com.vn"'
-                   . ' SINCE "'  . date('d-M-Y', $fromTs)   . '"'
+                   . ' SINCE "'  . date('d-M-Y', $sinceTs)  . '"'
                    . ' BEFORE "' . date('d-M-Y', $beforeTs) . '"';
             $nums = @imap_search($inbox, $query) ?: [];
             rsort($nums);
 
             $hidden = $this->loadHidden($range->to);
             $rows   = [];
+            // 24-hour grace for udate-based filtering — see logic below.
+            $graceSec      = 24 * 3600;
+            $fromTsGrace   = $fromTs - $graceSec;
+            $toTsGrace     = $toTs   + $graceSec;
             foreach ($nums as $num) {
                 $h = @imap_headerinfo($inbox, $num);
                 if (!$h) continue;
@@ -68,28 +79,54 @@ final class MailImapService implements MailServiceInterface
                 $body = $this->fetchHtmlBody($inbox, $num);
                 $src  = preg_replace('/\s+/u', ' ', $body);
 
-                $txTime = ''; $txTs = 0;
+                $txTime = ''; $txTs = 0; $bodyDate = '';
                 if (preg_match('/\b(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\b/u', $src, $m)) {
-                    $txTime = $m[0];
-                    $txTs   = mktime((int)$m[4], (int)$m[5], (int)$m[6], (int)$m[2], (int)$m[1], (int)$m[3]);
+                    $txTime   = $m[0];
+                    $txTs     = mktime((int)$m[4], (int)$m[5], (int)$m[6], (int)$m[2], (int)$m[1], (int)$m[3]);
+                    $bodyDate = sprintf('%04d-%02d-%02d', (int)$m[3], (int)$m[2], (int)$m[1]);  // 'Y-m-d'
                 }
                 $amount = 0;
                 if (preg_match('/([\d.,]+)\s*VND\b/ui', $src, $m)) {
                     $amount = (int)str_replace([',', '.'], ['', ''], $m[1]);
                 }
 
-                $useTs = $txTs > 0 ? $txTs : (isset($h->udate) ? (int)$h->udate : 0);
-                if ($useTs > 0 && $useTs < $fromTs) break;          // sorted desc — earlier emails done
-                if ($useTs > 0 && $useTs > $toTs)   continue;
+                // ─── Date filtering — bank-day-aware ─────────────────
+                // The bank emits its body timestamp in Vietnam local time
+                // ("21/05/2026 …"). When the body parses cleanly we filter
+                // by that CALENDAR DATE — TZ-agnostic, matches what the
+                // operator sees in the bank's view of the day.
+                //
+                // When the body has no parseable timestamp (malformed
+                // template, image-only email, etc.) we fall back to the
+                // IMAP udate (UTC). To avoid losing late-night VN mails
+                // whose UTC udate spills into the next/prev day, the
+                // udate path uses a 24-hour grace zone around [from, to].
+                //
+                // Header `udate` is missing on some Gmail accounts —
+                // fall back to strtotime($h->date) like payday2 did so
+                // we don't lose those mails entirely.
+                $udate = isset($h->udate) ? (int)$h->udate
+                       : (isset($h->date) ? (int)strtotime($h->date) : 0);
+
+                if ($bodyDate !== '') {
+                    if ($bodyDate < $range->from) break;      // sorted desc — earlier mails done
+                    if ($bodyDate > $range->to)   continue;
+                } else {
+                    if ($udate > 0 && $udate < $fromTsGrace) break;
+                    if ($udate > 0 && $udate > $toTsGrace)   continue;
+                }
 
                 $uid = (int)@imap_uid($inbox, $num);
                 if ($uid <= 0) continue;
                 $isHidden = isset($hidden[$uid]);
                 if ($isHidden && !$includeHidden) continue;
 
+                // For display we prefer txTs (the bank's reported time);
+                // fall back to udate when body parsing failed.
+                $displayTs = $txTs > 0 ? $txTs : $udate;
                 $rows[] = new MailTransaction(
                     mailUid:       $uid,
-                    date:          $useTs > 0 ? date('Y-m-d H:i:s', $useTs) : '',
+                    date:          $displayTs > 0 ? date('Y-m-d H:i:s', $displayTs) : '',
                     amount:        Money::vnd($amount),
                     content:       self::decodeHeader($h->subject ?? ''),
                     txTime:        $txTime,
