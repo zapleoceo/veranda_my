@@ -351,6 +351,60 @@ return [
     \App\Order\Http\Middleware\CsrfMiddleware::class           => fn()  =>
         new \App\Order\Http\Middleware\CsrfMiddleware(),
 
+    // ─── /poster-app — POS iframe widget for PIN-learning + shift tracking ───
+    // All Domain/Contracts/Repositories/Services/Actions live under
+    // src/PosterApp/ — separate namespace, separate tables, isolated
+    // from Order/. Auth between widget and backend is a stateless
+    // 12h HMAC token (no cookies — iframe-friendly).
+    \App\PosterApp\Infrastructure\Schema::class                       => fn($c) =>
+        new \App\PosterApp\Infrastructure\Schema($c->get(Database::class)),
+    \App\PosterApp\Infrastructure\PosterAppConfig::class              => fn()   =>
+        new \App\PosterApp\Infrastructure\PosterAppConfig(),
+    \App\PosterApp\Infrastructure\PosterAppToken::class               => fn($c) =>
+        new \App\PosterApp\Infrastructure\PosterAppToken(
+            $c->get(\App\PosterApp\Infrastructure\PosterAppConfig::class),
+        ),
+    \App\PosterApp\Contracts\EmployeePinRepositoryInterface::class    => fn($c) =>
+        new \App\PosterApp\Repositories\EmployeePinRepository(
+            $c->get(Database::class),
+            $c->get(\App\PosterApp\Infrastructure\Schema::class),
+        ),
+    \App\PosterApp\Contracts\WorkShiftRepositoryInterface::class      => fn($c) =>
+        new \App\PosterApp\Repositories\WorkShiftRepository(
+            $c->get(Database::class),
+            $c->get(\App\PosterApp\Infrastructure\Schema::class),
+        ),
+    \App\PosterApp\Services\PinAuthService::class                     => fn($c) =>
+        new \App\PosterApp\Services\PinAuthService(
+            $c->get(\App\PosterApp\Contracts\EmployeePinRepositoryInterface::class),
+        ),
+    \App\PosterApp\Services\WorkShiftService::class                   => fn($c) =>
+        new \App\PosterApp\Services\WorkShiftService(
+            $c->get(\App\PosterApp\Contracts\WorkShiftRepositoryInterface::class),
+        ),
+    \App\PosterApp\Http\PosterAppController::class                    => fn($c) =>
+        new \App\PosterApp\Http\PosterAppController(
+            $c->get(\App\PosterApp\Infrastructure\PosterAppConfig::class),
+        ),
+    \App\PosterApp\Http\Actions\WidgetLoginAction::class              => fn($c) =>
+        new \App\PosterApp\Http\Actions\WidgetLoginAction(
+            $c->get(\App\PosterApp\Services\PinAuthService::class),
+            $c->get(\App\PosterApp\Services\WorkShiftService::class),
+            $c->get(\App\PosterApp\Infrastructure\PosterAppToken::class),
+        ),
+    \App\PosterApp\Http\Actions\WidgetShiftStartAction::class         => fn($c) =>
+        new \App\PosterApp\Http\Actions\WidgetShiftStartAction(
+            $c->get(\App\PosterApp\Services\WorkShiftService::class),
+            $c->get(\App\PosterApp\Infrastructure\PosterAppToken::class),
+        ),
+    \App\PosterApp\Http\Actions\WidgetShiftEndAction::class           => fn($c) =>
+        new \App\PosterApp\Http\Actions\WidgetShiftEndAction(
+            $c->get(\App\PosterApp\Services\WorkShiftService::class),
+            $c->get(\App\PosterApp\Infrastructure\PosterAppToken::class),
+        ),
+    \App\PosterApp\Http\Middleware\PosterOriginMiddleware::class      => fn()   =>
+        new \App\PosterApp\Http\Middleware\PosterOriginMiddleware(),
+
     // ─── Schedule (shift planner) ─────────────────────────────
     // SchemaManager is a singleton — all schedule repos receive it and
     // call ensure() in their constructor. ensure() is gated by a static
