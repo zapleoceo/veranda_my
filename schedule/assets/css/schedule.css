@@ -105,6 +105,16 @@
 .sch-btn.primary:hover { background: #d4a062; color: #0f1117; }
 .sch-btn.ghost { background: transparent; color: var(--muted); }
 .sch-btn[disabled] { cursor: not-allowed; opacity: 0.85; }
+/* Full-page block during the brief save → reload window (and during
+   "another user saved, re-syncing" handling). Prevents the user from
+   making edits that would be wiped by the imminent location.reload(). */
+body.sch-blocking-overlay::after {
+    content: ''; position: fixed; inset: 0; z-index: 99998;
+    background: rgba(0, 0, 0, 0.25);
+    cursor: progress;
+    pointer-events: all;
+}
+
 /* Pending → success/error feedback states for save buttons (driven by
    withBtnPending() in schedule.js). Visual cycle:
      idle → pending (yellow/dim) → success (green) → idle

@@ -6,14 +6,23 @@ namespace App\Schedule\Contracts;
 
 interface SnapshotRepositoryInterface
 {
-    /** Returns the current draft's JSON, or null if no draft exists yet. */
+    /**
+     * Returns the current draft's JSON + its version counter, or null
+     * if no draft exists yet. Shape:
+     *   ['state' => array, 'version' => int]
+     */
     public function loadCurrent(): ?array;
 
     /**
      * Persists the current draft state — UPDATEs the single is_current=1
      * row (or inserts if none exists). Never creates a new named version.
+     *
+     * If `$expectedVersion` is non-null and the row in the DB has a
+     * higher version (another operator has saved since the caller
+     * loaded), returns an array with `'conflict' => true` and the
+     * current state. Otherwise returns `['id' => N, 'version' => N+1]`.
      */
-    public function saveCurrent(array $state, string $email): int;
+    public function saveCurrent(array $state, string $email, ?int $expectedVersion = null): array;
 
     /**
      * Saves the given state as a NEW named version (is_current=0). The

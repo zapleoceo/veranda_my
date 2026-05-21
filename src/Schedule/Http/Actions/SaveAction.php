@@ -27,17 +27,43 @@ final class SaveAction
             return $this->json->fail($response, 'Bad payload: state required', 400);
         }
         try {
-            $id = $this->service->saveCurrent(
+            // Optional client-supplied version. When present, the repo
+            // rejects with conflict if the stored row has been bumped
+            // by someone else in the meantime — prevents silent
+            // overwriting of another operator's edits.
+            $expectedVersion = array_key_exists('version', $body)
+                ? (int) $body['version']
+                : null;
+
+            $result = $this->service->saveCurrent(
                 $body['state'],
                 (string) ($_SESSION['user_email'] ?? ''),
+                $expectedVersion,
             );
+
+            if (!empty($result['conflict'])) {
+                // 409: client must reload (or merge). Includes the live
+                // state + new version so the client can re-sync without
+                // a second round trip.
+                return $this->json->write($response, [
+                    'ok'       => false,
+                    'conflict' => true,
+                    'error'    => 'Кто-то другой сохранил график. Обновите страницу, чтобы увидеть актуальную версию.',
+                    'version'  => $result['version'],
+                    'state'    => $result['state'],
+                ], 409);
+            }
+
             // No `snapshots` in the response — draft-save doesn't touch
             // the named-version list. The frontend already keeps its
             // local App.snapshots in sync; this saves one SELECT + a
             // JSON serialization per autosave (fires after every cell
             // edit). Only save_version / rename_snap / del_snap need
             // to return the refreshed list.
-            return $this->json->ok($response, ['id' => $id]);
+            return $this->json->ok($response, [
+                'id'      => $result['id'],
+                'version' => $result['version'],
+            ]);
         } catch (\Throwable $e) {
             return $this->json->fail($response, $e->getMessage(), 500);
         }

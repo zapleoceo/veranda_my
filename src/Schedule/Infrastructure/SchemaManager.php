@@ -25,7 +25,7 @@ use App\Infrastructure\Database;
  */
 final class SchemaManager
 {
-    private const VERSION = '2';   // bump when adding tables/columns/backfills
+    private const VERSION = '3';   // bump when adding tables/columns/backfills
 
     private static bool $checkedThisRequest = false;
 
@@ -100,6 +100,7 @@ final class SchemaManager
                 created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_by  VARCHAR(255) NOT NULL DEFAULT '',
                 share_code  VARCHAR(32) DEFAULT NULL,
+                version     INT NOT NULL DEFAULT 0,
                 UNIQUE KEY uniq_share (share_code),
                 KEY idx_current (is_current),
                 KEY idx_created (created_at)
@@ -109,6 +110,11 @@ final class SchemaManager
         // already there. Runs at most once per VERSION bump.
         try { $this->db->query("ALTER TABLE {$t} ADD COLUMN share_code VARCHAR(32) DEFAULT NULL"); } catch (\Throwable) {}
         try { $this->db->query("ALTER TABLE {$t} ADD UNIQUE KEY uniq_share (share_code)"); } catch (\Throwable) {}
+        // Optimistic-concurrency `version` counter — incremented on every
+        // saveCurrent. Client sends back the version it loaded; mismatch
+        // → 409 conflict (prevents two operators from silently
+        // overwriting each other's edits).
+        try { $this->db->query("ALTER TABLE {$t} ADD COLUMN version INT NOT NULL DEFAULT 0"); } catch (\Throwable) {}
     }
 
     private function createZones(): void

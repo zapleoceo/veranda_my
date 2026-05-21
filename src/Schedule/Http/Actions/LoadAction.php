@@ -19,12 +19,14 @@ final class LoadAction
 
     public function __invoke(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        $loaded = $this->service->loadCurrent();
         return $this->json->ok($response, [
-            'state'     => $this->service->loadCurrent(),
-            'employees' => $this->service->fetchEmployees(),
-            'halls'     => $this->service->fetchHalls(),
-            'zones'     => $this->service->listZones(),
-            'snapshots' => $this->service->listSnapshots(),
+            'state'      => $loaded['state'],
+            'state_ver'  => (int) ($loaded['version'] ?? 0),
+            'employees'  => $this->service->fetchEmployees(),
+            'halls'      => $this->service->fetchHalls(),
+            'zones'      => $this->service->listZones(),
+            'snapshots'  => $this->service->listSnapshots(),
         ]);
     }
 }

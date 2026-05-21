@@ -145,7 +145,10 @@ final class ScheduleController
     private function canAccess(): bool
     {
         $perms = $_SESSION['user_permissions'] ?? null;
-        return !is_array($perms) || !empty($perms['schedule']);
+        // Strict: missing/corrupt session denies. (Was permissive — if
+        // ever a route bypassed AuthMiddleware, the door was open.)
+        if (!is_array($perms)) return false;
+        return !empty($perms['schedule']);
     }
 
     private function dispatchAjax(string $ajax, ServerRequestInterface $req, ResponseInterface $res): ResponseInterface
@@ -168,7 +171,9 @@ final class ScheduleController
             $periodTo   ??= $range['to'];
         }
 
-        $state     = $this->service->loadCurrent();
+        $loaded    = $this->service->loadCurrent();
+        $state     = $loaded['state'];
+        $stateVer  = (int) ($loaded['version'] ?? 0);
         $employees = $this->service->fetchEmployees();
         $halls     = $this->service->fetchHalls();
         $zones     = $this->service->listZones();
@@ -180,11 +185,11 @@ final class ScheduleController
         $pageTitle    = 'График смен';
         $currentPath  = '/schedule';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">' . "\n"
-                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260520_perf2">';
+                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260521_concurrency">';
 
         // Variables exposed to the view template
         $viewVars = compact(
-            'state', 'employees', 'halls', 'zones', 'snapshots',
+            'state', 'stateVer', 'employees', 'halls', 'zones', 'snapshots',
             'periodFrom', 'periodTo', 'days', 'heatmap'
         );
         extract($viewVars, EXTR_SKIP);

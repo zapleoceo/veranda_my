@@ -31,29 +31,54 @@ final class ScheduleStateService
 
     // ─── State (snapshots) ──────────────────────────────────────────
 
-    /** Latest snapshot, or DefaultState if table is empty. */
+    /**
+     * Latest draft, or DefaultState if table is empty. Returns:
+     *   ['state' => array, 'version' => int]
+     * The `version` counter is what the client should send back on the
+     * next saveCurrent for optimistic-concurrency checks.
+     */
     public function loadCurrent(): array
     {
-        $raw = $this->snapshots->loadCurrent();
-        if (!is_array($raw)) return DefaultState::make();
-        // Ensure required keys (older snapshots may miss some)
-        $defaults = DefaultState::make();
-        $raw['version']   ??= 1;
-        $raw['blocks']    ??= $defaults['blocks'];
-        $raw['shifts']    ??= [];
-        $raw['templates'] ??= $defaults['templates'];
-        // Rules are new — seed defaults on legacy snapshots so the rule
-        // engine has something to evaluate on first load after upgrade.
-        if (empty($raw['rules']) || !is_array($raw['rules'])) {
-            $raw['rules'] = $defaults['rules'];
+        $row = $this->snapshots->loadCurrent();
+        if ($row === null) {
+            return ['state' => DefaultState::make(), 'version' => 0];
         }
-        return $raw;
+        $state = $this->normalizeState($row['state'] ?? []);
+        return ['state' => $state, 'version' => (int) ($row['version'] ?? 0)];
     }
 
-    /** Auto-save / regular save — overwrites the single draft row. */
-    public function saveCurrent(array $state, string $email): int
+    /** Fills missing top-level keys with DefaultState values. */
+    private function normalizeState(array $state): array
     {
-        return $this->snapshots->saveCurrent($state, $email);
+        $defaults = DefaultState::make();
+        // Note: state['version'] is the snapshot's own "schema version"
+        // (used by old DefaultState). NOT to be confused with the row's
+        // optimistic-concurrency `version` returned alongside in
+        // loadCurrent's wrapper.
+        $state['version']   ??= 1;
+        $state['blocks']    ??= $defaults['blocks'];
+        $state['shifts']    ??= [];
+        $state['templates'] ??= $defaults['templates'];
+        // Rules: only seed when key MISSING. Empty array preserved.
+        if (!array_key_exists('rules', $state) || !is_array($state['rules'])) {
+            $state['rules'] = $defaults['rules'];
+        }
+        return $state;
+    }
+
+    /**
+     * Auto-save / regular save — UPDATEs the single draft row.
+     * Returns ['id' => N, 'version' => N+1] on success, or
+     * ['conflict' => true, 'version' => N, 'state' => …] when a
+     * concurrent save by another operator beat us to it.
+     */
+    public function saveCurrent(array $state, string $email, ?int $expectedVersion = null): array
+    {
+        $result = $this->snapshots->saveCurrent($state, $email, $expectedVersion);
+        if (!empty($result['conflict']) && is_array($result['state'] ?? null)) {
+            $result['state'] = $this->normalizeState($result['state']);
+        }
+        return $result;
     }
 
     /** Manual "Save as version" — creates a new named snapshot row. */
