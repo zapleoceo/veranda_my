@@ -41,7 +41,7 @@ final class WorkShiftRepository implements WorkShiftRepositoryInterface
              VALUES (?, ?, NOW(), ?)",
             [$posterUserId, $posterShiftId, $source],
         );
-        return (int)$this->db->pdo()->lastInsertId();
+        return (int)$this->db->lastInsertId();
     }
 
     public function closeById(int $shiftId): void
