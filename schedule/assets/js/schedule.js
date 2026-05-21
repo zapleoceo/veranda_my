@@ -396,10 +396,20 @@
         const tbl = document.getElementById('schPayrollTable');
         if (!tbl) return;
         const blocks = App.state.blocks || [];
+
+        // Period scoping — sum ONLY shifts in the days currently shown
+        // in the grid, not the entire App.state.shifts dict (which can
+        // hold leftover dates from previous periods after navigation).
+        // Same source as recomputeSummaries → the two stay in sync.
+        const periodIsos = new Set();
+        document.querySelectorAll('.sch-warn-cell[data-day-iso]').forEach((c) => {
+            periodIsos.add(c.dataset.dayIso);
+        });
+
         const acc = new Map();   // empId → {id,name,tag,rate,hours,zp}
         blocks.forEach((blk) => {
             (blk.slots || []).forEach((_, sIdx) => {
-                Object.keys(App.state.shifts || {}).forEach((iso) => {
+                periodIsos.forEach((iso) => {
                     const sh = getShift(iso, blk.id, sIdx);
                     if (!sh) return;
                     const hrs = hoursBetween(sh.start, sh.end);
