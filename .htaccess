@@ -11,6 +11,7 @@ RewriteRule ^tr4/?$ tr4/index.php [L,QSA]
 RewriteRule ^tr4/api/?$ tr4/api.php [L,QSA]
 RewriteRule ^TableReservation/?$ TableReservation.php [L,QSA]
 RewriteRule ^neworder/?$ neworder/index.php [L,QSA]
+RewriteRule ^poster-app/?$ poster-app/index.php [L,QSA]
 
 # Redirects from old .php paths to new folders
 RewriteRule ^banya\.php$ /banya [R=301,L]

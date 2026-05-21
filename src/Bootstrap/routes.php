@@ -46,6 +46,11 @@ use App\Order\Http\Actions\OpenChecksAction        as NewOrderOpenChecksAction;
 use App\Order\Http\Actions\OrderCreateAction       as NewOrderCreateAction;
 use App\Order\Http\Actions\OrderAppendAction       as NewOrderAppendAction;
 use App\Order\Http\Middleware\CsrfMiddleware       as NewOrderCsrfMiddleware;
+use App\PosterApp\Http\PosterAppController;
+use App\PosterApp\Http\Actions\WidgetLoginAction      as PosterAppLoginAction;
+use App\PosterApp\Http\Actions\WidgetShiftStartAction as PosterAppShiftStartAction;
+use App\PosterApp\Http\Actions\WidgetShiftEndAction   as PosterAppShiftEndAction;
+use App\PosterApp\Http\Middleware\PosterOriginMiddleware;
 use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
@@ -259,6 +264,20 @@ $app->group('/neworder', function (RouteCollectorProxy $g) {
     });
 });
 $app->get('/neworder/assets/{file:.+}', [StaticController::class, 'neworderAssets']);
+
+// /poster-app — JS widget Poster loads inside the POS iframe.
+// GET renders the page; POSTs accept events from the widget. Each
+// mutation is wrapped in PosterOriginMiddleware which restricts
+// Origin/Referer to *.joinposter.com (and our own host for testing).
+$app->group('/poster-app', function (RouteCollectorProxy $g) {
+    $g->get('[/]', [PosterAppController::class, 'index']);
+    $g->group('/api', function (RouteCollectorProxy $api) {
+        $api->post('/login',       PosterAppLoginAction::class)->add(PosterOriginMiddleware::class);
+        $api->post('/shift-start', PosterAppShiftStartAction::class)->add(PosterOriginMiddleware::class);
+        $api->post('/shift-end',   PosterAppShiftEndAction::class)->add(PosterOriginMiddleware::class);
+    });
+});
+$app->get('/poster-app/assets/{file:.+}', [StaticController::class, 'posterAppAssets']);
 
 // Static assets from directories outside public/
 $app->get('/assets/{file:.+}',              [StaticController::class, 'globalAssets']);
