@@ -239,15 +239,6 @@
         const [h, m = '0'] = String(s).split(':');
         return (parseInt(h, 10) || 0) + ((parseInt(m, 10) || 0) / 60);
     }
-    function hoursToHHMM(h) {
-        // Float hours → "HH:MM". Wraps modulo 24 so an end value past
-        // midnight (e.g. 26.0 from a wrapped overnight shift) prints as
-        // "02:00" — which is how the user typed it in the popover.
-        h = ((h % 24) + 24) % 24;
-        const hh = Math.floor(h);
-        const mm = Math.round((h - hh) * 60);
-        return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-    }
     function ruleScopeMatches(rule, block) {
         const s = rule.scope || 'all';
         if (s === 'all') return true;
@@ -255,45 +246,6 @@
     }
     function empName(id) {
         return empById.get(id)?.name || ('uid:' + id);
-    }
-
-    // For startTime / endTime rules: build per-employee combined work-
-    // day ranges for a given day. Only employees whose shifts include
-    // at least one block in `rule.scope` are returned; their range is
-    // computed from ALL their shifts that day (any block), so the rule
-    // sees the person's continuous workday spanning multiple blocks.
-    //
-    // Returns: Map<empId, { minStart: hours, maxEnd: hours }>
-    function combinedDayRanges(iso, rule, blocks) {
-        const allRanges  = new Map();   // emp shifts across any block
-        const scopedEmps = new Set();   // emps with ≥1 shift in scope
-        blocks.forEach((blk) => {
-            const inScope = ruleScopeMatches(rule, blk);
-            (blk.slots || []).forEach((_, sIdx) => {
-                const sh = getShift(iso, blk.id, sIdx);
-                if (!sh || !sh.start || !sh.end) return;
-                const id = parseInt(sh.emp_id, 10) || 0;
-                if (id <= 0) return;
-                const s = parseHHMM(sh.start);
-                let   e = parseHHMM(sh.end);
-                if (e <= s) e += 24;            // overnight wrap
-                let r = allRanges.get(id);
-                if (!r) {
-                    r = { minStart: s, maxEnd: e };
-                    allRanges.set(id, r);
-                } else {
-                    if (s < r.minStart) r.minStart = s;
-                    if (e > r.maxEnd)   r.maxEnd   = e;
-                }
-                if (inScope) scopedEmps.add(id);
-            });
-        });
-        const out = new Map();
-        scopedEmps.forEach((id) => {
-            const r = allRanges.get(id);
-            if (r) out.set(id, r);
-        });
-        return out;
     }
 
     // ════════════════ Rule engine ════════════════
@@ -377,36 +329,32 @@
                     break;
                 }
 
-                // startTime / endTime check the COMBINED workday of each
-                // person — not each individual shift. So a waiter who
-                // does Главный 10-14 → Беседка 14-22 satisfies a "start
-                // at 10" + "end at 22" rule (their day IS 10-22), even
-                // though no single shift spans the whole window.
-                //
-                // Scope acts as a filter on WHICH people to check: at
-                // least one of their shifts that day must be in a scope
-                // block. Once a person qualifies, we compute their
-                // combined min(start) / max(end) ACROSS ALL their shifts
-                // (any block) and check that against rule.value.
-                case 'startTime':
-                case 'endTime': {
-                    const expected = (rule.type === 'endTime' && weekend && rule.weekendValue)
-                        ? rule.weekendValue
-                        : (rule.value || '');
+                case 'startTime': {
+                    const expected = rule.value || '';
                     if (!expected) break;
-                    const ranges = combinedDayRanges(iso, rule, blocks);
-                    ranges.forEach((r, id) => {
-                        if (rule.type === 'startTime') {
-                            const got = hoursToHHMM(r.minStart);
-                            if (got !== expected) {
-                                reasons.push(`${rule.name || 'Старт ≠ ' + expected}: ${empName(id)} в ${got}`);
-                            }
-                        } else {
-                            const got = hoursToHHMM(r.maxEnd);
-                            if (got !== expected) {
-                                reasons.push(`${rule.name || 'Конец ≠ ' + expected}: ${empName(id)} до ${got}`);
-                            }
-                        }
+                    blocks.forEach((blk) => {
+                        if (!ruleScopeMatches(rule, blk)) return;
+                        (blk.slots || []).forEach((_, sIdx) => {
+                            const sh = getShift(iso, blk.id, sIdx);
+                            if (!sh || !sh.start || sh.start === expected) return;
+                            const id = parseInt(sh.emp_id, 10) || 0;
+                            reasons.push(`${rule.name || 'Старт ≠ ' + expected}: ${empName(id)} в ${sh.start}`);
+                        });
+                    });
+                    break;
+                }
+
+                case 'endTime': {
+                    const expected = (weekend && rule.weekendValue) ? rule.weekendValue : (rule.value || '');
+                    if (!expected) break;
+                    blocks.forEach((blk) => {
+                        if (!ruleScopeMatches(rule, blk)) return;
+                        (blk.slots || []).forEach((_, sIdx) => {
+                            const sh = getShift(iso, blk.id, sIdx);
+                            if (!sh || !sh.end || sh.end === expected) return;
+                            const id = parseInt(sh.emp_id, 10) || 0;
+                            reasons.push(`${rule.name || 'Конец ≠ ' + expected}: ${empName(id)} до ${sh.end}`);
+                        });
                     });
                     break;
                 }
