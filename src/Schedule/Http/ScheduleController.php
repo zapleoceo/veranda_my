@@ -11,12 +11,16 @@ use App\Schedule\Http\Actions\DeleteZoneAction;
 use App\Schedule\Http\Actions\ListSnapshotsAction;
 use App\Schedule\Http\Actions\LoadAction;
 use App\Schedule\Http\Actions\LoadSnapshotAction;
+use App\Schedule\Http\Actions\LockAcquireAction;
+use App\Schedule\Http\Actions\LockHeartbeatAction;
+use App\Schedule\Http\Actions\LockReleaseAction;
 use App\Schedule\Http\Actions\ReloadPosterAction;
 use App\Schedule\Http\Actions\RenameSnapshotAction;
 use App\Schedule\Http\Actions\SaveAction;
 use App\Schedule\Http\Actions\SaveStaffTagsAction;
 use App\Schedule\Http\Actions\SaveVersionAction;
 use App\Schedule\Services\HeatmapBuilder;
+use App\Schedule\Services\PageLockService;
 use App\Schedule\Services\PeriodBuilder;
 use App\Schedule\Services\ScheduleStateService;
 use Psr\Http\Message\ResponseInterface;
@@ -48,6 +52,7 @@ final class ScheduleController
         private readonly ScheduleStateService $service,
         private readonly PeriodBuilder        $periodBuilder,
         private readonly HeatmapBuilder       $heatmapBuilder,
+        private readonly PageLockService      $lock,
         private readonly JsonResponder        $json,
         LoadAction            $load,
         SaveAction            $save,
@@ -61,6 +66,9 @@ final class ScheduleController
         SaveStaffTagsAction   $saveStaffTags,
         ReloadPosterAction    $reloadPoster,
         DebugPosterAction     $debugPoster,
+        LockAcquireAction     $lockAcquire,
+        LockHeartbeatAction   $lockHeartbeat,
+        LockReleaseAction     $lockRelease,
     ) {
         $this->ajaxActions = [
             'load'            => $load,
@@ -75,6 +83,12 @@ final class ScheduleController
             'save_staff_tags' => $saveStaffTags,
             'reload_poster'   => $reloadPoster,
             'debug_poster'    => $debugPoster,
+            // Page-edit lock: prevents two operators from saving over
+            // each other. JS calls acquire on boot + heartbeat every
+            // 20s + release on beforeunload.
+            'lock_acquire'    => $lockAcquire,
+            'lock_heartbeat'  => $lockHeartbeat,
+            'lock_release'    => $lockRelease,
         ];
     }
 
@@ -175,6 +189,18 @@ final class ScheduleController
         $state     = $loaded['state'];
         $stateVer  = (int) ($loaded['version'] ?? 0);
         $employees = $this->service->fetchEmployees();
+
+        // Try to grab (or refresh) the page-edit lock for this operator
+        // so subsequent saves are allowed. If another operator already
+        // holds an active lock, $lockState['owned']=false and the JS
+        // will switch to read-only with a banner.
+        $actorEmail = (string) ($_SESSION['user_email'] ?? '');
+        $actorName  = (string) ($_SESSION['user_name']  ?? $actorEmail);
+        $lockState  = $actorEmail !== ''
+            ? $this->lock->acquire($actorEmail, $actorName)
+            : ['owned' => false, 'lock' => $this->lock->current()];
+        $lockState['ttl']   = PageLockService::TTL_SECONDS;
+        $lockState['actor'] = $actorEmail;
         $halls     = $this->service->fetchHalls();
         $zones     = $this->service->listZones();
         $snapshots = $this->service->listSnapshots();
@@ -185,12 +211,12 @@ final class ScheduleController
         $pageTitle    = 'График смен';
         $currentPath  = '/schedule';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">' . "\n"
-                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260521_concurrency">';
+                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260522_pagelock">';
 
         // Variables exposed to the view template
         $viewVars = compact(
             'state', 'stateVer', 'employees', 'halls', 'zones', 'snapshots',
-            'periodFrom', 'periodTo', 'days', 'heatmap'
+            'periodFrom', 'periodTo', 'days', 'heatmap', 'lockState'
         );
         extract($viewVars, EXTR_SKIP);
 

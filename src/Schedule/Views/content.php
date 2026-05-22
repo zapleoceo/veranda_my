@@ -125,6 +125,26 @@ foreach ($days as $d) {
 <div class="container sch-wrap">
 
   <?php
+  // Read-only banner — rendered when another operator currently holds
+  // the page-edit lock. JS shows/hides this same element on lock state
+  // changes (heartbeat returns owned=false → show; lock_acquire shows
+  // owned=true → hide).
+  $lockState     ??= ['owned' => true, 'lock' => null];
+  $lockOwnedBoot = !empty($lockState['owned']);
+  $lockHolder    = $lockState['lock'] ?? null;
+  $lockHolderNm  = (string) ($lockHolder['name'] ?? $lockHolder['email'] ?? 'другой пользователь');
+  ?>
+  <div class="sch-lock-banner" id="schLockBanner"<?= $lockOwnedBoot ? ' hidden' : '' ?>>
+    <span class="sch-lock-icon">🔒</span>
+    <span class="sch-lock-text">
+      График сейчас редактирует <b id="schLockHolderName"><?= htmlspecialchars($lockHolderNm) ?></b>.
+      Чтобы редактировать самому — попроси его выйти со страницы.
+      <span class="sch-lock-hint">Любые правки на этой вкладке <b>не сохранятся</b> в базе.</span>
+    </span>
+    <button type="button" class="sch-btn ghost" id="schLockRetry">Проверить ещё раз</button>
+  </div>
+
+  <?php
   // Distinct employees in the period (cheap walk for the topbar metric).
   $empSet = [];
   foreach ($days as $d) {
@@ -624,6 +644,10 @@ Hover на ⚠ в конкретном дне покажет причины.">�
       'halls'     => $halls,
       'zones'     => $zones,
       'snapshots' => $snapshots,
+      // Page-edit lock state at first paint. owned=true means we got it
+      // (or it was free). owned=false means someone else is editing →
+      // JS goes into read-only mode + shows the banner.
+      'lockState' => $lockState ?? ['owned' => true, 'lock' => null, 'ttl' => 60],
   ];
   ?>
   <script id="schBootData" type="application/json"><?= json_encode($schBootPayload, JSON_UNESCAPED_UNICODE) ?></script>
@@ -770,4 +794,4 @@ Hover на ⚠ в конкретном дне покажет причины.">�
   </div>
 </div>
 
-<script src="/schedule/assets/js/schedule.js?v=20260521_concurrency" defer></script>
+<script src="/schedule/assets/js/schedule.js?v=20260522_pagelock" defer></script>

@@ -115,6 +115,51 @@ body.sch-blocking-overlay::after {
     pointer-events: all;
 }
 
+/* Page-edit lock banner. Rendered hidden when owned=true; JS toggles
+   on heartbeat / acquire response. Bright amber to be noticed. */
+.sch-lock-banner {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 14px; margin-bottom: 12px;
+    background: rgba(245, 158, 11, .14);
+    border: 1px solid rgba(245, 158, 11, .45);
+    border-radius: 8px;
+    color: var(--text); font-size: 12px;
+    line-height: 1.4;
+}
+.sch-lock-banner[hidden] { display: none; }
+.sch-lock-icon { font-size: 18px; }
+.sch-lock-text { flex: 1; }
+.sch-lock-text b { color: #f59e0b; font-weight: 700; }
+.sch-lock-hint {
+    display: block; margin-top: 2px;
+    color: var(--muted); font-size: 11px;
+}
+.sch-lock-hint b { color: #f87171; }
+
+/* Read-only mode (lock held by another user). Disables save buttons +
+   structural mutation buttons, dims the popover Save. Cell click /
+   drag still work locally so the second viewer can experiment, but
+   the saves get 423 and the toast says why. */
+body.sch-readonly .sch-btn.primary,
+body.sch-readonly #schSaveBtn,
+body.sch-readonly #schSaveSnapBtn,
+body.sch-readonly #schStaffBtn,
+body.sch-readonly #schCopyWeek,
+body.sch-readonly #schClearPeriod,
+body.sch-readonly #schAddBlockBtn,
+body.sch-readonly .sch-block-add-slot,
+body.sch-readonly .sch-block-del,
+body.sch-readonly .sch-slot-del,
+body.sch-readonly .sch-rules,
+body.sch-readonly .sch-snap-btn,
+body.sch-readonly #schPopoverSave,
+body.sch-readonly #schPopoverDel,
+body.sch-readonly #schModalStaffSave {
+    opacity: 0.4 !important;
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+}
+
 /* Pending → success/error feedback states for save buttons (driven by
    withBtnPending() in schedule.js). Visual cycle:
      idle → pending (yellow/dim) → success (green) → idle
