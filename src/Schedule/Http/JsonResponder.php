@@ -22,6 +22,20 @@ final class JsonResponder
         return $this->write($response, ['ok' => false, 'error' => $error], $status);
     }
 
+    /**
+     * 423 Locked — page is being edited by someone else. Includes the
+     * lock holder info so the JS banner can name the operator.
+     */
+    public function locked(ResponseInterface $response, ?array $lock): ResponseInterface
+    {
+        return $this->write($response, [
+            'ok'     => false,
+            'locked' => true,
+            'lock'   => $lock,
+            'error'  => 'Страница редактируется другим пользователем — изменения не сохранены.',
+        ], 423);
+    }
+
     public function write(ResponseInterface $response, array $data, int $status = 200): ResponseInterface
     {
         $response->getBody()->write(

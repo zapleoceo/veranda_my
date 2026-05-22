@@ -32,6 +32,9 @@
         zones:     boot.zones     || [],
         snapshots: boot.snapshots || [],
         dirty:     false,
+        // Page-edit lock — single editor at a time. owned=false →
+        // read-only mode, banner visible, all save POSTs get 423.
+        lock:      boot.lockState || { owned: true, lock: null, ttl: 60 },
     };
     if (Array.isArray(App.state.shifts)) App.state.shifts = {};
     if (!App.state.shifts || typeof App.state.shifts !== 'object') App.state.shifts = {};
@@ -154,6 +157,14 @@
             const err = new Error(j.error || 'Конфликт версий');
             err.code  = 'CONFLICT';
             err.state = j.state || null;
+            throw err;
+        }
+        // 423 Locked — another operator holds the page-edit lock.
+        // Discardable: don't retry, just show the banner.
+        if (res.status === 423 && j && j.locked) {
+            const err = new Error(j.error || 'Страница заблокирована');
+            err.code = 'LOCKED';
+            err.lock = j.lock || null;
             throw err;
         }
         if (res.status === 401) {
@@ -723,6 +734,83 @@
     setTimeout(() => recomputeSummaries(), 0);
 
 
+    // ════════════════ Page-edit lock ════════════════
+    //
+    // Single-editor model: first browser to open /schedule grabs the
+    // lock. A second visitor sees a banner naming the editor and is
+    // server-side denied (423) on every write. Heartbeats every TTL/3
+    // keep the owner's claim alive; on tab close we sendBeacon a
+    // release so the next opener doesn't have to wait the full TTL.
+    function applyLockState(state) {
+        if (!state) return;
+        App.lock = Object.assign(App.lock, state);
+        const banner = document.getElementById('schLockBanner');
+        const nameEl = document.getElementById('schLockHolderName');
+        const owned  = !!state.owned;
+        document.body.classList.toggle('sch-readonly', !owned);
+        if (banner) banner.hidden = owned;
+        if (!owned && nameEl) {
+            const holder = state.lock || {};
+            nameEl.textContent = holder.name || holder.email || 'другой пользователь';
+        }
+    }
+    async function lockHeartbeat() {
+        try {
+            const j = await api('lock_heartbeat', { method: 'POST', body: {} });
+            applyLockState(j);
+        } catch (e) {
+            // Ignore transient heartbeat failures — they'll retry next tick.
+            console.warn('lock heartbeat failed:', e.message);
+        }
+    }
+    function startHeartbeat() {
+        const ttl = (App.lock?.ttl || 60) * 1000;
+        // Beat at ~⅓ of TTL so two missed beats still don't expire the lock.
+        const interval = Math.max(5000, Math.floor(ttl / 3));
+        setInterval(lockHeartbeat, interval);
+    }
+    function releaseLockOnUnload() {
+        if (!App.lock?.owned) return;
+        // sendBeacon is the only thing that runs reliably during unload.
+        // POST with text/plain so the server still sees the request body
+        // (we don't actually need one — empty payload is fine).
+        try {
+            navigator.sendBeacon?.(
+                '/schedule/?ajax=lock_release',
+                new Blob([''], { type: 'text/plain' })
+            );
+        } catch (_) {}
+    }
+    window.addEventListener('beforeunload', releaseLockOnUnload);
+    window.addEventListener('pagehide',     releaseLockOnUnload);
+
+    // Apply initial server-rendered lock state + start heartbeat loop.
+    applyLockState(App.lock);
+    startHeartbeat();
+
+    // "Проверить ещё раз" button in the banner: manual re-acquire.
+    // Useful when the previous editor closed their tab but the TTL
+    // hasn't elapsed yet — user clicks, server sees lock free, banner
+    // disappears, full editing unlocked without waiting.
+    document.getElementById('schLockRetry')?.addEventListener('click', async (ev) => {
+        const btn = ev.currentTarget;
+        try {
+            const j = await withBtnPending(btn,
+                () => api('lock_acquire', { method: 'POST', body: {} }),
+                { pending: 'Проверяю…', success: 'Готово' });
+            applyLockState(j);
+            if (j.owned) {
+                toast('Лок получен — можно редактировать');
+                setTimeout(() => location.reload(), 500);
+            } else {
+                toast('Всё ещё редактируется ' + (j.lock?.name || ''), 'err');
+            }
+        } catch (e) {
+            toast('Ошибка: ' + e.message, 'err');
+        }
+    });
+
+
     // ════════════════ Save queue ════════════════
     //
     // Pattern: debounce + single-flight + pending follow-up.
@@ -780,6 +868,15 @@
             if (!savePending) toast('Сохранено ✓');   // suppress mid-burst toasts
         } catch (e) {
             if (e.code === 'SESSION_EXPIRED') { handleSessionExpired(e); return; }
+            if (e.code === 'LOCKED') {
+                // Page is owned by another operator. Don't retry — show
+                // the banner via applyLockState and discard the queue.
+                applyLockState({ owned: false, lock: e.lock });
+                savePending  = false;
+                saveFailures = 0;
+                toast('Сохранение запрещено: страница редактируется другим пользователем.', 'err');
+                return;
+            }
             if (e.code === 'CONFLICT') {
                 // Another operator saved between our load and this POST.
                 // Force a reload — overlay first so the user can't keep
