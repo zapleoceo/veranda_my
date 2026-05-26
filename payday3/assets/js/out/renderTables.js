@@ -34,7 +34,7 @@ export function renderOutMail(rows, links) {
     const tbody = document.querySelector('#pd3OutMailTable tbody');
     if (!tbody) return;
     if (!rows.length) {
-        tbody.innerHTML = '<tr class="pd3-empty"><td colspan="6">Писем за период не найдено.</td></tr>';
+        tbody.innerHTML = '<tr class="pd3-empty"><td colspan="7">Писем за период не найдено.</td></tr>';
         return;
     }
     tbody.innerHTML = rows.map((r) => {
@@ -51,13 +51,13 @@ export function renderOutMail(rows, links) {
             </td>
             <td class="pd3-col pd3-col--content">${esc(r.content)}</td>
             <td class="pd3-col pd3-col--time nowrap">${esc(time)}</td>
-            <td class="pd3-col pd3-col--sum  nowrap right">
+            <td class="pd3-col pd3-col--sum  nowrap right">${esc(r.amount_fmt)}</td>
+            <td class="pd3-col pd3-col--create">
                 <button type="button" class="pd3-out-mail-create"
                         title="Создать транзакцию в Poster на эту сумму"
                         data-mail-uid="${r.mail_uid}"
                         data-amount="${r.amount}"
                         data-date="${esc(r.date)}">+</button>
-                ${esc(r.amount_fmt)}
             </td>
             <td class="pd3-col pd3-col--cb">
                 <input type="checkbox" class="pd3-cb pd3-cb--out-mail" data-mail-uid="${r.mail_uid}" data-sum="${r.amount}">
