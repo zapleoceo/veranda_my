@@ -166,10 +166,10 @@ details summary{cursor:pointer;user-select:none}
 </head>
 <body>
 <?php
-$_sbCan = function(string $p): bool {
-    $perms = $_SESSION['user_permissions'] ?? null;
-    return !is_array($perms) || !empty($perms[$p]);
-};
+// Sidebar uses the same strict helper as page-level + AJAX gates so the
+// link never points at a page the user can't open. If user_permissions
+// somehow aren't loaded into the session, links hide — fail-safe.
+$_sbCan = static fn (string $p): bool => \App\Infrastructure\Permissions::can($p);
 
 $navSections = [
     [

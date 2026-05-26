@@ -55,7 +55,11 @@
     let stickyWrap = null;
     let stickyTable = null;
     let lastStickyVisible = false;
-    const csrfToken = String(window.__EMPLOYEES_CSRF__ || '');
+    // CSRF token lives in a mutable cell so server-side retransmit
+    // (`new_csrf` field on 419 responses) can update it without a page
+    // reload — used when the PHP session was recycled between page-
+    // load and the AJAX call.
+    let csrfToken = String(window.__EMPLOYEES_CSRF__ || '');
 
     const setLoading = (on) => {
         btn.disabled = on;
@@ -84,6 +88,32 @@
         const headers = Object.assign({}, h || {});
         if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
         return headers;
+    };
+
+    // Single POST helper that transparently handles a recycled session:
+    // on 419 with `retry: true`, server hands us a fresh token via
+    // `new_csrf`; we update local state and re-POST once with the new
+    // header. Any other failure surfaces as a regular Error.
+    const csrfPost = async (url, init = {}) => {
+        const opts = Object.assign({}, init);
+        opts.method = init.method || 'POST';
+        opts.headers = withCsrf(init.headers);
+        let res = await fetch(url, opts);
+        let txt = await res.text();
+        let j   = null; try { j = JSON.parse(txt); } catch (_) {}
+        if (res.status === 419 && j && j.retry && j.new_csrf) {
+            csrfToken = String(j.new_csrf);
+            opts.headers = withCsrf(init.headers);
+            res = await fetch(url, opts);
+            txt = await res.text();
+            j   = null; try { j = JSON.parse(txt); } catch (_) {}
+        }
+        if (res.status === 419 && j && j.needs_refresh) {
+            showToast(j.error || 'Сессия истекла — обновите страницу');
+            if (confirm('Сессия истекла. Перезагрузить страницу?')) location.reload();
+            throw new Error(j.error || 'Сессия истекла');
+        }
+        return { res, txt, j };
     };
     const digitsOnly = (s) => String(s || '').replace(/\D+/g, '');
     const accountTagById = (acc) => {
@@ -475,14 +505,10 @@
                 try {
                     const url = new URL(location.href);
                     url.searchParams.set('ajax', 'save_rate');
-                    const res = await fetch(url.toString(), {
-                        method: 'POST',
-                        headers: withCsrf({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
+                    const { j } = await csrfPost(url.toString(), {
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                         body: JSON.stringify({ user_id: uid, rate: String(next) }),
                     });
-                    const txt = await res.text();
-                    let j = null;
-                    try { j = JSON.parse(txt); } catch (_) {}
                     if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка сохранения');
                     const saved = Number(j.rate || 0);
                     inp.setAttribute('data-rate', String(saved));
@@ -609,12 +635,10 @@
             const prevDisabled = t.disabled;
             t.disabled = true;
             try {
-                const r = await fetch('?ajax=fix_salary_update_comment', {
-                    method: 'POST',
-                    headers: withCsrf({ 'Content-Type': 'application/json' }),
+                const { j } = await csrfPost('?ajax=fix_salary_update_comment', {
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ transaction_id: txId, waiter_id: waiterId, employee_name: empName })
                 });
-                const j = await r.json();
                 if (!j || !j.ok) throw new Error(j?.error || 'Ошибка');
                 const tr = t.closest('tr');
                 const cell = tr ? tr.querySelector('.fix-td-comment') : null;
@@ -1343,14 +1367,10 @@
         try {
             const url = new URL(location.href);
             url.searchParams.set('ajax', 'pay_extra');
-            const res = await fetch(url.toString(), {
-                method: 'POST',
-                headers: withCsrf({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
+            const { j } = await csrfPost(url.toString(), {
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({ waiter_id: uid, kind, amount_vnd: amount, account_from: accountFrom, employee_name: empName }),
             });
-            const txt = await res.text();
-            let j = null;
-            try { j = JSON.parse(txt); } catch (_) {}
             if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
             const date = j.date ? String(j.date) : '';
             if (kind === 'salary') {

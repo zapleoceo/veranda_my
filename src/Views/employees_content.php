@@ -234,4 +234,4 @@
 window.__USER_EMAIL__ = <?= json_encode((string) ($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 window.__EMPLOYEES_CSRF__ = <?= json_encode($employeesCsrf, JSON_UNESCAPED_UNICODE) ?>;
 </script>
-<script src="/assets/js/employees_view.js?v=20260520_help" defer></script>
+<script src="/assets/js/employees_view.js?v=20260520_perms" defer></script>
