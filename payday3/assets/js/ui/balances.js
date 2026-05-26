@@ -357,7 +357,14 @@ export function initBalances({ state }) {
         try { saveActualNow(state); } catch (_) {}
     });
 
-    reloadPoster().then(() => loadActual(state)).then(syncBtnRefresh);
+    // Fire Poster (slow Poster API) and Факт (fast DB query) in parallel.
+    // Previously the chain was reloadPoster().then(loadActual) — if the
+    // Poster API hangs (it has, repeatedly: nginx-side 60 s upstream
+    // timeouts surface in the error log), the operator stared at empty
+    // ФАКТ inputs for a minute even though the local row was already
+    // persisted. allSettled so a Poster failure doesn't sink the Факт
+    // load, and vice versa.
+    Promise.allSettled([reloadPoster(), loadActual(state)]).finally(syncBtnRefresh);
 
     // Pre-warm html2canvas in the background so the very first
     // Telegram click doesn't feel sluggish while the CDN script loads.
