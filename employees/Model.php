@@ -47,9 +47,7 @@ class EmployeesModel {
 
     public function saveRate() {
 
-    if (!veranda_can('admin')) {
-        employees_json_exit(['ok' => false, 'error' => 'Forbidden'], 403);
-    }
+    employees_require_write();
 
     $raw = file_get_contents('php://input');
     $j = json_decode((string)$raw, true);
@@ -384,11 +382,7 @@ class EmployeesModel {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
-    if (!veranda_can('admin')) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+    employees_require_write();
 
     $raw = file_get_contents('php://input');
     $j = json_decode((string)$raw, true);
@@ -440,11 +434,7 @@ class EmployeesModel {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
-    if (!veranda_can('admin')) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+    employees_require_write();
 
     $raw = file_get_contents('php://input');
     $j = json_decode((string)$raw, true);
@@ -715,11 +705,7 @@ class EmployeesModel {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
-    if (!veranda_can('admin')) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+    employees_require_write();
 
     $raw = file_get_contents('php://input');
     $j = json_decode((string)$raw, true);
@@ -1135,11 +1121,7 @@ class EmployeesModel {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
-    if (!veranda_can('admin')) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Forbidden'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+    employees_require_write();
 
     $raw = file_get_contents('php://input');
     $j = json_decode((string)$raw, true);

@@ -17,6 +17,27 @@ function employees_json_exit(array $payload, int $code = 200): void {
     exit;
 }
 
+/**
+ * Single gate for every write-operation in employees/Model.php.
+ *
+ * Original code had `if (!veranda_can('admin'))` repeated in 5 Model
+ * methods. That coupled the financial actions on this page to the
+ * super-admin permission — meaning a user granted only `employees`
+ * (via /admin/access) could view but not pay. `admin` is a global
+ * super-permission that also unlocks /admin/access itself, so giving
+ * it to e.g. a finance assistant was the wrong escalation.
+ *
+ * New rule: holding the `employees` permission is enough to act on
+ * this page. The page-load and AJAX gates already enforce it; this
+ * helper is the last line of defence so Model methods stay safe even
+ * if a future caller skips the dispatcher.
+ */
+function employees_require_write(): void {
+    if (!\App\Infrastructure\Permissions::can('employees')) {
+        \App\Infrastructure\Permissions::denyJsonExit('Forbidden');
+    }
+}
+
 function employees_csrf_ensure(): string {
     if (session_status() !== PHP_SESSION_ACTIVE) {
         return '';
