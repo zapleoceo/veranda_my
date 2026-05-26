@@ -394,6 +394,7 @@ body.pd3-mode-out .pd3-section--out { display: block; }
 .pd3-table { table-layout: auto; }
 .pd3-col--hide,
 .pd3-col--cb,
+.pd3-col--create,
 .pd3-col--anchor,
 .pd3-col--lead,
 .pd3-col--time,
@@ -418,6 +419,7 @@ body.pd3-mode-out .pd3-section--out { display: block; }
    and the checkbox is small, no need for the wider per-cell padding. */
 .pd3-col--hide,
 .pd3-col--cb,
+.pd3-col--create,
 .pd3-col--anchor,
 .pd3-col--lead { padding-left: var(--pd3-s-1); padding-right: var(--pd3-s-1); }
 .pd3-col--table { text-align: right; }
@@ -1299,9 +1301,10 @@ body.pd3-help-mode [data-help-abs] {
 }
 
 /* "+" button on each OUT-mail row → opens Create-TX modal.
-   Visible only on UNLINKED rows (row-red) — same rule as payday2.
-   Linked rows already have a Poster counterpart, no point offering
-   the create-from-scratch action there. */
+   Lives in its own narrow column (.pd3-col--create) right before the
+   checkbox. Visible only on UNLINKED rows (row-red) — same rule as
+   payday2. Linked rows already have a Poster counterpart, no point
+   offering the create-from-scratch action there. */
 .pd3-out-mail-create {
     display: none;
     align-items: center;
@@ -1317,8 +1320,6 @@ body.pd3-help-mode [data-help-abs] {
     font-weight: 900;
     line-height: 1;
     padding: 0;
-    margin-right: var(--pd3-s-4);
-    vertical-align: middle;
 }
 .pd3-out-mail-create:hover { background: rgba(255,255,255,0.08); }
 tr.row-red .pd3-out-mail-create { display: inline-flex; }

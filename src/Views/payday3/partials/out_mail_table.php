@@ -35,12 +35,13 @@ declare(strict_types=1);
                     <th class="pd3-col pd3-col--content">Content</th>
                     <th class="pd3-col pd3-col--time nowrap">Время</th>
                     <th class="pd3-col pd3-col--sum  nowrap right">Сумма</th>
+                    <th class="pd3-col pd3-col--create"></th>
                     <th class="pd3-col pd3-col--cb"></th>
                     <th class="pd3-col pd3-col--anchor"></th>
                 </tr>
             </thead>
             <tbody>
-                <tr class="pd3-empty"><td colspan="6">Открой OUT, чтобы загрузить почту…</td></tr>
+                <tr class="pd3-empty"><td colspan="7">Открой OUT, чтобы загрузить почту…</td></tr>
             </tbody>
         </table>
     </div>
