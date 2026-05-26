@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Infrastructure\Permissions;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -11,10 +12,11 @@ class EmployeesController
 {
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $perms = $_SESSION['user_permissions'] ?? null;
-        if (is_array($perms) && empty($perms['employees'])) {
-            $response->getBody()->write('Forbidden');
-            return $response->withStatus(403)->withHeader('Content-Type', 'text/plain');
+        // Single permission gate — same helper the sidebar and legacy
+        // AJAX dispatcher use, so a revoked user can neither see the
+        // link, open the page, nor fire AJAX.
+        if (!Permissions::can('employees')) {
+            return Permissions::denyHtml($response);
         }
 
         date_default_timezone_set('Asia/Ho_Chi_Minh');

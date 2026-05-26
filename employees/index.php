@@ -11,7 +11,22 @@ require_once __DIR__ . '/http.php';
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
-veranda_require('employees');
+// Page-level permission gate. Strict via the shared Permissions helper:
+// denies if user_permissions isn't loaded OR `employees` is falsy. Same
+// rule as the sidebar link visibility and EmployeesController::index,
+// so a revoked user gets a consistent 403 everywhere.
+//
+// For AJAX requests we return JSON 403 so the front-end can show a
+// proper toast instead of trying to parse the legacy "Forbidden" text.
+$ajax = (string)($_GET['ajax'] ?? '');
+if (!\App\Infrastructure\Permissions::can('employees')) {
+    if ($ajax !== '') {
+        \App\Infrastructure\Permissions::denyJsonExit('Нет прав на страницу «ЗП сотрудников»');
+    }
+    http_response_code(403);
+    echo 'Forbidden';
+    exit;
+}
 
 $posterToken = (string)($_ENV['POSTER_API_TOKEN'] ?? '');
 if ($posterToken === '') {
@@ -24,7 +39,6 @@ require_once __DIR__ . '/Model.php';
 $model = new \App\Models\EmployeesModel($db, $posterToken);
 
 $employeesCsrf = employees_csrf_ensure();
-$ajax = (string)($_GET['ajax'] ?? '');
 
 if ($ajax !== '') {
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
