@@ -15,6 +15,16 @@ class TelegramAlertService
     private const EDIT_COOLDOWN_SECONDS = 60;
     private const STATUS_LOCK_NAME      = 'tg_status_msg';
     private const STATUS_MSG_HISTORY    = 10;
+    private const RUN_LOCK_NAME         = 'tg_alerts_run';
+
+    /**
+     * Telegram bots can edit/delete their own messages only for 48h after
+     * sending (unless the bot is admin with delete_messages permission).
+     * Past that window the API replies "message to delete not found" and
+     * the message becomes a permanent orphan. We bail early to avoid the
+     * round-trip + log noise, and to know when to give up retrying.
+     */
+    private const BOT_MUTATION_WINDOW_SECONDS = 47 * 3600; // 47h to be safe of clock drift
 
     public function __construct(
         private readonly Database            $db,
@@ -26,31 +36,62 @@ class TelegramAlertService
 
     public function run(): void
     {
-        $startedAt = microtime(true);
-        $today     = date('Y-m-d');
-        $nowTs     = time();
-        $now       = date('Y-m-d H:i:s', $nowTs);
+        // Whole-run lock so two crons started inside the same minute don't
+        // race on tg_alert_items (would otherwise double-send or double-edit).
+        // GET_LOCK(... ,0) is non-blocking — overlapping tick just no-ops.
+        // The lock is session-scoped; if PHP dies before RELEASE_LOCK fires,
+        // MySQL auto-releases when the connection closes.
+        $haveLock = (int) $this->db
+            ->query("SELECT GET_LOCK(?, 0) AS l", [self::RUN_LOCK_NAME])
+            ->fetchColumn();
+        if ($haveLock !== 1) {
+            Logger::get()->info('telegram_alerts.skipped_locked');
+            return;
+        }
 
-        $settings  = $this->_loadSettings();
-        $metrics   = $this->_calculateMetrics($today, $settings);
-        $this->_updateStatusMessage($metrics, $now);
+        try {
+            $startedAt = microtime(true);
+            $today     = date('Y-m-d');
+            $nowTs     = time();
+            $now       = date('Y-m-d H:i:s', $nowTs);
 
-        $cutoff  = date('Y-m-d H:i:s', strtotime("-{$metrics->waitLimitMinutes} minutes"));
-        $rows    = $this->_fetchOverdueRows($today, $cutoff);
-        $stats   = $this->_processItems($rows, $today, $now, $nowTs);
+            $settings  = $this->_loadSettings();
+            $metrics   = $this->_calculateMetrics($today, $settings);
+            $this->_updateStatusMessage($metrics, $now);
 
-        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
-        $this->_writeRunMeta($today, $durationMs, $metrics, $stats);
+            $cutoff  = date('Y-m-d H:i:s', strtotime("-{$metrics->waitLimitMinutes} minutes"));
+            $rows    = $this->_fetchOverdueRows($today, $cutoff, $settings);
+            $stats   = $this->_processItems($rows, $today, $now, $nowTs);
 
-        Logger::get()->info('telegram_alerts.done', [
-            'duration_ms' => $durationMs,
-            'open'        => $metrics->openChecksDisplay,
-            'wait'        => $metrics->waitLimitMinutes,
-            'sent'        => $stats['sent'],
-            'edited'      => $stats['edited'],
-            'deleted'     => $stats['deleted'],
-            'unchanged'   => $stats['unchanged'],
-        ]);
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+            $this->_writeRunMeta($today, $durationMs, $metrics, $stats);
+
+            Logger::get()->info('telegram_alerts.done', [
+                'duration_ms' => $durationMs,
+                'open'        => $metrics->openChecksDisplay,
+                'wait'        => $metrics->waitLimitMinutes,
+                'sent'        => $stats['sent'],
+                'edited'      => $stats['edited'],
+                'deleted'     => $stats['deleted'],
+                'unchanged'   => $stats['unchanged'],
+            ]);
+        } finally {
+            try { $this->db->query("SELECT RELEASE_LOCK(?)", [self::RUN_LOCK_NAME]); } catch (\Throwable) {}
+        }
+    }
+
+    /**
+     * Builds the WHERE-fragment that excludes ignored/auto-excluded items.
+     * Shared between metrics counting and overdue-row fetching so the
+     * "Долгих блюд" counter on the status message always matches the actual
+     * alerts in the chat. Previously _fetchOverdueRows hardcoded one variant
+     * which silently disagreed with the counter when ko_use_logical_close=0.
+     */
+    private function _excludeSqlForSettings(\stdClass $s): string
+    {
+        return $s->ko_use_logical_close
+            ? " AND COALESCE(exclude_from_dashboard, 0) = 0 "
+            : " AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0) ";
     }
 
     // ─── settings ────────────────────────────────────────────────────────────
@@ -78,9 +119,7 @@ class TelegramAlertService
     private function _calculateMetrics(string $today, \stdClass $s): \stdClass
     {
         $ks         = $this->db->t('kitchen_stats');
-        $excludeSql = $s->ko_use_logical_close
-            ? " AND COALESCE(exclude_from_dashboard, 0) = 0 "
-            : " AND NOT (COALESCE(exclude_from_dashboard, 0) = 1 AND COALESCE(exclude_auto, 0) = 0) ";
+        $excludeSql = $this->_excludeSqlForSettings($s);
 
         // Open checks / load count
         if ($s->exclude_partners_from_load) {
@@ -160,11 +199,11 @@ class TelegramAlertService
 
     private function _updateStatusMessage(\stdClass $m, string $now): void
     {
+        $haveLock = (int) $this->db->query("SELECT GET_LOCK(?, 0) AS l", [self::STATUS_LOCK_NAME])->fetchColumn();
+        if ($haveLock !== 1) {
+            return;
+        }
         try {
-            $lock = $this->db->query("SELECT GET_LOCK(?, 0) AS l", [self::STATUS_LOCK_NAME])->fetchColumn();
-            if ((int) $lock !== 1) {
-                return;
-            }
 
             $lastSync   = $this->meta->get('poster_last_sync_at', $now);
             $srvTag     = trim((string) (php_uname('n') ?: ''));
@@ -217,7 +256,6 @@ class TelegramAlertService
             // flickered the status line in the chat.
             $currentHash = sha1($statusText);
             if ($prevId > 0 && $prevHash === $currentHash) {
-                $this->db->query("SELECT RELEASE_LOCK(?)", [self::STATUS_LOCK_NAME]);
                 return;
             }
 
@@ -239,7 +277,6 @@ class TelegramAlertService
                         'telegram_status_msg_id'   => '0',
                         'telegram_status_msg_hash' => '',
                     ]);
-                    $this->db->query("SELECT RELEASE_LOCK(?)", [self::STATUS_LOCK_NAME]);
                     return;
                 }
             }
@@ -255,29 +292,28 @@ class TelegramAlertService
                     $this->bot->deleteMessage((int) $id);
                 }
             }
-
-            $this->db->query("SELECT RELEASE_LOCK(?)", [self::STATUS_LOCK_NAME]);
         } catch (\Throwable $e) {
             Logger::get()->warning('telegram_alerts.status_fail', ['error' => $e->getMessage()]);
+        } finally {
+            try { $this->db->query("SELECT RELEASE_LOCK(?)", [self::STATUS_LOCK_NAME]); } catch (\Throwable) {}
         }
     }
 
     // ─── overdue items ────────────────────────────────────────────────────────
 
-    private function _fetchOverdueRows(string $today, string $cutoff): array
+    private function _fetchOverdueRows(string $today, string $cutoff, \stdClass $s): array
     {
-        $ks = $this->db->t('kitchen_stats');
-        // exclude_sql based on settings already baked into cutoff; re-use simple form here
+        $ks         = $this->db->t('kitchen_stats');
+        $excludeSql = $this->_excludeSqlForSettings($s);
         return $this->db->query(
             "SELECT id, transaction_id, receipt_number, table_number, waiter_name,
-                    transaction_comment, dish_name, ticket_sent_at
+                    transaction_comment, dish_name, ticket_sent_at, tg_sent_at
              FROM {$ks}
              WHERE ready_pressed_at IS NULL
                AND ticket_sent_at IS NOT NULL
                AND transaction_date = ?
                AND status = 1
-               AND COALESCE(was_deleted, 0) = 0
-               AND COALESCE(exclude_from_dashboard, 0) = 0
+               AND COALESCE(was_deleted, 0) = 0 {$excludeSql}
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
                AND ticket_sent_at < ?
              ORDER BY transaction_id ASC, ticket_sent_at ASC, id ASC",
@@ -290,18 +326,44 @@ class TelegramAlertService
         $existing    = $this->alertItems->findByDate($today);
         $candidateIds = array_flip(array_filter(array_column($rows, 'id')));
 
-        $sent = $edited = $deleted = $unchanged = 0;
+        $sent = $edited = $deleted = $unchanged = $deferred = 0;
 
         // Delete alerts for items no longer overdue
         foreach ($existing as $kid => $item) {
             if (isset($candidateIds[$kid])) {
                 continue;
             }
-            if ($item->messageId !== null) {
-                $this->bot->deleteMessage($item->messageId);
-                $deleted++;
+            if ($item->messageId === null) {
+                $this->alertItems->delete($today, $kid);
+                continue;
             }
-            $this->alertItems->delete($today, $kid);
+
+            $deletedOk = $this->bot->deleteMessage($item->messageId);
+            if ($deletedOk) {
+                $deleted++;
+                $this->alertItems->delete($today, $kid);
+                continue;
+            }
+
+            // Bot-not-admin scenario: delete may have failed because the
+            // message is older than 48h. Past that point retrying will keep
+            // failing forever — give up cleanly and stop logging noise.
+            // If we're still within the editable window, leave the row so
+            // the next tick tries again (covers transient API errors).
+            if ($this->_isPastMutationWindow($item)) {
+                Logger::get()->info('telegram_alerts.delete_orphan', [
+                    'kid'        => $kid,
+                    'message_id' => $item->messageId,
+                    'reason'     => 'past_48h_window',
+                ]);
+                $this->alertItems->delete($today, $kid);
+            } else {
+                // Leave the row in place so the next tick retries. We DON'T
+                // touch last_seen_at — it's frozen at the last "alive
+                // overdue" tick, so _isPastMutationWindow can use it as an
+                // age proxy and eventually give up.
+                $deferred++;
+            }
         }
 
         // Send/edit alerts for current overdue items
@@ -355,7 +417,22 @@ class TelegramAlertService
             }
         }
 
-        return compact('sent', 'edited', 'deleted', 'unchanged');
+        return compact('sent', 'edited', 'deleted', 'unchanged', 'deferred');
+    }
+
+    /**
+     * Returns true if the message backed by $item is past the 48h window
+     * Telegram allows non-admin bots to mutate. We use AlertItem::lastSeenAt
+     * as a proxy for sent time — it's updated on every tick the alert is
+     * still alive, so it lower-bounds the message age.
+     */
+    private function _isPastMutationWindow(\App\Models\AlertItem $item): bool
+    {
+        $seen = $item->lastSeenAt ?? '';
+        if ($seen === '') {
+            return false; // unknown age — don't assume the worst
+        }
+        return (time() - (int) strtotime($seen)) > self::BOT_MUTATION_WINDOW_SECONDS;
     }
 
     private function _buildItemMessage(array $r, int $nowTs): array
