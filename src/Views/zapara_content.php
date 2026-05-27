@@ -37,4 +37,10 @@
     <div class="grid" id="charts"><div class="card muted" style="display:flex; align-items:center; justify-content:center; min-height: 120px;">Выбери период и нажми «Загрузить»</div></div>
 </div>
 
-<script src="/assets/js/zapara.js?v=20260516_slash"></script>
+<?php
+// Auto-bust the JS cache on every deploy — filemtime echo'd into the
+// query string means a fresh ?v= every code update, no manual bumps.
+$_zaparaJs = __DIR__ . '/../../assets/js/zapara.js';
+$_zaparaV  = @filemtime($_zaparaJs) ?: '1';
+?>
+<script src="/assets/js/zapara.js?v=<?= htmlspecialchars((string)$_zaparaV) ?>"></script>
