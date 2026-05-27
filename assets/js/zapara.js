@@ -420,37 +420,18 @@
         return span;
     };
 
-    // Глобальная легенда сверху над сеткой графиков. Один раз, не дублируется
-    // под каждой карточкой — чтобы не отнимать вертикальное пространство и
-    // глаз не дёргался от 8 одинаковых легенд по сетке.
-    const renderGlobalLegend = (isDishes) => {
-        const wrap = document.createElement('div');
-        wrap.style.padding = '6px 14px';
-        wrap.style.marginBottom = '10px';
-        wrap.style.background = 'rgba(255,255,255,0.04)';
-        wrap.style.border = '1px solid rgba(255,255,255,0.06)';
-        wrap.style.borderRadius = '10px';
-        wrap.style.display = 'flex';
-        wrap.style.flexWrap = 'wrap';
-        wrap.style.alignItems = 'center';
-        wrap.style.gap = '6px 0';
+    // Легенда — инлайн внутри подзаголовка «Источник: Poster ...».
+    // Переписывается каждый раз render() — пересоздаём чипы под текущую метрику.
+    const updateLegendInline = (isDishes) => {
+        const slot = document.getElementById('zapLegend');
+        if (!slot) return;
+        slot.innerHTML = '';
         if (isDishes) {
-            wrap.appendChild(makeLegendChip('Кухня', SERIES_COLORS.kitchen));
-            wrap.appendChild(makeLegendChip('Бар',   SERIES_COLORS.bar));
-            const hint = document.createElement('span');
-            hint.className = 'muted';
-            hint.style.fontSize = '12px';
-            hint.textContent = 'Наведи мышь на график для деталей по часу';
-            wrap.appendChild(hint);
+            slot.appendChild(makeLegendChip('Кухня', SERIES_COLORS.kitchen));
+            slot.appendChild(makeLegendChip('Бар',   SERIES_COLORS.bar));
         } else {
-            wrap.appendChild(makeLegendChip('Чеки', SERIES_COLORS.checks));
-            const hint = document.createElement('span');
-            hint.className = 'muted';
-            hint.style.fontSize = '12px';
-            hint.textContent = 'Наведи мышь на график для деталей по часу';
-            wrap.appendChild(hint);
+            slot.appendChild(makeLegendChip('Чеки', SERIES_COLORS.checks));
         }
-        return wrap;
     };
 
     // ─── Hover-tooltip overlay ─────────────────────────────────────
@@ -653,8 +634,9 @@
         const daysByDow = (data && data.days_by_dow) ? data.days_by_dow : {};
         const daysTotal = Number((data && data.days_total) ? data.days_total : 0) || 0;
 
-        // Глобальная легенда сверху — одна на всё, не дублируем под каждой карточкой.
-        chartsEl.appendChild(renderGlobalLegend(isDishes));
+        // Легенду рисуем инлайном в подзаголовке «Источник: Poster ...» —
+        // не отбираем место в сетке графиков.
+        updateLegendInline(isDishes);
 
         dows.forEach((d) => {
             const dCnt = Number(daysByDow && daysByDow[d.key] ? daysByDow[d.key] : 0) || 0;

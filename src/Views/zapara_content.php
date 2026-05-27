@@ -31,7 +31,10 @@
     </div>
     <div style="margin-top: 12px;">
         <h1>Zapara</h1>
-        <div class="muted">Источник: Poster (dash.getTransactions), группировка по дню недели и часу открытия чека</div>
+        <div class="muted">
+            Источник: Poster (dash.getTransactions), группировка по дню недели и часу открытия чека
+            <span id="zapLegend" style="margin-left: 14px;"></span>
+        </div>
     </div>
 
     <div class="grid" id="charts"><div class="card muted" style="display:flex; align-items:center; justify-content:center; min-height: 120px;">Выбери период и нажми «Загрузить»</div></div>
