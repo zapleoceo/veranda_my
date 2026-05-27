@@ -391,10 +391,11 @@
         });
     };
 
-    // Цвета двух серий — соответствует легенде в head'е карточки графика.
+    // Цвета двух серий + цвет для одиночной серии «Чеки».
     const SERIES_COLORS = {
         bar:     'rgba(96, 165, 250, 0.92)',   // голубой
         kitchen: 'rgba(255, 145, 90, 0.92)',   // оранжевый
+        checks:  'rgba(255, 120, 120, 0.92)',  // красный — тот же что и старый одиночный
     };
 
     const makeLegendChip = (label, color) => {
@@ -402,19 +403,226 @@
         span.style.display = 'inline-flex';
         span.style.alignItems = 'center';
         span.style.gap = '6px';
-        span.style.marginRight = '12px';
-        span.style.fontSize = '12px';
+        span.style.marginRight = '16px';
+        span.style.fontSize = '13px';
         const dot = document.createElement('span');
         dot.style.display = 'inline-block';
-        dot.style.width = '10px';
-        dot.style.height = '10px';
+        dot.style.width = '12px';
+        dot.style.height = '12px';
         dot.style.borderRadius = '50%';
         dot.style.background = color;
+        dot.style.boxShadow = '0 0 0 2px rgba(255,255,255,.08)';
         const t = document.createElement('span');
         t.textContent = label;
+        t.style.fontWeight = '700';
         span.appendChild(dot);
         span.appendChild(t);
         return span;
+    };
+
+    // Глобальная легенда сверху над сеткой графиков. Один раз, не дублируется
+    // под каждой карточкой — чтобы не отнимать вертикальное пространство и
+    // глаз не дёргался от 8 одинаковых легенд по сетке.
+    const renderGlobalLegend = (isDishes) => {
+        const wrap = document.createElement('div');
+        wrap.style.padding = '6px 14px';
+        wrap.style.marginBottom = '10px';
+        wrap.style.background = 'rgba(255,255,255,0.04)';
+        wrap.style.border = '1px solid rgba(255,255,255,0.06)';
+        wrap.style.borderRadius = '10px';
+        wrap.style.display = 'flex';
+        wrap.style.flexWrap = 'wrap';
+        wrap.style.alignItems = 'center';
+        wrap.style.gap = '6px 0';
+        if (isDishes) {
+            wrap.appendChild(makeLegendChip('Кухня', SERIES_COLORS.kitchen));
+            wrap.appendChild(makeLegendChip('Бар',   SERIES_COLORS.bar));
+            const hint = document.createElement('span');
+            hint.className = 'muted';
+            hint.style.fontSize = '12px';
+            hint.textContent = 'Наведи мышь на график для деталей по часу';
+            wrap.appendChild(hint);
+        } else {
+            wrap.appendChild(makeLegendChip('Чеки', SERIES_COLORS.checks));
+            const hint = document.createElement('span');
+            hint.className = 'muted';
+            hint.style.fontSize = '12px';
+            hint.textContent = 'Наведи мышь на график для деталей по часу';
+            wrap.appendChild(hint);
+        }
+        return wrap;
+    };
+
+    // ─── Hover-tooltip overlay ─────────────────────────────────────
+    //
+    // Каждый canvas после рендера получает в `._z` копию данных, которыми
+    // его рисовали. mousemove → пересчёт ближайшего часа → перерисовка с
+    // подсветкой + тултип в углу. mouseleave → перерисовка без подсветки.
+    // Дёшево: 15 точек на график, ребайнд занимает <1ms.
+
+    const CHART_PAD = { L: 44, R: 16, T: 12, B: 28 };
+
+    const computeHourIdxLine = (canvas, mouseX, hoursLen) => {
+        const iw = canvas.width - CHART_PAD.L - CHART_PAD.R;
+        const stepX = iw / Math.max(1, hoursLen - 1);
+        const idx = Math.round((mouseX - CHART_PAD.L) / stepX);
+        if (idx < 0 || idx >= hoursLen) return -1;
+        return idx;
+    };
+    const computeHourIdxBar = (canvas, mouseX, hoursLen) => {
+        const iw = canvas.width - CHART_PAD.L - CHART_PAD.R;
+        const barGap = 6;
+        const barW = Math.max(6, Math.floor((iw - barGap * (hoursLen - 1)) / hoursLen));
+        const usedW = barW * hoursLen + barGap * (hoursLen - 1);
+        const startX = CHART_PAD.L + Math.floor((iw - usedW) / 2);
+        const localX = mouseX - startX;
+        if (localX < 0) return -1;
+        const idx = Math.floor(localX / (barW + barGap));
+        if (idx < 0 || idx >= hoursLen) return -1;
+        return idx;
+    };
+
+    /**
+     * Перерисовать canvas по сохранённому в нём _z. Если передан hourIdx — добавить
+     * сверху вертикальный пунктир + тултип со значениями серий за этот час.
+     */
+    const drawCanvasFromZ = (canvas, hoverIdx = -1) => {
+        const z = canvas._z;
+        if (!z) return;
+        if (z.chartType === 'line') {
+            if (z.series.length === 1) drawLine(canvas, z.hours, z.series[0].counts);
+            else drawLineMulti(canvas, z.hours, z.series);
+        } else {
+            if (z.series.length === 1) drawBars(canvas, z.hours, z.series[0].counts, null, z.isAvgChart);
+            else drawBarsStack(canvas, z.hours, z.series, z.isAvgChart);
+        }
+        if (hoverIdx >= 0) drawHoverOverlay(canvas, hoverIdx);
+    };
+
+    const drawHoverOverlay = (canvas, hourIdx) => {
+        const z = canvas._z;
+        if (!z) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const ih = canvas.height - CHART_PAD.T - CHART_PAD.B;
+        const hours = z.hours;
+
+        // X центра выделенного часа — отличается для линии и баров.
+        let cx;
+        if (z.chartType === 'line') {
+            const iw = canvas.width - CHART_PAD.L - CHART_PAD.R;
+            const stepX = iw / Math.max(1, hours.length - 1);
+            cx = CHART_PAD.L + stepX * hourIdx;
+        } else {
+            const iw = canvas.width - CHART_PAD.L - CHART_PAD.R;
+            const barGap = 6;
+            const barW = Math.max(6, Math.floor((iw - barGap * (hours.length - 1)) / hours.length));
+            const usedW = barW * hours.length + barGap * (hours.length - 1);
+            const startX = CHART_PAD.L + Math.floor((iw - usedW) / 2);
+            cx = startX + hourIdx * (barW + barGap) + barW / 2;
+        }
+
+        // Вертикальный пунктир-направляющая.
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(cx, CHART_PAD.T);
+        ctx.lineTo(cx, CHART_PAD.T + ih);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // Состав тултипа.
+        const hourLabel = String(hours[hourIdx]).padStart(2, '0') + ':00';
+        const fmt = (v) => z.isAvgChart
+            ? (Math.round(v * 10) / 10).toFixed(1).replace(/\.0$/, '')
+            : String(Math.round(v));
+        const seriesLines = z.series.map((s) => ({
+            label: s.label,
+            color: s.color,
+            value: fmt(Number(s.counts[String(hours[hourIdx])] || 0)),
+        }));
+        const hasTotal = z.series.length > 1;
+        const totalRaw = z.series.reduce((acc, s) => acc + Number(s.counts[String(hours[hourIdx])] || 0), 0);
+        const totalLine = hasTotal ? { label: 'Всего', value: fmt(totalRaw) } : null;
+
+        // Замер ширины
+        ctx.save();
+        ctx.font = '600 13px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+        let maxW = ctx.measureText(hourLabel).width;
+        ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+        seriesLines.forEach((l) => {
+            const w = ctx.measureText(l.label + ': ' + l.value).width + 16;
+            if (w > maxW) maxW = w;
+        });
+        if (totalLine) {
+            const w = ctx.measureText(totalLine.label + ': ' + totalLine.value).width;
+            if (w > maxW) maxW = w;
+        }
+        const padIn = 10;
+        const lineH = 18;
+        const linesCount = 1 + seriesLines.length + (totalLine ? 1 : 0);
+        const tipW = Math.ceil(maxW) + padIn * 2;
+        const tipH = padIn + linesCount * lineH + padIn - 4;
+        let tipX = cx + 10;
+        if (tipX + tipW > canvas.width - 4) tipX = cx - 10 - tipW;
+        if (tipX < 4) tipX = 4;
+        const tipY = CHART_PAD.T + 4;
+
+        // Фон + бордер
+        ctx.fillStyle = 'rgba(15, 18, 24, 0.93)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.rect(tipX + 0.5, tipY + 0.5, tipW, tipH);
+        ctx.fill();
+        ctx.stroke();
+
+        // Час (жирно)
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = 'rgba(245,238,228,0.95)';
+        ctx.font = '700 13px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+        ctx.fillText(hourLabel, tipX + padIn, tipY + padIn - 2);
+
+        // Серии — с цветной точкой
+        ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+        seriesLines.forEach((line, i) => {
+            const ly = tipY + padIn - 2 + (i + 1) * lineH;
+            ctx.fillStyle = line.color;
+            ctx.beginPath();
+            ctx.arc(tipX + padIn + 4, ly + 6, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(245,238,228,0.85)';
+            ctx.fillText(line.label + ': ' + line.value, tipX + padIn + 14, ly);
+        });
+        // Всего (для мультисерийных)
+        if (totalLine) {
+            const ly = tipY + padIn - 2 + (seriesLines.length + 1) * lineH;
+            ctx.fillStyle = 'rgba(245,238,228,0.95)';
+            ctx.font = '700 12px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+            ctx.fillText(totalLine.label + ': ' + totalLine.value, tipX + padIn, ly);
+        }
+        ctx.restore();
+    };
+
+    const setupCanvasHover = (canvas) => {
+        if (canvas._hoverWired) return;
+        canvas._hoverWired = true;
+        canvas.style.cursor = 'crosshair';
+        canvas.addEventListener('mousemove', (e) => {
+            const z = canvas._z;
+            if (!z) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const idx = z.chartType === 'line'
+                ? computeHourIdxLine(canvas, x, z.hours.length)
+                : computeHourIdxBar(canvas, x, z.hours.length);
+            drawCanvasFromZ(canvas, idx);
+        });
+        canvas.addEventListener('mouseleave', () => drawCanvasFromZ(canvas, -1));
     };
 
     const hours = [];
@@ -445,6 +653,9 @@
         const daysByDow = (data && data.days_by_dow) ? data.days_by_dow : {};
         const daysTotal = Number((data && data.days_total) ? data.days_total : 0) || 0;
 
+        // Глобальная легенда сверху — одна на всё, не дублируем под каждой карточкой.
+        chartsEl.appendChild(renderGlobalLegend(isDishes));
+
         dows.forEach((d) => {
             const dCnt = Number(daysByDow && daysByDow[d.key] ? daysByDow[d.key] : 0) || 0;
             const perDay        = perDayAverages(counts[d.key],        dCnt);
@@ -459,7 +670,6 @@
             const { wrap, canvas } = makeCanvasCard(d.name, meta);
             chartsEl.appendChild(wrap);
             renderOneChart(canvas, isDishes, perDay, perDayBar, perDayKitchen, true);
-            attachLegend(wrap, isDishes);
         });
 
         // «Среднее» — сумма всех dow поделённая на daysTotal.
@@ -474,7 +684,6 @@
         const { wrap, canvas } = makeCanvasCard('Среднее', meta);
         chartsEl.appendChild(wrap);
         renderOneChart(canvas, isDishes, avgAll, avgAllBar, avgAllKitchen, true);
-        attachLegend(wrap, isDishes);
     };
 
     // Усреднение counts_*_by_dow в "среднее по часу за весь период".
@@ -493,35 +702,24 @@
     };
 
     /**
-     * isDishes=true ⇒ две линии/стэк: бар + кухня (без общей).
-     * isDishes=false ⇒ одна линия (чеки нельзя разделить по цехам).
+     * isDishes=true ⇒ две серии: кухня + бар (без общей).
+     * isDishes=false ⇒ одна серия (чеки нельзя разделить по цехам).
+     *
+     * Сохраняет данные в canvas._z и подключает hover-обработчик чтобы
+     * наведение мыши показывало значения за конкретный час.
      */
     const renderOneChart = (canvas, isDishes, totalCounts, barCounts, kitchenCounts, isAvgChart) => {
-        if (!isDishes) {
-            // Чеки: одна линия, без разбивки.
-            if (chartType === 'line') drawLine(canvas, hours, totalCounts);
-            else drawBars(canvas, hours, totalCounts, null, isAvgChart);
-            return;
-        }
-        const series = [
-            { label: 'Кухня', color: SERIES_COLORS.kitchen, counts: kitchenCounts },
-            { label: 'Бар',   color: SERIES_COLORS.bar,     counts: barCounts },
-        ];
-        if (chartType === 'line') drawLineMulti(canvas, hours, series);
-        else drawBarsStack(canvas, hours, series, isAvgChart);
-    };
-
-    // Маленькая инлайн-легенда под графиком (только при разбивке по цехам).
-    const attachLegend = (wrap, isDishes) => {
-        if (!isDishes) return;
-        const legend = document.createElement('div');
-        legend.className = 'muted';
-        legend.style.marginTop = '4px';
-        legend.style.fontSize  = '12px';
-        legend.style.textAlign = 'right';
-        legend.appendChild(makeLegendChip('Кухня', SERIES_COLORS.kitchen));
-        legend.appendChild(makeLegendChip('Бар',   SERIES_COLORS.bar));
-        wrap.appendChild(legend);
+        const series = isDishes
+            ? [
+                { label: 'Кухня', color: SERIES_COLORS.kitchen, counts: kitchenCounts },
+                { label: 'Бар',   color: SERIES_COLORS.bar,     counts: barCounts     },
+              ]
+            : [
+                { label: 'Чеки', color: SERIES_COLORS.checks, counts: totalCounts },
+              ];
+        canvas._z = { hours, series, chartType, isAvgChart };
+        drawCanvasFromZ(canvas, -1);
+        setupCanvasHover(canvas);
     };
 
     const setProgress = (done, total, text) => {
