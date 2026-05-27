@@ -59,16 +59,24 @@ class AuthMiddleware implements MiddlewareInterface
         // same operator can run in parallel — PHP's default file
         // session handler holds an exclusive lock until script end,
         // which otherwise serialises every fetch() coming from one
-        // browser tab. Scoped to /payday3/* (page + API) because
-        // those paths' code is known: RequestThrottle, BalanceSync
-        // and PosterCheckService all call Session::start() themselves
-        // when they need to write, and the read-only actions stay
-        // happy with the in-memory $_SESSION array.
+        // browser tab. Scoped to known read-only-on-session paths:
         //
-        // Legacy modules (/payday2, /employees, /banya, …) still
-        // hold the lock for their entire request to avoid silently
-        // dropping their own session writes.
-        if (str_starts_with($request->getUri()->getPath(), '/payday3')) {
+        //   /payday3/* — RequestThrottle, BalanceSync and
+        //                PosterCheckService all call Session::start()
+        //                themselves when they need to write.
+        //   /zapara/*  — workshops/dishes report, only reads
+        //                $_SESSION['user_permissions'] once at the
+        //                top of the controller. Without lock release
+        //                the 14 parallel ?ajax=day fetches block
+        //                each other → user sees serial responses
+        //                ≈500ms apart instead of all together.
+        //
+        // Legacy modules (/payday2, /employees, /banya, /roma, …)
+        // still hold the lock for their entire request to avoid
+        // silently dropping their own session writes.
+        $path = $request->getUri()->getPath();
+        if (str_starts_with($path, '/payday3')
+         || str_starts_with($path, '/zapara')) {
             Session::close();
         }
 
