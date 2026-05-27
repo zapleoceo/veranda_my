@@ -7,26 +7,98 @@ class ApiPosterZaparaModel
     private \App\Classes\PosterAPI $api;
     private \DateTimeZone $tz;
 
+    /** product_id => 'bar' | 'kitchen' (memoised within one PHP request) */
+    private ?array $productGroup = null;
+    /** workshop_id => 'bar' | 'kitchen' — what each workshop was classified as */
+    private ?array $workshopGroup = null;
+    /** workshop_id => name (для отладки / отображения) */
+    private ?array $workshopNames = null;
+
     public function __construct(\App\Classes\PosterAPI $api)
     {
         $this->api = $api;
         $this->tz = new \DateTimeZone('Asia/Ho_Chi_Minh');
     }
 
+    /**
+     * Загружает мэппинг product_id → группа цеха ('bar' или 'kitchen') живьём
+     * из Poster API. Никакой локальной БД: на каждый запрос — свежие данные.
+     *
+     * Один раз на PHP-процесс (memoised), чтобы внутри одного ?ajax=day
+     * не дёргать menu.getProducts повторно.
+     */
+    private function ensureProductGroups(): void
+    {
+        if ($this->productGroup !== null) return;
+
+        // 1) workshop_id → name + классификация по названию
+        $workshops = $this->api->request('menu.getWorkshops', [], 'GET');
+        $this->workshopNames = [];
+        $this->workshopGroup = [];
+        if (is_array($workshops)) {
+            foreach ($workshops as $w) {
+                if (!is_array($w)) continue;
+                $wid = (int)($w['workshop_id'] ?? 0);
+                if ($wid <= 0) continue;
+                $name = trim((string)($w['workshop_name'] ?? ''));
+                $this->workshopNames[$wid] = $name;
+                $this->workshopGroup[$wid] = $this->classifyWorkshop($name);
+            }
+        }
+
+        // 2) product_id → workshop_id → group
+        $products = $this->api->request('menu.getProducts', [], 'GET');
+        $this->productGroup = [];
+        if (is_array($products)) {
+            foreach ($products as $p) {
+                if (!is_array($p)) continue;
+                $pid = (int)($p['product_id'] ?? 0);
+                if ($pid <= 0) continue;
+                $wid = (int)($p['workshop'] ?? $p['workshop_id'] ?? 0);
+                $this->productGroup[$pid] = $this->workshopGroup[$wid] ?? 'kitchen';
+            }
+        }
+    }
+
+    /**
+     * Простая классификация по названию цеха. Всё что содержит «бар»/«bar»/
+     * «напит»/«drink»/«кофе»/«coffee» — это бар, остальное считается кухней.
+     * Если в Веранде у цеха будет «нестандартное» название и он попадёт не туда,
+     * правим один список ключевых слов здесь.
+     */
+    private function classifyWorkshop(string $name): string
+    {
+        if ($name === '') return 'kitchen';
+        $lower = mb_strtolower($name, 'UTF-8');
+        $barKeywords = ['бар', 'bar', 'напит', 'drink', 'кофе', 'coffee'];
+        foreach ($barKeywords as $kw) {
+            if (mb_strpos($lower, $kw) !== false) return 'bar';
+        }
+        return 'kitchen';
+    }
+
     public function day(string $date): array
     {
+        $this->ensureProductGroups();
+
         $hours = [];
         for ($h = 9; $h <= 23; $h++) $hours[] = $h;
 
         $countsByHourChecks = [];
         $countsByHourDishes = [];
+        $countsByHourBar     = [];
+        $countsByHourKitchen = [];
         foreach ($hours as $h) {
-            $countsByHourChecks[(string)$h] = 0;
-            $countsByHourDishes[(string)$h] = 0;
+            $countsByHourChecks[(string)$h]  = 0;
+            $countsByHourDishes[(string)$h]  = 0;
+            $countsByHourBar[(string)$h]     = 0;
+            $countsByHourKitchen[(string)$h] = 0;
         }
 
-        $totalChecks = 0;
-        $totalDishes = 0;
+        $totalChecks  = 0;
+        $totalDishes  = 0;
+        $totalBar     = 0;
+        $totalKitchen = 0;
 
         $nextTr = null;
         $prevNextTr = null;
@@ -72,7 +144,9 @@ class ApiPosterZaparaModel
                 $countsByHourChecks[$hourKey] += 1;
                 $totalChecks++;
 
-                $dishCount = 0;
+                $dishCount    = 0;
+                $dishBar      = 0;
+                $dishKitchen  = 0;
                 $prods = $tx['products'] ?? null;
                 if (is_array($prods)) {
                     foreach ($prods as $p) {
@@ -81,12 +155,26 @@ class ApiPosterZaparaModel
                         if (is_string($c)) $c = str_replace(',', '.', trim($c));
                         $cn = is_numeric($c) ? (float)$c : 1.0;
                         if ($cn <= 0) continue;
-                        $dishCount += (int)round($cn);
+                        $n = (int)round($cn);
+                        $dishCount += $n;
+
+                        // Каждый product_id отображаем на группу цеха
+                        // ('bar' / 'kitchen'). По умолчанию (если товара нет в
+                        // мэппинге — например удалён или это услуга) считаем
+                        // как кухню, чтобы общий total = bar + kitchen.
+                        $pid = (int)($p['product_id'] ?? 0);
+                        $group = $this->productGroup[$pid] ?? 'kitchen';
+                        if ($group === 'bar') $dishBar     += $n;
+                        else                  $dishKitchen += $n;
                     }
                 }
                 if ($dishCount > 0) {
-                    $countsByHourDishes[$hourKey] += $dishCount;
-                    $totalDishes += $dishCount;
+                    $countsByHourDishes[$hourKey]  += $dishCount;
+                    $countsByHourBar[$hourKey]     += $dishBar;
+                    $countsByHourKitchen[$hourKey] += $dishKitchen;
+                    $totalDishes  += $dishCount;
+                    $totalBar     += $dishBar;
+                    $totalKitchen += $dishKitchen;
                 }
             }
 
@@ -103,10 +191,19 @@ class ApiPosterZaparaModel
             'dow' => $dow,
             'status' => 2,
             'hours' => $hours,
-            'counts_by_hour_checks' => $countsByHourChecks,
-            'counts_by_hour_dishes' => $countsByHourDishes,
-            'total_checks' => $totalChecks,
-            'total_dishes' => $totalDishes,
+            'counts_by_hour_checks'  => $countsByHourChecks,
+            'counts_by_hour_dishes'  => $countsByHourDishes,
+            'counts_by_hour_bar'     => $countsByHourBar,
+            'counts_by_hour_kitchen' => $countsByHourKitchen,
+            'total_checks'  => $totalChecks,
+            'total_dishes'  => $totalDishes,
+            'total_bar'     => $totalBar,
+            'total_kitchen' => $totalKitchen,
+            // Для отладки — какие цеха увидели и куда их положили. Если
+            // классификация неверна (например цех «Десертная» попал в kitchen,
+            // а он по сути bar) — будет видно в /zapara/?ajax=day&date=...
+            'workshops' => $this->workshopNames ?? [],
+            'workshop_groups' => $this->workshopGroup ?? [],
         ];
     }
 

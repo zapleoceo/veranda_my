@@ -262,56 +262,266 @@
         else drawBars(canvas, hours, countsByHour, null, false);
     };
 
+    // ─── Multi-series renderers (bar workshop + kitchen workshop) ───
+    //
+    // series = [{ label, color, counts: {hour: value} }, ...]
+    // Используется только когда metric === 'dishes' — для чеков разбивка
+    // по цехам не имеет смысла (один чек охватывает оба цеха).
+
+    const drawLineMulti = (canvas, hours, series) => {
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        const padL = 44, padR = 16, padT = 12, padB = 28;
+        const iw = w - padL - padR, ih = h - padT - padB;
+        let maxV = 1;
+        series.forEach((s) => {
+            hours.forEach((hh) => {
+                const v = Number(s.counts[String(hh)] || 0);
+                if (v > maxV) maxV = v;
+            });
+        });
+        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = padT + (ih * i / 4);
+            ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + iw, y); ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(245,238,228,0.62)';
+        ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+        ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        for (let i = 0; i <= 4; i++) {
+            const v = Math.round(maxV * (1 - i / 4));
+            const y = padT + (ih * i / 4);
+            ctx.fillText(String(v), padL - 8, y);
+        }
+        const stepX = iw / Math.max(1, (hours.length - 1));
+        const x0 = padL;
+        series.forEach((s) => {
+            ctx.strokeStyle = s.color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            hours.forEach((hh, idx) => {
+                const v = Number(s.counts[String(hh)] || 0);
+                const x = x0 + stepX * idx;
+                const y = padT + ih - (v / maxV) * ih;
+                if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            ctx.fillStyle = s.color;
+            hours.forEach((hh, idx) => {
+                const v = Number(s.counts[String(hh)] || 0);
+                const x = x0 + stepX * idx;
+                const y = padT + ih - (v / maxV) * ih;
+                ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+            });
+        });
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        hours.forEach((hh, idx) => {
+            if (hh % 2 !== 1) return;
+            const x = x0 + stepX * idx;
+            ctx.fillStyle = 'rgba(245,238,228,0.62)';
+            ctx.fillText(String(hh), x, padT + ih + 6);
+        });
+    };
+
+    // Стэк bar-on-top-of-kitchen — две группы видно в одном столбике.
+    const drawBarsStack = (canvas, hours, series, isAvgChart) => {
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        const padL = 44, padR = 16, padT = 12, padB = 28;
+        const iw = w - padL - padR, ih = h - padT - padB;
+        const totals = hours.map((hh) => {
+            let s = 0;
+            series.forEach((sr) => { s += Number(sr.counts[String(hh)] || 0); });
+            return s;
+        });
+        const maxV = Math.max(1, ...totals);
+        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = padT + (ih * i / 4);
+            ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + iw, y); ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(245,238,228,0.62)';
+        ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+        ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        for (let i = 0; i <= 4; i++) {
+            const v = Math.round(maxV * (1 - i / 4));
+            const y = padT + (ih * i / 4);
+            ctx.fillText(String(v), padL - 8, y);
+        }
+        const barGap = 6;
+        const barW = Math.max(6, Math.floor((iw - barGap * (hours.length - 1)) / hours.length));
+        const usedW = barW * hours.length + barGap * (hours.length - 1);
+        const startX = padL + Math.floor((iw - usedW) / 2);
+
+        hours.forEach((hh, idx) => {
+            const x = startX + idx * (barW + barGap);
+            let stackBottom = padT + ih;
+            series.forEach((sr) => {
+                const v = Number(sr.counts[String(hh)] || 0);
+                if (v <= 0) return;
+                const bh = Math.round((v / maxV) * ih);
+                const y = stackBottom - bh;
+                ctx.fillStyle = sr.color;
+                ctx.fillRect(x, y, barW, bh);
+                stackBottom = y;
+            });
+            const total = totals[idx];
+            if (total > 0) {
+                ctx.save();
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'rgba(11, 15, 22, 0.90)';
+                ctx.font = '900 11px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+                const totalBh = Math.round((total / maxV) * ih);
+                const ty = Math.max(padT + ih - totalBh + 11, padT + ih - totalBh / 2);
+                const tLabel = isAvgChart
+                    ? (Math.round(total * 10) / 10).toFixed(1).replace(/\.0$/, '')
+                    : String(Math.round(total));
+                ctx.fillText(tLabel, x + barW / 2, ty);
+                ctx.restore();
+            }
+            ctx.fillStyle = 'rgba(245,238,228,0.62)';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+            if (hh % 2 === 1) ctx.fillText(String(hh), x + barW / 2, padT + ih + 6);
+        });
+    };
+
+    // Цвета двух серий — соответствует легенде в head'е карточки графика.
+    const SERIES_COLORS = {
+        bar:     'rgba(96, 165, 250, 0.92)',   // голубой
+        kitchen: 'rgba(255, 145, 90, 0.92)',   // оранжевый
+    };
+
+    const makeLegendChip = (label, color) => {
+        const span = document.createElement('span');
+        span.style.display = 'inline-flex';
+        span.style.alignItems = 'center';
+        span.style.gap = '6px';
+        span.style.marginRight = '12px';
+        span.style.fontSize = '12px';
+        const dot = document.createElement('span');
+        dot.style.display = 'inline-block';
+        dot.style.width = '10px';
+        dot.style.height = '10px';
+        dot.style.borderRadius = '50%';
+        dot.style.background = color;
+        const t = document.createElement('span');
+        t.textContent = label;
+        span.appendChild(dot);
+        span.appendChild(t);
+        return span;
+    };
+
     const hours = [];
     for (let hh = 9; hh <= 23; hh++) hours.push(hh);
 
+    /**
+     * Превращает counts_by_dow (для одного дня недели) в перисечасовое
+     * среднее по count'у дней этого dow. Возвращает {hour: per-day-average}.
+     */
+    const perDayAverages = (countsForDow, dCnt) => {
+        const out = {};
+        hours.forEach((h) => {
+            const hk = String(h);
+            const v = countsForDow ? Number(countsForDow[hk] || 0) : 0;
+            out[hk] = dCnt > 0 ? (v / dCnt) : 0;
+        });
+        return out;
+    };
+
     const render = (data) => {
         clearCharts();
-        const counts = metric === 'dishes'
+        const isDishes = (metric === 'dishes');
+        const counts = isDishes
             ? ((data && data.counts_dishes_by_dow) ? data.counts_dishes_by_dow : {})
             : ((data && data.counts_checks_by_dow) ? data.counts_checks_by_dow : ((data && data.counts_by_dow) ? data.counts_by_dow : {}));
+        const countsBar     = (data && data.counts_bar_by_dow)     ? data.counts_bar_by_dow     : {};
+        const countsKitchen = (data && data.counts_kitchen_by_dow) ? data.counts_kitchen_by_dow : {};
         const daysByDow = (data && data.days_by_dow) ? data.days_by_dow : {};
         const daysTotal = Number((data && data.days_total) ? data.days_total : 0) || 0;
-        const avgAll = {};
+
+        dows.forEach((d) => {
+            const dCnt = Number(daysByDow && daysByDow[d.key] ? daysByDow[d.key] : 0) || 0;
+            const perDay        = perDayAverages(counts[d.key],        dCnt);
+            const perDayBar     = perDayAverages(countsBar[d.key],     dCnt);
+            const perDayKitchen = perDayAverages(countsKitchen[d.key], dCnt);
+
+            let dayAvgTotal = 0;
+            hours.forEach((h) => { dayAvgTotal += Number(perDay[String(h)] || 0) || 0; });
+            const dayAvgTxt = (Math.round(dayAvgTotal * 10) / 10).toFixed(1).replace(/\.0$/, '');
+            const unit = isDishes ? 'блюд' : 'чек';
+            const meta = '09:00 — 24:00 · ср/день: ' + dayAvgTxt + ' ' + unit + (dCnt > 0 ? (' · ' + String(dCnt) + ' дн') : '');
+            const { wrap, canvas } = makeCanvasCard(d.name, meta);
+            chartsEl.appendChild(wrap);
+            renderOneChart(canvas, isDishes, perDay, perDayBar, perDayKitchen, true);
+            attachLegend(wrap, isDishes);
+        });
+
+        // «Среднее» — сумма всех dow поделённая на daysTotal.
+        const avgAll        = avgAcrossDows(counts,        daysTotal);
+        const avgAllBar     = avgAcrossDows(countsBar,     daysTotal);
+        const avgAllKitchen = avgAcrossDows(countsKitchen, daysTotal);
+        let avgAllTotal = 0;
+        hours.forEach((h) => { avgAllTotal += Number(avgAll[String(h)] || 0) || 0; });
+        const avgAllTxt = (Math.round(avgAllTotal * 10) / 10).toFixed(1).replace(/\.0$/, '');
+        const unit = isDishes ? 'блюд' : 'чек';
+        const meta = '09:00 — 24:00 · ср/день: ' + avgAllTxt + ' ' + unit;
+        const { wrap, canvas } = makeCanvasCard('Среднее', meta);
+        chartsEl.appendChild(wrap);
+        renderOneChart(canvas, isDishes, avgAll, avgAllBar, avgAllKitchen, true);
+        attachLegend(wrap, isDishes);
+    };
+
+    // Усреднение counts_*_by_dow в "среднее по часу за весь период".
+    const avgAcrossDows = (countsByDow, daysTotal) => {
+        const out = {};
         hours.forEach((h) => {
             const hk = String(h);
             let sum = 0;
             dows.forEach((d) => {
-                const v = counts && counts[d.key] ? Number(counts[d.key][hk] || 0) : 0;
+                const v = countsByDow && countsByDow[d.key] ? Number(countsByDow[d.key][hk] || 0) : 0;
                 if (isFinite(v)) sum += v;
             });
-            avgAll[hk] = daysTotal > 0 ? (sum / daysTotal) : 0;
+            out[hk] = daysTotal > 0 ? (sum / daysTotal) : 0;
         });
+        return out;
+    };
 
-        dows.forEach((d) => {
-            const dCnt = Number(daysByDow && daysByDow[d.key] ? daysByDow[d.key] : 0) || 0;
-            const perDay = {};
-            hours.forEach((h) => {
-                const hk = String(h);
-                const v = counts && counts[d.key] ? Number(counts[d.key][hk] || 0) : 0;
-                perDay[hk] = dCnt > 0 ? (v / dCnt) : 0;
-            });
-            let dayAvgTotal = 0;
-            hours.forEach((h) => { dayAvgTotal += Number(perDay[String(h)] || 0) || 0; });
-            const dayAvgTxt = (Math.round(dayAvgTotal * 10) / 10).toFixed(1).replace(/\.0$/, '');
-            const unit = metric === 'dishes' ? 'блюд' : 'чек';
-            const meta = '09:00 — 24:00 · ср/день: ' + dayAvgTxt + ' ' + unit + (dCnt > 0 ? (' · ' + String(dCnt) + ' дн') : '');
-            const { wrap, canvas } = makeCanvasCard(d.name, meta);
-            chartsEl.appendChild(wrap);
-            if (chartType === 'line') drawLine(canvas, hours, perDay);
-            else drawBars(canvas, hours, perDay, null, true);
-        });
-        {
-            let avgAllTotal = 0;
-            hours.forEach((h) => { avgAllTotal += Number(avgAll[String(h)] || 0) || 0; });
-            const avgAllTxt = (Math.round(avgAllTotal * 10) / 10).toFixed(1).replace(/\.0$/, '');
-            const unit = metric === 'dishes' ? 'блюд' : 'чек';
-            const meta = '09:00 — 24:00 · ср/день: ' + avgAllTxt + ' ' + unit;
-            const { wrap, canvas } = makeCanvasCard('Среднее', meta);
-            chartsEl.appendChild(wrap);
-            if (chartType === 'line') drawLine(canvas, hours, avgAll);
-            else drawBars(canvas, hours, avgAll, null, true);
+    /**
+     * isDishes=true ⇒ две линии/стэк: бар + кухня (без общей).
+     * isDishes=false ⇒ одна линия (чеки нельзя разделить по цехам).
+     */
+    const renderOneChart = (canvas, isDishes, totalCounts, barCounts, kitchenCounts, isAvgChart) => {
+        if (!isDishes) {
+            // Чеки: одна линия, без разбивки.
+            if (chartType === 'line') drawLine(canvas, hours, totalCounts);
+            else drawBars(canvas, hours, totalCounts, null, isAvgChart);
+            return;
         }
+        const series = [
+            { label: 'Кухня', color: SERIES_COLORS.kitchen, counts: kitchenCounts },
+            { label: 'Бар',   color: SERIES_COLORS.bar,     counts: barCounts },
+        ];
+        if (chartType === 'line') drawLineMulti(canvas, hours, series);
+        else drawBarsStack(canvas, hours, series, isAvgChart);
+    };
+
+    // Маленькая инлайн-легенда под графиком (только при разбивке по цехам).
+    const attachLegend = (wrap, isDishes) => {
+        if (!isDishes) return;
+        const legend = document.createElement('div');
+        legend.className = 'muted';
+        legend.style.marginTop = '4px';
+        legend.style.fontSize  = '12px';
+        legend.style.textAlign = 'right';
+        legend.appendChild(makeLegendChip('Кухня', SERIES_COLORS.kitchen));
+        legend.appendChild(makeLegendChip('Бар',   SERIES_COLORS.bar));
+        wrap.appendChild(legend);
     };
 
     const setProgress = (done, total, text) => {
@@ -364,14 +574,20 @@
         clearCharts();
         chartsEl.innerHTML = '<div class="card muted" style="display:flex; align-items:center; justify-content:center; min-height: 120px;">Загрузка…</div>';
         try {
-            const countsChecks = {};
-            const countsDishes = {};
+            const countsChecks  = {};
+            const countsDishes  = {};
+            const countsBar     = {};
+            const countsKitchen = {};
             for (let dow = 1; dow <= 7; dow++) {
-                countsChecks[String(dow)] = {};
-                countsDishes[String(dow)] = {};
+                countsChecks[String(dow)]  = {};
+                countsDishes[String(dow)]  = {};
+                countsBar[String(dow)]     = {};
+                countsKitchen[String(dow)] = {};
                 hours.forEach((h) => {
-                    countsChecks[String(dow)][String(h)] = 0;
-                    countsDishes[String(dow)][String(h)] = 0;
+                    countsChecks[String(dow)][String(h)]  = 0;
+                    countsDishes[String(dow)][String(h)]  = 0;
+                    countsBar[String(dow)][String(h)]     = 0;
+                    countsKitchen[String(dow)][String(h)] = 0;
                 });
             }
             const daysByDow = {};
@@ -405,17 +621,19 @@
                     throw new Error(reason);
                 }
                 const dow = String(j.dow || '');
-                const byHourChecks = j.counts_by_hour_checks || {};
-                const byHourDishes = j.counts_by_hour_dishes || {};
+                const byHourChecks  = j.counts_by_hour_checks  || {};
+                const byHourDishes  = j.counts_by_hour_dishes  || {};
+                const byHourBar     = j.counts_by_hour_bar     || {};
+                const byHourKitchen = j.counts_by_hour_kitchen || {};
                 if (!countsChecks[dow]) return;
                 daysByDow[dow] = (Number(daysByDow[dow] || 0) || 0) + 1;
                 daysTotal += 1;
                 hours.forEach((h) => {
                     const hk = String(h);
-                    const v1 = Number(byHourChecks[hk] || 0) || 0;
-                    const v2 = Number(byHourDishes[hk] || 0) || 0;
-                    countsChecks[dow][hk] += v1;
-                    countsDishes[dow][hk] += v2;
+                    countsChecks[dow][hk]  += Number(byHourChecks[hk]  || 0) || 0;
+                    countsDishes[dow][hk]  += Number(byHourDishes[hk]  || 0) || 0;
+                    countsBar[dow][hk]     += Number(byHourBar[hk]     || 0) || 0;
+                    countsKitchen[dow][hk] += Number(byHourKitchen[hk] || 0) || 0;
                 });
 
             };
@@ -440,7 +658,14 @@
 
             await Promise.all(workers);
             hideProgress();
-            lastData = { counts_checks_by_dow: countsChecks, counts_dishes_by_dow: countsDishes, days_by_dow: daysByDow, days_total: daysTotal };
+            lastData = {
+                counts_checks_by_dow:  countsChecks,
+                counts_dishes_by_dow:  countsDishes,
+                counts_bar_by_dow:     countsBar,
+                counts_kitchen_by_dow: countsKitchen,
+                days_by_dow:           daysByDow,
+                days_total:            daysTotal,
+            };
             render(lastData);
             if (errors.length) {
                 const head = errors.slice(0, 3).map((x) => x.date + ': ' + x.error).join('\n');
