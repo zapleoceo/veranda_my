@@ -393,7 +393,17 @@
                 const txt = await res.text();
                 let j = null;
                 try { j = JSON.parse(txt); } catch (_) {}
-                if (!j || !j.ok) throw new Error((j && j.error) ? j.error : ('Ошибка (' + String(res.status) + ')'));
+                if (!j || !j.ok) {
+                    // Если сервер вернул не-JSON (например HTML с ошибкой Slim),
+                    // показываем первые ~200 символов тела вместо обобщённого «(500)»,
+                    // чтобы причина была видна в alert клиенту.
+                    const reason = (j && j.error)
+                        ? j.error
+                        : (txt
+                            ? txt.replace(/<[^>]+>/g, '').trim().slice(0, 200)
+                            : ('Ошибка (' + String(res.status) + ')'));
+                    throw new Error(reason);
+                }
                 const dow = String(j.dow || '');
                 const byHourChecks = j.counts_by_hour_checks || {};
                 const byHourDishes = j.counts_by_hour_dishes || {};
