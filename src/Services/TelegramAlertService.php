@@ -74,6 +74,7 @@ class TelegramAlertService
                 'edited'      => $stats['edited'],
                 'deleted'     => $stats['deleted'],
                 'unchanged'   => $stats['unchanged'],
+                'deferred'    => $stats['deferred'] ?? 0,
             ]);
         } finally {
             try { $this->db->query("SELECT RELEASE_LOCK(?)", [self::RUN_LOCK_NAME]); } catch (\Throwable) {}
