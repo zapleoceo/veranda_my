@@ -21,42 +21,121 @@ class ApiPosterZaparaModel
     }
 
     /**
-     * Загружает мэппинг product_id → группа цеха ('bar' или 'kitchen') живьём
-     * из Poster API. Никакой локальной БД: на каждый запрос — свежие данные.
+     * Параллельно тянет все три исходных запроса Poster для одного дня:
+     *   menu.getWorkshops, menu.getProducts, dash.getTransactions(первая страница).
+     * Через curl_multi → wall-time = max(longest call), а не сумма всех трёх.
+     * Никакого кеширования, всё живьём на каждый ?ajax=day.
      *
-     * Один раз на PHP-процесс (memoised), чтобы внутри одного ?ajax=day
-     * не дёргать menu.getProducts повторно.
+     * Возвращает: [workshopsArr, productsArr, transactionsFirstBatch].
      */
-    private function ensureProductGroups(): void
+    private function fetchDayInitialParallel(string $date): array
     {
-        if ($this->productGroup !== null) return;
+        // Достаём токен через рефлексию — он private в PosterAPI, переиспользуем
+        // тот же ключ без правки публичного API клиента.
+        $ref = new \ReflectionClass($this->api);
+        $tokenProp = $ref->getProperty('token');
+        $tokenProp->setAccessible(true);
+        $token = (string)$tokenProp->getValue($this->api);
+        if ($token === '') throw new \RuntimeException('Poster token is empty');
 
-        // 1) workshop_id → name + классификация по названию
-        $workshops = $this->api->request('menu.getWorkshops', [], 'GET');
-        $this->workshopNames = [];
-        $this->workshopGroup = [];
-        if (is_array($workshops)) {
-            foreach ($workshops as $w) {
-                if (!is_array($w)) continue;
-                $wid = (int)($w['workshop_id'] ?? 0);
-                if ($wid <= 0) continue;
-                $name = trim((string)($w['workshop_name'] ?? ''));
-                $this->workshopNames[$wid] = $name;
-                $this->workshopGroup[$wid] = $this->classifyWorkshop($name);
-            }
+        $base   = 'https://joinposter.com/api/';
+        $dateYmd = str_replace('-', '', $date);
+        $urls = [
+            'workshops' => $base . 'menu.getWorkshops?' . http_build_query(['token' => $token]),
+            'products'  => $base . 'menu.getProducts?'  . http_build_query(['token' => $token, 'hidden' => 0]),
+            'tx'        => $base . 'dash.getTransactions?' . http_build_query([
+                'token'             => $token,
+                'dateFrom'          => $dateYmd,
+                'dateTo'            => $dateYmd,
+                'status'            => 2,
+                'include_products'  => 'true',
+                'include_history'   => 'false',
+                'include_delivery'  => 'false',
+                'timezone'          => 'client',
+            ]),
+        ];
+
+        $mh = curl_multi_init();
+        $handles = [];
+        foreach ($urls as $name => $url) {
+            $ch = $this->buildCurl($url);
+            curl_multi_add_handle($mh, $ch);
+            $handles[$name] = $ch;
         }
 
-        // 2) product_id → workshop_id → group
-        $products = $this->api->request('menu.getProducts', [], 'GET');
+        // Классический curl_multi-event-loop. select() блочится на готовности
+        // любого из handle'ов чтобы не крутить busy-loop CPU.
+        $running = null;
+        do {
+            $status = curl_multi_exec($mh, $running);
+            if ($running > 0) curl_multi_select($mh, 0.1);
+        } while ($running > 0 && $status === CURLM_OK);
+
+        $result = [];
+        foreach ($handles as $name => $ch) {
+            $raw  = curl_multi_getcontent($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err  = curl_error($ch);
+            curl_multi_remove_handle($mh, $ch);
+            curl_close($ch);
+            $result[$name] = $this->parsePosterResponse('menu.'.$name, $raw, $code, $err);
+        }
+        curl_multi_close($mh);
+
+        return [$result['workshops'], $result['products'], $result['tx']];
+    }
+
+    private function buildCurl(string $url)
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_ENCODING, 'gzip');
+        return $ch;
+    }
+
+    private function parsePosterResponse(string $method, $raw, int $code, string $err): array
+    {
+        if ($err !== '') throw new \RuntimeException('CURL ' . $method . ': ' . $err);
+        if (!is_string($raw) || $raw === '') {
+            throw new \RuntimeException('Poster ' . $method . ': empty response (http=' . $code . ')');
+        }
+        $j = json_decode($raw, true);
+        if (!is_array($j)) {
+            throw new \RuntimeException('Poster ' . $method . ': invalid JSON (http=' . $code . ')');
+        }
+        if ($code < 200 || $code > 299) {
+            throw new \RuntimeException('Poster ' . $method . ': http=' . $code);
+        }
+        if (isset($j['error']) && $j['error']) {
+            $msg = is_string($j['error']) ? $j['error'] : json_encode($j['error']);
+            throw new \RuntimeException('Poster ' . $method . ': ' . $msg);
+        }
+        return is_array($j['response'] ?? null) ? $j['response'] : [];
+    }
+
+    /** Построить мэппинг product_id → 'bar'|'kitchen' из сырых ответов Poster. */
+    private function buildWorkshopMap(array $workshops, array $products): void
+    {
+        $this->workshopNames = [];
+        $this->workshopGroup = [];
+        foreach ($workshops as $w) {
+            if (!is_array($w)) continue;
+            $wid = (int)($w['workshop_id'] ?? 0);
+            if ($wid <= 0) continue;
+            $name = trim((string)($w['workshop_name'] ?? ''));
+            $this->workshopNames[$wid] = $name;
+            $this->workshopGroup[$wid] = $this->classifyWorkshop($name);
+        }
         $this->productGroup = [];
-        if (is_array($products)) {
-            foreach ($products as $p) {
-                if (!is_array($p)) continue;
-                $pid = (int)($p['product_id'] ?? 0);
-                if ($pid <= 0) continue;
-                $wid = (int)($p['workshop'] ?? $p['workshop_id'] ?? 0);
-                $this->productGroup[$pid] = $this->workshopGroup[$wid] ?? 'kitchen';
-            }
+        foreach ($products as $p) {
+            if (!is_array($p)) continue;
+            $pid = (int)($p['product_id'] ?? 0);
+            if ($pid <= 0) continue;
+            $wid = (int)($p['workshop'] ?? $p['workshop_id'] ?? 0);
+            $this->productGroup[$pid] = $this->workshopGroup[$wid] ?? 'kitchen';
         }
     }
 
@@ -79,109 +158,59 @@ class ApiPosterZaparaModel
 
     public function day(string $date): array
     {
-        $this->ensureProductGroups();
+        // ── Optimisation: вместо последовательной цепочки menu.getWorkshops →
+        // menu.getProducts → dash.getTransactions выполняем их параллельно через
+        // curl_multi. Все три запроса независимы (mapping product→цех нужен
+        // ТОЛЬКО для аггрегации после того как все три ответа пришли).
+        // Wall time = max(longest) вместо суммы ≈ −60% на каждый ?ajax=day.
+        // Никакого кеширования — каждый вызов тянет всё свежим из Poster.
+        [$workshopsRaw, $productsRaw, $firstBatch] = $this->fetchDayInitialParallel($date);
+        $this->buildWorkshopMap($workshopsRaw, $productsRaw);
 
         $hours = [];
         for ($h = 9; $h <= 23; $h++) $hours[] = $h;
 
-        $countsByHourChecks = [];
-        $countsByHourDishes = [];
-        $countsByHourBar     = [];
-        $countsByHourKitchen = [];
-        foreach ($hours as $h) {
-            $countsByHourChecks[(string)$h]  = 0;
-            $countsByHourDishes[(string)$h]  = 0;
-            $countsByHourBar[(string)$h]     = 0;
-            $countsByHourKitchen[(string)$h] = 0;
-        }
-
-        $totalChecks  = 0;
-        $totalDishes  = 0;
-        $totalBar     = 0;
-        $totalKitchen = 0;
-
-        $nextTr = null;
-        $prevNextTr = null;
-        $guard = 0;
+        $counts = [
+            'checks'  => array_fill_keys(array_map('strval', $hours), 0),
+            'dishes'  => array_fill_keys(array_map('strval', $hours), 0),
+            'bar'     => array_fill_keys(array_map('strval', $hours), 0),
+            'kitchen' => array_fill_keys(array_map('strval', $hours), 0),
+        ];
+        $totals = ['checks' => 0, 'dishes' => 0, 'bar' => 0, 'kitchen' => 0];
         $seenTx = [];
 
-        do {
-            $guard++;
-            if ($guard > 20000) break;
-            $params = [
-                'dateFrom' => str_replace('-', '', $date),
-                'dateTo' => str_replace('-', '', $date),
-                'status' => 2,
+        // Первая страница — уже параллельно загружена.
+        $nextTr = $this->processBatch($firstBatch, $counts, $totals, $seenTx);
+
+        // Пагинация (нужна только если день > 100 транзакций — у Веранды
+        // практически никогда не бывает). Идём по next_tr пока не закончится
+        // или не повторится. Защитный счётчик от бесконечных циклов.
+        $guard = 0;
+        while ($nextTr !== null && $guard++ < 100) {
+            $batch = $this->api->request('dash.getTransactions', [
+                'dateFrom'         => str_replace('-', '', $date),
+                'dateTo'           => str_replace('-', '', $date),
+                'status'           => 2,
                 'include_products' => 'true',
-                'include_history' => 'false',
+                'include_history'  => 'false',
                 'include_delivery' => 'false',
-                'timezone' => 'client',
-            ];
-            if ($nextTr !== null) $params['next_tr'] = $nextTr;
-            $batch = $this->api->request('dash.getTransactions', $params, 'GET');
+                'timezone'         => 'client',
+                'next_tr'          => $nextTr,
+            ], 'GET');
             if (!is_array($batch) || count($batch) === 0) break;
+            $prevTr = $nextTr;
+            $nextTr = $this->processBatch($batch, $counts, $totals, $seenTx);
+            if ($nextTr === $prevTr) break;
+        }
 
-            $last = end($batch);
-            $nextTrCandidate = is_array($last) ? ($last['transaction_id'] ?? null) : null;
-
-            foreach ($batch as $tx) {
-                if (!is_array($tx)) continue;
-                $txId = (int)($tx['transaction_id'] ?? 0);
-                if ($txId <= 0) continue;
-                if (isset($seenTx[$txId])) continue;
-                $seenTx[$txId] = true;
-
-                $v = $tx['date_start_new'] ?? $tx['date_start'] ?? null;
-                if ($v === null) continue;
-                $ts = (int)$v;
-                if ($ts > 10000000000) $ts = (int)round($ts / 1000);
-                if ($ts <= 0) continue;
-
-                $dt = (new \DateTimeImmutable('@' . $ts))->setTimezone($this->tz);
-                $hour = (int)$dt->format('G');
-                if ($hour < 9 || $hour > 23) continue;
-                $hourKey = (string)$hour;
-                $countsByHourChecks[$hourKey] += 1;
-                $totalChecks++;
-
-                $dishCount    = 0;
-                $dishBar      = 0;
-                $dishKitchen  = 0;
-                $prods = $tx['products'] ?? null;
-                if (is_array($prods)) {
-                    foreach ($prods as $p) {
-                        if (!is_array($p)) continue;
-                        $c = $p['count'] ?? $p['quantity'] ?? 1;
-                        if (is_string($c)) $c = str_replace(',', '.', trim($c));
-                        $cn = is_numeric($c) ? (float)$c : 1.0;
-                        if ($cn <= 0) continue;
-                        $n = (int)round($cn);
-                        $dishCount += $n;
-
-                        // Каждый product_id отображаем на группу цеха
-                        // ('bar' / 'kitchen'). По умолчанию (если товара нет в
-                        // мэппинге — например удалён или это услуга) считаем
-                        // как кухню, чтобы общий total = bar + kitchen.
-                        $pid = (int)($p['product_id'] ?? 0);
-                        $group = $this->productGroup[$pid] ?? 'kitchen';
-                        if ($group === 'bar') $dishBar     += $n;
-                        else                  $dishKitchen += $n;
-                    }
-                }
-                if ($dishCount > 0) {
-                    $countsByHourDishes[$hourKey]  += $dishCount;
-                    $countsByHourBar[$hourKey]     += $dishBar;
-                    $countsByHourKitchen[$hourKey] += $dishKitchen;
-                    $totalDishes  += $dishCount;
-                    $totalBar     += $dishBar;
-                    $totalKitchen += $dishKitchen;
-                }
-            }
-
-            $prevNextTr = $nextTr;
-            $nextTr = $nextTrCandidate;
-            if ($nextTr === null || $nextTr === $prevNextTr) break;
-        } while (true);
+        $countsByHourChecks  = $counts['checks'];
+        $countsByHourDishes  = $counts['dishes'];
+        $countsByHourBar     = $counts['bar'];
+        $countsByHourKitchen = $counts['kitchen'];
+        $totalChecks  = $totals['checks'];
+        $totalDishes  = $totals['dishes'];
+        $totalBar     = $totals['bar'];
+        $totalKitchen = $totals['kitchen'];
 
         $dow = (int)(new \DateTimeImmutable($date . ' 12:00:00', $this->tz))->format('N');
 
@@ -205,6 +234,66 @@ class ApiPosterZaparaModel
             'workshops' => $this->workshopNames ?? [],
             'workshop_groups' => $this->workshopGroup ?? [],
         ];
+    }
+
+    /**
+     * Обработать одну страницу транзакций (от первой curl_multi-выгрузки
+     * или из последующего next_tr): расписать по часам и группам цехов.
+     * Все массивы передаются по ссылке. Возвращает кандидата на next_tr
+     * (id последней транзакции в батче) или null если страница пустая.
+     */
+    private function processBatch(array $batch, array &$counts, array &$totals, array &$seenTx): ?int
+    {
+        if (count($batch) === 0) return null;
+
+        foreach ($batch as $tx) {
+            if (!is_array($tx)) continue;
+            $txId = (int)($tx['transaction_id'] ?? 0);
+            if ($txId <= 0) continue;
+            if (isset($seenTx[$txId])) continue;
+            $seenTx[$txId] = true;
+
+            $v = $tx['date_start_new'] ?? $tx['date_start'] ?? null;
+            if ($v === null) continue;
+            $ts = (int)$v;
+            if ($ts > 10000000000) $ts = (int)round($ts / 1000);
+            if ($ts <= 0) continue;
+
+            $dt = (new \DateTimeImmutable('@' . $ts))->setTimezone($this->tz);
+            $hour = (int)$dt->format('G');
+            if ($hour < 9 || $hour > 23) continue;
+            $hk = (string)$hour;
+
+            $counts['checks'][$hk] += 1;
+            $totals['checks']      += 1;
+
+            $dishCount = 0; $dishBar = 0; $dishKitchen = 0;
+            foreach (($tx['products'] ?? []) as $p) {
+                if (!is_array($p)) continue;
+                $c = $p['count'] ?? $p['quantity'] ?? 1;
+                if (is_string($c)) $c = str_replace(',', '.', trim($c));
+                $cn = is_numeric($c) ? (float)$c : 1.0;
+                if ($cn <= 0) continue;
+                $n = (int)round($cn);
+                $dishCount += $n;
+                $pid = (int)($p['product_id'] ?? 0);
+                $group = $this->productGroup[$pid] ?? 'kitchen';
+                if ($group === 'bar') $dishBar     += $n;
+                else                  $dishKitchen += $n;
+            }
+            if ($dishCount > 0) {
+                $counts['dishes'][$hk]  += $dishCount;
+                $counts['bar'][$hk]     += $dishBar;
+                $counts['kitchen'][$hk] += $dishKitchen;
+                $totals['dishes']       += $dishCount;
+                $totals['bar']          += $dishBar;
+                $totals['kitchen']      += $dishKitchen;
+            }
+        }
+
+        $last = end($batch);
+        $nextTrId = is_array($last) ? ($last['transaction_id'] ?? null) : null;
+        return $nextTrId !== null ? (int)$nextTrId : null;
     }
 
     public function data(string $dateFrom, string $dateTo): array
