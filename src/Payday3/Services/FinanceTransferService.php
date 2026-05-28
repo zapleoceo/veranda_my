@@ -139,6 +139,14 @@ final class FinanceTransferService implements FinanceTransferServiceInterface
             'timezone'   => 'client',
         ]);
         if ($rows === []) {
+            // Poster's finance.getTransactions ignores the Ymd format on
+            // some tenants → 0 rows. The dmY fallback exists for those —
+            // BUT under dmY Poster returns the ENTIRE history of the
+            // account, IGNORING dateFrom/dateTo. Without an explicit ts
+            // guard below we'd flag any historical 50 000 "Перевод
+            // типсов" as "already exists today" and refuse to create a
+            // legitimate new one. See payday2/ajax.php `transfer_tips`,
+            // which does the same per-row ts check.
             $rows = $this->safeFinanceRequest($this->poster->client(), [
                 'dateFrom'   => date('dmY', $startTs),
                 'dateTo'     => date('dmY', $endTs),
@@ -150,6 +158,14 @@ final class FinanceTransferService implements FinanceTransferServiceInterface
         $needle = mb_strtolower($commentBase, 'UTF-8');
         foreach ($rows as $row) {
             if (!is_array($row)) continue;
+
+            // Date-range guard — same as fetchTransfers(). Without it
+            // the dmY-fallback branch above lets every historical row
+            // through, producing false positives for any past transfer
+            // that happens to share today's amount.
+            $ts = self::pickTs($row);
+            if ($ts === null || $ts < $startTs || $ts > $endTs) continue;
+
             // Compare against our VND amount (Poster's amount comes
             // through normMoneyMinor → posterCentsToVnd-equivalent).
             $rawAmt = $row['amount'] ?? $row['amount_to'] ?? $row['amount_from'] ?? $row['sum'] ?? 0;
