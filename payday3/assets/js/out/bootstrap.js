@@ -38,11 +38,12 @@ function rangeQs(state) {
 }
 
 export function initOutMode({ state }) {
-    let loaded   = false;
-    let renderer = null;
-    let mailRows = [];
-    let finRows  = [];
-    let links    = [];
+    let loaded         = false;
+    let renderer       = null;
+    let mailRows       = [];
+    let finRows        = [];
+    let links          = [];
+    let showHiddenMail = false;   // tracks the hidden-mail eye toggle state
     const selMail = new Set();
     const selFin  = new Set();
 
@@ -101,7 +102,7 @@ export function initOutMode({ state }) {
         links = Array.isArray(result?.links) ? result.links : links;
         // Re-render tbodies so row colours follow the new link set,
         // then ask the renderer to redraw connectors.
-        renderOutMail(mailRows, links);
+        renderOutMail(mailRows, links, { showHidden: showHiddenMail });
         renderOutFinance(finRows, links);
         selMail.clear();
         selFin.clear();
@@ -141,7 +142,7 @@ export function initOutMode({ state }) {
             mailRows = mailRes.status === 'fulfilled' ? (mailRes.value?.mail    || []) : [];
             finRows  = finRes .status === 'fulfilled' ? (finRes .value?.finance || []) : [];
             links    = linkRes.status === 'fulfilled' ? (linkRes.value?.links   || []) : [];
-            renderOutMail(mailRows, links);
+            renderOutMail(mailRows, links, { showHidden: !!opts.includeHidden });
             renderOutFinance(finRows, links);
             updateOutFooter(mailRows, finRows);
             buildRenderer();
@@ -251,7 +252,8 @@ export function initOutMode({ state }) {
     // Hidden-mail eye toggle on the mail card — reloads everything
     // through the same fan-out load() helper with includeHidden set
     // so the request stays parallel and we reuse one code path.
-    let showHiddenMail = false;
+    // (showHiddenMail is declared at the top of initOutMode so
+    //  afterMutation can pass it to renderOutMail as well.)
     document.getElementById('pd3OutMailHiddenToggle')?.addEventListener('click', async (e) => {
         showHiddenMail = !showHiddenMail;
         e.currentTarget.setAttribute('aria-pressed', showHiddenMail ? 'true' : 'false');
