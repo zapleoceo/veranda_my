@@ -25,7 +25,7 @@ function rowState(edges) {
     return yellow ? 'row-yellow' : 'row-green';
 }
 
-export function renderOutMail(rows, links) {
+export function renderOutMail(rows, links, { showHidden = false } = {}) {
     const byMail = new Map();
     for (const l of links) {
         if (!byMail.has(l.mail_uid)) byMail.set(l.mail_uid, []);
@@ -40,7 +40,7 @@ export function renderOutMail(rows, links) {
     tbody.innerHTML = rows.map((r) => {
         const state = r.is_hidden ? 'row-hidden' : rowState(byMail.get(r.mail_uid));
         const time  = (r.date || '').slice(11, 19);
-        const cls   = ['pd3-row', state, r.is_hidden ? 'is-hidden' : ''].filter(Boolean).join(' ');
+        const cls   = ['pd3-row', state, r.is_hidden && !showHidden ? 'is-hidden' : ''].filter(Boolean).join(' ');
         return `<tr id="pd3-out-mail-${r.mail_uid}" class="${cls}"
                     data-mail-uid="${r.mail_uid}"
                     data-ts="${esc(r.date)}"
