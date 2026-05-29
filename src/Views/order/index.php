@@ -89,8 +89,11 @@ $h = static fn($s) => htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 
             <h2 id="noCartTitle"><?= $h($t['cart']) ?></h2>
             <button type="button" class="no-iconbtn" data-no-close aria-label="<?= $h($t['close']) ?>">×</button>
         </header>
-        <div class="no-cart__items" id="noCartItems"></div>
+        <!-- Open-check banner — наверху корзины (под header'ом), не между
+             items и footer'ом. Так оператор гарантированно его видит при
+             открытии корзины, а не скроллит мимо. -->
         <div class="no-cart__open-check" id="noOpenCheck" hidden></div>
+        <div class="no-cart__items" id="noCartItems"></div>
         <footer class="no-cart__footer">
             <label class="no-field">
                 <span><?= $h($t['commentLabel']) ?></span>

@@ -26,8 +26,11 @@ const DEFAULT = {
     cart:        [],       // CartLine[] - same shape we POST
     comment:     '',
 
-    openChecks:  [],       // OpenCheck[] for current table
-    appendToTx:  0,        // 0 = new order, >0 = append to this transaction_id
+    openChecks:           [],   // OpenCheck[] for current table
+    appendToTx:           0,    // 0 = new order, >0 = append to this transaction_id
+    openCheckChoiceMade:  true, // false ⇒ open checks exist and operator
+                                //          hasn't picked yet — submit blocked
+                                //          until they tap one of the radios
 
     search:      '',
 };
@@ -100,10 +103,28 @@ export class State {
         // Changing tables invalidates the open-check pick — caller
         // should refetch and reapply state.appendToTx.
         this._s.appendToTx = 0;
+        this._s.openCheckChoiceMade = true;   // until openChecks land
         this._emit();
     }
-    setOpenChecks(checks) { this._s.openChecks = checks || []; this._emit(); }
-    setAppendToTx(txId)   { this._s.appendToTx = Number(txId) || 0; this._emit(); }
+    setOpenChecks(checks) {
+        this._s.openChecks = checks || [];
+        // If a table has at least one open check, the operator MUST
+        // pick a mode (new vs append to which). Force a fresh choice
+        // every time the open-check list comes back non-empty —
+        // this is what makes the cart banner show «no default» radios.
+        this._s.openCheckChoiceMade = (this._s.openChecks.length === 0);
+        // Reset any stale "append-to" choice from the previous table
+        // so neither radio appears pre-selected.
+        if (this._s.openChecks.length > 0) this._s.appendToTx = 0;
+        this._emit();
+    }
+    setAppendToTx(txId) {
+        this._s.appendToTx = Number(txId) || 0;
+        // Picking any radio (including «Новый отдельный заказ») counts
+        // as «I saw the prompt and made a deliberate decision».
+        this._s.openCheckChoiceMade = true;
+        this._emit();
+    }
 
     setComment(c) { this._s.comment = String(c || ''); this._emit(); }
     setSearch(q)  { this._s.search  = String(q || ''); this._emit(); }

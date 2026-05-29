@@ -424,7 +424,7 @@ button { cursor: pointer; }
 
 /* ─── Cart open-check banner ────────────────────────────────────── */
 .no-cart__open-check {
-    margin: 0 var(--no-s-6);
+    margin: var(--no-s-4) var(--no-s-6) 0;
     padding: var(--no-s-4);
     background: var(--accent2);
     border: 1px solid var(--accent);
@@ -435,6 +435,22 @@ button { cursor: pointer; }
     margin: 0 0 var(--no-s-2);
     font-size: var(--no-fs-md);
     color: var(--accent);
+}
+/* Когда оператор ещё не выбрал режим (новый/добавить к чеку), баннер
+   светится более ярко и пульсирует, чтобы его невозможно было упустить. */
+.no-cart__open-check.is-pending {
+    background: rgba(255, 145, 90, 0.18);
+    border-color: var(--warn);
+    border-width: 2px;
+    animation: noPulseWarn 1.6s ease-in-out infinite;
+}
+.no-cart__open-check.is-pending h4 {
+    color: var(--warn);
+    font-weight: 800;
+}
+@keyframes noPulseWarn {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 145, 90, 0.0); }
+    50%      { box-shadow: 0 0 0 6px rgba(255, 145, 90, 0.18); }
 }
 .no-radios { display: flex; flex-direction: column; gap: var(--no-s-2); }
 .no-radio {
