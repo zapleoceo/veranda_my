@@ -19,12 +19,20 @@ class ReservationsAdminController
         $userEmail = $request->getAttribute('user_email', '');
         $flash     = ['ok' => '', 'err' => ''];
         $body      = $request->getParsedBody() ?? [];
+        $query     = $request->getQueryParams();
+
+        // CSV-экспорт клиентов — стримим напрямую, без layout/HTML.
+        if (($query['export'] ?? '') === 'clients') {
+            return $this->_exportClientsCsv($response);
+        }
 
         $config = $this->_loadConfig();
 
         if ($request->getMethod() === 'POST' && isset($body['save_config'])) {
             $config = $this->_saveConfig((array) $body, $flash);
         }
+
+        $clients = $this->_loadClients();
 
         ob_start();
         require __DIR__ . '/../../Views/admin/reservations.php';
@@ -70,6 +78,84 @@ class ReservationsAdminController
             $flash['err'] = $e->getMessage();
         }
         return $config;
+    }
+
+    /**
+     * Уникальные клиенты, агрегированные по основному телефону. Без
+     * удалённых броней (soft-delete через `deleted_at`). За «имя» берём
+     * самое свежее по start_time — у одного телефона за год имя могло
+     * быть введено в разных вариантах, последнее обычно корректнее.
+     *
+     * Поля в возвращаемых рядах:
+     *   phone, name, reservations_count, last_reservation, first_seen,
+     *   whatsapp_phone, zalo_phone, lang
+     */
+    private function _loadClients(): array
+    {
+        $t = $this->db->t('reservations');
+        try {
+            return $this->db->query("
+                SELECT
+                    r.phone,
+                    /* последнее использованное имя — берём имя из самой
+                       свежей не-удалённой записи этого телефона */
+                    (SELECT r2.name
+                       FROM {$t} r2
+                       WHERE r2.phone = r.phone
+                         AND r2.deleted_at IS NULL
+                       ORDER BY r2.start_time DESC
+                       LIMIT 1) AS name,
+                    COUNT(*)              AS reservations_count,
+                    MAX(r.start_time)     AS last_reservation,
+                    MIN(r.created_at)     AS first_seen,
+                    MAX(r.whatsapp_phone) AS whatsapp_phone,
+                    MAX(r.zalo_phone)     AS zalo_phone,
+                    MAX(r.lang)           AS lang
+                FROM {$t} r
+                WHERE r.phone <> '' AND r.deleted_at IS NULL
+                GROUP BY r.phone
+                ORDER BY MAX(r.start_time) DESC
+            ")->fetchAll();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function _exportClientsCsv(ResponseInterface $response): ResponseInterface
+    {
+        $clients = $this->_loadClients();
+
+        // In-memory stream + fputcsv — экранирование кавычек/разделителей
+        // делает сам PHP, без шанса сломать CSV запятой в имени.
+        $fh = fopen('php://temp', 'w+');
+        // BOM чтобы Excel под Windows открыл UTF-8 корректно.
+        fwrite($fh, "\xEF\xBB\xBF");
+        fputcsv($fh, [
+            'Имя', 'Телефон', 'WhatsApp', 'Zalo',
+            'Кол-во броней', 'Последняя бронь', 'Первая бронь', 'Язык',
+        ]);
+        foreach ($clients as $c) {
+            fputcsv($fh, [
+                (string)($c['name']               ?? ''),
+                (string)($c['phone']              ?? ''),
+                (string)($c['whatsapp_phone']     ?? ''),
+                (string)($c['zalo_phone']         ?? ''),
+                (string)($c['reservations_count'] ?? ''),
+                (string)($c['last_reservation']   ?? ''),
+                (string)($c['first_seen']         ?? ''),
+                (string)($c['lang']               ?? ''),
+            ]);
+        }
+        rewind($fh);
+        $csv = stream_get_contents($fh);
+        fclose($fh);
+
+        $filename = 'veranda-clients-' . date('Y-m-d') . '.csv';
+        $response->getBody()->write((string) $csv);
+        return $response
+            ->withHeader('Content-Type', 'text/csv; charset=utf-8')
+            ->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->withHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     private function _layout(ResponseInterface $response, string $content, string $path, string $userEmail, array $flash): ResponseInterface
