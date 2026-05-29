@@ -81,6 +81,19 @@ class VposterAction implements ActionInterface
         $baseText = preg_replace('/\n?\s*@\w+\s+@\w+\s+свяжитесь\s+с\s+гостем\s*\n?/u', "\n", $baseText);
 
         if (!$result['ok']) {
+            // Re-read is_poster_pushed — a concurrent push (or a previous push
+            // that updated Poster but not our DB) may have set it to 1 between
+            // our initial read and the pushToPoster lock check. If so, collapse
+            // the message and remove buttons rather than showing a retryable error.
+            $fresh = $ctx->db->query("SELECT is_poster_pushed FROM {$res} WHERE id = ? LIMIT 1", [$ctx->actionId])->fetch();
+            if ((int)($fresh['is_poster_pushed'] ?? 0) === 1) {
+                $ctx->bot->editMessageText(
+                    $ctx->messageId,
+                    $baseText . "\n\n🚀 <b>Уже в Poster</b> (отправлено ранее)",
+                    []
+                );
+                return '';
+            }
             $ctx->bot->editMessageText(
                 $ctx->messageId,
                 $baseText . "\n\n❌ Poster: " . htmlspecialchars((string) $result['error']),

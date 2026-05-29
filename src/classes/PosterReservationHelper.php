@@ -283,7 +283,34 @@ class PosterReservationHelper {
             $posterId = (int)($resp['incoming_order_id'] ?? $resp['reservation_id'] ?? $resp['id'] ?? 0);
 
             if (isset($resp['error']) || $posterId <= 0) {
-                $err = $resp['error'] ?? 'Unknown Poster API Error (no ID returned)';
+                // createReservation failed — Poster may have rejected because
+                // the booking already exists (e.g. a previous push that saved
+                // to Poster but failed to update our DB, or a concurrent
+                // request).  Do a second marker-only search so we can return
+                // duplicate:true and let VposterAction collapse the keyboard
+                // instead of leaving dangling buttons.
+                $retryRows = [];
+                try {
+                    $retryRows = $api->request('incomingOrders.getReservations', [
+                        'timezone'  => 'client',
+                        'date_from' => $dateFrom,
+                        'date_to'   => $dateTo,
+                    ], 'GET');
+                    if (!is_array($retryRows)) $retryRows = [];
+                } catch (\Throwable) {}
+                foreach ($retryRows as $pr) {
+                    if (!is_array($pr)) continue;
+                    if ((int)($pr['status'] ?? 0) === 7) continue;
+                    $prComment = (string)($pr['comment'] ?? '');
+                    if ($prComment !== '' && strpos($prComment, $marker) !== false) {
+                        $dupeId = (int)($pr['incoming_order_id'] ?? 0);
+                        $db->query("UPDATE {$resTable} SET is_poster_pushed = 1, poster_id = ? WHERE id = ?",
+                            [$dupeId, $reservationId]);
+                        $locked = false;
+                        return ['ok' => true, 'duplicate' => true,
+                                'poster_res' => ['incoming_order_id' => $dupeId]];
+                    }
+                }
                 $db->query("UPDATE {$resTable} SET is_poster_pushed = 0 WHERE id = ?", [$reservationId]);
                 return ['ok' => false, 'error' => "Poster API: " . (is_array($resp) ? json_encode($resp, JSON_UNESCAPED_UNICODE) : $resp)];
             }
