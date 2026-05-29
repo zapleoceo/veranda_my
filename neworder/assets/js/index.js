@@ -54,8 +54,18 @@ const openModif         = initModifiers({ state });
 // — without this order JS still works at runtime because the arrow runs after
 // init completes, but the dependency direction is clearer this way.
 const refreshOpenChecks = initOpenChecks({ state });
-const openLoc           = initLocationPicker({ state, onChange: () => refreshOpenChecks() });
-const submit            = initSubmit({ state, openCart });
+const openLoc           = initLocationPicker({
+    state,
+    // After the operator picks a new table, refetch its open checks AND,
+    // if there are any, auto-open the cart so the «pick a mode» banner
+    // is visible immediately. This is the primary fix for «оператор
+    // не увидел что нужно выбрать режим».
+    onChange: async () => {
+        await refreshOpenChecks();
+        if (state.s.openChecks.length > 0) openCart();
+    },
+});
+const submit            = initSubmit({ state, openCart, refreshOpenChecks });
 
 // Cart bar opens the sheet; the sheet has its own close handlers.
 document.getElementById('noCartBar')?.addEventListener('click', () => openCart());

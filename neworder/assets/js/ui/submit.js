@@ -29,12 +29,16 @@ function closeCart() {
     $cart.setAttribute('aria-hidden', 'true');
 }
 
-export function initSubmit({ state, openCart }) {
-    document.getElementById('noNewOrderBtn')?.addEventListener('click', () => {
+export function initSubmit({ state, openCart, refreshOpenChecks }) {
+    document.getElementById('noNewOrderBtn')?.addEventListener('click', async () => {
         hideSuccess();
         // Allow another order on the same table — only clear the cart,
-        // keep spot/hall/table so the operator stays in context.
+        // keep spot/hall/table so the operator stays in context. Then
+        // refresh open-checks so the next order sees fresh state
+        // (otherwise stale data could hide a freshly-created check
+        // we just opened ourselves a moment ago).
         state.clearCart();
+        try { await refreshOpenChecks?.(); } catch (_) {}
     });
 
     return async function submit() {
@@ -49,10 +53,16 @@ export function initSubmit({ state, openCart }) {
             document.getElementById('noLocationBtn')?.click();
             return;
         }
-        // We used to bail here when state.s.spotTabletId was 0, but
-        // spots.getSpot doesn't actually expose spot_tablet_id — the
-        // backend now falls back to a configured default so we just
-        // forward whatever value we have (0 ⇒ backend default).
+        // Open-check guard. If the selected table has any open checks
+        // and the operator hasn't explicitly picked a radio (new vs
+        // append), refuse to submit until they do — otherwise it's
+        // too easy to accidentally create a second check on a busy
+        // table because the cart was never opened.
+        if (state.s.openChecks.length > 0 && !state.s.openCheckChoiceMade) {
+            toast(t('openCheckPickFirst'), { error: true });
+            openCart?.();   // force the banner into view
+            return;
+        }
 
         const btn = document.getElementById('noSubmitBtn');
         const errBox = document.getElementById('noCartError');
@@ -82,10 +92,13 @@ export function initSubmit({ state, openCart }) {
                 message = t('orderAcceptedTpl', { id: result.order_id });
             }
             // Clear cart but keep the location — next order on the same
-            // table starts in one tap.
+            // table starts in one tap. Then refresh open-checks so a
+            // brand-new check we just created (or a check that just
+            // got appended to) is visible in the banner on next open.
             state.clearCart();
             closeCart();
             showSuccess(message);
+            try { await refreshOpenChecks?.(); } catch (_) {}
         } catch (e) {
             errBox.textContent = e.message || t('errorGeneric');
             errBox.hidden = false;

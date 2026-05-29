@@ -34,10 +34,19 @@ function render(state) {
         return;
     }
     wrap.hidden = false;
-    const newSelected = state.s.appendToTx === 0;
-    const headline = checks.length === 1
-        ? t('openCheckOne')
-        : t('openCheckMany', { n: checks.length });
+    // is-pending marker — пока оператор не сделал явный выбор. CSS
+    // подсвечивает баннер ярко-жёлтой рамкой чтобы его невозможно было
+    // проскроллить.
+    wrap.classList.toggle('is-pending', !state.s.openCheckChoiceMade);
+
+    // Когда выбор ещё не сделан — НИ ОДНА радио-кнопка не отмечена,
+    // submit заблокирован (см. submit.js). Это лечит кейс «оператор
+    // не открыл корзину, нажал submit и случайно сделал второй чек».
+    const choiceMade  = state.s.openCheckChoiceMade;
+    const newSelected = choiceMade && state.s.appendToTx === 0;
+    const headline = !choiceMade
+        ? (checks.length === 1 ? t('openCheckOnePrompt') : t('openCheckManyPrompt', { n: checks.length }))
+        : (checks.length === 1 ? t('openCheckOne')       : t('openCheckMany',       { n: checks.length }));
     wrap.innerHTML = `
         <h4>${esc(headline)}</h4>
         <div class="no-radios">
