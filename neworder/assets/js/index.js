@@ -46,13 +46,16 @@ window.__no = state;   // dev-tools peek hook; remove later
 
 // Modules wire themselves to DOM nodes by id — they receive `state` and
 // each other's public hooks (open/close/refresh) as needed.
-const refreshMenu = await initMenu({ state });
+const refreshMenu       = await initMenu({ state });
 initSearch({ state });
-const openCart    = initCart({ state, onSubmit: () => submit() });
-const openModif   = initModifiers({ state });
-const openLoc     = initLocationPicker({ state, onChange: () => refreshOpenChecks() });
+const openCart          = initCart({ state, onSubmit: () => submit() });
+const openModif         = initModifiers({ state });
+// refreshOpenChecks must be defined BEFORE locationPicker (which captures it)
+// — without this order JS still works at runtime because the arrow runs after
+// init completes, but the dependency direction is clearer this way.
 const refreshOpenChecks = initOpenChecks({ state });
-const submit      = initSubmit({ state, openCart });
+const openLoc           = initLocationPicker({ state, onChange: () => refreshOpenChecks() });
+const submit            = initSubmit({ state, openCart });
 
 // Cart bar opens the sheet; the sheet has its own close handlers.
 document.getElementById('noCartBar')?.addEventListener('click', () => openCart());
