@@ -133,8 +133,17 @@ async function loadActual(state) {
         const data = await api.get('/payday3/api/balances?date=' + encodeURIComponent(date));
         for (const k of ['andrey', 'vietnam', 'cash']) {
             const input = document.getElementById('pd3BalActual_' + k);
-            if (input) input.value = fmt(data?.['bal_' + k]);
+            const v = data?.['bal_' + k] ?? null;
+            if (input) input.value = fmt(v);
+            // Sync lastSavedKeys so saveActualNow doesn't see the initial
+            // undefined vs null as a "change" and insert a ghost null-row
+            // before the user has touched anything (which would then mask
+            // older real data via the latestFor DESC query).
+            lastSavedKeys[k] = v;
         }
+        // total is computed client-side; seed its sentinel too so a
+        // beforeunload during page load can't write null for it.
+        lastSavedKeys['total'] = data?.['bal_total'] ?? null;
         refreshDiffs(posterCache);
     } catch (e) {
         setStatus('Факт: ' + (e.message || 'error'), 'error');
