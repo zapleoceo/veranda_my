@@ -149,12 +149,19 @@ final class OrdersService implements OrdersServiceInterface
         $api = $this->poster->client();
         $spotIdEff = $spotId > 0 ? $spotId : $this->defaultSpotId;
 
-        if (trim($comment) !== '') {
+        // Per-line comments — Poster's REST API has NO documented endpoint
+        // for per-product comments in an open transaction (the documented
+        // method list contains only transactions.changeComment, which is
+        // transaction-level). To not lose the operator's notes, fold them
+        // into the transaction-level comment with «Product #ID: text»
+        // format. Kitchen sees them attached to the receipt.
+        $aggregatedComment = $this->buildAggregatedComment($comment, $lines);
+        if ($aggregatedComment !== '') {
             $api->request('transactions.changeComment', [
                 'spot_id'        => $spotIdEff,
                 'spot_tablet_id' => $tabletId,
                 'transaction_id' => $transactionId,
-                'comment'        => trim($comment),
+                'comment'        => $aggregatedComment,
             ], 'POST');
         }
 
@@ -167,30 +174,68 @@ final class OrdersService implements OrdersServiceInterface
         $i     = 0;
         foreach ($lines as $l) {
             $i++;
-            $time   = (string)($baseMs + $i);
-            $params = [
+            $time = (string)($baseMs + $i);
+
+            // ── Step 1: добавляем одну единицу товара в чек ──
+            // transactions.addTransactionProduct по документации добавляет
+            // ровно ОДНУ позицию. Поле `num` в спецификации НЕ упомянуто
+            // (legacy-код его передавал, но это могло молча игнорироваться).
+            // Идём строго по докам.
+            $addParams = [
                 'spot_id'        => $spotIdEff,
                 'spot_tablet_id' => $tabletId,
                 'transaction_id' => $transactionId,
                 'product_id'     => $l->productId,
-                'num'            => $l->count,
                 'time'           => $time,
             ];
             if ($l->modificatorId > 0) {
-                $params['modificator_id'] = $l->modificatorId;
+                $addParams['modificator_id'] = $l->modificatorId;
             }
             $modJson = $this->modificationsJson($l);
-            if ($modJson !== '') $params['modification'] = $modJson;
-            $api->request('transactions.addTransactionProduct', $params, 'POST');
+            if ($modJson !== '') $addParams['modification'] = $modJson;
+            $api->request('transactions.addTransactionProduct', $addParams, 'POST');
 
-            if ($l->comment !== '') {
-                $pccParams = $params + ['comment' => $l->comment];
-                unset($pccParams['num']);
-                $api->request('transactions.changeProductComment', $pccParams, 'POST');
+            // ── Step 2: если нужно >1 порции — догоняем count'ом ──
+            // transactions.changeTransactionProductCount — задокументированный
+            // метод, принимает `count` (integer/decimal). Вызываем только
+            // когда нужно изменить дефолтное 1, чтобы не делать лишнего
+            // round-trip'а.
+            if ($l->count > 1.0) {
+                $countParams = [
+                    'spot_id'        => $spotIdEff,
+                    'spot_tablet_id' => $tabletId,
+                    'transaction_id' => $transactionId,
+                    'product_id'     => $l->productId,
+                    'count'          => $l->count,
+                    'time'           => $time,
+                ];
+                if ($l->modificatorId > 0) $countParams['modificator_id'] = $l->modificatorId;
+                if ($modJson !== '') $countParams['modification'] = $modJson;
+                $api->request('transactions.changeTransactionProductCount', $countParams, 'POST');
             }
+
             $added++;
         }
         return ['added' => $added];
+    }
+
+    /**
+     * Склейка комментария чека и per-line комментариев в одну строку.
+     * Per-line формат: «Товар #ID: текст» — кухня в чеке увидит, какому
+     * блюду относится. Если нет ни одного непустого комментария —
+     * возвращает пустую строку и changeComment не дёргается.
+     */
+    private function buildAggregatedComment(string $orderComment, array $lines): string
+    {
+        $parts = [];
+        $oc = trim($orderComment);
+        if ($oc !== '') $parts[] = $oc;
+        foreach ($lines as $l) {
+            $c = trim($l->comment);
+            if ($c === '') continue;
+            $parts[] = 'Товар #' . $l->productId . ': ' . $c;
+        }
+        return implode("\n", $parts);
     }
 
     private function resolveBaseTimeMs(int $txId): int
