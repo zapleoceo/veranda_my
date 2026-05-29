@@ -103,6 +103,7 @@ final class FinanceTransferService implements FinanceTransferServiceInterface
             'amount_from'  => $amountVnd,
             'amount_to'    => $amountVnd,
             'date'         => $targetDate,
+            'timezone'     => 'client',     // store in client (Vietnam) TZ, not server UTC
             'comment'      => $comment,
             // Legacy field names — payday2 sent both shapes to
             // survive Poster API changes across tenants.
@@ -166,10 +167,12 @@ final class FinanceTransferService implements FinanceTransferServiceInterface
             $ts = self::pickTs($row);
             if ($ts === null || $ts < $startTs || $ts > $endTs) continue;
 
-            // Compare against our VND amount (Poster's amount comes
-            // through normMoneyMinor → posterCentsToVnd-equivalent).
+            // normMoneyMinor already returns VND (the Poster-cents
+            // heuristic divides by 100 internally) — no extra /100.
+            // Matches payday2's normMoney() which is compared directly
+            // to $amountVnd without a second division.
             $rawAmt = $row['amount'] ?? $row['amount_to'] ?? $row['amount_from'] ?? $row['sum'] ?? 0;
-            $sumVnd = (int)round(abs(self::normMoneyMinor($rawAmt)) / 100);
+            $sumVnd = abs(self::normMoneyMinor($rawAmt));
             if ($sumVnd !== $amountVnd) continue;
             $cmt = mb_strtolower((string)($row['comment'] ?? $row['description'] ?? ''), 'UTF-8');
             if ($cmt !== '' && mb_strpos($cmt, $needle) !== false) {

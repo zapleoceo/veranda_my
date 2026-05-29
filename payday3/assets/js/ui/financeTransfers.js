@@ -43,10 +43,10 @@ function renderMiniTable(rows) {
     const body = rows.map((f) => {
         const isOut = f.type === '0' || String(f.type).toLowerCase() === 'out' || String(f.type).toUpperCase() === 'O';
         const sumMinor = Math.abs(Number(f.sum_minor) || 0);
-        // Same poster-cents heuristic as Money::fromPosterCents.
-        const sumVnd = sumMinor === 0 ? 0
-            : (sumMinor % 100 === 0 ? sumMinor / 100 : Math.round(sumMinor / 100));
-        const signed = isOut ? -sumVnd : sumVnd;
+        // normMoneyMinor() on the server already returns VND — no
+        // extra /100 needed here (that was the double-division bug).
+        const sumVnd  = sumMinor;
+        const signed  = isOut ? -sumVnd : sumVnd;
         return `<tr>
             <td class="pd3-finance-td">${esc(fmtDate(f.ts))}<br><span class="muted">${esc(fmtTime(f.ts))}</span></td>
             <td class="pd3-finance-td right">${esc(fmt(signed))}</td>
@@ -81,14 +81,13 @@ function renderRow(kind, payload) {
     totalEl.textContent = totalVnd === null ? '—' : fmt(totalVnd);
 
     // Already-exists detection mirrors payday2: any found transfer
-    // whose minor-VND magnitude equals the expected VND total.
+    // whose VND magnitude equals the expected VND total.
+    // sum_minor from the server is already in VND (normMoneyMinor
+    // handles the Poster-cents heuristic server-side).
     let exists = false;
     if (totalVnd !== null && totalVnd > 0 && Array.isArray(found)) {
         for (const f of found) {
-            const sumMinor = Math.abs(Number(f.sum_minor) || 0);
-            const sumVnd = sumMinor === 0 ? 0
-                : (sumMinor % 100 === 0 ? sumMinor / 100 : Math.round(sumMinor / 100));
-            if (sumVnd === totalVnd) { exists = true; break; }
+            if (Math.abs(Number(f.sum_minor) || 0) === totalVnd) { exists = true; break; }
         }
     }
 
