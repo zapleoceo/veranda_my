@@ -1,73 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sitemap для публичных страниц veranda.my.
+
+  Правила, по которым он собран:
+    1. Каждая страница присутствует ровно одним <url> блоком —
+       языковые варианты идут внутри как <xhtml:link rel="alternate">.
+       Дублировать <url> с ?lang=ru было ошибкой: Google и так понимает
+       альтернативы через hreflang, а дубль <loc> размывает каноникал.
+    2. В <loc> попадает ТОЛЬКО та URL, что отдаёт 200 без редиректа.
+       nginx добавляет trailing slash к директориям через
+       301 → http:// (даунгрейд протокола, баг mod_dir), поэтому:
+         - /links/  (со слэшем) — финальный URL, не /links
+         - /tr3/    (со слэшем) — финальный URL, не /tr3
+    3. <loc> совпадает с тем, что страница объявляет в
+       <link rel="canonical"> — иначе Google видит конфликт.
+       /links/, /links/menu и /tr3/ всё это согласовано.
+
+  Не публичные (и не в sitemap, и Disallow в robots.txt):
+    /admin/*, /payday2/*, /payday3/*, /sepay/*, /schedule/*,
+    /banya, /roma, /employees, /reservations, /zapara, /rawdata,
+    /kitchen_online, /neworder/*, /api/*, /cron/*, /scripts/*,
+    /login, /logout, /auth_*, /telegram_*, /analytics.php,
+    /daily_summary.php, /dashboard*, /set_tg_webhook.php.
+-->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
-  <url>
-    <loc>https://veranda.my/links/?lang=ru</loc>
-    <lastmod>2026-05-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/links/?lang=ru"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/links/?lang=en"/>
-    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/links/?lang=vi"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://veranda.my/links/?lang=ko"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/links/"/>
-  </url>
 
-  <url>
-    <loc>https://veranda.my/links/</loc>
-    <lastmod>2026-05-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/links/?lang=ru"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/links/?lang=en"/>
-    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/links/?lang=vi"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://veranda.my/links/?lang=ko"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/links/"/>
-  </url>
+    <!-- ─── IG bio landing (4 языка) ─────────────────────────── -->
+    <url>
+        <loc>https://veranda.my/links/</loc>
+        <lastmod>2026-06-01</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/links/"/>
+        <xhtml:link rel="alternate" hreflang="ru"        href="https://veranda.my/links/?lang=ru"/>
+        <xhtml:link rel="alternate" hreflang="en"        href="https://veranda.my/links/?lang=en"/>
+        <xhtml:link rel="alternate" hreflang="vi"        href="https://veranda.my/links/?lang=vi"/>
+        <xhtml:link rel="alternate" hreflang="ko"        href="https://veranda.my/links/?lang=ko"/>
+    </url>
 
-  <url>
-    <loc>https://veranda.my/links/menu.php?lang=ru</loc>
-    <lastmod>2026-05-03</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/links/menu.php?lang=ru"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/links/menu.php?lang=en"/>
-    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/links/menu.php?lang=vi"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://veranda.my/links/menu.php?lang=ko"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/links/menu.php"/>
-  </url>
+    <!-- ─── Online меню (4 языка, чистый URL без .php) ────────── -->
+    <url>
+        <loc>https://veranda.my/links/menu</loc>
+        <lastmod>2026-06-01</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>0.9</priority>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/links/menu"/>
+        <xhtml:link rel="alternate" hreflang="ru"        href="https://veranda.my/links/menu?lang=ru"/>
+        <xhtml:link rel="alternate" hreflang="en"        href="https://veranda.my/links/menu?lang=en"/>
+        <xhtml:link rel="alternate" hreflang="vi"        href="https://veranda.my/links/menu?lang=vi"/>
+        <xhtml:link rel="alternate" hreflang="ko"        href="https://veranda.my/links/menu?lang=ko"/>
+    </url>
 
-  <url>
-    <loc>https://veranda.my/links/menu.php</loc>
-    <lastmod>2026-05-03</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/links/menu.php?lang=ru"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/links/menu.php?lang=en"/>
-    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/links/menu.php?lang=vi"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://veranda.my/links/menu.php?lang=ko"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/links/menu.php"/>
-  </url>
-
-  <url>
-    <loc>https://veranda.my/tr3?lang=ru</loc>
-    <lastmod>2026-05-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/tr3?lang=ru"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/tr3?lang=en"/>
-    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/tr3?lang=vi"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/tr3"/>
-  </url>
-
-  <url>
-    <loc>https://veranda.my/tr3</loc>
-    <lastmod>2026-05-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="ru" href="https://veranda.my/tr3?lang=ru"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://veranda.my/tr3?lang=en"/>
-    <xhtml:link rel="alternate" hreflang="vi" href="https://veranda.my/tr3?lang=vi"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/tr3"/>
-  </url>
+    <!-- ─── Бронирование столика TR3 (3 языка) ─────────────────── -->
+    <url>
+        <loc>https://veranda.my/tr3/</loc>
+        <lastmod>2026-06-01</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/tr3/"/>
+        <xhtml:link rel="alternate" hreflang="ru"        href="https://veranda.my/tr3/?lang=ru"/>
+        <xhtml:link rel="alternate" hreflang="en"        href="https://veranda.my/tr3/?lang=en"/>
+        <xhtml:link rel="alternate" hreflang="vi"        href="https://veranda.my/tr3/?lang=vi"/>
+    </url>
 </urlset>

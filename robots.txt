@@ -1,31 +1,67 @@
 User-agent: *
-Disallow: /admin/
+
+# ─── Публичные страницы (открыты для индексации) ────────────────
+# /              → 302 на /links (стартовая точка для ботов)
+# /links/        → IG-bio landing
+# /links/menu    → online меню
+# /tr3/          → бронирование столика
+# Все три перечислены в sitemap.xml ниже.
+
+# ─── Админка и операторские интерфейсы ─────────────────────────
 Disallow: /admin
-Disallow: /payday/
-Disallow: /payday
-Disallow: /payday2/
-Disallow: /payday2
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /dashboard/
 Disallow: /dashboard.php
+Disallow: /payday
+Disallow: /payday/
+Disallow: /payday2
+Disallow: /payday2/
+Disallow: /payday3
+Disallow: /payday3/
+Disallow: /kitchen_online
+Disallow: /kitchen_online/
 Disallow: /kitchen_online.php
+Disallow: /rawdata
+Disallow: /rawdata/
 Disallow: /rawdata.php
+Disallow: /zapara
+Disallow: /zapara/
 Disallow: /zapara.php
-Disallow: /employees/
+Disallow: /schedule
+Disallow: /schedule/
+Disallow: /sepay
+Disallow: /sepay/
 Disallow: /employees
-Disallow: /roma/
+Disallow: /employees/
 Disallow: /roma
-Disallow: /banya/
+Disallow: /roma/
 Disallow: /banya
-Disallow: /reservations/
+Disallow: /banya/
 Disallow: /reservations
-Disallow: /login.php
-Disallow: /logout.php
-Disallow: /auth_callback.php
-Disallow: /cron.php
-Disallow: /telegram_alerts.php
-Disallow: /telegram_webhook.php
-Disallow: /scripts/
-Disallow: /api/
-Disallow: /neworder/
+Disallow: /reservations/
 Disallow: /neworder
+Disallow: /neworder/
+
+# ─── Системные / служебные эндпоинты ────────────────────────────
+Disallow: /login
+Disallow: /login.php
+Disallow: /logout
+Disallow: /logout.php
+Disallow: /auth/
+Disallow: /auth_callback.php
+Disallow: /auth_check.php
+Disallow: /analytics.php
+Disallow: /daily_summary.php
+Disallow: /set_tg_webhook.php
+Disallow: /telegram_alerts.php
+Disallow: /telegram_webhook
+Disallow: /telegram_webhook.php
+Disallow: /cron
+Disallow: /cron/
+Disallow: /cron.php
+Disallow: /api/
+Disallow: /scripts/
+Disallow: /wa_listener/
 
 Sitemap: https://veranda.my/sitemap.xml

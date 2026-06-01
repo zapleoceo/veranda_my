@@ -161,7 +161,11 @@ foreach ($groups as $workshopId => $g) {
 $pageTitle = $lang === 'ru' ? 'Online меню' : ($lang === 'vi' ? 'Thực đơn online' : ($lang === 'ko' ? '온라인 메뉴' : 'Online menu'));
 $menuLabel = $lang === 'ru' ? 'МЕНЮ' : ($lang === 'vi' ? 'THỰC ĐƠN' : ($lang === 'ko' ? '메뉴' : 'MENU'));
 
-$baseUrl = \App\Infrastructure\Config::baseUrl() . '/links/menu.php';
+// Канонический URL — чистый, без .php (Slim роут /links/menu отдаёт
+// то же самое; sitemap.xml перечисляет именно эту форму). Прямой файл
+// /links/menu.php тоже отвечает 200, но через canonical всё индексируется
+// как /links/menu.
+$baseUrl = \App\Infrastructure\Config::baseUrl() . '/links/menu';
 $langUrl = static fn(string $code): string => $baseUrl . '?lang=' . urlencode($code);
 $canonicalUrl = $explicitLang === null ? $baseUrl : $langUrl($lang);
 $hreflang = [
