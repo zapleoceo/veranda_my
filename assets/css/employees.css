@@ -281,7 +281,7 @@
             width: max-content;
         }
         .tabel-table th, .tabel-table td {
-            padding: 5px 8px;
+            padding: 3px;                          /* user request — compact */
             border-bottom: 1px solid var(--border);
             border-right: 1px solid var(--border);
             text-align: right;
@@ -293,7 +293,13 @@
             color: var(--muted); font-weight: 700;
             font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
         }
-        .tabel-table thead th.weekend { color: #f87171; }
+        .tabel-table thead th .dow { font-weight: 500; font-size: 9px; }
+        /* Weekend tint covers the WHOLE column — header + body cells + tfoot.
+           Faint enough that real hours stay readable; weekend header text
+           also reddened for emphasis. */
+        .tabel-table th[data-weekend="1"],
+        .tabel-table td[data-weekend="1"] { background: rgba(248,113,113,0.08); }
+        .tabel-table thead th[data-weekend="1"] { color: #f87171; }
         /* First two sticky columns: employee name + role. */
         .tabel-table th:first-child,
         .tabel-table td:first-child {
@@ -302,9 +308,13 @@
             text-align: left;
             min-width: 140px;
             font-weight: 600;
+            padding: 3px 6px;                      /* slightly wider for name */
         }
         .tabel-table thead th:first-child { z-index: 4; }
         .tabel-table .num-zero { color: var(--border); }
+        /* Cell content: hours number on top, start–end below in micro font. */
+        .tabel-table .tabel-h     { font-weight: 700; line-height: 1.1; }
+        .tabel-table .tabel-range { font-size: 9px; color: var(--muted); line-height: 1.1; margin-top: 1px; }
         .tabel-table .tabel-total {
             font-weight: 900; color: var(--accent);
             background: rgba(184,135,70,.05);

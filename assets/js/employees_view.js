@@ -1515,12 +1515,12 @@
             return;
         }
         const totals = (data && data.totals) || { by_day: {}, grand: 0 };
+        const wkAttr = (iso) => isoIsWeekend(iso) ? ' data-weekend="1"' : '';
 
         let html = '<table class="tabel-table"><thead><tr>';
         html += '<th>Сотрудник</th>';
         days.forEach((iso) => {
-            const wk = isoIsWeekend(iso) ? ' class="weekend"' : '';
-            html += `<th${wk}><div>${esc(isoToShort(iso))}</div><div style="font-weight:500; font-size:9px;">${esc(isoToDow(iso))}</div></th>`;
+            html += `<th${wkAttr(iso)}><div>${esc(isoToShort(iso))}</div><div class="dow">${esc(isoToDow(iso))}</div></th>`;
         });
         html += '<th class="tabel-total">Σ</th>';
         html += '</tr></thead><tbody>';
@@ -1528,9 +1528,20 @@
         rows.forEach((r) => {
             html += `<tr><td>${esc(r.name || ('uid:' + r.user_id))}<div class="muted" style="font-size:10px; font-weight:400;">${esc(r.role || '')}</div></td>`;
             days.forEach((iso) => {
-                const h  = (r.by_day && r.by_day[iso]) || 0;
-                const cls = Number(h) > 0 ? '' : ' class="num-zero"';
-                html += `<td${cls}>${esc(fmtHours(h))}</td>`;
+                const cell = (r.by_day && r.by_day[iso]) || null;
+                const h    = cell ? Number(cell.h || 0) : 0;
+                const cls  = h > 0 ? '' : ' class="num-zero"';
+                const wk   = wkAttr(iso);
+                if (h > 0) {
+                    const s = cell && cell.s ? String(cell.s) : '';
+                    const e = cell && cell.e ? String(cell.e) : '';
+                    const range = (s && e)
+                        ? `<div class="tabel-range">${esc(s)}–${esc(e)}</div>`
+                        : '';
+                    html += `<td${wk}><div class="tabel-h">${esc(fmtHours(h))}</div>${range}</td>`;
+                } else {
+                    html += `<td${cls}${wk}>·</td>`;
+                }
             });
             html += `<td class="tabel-total">${esc(fmtHours(r.total))}</td>`;
             html += '</tr>';
@@ -1539,7 +1550,7 @@
         html += '</tbody><tfoot><tr><td>Итого</td>';
         days.forEach((iso) => {
             const h = (totals.by_day && totals.by_day[iso]) || 0;
-            html += `<td>${esc(fmtHours(h))}</td>`;
+            html += `<td${wkAttr(iso)}>${esc(fmtHours(h))}</td>`;
         });
         html += `<td class="tabel-total">${esc(fmtHours(totals.grand))}</td>`;
         html += '</tr></tfoot></table>';
