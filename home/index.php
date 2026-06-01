@@ -121,7 +121,7 @@ $jsonLd = [
 <!-- Google Fonts (только Cyrillic subset, font-display: swap) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
 
 <?php include $_SERVER['DOCUMENT_ROOT'] . '/analytics.php'; ?>
 
@@ -254,13 +254,17 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     display: flex; align-items: center; justify-content: space-between;
     gap: var(--s-3);
 }
+/* Логотип — общий стиль с /links/: Cinzel 700, всё капсом,
+   широкий letter-spacing. Так бренд читается одинаково на всех
+   страницах сайта. */
 .hdr__brand {
-    font-family: var(--serif); font-size: 24px; font-weight: 500;
-    color: #fff; letter-spacing: .02em;
+    font-family: 'Cinzel', Georgia, "Times New Roman", serif;
+    font-weight: 700; font-size: 22px;
+    letter-spacing: 0.12em;
+    color: #fff;
     transition: color .35s;
 }
 .hdr.is-scrolled .hdr__brand { color: var(--ink); }
-.hdr__brand i { font-style: italic; color: var(--red); font-weight: 400; }
 
 .hdr__actions { display: flex; align-items: center; gap: var(--s-2); }
 .hdr__lang {
@@ -652,10 +656,11 @@ section { padding: var(--s-9) 0; position: relative; }
 @media (min-width: 600px) { .ftr__top { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 900px) { .ftr__top { grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--s-7); } }
 .ftr__brand {
-    font-family: var(--serif); font-size: 32px; font-weight: 400;
+    font-family: 'Cinzel', Georgia, "Times New Roman", serif;
+    font-weight: 700; font-size: 28px;
+    letter-spacing: 0.14em;
     color: #fff; margin-bottom: var(--s-3);
 }
-.ftr__brand i { font-style: italic; color: var(--red-soft); }
 .ftr__tagline { color: rgba(245, 239, 228, .7); font-size: 15px; margin-bottom: var(--s-4); }
 .ftr__socials { display: flex; gap: var(--s-2); }
 .ftr__socials a {
@@ -708,7 +713,7 @@ section { padding: var(--s-9) 0; position: relative; }
 <!-- ─── Header ─────────────────────────────────────────────────── -->
 <header class="hdr" id="hdr">
     <div class="container hdr__row">
-        <a class="hdr__brand" href="<?= $h($canonicalUrl) ?>">Vera<i>nda</i></a>
+        <a class="hdr__brand" href="<?= $h($canonicalUrl) ?>">VERANDA</a>
         <div class="hdr__actions">
             <div class="hdr__lang" role="group" aria-label="Язык">
                 <button type="button" aria-pressed="true"  data-lang="ru">RU</button><span>·</span>
@@ -914,7 +919,7 @@ section { padding: var(--s-9) 0; position: relative; }
                 </div>
                 <div style="display: flex; gap: var(--s-3); flex-wrap: wrap;">
                     <a class="btn btn--red"     href="<?= $h($mapsUrl) ?>" target="_blank" rel="noopener">Построить маршрут <?= $icon['arrow'] ?></a>
-                    <a class="btn btn--outline" href="<?= $h($whatsappUrl) ?>" target="_blank" rel="noopener">Спросить дорогу</a>
+                    <a class="btn btn--outline" href="<?= $h($telegramUrl) ?>" target="_blank" rel="noopener">Спросить дорогу</a>
                 </div>
             </div>
         </div>
@@ -926,7 +931,7 @@ section { padding: var(--s-9) 0; position: relative; }
     <div class="container">
         <div class="ftr__top">
             <div>
-                <div class="ftr__brand">Vera<i>nda</i></div>
+                <div class="ftr__brand">VERANDA</div>
                 <p class="ftr__tagline">Ресторан, баня и игры на одной поляне в горах Нячанга. Бронирование столика — через сайт.</p>
                 <div class="ftr__socials">
                     <a href="<?= $h($whatsappUrl) ?>"  target="_blank" rel="noopener" aria-label="WhatsApp"><?= $icon['wa'] ?></a>
@@ -949,7 +954,6 @@ section { padding: var(--s-9) 0; position: relative; }
                 <ul>
                     <li><a href="<?= $h($banyaUrl) ?>"    target="_blank" rel="noopener">Баня «Сила Духа»</a></li>
                     <li><a href="<?= $h($gamezoneUrl) ?>" target="_blank" rel="noopener">GameZone</a></li>
-                    <li><a href="<?= $h($telegramUrl) ?>" target="_blank" rel="noopener">TG Nha Trang</a></li>
                 </ul>
             </div>
             <div>
