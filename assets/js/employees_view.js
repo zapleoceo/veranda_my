@@ -1535,10 +1535,19 @@
                 if (h > 0) {
                     const s = cell && cell.s ? String(cell.s) : '';
                     const e = cell && cell.e ? String(cell.e) : '';
-                    const range = (s && e)
-                        ? `<div class="tabel-range">${esc(s)}–${esc(e)}</div>`
-                        : '';
-                    html += `<td${wk}><div class="tabel-h">${esc(fmtHours(h))}</div>${range}</td>`;
+                    let range = '';
+                    let tip   = '';
+                    if (s && e) {
+                        range = `<div class="tabel-range">${esc(s)}–${esc(e)}</div>`;
+                    } else {
+                        // Times come from dash.getTransactions (min..max).
+                        // Pure kitchen / management staff never close
+                        // checks, so we have no transactions to mine for
+                        // them. Surfacing this in a hover tooltip prevents
+                        // the "looks like a bug" perception.
+                        tip = ' title="Часы из dash.getWaitersSales (worked_time). Время старта/финиша недоступно — этот сотрудник не закрывал чеки в этот день."';
+                    }
+                    html += `<td${wk}${tip}><div class="tabel-h">${esc(fmtHours(h))}</div>${range}</td>`;
                 } else {
                     html += `<td${cls}${wk}>·</td>`;
                 }

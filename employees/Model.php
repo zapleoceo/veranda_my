@@ -236,8 +236,12 @@ class EmployeesModel {
             foreach ($days as $i => $d) {
                 $ymd = str_replace('-', '', $d);
                 $salesUrl = $salesBase . '?token=' . urlencode($token) . '&dateFrom=' . $ymd . '&dateTo=' . $ymd;
+                // No `status=2` filter — open + cancelled checks also have
+                // a `date` (open time) we can use as a shift-start signal,
+                // widening coverage for people who closed few checks that
+                // day. We still skip the heavy children fields.
                 $txUrl    = $txBase    . '?token=' . urlencode($token) . '&dateFrom=' . $ymd . '&dateTo=' . $ymd
-                          . '&status=2&include_history=false&include_products=false&include_delivery=false';
+                          . '&include_history=false&include_products=false&include_delivery=false';
                 $salesMap[(int)$i] = $mkHandle($salesUrl);
                 $txMap[(int)$i]    = $mkHandle($txUrl);
                 curl_multi_add_handle($mh, $salesMap[$i]);
@@ -274,28 +278,40 @@ class EmployeesModel {
                 curl_multi_remove_handle($mh, $ch);
                 curl_close($ch);
             }
+            // Normalise a Poster date field ("YYYY-MM-DD HH:MM:SS" or unix
+            // ms) to "HH:MM" or null. Used for both `date` (open time)
+            // and `date_close` (close time) per transaction so we widen
+            // min/max coverage — any of the two beats nothing.
+            $toHM = static function ($raw): ?string {
+                $raw = (string) ($raw ?? '');
+                if ($raw === '') return null;
+                if (preg_match('/(\d{2}):(\d{2})(?::\d{2})?\s*$/', $raw, $m)) {
+                    return $m[1] . ':' . $m[2];
+                }
+                if (is_numeric($raw) && (int)$raw > 0) {
+                    $ts = (int)$raw;
+                    if ($ts > 10000000000) $ts = (int)round($ts / 1000);
+                    return date('H:i', $ts);
+                }
+                return null;
+            };
             foreach ($txMap as $i => $ch) {
                 $iso = $days[$i];
                 foreach ($readResp($ch) as $tx) {
                     if (!is_array($tx)) continue;
                     $uid = (int)($tx['user_id'] ?? 0);
                     if ($uid <= 0) continue;
-                    $raw = (string)($tx['date_close'] ?? ($tx['date'] ?? ''));
-                    // Poster gives "YYYY-MM-DD HH:MM:SS" or sometimes unix
-                    // millis. Normalise to "HH:MM" for display.
-                    $hhmm = '';
-                    if (preg_match('/(\d{2}):(\d{2})(?::\d{2})?\s*$/', $raw, $m)) {
-                        $hhmm = $m[1] . ':' . $m[2];
-                    } elseif (is_numeric($raw) && (int)$raw > 0) {
-                        $ts = (int)$raw;
-                        if ($ts > 10000000000) $ts = (int)round($ts / 1000);
-                        $hhmm = date('H:i', $ts);
+                    // Consider BOTH open and close timestamps — open
+                    // pushes the min earlier (shift start), close pushes
+                    // the max later (shift end). Either is enough on
+                    // its own.
+                    foreach ([$toHM($tx['date'] ?? ''), $toHM($tx['date_close'] ?? '')] as $hhmm) {
+                        if ($hhmm === null) continue;
+                        $cur = $timeByUserDay[$uid][$iso] ?? ['s' => $hhmm, 'e' => $hhmm];
+                        if (strcmp($hhmm, $cur['s']) < 0) $cur['s'] = $hhmm;
+                        if (strcmp($hhmm, $cur['e']) > 0) $cur['e'] = $hhmm;
+                        $timeByUserDay[$uid][$iso] = $cur;
                     }
-                    if ($hhmm === '') continue;
-                    $cur = $timeByUserDay[$uid][$iso] ?? ['s' => $hhmm, 'e' => $hhmm];
-                    if (strcmp($hhmm, $cur['s']) < 0) $cur['s'] = $hhmm;
-                    if (strcmp($hhmm, $cur['e']) > 0) $cur['e'] = $hhmm;
-                    $timeByUserDay[$uid][$iso] = $cur;
                 }
                 curl_multi_remove_handle($mh, $ch);
                 curl_close($ch);
