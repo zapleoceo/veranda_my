@@ -9,9 +9,9 @@ RewriteRule ^tr3/?$ tr3/index.php [L,QSA]
 RewriteRule ^tr3/api/?$ tr3/api.php [L,QSA]
 RewriteRule ^tr4/?$ tr4/index.php [L,QSA]
 RewriteRule ^tr4/api/?$ tr4/api.php [L,QSA]
-RewriteRule ^TableReservation/?$ TableReservation.php [L,QSA]
 RewriteRule ^neworder/?$ neworder/index.php [L,QSA]
 RewriteRule ^poster-app/?$ poster-app/index.php [L,QSA]
+# TableReservation.php был удалён — rewrite больше не нужен.
 
 # Redirects from old .php paths to new folders
 RewriteRule ^banya\.php$ /banya [R=301,L]
@@ -29,6 +29,9 @@ RewriteRule ^employees/?$ employees/index.php [L,QSA]
 RewriteRule ^reservations/?$ reservations/index.php [L,QSA]
 
 
+# Catch-all: /foo → /foo.php (если /foo.php существует и /foo это не директория).
+# Благодаря этому правилу /links/menu, /login, /logout и т.п. отвечают тем
+# же контентом что и .php-аналог — пара URL'ов работает одинаково.
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.php -f
 RewriteRule ^(.*)$ $1.php [L,QSA]

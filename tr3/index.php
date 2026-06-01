@@ -76,12 +76,12 @@ $mk = function (string $l) use ($self, $baseQs) {
   <title><?= htmlspecialchars(tr('page_title')) ?></title>
   <link rel="icon" type="image/svg+xml" href="/links/favicon.svg">
   <meta name="description" content="<?= htmlspecialchars($lang === 'ru' ? 'Бронирование столика в Veranda: выберите стол и время.' : ($lang === 'vi' ? 'Đặt bàn tại Veranda: chọn bàn và thời gian.' : ($lang === 'en' ? 'Reserve a table at Veranda: pick a table and time.' : 'Veranda 테이블 예약: 테이블과 시간을 선택하세요.'))) ?>">
-  <link rel="canonical" href="<?= htmlspecialchars($_siteBase) ?>/tr3?lang=<?= urlencode($lang) ?>">
+  <link rel="canonical" href="<?= htmlspecialchars($_siteBase) ?>/tr3/?lang=<?= urlencode($lang) ?>">
   <meta property="og:site_name" content="Veranda">
   <meta property="og:type" content="website">
   <meta property="og:title" content="<?= htmlspecialchars(tr('page_title')) ?>">
   <meta property="og:description" content="<?= htmlspecialchars($lang === 'ru' ? 'Онлайн бронирование столика.' : ($lang === 'vi' ? 'Đặt bàn online.' : ($lang === 'en' ? 'Online table reservation.' : '온라인 테이블 예약.'))) ?>">
-  <meta property="og:url" content="<?= htmlspecialchars($_siteBase) ?>/tr3?lang=<?= urlencode($lang) ?>">
+  <meta property="og:url" content="<?= htmlspecialchars($_siteBase) ?>/tr3/?lang=<?= urlencode($lang) ?>">
   <meta property="og:image" content="<?= htmlspecialchars($_siteBase) ?>/assets/img/links_bg.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="<?= htmlspecialchars($_siteBase) ?>/assets/img/links_bg.png">
