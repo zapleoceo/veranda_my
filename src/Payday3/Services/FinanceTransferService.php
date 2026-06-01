@@ -390,10 +390,18 @@ final class FinanceTransferService implements FinanceTransferServiceInterface
     }
 
     /**
-     * Poster sometimes returns amounts as VND (200_000_000) and other
-     * times as cents (200_000_000_00). Heuristic mirrors payday2:
-     * if the value is suspiciously large AND divisible by 100, treat
-     * it as cents and downscale.
+     * Converts a raw Poster monetary field to VND.
+     *
+     * Poster's finance.getTransactions (and related endpoints) returns
+     * every monetary field in cents: 1 cent = 0.01 VND, so 835 000 VND
+     * comes as 83 500 000.  Money::fromPosterCents() and every other
+     * Poster consumer in this codebase (PosterBalanceService,
+     * PosterCashShiftService, etc.) confirm this is consistent — Poster
+     * never returns raw VND.  Always divide by 100.
+     *
+     * The old heuristic (divide only if > 200 000 000) failed for sums
+     * whose cents representation falls below that threshold (any VND
+     * amount < 2 000 000 VND = 200 000 000 cents).
      */
     private static function normMoneyMinor(mixed $raw): int
     {
@@ -401,6 +409,6 @@ final class FinanceTransferService implements FinanceTransferServiceInterface
         if (is_int($raw) || is_float($raw)) $f = (float)$raw;
         elseif (is_string($raw)) $f = (float)str_replace(',', '.', str_replace(' ', '', trim($raw)));
         $n = (int)round($f);
-        return ($n > 200_000_000 && $n % 100 === 0) ? (int)round($n / 100) : $n;
+        return (int)round($n / 100);
     }
 }
