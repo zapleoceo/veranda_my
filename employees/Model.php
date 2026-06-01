@@ -223,9 +223,15 @@ class EmployeesModel {
             $token        = $this->posterToken;
             $salesBase    = 'https://joinposter.com/api/dash.getWaitersSales';
             $txBase       = 'https://joinposter.com/api/dash.getTransactions';
+            // Primary source for shift bounds — actual clock-in/out
+            // records from Poster's timesheet. Covers kitchen / managers
+            // too (anyone who clocks in). Falls back to tx-based min/max
+            // when this endpoint returns nothing.
+            $attBase      = 'https://joinposter.com/api/access.getEmployeesAttendance';
             $mh           = curl_multi_init();
-            $salesMap     = []; // dayIdx => handle
-            $txMap        = []; // dayIdx => handle
+            $salesMap     = []; // dayIdx => handle (dash.getWaitersSales)
+            $txMap        = []; // dayIdx => handle (dash.getTransactions)
+            $attMap       = []; // dayIdx => handle (access.getEmployeesAttendance)
             $mkHandle = static function (string $url): \CurlHandle {
                 $ch = curl_init();
                 curl_setopt($ch, CURLOPT_URL, $url);
@@ -242,10 +248,13 @@ class EmployeesModel {
                 // day. We still skip the heavy children fields.
                 $txUrl    = $txBase    . '?token=' . urlencode($token) . '&dateFrom=' . $ymd . '&dateTo=' . $ymd
                           . '&include_history=false&include_products=false&include_delivery=false';
+                $attUrl   = $attBase   . '?token=' . urlencode($token) . '&dateFrom=' . $ymd . '&dateTo=' . $ymd;
                 $salesMap[(int)$i] = $mkHandle($salesUrl);
                 $txMap[(int)$i]    = $mkHandle($txUrl);
+                $attMap[(int)$i]   = $mkHandle($attUrl);
                 curl_multi_add_handle($mh, $salesMap[$i]);
                 curl_multi_add_handle($mh, $txMap[$i]);
+                curl_multi_add_handle($mh, $attMap[$i]);
             }
             do {
                 $status = curl_multi_exec($mh, $active);
@@ -315,6 +324,48 @@ class EmployeesModel {
                 }
                 curl_multi_remove_handle($mh, $ch);
                 curl_close($ch);
+            }
+            // Attendance records — primary source for shift bounds, covers
+            // non-waitstaff too. Poster's response shape isn't officially
+            // documented for the free tier, so we accept multiple field
+            // names defensively: time_in/time_out, date_in/date_out,
+            // start_time/end_time, date_start/date_end. ANY match per
+            // record is taken; the record's HH:MM is fed into the same
+            // min/max pipeline as the tx-based one. Attendance OVERWRITES
+            // tx-based bounds for a (uid, day) pair only when it produces
+            // tighter (i.e. real clock-in/clock-out) values.
+            $attendanceTimes = []; // uid => iso => ['s' => HH:MM, 'e' => HH:MM]
+            foreach ($attMap as $i => $ch) {
+                $iso = $days[$i];
+                foreach ($readResp($ch) as $att) {
+                    if (!is_array($att)) continue;
+                    $uid = (int)($att['user_id'] ?? ($att['employee_id'] ?? 0));
+                    if ($uid <= 0) continue;
+                    $startRaw = $att['date_in']    ?? $att['time_in']    ?? $att['start_time']
+                              ?? $att['date_start'] ?? $att['shift_start'] ?? null;
+                    $endRaw   = $att['date_out']   ?? $att['time_out']   ?? $att['end_time']
+                              ?? $att['date_end']   ?? $att['shift_end']  ?? null;
+                    $s = $toHM($startRaw);
+                    $e = $toHM($endRaw);
+                    if ($s === null && $e === null) continue;
+                    $cur = $attendanceTimes[$uid][$iso] ?? ['s' => null, 'e' => null];
+                    if ($s !== null && ($cur['s'] === null || strcmp($s, $cur['s']) < 0)) $cur['s'] = $s;
+                    if ($e !== null && ($cur['e'] === null || strcmp($e, $cur['e']) > 0)) $cur['e'] = $e;
+                    $attendanceTimes[$uid][$iso] = $cur;
+                }
+                curl_multi_remove_handle($mh, $ch);
+                curl_close($ch);
+            }
+            // Overlay attendance over tx-based bounds where available.
+            // Attendance wins because it reflects actual clock-in/clock-out
+            // rather than first/last check activity.
+            foreach ($attendanceTimes as $uid => $byIso) {
+                foreach ($byIso as $iso => $bounds) {
+                    $cur = $timeByUserDay[$uid][$iso] ?? ['s' => '', 'e' => ''];
+                    if (!empty($bounds['s'])) $cur['s'] = $bounds['s'];
+                    if (!empty($bounds['e'])) $cur['e'] = $bounds['e'];
+                    $timeByUserDay[$uid][$iso] = $cur;
+                }
             }
             curl_multi_close($mh);
 
