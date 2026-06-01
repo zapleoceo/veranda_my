@@ -158,6 +158,20 @@ $app->get('/schedule/v/{code:[A-Za-z0-9_-]+}', [ScheduleController::class, 'publ
 $app->map(['GET', 'POST'], '/schedule[/]', [ScheduleController::class, 'index'])
     ->add(AuthMiddleware::class);
 
+// Phase 5: public home page (preview).
+// Self-contained module in /home/index.php (same pattern as /links).
+// Корневой / пока продолжает 302 на /links — переключим на /home
+// только после того, как разметка будет принята.
+$homeAction = function ($req, $res) {
+    ob_start();
+    require __DIR__ . '/../../home/index.php';
+    $html = (string)ob_get_clean();
+    $res->getBody()->write($html);
+    return $res->withHeader('Content-Type', 'text/html; charset=utf-8');
+};
+$app->get('/home',  $homeAction);
+$app->get('/home/', $homeAction);
+
 // Phase 4: public links landing + menu
 $app->get('/links', [LinksController::class, 'index']);
 $app->get('/links/', function ($req, $res) { return $res->withHeader('Location', '/links')->withStatus(301); });
