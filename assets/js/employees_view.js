@@ -1540,12 +1540,13 @@
                     if (s && e) {
                         range = `<div class="tabel-range">${esc(s)}–${esc(e)}</div>`;
                     } else {
-                        // Times come from dash.getTransactions (min..max).
-                        // Pure kitchen / management staff never close
-                        // checks, so we have no transactions to mine for
-                        // them. Surfacing this in a hover tooltip prevents
-                        // the "looks like a bug" perception.
-                        tip = ' title="Часы из dash.getWaitersSales (worked_time). Время старта/финиша недоступно — этот сотрудник не закрывал чеки в этот день."';
+                        // Bounds come from access.getEmployeesAttendance
+                        // first, falling back to dash.getTransactions
+                        // min/max. If neither produced data for this
+                        // (user, day) pair, Poster's free-tier API simply
+                        // doesn't expose it — flag it in the hover so
+                        // it doesn't read as a bug.
+                        tip = ' title="Часы из dash.getWaitersSales. Время старта/финиша смены не найдено: ни в access.getEmployeesAttendance, ни в чеках за этот день."';
                     }
                     html += `<td${wk}${tip}><div class="tabel-h">${esc(fmtHours(h))}</div>${range}</td>`;
                 } else {
