@@ -173,6 +173,138 @@ class EmployeesModel {
     exit;
     }
 
+    /**
+     * GET /employees/?ajax=tabel&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+     *
+     * Builds the timesheet matrix: rows = employees (from
+     * access.getEmployees), columns = days (from period), cell =
+     * worked_time (hours) on that day for that user_id.
+     *
+     * Implementation: one dash.getWaitersSales call per day, fired in
+     * parallel via curl_multi (same pattern as tipsRun). For a 14-day
+     * period that's ~14 HTTP requests, all in flight at once.
+     *
+     * Response:
+     *   { ok: true,
+     *     days:    ["2026-05-01", "2026-05-02", ...],
+     *     rows:    [{user_id, name, role, by_day: {iso: hours}, total}],
+     *     totals:  {by_day: {iso: hours}, grand: hours} }
+     */
+    public function tabel() {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        @set_time_limit(120);
+
+        $dateFrom = $this->parseDate((string)($_GET['date_from'] ?? ''));
+        $dateTo   = $this->parseDate((string)($_GET['date_to']   ?? ''));
+        if ($dateFrom === null || $dateTo === null || $dateFrom > $dateTo) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Некорректный период'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $days = $this->mkDays($dateFrom, $dateTo);
+        if (!$days) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Нет дней'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        try {
+            $api  = new \App\Classes\PosterAPI($this->posterToken);
+            $emps = $api->request('access.getEmployees', [], 'GET');
+            if (!is_array($emps)) $emps = [];
+
+            // Parallel per-day fetch of dash.getWaitersSales.
+            $apiBase = 'https://joinposter.com/api/dash.getWaitersSales';
+            $token   = $this->posterToken;
+            $chs     = [];
+            $map     = [];
+            foreach ($days as $i => $d) {
+                $ymd = str_replace('-', '', $d);
+                $url = $apiBase . '?token=' . urlencode($token) . '&dateFrom=' . $ymd . '&dateTo=' . $ymd;
+                $ch  = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+                $chs[] = $ch;
+                $map[(int)$i] = $ch;
+            }
+            $mh = curl_multi_init();
+            foreach ($chs as $ch) curl_multi_add_handle($mh, $ch);
+            do {
+                $status = curl_multi_exec($mh, $active);
+                if ($active) curl_multi_select($mh, 0.2);
+            } while ($active && $status == CURLM_OK);
+
+            // hoursByUserDay[uid][iso_day] = hours
+            $hoursByUserDay = [];
+            foreach ($map as $i => $ch) {
+                $body = curl_multi_getcontent($ch);
+                curl_multi_remove_handle($mh, $ch);
+                curl_close($ch);
+                if (!is_string($body) || $body === '') continue;
+                $data = json_decode($body, true);
+                $resp = is_array($data) && isset($data['response']) ? $data['response'] : $data;
+                if (!is_array($resp)) continue;
+                $iso = $days[$i];
+                foreach ($resp as $row) {
+                    if (!is_array($row)) continue;
+                    $uid = (int)($row['user_id'] ?? 0);
+                    if ($uid <= 0) continue;
+                    $worked = $row['worked_time'] ?? ($row['workedTime'] ?? ($row['middle_time'] ?? null));
+                    $workedMin = is_numeric($worked) ? (int)round((float)$worked) : 0;
+                    if ($workedMin <= 0) continue;
+                    $h = round($workedMin / 60, 2);
+                    $hoursByUserDay[$uid][$iso] = ($hoursByUserDay[$uid][$iso] ?? 0) + $h;
+                }
+            }
+            curl_multi_close($mh);
+
+            // Build rows. Include only employees with at least one shift in
+            // the period — empty rows pollute the table.
+            $rows = [];
+            $totalsByDay = array_fill_keys($days, 0.0);
+            $grandTotal  = 0.0;
+            foreach ($emps as $e) {
+                if (!is_array($e)) continue;
+                $uid = (int)($e['user_id'] ?? 0);
+                if ($uid <= 0) continue;
+                $byDay = $hoursByUserDay[$uid] ?? [];
+                if (!$byDay) continue;
+                $total = 0.0;
+                foreach ($byDay as $iso => $h) {
+                    $total              += (float)$h;
+                    $totalsByDay[$iso]  += (float)$h;
+                }
+                $grandTotal += $total;
+                $rows[] = [
+                    'user_id' => $uid,
+                    'name'    => trim((string)($e['name'] ?? '')),
+                    'role'    => trim((string)($e['role_name'] ?? '')),
+                    'by_day'  => $byDay,
+                    'total'   => round($total, 2),
+                ];
+            }
+            usort($rows, static fn($a, $b) => $b['total'] <=> $a['total']);
+            foreach ($totalsByDay as $k => $v) $totalsByDay[$k] = round((float)$v, 2);
+
+            echo json_encode([
+                'ok'     => true,
+                'days'   => $days,
+                'rows'   => $rows,
+                'totals' => [
+                    'by_day' => $totalsByDay,
+                    'grand'  => round($grandTotal, 2),
+                ],
+            ], JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+
     public function hoursByDay() {
 
     header('Content-Type: application/json; charset=utf-8');

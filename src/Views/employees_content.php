@@ -32,6 +32,8 @@
                         data-help-abs="Ручная выплата (Tips/Salary). Выбор сотрудника, типа, счёта и суммы. Перед выполнением — обязательная галочка «да проверил».">PayExtra</button>
                 <button type="button" class="secondary" id="fixBtn"
                         data-help-abs="FIX — список SLR транзакций за 30 дней. Можно переназначить сотрудника в комментарии транзакции, если в Poster выплату оформили не на того.">FIX</button>
+                <button type="button" class="secondary" id="tabelBtn"
+                        data-help-abs="Табель — таблица «сотрудник × день» с часами работы за выбранный период работы. Использует тот же dash.getWaitersSales что и колонка Часы, только в разбивке по дням.">Табель</button>
             </div>
             <button type="button" class="help-btn" id="helpBtn" title="Подсказки по интерфейсу"
                     aria-pressed="false"
@@ -175,6 +177,15 @@
     </div>
 </div>
 
+<div class="modal-backdrop" id="tabelModal">
+    <div class="modal tabel-modal" role="dialog" aria-modal="true" aria-labelledby="tabelTitle">
+        <button type="button" id="tabelClose" style="position:absolute; top:10px; right:10px; background:transparent; border:0; font-size:20px; line-height:20px; cursor:pointer;">✕</button>
+        <h3 id="tabelTitle">Табель</h3>
+        <div class="tabel-period muted" id="tabelPeriod"></div>
+        <div class="tabel-body" id="tabelBody"></div>
+    </div>
+</div>
+
 <div class="modal-backdrop" id="paidModal">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="paidTitle">
         <h3 id="paidTitle">Подтверждение</h3>
@@ -234,4 +245,4 @@
 window.__USER_EMAIL__ = <?= json_encode((string) ($_SESSION['user_email'] ?? ''), JSON_UNESCAPED_UNICODE) ?>;
 window.__EMPLOYEES_CSRF__ = <?= json_encode($employeesCsrf, JSON_UNESCAPED_UNICODE) ?>;
 </script>
-<script src="/assets/js/employees_view.js?v=20260520_txrow" defer></script>
+<script src="/assets/js/employees_view.js?v=20260521_tabel" defer></script>
