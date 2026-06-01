@@ -215,40 +215,53 @@ class EmployeesModel {
             $emps = $api->request('access.getEmployees', [], 'GET');
             if (!is_array($emps)) $emps = [];
 
-            // Parallel per-day fetch of dash.getWaitersSales.
-            $apiBase = 'https://joinposter.com/api/dash.getWaitersSales';
-            $token   = $this->posterToken;
-            $chs     = [];
-            $map     = [];
-            foreach ($days as $i => $d) {
-                $ymd = str_replace('-', '', $d);
-                $url = $apiBase . '?token=' . urlencode($token) . '&dateFrom=' . $ymd . '&dateTo=' . $ymd;
-                $ch  = curl_init();
+            // Fire two parallel curl streams per day in the same multi
+            // handle: dash.getWaitersSales for hours + dash.getTransactions
+            // for per-shift start/end times. min(tx.date) ≈ shift start,
+            // max(tx.date) ≈ shift end — using the actual transaction
+            // log avoids a second Poster API endpoint that doesn't exist.
+            $token        = $this->posterToken;
+            $salesBase    = 'https://joinposter.com/api/dash.getWaitersSales';
+            $txBase       = 'https://joinposter.com/api/dash.getTransactions';
+            $mh           = curl_multi_init();
+            $salesMap     = []; // dayIdx => handle
+            $txMap        = []; // dayIdx => handle
+            $mkHandle = static function (string $url): \CurlHandle {
+                $ch = curl_init();
                 curl_setopt($ch, CURLOPT_URL, $url);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-                $chs[] = $ch;
-                $map[(int)$i] = $ch;
+                return $ch;
+            };
+            foreach ($days as $i => $d) {
+                $ymd = str_replace('-', '', $d);
+                $salesUrl = $salesBase . '?token=' . urlencode($token) . '&dateFrom=' . $ymd . '&dateTo=' . $ymd;
+                $txUrl    = $txBase    . '?token=' . urlencode($token) . '&dateFrom=' . $ymd . '&dateTo=' . $ymd
+                          . '&status=2&include_history=false&include_products=false&include_delivery=false';
+                $salesMap[(int)$i] = $mkHandle($salesUrl);
+                $txMap[(int)$i]    = $mkHandle($txUrl);
+                curl_multi_add_handle($mh, $salesMap[$i]);
+                curl_multi_add_handle($mh, $txMap[$i]);
             }
-            $mh = curl_multi_init();
-            foreach ($chs as $ch) curl_multi_add_handle($mh, $ch);
             do {
                 $status = curl_multi_exec($mh, $active);
                 if ($active) curl_multi_select($mh, 0.2);
             } while ($active && $status == CURLM_OK);
 
-            // hoursByUserDay[uid][iso_day] = hours
+            // hoursByUserDay[uid][iso] = hours
+            // timeByUserDay[uid][iso]  = ['s' => 'HH:MM', 'e' => 'HH:MM']
             $hoursByUserDay = [];
-            foreach ($map as $i => $ch) {
+            $timeByUserDay  = [];
+            $readResp = static function (\CurlHandle $ch): array {
                 $body = curl_multi_getcontent($ch);
-                curl_multi_remove_handle($mh, $ch);
-                curl_close($ch);
-                if (!is_string($body) || $body === '') continue;
+                if (!is_string($body) || $body === '') return [];
                 $data = json_decode($body, true);
                 $resp = is_array($data) && isset($data['response']) ? $data['response'] : $data;
-                if (!is_array($resp)) continue;
+                return is_array($resp) ? $resp : [];
+            };
+            foreach ($salesMap as $i => $ch) {
                 $iso = $days[$i];
-                foreach ($resp as $row) {
+                foreach ($readResp($ch) as $row) {
                     if (!is_array($row)) continue;
                     $uid = (int)($row['user_id'] ?? 0);
                     if ($uid <= 0) continue;
@@ -258,6 +271,34 @@ class EmployeesModel {
                     $h = round($workedMin / 60, 2);
                     $hoursByUserDay[$uid][$iso] = ($hoursByUserDay[$uid][$iso] ?? 0) + $h;
                 }
+                curl_multi_remove_handle($mh, $ch);
+                curl_close($ch);
+            }
+            foreach ($txMap as $i => $ch) {
+                $iso = $days[$i];
+                foreach ($readResp($ch) as $tx) {
+                    if (!is_array($tx)) continue;
+                    $uid = (int)($tx['user_id'] ?? 0);
+                    if ($uid <= 0) continue;
+                    $raw = (string)($tx['date_close'] ?? ($tx['date'] ?? ''));
+                    // Poster gives "YYYY-MM-DD HH:MM:SS" or sometimes unix
+                    // millis. Normalise to "HH:MM" for display.
+                    $hhmm = '';
+                    if (preg_match('/(\d{2}):(\d{2})(?::\d{2})?\s*$/', $raw, $m)) {
+                        $hhmm = $m[1] . ':' . $m[2];
+                    } elseif (is_numeric($raw) && (int)$raw > 0) {
+                        $ts = (int)$raw;
+                        if ($ts > 10000000000) $ts = (int)round($ts / 1000);
+                        $hhmm = date('H:i', $ts);
+                    }
+                    if ($hhmm === '') continue;
+                    $cur = $timeByUserDay[$uid][$iso] ?? ['s' => $hhmm, 'e' => $hhmm];
+                    if (strcmp($hhmm, $cur['s']) < 0) $cur['s'] = $hhmm;
+                    if (strcmp($hhmm, $cur['e']) > 0) $cur['e'] = $hhmm;
+                    $timeByUserDay[$uid][$iso] = $cur;
+                }
+                curl_multi_remove_handle($mh, $ch);
+                curl_close($ch);
             }
             curl_multi_close($mh);
 
@@ -270,12 +311,18 @@ class EmployeesModel {
                 if (!is_array($e)) continue;
                 $uid = (int)($e['user_id'] ?? 0);
                 if ($uid <= 0) continue;
-                $byDay = $hoursByUserDay[$uid] ?? [];
-                if (!$byDay) continue;
+                $byDayHours = $hoursByUserDay[$uid] ?? [];
+                if (!$byDayHours) continue;
+                $byDay = [];
                 $total = 0.0;
-                foreach ($byDay as $iso => $h) {
+                foreach ($byDayHours as $iso => $h) {
                     $total              += (float)$h;
                     $totalsByDay[$iso]  += (float)$h;
+                    $byDay[$iso] = [
+                        'h' => round((float)$h, 2),
+                        's' => $timeByUserDay[$uid][$iso]['s'] ?? '',
+                        'e' => $timeByUserDay[$uid][$iso]['e'] ?? '',
+                    ];
                 }
                 $grandTotal += $total;
                 $rows[] = [
