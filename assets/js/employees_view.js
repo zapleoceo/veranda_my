@@ -39,6 +39,11 @@
     const fixModal = document.getElementById('fixModal');
     const fixClose = document.getElementById('fixClose');
     const fixEyeBtn = document.getElementById('fixEyeBtn');
+    const tabelBtn   = document.getElementById('tabelBtn');
+    const tabelModal = document.getElementById('tabelModal');
+    const tabelClose = document.getElementById('tabelClose');
+    const tabelBody  = document.getElementById('tabelBody');
+    const tabelPeriodEl = document.getElementById('tabelPeriod');
     const fixBody = document.getElementById('fixBody');
     const payExtraModal = document.getElementById('payExtraModal');
     const payExtraEmp = document.getElementById('payExtraEmp');
@@ -1474,6 +1479,110 @@
         if (!uid || amountVnd <= 0) return;
         openPayExtraPreset({ kind, userId: uid, amountVnd }).catch((err) => setError(err && err.message ? err.message : 'Ошибка'));
     });
+    // ─── Табель: employee × day matrix ──────────────────────────────────
+    // Click "Табель" → POST-like GET /?ajax=tabel for the current work
+    // period. Server pulls dash.getWaitersSales per day in parallel.
+    // We render an H+1 × N+1 table: rows = employees with shifts, cols =
+    // ISO days, last col = total hours, footer = totals per day + grand.
+    const TABEL_DOW_RU = ['вс','пн','вт','ср','чт','пт','сб'];
+    const isoToDow = (iso) => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+        if (!m) return '';
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0);
+        return TABEL_DOW_RU[d.getDay()];
+    };
+    const isoIsWeekend = (iso) => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+        if (!m) return false;
+        const w = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0).getDay();
+        return w === 0 || w === 5 || w === 6;   // Пт/Сб/Вс
+    };
+    const isoToShort = (iso) => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+        return m ? `${m[3]}.${m[2]}` : iso;
+    };
+    const fmtHours = (h) => {
+        const v = Number(h || 0);
+        return v > 0 ? (Math.round(v * 100) / 100).toString() : '·';
+    };
+
+    function renderTabel(data) {
+        if (!tabelBody) return;
+        const days = Array.isArray(data && data.days) ? data.days : [];
+        const rows = Array.isArray(data && data.rows) ? data.rows : [];
+        if (!rows.length) {
+            tabelBody.innerHTML = '<div class="tabel-empty">Нет смен за выбранный период работы.</div>';
+            return;
+        }
+        const totals = (data && data.totals) || { by_day: {}, grand: 0 };
+
+        let html = '<table class="tabel-table"><thead><tr>';
+        html += '<th>Сотрудник</th>';
+        days.forEach((iso) => {
+            const wk = isoIsWeekend(iso) ? ' class="weekend"' : '';
+            html += `<th${wk}><div>${esc(isoToShort(iso))}</div><div style="font-weight:500; font-size:9px;">${esc(isoToDow(iso))}</div></th>`;
+        });
+        html += '<th class="tabel-total">Σ</th>';
+        html += '</tr></thead><tbody>';
+
+        rows.forEach((r) => {
+            html += `<tr><td>${esc(r.name || ('uid:' + r.user_id))}<div class="muted" style="font-size:10px; font-weight:400;">${esc(r.role || '')}</div></td>`;
+            days.forEach((iso) => {
+                const h  = (r.by_day && r.by_day[iso]) || 0;
+                const cls = Number(h) > 0 ? '' : ' class="num-zero"';
+                html += `<td${cls}>${esc(fmtHours(h))}</td>`;
+            });
+            html += `<td class="tabel-total">${esc(fmtHours(r.total))}</td>`;
+            html += '</tr>';
+        });
+
+        html += '</tbody><tfoot><tr><td>Итого</td>';
+        days.forEach((iso) => {
+            const h = (totals.by_day && totals.by_day[iso]) || 0;
+            html += `<td>${esc(fmtHours(h))}</td>`;
+        });
+        html += `<td class="tabel-total">${esc(fmtHours(totals.grand))}</td>`;
+        html += '</tr></tfoot></table>';
+
+        tabelBody.innerHTML = html;
+    }
+
+    async function openTabel() {
+        if (!tabelModal || !tabelBody) return;
+        const df = dateFrom ? String(dateFrom.value || '').trim() : '';
+        const dt = dateTo   ? String(dateTo.value   || '').trim() : '';
+        if (!df || !dt) {
+            showToast('Выберите период работы');
+            return;
+        }
+        tabelModal.classList.add('tabel-open');
+        if (tabelPeriodEl) tabelPeriodEl.textContent = `Период работы: ${df} — ${dt}`;
+        tabelBody.innerHTML = '<div class="tabel-loading"><span class="spinner emp-style-0"></span> Загрузка табеля…</div>';
+        try {
+            const url = new URL(location.href);
+            url.searchParams.set('ajax', 'tabel');
+            url.searchParams.set('date_from', df);
+            url.searchParams.set('date_to',   dt);
+            const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+            const txt = await res.text();
+            let j = null; try { j = JSON.parse(txt); } catch (_) {}
+            if (!j || !j.ok) throw new Error((j && j.error) ? j.error : 'Ошибка');
+            renderTabel(j);
+        } catch (err) {
+            tabelBody.innerHTML = `<div class="tabel-empty">Ошибка: ${esc(err && err.message ? err.message : err)}</div>`;
+        }
+    }
+    function closeTabel() { if (tabelModal) tabelModal.classList.remove('tabel-open'); }
+    if (tabelBtn)   tabelBtn.addEventListener('click', openTabel);
+    if (tabelClose) tabelClose.addEventListener('click', closeTabel);
+    if (tabelModal) {
+        tabelModal.addEventListener('click', (e) => { if (e.target === tabelModal) closeTabel(); });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && tabelModal.classList.contains('tabel-open')) closeTabel();
+        });
+    }
+
+
     cancelBtn.addEventListener('click', async () => {
         try {
             cancelBtn.disabled = true;

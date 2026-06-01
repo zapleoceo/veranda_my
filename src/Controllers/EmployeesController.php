@@ -31,7 +31,7 @@ class EmployeesController
         $pageTitle    = 'ЗП сотрудников';
         $currentPath  = '/employees';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css?v=20260430_0007">' . "\n"
-                      . '<link rel="stylesheet" href="/assets/css/employees.css?v=20260520_txrow">' . "\n"
+                      . '<link rel="stylesheet" href="/assets/css/employees.css?v=20260521_tabel">' . "\n"
                       . '<link rel="stylesheet" href="/assets/css/employees_view.css?v=20260516">';
 
         // Replicate employees_csrf_ensure() without requiring legacy files

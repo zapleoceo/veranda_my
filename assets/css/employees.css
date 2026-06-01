@@ -247,7 +247,84 @@
             .progress { margin-left: 0; }
             .modal-backdrop { padding: 5px; }
         }
-        .emp-toast {
+        /* ─── Табель modal: employee × day matrix ─────────────────────────
+   Wide modal (uses the same fixModal width formula), sticky first column
+   for names and sticky header for day numbers so both stay visible while
+   scrolling a long table. */
+        #tabelModal {
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        #tabelModal.tabel-open { display: flex; }
+        #tabelModal .modal.tabel-modal {
+            position: relative;
+            width: min(1400px, calc(100vw - 16px));
+            max-width: 1400px;
+            max-height: calc(100vh - 24px);
+            overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        .tabel-period {
+            font-size: 12px; font-weight: 800;
+            margin-bottom: 10px;
+        }
+        .tabel-body {
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            max-height: calc(100vh - 180px);
+            border: 1px solid var(--border); border-radius: 8px;
+        }
+        .tabel-table {
+            border-collapse: collapse; font-size: 12px;
+            font-variant-numeric: tabular-nums;
+            width: max-content;
+        }
+        .tabel-table th, .tabel-table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+            text-align: right;
+            white-space: nowrap;
+        }
+        .tabel-table thead th {
+            position: sticky; top: 0; z-index: 3;
+            background: var(--card);
+            color: var(--muted); font-weight: 700;
+            font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .tabel-table thead th.weekend { color: #f87171; }
+        /* First two sticky columns: employee name + role. */
+        .tabel-table th:first-child,
+        .tabel-table td:first-child {
+            position: sticky; left: 0; z-index: 2;
+            background: var(--card);
+            text-align: left;
+            min-width: 140px;
+            font-weight: 600;
+        }
+        .tabel-table thead th:first-child { z-index: 4; }
+        .tabel-table .num-zero { color: var(--border); }
+        .tabel-table .tabel-total {
+            font-weight: 900; color: var(--accent);
+            background: rgba(184,135,70,.05);
+        }
+        .tabel-table tfoot td {
+            font-weight: 900; font-size: 12px;
+            background: var(--card);
+            position: sticky; bottom: 0; z-index: 2;
+            border-top: 2px solid var(--border);
+        }
+        .tabel-table tfoot td:first-child { z-index: 3; text-align: left; }
+        .tabel-empty,
+        .tabel-loading {
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+.emp-toast {
             position: fixed;
             bottom: 20px;
             left: 50%;

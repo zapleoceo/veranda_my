@@ -48,6 +48,7 @@ if ($ajax !== '') {
         case 'save_rate': $model->saveRate(); break;
         case 'load': $model->load(); break;
         case 'hours_by_day': $model->hoursByDay(); break;
+        case 'tabel': $model->tabel(); break;
         case 'tips_prepare': $model->tipsPrepare(); break;
         case 'tips_run': $model->tipsRun(); break;
         case 'tips_cancel': $model->tipsCancel(); break;
