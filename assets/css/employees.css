@@ -286,6 +286,18 @@
             border-right: 1px solid var(--border);
             text-align: right;
             white-space: nowrap;
+            position: relative;                    /* anchor for .tabel-flag */
+        }
+        /* Small red dot in the top-right corner — flagged when the tx-span
+           (max−min of check times) is shorter than worked_time by more
+           than 30 min. Hover the cell to see the explanation in title. */
+        .tabel-flag {
+            position: absolute;
+            top: 2px; right: 2px;
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 4px rgba(239,68,68,0.6);
         }
         .tabel-table thead th {
             position: sticky; top: 0; z-index: 3;

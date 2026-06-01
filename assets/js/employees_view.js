@@ -1535,20 +1535,29 @@
                 if (h > 0) {
                     const s = cell && cell.s ? String(cell.s) : '';
                     const e = cell && cell.e ? String(cell.e) : '';
+                    const mismatch = !!(cell && cell.m);
                     let range = '';
                     let tip   = '';
                     if (s && e) {
                         range = `<div class="tabel-range">${esc(s)}–${esc(e)}</div>`;
                     } else {
-                        // Bounds come from access.getEmployeesAttendance
-                        // first, falling back to dash.getTransactions
-                        // min/max. If neither produced data for this
-                        // (user, day) pair, Poster's free-tier API simply
-                        // doesn't expose it — flag it in the hover so
-                        // it doesn't read as a bug.
-                        tip = ' title="Часы из dash.getWaitersSales. Время старта/финиша смены не найдено: ни в access.getEmployeesAttendance, ни в чеках за этот день."';
+                        // Times come from dash.getTransactions (min/max of
+                        // check open/close). Pure kitchen / management
+                        // don't close checks, so we have nothing to mine.
+                        // Poster's free API doesn't expose raw clock-in/
+                        // out per employee for any other endpoint
+                        // (verified by exhaustive probing).
+                        tip = ' title="Часы из dash.getWaitersSales. Время старта/финиша смены не найдено — этот сотрудник не закрывал чеки в этот день, а отдельного API для табельных времён у Poster нет."';
                     }
-                    html += `<td${wk}${tip}><div class="tabel-h">${esc(fmtHours(h))}</div>${range}</td>`;
+                    // Red dot in the top-right corner when worked_time
+                    // exceeds the tx-span by more than 30 min. Indicates
+                    // a likely shift bound that's WIDER than the
+                    // tx-derived range (e.g. clocked in early, started
+                    // ringing checks later).
+                    const flag = mismatch
+                        ? '<span class="tabel-flag" title="Часы по табелю больше, чем разница между первым и последним чеком (>30 мин). Возможно реальные старт/финиш смены шире, чем показано."></span>'
+                        : '';
+                    html += `<td${wk}${tip}><div class="tabel-h">${esc(fmtHours(h))}</div>${range}${flag}</td>`;
                 } else {
                     html += `<td${cls}${wk}>·</td>`;
                 }
