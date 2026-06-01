@@ -801,6 +801,23 @@
             totSlrPaidMinor += Math.abs(spTotal || 0);
             const paidDisabled = tipsToPayMinor <= 0 ? 'disabled' : '';
             const salaryPayDisabled = salaryToPayVnd <= 0 ? 'disabled' : '';
+            // Render one transaction = one row. Used for both Tips ✓ and ЗП ✓
+            // cells so the format stays in sync (DRY).
+            const renderPaidItems = (items) => (items || []).map((it) => {
+                const raw   = String(it && it.date ? it.date : '');
+                const parts = raw.split(' ');
+                const d     = parts[0] || raw;
+                const tm    = parts[1] || '';
+                const acc   = Number(it && it.account_id ? it.account_id : 0) || 0;
+                const ic    = accountTagById(acc);
+                const amt   = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
+                return `<div class="paid-row">
+                            <span class="pi-cell date-cell">${esc(d)}</span>
+                            <span class="pi-cell time-cell">${esc(tm)}</span>
+                            <span class="pi-cell type-cell">${ic ? ic : ''}</span>
+                            <span class="pi-cell amt-cell">${esc(amt)}</span>
+                        </div>`;
+            }).join('');
             tr.innerHTML = `
                 <td class="col-id">${esc(r.user_id)}</td>
                 <td class="col-name"><div>${esc(r.name)}</div></td>
@@ -810,22 +827,8 @@
                 <td class="col-hours" style="text-align:right;"><button type="button" class="hours-btn" data-user-id="${esc(r.user_id)}">${esc(r.worked_hours)}</button></td>
                 <td class="col-tips" style="text-align:right;">${esc(fmtMoney(tipsVnd))}</td>
                 <td class="col-paid" style="text-align:right;">
-                    ${tpAmt ? `<div style="font-weight:900;">${esc(tpAmt)}</div>` : '—'}
-                    ${tpItems.length ? tpItems.map((it) => {
-                        const raw = String(it && it.date ? it.date : '');
-                        const parts = raw.split(' ');
-                        const d = parts[0] || raw;
-                        const tm = parts[1] || '';
-                        const acc = Number(it && it.account_id ? it.account_id : 0) || 0;
-                        const ic = accountTagById(acc);
-                        const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
-                        return `<div class="paid-item">
-                                    <div class="pi-cell date-cell">${esc(d)}</div>
-                                    <div class="pi-cell type-cell">${ic ? ic : ''}</div>
-                                    <div class="pi-cell time-cell">${esc(tm)}</div>
-                                    <div class="pi-cell amt-cell">${esc(amt)}</div>
-                                </div>`;
-                    }).join('') : ''}
+                    ${tpAmt ? `<div class="paid-total">${esc(tpAmt)}</div>` : '—'}
+                    ${renderPaidItems(tpItems)}
                 </td>
                 <td class="col-ttp" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
@@ -835,22 +838,8 @@
                 </td>
                 <td class="col-salary salary-cell" style="text-align:right;" data-user-id="${esc(r.user_id)}">${esc(fmtMoney(salaryVnd))}</td>
                 <td class="col-slr" style="text-align:right;">
-                    ${spAmt ? `<div style="font-weight:900;">${esc(spAmt)}</div>` : '—'}
-                    ${spItems.length ? spItems.map((it) => {
-                        const raw = String(it && it.date ? it.date : '');
-                        const parts = raw.split(' ');
-                        const d = parts[0] || raw;
-                        const tm = parts[1] || '';
-                        const acc = Number(it && it.account_id ? it.account_id : 0) || 0;
-                        const ic = accountTagById(acc);
-                        const amt = fmtMoney(vndFromMinor(Math.abs(Number(it && it.amount ? it.amount : 0))));
-                        return `<div class="paid-item">
-                                    <div class="pi-cell date-cell">${esc(d)}</div>
-                                    <div class="pi-cell type-cell">${ic ? ic : ''}</div>
-                                    <div class="pi-cell time-cell">${esc(tm)}</div>
-                                    <div class="pi-cell amt-cell">${esc(amt)}</div>
-                                </div>`;
-                    }).join('') : ''}
+                    ${spAmt ? `<div class="paid-total">${esc(spAmt)}</div>` : '—'}
+                    ${renderPaidItems(spItems)}
                 </td>
                 <td class="col-salarytopay" style="text-align:right;">
                     <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap: 6px; width: 100%;">
