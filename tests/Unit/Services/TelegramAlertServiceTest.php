@@ -46,6 +46,7 @@ class TelegramAlertServiceTest extends TestCase
             [
                 'id'                  => 42,
                 'transaction_id'      => 100,
+                'transaction_date'    => date('Y-m-d'),
                 'receipt_number'      => 'R001',
                 'table_number'        => '5',
                 'waiter_name'         => 'Ivan',
@@ -56,7 +57,7 @@ class TelegramAlertServiceTest extends TestCase
         ]);
 
         // No existing alert for this item
-        $this->alertItems->method('findByDate')->willReturn([]);
+        $this->alertItems->method('findAllActive')->willReturn([]);
 
         // Expect a new message to be sent
         $this->bot->expects($this->once())
@@ -85,15 +86,16 @@ class TelegramAlertServiceTest extends TestCase
             lastTextHash:   'abc',
             lastSeenAt:     date('Y-m-d H:i:s'),
         );
-        $this->alertItems->method('findByDate')->willReturn([42 => $existingItem]);
+        $this->alertItems->method('findAllActive')->willReturn([42 => $existingItem]);
 
         $this->bot->expects($this->once())
             ->method('deleteMessage')
             ->with(777);
 
+        // deleteByKid: без даты, только по kitchen_stats_id
         $this->alertItems->expects($this->once())
-            ->method('delete')
-            ->with($this->anything(), 42);
+            ->method('deleteByKid')
+            ->with(42);
 
         $this->meta->expects($this->atLeastOnce())->method('setMany');
 
@@ -106,6 +108,7 @@ class TelegramAlertServiceTest extends TestCase
 
         $row = [
             'id' => 10, 'transaction_id' => 50,
+            'transaction_date' => date('Y-m-d'),
             'receipt_number' => 'R10', 'table_number' => '3',
             'waiter_name' => 'Anna', 'transaction_comment' => '',
             'dish_name' => 'Spring Roll',
@@ -118,7 +121,7 @@ class TelegramAlertServiceTest extends TestCase
         $hash = sha1($text . '|' . json_encode($keyboard));
 
         $existingItem = new AlertItem(10, 50, 123, $hash, date('Y-m-d H:i:s', time() - 120));
-        $this->alertItems->method('findByDate')->willReturn([10 => $existingItem]);
+        $this->alertItems->method('findAllActive')->willReturn([10 => $existingItem]);
 
         // Same hash → should NOT call sendMessageWithKeyboard or editMessageText
         $this->bot->expects($this->never())->method('sendMessageWithKeyboard');
