@@ -831,7 +831,7 @@ section { padding: var(--s-9) 0; position: relative; }
 
         <!-- World 2: Banya — reverse -->
         <article class="world world--reverse reveal">
-            <div class="world__media"><?= v_img('bougainvillea', 'Терраса с бугенвиллией и плетёной мебелью', '(min-width: 780px) 50vw, 100vw') ?></div>
+            <div class="world__media"><?= v_img('banya', 'Русская баня на дровах — парная с веником', '(min-width: 780px) 50vw, 100vw') ?></div>
             <div class="world__text">
                 <div class="num">02 — Баня «Сила Духа»</div>
                 <h3>Настоящая русская баня <em>на дровах</em></h3>
@@ -848,7 +848,7 @@ section { padding: var(--s-9) 0; position: relative; }
 
         <!-- World 3: GameZone -->
         <article class="world reveal">
-            <div class="world__media"><?= v_img('gazebo-outside', 'Беседка-домик в саду', '(min-width: 780px) 50vw, 100vw') ?></div>
+            <div class="world__media"><?= v_img('gamezone', 'Archery Tag — лучный бой в GameZone', '(min-width: 780px) 50vw, 100vw') ?></div>
             <div class="world__text">
                 <div class="num">03 — GameZone</div>
                 <h3>Лазертаг, <em>Archery Tag</em>, детский клуб</h3>
