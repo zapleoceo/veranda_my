@@ -17,14 +17,12 @@ class TelegramAlertService
     private const STATUS_MSG_HISTORY    = 10;
     private const RUN_LOCK_NAME         = 'tg_alerts_run';
 
-    /**
-     * Telegram bots can edit/delete their own messages only for 48h after
-     * sending (unless the bot is admin with delete_messages permission).
-     * Past that window the API replies "message to delete not found" and
-     * the message becomes a permanent orphan. We bail early to avoid the
-     * round-trip + log noise, and to know when to give up retrying.
-     */
-    private const BOT_MUTATION_WINDOW_SECONDS = 47 * 3600; // 47h to be safe of clock drift
+    // Бот должен быть админом группы с permission `delete_messages`.
+    // В этом режиме Telegram'овское 48-часовое окно на удаление своих
+    // сообщений не применяется, поэтому раньше живший здесь
+    // BOT_MUTATION_WINDOW_SECONDS / _isPastMutationWindow / deferred-ветка
+    // удалены — это был мёртвый код. Если когда-то бота снимут с админов
+    // — это регресс настройки группы, а не работа кода.
 
     public function __construct(
         private readonly Database            $db,
@@ -60,8 +58,8 @@ class TelegramAlertService
             $this->_updateStatusMessage($metrics, $now);
 
             $cutoff  = date('Y-m-d H:i:s', strtotime("-{$metrics->waitLimitMinutes} minutes"));
-            $rows    = $this->_fetchOverdueRows($today, $cutoff, $settings);
-            $stats   = $this->_processItems($rows, $today, $now, $nowTs);
+            $rows    = $this->_fetchOverdueRows($cutoff, $settings);
+            $stats   = $this->_processItems($rows, $now, $nowTs);
 
             $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
             $this->_writeRunMeta($today, $durationMs, $metrics, $stats);
@@ -74,7 +72,6 @@ class TelegramAlertService
                 'edited'      => $stats['edited'],
                 'deleted'     => $stats['deleted'],
                 'unchanged'   => $stats['unchanged'],
-                'deferred'    => $stats['deferred'] ?? 0,
             ]);
         } finally {
             try { $this->db->query("SELECT RELEASE_LOCK(?)", [self::RUN_LOCK_NAME]); } catch (\Throwable) {}
@@ -106,11 +103,25 @@ class TelegramAlertService
             'exclude_partners_from_load' => '0',
             'ko_use_logical_close'       => '1',
         ];
+        // Поля где `0` — валидный смысл (булевы переключатели).
+        // Для них пустое значение остаётся `0`, не fallback на дефолт.
+        $allowZero = ['exclude_partners_from_load', 'ko_use_logical_close'];
+
         $values = $this->meta->getMany(array_keys($defaults));
 
         $s = new \stdClass();
         foreach ($defaults as $key => $default) {
-            $s->$key = (int) ($values[$key] ?? $default);
+            $raw = $values[$key] ?? $default;
+            $v   = (int) $raw;
+            // Защита от случайно записанной пустой строки в meta:
+            // (int)'' = 0, а 0 у timing-полей означает cutoff = now, что
+            // мгновенно делает все свежие блюда «overdue» → шквал
+            // алертов. Для тайминговых полей трактуем `<= 0` как
+            // «дефолт». Булевы переключатели проходят как есть.
+            if ($v <= 0 && !in_array($key, $allowZero, true)) {
+                $v = (int) $default;
+            }
+            $s->$key = $v;
         }
         return $s;
     }
@@ -302,76 +313,89 @@ class TelegramAlertService
 
     // ─── overdue items ────────────────────────────────────────────────────────
 
-    private function _fetchOverdueRows(string $today, string $cutoff, \stdClass $s): array
+    /**
+     * Открытые карточки, у которых ticket_sent_at старше cutoff (overdue).
+     *
+     * Раньше здесь стояло `transaction_date = $today`. Это связывало
+     * жизнь алерта с календарным днём: в полночь карточки прошлого дня
+     * выпадали из выборки одновременно со строками tg_alert_items
+     * (findByDate тоже фильтровал по today), и сообщения в Telegram
+     * оставались сиротами навсегда. Теперь дата в WHERE не участвует.
+     *
+     * `ticket_sent_at >= now - 7 days` — НЕ бизнес-условие, а защита
+     * индекса от full-scan. Open-чек неделю — это уже не «overdue
+     * блюдо», а сбой синхронизации; такого в норме нет.
+     *
+     * Возвращаем transaction_date — нужен для INSERT-пути в upsert
+     * (composite PK таблицы), но в самом фильтре больше не участвует.
+     */
+    private function _fetchOverdueRows(string $cutoff, \stdClass $s): array
     {
         $ks         = $this->db->t('kitchen_stats');
         $excludeSql = $this->_excludeSqlForSettings($s);
+        $safeguard  = date('Y-m-d H:i:s', strtotime('-7 days'));
         return $this->db->query(
-            "SELECT id, transaction_id, receipt_number, table_number, waiter_name,
-                    transaction_comment, dish_name, ticket_sent_at, tg_sent_at
+            "SELECT id, transaction_id, transaction_date, receipt_number, table_number,
+                    waiter_name, transaction_comment, dish_name, ticket_sent_at, tg_sent_at
              FROM {$ks}
              WHERE ready_pressed_at IS NULL
                AND ticket_sent_at IS NOT NULL
-               AND transaction_date = ?
                AND status = 1
                AND COALESCE(was_deleted, 0) = 0 {$excludeSql}
                AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
-               AND ticket_sent_at < ?
+               AND ticket_sent_at >= ?
+               AND ticket_sent_at <  ?
              ORDER BY transaction_id ASC, ticket_sent_at ASC, id ASC",
-            [$today, $cutoff]
+            [$safeguard, $cutoff]
         )->fetchAll();
     }
 
-    private function _processItems(array $rows, string $today, string $now, int $nowTs): array
+    private function _processItems(array $rows, string $now, int $nowTs): array
     {
-        $existing    = $this->alertItems->findByDate($today);
+        // ВСЕ живые алерты, без фильтра по дате. Раньше здесь стоял
+        // findByDate(today), который в полночь забывал про вчерашние
+        // строки tg_alert_items и сообщения оставались сиротами в чате.
+        $existing     = $this->alertItems->findAllActive();
         $candidateIds = array_flip(array_filter(array_column($rows, 'id')));
 
-        $sent = $edited = $deleted = $unchanged = $deferred = 0;
+        $sent = $edited = $deleted = $unchanged = 0;
 
-        // Delete alerts for items no longer overdue
+        // ── 1. Снимаем алерты, которые больше не overdue ──────────────
+        // (повар нажал готово / чек закрыт в Poster / помечено игнор /
+        //  was_deleted=1 — любое условие, выводящее карточку из выборки)
         foreach ($existing as $kid => $item) {
             if (isset($candidateIds[$kid])) {
                 continue;
             }
+            // Row без message_id остался от незавершённого send_fail
+            // прошлого тика — чистим из БД без обращения в Telegram.
             if ($item->messageId === null) {
-                $this->alertItems->delete($today, $kid);
+                $this->alertItems->deleteByKid($kid);
                 continue;
             }
 
-            $deletedOk = $this->bot->deleteMessage($item->messageId);
-            if ($deletedOk) {
+            // Бот = админ группы с правом delete_messages, поэтому
+            // удаление работает для сообщений любого возраста.
+            // Если Telegram всё же ответил false (сообщение уже было
+            // удалено руками / редкий 5xx) — всё равно чистим row,
+            // чтобы он не висел вечно. Следующий тик не будет
+            // повторно стучаться в несуществующее сообщение.
+            $okDelete = $this->bot->deleteMessage($item->messageId);
+            if ($okDelete) {
                 $deleted++;
-                $this->alertItems->delete($today, $kid);
-                continue;
             }
-
-            // Bot-not-admin scenario: delete may have failed because the
-            // message is older than 48h. Past that point retrying will keep
-            // failing forever — give up cleanly and stop logging noise.
-            // If we're still within the editable window, leave the row so
-            // the next tick tries again (covers transient API errors).
-            if ($this->_isPastMutationWindow($item)) {
-                Logger::get()->info('telegram_alerts.delete_orphan', [
-                    'kid'        => $kid,
-                    'message_id' => $item->messageId,
-                    'reason'     => 'past_48h_window',
-                ]);
-                $this->alertItems->delete($today, $kid);
-            } else {
-                // Leave the row in place so the next tick retries. We DON'T
-                // touch last_seen_at — it's frozen at the last "alive
-                // overdue" tick, so _isPastMutationWindow can use it as an
-                // age proxy and eventually give up.
-                $deferred++;
-            }
+            $this->alertItems->deleteByKid($kid);
         }
 
-        // Send/edit alerts for current overdue items
+        // ── 2. Отправляем / редактируем актуальные overdue ────────────
         foreach ($rows as $r) {
             $kid  = (int) ($r['id'] ?? 0);
             $txId = (int) ($r['transaction_id'] ?? 0);
-            if ($kid <= 0 || $txId <= 0) {
+            // transaction_date берём из самой kitchen_stats row, а не
+            // из today — иначе вновь привяжемся к календарному дню,
+            // что только что вылечили в выборке.
+            $txDate = trim((string) ($r['transaction_date'] ?? ''));
+            if ($kid <= 0 || $txId <= 0 || $txDate === '') {
                 continue;
             }
 
@@ -382,18 +406,19 @@ class TelegramAlertService
             $prevMsgId = $prev?->messageId;
             $prevHash  = $prev?->lastTextHash ?? '';
 
-            // Rate-limit edits to once per 60 seconds
+            // Rate-limit edits to once per 60 seconds — UPDATE seen всё
+            // равно делаем под правильной датой row'а.
             if ($prevMsgId !== null && $prevHash !== $hash && $prev->lastSeenAt !== '') {
                 $age = $nowTs - (int) strtotime($prev->lastSeenAt);
                 if ($age < self::EDIT_COOLDOWN_SECONDS) {
-                    $this->alertItems->updateSeen($today, $kid, $now);
+                    $this->alertItems->updateSeen($txDate, $kid, $now);
                     $unchanged++;
                     continue;
                 }
             }
 
             if ($prevMsgId !== null && $prevHash === $hash) {
-                $this->alertItems->updateSeen($today, $kid, $now);
+                $this->alertItems->updateSeen($txDate, $kid, $now);
                 $unchanged++;
                 continue;
             }
@@ -401,7 +426,7 @@ class TelegramAlertService
             // Try edit first, then send new
             if ($prevMsgId !== null && $this->bot->editMessageText($prevMsgId, $text, $keyboard)) {
                 $this->_updateKsMessageMeta($kid, $prevMsgId, $now);
-                $this->alertItems->updateHash($today, $kid, $txId, $hash, $now);
+                $this->alertItems->updateHash($txDate, $kid, $txId, $hash, $now);
                 $edited++;
             } else {
                 if ($prevMsgId !== null) {
@@ -410,7 +435,7 @@ class TelegramAlertService
                 $newId = $this->bot->sendMessageWithKeyboard($text, $keyboard, $this->threadId);
                 if ($newId !== null) {
                     $this->_updateKsMessageMeta($kid, $newId, $now);
-                    $this->alertItems->upsert($today, $kid, $txId, $newId, $hash, $now);
+                    $this->alertItems->upsert($txDate, $kid, $txId, $newId, $hash, $now);
                     $sent++;
                 } else {
                     Logger::get()->warning('telegram_alerts.send_fail', ['kid' => $kid, 'tx' => $txId]);
@@ -418,22 +443,7 @@ class TelegramAlertService
             }
         }
 
-        return compact('sent', 'edited', 'deleted', 'unchanged', 'deferred');
-    }
-
-    /**
-     * Returns true if the message backed by $item is past the 48h window
-     * Telegram allows non-admin bots to mutate. We use AlertItem::lastSeenAt
-     * as a proxy for sent time — it's updated on every tick the alert is
-     * still alive, so it lower-bounds the message age.
-     */
-    private function _isPastMutationWindow(\App\Models\AlertItem $item): bool
-    {
-        $seen = $item->lastSeenAt ?? '';
-        if ($seen === '') {
-            return false; // unknown age — don't assume the worst
-        }
-        return (time() - (int) strtotime($seen)) > self::BOT_MUTATION_WINDOW_SECONDS;
+        return compact('sent', 'edited', 'deleted', 'unchanged');
     }
 
     private function _buildItemMessage(array $r, int $nowTs): array

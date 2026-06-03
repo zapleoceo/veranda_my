@@ -3,31 +3,34 @@
 declare(strict_types=1);
 
 /**
- * One-shot maintenance script: deletes Telegram alert messages that the
- * normal telegram_alerts cron can no longer reach.
+ * RESCUE-ONLY one-shot maintenance script. НЕ ставить в cron.
  *
- * Sources of orphans:
- *   1. tg_alert_items rows whose transaction_date < today — the main cron
- *      only iterates findByDate(today), so past-day rows never get cleaned
- *      up if their tx closed after midnight.
- *   2. kitchen_stats.tg_message_id set but no matching tg_alert_items row
- *      AND the row is no longer "active" (status>1 / ready_pressed_at /
- *      excluded / deleted). The earlier _processItems bug dropped DB rows
- *      even when bot.deleteMessage returned false, leaving Telegram
- *      messages dangling.
+ * После фикса июня 2026 TelegramAlertService::_processItems больше не
+ * фильтрует по `today` — он берёт ВСЕ живые алерты (findAllActive) и
+ * удаляет те, что больше не overdue, независимо от даты. То есть
+ * orphan'ы прошлого дня в норме не появляются.
  *
- * Telegram constraint: a non-admin bot can only delete its own messages for
- * the first 48 hours after sending. If the bot is not admin and the message
- * is older, this script will get HTTP 400 "message to delete not found" and
- * simply skip — same outcome as leaving it alone. To clean up older orphans
- * the bot needs admin rights with the delete_messages permission in the
- * group.
+ * Этот скрипт оставлен как аварийный инструмент:
+ *   - после прошлого периода когда баг ещё жил — вычистить накопившееся
+ *   - если случится поломка синхронизации kitchen_stats и в Telegram
+ *     зависнут сообщения с битыми привязками
+ *
+ * Sources of orphans, которые он подметает:
+ *   1. tg_alert_items с transaction_date < today — оставшиеся от
+ *      старой логики, в которой main cron их не видел.
+ *   2. kitchen_stats.tg_message_id без соответствующей tg_alert_items
+ *      строки И сама kitchen_stats row уже не «active» (status>1,
+ *      ready_pressed_at, excluded, deleted).
+ *
+ * Telegram constraint: бот должен быть админом группы с правом
+ * delete_messages — иначе 48h окно режет удаление старых сообщений.
+ * У нас бот всегда админ, поэтому проблемы нет.
  *
  * Usage:
  *   cd /var/www/veranda_my_usr/data/www/veranda.my
  *   /opt/php82/bin/php scripts/kitchen/cleanup_orphan_alerts.php
  *
- * Idempotent — safe to re-run. Prints a summary at the end.
+ * Idempotent — safe to re-run. Печатает summary в конце.
  */
 
 require_once __DIR__ . '/../../vendor/autoload.php';
