@@ -182,6 +182,7 @@ $navSections = [
     [
         'title' => 'Отчёты',
         'links' => [
+            '/admin/weather' => ['label' => 'Погода',           'perm' => 'admin'],
             '/zapara'       => ['label' => 'Запара',          'perm' => 'zapara'],
             '/banya'        => ['label' => 'Баня',            'perm' => 'banya'],
             '/roma'         => ['label' => 'Кальяны',         'perm' => 'roma'],

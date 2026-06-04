@@ -55,6 +55,7 @@ use App\Controllers\StaticController;
 use App\Controllers\WebhookController;
 use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\SyncController;
+use App\Controllers\Admin\WeatherController;
 use App\Controllers\Admin\TelegramAdminController;
 use App\Controllers\Admin\MenuController;
 use App\Controllers\Admin\AccessController;
@@ -125,6 +126,7 @@ $app->get('/admin/', [DashboardController::class, 'index'])
     ->add(AuthMiddleware::class);
 $app->group('/admin', function (RouteCollectorProxy $group) {
     $group->get('', [DashboardController::class, 'index']);
+    $group->get('/weather', [WeatherController::class, 'index']);
     $group->map(['GET', 'POST'], '/sync', [SyncController::class, 'index']);
     $group->post('/sync/start', [SyncController::class, 'start']);
     $group->map(['GET', 'POST'], '/telegram', [TelegramAdminController::class, 'index']);
