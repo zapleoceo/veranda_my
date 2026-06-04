@@ -60,18 +60,30 @@ if ($botId > 0) {
     echo "skip: botId unknown\n";
 }
 
-echo "\n=== 5. Берём первое сообщение из tg_alert_items + пробуем удалить ===\n";
-$ai = $db->t('tg_alert_items');
+echo "\n=== 5. Пробуем удалить ИМЕННО прошлогоднее (на котором cleanup споткнулся) ===\n";
+$ai    = $db->t('tg_alert_items');
+$today = date('Y-m-d');
 $row = $db->query(
     "SELECT transaction_date, kitchen_stats_id, message_id
      FROM {$ai}
-     WHERE message_id IS NOT NULL
-     ORDER BY transaction_date DESC, kitchen_stats_id DESC
-     LIMIT 1"
+     WHERE transaction_date < ? AND message_id IS NOT NULL
+     ORDER BY transaction_date ASC, kitchen_stats_id ASC
+     LIMIT 1",
+    [$today]
 )->fetch();
 
 if (!$row) {
-    echo "tg_alert_items пусто — ничего не пробуем.\n";
+    echo "tg_alert_items < today пусто — все past-day строки уже подметены. Пробуем самое свежее.\n";
+    $row = $db->query(
+        "SELECT transaction_date, kitchen_stats_id, message_id
+         FROM {$ai}
+         WHERE message_id IS NOT NULL
+         ORDER BY transaction_date DESC, kitchen_stats_id DESC
+         LIMIT 1"
+    )->fetch();
+}
+if (!$row) {
+    echo "tg_alert_items вообще пусто — нечего пробовать.\n";
     exit(0);
 }
 $msgId = (int) $row['message_id'];
