@@ -42,7 +42,7 @@
     <div style="padding:.6rem 1rem;border-bottom:1px solid #e5e7eb;font-weight:600">Категории</div>
     <div style="overflow-x:auto">
     <table>
-        <thead><tr><th>Poster</th><th>Имя на сайте (RU)</th><th>Цех</th><th>Показ</th><th>Порядок</th><th>Блюд</th><th></th></tr></thead>
+        <thead><tr><th>Poster</th><th>Имя на сайте (RU)</th><th>Цех</th><th>Показ</th><th>Порядок</th><th>Блюд</th><th>Объединить в</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($categories as $c): $cid = (int)$c['id']; $isCustom = (int)$c['poster_id'] >= 900000; ?>
             <tr data-cat="<?= $cid ?>">
@@ -62,10 +62,18 @@
                 <td style="text-align:center"><input type="checkbox" class="cat-show" <?= $c['show_on_site'] ? 'checked' : '' ?>></td>
                 <td><input type="number" class="cat-sort" value="<?= (int)$c['sort_order'] ?>" style="width:64px"></td>
                 <td style="text-align:center;font-size:.8rem"><?= (int)$c['item_count'] ?></td>
+                <td>
+                    <select class="cat-merge" onchange="mergeCat(<?= $cid ?>, this)">
+                        <option value="0">— не объединять —</option>
+                        <?php foreach ($categories as $c2): if ((int)$c2['id'] === $cid) continue; ?>
+                            <option value="<?= (int)$c2['id'] ?>"><?= htmlspecialchars((string)(($c2['name_ru'] ?? '') !== '' ? $c2['name_ru'] : $c2['name_raw'])) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </td>
                 <td style="white-space:nowrap"><button class="btn btn-sm btn-secondary" onclick="saveCat(<?= $cid ?>)">Сохранить</button> <span class="cat-status" style="font-size:.8rem"></span></td>
             </tr>
         <?php endforeach; ?>
-        <?php if (empty($categories)): ?><tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:1rem">Нет категорий</td></tr><?php endif; ?>
+        <?php if (empty($categories)): ?><tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:1rem">Нет категорий</td></tr><?php endif; ?>
         </tbody>
     </table>
     </div>
@@ -106,6 +114,21 @@ function saveWs(id) {
 function saveCat(id) {
     const row = document.querySelector('tr[data-cat="' + id + '"]');
     postForm('cat_save', {id: id, name_ru: row.querySelector('.cat-name').value, workshop_id: row.querySelector('.cat-ws').value, show_on_site: row.querySelector('.cat-show').checked ? 1 : 0, sort_order: row.querySelector('.cat-sort').value}, row.querySelector('.cat-status'));
+}
+async function mergeCat(fromId, sel) {
+    const toId = parseInt(sel.value, 10) || 0;
+    if (!toId) return;
+    const toName = sel.options[sel.selectedIndex].text.trim();
+    const row = document.querySelector('tr[data-cat="' + fromId + '"]');
+    const fromName = (row.querySelector('.cat-name').value || '').trim() || ('#' + fromId);
+    if (!confirm('Перенести все блюда из «' + fromName + '» в «' + toName + '» и скрыть «' + fromName + '»?')) { sel.value = '0'; return; }
+    const d = await postForm('cat_merge', {from_id: fromId, to_id: toId}, row.querySelector('.cat-status'));
+    if (d.ok) {
+        row.querySelector('.cat-status').textContent = '✅ перенесено: ' + (d.moved ?? 0);
+        setTimeout(() => location.reload(), 800);
+    } else {
+        sel.value = '0';
+    }
 }
 async function createCat() {
     const st = document.getElementById('createStatus');
