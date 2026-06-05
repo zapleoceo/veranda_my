@@ -66,12 +66,24 @@ class MenuController
         $status    = $q['status'] ?? 'published';
         $workshop  = $q['workshop_id'] ?? '';
 
-        $where  = ['1=1'];
+        $pmi  = $this->db->t('poster_menu_items');
+        $mi   = $this->db->t('menu_items');
+        $miTr = $this->db->t('menu_item_tr');
+
+        // Схема: menu_items.poster_item_id -> poster_menu_items.id;
+        // переводы лежат в menu_item_tr (item_id = menu_items.id, по языкам).
+        $joins = "FROM {$pmi} pmi
+                  LEFT JOIN {$mi} mi ON mi.poster_item_id = pmi.id
+                  LEFT JOIN {$miTr} itr_ru ON itr_ru.item_id = mi.id AND itr_ru.lang = 'ru'
+                  LEFT JOIN {$miTr} itr_en ON itr_en.item_id = mi.id AND itr_en.lang = 'en'";
+
+        $where  = ['pmi.is_active = 1'];
         $params = [];
 
         if ($search !== '') {
-            $where[]  = "(pmi.title_ru LIKE ? OR pmi.title_en LIKE ? OR CAST(pmi.poster_id AS CHAR) LIKE ?)";
+            $where[]  = "(pmi.name_raw LIKE ? OR itr_ru.title LIKE ? OR itr_en.title LIKE ? OR CAST(pmi.poster_id AS CHAR) LIKE ?)";
             $like     = '%' . $search . '%';
+            $params[] = $like;
             $params[] = $like;
             $params[] = $like;
             $params[] = $like;
@@ -84,28 +96,30 @@ class MenuController
         }
 
         if ($workshop !== '') {
-            $where[]  = 'pmi.workshop_id = ?';
+            $where[]  = 'pmi.station_id = ?';
             $params[] = (int) $workshop;
         }
 
         $whereStr = implode(' AND ', $where);
-        $pmi      = $this->db->t('poster_menu_items');
-        $mi       = $this->db->t('menu_items');
 
         try {
             $total = (int) $this->db->query(
-                "SELECT COUNT(*) FROM {$pmi} pmi LEFT JOIN {$mi} mi ON mi.poster_id = pmi.poster_id WHERE {$whereStr}",
+                "SELECT COUNT(*) {$joins} WHERE {$whereStr}",
                 $params
             )->fetchColumn();
 
             $items = $this->db->query(
-                "SELECT pmi.poster_id, pmi.title_ru, pmi.title_en, pmi.title_vn, pmi.title_ko,
-                        pmi.price, pmi.workshop_name, pmi.category_name,
-                        COALESCE(mi.is_published, 0) AS is_published, mi.id AS menu_item_id
-                 FROM {$pmi} pmi
-                 LEFT JOIN {$mi} mi ON mi.poster_id = pmi.poster_id
+                "SELECT pmi.poster_id,
+                        COALESCE(NULLIF(itr_ru.title,''), pmi.name_raw, '') AS title_ru,
+                        COALESCE(itr_en.title, '') AS title_en,
+                        pmi.price_raw AS price,
+                        pmi.station_name AS workshop_name,
+                        COALESCE(NULLIF(pmi.sub_category_name,''), pmi.main_category_name, '') AS category_name,
+                        COALESCE(mi.is_published, 0) AS is_published,
+                        mi.id AS menu_item_id
+                 {$joins}
                  WHERE {$whereStr}
-                 ORDER BY pmi.title_ru ASC
+                 ORDER BY pmi.name_raw ASC
                  LIMIT {$perPage} OFFSET {$offset}",
                 $params
             )->fetchAll();
@@ -126,18 +140,27 @@ class MenuController
 
         try {
             $item = $this->db->query(
-                "SELECT pmi.*, COALESCE(mi.is_published, 0) AS is_published, mi.id AS menu_item_id
-                 FROM {$pmi} pmi LEFT JOIN {$mi} mi ON mi.poster_id = pmi.poster_id
+                "SELECT pmi.poster_id,
+                        pmi.name_raw AS title_ru,
+                        pmi.price_raw AS price,
+                        pmi.station_name AS workshop_name,
+                        COALESCE(NULLIF(pmi.sub_category_name,''), pmi.main_category_name, '') AS category_name,
+                        COALESCE(mi.is_published, 0) AS is_published,
+                        mi.id AS menu_item_id
+                 FROM {$pmi} pmi LEFT JOIN {$mi} mi ON mi.poster_item_id = pmi.id
                  WHERE pmi.poster_id = ? LIMIT 1",
                 [$posterId]
             )->fetch();
 
             if (!$item) { return false; }
 
-            $translations = $this->db->query(
-                "SELECT lang, title, description FROM {$tr} WHERE poster_id = ?",
-                [$posterId]
-            )->fetchAll(\PDO::FETCH_UNIQUE | \PDO::FETCH_ASSOC);
+            $translations = [];
+            if (!empty($item['menu_item_id'])) {
+                $translations = $this->db->query(
+                    "SELECT lang, title, description FROM {$tr} WHERE item_id = ?",
+                    [(int) $item['menu_item_id']]
+                )->fetchAll(\PDO::FETCH_UNIQUE | \PDO::FETCH_ASSOC);
+            }
 
             $item['translations'] = $translations;
             return $item;
@@ -153,11 +176,19 @@ class MenuController
         $publish  = (int) ($body['publish'] ?? 0);
 
         try {
-            $mi = $this->db->t('menu_items');
+            $pmi = $this->db->t('poster_menu_items');
+            $mi  = $this->db->t('menu_items');
+
+            $row = $this->db->query("SELECT id FROM {$pmi} WHERE poster_id = ? LIMIT 1", [$posterId])->fetch();
+            $posterItemId = (int) ($row['id'] ?? 0);
+            if ($posterItemId <= 0) {
+                throw new \RuntimeException('Товар не найден (poster_id=' . $posterId . ')');
+            }
+
             $this->db->query(
-                "INSERT INTO {$mi} (poster_id, is_published) VALUES (?, ?)
+                "INSERT INTO {$mi} (poster_item_id, is_published) VALUES (?, ?)
                  ON DUPLICATE KEY UPDATE is_published = VALUES(is_published)",
-                [$posterId, $publish]
+                [$posterItemId, $publish ? 1 : 0]
             );
             $payload = json_encode(['ok' => true]);
         } catch (\Throwable $e) {
@@ -172,17 +203,38 @@ class MenuController
     {
         $body     = (array) ($request->getParsedBody() ?? []);
         $posterId = (int) ($body['poster_id'] ?? 0);
-        $tr       = $this->db->t('menu_item_tr');
 
         try {
+            $pmi  = $this->db->t('poster_menu_items');
+            $mi   = $this->db->t('menu_items');
+            $tr   = $this->db->t('menu_item_tr');
+
+            $row = $this->db->query("SELECT id FROM {$pmi} WHERE poster_id = ? LIMIT 1", [$posterId])->fetch();
+            $posterItemId = (int) ($row['id'] ?? 0);
+            if ($posterItemId <= 0) {
+                throw new \RuntimeException('Товар не найден (poster_id=' . $posterId . ')');
+            }
+
+            // Переводы привязаны к menu_items.id — гарантируем строку и берём её id.
+            $this->db->query(
+                "INSERT INTO {$mi} (poster_item_id) VALUES (?)
+                 ON DUPLICATE KEY UPDATE poster_item_id = VALUES(poster_item_id)",
+                [$posterItemId]
+            );
+            $miRow  = $this->db->query("SELECT id FROM {$mi} WHERE poster_item_id = ? LIMIT 1", [$posterItemId])->fetch();
+            $itemId = (int) ($miRow['id'] ?? 0);
+            if ($itemId <= 0) {
+                throw new \RuntimeException('Не удалось создать строку меню');
+            }
+
             foreach (['ru', 'en', 'vn', 'ko'] as $lang) {
                 $title = trim((string) ($body["title_{$lang}"] ?? ''));
                 $desc  = trim((string) ($body["desc_{$lang}"] ?? ''));
                 if ($title !== '' || $desc !== '') {
                     $this->db->query(
-                        "INSERT INTO {$tr} (poster_id, lang, title, description) VALUES (?, ?, ?, ?)
+                        "INSERT INTO {$tr} (item_id, lang, title, description) VALUES (?, ?, ?, ?)
                          ON DUPLICATE KEY UPDATE title = VALUES(title), description = VALUES(description)",
-                        [$posterId, $lang, $title, $desc]
+                        [$itemId, $lang, $title, $desc]
                     );
                 }
             }

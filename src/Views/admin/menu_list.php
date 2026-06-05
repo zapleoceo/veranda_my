@@ -58,7 +58,7 @@ $currentSearch = htmlspecialchars($_GET['q'] ?? '');
                 <td style="font-size:.75rem;color:#9ca3af"><?= (int)$item['poster_id'] ?></td>
                 <td><?= htmlspecialchars((string)($item['title_ru'] ?? '')) ?></td>
                 <td style="color:#6b7280"><?= htmlspecialchars((string)($item['title_en'] ?? '')) ?></td>
-                <td style="white-space:nowrap"><?= number_format((float)($item['price'] ?? 0) / 100, 0, '.', ' ') ?></td>
+                <td style="white-space:nowrap"><?= number_format((float)($item['price'] ?? 0), 0, '.', ' ') ?> ₫</td>
                 <td style="font-size:.75rem"><?= htmlspecialchars((string)($item['workshop_name'] ?? '')) ?></td>
                 <td style="font-size:.75rem"><?= htmlspecialchars((string)($item['category_name'] ?? '')) ?></td>
                 <td>

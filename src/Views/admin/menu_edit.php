@@ -12,7 +12,7 @@ $tr = $item['translations'] ?? [];
         Poster ID: <?= (int)$item['poster_id'] ?> &nbsp;|&nbsp;
         Цех: <?= htmlspecialchars((string)($item['workshop_name'] ?? '—')) ?> &nbsp;|&nbsp;
         Категория: <?= htmlspecialchars((string)($item['category_name'] ?? '—')) ?> &nbsp;|&nbsp;
-        Цена: <?= number_format((float)($item['price'] ?? 0) / 100, 0, '.', ' ') ?>
+        Цена: <?= number_format((float)($item['price'] ?? 0), 0, '.', ' ') ?> ₫
     </div>
 
     <div style="display:grid;gap:1.25rem">
