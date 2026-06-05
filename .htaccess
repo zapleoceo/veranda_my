@@ -21,6 +21,9 @@ RewriteRule ^employees\.php$ /employees [R=301,L]
 RewriteRule ^reservations\.php$ /reservations [R=301,L]
 RewriteRule ^logs\.php$ /admin/logs [R=301,L,QSA]
 
+# menu-beta удалён → старые ссылки ведём на чистый /links/menu
+RewriteRule ^links/menu-beta(?:\.php)?$ /links/menu [R=301,L,QSA]
+
 # Routes for new folders. Each <module>/index.php has a SLIM_RUNNING guard
 # that delegates to public/index.php — Slim then renders via layout.php.
 # admin/ was deleted entirely; nginx try_files falls /admin through to Slim.
