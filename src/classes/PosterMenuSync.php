@@ -437,12 +437,15 @@ class PosterMenuSync {
     }
 
     private function extractLeadingSortNumber(string $name): int {
+        // sort_order у menu_workshops/menu_categories — TINYINT UNSIGNED (0..255).
+        // В strict-режиме MySQL значение >255 даёт SQLSTATE 22003 (1264) и валит
+        // весь синк, поэтому клампим и распарсенный номер, и фолбэк «в конец».
         $s = trim($name);
         if ($s === '') return 0;
         if (preg_match('/^\s*(\d{1,3})/u', $s, $m)) {
-            return (int)$m[1];
+            return min(255, (int)$m[1]);
         }
-        return 999;
+        return 255;
     }
 
     private function markMissingItemsInactive(array $activePosterIds): void {
