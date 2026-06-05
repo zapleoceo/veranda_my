@@ -19,6 +19,7 @@ $currentSearch = htmlspecialchars($_GET['q'] ?? '');
         </div>
         <button type="submit" class="btn btn-primary">Фильтр</button>
         <span style="flex:1"></span>
+        <a href="?view=cats" class="btn btn-secondary">⚙ Категории/цеха</a>
         <form method="POST" style="margin:0">
             <button type="submit" name="sync_menu" class="btn btn-secondary"
                 onclick="return confirm('Синхронизировать меню из Poster?')">↻ Синк из Poster</button>
