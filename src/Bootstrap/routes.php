@@ -177,6 +177,9 @@ $app->get('/links', [LinksController::class, 'index']);
 $app->get('/links/', function ($req, $res) { return $res->withHeader('Location', '/links')->withStatus(301); });
 $app->get('/links/menu', [MenuPublicController::class, 'show']);
 $app->get('/links/menu.php', [MenuPublicController::class, 'show']);
+// menu-beta удалён → 301 на чистый /links/menu (.htaccess на nginx-стеке неактивен)
+$app->get('/links/menu-beta', function ($req, $res) { return $res->withHeader('Location', '/links/menu')->withStatus(301); });
+$app->get('/links/menu-beta.php', function ($req, $res) { return $res->withHeader('Location', '/links/menu')->withStatus(301); });
 $app->get('/menu', [MenuPublicController::class, 'show']);
 
 // Phase 4: tr3 (public booking widget)
