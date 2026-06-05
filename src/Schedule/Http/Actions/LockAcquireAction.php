@@ -33,7 +33,13 @@ final class LockAcquireAction
         if ($email === '') {
             return $this->json->fail($response, 'Auth required', 401);
         }
-        $r = $this->lock->acquire($email, $name);
+        // body { force: 1 } → "Перехватить": take over a lock held by a
+        // forgotten/open tab. Otherwise the normal claim-if-free-or-mine.
+        $body  = json_decode((string) $request->getBody(), true);
+        $force = is_array($body) && !empty($body['force']);
+        $r = $force
+            ? $this->lock->steal($email, $name)
+            : $this->lock->acquire($email, $name);
         return $this->json->ok($response, [
             'owned' => $r['owned'],
             'lock'  => $r['lock'],

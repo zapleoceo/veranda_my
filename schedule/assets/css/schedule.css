@@ -130,6 +130,7 @@ body.sch-blocking-overlay::after {
 .sch-lock-icon { font-size: 18px; }
 .sch-lock-text { flex: 1; }
 .sch-lock-text b { color: #f59e0b; font-weight: 700; }
+.sch-lock-meta { color: var(--muted); font-weight: 400; }
 .sch-lock-hint {
     display: block; margin-top: 2px;
     color: var(--muted); font-size: 11px;
@@ -582,6 +583,7 @@ body.sch-readonly #schModalStaffSave {
 }
 .sch-snap-pill .sch-snap-name { font-weight: 600; }
 .sch-snap-pill .when { color: var(--muted); font-size: 11px; }
+.sch-snap-pill .sch-snap-by { color: var(--muted); font-size: 11px; opacity: .85; }
 .sch-snap-pill:hover { border-color: var(--accent); }
 .sch-snap-btn {
     display: inline-flex; align-items: center; justify-content: center;

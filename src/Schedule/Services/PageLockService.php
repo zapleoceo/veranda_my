@@ -63,6 +63,26 @@ final class PageLockService
         return $this->acquire($email, $name);
     }
 
+    /**
+     * Force-take the lock regardless of who currently holds it.
+     *
+     * For the "Перехватить" button: someone left a tab open and their
+     * heartbeat keeps the lock alive, so it never frees on its own. Edits
+     * auto-save to the draft continuously and saves are version-guarded, so
+     * the previous holder loses at most the last sub-second of typing; on
+     * their next heartbeat they cleanly drop to read-only.
+     * acquired_at resets to now — it's a fresh session for the new owner.
+     */
+    public function steal(string $email, string $name): array
+    {
+        $this->cache->set(self::KEY, [
+            'email'       => $email,
+            'name'        => $name,
+            'acquired_at' => date('Y-m-d H:i:s'),
+        ]);
+        return ['owned' => true, 'lock' => $this->current()];
+    }
+
     /** Explicit release — called from beforeunload via sendBeacon. */
     public function release(string $email): void
     {

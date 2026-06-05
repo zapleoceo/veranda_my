@@ -211,7 +211,7 @@ final class ScheduleController
         $pageTitle    = 'График смен';
         $currentPath  = '/schedule';
         $headExtra    = '<link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">' . "\n"
-                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260522_pagelock">';
+                      . '<link rel="stylesheet" href="/schedule/assets/css/schedule.css?v=20260605_lockwho">';
 
         // Variables exposed to the view template
         $viewVars = compact(
