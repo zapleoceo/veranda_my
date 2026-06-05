@@ -30,6 +30,11 @@ class MenuController
             return $this->_ajaxSaveEdit($request, $response);
         }
 
+        // AJAX: set site category for an item
+        if (($query['ajax'] ?? '') === 'set_category') {
+            return $this->_ajaxSetCategory($request, $response);
+        }
+
         // Sync menu from Poster
         if ($request->getMethod() === 'POST' && isset($body['sync_menu'])) {
             $this->_syncMenu($flash);
@@ -42,6 +47,7 @@ class MenuController
             if (!$item) {
                 return $response->withHeader('Location', '/admin/menu')->withStatus(302);
             }
+            $siteCategories = $this->_loadSiteCategories();
             ob_start();
             require __DIR__ . '/../../Views/admin/menu_edit.php';
             $content = ob_get_clean();
@@ -134,9 +140,13 @@ class MenuController
 
     private function _loadItem(int $posterId): array|false
     {
-        $pmi = $this->db->t('poster_menu_items');
-        $mi  = $this->db->t('menu_items');
-        $tr  = $this->db->t('menu_item_tr');
+        $pmi  = $this->db->t('poster_menu_items');
+        $mi   = $this->db->t('menu_items');
+        $tr   = $this->db->t('menu_item_tr');
+        $mc   = $this->db->t('menu_categories');
+        $mw   = $this->db->t('menu_workshops');
+        $mcTr = $this->db->t('menu_category_tr');
+        $mwTr = $this->db->t('menu_workshop_tr');
 
         try {
             $item = $this->db->query(
@@ -146,8 +156,16 @@ class MenuController
                         pmi.station_name AS workshop_name,
                         COALESCE(NULLIF(pmi.sub_category_name,''), pmi.main_category_name, '') AS category_name,
                         COALESCE(mi.is_published, 0) AS is_published,
-                        mi.id AS menu_item_id
-                 FROM {$pmi} pmi LEFT JOIN {$mi} mi ON mi.poster_item_id = pmi.id
+                        mi.id AS menu_item_id,
+                        mi.category_id AS site_category_id,
+                        COALESCE(NULLIF(sctr.name,''), sc.name_raw, '') AS site_category_name,
+                        COALESCE(NULLIF(swtr.name,''), sw.name_raw, '') AS site_workshop_name
+                 FROM {$pmi} pmi
+                 LEFT JOIN {$mi} mi ON mi.poster_item_id = pmi.id
+                 LEFT JOIN {$mc} sc ON sc.id = mi.category_id
+                 LEFT JOIN {$mw} sw ON sw.id = sc.workshop_id
+                 LEFT JOIN {$mcTr} sctr ON sctr.category_id = sc.id AND sctr.lang = 'ru'
+                 LEFT JOIN {$mwTr} swtr ON swtr.workshop_id = sw.id AND swtr.lang = 'ru'
                  WHERE pmi.poster_id = ? LIMIT 1",
                 [$posterId]
             )->fetch();
@@ -219,6 +237,69 @@ class MenuController
         return [(int) ($row2['id'] ?? 0), ''];
     }
 
+    /** Site-категории для дропдауна, сгруппированы по цеху (RU-имена). */
+    private function _loadSiteCategories(): array
+    {
+        $mc   = $this->db->t('menu_categories');
+        $mw   = $this->db->t('menu_workshops');
+        $mcTr = $this->db->t('menu_category_tr');
+        $mwTr = $this->db->t('menu_workshop_tr');
+        try {
+            return $this->db->query(
+                "SELECT c.id,
+                        COALESCE(NULLIF(ctr.name,''), c.name_raw, '') AS cat_name,
+                        c.workshop_id,
+                        COALESCE(NULLIF(wtr.name,''), w.name_raw, '— без цеха —') AS ws_name,
+                        COALESCE(w.sort_order, 999) AS ws_sort,
+                        COALESCE(c.sort_order, 0) AS cat_sort
+                 FROM {$mc} c
+                 LEFT JOIN {$mw} w ON w.id = c.workshop_id
+                 LEFT JOIN {$mcTr} ctr ON ctr.category_id = c.id AND ctr.lang = 'ru'
+                 LEFT JOIN {$mwTr} wtr ON wtr.workshop_id = w.id AND wtr.lang = 'ru'
+                 ORDER BY ws_sort ASC, ws_name ASC, cat_sort ASC, cat_name ASC"
+            )->fetchAll();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function _ajaxSetCategory(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $body       = (array) ($request->getParsedBody() ?? []);
+        $posterId   = (int) ($body['poster_id'] ?? 0);
+        $categoryId = (int) ($body['category_id'] ?? 0);
+
+        try {
+            $mi = $this->db->t('menu_items');
+            [$itemId, $err] = $this->_resolveMenuItemId($posterId, true);
+            if ($itemId <= 0) {
+                throw new \RuntimeException($err !== '' ? $err : 'Позиция не найдена');
+            }
+
+            if ($categoryId > 0) {
+                $mc = $this->db->t('menu_categories');
+                $exists = $this->db->query("SELECT id FROM {$mc} WHERE id = ? LIMIT 1", [$categoryId])->fetch();
+                if (!$exists) {
+                    throw new \RuntimeException('Категория не найдена');
+                }
+                $this->db->query("UPDATE {$mi} SET category_id = ? WHERE id = ?", [$categoryId, $itemId]);
+            } else {
+                // «не привязано» → снимаем публикацию; обнуляем category_id, если колонка это позволяет.
+                try {
+                    $this->db->query("UPDATE {$mi} SET category_id = NULL, is_published = 0 WHERE id = ?", [$itemId]);
+                } catch (\Throwable $e) {
+                    $this->db->query("UPDATE {$mi} SET is_published = 0 WHERE id = ?", [$itemId]);
+                }
+            }
+            $payload = json_encode(['ok' => true]);
+        } catch (\Throwable $e) {
+            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+
+        $response->getBody()->write((string) $payload);
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
     private function _ajaxTogglePublish(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $body     = (array) ($request->getParsedBody() ?? []);
@@ -236,6 +317,13 @@ class MenuController
                     throw new \RuntimeException($err);
                 }
             } else {
+                if ($pub === 1) {
+                    // Правило: публиковать можно только при наличии site-категории.
+                    $cat = $this->db->query("SELECT category_id FROM {$mi} WHERE id = ? LIMIT 1", [$itemId])->fetch();
+                    if (empty($cat['category_id'])) {
+                        throw new \RuntimeException('Нельзя опубликовать без категории сайта — привяжите категорию в редакторе');
+                    }
+                }
                 $this->db->query("UPDATE {$mi} SET is_published = ? WHERE id = ?", [$pub, $itemId]);
             }
             $payload = json_encode(['ok' => true]);
