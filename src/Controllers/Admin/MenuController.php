@@ -169,6 +169,56 @@ class MenuController
         }
     }
 
+    /**
+     * Резолвит menu_items.id по Poster product id. При $create=true создаёт
+     * строку, если её нет (category_id берём из категории Poster — на случай
+     * NOT NULL схемы). Возвращает [itemId, errorMessage].
+     */
+    private function _resolveMenuItemId(int $posterId, bool $create): array
+    {
+        $pmi = $this->db->t('poster_menu_items');
+        $mi  = $this->db->t('menu_items');
+        $mc  = $this->db->t('menu_categories');
+
+        $prod = $this->db->query(
+            "SELECT id, sub_category_id, main_category_id FROM {$pmi} WHERE poster_id = ? LIMIT 1",
+            [$posterId]
+        )->fetch();
+        $posterItemId = (int) ($prod['id'] ?? 0);
+        if ($posterItemId <= 0) {
+            return [0, 'Товар не найден (poster_id=' . $posterId . ')'];
+        }
+
+        $row = $this->db->query("SELECT id FROM {$mi} WHERE poster_item_id = ? LIMIT 1", [$posterItemId])->fetch();
+        if ($row) {
+            return [(int) $row['id'], ''];
+        }
+        if (!$create) {
+            return [0, ''];
+        }
+
+        // Строки ещё нет — создаём. category_id может быть NOT NULL, поэтому
+        // пробуем подтянуть категорию Poster (sub, иначе main).
+        $catId = null;
+        foreach ([(int) ($prod['sub_category_id'] ?? 0), (int) ($prod['main_category_id'] ?? 0)] as $posterCat) {
+            if ($posterCat <= 0) continue;
+            $c = $this->db->query("SELECT id FROM {$mc} WHERE poster_id = ? LIMIT 1", [$posterCat])->fetch();
+            if ($c) { $catId = (int) $c['id']; break; }
+        }
+
+        try {
+            $this->db->query(
+                "INSERT INTO {$mi} (poster_item_id, category_id, image_url, is_published, sort_order) VALUES (?, ?, NULL, 0, 0)",
+                [$posterItemId, $catId]
+            );
+        } catch (\Throwable $e) {
+            return [0, 'Позиция не привязана к категории — запустите «Синк из Poster»'];
+        }
+
+        $row2 = $this->db->query("SELECT id FROM {$mi} WHERE poster_item_id = ? LIMIT 1", [$posterItemId])->fetch();
+        return [(int) ($row2['id'] ?? 0), ''];
+    }
+
     private function _ajaxTogglePublish(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $body     = (array) ($request->getParsedBody() ?? []);
@@ -176,20 +226,18 @@ class MenuController
         $publish  = (int) ($body['publish'] ?? 0);
 
         try {
-            $pmi = $this->db->t('poster_menu_items');
             $mi  = $this->db->t('menu_items');
+            $pub = $publish ? 1 : 0;
 
-            $row = $this->db->query("SELECT id FROM {$pmi} WHERE poster_id = ? LIMIT 1", [$posterId])->fetch();
-            $posterItemId = (int) ($row['id'] ?? 0);
-            if ($posterItemId <= 0) {
-                throw new \RuntimeException('Товар не найден (poster_id=' . $posterId . ')');
+            // Снимаем публикацию у несуществующей строки — уже не опубликовано.
+            [$itemId, $err] = $this->_resolveMenuItemId($posterId, $pub === 1);
+            if ($itemId <= 0) {
+                if ($err !== '') {
+                    throw new \RuntimeException($err);
+                }
+            } else {
+                $this->db->query("UPDATE {$mi} SET is_published = ? WHERE id = ?", [$pub, $itemId]);
             }
-
-            $this->db->query(
-                "INSERT INTO {$mi} (poster_item_id, is_published) VALUES (?, ?)
-                 ON DUPLICATE KEY UPDATE is_published = VALUES(is_published)",
-                [$posterItemId, $publish ? 1 : 0]
-            );
             $payload = json_encode(['ok' => true]);
         } catch (\Throwable $e) {
             $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
@@ -205,26 +253,12 @@ class MenuController
         $posterId = (int) ($body['poster_id'] ?? 0);
 
         try {
-            $pmi  = $this->db->t('poster_menu_items');
-            $mi   = $this->db->t('menu_items');
-            $tr   = $this->db->t('menu_item_tr');
-
-            $row = $this->db->query("SELECT id FROM {$pmi} WHERE poster_id = ? LIMIT 1", [$posterId])->fetch();
-            $posterItemId = (int) ($row['id'] ?? 0);
-            if ($posterItemId <= 0) {
-                throw new \RuntimeException('Товар не найден (poster_id=' . $posterId . ')');
-            }
+            $tr = $this->db->t('menu_item_tr');
 
             // Переводы привязаны к menu_items.id — гарантируем строку и берём её id.
-            $this->db->query(
-                "INSERT INTO {$mi} (poster_item_id) VALUES (?)
-                 ON DUPLICATE KEY UPDATE poster_item_id = VALUES(poster_item_id)",
-                [$posterItemId]
-            );
-            $miRow  = $this->db->query("SELECT id FROM {$mi} WHERE poster_item_id = ? LIMIT 1", [$posterItemId])->fetch();
-            $itemId = (int) ($miRow['id'] ?? 0);
+            [$itemId, $err] = $this->_resolveMenuItemId($posterId, true);
             if ($itemId <= 0) {
-                throw new \RuntimeException('Не удалось создать строку меню');
+                throw new \RuntimeException($err !== '' ? $err : 'Не удалось создать строку меню');
             }
 
             foreach (['ru', 'en', 'vn', 'ko'] as $lang) {
