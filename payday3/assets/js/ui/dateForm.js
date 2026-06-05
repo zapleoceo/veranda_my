@@ -17,7 +17,13 @@ export function initDateForm() {
     rangeBtn?.addEventListener('click', () => {
         if (!dateTo) return;
         dateTo.classList.toggle('is-hidden');
-        if (!dateTo.classList.contains('is-hidden')) dateTo.focus();
+        if (!dateTo.classList.contains('is-hidden')) {
+            // Pre-fill dateTo with the current dateFrom value so the
+            // operator sees a same-day range by default — they can then
+            // pick a different end date if needed.
+            if (dateFrom?.value) dateTo.value = dateFrom.value;
+            dateTo.focus();
+        }
     });
 
     // Auto-submit on any date change — there's no "Открыть" button.
@@ -25,8 +31,15 @@ export function initDateForm() {
     // ranges are valid (the controller treats missing dateTo as
     // dateFrom and vice versa).
     const submit = () => form.submit();
-    dateFrom?.addEventListener('change', submit);
-    dateTo  ?.addEventListener('change', submit);
+    dateFrom?.addEventListener('change', () => {
+        // Keep dateTo in sync when it's visible so changing the start
+        // date doesn't accidentally leave a stale end date.
+        if (dateTo && !dateTo.classList.contains('is-hidden') && dateFrom.value) {
+            dateTo.value = dateFrom.value;
+        }
+        submit();
+    });
+    dateTo?.addEventListener('change', submit);
 
     form.addEventListener('submit', () => {
         spinner?.classList.remove('is-hidden');

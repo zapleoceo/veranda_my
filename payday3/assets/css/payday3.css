@@ -1115,6 +1115,8 @@ body.pd3-help-mode [data-help-abs] {
     flex: 0 0 auto;
     align-self: flex-start;
     max-width: 100%;
+    max-height: 407px;
+    overflow-y: auto;
 }
 .pd3-finance__row {
     padding: var(--pd3-s-3) var(--pd3-s-7) var(--pd3-s-4);
