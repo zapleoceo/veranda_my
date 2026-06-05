@@ -11,6 +11,20 @@ use Psr\Http\Message\ServerRequestInterface;
 
 class MenuController
 {
+    /** poster_id кастомных (не из Poster) категорий начинается с этого числа — синк их не трогает. */
+    private const CUSTOM_POSTER_ID_BASE = 900000;
+
+    /** ajax-параметр => метод-обработчик. */
+    private const AJAX_ACTIONS = [
+        'toggle_publish' => '_ajaxTogglePublish',
+        'save_edit'      => '_ajaxSaveEdit',
+        'set_category'   => '_ajaxSetCategory',
+        'cat_save'       => '_ajaxCatSave',
+        'cat_create'     => '_ajaxCatCreate',
+        'cat_merge'      => '_ajaxCatMerge',
+        'ws_save'        => '_ajaxWsSave',
+    ];
+
     public function __construct(private readonly Database $db) {}
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -20,26 +34,11 @@ class MenuController
         $query     = $request->getQueryParams();
         $body      = (array) ($request->getParsedBody() ?? []);
 
-        // AJAX: toggle publish
-        if (($query['ajax'] ?? '') === 'toggle_publish') {
-            return $this->_ajaxTogglePublish($request, $response);
+        // AJAX-экшены (см. AJAX_ACTIONS)
+        $ajax = (string) ($query['ajax'] ?? '');
+        if (isset(self::AJAX_ACTIONS[$ajax])) {
+            return $this->{self::AJAX_ACTIONS[$ajax]}($request, $response);
         }
-
-        // AJAX: save edit
-        if (($query['ajax'] ?? '') === 'save_edit') {
-            return $this->_ajaxSaveEdit($request, $response);
-        }
-
-        // AJAX: set site category for an item
-        if (($query['ajax'] ?? '') === 'set_category') {
-            return $this->_ajaxSetCategory($request, $response);
-        }
-
-        // AJAX: категории/цеха (интерфейс маппинга)
-        if (($query['ajax'] ?? '') === 'cat_save')    { return $this->_ajaxCatSave($request, $response); }
-        if (($query['ajax'] ?? '') === 'cat_create')  { return $this->_ajaxCatCreate($request, $response); }
-        if (($query['ajax'] ?? '') === 'cat_merge')   { return $this->_ajaxCatMerge($request, $response); }
-        if (($query['ajax'] ?? '') === 'ws_save')     { return $this->_ajaxWsSave($request, $response); }
 
         // Sync menu from Poster
         if ($request->getMethod() === 'POST' && isset($body['sync_menu'])) {
@@ -72,6 +71,27 @@ class MenuController
         }
 
         return $this->_layout($response, (string) $content, $userEmail, $flash);
+    }
+
+    /** Пишет JSON-ответ (UTF-8 без \uXXXX). */
+    private function _json(ResponseInterface $response, array $data): ResponseInterface
+    {
+        $response->getBody()->write((string) json_encode($data, JSON_UNESCAPED_UNICODE));
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /**
+     * Обёртка AJAX-логики: $fn возвращает доп-поля ответа (или []) и бросает
+     * \Throwable при ошибке. Успех -> {ok:true, ...extra}, ошибка -> {ok:false, error}.
+     */
+    private function _jsonGuard(ResponseInterface $response, callable $fn): ResponseInterface
+    {
+        try {
+            $extra = $fn();
+            return $this->_json($response, ['ok' => true] + (is_array($extra) ? $extra : []));
+        } catch (\Throwable $e) {
+            return $this->_json($response, ['ok' => false, 'error' => $e->getMessage()]);
+        }
     }
 
     private function _loadList(array $q): array
@@ -275,43 +295,6 @@ class MenuController
         }
     }
 
-    private function _ajaxSetCategory(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
-    {
-        $body       = (array) ($request->getParsedBody() ?? []);
-        $posterId   = (int) ($body['poster_id'] ?? 0);
-        $categoryId = (int) ($body['category_id'] ?? 0);
-
-        try {
-            $mi = $this->db->t('menu_items');
-            [$itemId, $err] = $this->_resolveMenuItemId($posterId, true);
-            if ($itemId <= 0) {
-                throw new \RuntimeException($err !== '' ? $err : 'Позиция не найдена');
-            }
-
-            if ($categoryId > 0) {
-                $mc = $this->db->t('menu_categories');
-                $exists = $this->db->query("SELECT id FROM {$mc} WHERE id = ? LIMIT 1", [$categoryId])->fetch();
-                if (!$exists) {
-                    throw new \RuntimeException('Категория не найдена');
-                }
-                $this->db->query("UPDATE {$mi} SET category_id = ? WHERE id = ?", [$categoryId, $itemId]);
-            } else {
-                // «не привязано» → снимаем публикацию; обнуляем category_id, если колонка это позволяет.
-                try {
-                    $this->db->query("UPDATE {$mi} SET category_id = NULL, is_published = 0 WHERE id = ?", [$itemId]);
-                } catch (\Throwable $e) {
-                    $this->db->query("UPDATE {$mi} SET is_published = 0 WHERE id = ?", [$itemId]);
-                }
-            }
-            $payload = json_encode(['ok' => true]);
-        } catch (\Throwable $e) {
-            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
-        }
-
-        $response->getBody()->write((string) $payload);
-        return $response->withHeader('Content-Type', 'application/json');
-    }
-
     /** Цеха для интерфейса маппинга (RU-имя из _tr). */
     private function _loadWorkshopsAdmin(): array
     {
@@ -336,12 +319,14 @@ class MenuController
         $mc   = $this->db->t('menu_categories');
         $mcTr = $this->db->t('menu_category_tr');
         $mi   = $this->db->t('menu_items');
+        $base = self::CUSTOM_POSTER_ID_BASE;
         try {
             return $this->db->query(
                 "SELECT c.id, c.poster_id, c.name_raw, c.workshop_id,
                         COALESCE(NULLIF(ctr.name,''), '') AS name_ru,
                         COALESCE(c.show_on_site, 0) AS show_on_site,
                         COALESCE(c.sort_order, 0) AS sort_order,
+                        CASE WHEN c.poster_id >= {$base} THEN 1 ELSE 0 END AS is_custom,
                         (SELECT COUNT(*) FROM {$mi} m WHERE m.category_id = c.id) AS item_count
                  FROM {$mc} c
                  LEFT JOIN {$mcTr} ctr ON ctr.category_id = c.id AND ctr.lang = 'ru'
@@ -350,22 +335,54 @@ class MenuController
         } catch (\Throwable) { return []; }
     }
 
+    private function _ajaxSetCategory(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        return $this->_jsonGuard($response, function () use ($request) {
+            $body       = (array) ($request->getParsedBody() ?? []);
+            $posterId   = (int) ($body['poster_id'] ?? 0);
+            $categoryId = (int) ($body['category_id'] ?? 0);
+            $mi = $this->db->t('menu_items');
+
+            [$itemId, $err] = $this->_resolveMenuItemId($posterId, true);
+            if ($itemId <= 0) {
+                throw new \RuntimeException($err !== '' ? $err : 'Позиция не найдена');
+            }
+
+            if ($categoryId > 0) {
+                $mc = $this->db->t('menu_categories');
+                if (!$this->db->query("SELECT id FROM {$mc} WHERE id = ? LIMIT 1", [$categoryId])->fetch()) {
+                    throw new \RuntimeException('Категория не найдена');
+                }
+                $this->db->query("UPDATE {$mi} SET category_id = ? WHERE id = ?", [$categoryId, $itemId]);
+            } else {
+                // «не привязано» → снимаем публикацию; обнуляем category_id, если колонка это позволяет.
+                try {
+                    $this->db->query("UPDATE {$mi} SET category_id = NULL, is_published = 0 WHERE id = ?", [$itemId]);
+                } catch (\Throwable $e) {
+                    $this->db->query("UPDATE {$mi} SET is_published = 0 WHERE id = ?", [$itemId]);
+                }
+            }
+            return [];
+        });
+    }
+
     private function _ajaxCatSave(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $b          = (array) ($request->getParsedBody() ?? []);
-        $id         = (int) ($b['id'] ?? 0);
-        $workshopId = (int) ($b['workshop_id'] ?? 0);
-        $show       = (int) ($b['show_on_site'] ?? 0);
-        $sort       = max(0, min(255, (int) ($b['sort_order'] ?? 0)));
-        $nameRu     = trim((string) ($b['name_ru'] ?? ''));
-        try {
+        return $this->_jsonGuard($response, function () use ($request) {
+            $b          = (array) ($request->getParsedBody() ?? []);
+            $id         = (int) ($b['id'] ?? 0);
+            $workshopId = (int) ($b['workshop_id'] ?? 0);
+            $show       = (int) ($b['show_on_site'] ?? 0) ? 1 : 0;
+            $sort       = max(0, min(255, (int) ($b['sort_order'] ?? 0)));
+            $nameRu     = trim((string) ($b['name_ru'] ?? ''));
             $mc   = $this->db->t('menu_categories');
             $mcTr = $this->db->t('menu_category_tr');
+
             if ($id <= 0) { throw new \RuntimeException('Нет id категории'); }
             if ($workshopId > 0) {
-                $this->db->query("UPDATE {$mc} SET workshop_id = ?, show_on_site = ?, sort_order = ? WHERE id = ?", [$workshopId, $show ? 1 : 0, $sort, $id]);
+                $this->db->query("UPDATE {$mc} SET workshop_id = ?, show_on_site = ?, sort_order = ? WHERE id = ?", [$workshopId, $show, $sort, $id]);
             } else {
-                $this->db->query("UPDATE {$mc} SET show_on_site = ?, sort_order = ? WHERE id = ?", [$show ? 1 : 0, $sort, $id]);
+                $this->db->query("UPDATE {$mc} SET show_on_site = ?, sort_order = ? WHERE id = ?", [$show, $sort, $id]);
             }
             if ($nameRu !== '') {
                 $this->db->query(
@@ -373,28 +390,27 @@ class MenuController
                     [$id, $nameRu]
                 );
             }
-            $payload = json_encode(['ok' => true]);
-        } catch (\Throwable $e) {
-            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
-        }
-        $response->getBody()->write((string) $payload);
-        return $response->withHeader('Content-Type', 'application/json');
+            return [];
+        });
     }
 
     private function _ajaxCatCreate(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $b          = (array) ($request->getParsedBody() ?? []);
-        $workshopId = (int) ($b['workshop_id'] ?? 0);
-        $nameRu     = trim((string) ($b['name_ru'] ?? ''));
-        $sort       = max(0, min(255, (int) ($b['sort_order'] ?? 0)));
-        try {
+        return $this->_jsonGuard($response, function () use ($request) {
+            $b          = (array) ($request->getParsedBody() ?? []);
+            $workshopId = (int) ($b['workshop_id'] ?? 0);
+            $nameRu     = trim((string) ($b['name_ru'] ?? ''));
+            $sort       = max(0, min(255, (int) ($b['sort_order'] ?? 0)));
             $mc   = $this->db->t('menu_categories');
             $mcTr = $this->db->t('menu_category_tr');
+
             if ($nameRu === '')   { throw new \RuntimeException('Укажите название категории'); }
             if ($workshopId <= 0) { throw new \RuntimeException('Выберите цех'); }
-            // Синтетический poster_id вне диапазона Poster (>=900000): синк его не трогает и не перетирает.
-            $next = (int) $this->db->query("SELECT COALESCE(MAX(poster_id),900000)+1 FROM {$mc} WHERE poster_id >= 900000")->fetchColumn();
-            if ($next < 900001) { $next = 900001; }
+
+            // Синтетический poster_id вне диапазона Poster: синк его не трогает и не перетирает.
+            $base = self::CUSTOM_POSTER_ID_BASE;
+            $next = (int) $this->db->query("SELECT COALESCE(MAX(poster_id), {$base}) + 1 FROM {$mc} WHERE poster_id >= {$base}")->fetchColumn();
+            if ($next <= $base) { $next = $base + 1; }
             $this->db->query(
                 "INSERT INTO {$mc} (poster_id, workshop_id, name_raw, sort_order, show_on_site) VALUES (?, ?, ?, ?, 1)",
                 [$next, $workshopId, $nameRu, $sort]
@@ -406,27 +422,25 @@ class MenuController
                     [$newId, $nameRu]
                 );
             }
-            $payload = json_encode(['ok' => true, 'id' => $newId]);
-        } catch (\Throwable $e) {
-            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
-        }
-        $response->getBody()->write((string) $payload);
-        return $response->withHeader('Content-Type', 'application/json');
+            return ['id' => $newId];
+        });
     }
 
     /** Объединение: переносит все блюда категории-источника в целевую и скрывает источник. */
     private function _ajaxCatMerge(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $b      = (array) ($request->getParsedBody() ?? []);
-        $fromId = (int) ($b['from_id'] ?? 0);
-        $toId   = (int) ($b['to_id'] ?? 0);
-        try {
+        return $this->_jsonGuard($response, function () use ($request) {
+            $b      = (array) ($request->getParsedBody() ?? []);
+            $fromId = (int) ($b['from_id'] ?? 0);
+            $toId   = (int) ($b['to_id'] ?? 0);
             $mc = $this->db->t('menu_categories');
             $mi = $this->db->t('menu_items');
+
             if ($fromId <= 0 || $toId <= 0) { throw new \RuntimeException('Не выбрана категория'); }
             if ($fromId === $toId)          { throw new \RuntimeException('Источник и цель совпадают'); }
-            $exists = $this->db->query("SELECT id FROM {$mc} WHERE id = ? LIMIT 1", [$toId])->fetch();
-            if (!$exists) { throw new \RuntimeException('Целевая категория не найдена'); }
+            if (!$this->db->query("SELECT id FROM {$mc} WHERE id = ? LIMIT 1", [$toId])->fetch()) {
+                throw new \RuntimeException('Целевая категория не найдена');
+            }
 
             $moved = (int) $this->db->query(
                 "UPDATE {$mi} SET category_id = ? WHERE category_id = ?",
@@ -434,82 +448,65 @@ class MenuController
             )->rowCount();
             $this->db->query("UPDATE {$mc} SET show_on_site = 0 WHERE id = ?", [$fromId]);
 
-            $payload = json_encode(['ok' => true, 'moved' => $moved]);
-        } catch (\Throwable $e) {
-            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
-        }
-        $response->getBody()->write((string) $payload);
-        return $response->withHeader('Content-Type', 'application/json');
+            return ['moved' => $moved];
+        });
     }
 
     private function _ajaxWsSave(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $b      = (array) ($request->getParsedBody() ?? []);
-        $id     = (int) ($b['id'] ?? 0);
-        $show   = (int) ($b['show_on_site'] ?? 0);
-        $sort   = max(0, min(255, (int) ($b['sort_order'] ?? 0)));
-        $nameRu = trim((string) ($b['name_ru'] ?? ''));
-        try {
+        return $this->_jsonGuard($response, function () use ($request) {
+            $b      = (array) ($request->getParsedBody() ?? []);
+            $id     = (int) ($b['id'] ?? 0);
+            $show   = (int) ($b['show_on_site'] ?? 0) ? 1 : 0;
+            $sort   = max(0, min(255, (int) ($b['sort_order'] ?? 0)));
+            $nameRu = trim((string) ($b['name_ru'] ?? ''));
             $mw   = $this->db->t('menu_workshops');
             $mwTr = $this->db->t('menu_workshop_tr');
+
             if ($id <= 0) { throw new \RuntimeException('Нет id цеха'); }
-            $this->db->query("UPDATE {$mw} SET show_on_site = ?, sort_order = ? WHERE id = ?", [$show ? 1 : 0, $sort, $id]);
+            $this->db->query("UPDATE {$mw} SET show_on_site = ?, sort_order = ? WHERE id = ?", [$show, $sort, $id]);
             if ($nameRu !== '') {
                 $this->db->query(
                     "INSERT INTO {$mwTr} (workshop_id, lang, name) VALUES (?, 'ru', ?) ON DUPLICATE KEY UPDATE name = VALUES(name)",
                     [$id, $nameRu]
                 );
             }
-            $payload = json_encode(['ok' => true]);
-        } catch (\Throwable $e) {
-            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
-        }
-        $response->getBody()->write((string) $payload);
-        return $response->withHeader('Content-Type', 'application/json');
+            return [];
+        });
     }
 
     private function _ajaxTogglePublish(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $body     = (array) ($request->getParsedBody() ?? []);
-        $posterId = (int) ($body['poster_id'] ?? 0);
-        $publish  = (int) ($body['publish'] ?? 0);
-
-        try {
-            $mi  = $this->db->t('menu_items');
-            $pub = $publish ? 1 : 0;
+        return $this->_jsonGuard($response, function () use ($request) {
+            $body     = (array) ($request->getParsedBody() ?? []);
+            $posterId = (int) ($body['poster_id'] ?? 0);
+            $pub      = ((int) ($body['publish'] ?? 0)) ? 1 : 0;
+            $mi       = $this->db->t('menu_items');
 
             // Снимаем публикацию у несуществующей строки — уже не опубликовано.
             [$itemId, $err] = $this->_resolveMenuItemId($posterId, $pub === 1);
             if ($itemId <= 0) {
-                if ($err !== '') {
-                    throw new \RuntimeException($err);
-                }
-            } else {
-                if ($pub === 1) {
-                    // Правило: публиковать можно только при наличии site-категории.
-                    $cat = $this->db->query("SELECT category_id FROM {$mi} WHERE id = ? LIMIT 1", [$itemId])->fetch();
-                    if (empty($cat['category_id'])) {
-                        throw new \RuntimeException('Нельзя опубликовать без категории сайта — привяжите категорию в редакторе');
-                    }
-                }
-                $this->db->query("UPDATE {$mi} SET is_published = ? WHERE id = ?", [$pub, $itemId]);
+                if ($err !== '') { throw new \RuntimeException($err); }
+                return [];
             }
-            $payload = json_encode(['ok' => true]);
-        } catch (\Throwable $e) {
-            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
-        }
-
-        $response->getBody()->write((string) $payload);
-        return $response->withHeader('Content-Type', 'application/json');
+            if ($pub === 1) {
+                // Правило: публиковать можно только при наличии site-категории.
+                $cat = $this->db->query("SELECT category_id FROM {$mi} WHERE id = ? LIMIT 1", [$itemId])->fetch();
+                if (empty($cat['category_id'])) {
+                    throw new \RuntimeException('Нельзя опубликовать без категории сайта — привяжите категорию в редакторе');
+                }
+            }
+            $this->db->query("UPDATE {$mi} SET is_published = ? WHERE id = ?", [$pub, $itemId]);
+            return [];
+        });
     }
 
     private function _ajaxSaveEdit(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $body     = (array) ($request->getParsedBody() ?? []);
-        $posterId = (int) ($body['poster_id'] ?? 0);
-
-        try {
-            $tr = $this->db->t('menu_item_tr');
+        return $this->_jsonGuard($response, function () use ($request) {
+            $body     = (array) ($request->getParsedBody() ?? []);
+            $posterId = (int) ($body['poster_id'] ?? 0);
+            $tr       = $this->db->t('menu_item_tr');
 
             // Переводы привязаны к menu_items.id — гарантируем строку и берём её id.
             [$itemId, $err] = $this->_resolveMenuItemId($posterId, true);
@@ -528,13 +525,8 @@ class MenuController
                     );
                 }
             }
-            $payload = json_encode(['ok' => true]);
-        } catch (\Throwable $e) {
-            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
-        }
-
-        $response->getBody()->write((string) $payload);
-        return $response->withHeader('Content-Type', 'application/json');
+            return [];
+        });
     }
 
     private function _syncMenu(array &$flash): void
