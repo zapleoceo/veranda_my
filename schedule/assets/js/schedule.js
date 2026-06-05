@@ -741,17 +741,33 @@
     // server-side denied (423) on every write. Heartbeats every TTL/3
     // keep the owner's claim alive; on tab close we sendBeacon a
     // release so the next opener doesn't have to wait the full TTL.
+    // "с 14:32" today, or "с 04.06 14:32" if the lock was taken earlier —
+    // lets a viewer tell an active session from a forgotten-open tab.
+    function lockSinceLabel(holder) {
+        const m = String(holder?.acquired_at || '').match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+        if (!m) return '';
+        const [, y, mo, d, hh, mm] = m;
+        const now = new Date();
+        const today = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+        return today === `${y}-${mo}-${d}` ? `с ${hh}:${mm}` : `с ${d}.${mo} ${hh}:${mm}`;
+    }
     function applyLockState(state) {
         if (!state) return;
         App.lock = Object.assign(App.lock, state);
         const banner = document.getElementById('schLockBanner');
         const nameEl = document.getElementById('schLockHolderName');
+        const metaEl = document.getElementById('schLockHolderMeta');
         const owned  = !!state.owned;
         document.body.classList.toggle('sch-readonly', !owned);
         if (banner) banner.hidden = owned;
-        if (!owned && nameEl) {
+        if (!owned) {
             const holder = state.lock || {};
-            nameEl.textContent = holder.name || holder.email || 'другой пользователь';
+            // Identify the editor by login e-mail — no name matching.
+            if (nameEl) nameEl.textContent = holder.email || holder.name || 'другой пользователь';
+            if (metaEl) {
+                const since = lockSinceLabel(holder);
+                metaEl.textContent = since ? ` (${since})` : '';
+            }
         }
     }
     async function lockHeartbeat() {
@@ -803,7 +819,32 @@
                 toast('Лок получен — можно редактировать');
                 setTimeout(() => location.reload(), 500);
             } else {
-                toast('Всё ещё редактируется ' + (j.lock?.name || ''), 'err');
+                toast('Всё ещё редактируется ' + (j.lock?.email || j.lock?.name || ''), 'err');
+            }
+        } catch (e) {
+            toast('Ошибка: ' + e.message, 'err');
+        }
+    });
+
+    // "Перехватить" — force-take the lock from whoever holds it. For the
+    // case where someone left a tab open and their heartbeat keeps the lock
+    // alive forever. Edits auto-save to the draft and saves are
+    // version-guarded, so the previous editor loses at most a sub-second of
+    // un-saved typing and cleanly drops to read-only on their next heartbeat.
+    document.getElementById('schLockSteal')?.addEventListener('click', async (ev) => {
+        const who = App.lock?.lock?.email || 'другого пользователя';
+        if (!confirm(`Перехватить редактирование у ${who}?\n\nЕсли он сейчас что-то правит на своей вкладке и не сохранил — эти правки могут потеряться.`)) return;
+        const btn = ev.currentTarget;
+        try {
+            const j = await withBtnPending(btn,
+                () => api('lock_acquire', { method: 'POST', body: { force: 1 } }),
+                { pending: 'Перехватываю…', success: 'Готово' });
+            applyLockState(j);
+            if (j.owned) {
+                toast('Редактирование перехвачено');
+                setTimeout(() => location.reload(), 500);
+            } else {
+                toast('Не удалось перехватить', 'err');
             }
         } catch (e) {
             toast('Ошибка: ' + e.message, 'err');
@@ -1420,9 +1461,13 @@
             const shareBtn = shareUrl
                 ? `<button class="sch-snap-btn sch-snap-share" title="Скопировать публичную ссылку" data-share-url="${esc(shareUrl)}">🔗</button>`
                 : '';
+            const byHtml = s.created_by
+                ? `<span class="sch-snap-by" title="Автор версии: ${esc(s.created_by)}">👤 ${esc(s.created_by)}</span>`
+                : '';
             pill.innerHTML = `
                 <span class="sch-snap-name">${esc(s.label)}</span>
                 <span class="when">${esc(when)}</span>
+                ${byHtml}
                 ${shareBtn}
                 <button class="sch-snap-btn sch-snap-rename" title="Переименовать" data-snap-id="${s.id}">✏</button>
                 <button class="sch-snap-btn sch-snap-del"    title="Удалить"        data-snap-id="${s.id}">×</button>
