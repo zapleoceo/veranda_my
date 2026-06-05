@@ -38,6 +38,7 @@ class MenuController
         // AJAX: категории/цеха (интерфейс маппинга)
         if (($query['ajax'] ?? '') === 'cat_save')    { return $this->_ajaxCatSave($request, $response); }
         if (($query['ajax'] ?? '') === 'cat_create')  { return $this->_ajaxCatCreate($request, $response); }
+        if (($query['ajax'] ?? '') === 'cat_merge')   { return $this->_ajaxCatMerge($request, $response); }
         if (($query['ajax'] ?? '') === 'ws_save')     { return $this->_ajaxWsSave($request, $response); }
 
         // Sync menu from Poster
@@ -406,6 +407,34 @@ class MenuController
                 );
             }
             $payload = json_encode(['ok' => true, 'id' => $newId]);
+        } catch (\Throwable $e) {
+            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        $response->getBody()->write((string) $payload);
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /** Объединение: переносит все блюда категории-источника в целевую и скрывает источник. */
+    private function _ajaxCatMerge(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $b      = (array) ($request->getParsedBody() ?? []);
+        $fromId = (int) ($b['from_id'] ?? 0);
+        $toId   = (int) ($b['to_id'] ?? 0);
+        try {
+            $mc = $this->db->t('menu_categories');
+            $mi = $this->db->t('menu_items');
+            if ($fromId <= 0 || $toId <= 0) { throw new \RuntimeException('Не выбрана категория'); }
+            if ($fromId === $toId)          { throw new \RuntimeException('Источник и цель совпадают'); }
+            $exists = $this->db->query("SELECT id FROM {$mc} WHERE id = ? LIMIT 1", [$toId])->fetch();
+            if (!$exists) { throw new \RuntimeException('Целевая категория не найдена'); }
+
+            $moved = (int) $this->db->query(
+                "UPDATE {$mi} SET category_id = ? WHERE category_id = ?",
+                [$toId, $fromId]
+            )->rowCount();
+            $this->db->query("UPDATE {$mc} SET show_on_site = 0 WHERE id = ?", [$fromId]);
+
+            $payload = json_encode(['ok' => true, 'moved' => $moved]);
         } catch (\Throwable $e) {
             $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
