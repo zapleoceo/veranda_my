@@ -44,7 +44,7 @@
     <table>
         <thead><tr><th>Poster</th><th>Имя на сайте (RU)</th><th>Цех</th><th>Показ</th><th>Порядок</th><th>Блюд</th><th>Объединить в</th><th></th></tr></thead>
         <tbody>
-        <?php foreach ($categories as $c): $cid = (int)$c['id']; $isCustom = (int)$c['poster_id'] >= 900000; ?>
+        <?php foreach ($categories as $c): $cid = (int)$c['id']; $isCustom = !empty($c['is_custom']); ?>
             <tr data-cat="<?= $cid ?>">
                 <td style="font-size:.75rem;color:#9ca3af;white-space:nowrap">
                     <?php if ($isCustom): ?><span style="color:#2563eb">своя</span><?php else: ?><?= (int)$c['poster_id'] ?><?php endif; ?>
