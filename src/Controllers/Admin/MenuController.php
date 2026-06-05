@@ -35,14 +35,25 @@ class MenuController
             return $this->_ajaxSetCategory($request, $response);
         }
 
+        // AJAX: категории/цеха (интерфейс маппинга)
+        if (($query['ajax'] ?? '') === 'cat_save')    { return $this->_ajaxCatSave($request, $response); }
+        if (($query['ajax'] ?? '') === 'cat_create')  { return $this->_ajaxCatCreate($request, $response); }
+        if (($query['ajax'] ?? '') === 'ws_save')     { return $this->_ajaxWsSave($request, $response); }
+
         // Sync menu from Poster
         if ($request->getMethod() === 'POST' && isset($body['sync_menu'])) {
             $this->_syncMenu($flash);
         }
 
-        $view = in_array($query['view'] ?? '', ['list', 'edit'], true) ? $query['view'] : 'list';
+        $view = in_array($query['view'] ?? '', ['list', 'edit', 'cats'], true) ? $query['view'] : 'list';
 
-        if ($view === 'edit') {
+        if ($view === 'cats') {
+            $workshops  = $this->_loadWorkshopsAdmin();
+            $categories = $this->_loadCategoriesAdmin();
+            ob_start();
+            require __DIR__ . '/../../Views/admin/menu_cats.php';
+            $content = ob_get_clean();
+        } elseif ($view === 'edit') {
             $item = $this->_loadItem((int) ($query['id'] ?? 0));
             if (!$item) {
                 return $response->withHeader('Location', '/admin/menu')->withStatus(302);
@@ -296,6 +307,134 @@ class MenuController
             $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
 
+        $response->getBody()->write((string) $payload);
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    /** Цеха для интерфейса маппинга (RU-имя из _tr). */
+    private function _loadWorkshopsAdmin(): array
+    {
+        $mw   = $this->db->t('menu_workshops');
+        $mwTr = $this->db->t('menu_workshop_tr');
+        try {
+            return $this->db->query(
+                "SELECT w.id, w.poster_id, w.name_raw,
+                        COALESCE(NULLIF(wtr.name,''), '') AS name_ru,
+                        COALESCE(w.show_on_site, 0) AS show_on_site,
+                        COALESCE(w.sort_order, 0) AS sort_order
+                 FROM {$mw} w
+                 LEFT JOIN {$mwTr} wtr ON wtr.workshop_id = w.id AND wtr.lang = 'ru'
+                 ORDER BY w.sort_order ASC, name_ru ASC, w.name_raw ASC"
+            )->fetchAll();
+        } catch (\Throwable) { return []; }
+    }
+
+    /** Site-категории для интерфейса маппинга (с числом привязанных блюд). */
+    private function _loadCategoriesAdmin(): array
+    {
+        $mc   = $this->db->t('menu_categories');
+        $mcTr = $this->db->t('menu_category_tr');
+        $mi   = $this->db->t('menu_items');
+        try {
+            return $this->db->query(
+                "SELECT c.id, c.poster_id, c.name_raw, c.workshop_id,
+                        COALESCE(NULLIF(ctr.name,''), '') AS name_ru,
+                        COALESCE(c.show_on_site, 0) AS show_on_site,
+                        COALESCE(c.sort_order, 0) AS sort_order,
+                        (SELECT COUNT(*) FROM {$mi} m WHERE m.category_id = c.id) AS item_count
+                 FROM {$mc} c
+                 LEFT JOIN {$mcTr} ctr ON ctr.category_id = c.id AND ctr.lang = 'ru'
+                 ORDER BY c.workshop_id ASC, c.sort_order ASC, name_ru ASC"
+            )->fetchAll();
+        } catch (\Throwable) { return []; }
+    }
+
+    private function _ajaxCatSave(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $b          = (array) ($request->getParsedBody() ?? []);
+        $id         = (int) ($b['id'] ?? 0);
+        $workshopId = (int) ($b['workshop_id'] ?? 0);
+        $show       = (int) ($b['show_on_site'] ?? 0);
+        $sort       = max(0, min(255, (int) ($b['sort_order'] ?? 0)));
+        $nameRu     = trim((string) ($b['name_ru'] ?? ''));
+        try {
+            $mc   = $this->db->t('menu_categories');
+            $mcTr = $this->db->t('menu_category_tr');
+            if ($id <= 0) { throw new \RuntimeException('Нет id категории'); }
+            if ($workshopId > 0) {
+                $this->db->query("UPDATE {$mc} SET workshop_id = ?, show_on_site = ?, sort_order = ? WHERE id = ?", [$workshopId, $show ? 1 : 0, $sort, $id]);
+            } else {
+                $this->db->query("UPDATE {$mc} SET show_on_site = ?, sort_order = ? WHERE id = ?", [$show ? 1 : 0, $sort, $id]);
+            }
+            if ($nameRu !== '') {
+                $this->db->query(
+                    "INSERT INTO {$mcTr} (category_id, lang, name) VALUES (?, 'ru', ?) ON DUPLICATE KEY UPDATE name = VALUES(name)",
+                    [$id, $nameRu]
+                );
+            }
+            $payload = json_encode(['ok' => true]);
+        } catch (\Throwable $e) {
+            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        $response->getBody()->write((string) $payload);
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    private function _ajaxCatCreate(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $b          = (array) ($request->getParsedBody() ?? []);
+        $workshopId = (int) ($b['workshop_id'] ?? 0);
+        $nameRu     = trim((string) ($b['name_ru'] ?? ''));
+        $sort       = max(0, min(255, (int) ($b['sort_order'] ?? 0)));
+        try {
+            $mc   = $this->db->t('menu_categories');
+            $mcTr = $this->db->t('menu_category_tr');
+            if ($nameRu === '')   { throw new \RuntimeException('Укажите название категории'); }
+            if ($workshopId <= 0) { throw new \RuntimeException('Выберите цех'); }
+            // Синтетический poster_id вне диапазона Poster (>=900000): синк его не трогает и не перетирает.
+            $next = (int) $this->db->query("SELECT COALESCE(MAX(poster_id),900000)+1 FROM {$mc} WHERE poster_id >= 900000")->fetchColumn();
+            if ($next < 900001) { $next = 900001; }
+            $this->db->query(
+                "INSERT INTO {$mc} (poster_id, workshop_id, name_raw, sort_order, show_on_site) VALUES (?, ?, ?, ?, 1)",
+                [$next, $workshopId, $nameRu, $sort]
+            );
+            $newId = (int) $this->db->query("SELECT id FROM {$mc} WHERE poster_id = ? LIMIT 1", [$next])->fetchColumn();
+            if ($newId > 0) {
+                $this->db->query(
+                    "INSERT INTO {$mcTr} (category_id, lang, name) VALUES (?, 'ru', ?) ON DUPLICATE KEY UPDATE name = VALUES(name)",
+                    [$newId, $nameRu]
+                );
+            }
+            $payload = json_encode(['ok' => true, 'id' => $newId]);
+        } catch (\Throwable $e) {
+            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        $response->getBody()->write((string) $payload);
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+    private function _ajaxWsSave(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $b      = (array) ($request->getParsedBody() ?? []);
+        $id     = (int) ($b['id'] ?? 0);
+        $show   = (int) ($b['show_on_site'] ?? 0);
+        $sort   = max(0, min(255, (int) ($b['sort_order'] ?? 0)));
+        $nameRu = trim((string) ($b['name_ru'] ?? ''));
+        try {
+            $mw   = $this->db->t('menu_workshops');
+            $mwTr = $this->db->t('menu_workshop_tr');
+            if ($id <= 0) { throw new \RuntimeException('Нет id цеха'); }
+            $this->db->query("UPDATE {$mw} SET show_on_site = ?, sort_order = ? WHERE id = ?", [$show ? 1 : 0, $sort, $id]);
+            if ($nameRu !== '') {
+                $this->db->query(
+                    "INSERT INTO {$mwTr} (workshop_id, lang, name) VALUES (?, 'ru', ?) ON DUPLICATE KEY UPDATE name = VALUES(name)",
+                    [$id, $nameRu]
+                );
+            }
+            $payload = json_encode(['ok' => true]);
+        } catch (\Throwable $e) {
+            $payload = json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
         $response->getBody()->write((string) $payload);
         return $response->withHeader('Content-Type', 'application/json');
     }
