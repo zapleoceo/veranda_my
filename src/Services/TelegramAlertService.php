@@ -184,6 +184,12 @@ class TelegramAlertService
         $m->queueKitchen       = $queueKitchen;
         $m->overdueBar         = $overdueBar;
         $m->overdueKitchen     = $overdueKitchen;
+        // «В тайминге» — неготовые блюда, ещё НЕ просроченные (очередь минус
+        // долгие). overdue — строгое подмножество queue (тот же baseWhere +
+        // ticket_sent_at < cutoff), поэтому разница всегда >= 0; max(0,…)
+        // только страховка от микро-гонки между двумя SELECT'ами.
+        $m->timingBar          = max(0, $queueBar - $overdueBar);
+        $m->timingKitchen      = max(0, $queueKitchen - $overdueKitchen);
         return $m;
     }
 
@@ -252,8 +258,8 @@ class TelegramAlertService
                 . "В очереди: 🍸{$m->queueBar} / 🍔{$m->queueKitchen}\n"
                 . "Долгих блюд: 🍸{$m->overdueBar} / 🍔{$m->overdueKitchen}\n"
                 . "Время обновления: {$lastSync}\n"
-                . "Игноры: {$ignores['items']}|{$ignores['tx']}\n"
-                . "⚙️ Авто-закрытия: {$autoClosed}"
+                . "Игноры: {$ignores['items']}|{$ignores['tx']} ⚙️ {$autoClosed}\n"
+                . "В тайминге: 🍸{$m->timingBar} / 🍔{$m->timingKitchen}"
                 . ($srvTag !== '' ? "\nSrv: {$srvTag}" : '');
 
             $prevId   = (int) $this->meta->get('telegram_status_msg_id', '0');
