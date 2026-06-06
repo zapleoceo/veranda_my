@@ -8,7 +8,8 @@ use App\Payday3\Domain\DateRange;
 
 /**
  * Финансовые транзакции card (Vietnam Company + Tips):
- *   - DB-side sum of expected transfer cents (poster_checks aggregate);
+ *   - Live aggregate from Poster `dash.getTransactions` for the
+ *     expected-transfer total (no local snapshot read);
  *   - Poster-side `finance.getTransactions` walk for matching transfers;
  *
  * One method per kind keeps the action thin — the controller fans both

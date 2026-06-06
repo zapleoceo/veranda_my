@@ -64,7 +64,6 @@ jobs:
               --exclude "logs/" \
               --exclude ".git/" \
               --exclude ".github/" \
-              --exclude "payday2/local_config.json" \
               --exclude "wa_listener/auth/" \
               --exclude "wa_listener/qr_state.json" \
               --exclude "wa_listener/node_modules/" \

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Controllers\Auth\LoginController;
 use App\Controllers\Auth\CallbackController;
-use App\Controllers\Payday2Controller;
 use App\Payday3\Http\Payday3Controller;
 use App\Payday3\Http\Actions\LinksAction;
 use App\Payday3\Http\Actions\AutoLinkAction;
@@ -193,12 +192,6 @@ $app->map(['GET', 'POST'], '/tr3/api.php', [Tr3Controller::class, 'api']);
 $app->map(['GET', 'POST'], '/reservations[/]', [ReservationsController::class, 'index'])
     ->add(AuthMiddleware::class);
 
-// Phase 5: payday2 (auth-protected). Pattern accepts /payday2 and /payday2/
-// so direct .htaccess hits delegated through payday2/index.php → public/index.php
-// resolve to this controller (which renders through layout.php with sidebar).
-$app->map(['GET', 'POST'], '/payday2[/]', [Payday2Controller::class, 'dispatch'])
-    ->add(AuthMiddleware::class);
-
 // Phase 6: payday3 — clean Slim-native rebuild of payday2 (SOLID/DRY).
 // Browser-facing render + REST API under /payday3/api/*. Each AJAX endpoint
 // is a single-action class (one responsibility per file).
@@ -212,6 +205,7 @@ $app->group('/payday3', function (RouteCollectorProxy $g) {
         $api->delete('/links/{sepayId:[0-9]+}/{posterId:[0-9]+}',    UnlinkAction::class);
         $api->post(  '/day/clear',                                   ClearDayAction::class);
         $api->post(  '/sepay/sync',                                  SepaySyncAction::class);
+        $api->post(  '/sepay/hide',                                  \App\Payday3\Http\Actions\SepayHideAction::class);
         $api->post(  '/poster/sync',                                 PosterSyncAction::class);
         // OUT-direction reconciliation (BIDV mail ↔ Poster finance).
         // /out/data kept for back-compat (single bundled response);
@@ -303,7 +297,6 @@ $app->get('/tr3/assets/{file:.+}',          [StaticController::class, 'tr3Assets
 $app->get('/links/{file:.+}',               [StaticController::class, 'linksStatic']);
 $app->get('/reservations/assets/{file:.+}', [StaticController::class, 'reservationsAssets']);
 $app->get('/reservations/{file:[\w.-]+}',   [StaticController::class, 'reservationsRoot']);
-$app->get('/payday2/assets/{file:.+}',      [StaticController::class, 'payday2Assets']);
 $app->get('/payday3/assets/{file:.+}',      [StaticController::class, 'payday3Assets']);
 $app->get('/schedule/assets/{file:.+}',     [StaticController::class, 'scheduleAssets']);
 $app->get('/banya/{file:[\w.-]+}',          [StaticController::class, 'banyaStatic']);

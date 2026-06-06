@@ -4,12 +4,9 @@ declare(strict_types=1);
 ?>
 <form class="pd3-filters" method="get" action="/payday3">
     <label class="pd3-filters__field">
-        <span>С</span>
+        <span>Дата</span>
         <input type="date" name="dateFrom" value="<?= htmlspecialchars($range->from) ?>" required>
     </label>
-    <label class="pd3-filters__field">
-        <span>По</span>
-        <input type="date" name="dateTo" value="<?= htmlspecialchars($range->to) ?>" required>
-    </label>
+    <input type="hidden" name="dateTo" value="<?= htmlspecialchars($range->from) ?>">
     <button type="submit" class="pd3-btn">Показать</button>
 </form>

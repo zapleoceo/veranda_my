@@ -11,12 +11,6 @@ use App\Payday3\Domain\LocalSettings;
  * Filesystem-backed config store for payday3.
  *
  *   primary path: payday3/local_config.json (writable by web user)
- *   fallback:     payday2/local_config.json (read-only — for live
- *                 migration from the legacy module)
- *
- * Reading prefers payday3's file; if absent, the payday2 file is
- * used so existing deployments keep their tuned values. Writes
- * always go to payday3's file.
  *
  * Kept around for compatibility / read-side fallbacks; the active
  * repository is DbLocalSettingsRepository (settings now live in a
@@ -28,14 +22,13 @@ final class JsonLocalSettingsRepository implements LocalSettingsRepositoryInterf
 
     public function __construct(
         private readonly string $primaryPath,   // payday3/local_config.json
-        private readonly string $fallbackPath,  // payday2/local_config.json
     ) {}
 
     public function load(): LocalSettings
     {
         if ($this->cache !== null) return $this->cache;
 
-        $raw = $this->readJson($this->primaryPath) ?? $this->readJson($this->fallbackPath);
+        $raw = $this->readJson($this->primaryPath);
         if (!is_array($raw)) {
             return $this->cache = LocalSettings::defaults();
         }

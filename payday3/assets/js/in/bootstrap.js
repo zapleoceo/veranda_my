@@ -52,3 +52,37 @@ export function makeInLoader({ state, renderer }) {
         return inFlight;
     };
 }
+
+/**
+ * Wires the SePay per-row hide/restore button (`.pd3-row-hide` in
+ * #pd3SepayTable). Delegated on document.body so it works for both
+ * server-rendered and JS-rendered rows. After every mutation we call
+ * `reload()` so the row drops from the "open" list (or reappears under
+ * the eye-toggle) without a full page reload.
+ *
+ * Restore path: rows decorated with `.row-hidden` (via listHiddenInRange
+ * + eye-toggle) call the same endpoint with hidden=false, which deletes
+ * the sepay_hidden row.
+ */
+export function initSepayHide({ reload }) {
+    document.body.addEventListener('click', async (e) => {
+        const btn = e.target.closest?.('#pd3SepayTable .pd3-row-hide');
+        if (!btn) return;
+        const id = Number(btn.dataset.sepayId);
+        if (!id) return;
+        const tr = btn.closest('tr');
+        const isRestore = tr?.classList.contains('row-hidden') === true;
+        // Pre-disable to swallow double-clicks during the round-trip.
+        btn.disabled = true;
+        try {
+            await api.post('/payday3/api/sepay/hide', {
+                sepayId: id,
+                hidden:  !isRestore,
+            });
+            if (typeof reload === 'function') await reload();
+        } catch (err) {
+            alert(err.message || 'Не удалось скрыть/восстановить.');
+            btn.disabled = false;
+        }
+    });
+}

@@ -5,7 +5,6 @@ RewriteEngine On
 RewriteRule ^home/?$ home/index.php [L,QSA]
 RewriteRule ^links/?$ links/index.php [L,QSA]
 RewriteRule ^sepay/?$ sepay/index.php [L,QSA]
-RewriteRule ^payday2/?$ payday2/index.php [L,QSA]
 RewriteRule ^tr3/?$ tr3/index.php [L,QSA]
 RewriteRule ^tr3/api/?$ tr3/api.php [L,QSA]
 RewriteRule ^tr4/?$ tr4/index.php [L,QSA]
