@@ -39,6 +39,40 @@ final class SepayRepository implements SepayRepositoryInterface
         return array_map(static fn(array $row) => SepayTransaction::fromRow($row), $rows);
     }
 
+    public function hide(int $sepayId, string $comment = ''): void
+    {
+        if ($sepayId <= 0) return;
+        $sh = $this->db->t('sepay_hidden');
+        // INSERT IGNORE so a second click on an already-hidden row is a
+        // silent no-op (matches the eye-toggle/unhide round-trip the
+        // operator may trigger from the OUT-mode UI pattern).
+        $this->db->query(
+            "INSERT IGNORE INTO {$sh} (sepay_id, comment) VALUES (?, ?)",
+            [$sepayId, $comment]
+        );
+    }
+
+    public function unhide(int $sepayId): void
+    {
+        if ($sepayId <= 0) return;
+        $sh = $this->db->t('sepay_hidden');
+        $this->db->query(
+            "DELETE FROM {$sh} WHERE sepay_id = ?",
+            [$sepayId]
+        );
+    }
+
+    public function isHidden(int $sepayId): bool
+    {
+        if ($sepayId <= 0) return false;
+        $sh = $this->db->t('sepay_hidden');
+        $row = $this->db->query(
+            "SELECT 1 FROM {$sh} WHERE sepay_id = ? LIMIT 1",
+            [$sepayId]
+        )->fetch();
+        return $row !== false && $row !== null;
+    }
+
     /** @return SepayTransaction[] */
     public function listHiddenInRange(DateRange $r): array
     {

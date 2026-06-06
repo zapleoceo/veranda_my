@@ -33,7 +33,7 @@ const [
     { initModals },
     { initOutMode },
     { initBalances },
-    { makeInLoader },
+    { makeInLoader, initSepayHide },
     { initFinanceTransfers },
     { initCreateTx },
     { initFontScale },
@@ -139,6 +139,10 @@ initDataActions({
         finance.reload();
     },
 });
+// Per-row hide/restore — direct port of payday2's ?ajax=sepay_hide.
+// Reuses loadInData so the eye-toggle picks up the change without a
+// full page reload.
+initSepayHide({ reload: loadInData });
 
 // First-paint auto-fill. When the operator opens the page (or picks a
 // fresh date) we don't want either tab to greet them with empty tables.

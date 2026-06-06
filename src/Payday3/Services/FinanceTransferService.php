@@ -14,16 +14,18 @@ use App\Payday3\Domain\Money;
 /**
  * Финансовые транзакции (Vietnam Company + Tips). Two-step pipeline:
  *
- *   1. SQL aggregate over poster_checks to compute the expected
- *      transfer total in cents (then converted to VND).
+ *   1. Live `dash.getTransactions` walk for the range — sums the
+ *      expected transfer total directly from Poster (no local
+ *      poster_checks snapshot). Tips additionally JOINs check_payment_links
+ *      (local-only reconciliation) to restrict to checks paid via Sepay.
  *   2. Poster API `finance.getTransactions` for the target account
  *      (Vietnam or Tips) within the range, normalised to a flat
  *      `{ts, sum_minor, type, comment, user, account, transaction_id}`
  *      shape ready for JSON encode.
  *
- * Vietnam's payment method id is hard-coded at 11 — same constant
- * payday2's Config::METHOD_VIETNAM uses. Andrey / Tips / Vietnam
- * account_ids come from the injected LocalSettings.
+ * Vietnam's payment method id is hard-coded at 11 (legacy
+ * Config::METHOD_VIETNAM). Andrey / Tips / Vietnam account_ids come
+ * from the injected LocalSettings.
  */
 final class FinanceTransferService implements FinanceTransferServiceInterface
 {
@@ -182,52 +184,144 @@ final class FinanceTransferService implements FinanceTransferServiceInterface
         return false;
     }
 
+    /**
+     * Live aggregate from Poster — Vietnam Company expected transfer.
+     *
+     * Pulls every closed check in the range via dash.getTransactions and
+     * sums (payed_card + payed_third_party + tip_sum) for checks whose
+     * payment_method_id is METHOD_VIETNAM (11) with pay_type IN (2,3).
+     *
+     * No local poster_checks snapshot is read — every call walks the
+     * Poster API so the operator always sees the current state without
+     * needing to press the sync button first.
+     */
     private function vietnamExpectedVnd(DateRange $range): ?int
     {
         try {
-            $pc = $this->db->t('poster_checks');
-            $cents = (int)$this->db->query(
-                "SELECT COALESCE(SUM(payed_card + payed_third_party + tip_sum), 0)
-                 FROM {$pc}
-                 WHERE day_date BETWEEN ? AND ?
-                   AND pay_type IN (2,3)
-                   AND (payed_card + payed_third_party) > 0
-                   AND poster_payment_method_id = ?",
-                [$range->from, $range->to, self::METHOD_VIETNAM]
-            )->fetchColumn();
+            $checks = $this->fetchPosterChecksLive($range);
+            $cents  = 0;
+            foreach ($checks as $tx) {
+                if ((int)($tx['poster_payment_method_id'] ?? 0) !== self::METHOD_VIETNAM) continue;
+                if (!in_array((int)($tx['pay_type'] ?? 0), [2, 3], true)) continue;
+                if ((int)($tx['payed_card'] + $tx['payed_third_party']) <= 0) continue;
+                $cents += (int)($tx['payed_card'] + $tx['payed_third_party'] + $tx['tip_sum']);
+            }
             return Money::fromPosterCents($cents)->amount;
         } catch (\Throwable $e) {
             return null;
         }
     }
 
+    /**
+     * Live aggregate from Poster — Tips expected transfer.
+     *
+     * Vietnam's tip_sum is already paid through the Vietnam transfer,
+     * so tips are summed only on NON-Vietnam checks. The check has to
+     * be reconciled with a Sepay payment (check_payment_links — a local
+     * artefact of our IN-mode UI) to qualify.
+     *
+     *   - tip_sum / payed_card / payed_third_party come live from
+     *     dash.getTransactions on every call.
+     *   - check_payment_links stays local (it's the operator's manual
+     *     reconciliation map, not something Poster knows about).
+     */
     private function tipsExpectedVnd(DateRange $range): ?int
     {
         try {
-            $pc = $this->db->t('poster_checks');
-            $pl = $this->db->t('check_payment_links');
-            $cents = (int)$this->db->query(
-                "SELECT COALESCE(SUM(p.tip_sum), 0)
-                 FROM {$pc} p
-                 JOIN (
-                    SELECT DISTINCT l.poster_transaction_id
-                    FROM {$pl} l
-                    JOIN {$pc} p2 ON p2.transaction_id = l.poster_transaction_id
-                    WHERE p2.day_date BETWEEN ? AND ?
-                      AND COALESCE(p2.was_deleted, 0) = 0
-                 ) x ON x.poster_transaction_id = p.transaction_id
-                 WHERE p.day_date BETWEEN ? AND ?
-                   AND COALESCE(p.was_deleted, 0) = 0
-                   AND p.pay_type IN (2,3)
-                   AND (p.payed_card + p.payed_third_party) > 0
-                   AND p.tip_sum > 0
-                   AND COALESCE(p.poster_payment_method_id, 0) <> ?",
-                [$range->from, $range->to, $range->from, $range->to, self::METHOD_VIETNAM]
-            )->fetchColumn();
+            $checks = $this->fetchPosterChecksLive($range);
+            if ($checks === []) return 0;
+
+            $candidateIds = [];
+            foreach ($checks as $tx) {
+                if ((int)($tx['poster_payment_method_id'] ?? 0) === self::METHOD_VIETNAM) continue;
+                if (!in_array((int)($tx['pay_type'] ?? 0), [2, 3], true)) continue;
+                if ((int)($tx['payed_card'] + $tx['payed_third_party']) <= 0) continue;
+                if ((int)$tx['tip_sum'] <= 0) continue;
+                $candidateIds[(int)$tx['transaction_id']] = $tx;
+            }
+            if ($candidateIds === []) return 0;
+
+            // Filter to only checks that were reconciled with a Sepay
+            // payment — same predicate as the IN-mode "linked" graph.
+            $pl  = $this->db->t('check_payment_links');
+            $in  = implode(',', array_map('intval', array_keys($candidateIds)));
+            $rows = $this->db->query(
+                "SELECT DISTINCT poster_transaction_id FROM {$pl}
+                 WHERE poster_transaction_id IN ({$in})"
+            )->fetchAll();
+
+            $cents = 0;
+            foreach ($rows as $row) {
+                $tid = (int)($row['poster_transaction_id'] ?? 0);
+                if (!isset($candidateIds[$tid])) continue;
+                $cents += (int)$candidateIds[$tid]['tip_sum'];
+            }
             return Money::fromPosterCents($cents)->amount;
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Live Poster API walk — returns a list of normalised check rows
+     * for the range. Each entry has the keys vietnam/tips logic relies
+     * on: transaction_id, pay_type, poster_payment_method_id, payed_card,
+     * payed_third_party, tip_sum (sum of tip_sum + tips_card + tips_cash,
+     * matching PosterSyncService's stored value).
+     *
+     * Cached for the lifetime of one PHP request so vietnamExpectedVnd
+     * and tipsExpectedVnd share the API call (one HTTP round-trip per
+     * range, not two). The request-scoped cache resets between requests
+     * so the next call to /payday3/api/finance/transfers is still live.
+     */
+    private array $liveChecksCache = [];
+
+    private function fetchPosterChecksLive(DateRange $range): array
+    {
+        $key = $range->from . '..' . $range->to;
+        if (isset($this->liveChecksCache[$key])) {
+            return $this->liveChecksCache[$key];
+        }
+        $api = $this->poster->client();
+        $ymdFrom = str_replace('-', '', $range->from);
+        $ymdTo   = str_replace('-', '', $range->to);
+        $rows = $api->request('dash.getTransactions', [
+            'dateFrom'         => $ymdFrom,
+            'dateTo'           => $ymdTo,
+            'status'           => 2,
+            'include_products' => 0,
+            'include_history'  => 0,
+        ]);
+        if (!is_array($rows)) $rows = [];
+
+        $out = [];
+        foreach ($rows as $tx) {
+            if (!is_array($tx)) continue;
+            $txId = (int)($tx['transaction_id'] ?? $tx['id'] ?? 0);
+            if ($txId <= 0) continue;
+            $payedCard       = self::moneyToInt($tx['payed_card']        ?? $tx['payedCard']       ?? 0);
+            $payedThirdParty = self::moneyToInt($tx['payed_third_party'] ?? $tx['payedThirdParty'] ?? 0);
+            $serviceTip      = self::moneyToInt($tx['tip_sum'] ?? $tx['tipSum'] ?? 0);
+            $tipsCard        = self::moneyToInt($tx['tips_card'] ?? $tx['tipsCard'] ?? 0);
+            $tipsCash        = self::moneyToInt($tx['tips_cash'] ?? $tx['tipsCash'] ?? 0);
+            $out[] = [
+                'transaction_id'           => $txId,
+                'pay_type'                 => (int)($tx['pay_type'] ?? $tx['payType'] ?? 0),
+                'poster_payment_method_id' => (int)($tx['payment_method_id'] ?? $tx['paymentMethodId'] ?? 0),
+                'payed_card'               => $payedCard,
+                'payed_third_party'        => $payedThirdParty,
+                'tip_sum'                  => $serviceTip + $tipsCard + $tipsCash,
+            ];
+        }
+        return $this->liveChecksCache[$key] = $out;
+    }
+
+    private static function moneyToInt(mixed $v): int
+    {
+        if (is_int($v)) return $v;
+        if (is_float($v)) return (int)round($v);
+        if (is_string($v) && is_numeric($v)) return (int)round((float)$v);
+        return 0;
     }
 
     /**

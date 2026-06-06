@@ -17,7 +17,7 @@
        /links/, /links/menu и /tr3/ всё это согласовано.
 
   Не публичные (и не в sitemap, и Disallow в robots.txt):
-    /admin/*, /payday2/*, /payday3/*, /sepay/*, /schedule/*,
+    /admin/*, /payday3/*, /sepay/*, /schedule/*,
     /banya, /roma, /employees, /reservations, /zapara, /rawdata,
     /kitchen_online, /neworder/*, /api/*, /cron/*, /scripts/*,
     /login, /logout, /auth_*, /telegram_*, /analytics.php,

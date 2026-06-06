@@ -15,8 +15,6 @@ Disallow: /dashboard/
 Disallow: /dashboard.php
 Disallow: /payday
 Disallow: /payday/
-Disallow: /payday2
-Disallow: /payday2/
 Disallow: /payday3
 Disallow: /payday3/
 Disallow: /kitchen_online

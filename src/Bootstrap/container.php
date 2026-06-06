@@ -235,6 +235,9 @@ return [
         $c->get(OutReconciliationServiceInterface::class),
     ),
     MailHideAction::class      => fn($c) => new MailHideAction($c->get(MailServiceInterface::class)),
+    \App\Payday3\Http\Actions\SepayHideAction::class => fn($c) => new \App\Payday3\Http\Actions\SepayHideAction(
+        $c->get(SepayRepositoryInterface::class),
+    ),
 
     // ─── Payday3 balances footer ───────────────────────────────
     ActualBalanceRepositoryInterface::class => fn($c) => new ActualBalanceRepository($c->get(Database::class)),
@@ -245,13 +248,11 @@ return [
 
     // LocalSettings — DB-backed (payday3_settings.config_json). On the
     // first boot the table is empty so DbLocalSettingsRepository pulls
-    // values from the JSON repository (payday3/local_config.json with
-    // payday2 fallback) and writes them in — zero-touch migration for
-    // live deployments.
+    // values from the JSON repository (payday3/local_config.json) and
+    // writes them in — zero-touch migration for live deployments.
     LocalSettingsRepositoryInterface::class => function ($c) {
         $json = new JsonLocalSettingsRepository(
-            primaryPath:  dirname(__DIR__, 2) . '/payday3/local_config.json',
-            fallbackPath: dirname(__DIR__, 2) . '/payday2/local_config.json',
+            primaryPath: dirname(__DIR__, 2) . '/payday3/local_config.json',
         );
         return new DbLocalSettingsRepository($c->get(Database::class), $json);
     },
