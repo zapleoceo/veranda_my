@@ -36,6 +36,12 @@
 .nav__cta { display: none; }
 @media (min-width: 680px) { .nav__cta { display: inline-flex; } }
 @media (min-width: 900px) { .nav__links { display: flex; } }
+/* Переключатель языков */
+.nav__lang { display: inline-flex; align-items: center; gap: 1px; font-size: 12px; font-weight: 600; letter-spacing: .03em; margin-right: 2px; }
+.nav__lang a { padding: 5px 6px; border-radius: 7px; color: var(--text-3); transition: color .2s, background .2s; }
+.nav__lang a:hover { color: var(--text); background: var(--hair); }
+.nav__lang a.is-active { color: var(--ember); }
+@media (max-width: 560px) { .nav__ico { display: none; } }
 
 /* ─── Marquee ────────────────────────────────────────────────── */
 .marquee { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); background: var(--bg-2); overflow: hidden; }

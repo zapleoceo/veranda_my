@@ -4,32 +4,43 @@ declare(strict_types=1);
 
 namespace App\Home\Content;
 
+use App\Home\I18n\Lang;
+
 /**
- * Недельная афиша: одно событие на каждый день недели + логика «сегодня».
- *
- * Индекс дня — 0=Вс … 6=Сб, как у JS Date.getDay() и PHP date('w'),
- * чтобы серверный и клиентский расчёт «сегодня» совпадали.
- *
- * У каждого события — своя картинка (фон featured-карточки) и ссылка кнопки:
- * клик по дню в сетке меняет featured (текст + фон + ссылку). Ссылка по
- * умолчанию ведёт на бронь; задать индивидуальную — поменять url события.
+ * Недельная афиша: событие на каждый день недели + логика «сегодня».
+ * Индекс дня — 0=Вс … 6=Сб (как JS getDay / PHP date('w')).
+ * Тексты (title/time/note) и имена дней — из словаря Lang; фото — структура.
  */
 final class WeeklyProgram
 {
-    /** @var array<int,Event> событие по индексу дня недели (0..6) */
-    private array $byDay;
+    /** @var array<int,Event> */
+    private array $byDay = [];
 
-    public function __construct(private readonly int $today, string $reserveUrl)
-    {
-        $this->byDay = [
-            1 => new Event('Настольные игры',    'весь вечер',    'Бункер, Тайный Гитлер, Мафия, Uno — бесплатно. Приходите своей компанией.', 'gazebo-inside', $reserveUrl),
-            2 => new Event('Кино под звёздами',  '18:00 · 20:00', 'Детский и взрослый сеансы',      'lanterns-city', $reserveUrl),
-            3 => new Event('Live Music',         '19:00',         'Каверы англоязычных хитов',      'hero-terrace',  $reserveUrl),
-            4 => new Event('Кино под звёздами',  '18:00 · 20:00', 'Детский и взрослый сеансы',      'garden-path',   $reserveUrl),
-            5 => new Event('Live Music',         '19:00',         'Группы чередуются: The Pennywort, Улик, Рядновы, BiBi Duo', 'hero-lanterns', $reserveUrl),
-            6 => new Event('Живая музыка',       '19:00',         'Группы чередуются: The Pennywort, Улик, Рядновы, BiBi Duo', 'mountain-view', $reserveUrl),
-            0 => new Event('Вечер живой музыки', '19:00',         'Группы чередуются: The Pennywort, Улик, Рядновы, BiBi Duo', 'gazebo-outside', $reserveUrl),
-        ];
+    /** Фон featured-карточки по дню (структура, не зависит от языка). */
+    private const IMAGE = [
+        1 => 'gazebo-inside',
+        2 => 'lanterns-city',
+        3 => 'hero-terrace',
+        4 => 'garden-path',
+        5 => 'hero-lanterns',
+        6 => 'mountain-view',
+        0 => 'gazebo-outside',
+    ];
+
+    public function __construct(
+        private readonly Lang $lang,
+        private readonly int $today,
+        string $reserveUrl,
+    ) {
+        foreach (self::IMAGE as $day => $image) {
+            $this->byDay[$day] = new Event(
+                $lang->t("ev.d{$day}.title"),
+                $lang->t("ev.d{$day}.time"),
+                $lang->t("ev.d{$day}.note"),
+                $image,
+                $reserveUrl,
+            );
+        }
     }
 
     public function todayIndex(): int
@@ -45,7 +56,7 @@ final class WeeklyProgram
     /**
      * Неделя в порядке Пн→Вс для сетки.
      *
-     * @return array<int,Event> событие, ключ — индекс дня (0..6)
+     * @return array<int,Event>
      */
     public function week(): array
     {
@@ -59,11 +70,11 @@ final class WeeklyProgram
 
     public function dayName(int $day): string
     {
-        return ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][$day] ?? '';
+        return $this->lang->list('days.short')[$day] ?? '';
     }
 
     public function dayFullName(int $day): string
     {
-        return ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'][$day] ?? '';
+        return $this->lang->list('days.full')[$day] ?? '';
     }
 }
