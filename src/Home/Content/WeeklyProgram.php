@@ -24,11 +24,11 @@ final class WeeklyProgram
         $this->byDay = [
             1 => new Event('Настольные игры',    'весь вечер',    'Бункер, Тайный Гитлер, Мафия, Uno — бесплатно. Приходите своей компанией.', 'gazebo-inside', $reserveUrl),
             2 => new Event('Кино под звёздами',  '18:00 · 20:00', 'Детский и взрослый сеансы',      'lanterns-city', $reserveUrl),
-            3 => new Event('Live Music',         '19:00',         'The Pennywort / Улик',           'hero-terrace',  $reserveUrl),
+            3 => new Event('Live Music',         '19:00',         'Группы чередуются: The Pennywort, Улик, Рядновы, BiBi Duo', 'hero-terrace',  $reserveUrl),
             4 => new Event('Кино под звёздами',  '18:00 · 20:00', 'Детский и взрослый сеансы',      'garden-path',   $reserveUrl),
-            5 => new Event('Live Music',         '19:00',         'The Pennywort / Улик',           'hero-lanterns', $reserveUrl),
-            6 => new Event('Живая музыка',       '19:00',         'The Pennywort, Рядновы',         'mountain-view', $reserveUrl),
-            0 => new Event('Вечер живой музыки', '19:00',         'Рядновы, BiBi Duo',              'gazebo-outside', $reserveUrl),
+            5 => new Event('Live Music',         '19:00',         'Группы чередуются: The Pennywort, Улик, Рядновы, BiBi Duo', 'hero-lanterns', $reserveUrl),
+            6 => new Event('Живая музыка',       '19:00',         'Группы чередуются: The Pennywort, Улик, Рядновы, BiBi Duo', 'mountain-view', $reserveUrl),
+            0 => new Event('Вечер живой музыки', '19:00',         'Группы чередуются: The Pennywort, Улик, Рядновы, BiBi Duo', 'gazebo-outside', $reserveUrl),
         ];
     }
 
