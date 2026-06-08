@@ -6,13 +6,13 @@ use App\Home\View\Html;
 use App\Home\View\Icons;
 
 /**
- * Афиша. «Сегодня» рендерится на сервере (корректно без JS и для SEO).
- * Карточки дня — кнопки: клик меняет featured-карточку (день, текст, фон-фото
- * и ссылку кнопки). Данные события лежат в data-* — в JS не дублируются.
+ * Афиша. «Сегодня» — на сервере; карточки дня (кнопки) несут data-* для смены
+ * featured-карточки на клиенте (день, текст, фон, ссылка). Бейдж — из data-*.
  *
  * @var \App\Home\Content\PageContent   $content
  * @var \App\Home\Content\WeeklyProgram $program
  * @var \App\Home\Content\Contacts      $contacts
+ * @var \App\Home\I18n\Lang             $lang
  */
 
 $head = $content->heads()['tonight'];
@@ -36,11 +36,13 @@ $today = $program->today();
                 <div class="tonight__feature-body">
                     <div class="tonight__day" id="tonightDay"><?= Html::e($program->dayFullName($todayIdx)) ?></div>
                     <div class="tonight__feature-info">
-                        <span class="tonight__badge" id="tonightBadge">Сегодня вечером</span>
+                        <span class="tonight__badge" id="tonightBadge"
+                              data-today="<?= Html::e($lang->t('tonight.badgeToday')) ?>"
+                              data-week="<?= Html::e($lang->t('tonight.badgeWeek')) ?>"><?= Html::e($lang->t('tonight.badgeToday')) ?></span>
                         <h3 class="tonight__title" id="tonightTitle"><?= Html::e($today->title . ' · ' . $today->time) ?></h3>
                         <p class="tonight__note" id="tonightNote"><?= Html::e($today->note) ?></p>
                     </div>
-                    <a class="btn btn--primary" id="tonightCta" href="<?= Html::e($today->url) ?>" data-magnetic>Забронировать <span class="btn__ic"><?= Icons::get('arrow') ?></span></a>
+                    <a class="btn btn--primary" id="tonightCta" href="<?= Html::e($today->url) ?>" data-magnetic><?= Html::e($lang->t('tonight.book')) ?> <span class="btn__ic"><?= Icons::get('arrow') ?></span></a>
                 </div>
             </div>
         </div>
@@ -63,6 +65,6 @@ $today = $program->today();
             <?php endforeach; ?>
         </div>
 
-        <p class="tonight__free reveal">Вход на все события — свободный</p>
+        <p class="tonight__free reveal"><?= Html::e($lang->t('tonight.free')) ?></p>
     </div>
 </section>

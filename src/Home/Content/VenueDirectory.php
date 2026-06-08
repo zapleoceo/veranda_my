@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Home\Content;
 
+use App\Home\I18n\Lang;
+
 /**
- * Собирает «миры» комплекса. Зависит от Contacts (DIP) — все URL/телефоны
- * приходят из единого источника правды, здесь их не дублируем.
+ * Четыре «мира» комплекса. Структура (индексы, фото, URL, флаги) — здесь;
+ * тексты (label/title/lead/tags/alt/кнопки) — из словаря Lang по локали.
  */
 final class VenueDirectory
 {
-    public function __construct(private readonly Contacts $contacts)
-    {
+    public function __construct(
+        private readonly Lang $lang,
+        private readonly Contacts $contacts,
+    ) {
     }
 
     /**
@@ -19,85 +23,74 @@ final class VenueDirectory
      */
     public function worlds(): array
     {
+        $l = $this->lang;
         $c = $this->contacts;
 
         return [
-            // 01 — ресторан: галерея блюд + собственные конверсии (меню + бронь).
+            // 01 — ресторан: галерея блюд + меню/бронь.
             new Venue(
                 index: '01',
-                label: 'Ресторан',
-                titleHtml: 'Домашняя кухня <em>с европейским</em> акцентом',
-                lead: 'Завтраки в тени деревьев, борщ и солянка, авторские бургеры, '
-                    . 'паштеты и салаты, коктейли и свежее разливное пиво. Готовим то, '
-                    . 'по чему скучаешь дома, — и то, что попробовал в путешествии.',
-                tags: ['Завтраки', 'Домашняя кухня', 'Европейское', 'Коктейли', 'Свежее пиво'],
+                label: $l->t('world.restaurant.label'),
+                titleHtml: $l->t('world.restaurant.title'),
+                lead: $l->t('world.restaurant.lead'),
+                tags: $l->list('world.restaurant.tags'),
                 images: [
                     'food-cafe-01', 'food-cafe-07', 'food-cafe-02', 'food-cafe-04',
                     'food-cafe-08', 'food-cafe-03', 'food-cafe-05', 'food-cafe-06',
                 ],
-                imageAlt: 'Блюда кухни Veranda',
-                linkLabel: 'Открыть меню',
+                imageAlt: $l->t('world.restaurant.alt'),
+                linkLabel: $l->t('world.restaurant.link'),
                 linkUrl: $c->menu,
                 external: false,
                 reverse: false,
-                secondaryLabel: 'Забронировать',
+                secondaryLabel: $l->t('world.restaurant.book'),
                 secondaryUrl: $c->reserve,
             ),
 
-            // 02 — баня: партнёр на той же поляне. РОВНО ОДНА ссылка.
+            // 02 — баня (партнёр): одна ссылка.
             new Venue(
                 index: '02',
-                label: 'Баня «Сила Духа»',
-                titleHtml: 'Настоящая русская баня <em>на дровах</em>',
-                lead: 'Горячая парная на дровах, холодная купель, опытные пармастера, '
-                    . 'веники, чай с мёдом и квас. После — ужин на веранде, не вставая '
-                    . 'со стула.',
-                tags: ['Парная на дровах', 'Холодная купель', 'Пармастера', 'Чай с мёдом'],
+                label: $l->t('world.banya.label'),
+                titleHtml: $l->t('world.banya.title'),
+                lead: $l->t('world.banya.lead'),
+                tags: $l->list('world.banya.tags'),
                 images: ['banya'],
-                imageAlt: 'Русская баня на дровах — парная с веником',
-                linkLabel: 'Перейти на сайт бани',
+                imageAlt: $l->t('world.banya.alt'),
+                linkLabel: $l->t('world.banya.link'),
                 linkUrl: $c->banyaSite,
                 external: true,
                 reverse: true,
             ),
 
-            // 03 — GameZone: лазертаг + Archery Tag (без детской зоны — она отдельным
-            // миром ниже). РОВНО ОДНА ссылка.
+            // 03 — GameZone (лазертаг + Archery Tag): одна ссылка.
             new Venue(
                 index: '03',
-                label: 'GameZone',
-                titleHtml: 'Лазертаг и <em>Archery Tag</em>',
-                lead: 'Archery Tag — лучный бой, как пейнтбол, но безопасный: луки с '
-                    . 'мягкими наконечниками и инструктаж перед игрой. Плюс лазертаг и '
-                    . 'квесты. Командные игры для компании и корпоратива — единственные '
-                    . 'такие в Нячанге.',
-                tags: ['Archery Tag', 'Лазертаг', 'Квесты', 'BBQ-беседки', 'Корпоративы'],
+                label: $l->t('world.gamezone.label'),
+                titleHtml: $l->t('world.gamezone.title'),
+                lead: $l->t('world.gamezone.lead'),
+                tags: $l->list('world.gamezone.tags'),
                 images: ['gamezone'],
-                imageAlt: 'Archery Tag — лучный бой в GameZone',
-                linkLabel: 'Перейти на сайт GameZone',
+                imageAlt: $l->t('world.gamezone.alt'),
+                linkLabel: $l->t('world.gamezone.link'),
                 linkUrl: $c->gamezoneSite,
                 external: true,
                 reverse: false,
             ),
 
-            // 04 — детская локация (Ananas party): отдельный партнёр, сайта нет —
-            // ссылка на Instagram. РОВНО ОДНА ссылка.
+            // 04 — детская локация (Ananas, Instagram): видео на десктопе, фото на моб.
             new Venue(
                 index: '04',
-                label: 'Детская локация',
-                titleHtml: 'Игры, творчество и <em>детские праздники</em>',
-                lead: 'Детский клуб с аниматором: игры и мастер-классы, рисование, '
-                    . 'дискотеки со светомузыкой и сказкотерапия. Пока дети заняты делом '
-                    . '— родители отдыхают в ресторане или бане. Дни рождения и праздники '
-                    . 'под ключ: свой сценарий, шоу мыльных пузырей и квесты.',
-                tags: ['Аниматор', 'Мастер-классы', 'Дни рождения', 'Сказкотерапия', 'Дискотека'],
+                label: $l->t('world.kids.label'),
+                titleHtml: $l->t('world.kids.title'),
+                lead: $l->t('world.kids.lead'),
+                tags: $l->list('world.kids.tags'),
                 images: ['kids-1'],
-                imageAlt: 'Детское игровое пространство — игрушки, шары, фотозона',
-                video: 'kids-ananas',
-                linkLabel: 'Смотреть в Instagram',
+                imageAlt: $l->t('world.kids.alt'),
+                linkLabel: $l->t('world.kids.link'),
                 linkUrl: $c->kidsInstagram,
                 external: true,
                 reverse: true,
+                video: 'kids-ananas',
             ),
         ];
     }

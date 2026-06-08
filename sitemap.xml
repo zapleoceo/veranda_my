@@ -26,6 +26,38 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
 
+    <!-- ─── Главная /home (3 языка, path-URL — каждый язык свой <url>) ── -->
+    <url>
+        <loc>https://veranda.my/home/en/</loc>
+        <lastmod>2026-06-08</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>1.0</priority>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/home/en/"/>
+        <xhtml:link rel="alternate" hreflang="en"        href="https://veranda.my/home/en/"/>
+        <xhtml:link rel="alternate" hreflang="ru"        href="https://veranda.my/home/ru/"/>
+        <xhtml:link rel="alternate" hreflang="vi"        href="https://veranda.my/home/vi/"/>
+    </url>
+    <url>
+        <loc>https://veranda.my/home/ru/</loc>
+        <lastmod>2026-06-08</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>1.0</priority>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/home/en/"/>
+        <xhtml:link rel="alternate" hreflang="en"        href="https://veranda.my/home/en/"/>
+        <xhtml:link rel="alternate" hreflang="ru"        href="https://veranda.my/home/ru/"/>
+        <xhtml:link rel="alternate" hreflang="vi"        href="https://veranda.my/home/vi/"/>
+    </url>
+    <url>
+        <loc>https://veranda.my/home/vi/</loc>
+        <lastmod>2026-06-08</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>1.0</priority>
+        <xhtml:link rel="alternate" hreflang="x-default" href="https://veranda.my/home/en/"/>
+        <xhtml:link rel="alternate" hreflang="en"        href="https://veranda.my/home/en/"/>
+        <xhtml:link rel="alternate" hreflang="ru"        href="https://veranda.my/home/ru/"/>
+        <xhtml:link rel="alternate" hreflang="vi"        href="https://veranda.my/home/vi/"/>
+    </url>
+
     <!-- ─── IG bio landing (4 языка) ─────────────────────────── -->
     <url>
         <loc>https://veranda.my/links/</loc>

@@ -63,7 +63,7 @@
             if (titleEl) titleEl.textContent = d.title + ' · ' + d.time;
             if (noteEl) noteEl.textContent = d.note;
             if (ctaEl && d.url) ctaEl.href = d.url;
-            if (badgeEl) badgeEl.textContent = (Number(d.day) === today ? 'Сегодня вечером' : 'В афише');
+            if (badgeEl) badgeEl.textContent = (Number(d.day) === today ? badgeEl.dataset.today : badgeEl.dataset.week) || badgeEl.textContent;
             setBg(d.image);
         }
 
@@ -99,18 +99,7 @@
         });
     }
 
-    // ── 5. Переключатель языка (заглушка — пока живой только RU) ──
-    document.querySelectorAll('.hdr__lang button, [data-lang]').forEach(function (b) {
-        if (!b.hasAttribute('data-lang')) return;
-        b.addEventListener('click', function () {
-            var l = b.getAttribute('data-lang');
-            if (l && l !== 'ru') {
-                alert('Скоро: ' + l.toUpperCase() + '. Пока главная только на русском.');
-            }
-        });
-    });
-
-    // ── 6. Слайдер-галереи в «мирах» (crossfade + точки) ─────────
+    // ── 5. Слайдер-галереи в «мирах» (crossfade + точки) ─────────
     document.querySelectorAll('[data-gallery]').forEach(function (g) {
         var slides = g.querySelectorAll('.gallery__slide');
         var dots = g.querySelectorAll('.gallery__dot');
