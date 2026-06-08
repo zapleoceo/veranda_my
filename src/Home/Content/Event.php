@@ -17,6 +17,7 @@ final class Event
         public readonly string $note,
         public readonly string $image,
         public readonly string $url,
+        public readonly string $ctaLabel = '', // подпись кнопки; '' = глобальная «Забронировать»
     ) {
     }
 }

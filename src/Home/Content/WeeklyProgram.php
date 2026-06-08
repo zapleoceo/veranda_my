@@ -27,18 +27,24 @@ final class WeeklyProgram
         0 => 'gazebo-outside',
     ];
 
+    /** Дни с киносеансами — кнопка ведёт на афишу фильмов, а не на бронь. */
+    private const FILM_DAYS = [2, 4]; // Вт, Чт
+
     public function __construct(
         private readonly Lang $lang,
         private readonly int $today,
         string $reserveUrl,
+        string $filmUrl = '',
     ) {
         foreach (self::IMAGE as $day => $image) {
+            $isFilm = in_array($day, self::FILM_DAYS, true) && $filmUrl !== '';
             $this->byDay[$day] = new Event(
                 $lang->t("ev.d{$day}.title"),
                 $lang->t("ev.d{$day}.time"),
                 $lang->t("ev.d{$day}.note"),
                 $image,
-                $reserveUrl,
+                $isFilm ? $filmUrl : $reserveUrl,
+                $isFilm ? $lang->t('tonight.films') : '',
             );
         }
     }
