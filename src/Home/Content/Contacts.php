@@ -23,6 +23,7 @@ final class Contacts
         public readonly string $banyaPhoneDisplay = '+84 39 5959 140',
         // Каналы и соцсети
         public readonly string $telegram = 'https://t.me/gamezone_vietnam',
+        public readonly string $filmSchedule = 'https://t.me/gamezone_vietnam/1860', // афиша фильмов (пост в TG)
         public readonly string $telegramVeranda = 'https://t.me/Veranda_my',
         public readonly string $instagram = 'https://www.instagram.com/veranda.my/',
         public readonly string $kidsInstagram = 'https://www.instagram.com/prazdniki_hnatrang/',

@@ -68,7 +68,7 @@ body::after {
     font-family: var(--sans); font-size: 11px; font-weight: 600;
     letter-spacing: .22em; text-transform: uppercase; color: var(--ember-2);
     padding: 7px 14px; border: 1px solid var(--hair-2); border-radius: var(--r-pill);
-    background: rgba(231, 169, 72, .05);
+    background: rgba(184, 135, 70, .06);
 }
 .eyebrow::before {
     content: ""; width: 5px; height: 5px; border-radius: 50%;

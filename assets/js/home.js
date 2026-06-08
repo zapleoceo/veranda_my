@@ -62,7 +62,13 @@
             if (dayEl) dayEl.textContent = d.dayname;
             if (titleEl) titleEl.textContent = d.title + ' · ' + d.time;
             if (noteEl) noteEl.textContent = d.note;
-            if (ctaEl && d.url) ctaEl.href = d.url;
+            if (ctaEl) {
+                if (d.url) ctaEl.href = d.url;
+                var lbl = ctaEl.querySelector('.tonight__cta-label');
+                if (lbl && d.cta) lbl.textContent = d.cta;
+                if (/^https?:/.test(d.url || '')) { ctaEl.target = '_blank'; ctaEl.rel = 'noopener'; }
+                else { ctaEl.removeAttribute('target'); ctaEl.removeAttribute('rel'); }
+            }
             if (badgeEl) badgeEl.textContent = (Number(d.day) === today ? badgeEl.dataset.today : badgeEl.dataset.week) || badgeEl.textContent;
             setBg(d.image);
         }
