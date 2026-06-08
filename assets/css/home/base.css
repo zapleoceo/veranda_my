@@ -74,7 +74,7 @@ body::after {
     content: ""; width: 5px; height: 5px; border-radius: 50%;
     background: var(--red); box-shadow: 0 0 8px var(--glow-red);
 }
-.sec--paper .eyebrow { color: #9a6a1e; border-color: var(--paper-hair); background: rgba(219, 74, 47, .06); }
+.sec--paper .eyebrow { color: #9a6a1e; border-color: var(--paper-hair); background: rgba(184, 135, 70, .08); }
 
 /* Оверсайз-нумерал секции/мира (контурный — «editorial»). */
 .index {
@@ -102,8 +102,8 @@ body::after {
 }
 .btn__ic svg { width: 15px; height: 15px; }
 
-.btn--primary { background: var(--red); color: #fff; box-shadow: 0 16px 38px -14px var(--glow-red), var(--inset-hi); }
-.btn--primary .btn__ic { background: rgba(255, 255, 255, .18); }
+.btn--primary { background: var(--red); color: #1a130a; box-shadow: 0 16px 38px -14px var(--glow-red), var(--inset-hi); }
+.btn--primary .btn__ic { background: rgba(0, 0, 0, .16); }
 .btn--primary:hover { background: var(--red-2); box-shadow: 0 20px 48px -14px var(--glow-red), var(--inset-hi); }
 
 .btn--ghost { background: rgba(245, 236, 221, .04); color: var(--text); border: 1px solid var(--hair-2); padding: 10px 10px 10px 23px; }
