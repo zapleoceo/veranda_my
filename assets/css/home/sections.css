@@ -203,7 +203,7 @@
 .leaflet-container { background: var(--bg-2) !important; font-family: var(--sans) !important; }
 .leaflet-bar a { background: rgba(20, 16, 11, .85) !important; color: var(--text) !important; border-color: var(--hair) !important; }
 .leaflet-bar a:hover { background: var(--surface) !important; }
-.leaflet-control-attribution { background: rgba(20, 16, 11, .7) !important; color: var(--text-3) !important; }
+.leaflet-control-attribution { background: rgba(20, 16, 11, .45) !important; color: var(--text-3) !important; font-size: 9px !important; line-height: 1.4 !important; padding: 0 6px !important; opacity: .6; }
 .leaflet-control-attribution a { color: var(--ember-2) !important; }
 /* Кастомная метка — пульсирующая красная точка (без картинок). */
 .map-pin__dot, .map-pin__pulse { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--red); }

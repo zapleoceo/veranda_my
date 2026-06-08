@@ -162,6 +162,7 @@
         function init() {
             if (typeof L === 'undefined') return;
             var map = L.map(box, { zoomControl: false, scrollWheelZoom: false, attributionControl: true }).setView([lat, lng], 15);
+            map.attributionControl.setPrefix(false); // убрать «Leaflet 🇺🇦» (остаётся обязательная © OSM © CARTO)
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                 attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 19
             }).addTo(map);
