@@ -22,7 +22,7 @@ final class WeeklyProgram
     public function __construct(private readonly int $today, string $reserveUrl)
     {
         $this->byDay = [
-            1 => new Event('Мафия в беседке',    '19:00',         'Командная игра под гирляндами',  'gazebo-inside', $reserveUrl),
+            1 => new Event('Настольные игры',    'весь вечер',    'Бункер, Тайный Гитлер, Мафия, Uno — бесплатно. Приходите своей компанией.', 'gazebo-inside', $reserveUrl),
             2 => new Event('Кино под звёздами',  '18:00 · 20:00', 'Детский и взрослый сеансы',      'lanterns-city', $reserveUrl),
             3 => new Event('Live Music',         '19:00',         'Авторская и кавер-программа',     'hero-terrace',  $reserveUrl),
             4 => new Event('Кино под звёздами',  '18:00 · 20:00', 'Детский и взрослый сеансы',      'garden-path',   $reserveUrl),
