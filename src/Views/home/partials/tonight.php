@@ -30,7 +30,8 @@ $today = $program->today();
         <div class="tonight__feature frame reveal">
             <div class="frame__inner tonight__feature-in">
                 <div class="tonight__feature-bg" aria-hidden="true">
-                    <?= Html::img($today->image, '', '100vw', false, 'id="tonightBg"') ?>
+                    <?= Html::img($today->image, '', '100vw', false, 'class="is-active" data-bg') ?>
+                    <img data-bg alt="" aria-hidden="true">
                 </div>
                 <div class="tonight__feature-body">
                     <div class="tonight__day" id="tonightDay"><?= Html::e($program->dayFullName($todayIdx)) ?></div>

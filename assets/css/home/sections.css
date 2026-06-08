@@ -93,7 +93,8 @@
 .tonight__feature { margin-bottom: var(--s-6); }
 .tonight__feature-in { position: relative; min-height: 280px; display: flex; }
 .tonight__feature-bg { position: absolute; inset: 0; z-index: 0; }
-.tonight__feature-bg img { width: 100%; height: 100%; object-fit: cover; opacity: .4; transition: opacity .45s var(--ease-out); }
+.tonight__feature-bg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .55s var(--ease-out); }
+.tonight__feature-bg img.is-active { opacity: .4; }
 .tonight__feature-body {
     position: relative; z-index: 1; width: 100%;
     display: grid; grid-template-columns: 1fr; gap: var(--s-5); align-items: center;
