@@ -118,7 +118,7 @@ final class PageContent
 
     public function hours(): string
     {
-        return 'Открыто ежедневно с 10:00 до 23:00';
+        return 'Пн–Чт 10:00–22:00 · Пт–Вс 10:00–23:00';
     }
 
     public function directions(): string
