@@ -9,7 +9,7 @@ use App\Home\View\Html;
  * @var \App\Home\Content\Seo $seo
  */
 
-$v = '20260608h'; // cache-bust (живая карта локации)
+$v = '20260608i'; // cache-bust (надёжная загрузка карты + overflow-x clip)
 ?>
 <head>
 <meta charset="UTF-8">
