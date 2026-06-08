@@ -18,9 +18,9 @@ Evenings feature live music, open-air "cinema under the stars", board-game night
 
 ## Main pages
 
-- [Home — English](https://veranda.my/home/en/): the complex, weekly event schedule, the four worlds, location and map
-- [Home — Русский](https://veranda.my/home/ru/): главная страница комплекса
-- [Home — Tiếng Việt](https://veranda.my/home/vi/): trang chủ khu phức hợp
+- [Home — English](https://veranda.my/en/): the complex, weekly event schedule, the four worlds, location and map
+- [Home — Русский](https://veranda.my/ru/): главная страница комплекса
+- [Home — Tiếng Việt](https://veranda.my/vi/): trang chủ khu phức hợp
 - [Menu](https://veranda.my/links/menu): the food and drink menu
 - [Book a table](https://veranda.my/tr3/): table reservation
 - [All links](https://veranda.my/links/): link-in-bio page with contacts and socials

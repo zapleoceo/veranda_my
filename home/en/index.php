@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-// Языковой алиас /home/en/ — рендер главной на английском.
-// nginx отдаёт директорию через её index.php; .htaccess-rewrite — фолбэк для Apache.
-$_GET['lang'] = 'en';
-require __DIR__ . '/../index.php';
+// Легаси-путь /home/en/ → 301 на новый корневой /en/ (без /home).
+header('Location: /en/', true, 301);
+exit;

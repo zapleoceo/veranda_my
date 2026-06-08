@@ -2,6 +2,6 @@
 
 declare(strict_types=1);
 
-// Языковой алиас /home/ru/ — рендер главной на русском.
-$_GET['lang'] = 'ru';
-require __DIR__ . '/../index.php';
+// Легаси-путь /home/ru/ → 301 на новый корневой /ru/ (без /home).
+header('Location: /ru/', true, 301);
+exit;

@@ -2,6 +2,6 @@
 
 declare(strict_types=1);
 
-// Языковой алиас /home/vi/ — рендер главной на вьетнамском.
-$_GET['lang'] = 'vi';
-require __DIR__ . '/../index.php';
+// Легаси-путь /home/vi/ → 301 на новый корневой /vi/ (без /home).
+header('Location: /vi/', true, 301);
+exit;
