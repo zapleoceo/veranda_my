@@ -147,6 +147,14 @@
 .gallery__dot { width: 7px; height: 7px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .45); box-shadow: 0 1px 3px rgba(0, 0, 0, .4); cursor: pointer; transition: background .3s var(--ease-out), transform .3s var(--ease-out); }
 .gallery__dot.is-active { background: #fff; transform: scale(1.3); }
 
+/* Детский мир: на мобиле фото, на десктопе — зацикленное видео. */
+.kids-media .kids-video { width: 100%; height: 100%; object-fit: cover; display: none; }
+.kids-media .kids-photo { width: 100%; height: 100%; object-fit: cover; }
+@media (min-width: 860px) {
+    .kids-media .kids-video { display: block; }
+    .kids-media .kids-photo { display: none; }
+}
+
 /* ─── Атмосфера (светлая интерлюдия, asymmetric bento) ────────── */
 .bento__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
 .bento__cell .frame__inner { aspect-ratio: 3/4; }
