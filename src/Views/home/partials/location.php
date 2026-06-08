@@ -16,9 +16,9 @@ $head = $content->heads()['location'];
     <div class="wrap">
         <div class="location__grid">
             <div class="location__media frame reveal">
-                <div class="frame__inner">
-                    <?= Html::img('mountain-view', 'Вид на горы со столика Veranda', '(min-width: 860px) 50vw, 100vw') ?>
-                </div>
+                <div class="frame__inner location__map" id="locationMap"
+                     data-lat="<?= Html::e($contacts->mapLat) ?>" data-lng="<?= Html::e($contacts->mapLng) ?>"
+                     role="img" aria-label="Карта: где находится Veranda в Нячанге"></div>
             </div>
             <div class="reveal">
                 <span class="eyebrow"><?= Html::e($head['eyebrow']) ?></span>
@@ -27,7 +27,6 @@ $head = $content->heads()['location'];
                 <p class="location__coords"><?= Html::e($contacts->coords) ?> · гора Хон Чонг</p>
                 <ul class="facts">
                     <li><span class="facts__ico"><?= Icons::get('pin') ?></span><span class="facts__txt"><?= Html::e($content->directions()) ?></span></li>
-                    <li><span class="facts__ico"><?= Icons::get('phone') ?></span><span class="facts__txt"><a href="<?= Html::e($contacts->tel()) ?>"><?= Html::e($contacts->phoneDisplay) ?></a></span></li>
                     <li><span class="facts__ico"><?= Icons::get('clock') ?></span><span class="facts__txt"><?= Html::e($content->hours()) ?></span></li>
                 </ul>
                 <div class="location__cta">

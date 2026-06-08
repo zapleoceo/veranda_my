@@ -198,6 +198,19 @@
 .facts__txt a { color: var(--text); border-bottom: 1px solid var(--hair-2); }
 .location__cta { display: flex; gap: var(--s-3); flex-wrap: wrap; }
 
+/* Живая карта (Leaflet + тёмные тайлы CARTO). */
+.location__map { background: var(--bg-2); }
+.leaflet-container { background: var(--bg-2) !important; font-family: var(--sans) !important; }
+.leaflet-bar a { background: rgba(20, 16, 11, .85) !important; color: var(--text) !important; border-color: var(--hair) !important; }
+.leaflet-bar a:hover { background: var(--surface) !important; }
+.leaflet-control-attribution { background: rgba(20, 16, 11, .7) !important; color: var(--text-3) !important; }
+.leaflet-control-attribution a { color: var(--ember-2) !important; }
+/* Кастомная метка — пульсирующая красная точка (без картинок). */
+.map-pin__dot, .map-pin__pulse { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--red); }
+.map-pin__dot { box-shadow: 0 0 0 3px rgba(219, 74, 47, .3), 0 2px 8px rgba(0, 0, 0, .6); }
+.map-pin__pulse { opacity: .55; animation: mapPulse 2.2s var(--ease-out) infinite; }
+@keyframes mapPulse { from { transform: scale(1); opacity: .5; } to { transform: scale(3.6); opacity: 0; } }
+
 /* ─── Footer ─────────────────────────────────────────────────── */
 .ftr { background: #100c08; border-top: 1px solid var(--hair); padding: var(--s-9) 0 calc(var(--s-7) + 96px); }
 .ftr__top { display: grid; grid-template-columns: 1fr; gap: var(--s-7); padding-bottom: var(--s-7); border-bottom: 1px solid var(--hair); margin-bottom: var(--s-5); }

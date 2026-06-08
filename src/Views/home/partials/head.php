@@ -9,7 +9,7 @@ use App\Home\View\Html;
  * @var \App\Home\Content\Seo $seo
  */
 
-$v = '20260608g'; // cache-bust (кроссфейд фона афиши + футер)
+$v = '20260608h'; // cache-bust (живая карта локации)
 ?>
 <head>
 <meta charset="UTF-8">

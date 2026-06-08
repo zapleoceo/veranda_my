@@ -31,6 +31,8 @@ final class Contacts
         // Локация — рабочая короткая ссылка (взята из /links, не плейсхолдер)
         public readonly string $maps = 'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9',
         public readonly string $coords = '12.30° N · 109.21° E',
+        public readonly string $mapLat = '12.302584',
+        public readonly string $mapLng = '109.207279',
         // Конверсии
         public readonly string $reserve = '/tr3/',
         public readonly string $menu = '/links/menu',
