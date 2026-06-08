@@ -77,10 +77,13 @@ use Slim\Routing\RouteCollectorProxy;
 
 /** @var App $app */
 
-// Root: redirect based on auth state
+// Root: админ → /admin, гость → главная на языке браузера (/en/, /ru/, /vi/).
 $app->get('/', function ($req, $res) {
-    $location = !empty($_SESSION['user_email']) ? '/admin' : '/home/';
-    return $res->withHeader('Location', $location)->withStatus(302);
+    if (!empty($_SESSION['user_email'])) {
+        return $res->withHeader('Location', '/admin')->withStatus(302);
+    }
+    $lang = \App\Home\I18n\Locale::detect();
+    return $res->withHeader('Location', '/' . $lang . '/')->withStatus(302);
 });
 
 // Auth

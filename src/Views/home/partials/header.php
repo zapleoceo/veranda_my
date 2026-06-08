@@ -24,9 +24,9 @@ use App\Home\View\Icons;
         </nav>
         <div class="nav__right">
             <div class="nav__lang" role="group" aria-label="<?= Html::e($lang->t('nav.switcher')) ?>">
-                <a href="/home/en/"<?= $locale === 'en' ? ' class="is-active" aria-current="true"' : '' ?>>EN</a>
-                <a href="/home/ru/"<?= $locale === 'ru' ? ' class="is-active" aria-current="true"' : '' ?>>RU</a>
-                <a href="/home/vi/"<?= $locale === 'vi' ? ' class="is-active" aria-current="true"' : '' ?>>VI</a>
+                <a href="/en/"<?= $locale === 'en' ? ' class="is-active" aria-current="true"' : '' ?>>EN</a>
+                <a href="/ru/"<?= $locale === 'ru' ? ' class="is-active" aria-current="true"' : '' ?>>RU</a>
+                <a href="/vi/"<?= $locale === 'vi' ? ' class="is-active" aria-current="true"' : '' ?>>VI</a>
             </div>
             <a class="nav__ico" href="<?= Html::e($contacts->whatsApp()) ?>" target="_blank" rel="noopener" aria-label="WhatsApp"><?= Icons::get('wa') ?></a>
             <a class="nav__ico" href="<?= Html::e($contacts->telegram) ?>" target="_blank" rel="noopener" aria-label="Telegram"><?= Icons::get('tg') ?></a>

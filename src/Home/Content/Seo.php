@@ -23,7 +23,7 @@ final class Seo
 
     public function canonical(): string
     {
-        return $this->base . '/home/' . $this->locale . '/';
+        return $this->base . '/' . $this->locale . '/';
     }
 
     public function ogImage(): string
@@ -40,7 +40,7 @@ final class Seo
     {
         $out = [];
         foreach (Locale::SUPPORTED as $loc) {
-            $out[$loc] = $this->base . '/home/' . $loc . '/';
+            $out[$loc] = $this->base . '/' . $loc . '/';
         }
 
         return $out;
@@ -48,7 +48,7 @@ final class Seo
 
     public function xDefault(): string
     {
-        return $this->base . '/home/' . Locale::FALLBACK . '/';
+        return $this->base . '/' . Locale::FALLBACK . '/';
     }
 
     public function title(): string
@@ -88,7 +88,7 @@ final class Seo
         return [
             '@context' => 'https://schema.org',
             '@type' => 'Restaurant',
-            '@id' => $this->base . '/home/#restaurant',
+            '@id' => $this->base . '/#restaurant',
             'name' => 'Veranda Restaurant & Bar',
             'url' => $this->canonical(),
             'image' => $this->ogImage(),

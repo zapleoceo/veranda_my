@@ -2,7 +2,6 @@ DirectorySlash Off
 
 RewriteEngine On
 
-RewriteRule ^home/(en|ru|vi)/?$ home/index.php?lang=$1 [L,QSA]
 RewriteRule ^home/?$ home/index.php [L,QSA]
 RewriteRule ^links/?$ links/index.php [L,QSA]
 RewriteRule ^sepay/?$ sepay/index.php [L,QSA]
