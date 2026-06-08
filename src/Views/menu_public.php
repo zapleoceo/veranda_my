@@ -40,6 +40,7 @@ $telephone    = '+84396314266';
     <link rel="stylesheet" href="/assets/css/common.css?v=20260516_tokens2">
     <link rel="stylesheet" href="/assets/css/links_index.css?v=20260505_0001">
     <link rel="stylesheet" href="/assets/css/menu-beta.css?v=20260504_0040">
+    <?php $gaFile = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/analytics.php'; if ($gaFile !== '/analytics.php' && is_file($gaFile)) { include $gaFile; } ?>
 </head>
 <body class="menu-page">
 <main class="links-page menu-page">
