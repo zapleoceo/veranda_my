@@ -21,7 +21,8 @@ final class Venue
      * @param string[] $tags
      */
     public function __construct(
-        public readonly string $number,
+        public readonly string $index,
+        public readonly string $label,
         public readonly string $titleHtml,
         public readonly string $lead,
         public readonly array $tags,

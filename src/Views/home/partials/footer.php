@@ -11,7 +11,7 @@ use App\Home\View\Icons;
  */
 ?>
 <footer class="ftr">
-    <div class="container">
+    <div class="wrap">
         <div class="ftr__top">
             <div>
                 <div class="ftr__brand">VERANDA</div>
@@ -23,7 +23,7 @@ use App\Home\View\Icons;
                     <a href="<?= Html::e($contacts->tel()) ?>" aria-label="Позвонить"><?= Icons::get('phone') ?></a>
                 </div>
             </div>
-            <div>
+            <div class="ftr__col">
                 <h4>Veranda</h4>
                 <ul>
                     <li><a href="<?= Html::e($contacts->reserve) ?>">Бронь столика</a></li>
@@ -32,14 +32,14 @@ use App\Home\View\Icons;
                     <li><a href="/links/">Все ссылки</a></li>
                 </ul>
             </div>
-            <div>
+            <div class="ftr__col">
                 <h4>Партнёры</h4>
                 <ul>
                     <li><a href="<?= Html::e($contacts->banyaSite) ?>"    target="_blank" rel="noopener">Баня «Сила Духа»</a></li>
                     <li><a href="<?= Html::e($contacts->gamezoneSite) ?>" target="_blank" rel="noopener">GameZone</a></li>
                 </ul>
             </div>
-            <div>
+            <div class="ftr__col">
                 <h4>Контакты</h4>
                 <ul>
                     <li><a href="<?= Html::e($contacts->tel()) ?>"><?= Html::e($contacts->phoneDisplay) ?></a></li>

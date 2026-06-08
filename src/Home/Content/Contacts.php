@@ -28,6 +28,7 @@ final class Contacts
         public readonly string $facebook = 'https://www.facebook.com/vngamezone/',
         // Локация — рабочая короткая ссылка (взята из /links, не плейсхолдер)
         public readonly string $maps = 'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9',
+        public readonly string $coords = '12.30° N · 109.21° E',
         // Конверсии
         public readonly string $reserve = '/tr3/',
         public readonly string $menu = '/links/menu',

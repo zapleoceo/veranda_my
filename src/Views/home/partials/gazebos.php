@@ -12,17 +12,19 @@ use App\Home\View\Icons;
 
 $g = $content->gazebos();
 ?>
-<section class="gazebos">
-    <div class="container">
-        <div class="gazebos__split reveal">
-            <div class="gazebos__media">
-                <?= Html::img('gazebo-inside', 'Беседка с тканевыми занавесками внутри', '(min-width: 780px) 50vw, 100vw') ?>
+<section class="sec gazebos">
+    <div class="wrap">
+        <div class="gazebos__grid reveal">
+            <div class="gazebos__media frame">
+                <div class="frame__inner">
+                    <?= Html::img('gazebo-inside', 'Беседка с тканевыми занавесками внутри', '(min-width: 860px) 55vw, 100vw') ?>
+                </div>
             </div>
-            <div class="gazebos__text">
-                <span class="eyebrow eyebrow--soft">Приватно</span>
-                <h3><?= Html::e($g['title']) ?></h3>
-                <p><?= Html::e($g['lead']) ?></p>
-                <a class="btn btn--light" href="<?= Html::e($contacts->reserve) ?>">Забронировать беседку <?= Icons::get('arrow') ?></a>
+            <div class="gazebos__body">
+                <span class="eyebrow">Приватно</span>
+                <h2 class="h2"><?= Html::e($g['title']) ?></h2>
+                <p class="lead"><?= Html::e($g['lead']) ?></p>
+                <a class="btn btn--primary" href="<?= Html::e($contacts->reserve) ?>" data-magnetic>Забронировать беседку <span class="btn__ic"><?= Icons::get('arrow') ?></span></a>
             </div>
         </div>
     </div>
