@@ -26,7 +26,8 @@ final class Venue
         public readonly string $titleHtml,
         public readonly string $lead,
         public readonly array $tags,
-        public readonly string $image,
+        /** @var string[] базовые имена файлов (1 шт. = фото; >1 = слайдер-галерея) */
+        public readonly array $images,
         public readonly string $imageAlt,
         public readonly string $linkLabel,
         public readonly string $linkUrl,
@@ -40,5 +41,10 @@ final class Venue
     public function hasSecondary(): bool
     {
         return $this->secondaryLabel !== null && $this->secondaryUrl !== null;
+    }
+
+    public function isGallery(): bool
+    {
+        return count($this->images) > 1;
     }
 }

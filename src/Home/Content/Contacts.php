@@ -25,6 +25,7 @@ final class Contacts
         public readonly string $telegram = 'https://t.me/gamezone_vietnam',
         public readonly string $telegramVeranda = 'https://t.me/Veranda_my',
         public readonly string $instagram = 'https://www.instagram.com/veranda.my/',
+        public readonly string $kidsInstagram = 'https://www.instagram.com/prazdniki_hnatrang/',
         public readonly string $facebook = 'https://www.facebook.com/vngamezone/',
         // Локация — рабочая короткая ссылка (взята из /links, не плейсхолдер)
         public readonly string $maps = 'https://maps.app.goo.gl/wM9MMAGJjxUppDgR9',

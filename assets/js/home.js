@@ -73,4 +73,27 @@
             }
         });
     });
+
+    // ── 6. Слайдер-галереи в «мирах» (crossfade + точки) ─────────
+    document.querySelectorAll('[data-gallery]').forEach(function (g) {
+        var slides = g.querySelectorAll('.gallery__slide');
+        var dots = g.querySelectorAll('.gallery__dot');
+        if (slides.length < 2) return;
+
+        var i = 0, timer = null;
+        function show(n) {
+            n = (n + slides.length) % slides.length;
+            slides[i].classList.remove('is-active');
+            if (dots[i]) dots[i].classList.remove('is-active');
+            i = n;
+            slides[i].classList.add('is-active');
+            if (dots[i]) dots[i].classList.add('is-active');
+        }
+        function start() { if (reduce) return; stop(); timer = setInterval(function () { show(i + 1); }, 4200); }
+        function stop() { if (timer) { clearInterval(timer); timer = null; } }
+
+        dots.forEach(function (d, n) { d.addEventListener('click', function () { show(n); start(); }); });
+        if (fine) { g.addEventListener('pointerenter', stop); g.addEventListener('pointerleave', start); }
+        start();
+    });
 })();
