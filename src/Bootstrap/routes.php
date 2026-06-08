@@ -79,7 +79,7 @@ use Slim\Routing\RouteCollectorProxy;
 
 // Root: redirect based on auth state
 $app->get('/', function ($req, $res) {
-    $location = !empty($_SESSION['user_email']) ? '/admin' : '/links';
+    $location = !empty($_SESSION['user_email']) ? '/admin' : '/home/';
     return $res->withHeader('Location', $location)->withStatus(302);
 });
 
