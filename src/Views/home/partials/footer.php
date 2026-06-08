@@ -49,7 +49,7 @@ use App\Home\View\Icons;
             </div>
         </div>
         <div class="ftr__bottom">
-            © <?= date('Y') ?> Veranda · Бронирование через <a href="<?= Html::e($contacts->reserve) ?>">veranda.my/tr3</a>
+            © <?= date('Y') ?> Veranda
         </div>
     </div>
 </footer>

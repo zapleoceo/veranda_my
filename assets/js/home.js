@@ -21,7 +21,9 @@
     // ── 2. Афиша: клик по дню недели → меняет featured (текст+фон+ссылку) ──
     (function () {
         var today = new Date().getDay();
-        var bg = document.getElementById('tonightBg');
+        var bgs = document.querySelectorAll('.tonight__feature-bg [data-bg]');
+        var frontIdx = 0;
+        var wanted = null;
         var dayEl = document.getElementById('tonightDay');
         var titleEl = document.getElementById('tonightTitle');
         var noteEl = document.getElementById('tonightNote');
@@ -30,16 +32,24 @@
         var cards = document.querySelectorAll('.tonight__day-card');
         if (!cards.length) return;
 
+        // Кроссфейд между двумя слоями: новое фото грузится в задний слой и
+        // проявляется поверх старого. Никаких «скачков» и мелькания прошлого фото.
         function setBg(name) {
-            if (!bg || !name || bg.src.indexOf('/' + name + '-') > -1) return; // уже показан
-            var small = '/assets/img/home/' + name + '-700.webp';
+            if (!name || bgs.length < 2) return;
+            var front = bgs[frontIdx];
+            var cur = front.currentSrc || front.src || '';
+            wanted = name;
+            if (cur.indexOf('/' + name + '-') > -1) return; // уже показан
+            var back = bgs[1 - frontIdx];
             var large = '/assets/img/home/' + name + '-1400.webp';
-            bg.style.opacity = '0';
             var pre = new Image();
             pre.onload = pre.onerror = function () {
-                bg.src = small;
-                bg.srcset = small + ' 700w, ' + large + ' 1400w';
-                bg.style.opacity = '';
+                if (wanted !== name) return; // был более поздний клик — не перетираем
+                back.removeAttribute('srcset');
+                back.src = large;
+                back.classList.add('is-active');
+                front.classList.remove('is-active');
+                frontIdx = 1 - frontIdx;
             };
             pre.src = large;
         }
