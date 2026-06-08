@@ -1,0 +1,32 @@
+/* /home — дизайн-токены. Палитра реальной Veranda: дневная тропическая, тёплая. */
+:root {
+    --paper:    #f5efe4;   /* основной фон — бумага */
+    --paper-2:  #ede4d2;   /* чуть темнее для секций */
+    --paper-3:  #e0d3bb;
+    --ink:      #1f1810;   /* глубокий тёмный (текст) */
+    --ink-2:    #4a3d2c;
+    --ink-3:    #7a6a55;   /* приглушённый */
+    --line:     #d9cdb5;
+    --line-2:   rgba(31, 24, 16, .08);
+
+    --red:      #c2412c;   /* красный фонарей */
+    --red-2:    #a3331f;
+    --red-soft: #e89a8c;
+    --leaf:     #4a6b4a;   /* зелень */
+    --leaf-2:   #3a5536;
+    --gold:     #b88a3e;   /* охра/золото для акцентов */
+    --pink:     #d97595;   /* бугенвиллия — sparingly */
+    --sky:      #b8c8d4;
+
+    --r-sm: 6px;  --r-md: 12px;  --r-lg: 20px;  --r-pill: 999px;
+
+    --s-1: 4px;   --s-2: 8px;   --s-3: 12px;  --s-4: 16px;
+    --s-5: 24px;  --s-6: 32px;  --s-7: 48px;  --s-8: 72px;  --s-9: 96px;
+
+    --shadow-soft: 0 4px 16px rgba(31, 24, 16, .08);
+    --shadow-md:   0 12px 40px rgba(31, 24, 16, .12);
+    --shadow-deep: 0 24px 80px rgba(31, 24, 16, .18);
+
+    --serif: 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif;
+    --sans:  'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
