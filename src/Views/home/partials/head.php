@@ -9,7 +9,7 @@ use App\Home\View\Html;
  * @var \App\Home\Content\Seo $seo
  */
 
-$v = '20260608b'; // cache-bust статики (редизайн)
+$v = '20260608c'; // cache-bust статики (редизайн + фикс hero-слоёв)
 ?>
 <head>
 <meta charset="UTF-8">
