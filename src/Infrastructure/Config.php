@@ -83,7 +83,12 @@ class Config
         if ($env !== '') {
             return $env;
         }
-        $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+        // За Cloudflare/прокси $_SERVER['HTTPS'] не выставлен (SSL терминируется на edge,
+        // на origin идёт http) — учитываем прокси-заголовки, иначе og/JSON-LD уходят как http.
+        $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+            || (stripos((string)($_SERVER['HTTP_CF_VISITOR'] ?? ''), 'https') !== false)
+            || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
         $host  = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
         return ($https ? 'https' : 'http') . '://' . $host;
     }
