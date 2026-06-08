@@ -212,7 +212,8 @@
 @keyframes mapPulse { from { transform: scale(1); opacity: .5; } to { transform: scale(3.6); opacity: 0; } }
 
 /* ─── Footer ─────────────────────────────────────────────────── */
-.ftr { background: #100c08; border-top: 1px solid var(--hair); padding: var(--s-9) 0 calc(var(--s-7) + 96px); }
+.ftr { background: #100c08; border-top: 1px solid var(--hair); padding: var(--s-9) 0 var(--s-7); }
+@media (max-width: 760px) { .ftr { padding-bottom: calc(var(--s-7) + 78px); } } /* запас под липкую моб-кнопку */
 .ftr__top { display: grid; grid-template-columns: 1fr; gap: var(--s-7); padding-bottom: var(--s-7); border-bottom: 1px solid var(--hair); margin-bottom: var(--s-5); }
 @media (min-width: 600px) { .ftr__top { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 920px) { .ftr__top { grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--s-8); } }

@@ -8,7 +8,7 @@ declare(strict_types=1);
  * @var \App\Home\Content\Seo $seo
  */
 
-$v = '20260608j';
+$v = '20260608k';
 ?>
 <script type="application/ld+json"><?= json_encode($seo->jsonLd(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
 <script src="/assets/js/home.js?v=<?= $v ?>" defer></script>

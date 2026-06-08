@@ -15,7 +15,7 @@ use App\Home\View\Icons;
         <div class="ftr__top">
             <div>
                 <div class="ftr__brand">VERANDA</div>
-                <p class="ftr__tagline">Ресторан, баня и игры на одной поляне в горах Нячанга. Бронирование столика — через сайт.</p>
+                <p class="ftr__tagline">Ресторан, баня и игры на одной поляне в горах Нячанга.</p>
                 <div class="ftr__socials">
                     <a href="<?= Html::e($contacts->whatsApp()) ?>"  target="_blank" rel="noopener" aria-label="WhatsApp"><?= Icons::get('wa') ?></a>
                     <a href="<?= Html::e($contacts->telegram) ?>"   target="_blank" rel="noopener" aria-label="Telegram"><?= Icons::get('tg') ?></a>

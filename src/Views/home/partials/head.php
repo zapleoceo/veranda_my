@@ -9,7 +9,7 @@ use App\Home\View\Html;
  * @var \App\Home\Content\Seo $seo
  */
 
-$v = '20260608j'; // cache-bust (атрибуция карты — без флага, мельче)
+$v = '20260608k'; // cache-bust (футер-отступ + тексты)
 ?>
 <head>
 <meta charset="UTF-8">
