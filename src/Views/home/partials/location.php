@@ -32,7 +32,6 @@ $head = $content->heads()['location'];
                 </ul>
                 <div class="location__cta">
                     <a class="btn btn--primary" href="<?= Html::e($contacts->maps) ?>" target="_blank" rel="noopener" data-magnetic>Построить маршрут <span class="btn__ic"><?= Icons::get('arrow-ne') ?></span></a>
-                    <a class="btn btn--ghost" href="<?= Html::e($contacts->telegram) ?>" target="_blank" rel="noopener">Спросить дорогу <span class="btn__ic"><?= Icons::get('arrow-ne') ?></span></a>
                 </div>
             </div>
         </div>
