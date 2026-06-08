@@ -6,17 +6,19 @@ use App\Home\View\Html;
 use App\Home\View\Icons;
 
 /**
- * «Три мира на одной поляне». Editorial-split с оверсайз-нумералами и
+ * «Четыре мира на одной поляне». Editorial-split с оверсайз-нумералами и
  * double-bezel рамками; чередование сторон через --reverse. Цикл по $worlds (DRY).
  *
- * Баня и GameZone — ровно одна ссылка (требование); вторая кнопка только у
- * ресторана (меню + бронь — его собственные конверсии).
+ * Медиа: если у «мира» несколько фото — слайдер-галерея; иначе одно фото.
+ * У бани / GameZone / детской — ровно одна ссылка (требование); вторая кнопка
+ * только у ресторана (меню + бронь).
  *
  * @var \App\Home\Content\PageContent $content
  * @var \App\Home\Content\Venue[]     $worlds
  */
 
 $head = $content->heads()['worlds'];
+$sizes = '(min-width: 860px) 50vw, 100vw';
 ?>
 <section id="worlds" class="sec worlds">
     <div class="wrap">
@@ -29,9 +31,22 @@ $head = $content->heads()['worlds'];
         <?php foreach ($worlds as $w): ?>
         <article class="world reveal<?= $w->reverse ? ' world--reverse' : '' ?>">
             <div class="world__media frame">
-                <div class="frame__inner">
-                    <?= Html::img($w->image, $w->imageAlt, '(min-width: 860px) 50vw, 100vw') ?>
+                <?php if ($w->isGallery()): ?>
+                <div class="frame__inner gallery" data-gallery>
+                    <?php foreach ($w->images as $idx => $img): ?>
+                    <?= Html::img($img, $w->imageAlt, $sizes, false, 'class="gallery__slide' . ($idx === 0 ? ' is-active' : '') . '"') ?>
+                    <?php endforeach; ?>
+                    <div class="gallery__dots" aria-hidden="true">
+                        <?php foreach ($w->images as $idx => $img): ?>
+                        <button class="gallery__dot<?= $idx === 0 ? ' is-active' : '' ?>" type="button" aria-label="Фото <?= $idx + 1 ?>"></button>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
+                <?php else: ?>
+                <div class="frame__inner">
+                    <?= Html::img($w->images[0], $w->imageAlt, $sizes) ?>
+                </div>
+                <?php endif; ?>
             </div>
             <div class="world__body">
                 <div class="world__index index"><?= Html::e($w->index) ?></div>

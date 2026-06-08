@@ -139,6 +139,14 @@
 .chips li { font-size: 13px; padding: 7px 14px; border-radius: var(--r-pill); background: rgba(245, 236, 221, .04); border: 1px solid var(--hair); color: var(--text-2); }
 .world__cta { display: flex; gap: var(--s-3); flex-wrap: wrap; }
 
+/* Слайдер-галерея внутри double-bezel рамки «мира». */
+.gallery { position: relative; }
+.gallery .gallery__slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .9s var(--ease-out); }
+.gallery .gallery__slide.is-active { opacity: 1; }
+.gallery__dots { position: absolute; left: 0; right: 0; bottom: 16px; z-index: 2; display: flex; gap: 7px; justify-content: center; }
+.gallery__dot { width: 7px; height: 7px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .45); box-shadow: 0 1px 3px rgba(0, 0, 0, .4); cursor: pointer; transition: background .3s var(--ease-out), transform .3s var(--ease-out); }
+.gallery__dot.is-active { background: #fff; transform: scale(1.3); }
+
 /* ─── Атмосфера (светлая интерлюдия, asymmetric bento) ────────── */
 .bento__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
 .bento__cell .frame__inner { aspect-ratio: 3/4; }
