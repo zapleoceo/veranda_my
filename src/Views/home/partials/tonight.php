@@ -7,9 +7,8 @@ use App\Home\View\Icons;
 
 /**
  * Афиша. «Сегодня» рендерится на сервере (корректно без JS и для SEO);
- * каждая карточка дня несёт data-* с полными данными события, чтобы JS мог
- * пере-выбрать день на клиенте (на случай страницы, закешированной через
- * полночь) — без дублирования данных событий в JS.
+ * карточки дня несут data-* — JS пере-выбирает день на клиенте (страница могла
+ * закешироваться через полночь), без дублирования данных событий в JS.
  *
  * @var \App\Home\Content\PageContent   $content
  * @var \App\Home\Content\WeeklyProgram $program
@@ -21,26 +20,28 @@ $todayIdx = $program->todayIndex();
 $today = $program->today();
 $fullDay = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'][$todayIdx] ?? '';
 ?>
-<section id="tonight" class="tonight">
-    <div class="container">
-        <div class="section__head reveal">
+<section id="tonight" class="sec tonight">
+    <div class="wrap">
+        <div class="sec-head reveal">
             <span class="eyebrow"><?= Html::e($head['eyebrow']) ?></span>
-            <h2 class="h-section"><?= $head['titleHtml'] ?></h2>
+            <h2 class="h2"><?= $head['titleHtml'] ?></h2>
             <p class="lead"><?= Html::e($head['lead']) ?></p>
         </div>
 
-        <div class="tonight__hero reveal">
-            <div class="tonight__hero-bg" aria-hidden="true">
-                <?= Html::img('lanterns-city', '', '100vw') ?>
-            </div>
-            <div class="tonight__hero-inner">
-                <div class="tonight__day" id="tonightDay"><?= Html::e($fullDay) ?></div>
-                <div class="tonight__info">
-                    <span class="badge">Сегодня вечером</span>
-                    <h3 id="tonightTitle"><?= Html::e($today->title . ' · ' . $today->time) ?></h3>
-                    <p id="tonightNote"><?= Html::e($today->note) ?></p>
+        <div class="tonight__feature frame reveal">
+            <div class="frame__inner tonight__feature-in">
+                <div class="tonight__feature-bg" aria-hidden="true">
+                    <?= Html::img('lanterns-city', '', '100vw') ?>
                 </div>
-                <a class="btn btn--red" href="<?= Html::e($contacts->reserve) ?>">Забронировать <?= Icons::get('arrow') ?></a>
+                <div class="tonight__feature-body">
+                    <div class="tonight__day" id="tonightDay"><?= Html::e($fullDay) ?></div>
+                    <div class="tonight__feature-info">
+                        <span class="tonight__badge">Сегодня вечером</span>
+                        <h3 class="tonight__title" id="tonightTitle"><?= Html::e($today->title . ' · ' . $today->time) ?></h3>
+                        <p class="tonight__note" id="tonightNote"><?= Html::e($today->note) ?></p>
+                    </div>
+                    <a class="btn btn--primary" href="<?= Html::e($contacts->reserve) ?>" data-magnetic>Забронировать <span class="btn__ic"><?= Icons::get('arrow') ?></span></a>
+                </div>
             </div>
         </div>
 

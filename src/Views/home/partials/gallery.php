@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Home\View\Html;
 
 /**
- * Bento-галерея атмосферы: фото из контента + цитата гостя.
- * Раскладку плиток задаёт CSS (nth-child) — порядок фото берётся из PageContent.
+ * Атмосфера — светлая «paper»-интерлюдия (контрапункт тёмным секциям).
+ * Асимметричный bento: 2 крупных + 3 средних кадра + цитата на всю ширину.
  *
  * @var \App\Home\Content\PageContent $content
  */
@@ -14,21 +14,24 @@ use App\Home\View\Html;
 $head = $content->heads()['bento'];
 $photos = $content->gallery();
 $quote = $content->galleryQuote();
+$cells = ['a', 'b', 'c', 'd', 'e'];
 ?>
-<section class="bento">
-    <div class="container">
-        <div class="section__head reveal">
+<section class="sec sec--paper bento">
+    <div class="wrap">
+        <div class="sec-head reveal">
             <span class="eyebrow"><?= Html::e($head['eyebrow']) ?></span>
-            <h2 class="h-section"><?= $head['titleHtml'] ?></h2>
+            <h2 class="h2"><?= $head['titleHtml'] ?></h2>
         </div>
         <div class="bento__grid reveal">
-            <?php foreach ($photos as $p): ?>
-            <div class="bento__cell"><?= Html::img($p['name'], $p['alt'], '(min-width: 780px) 33vw, 50vw') ?></div>
+            <?php foreach ($photos as $i => $p): $cls = $cells[$i] ?? 'e'; ?>
+            <div class="bento__cell bento__cell--<?= $cls ?> frame">
+                <div class="frame__inner"><?= Html::img($p['name'], $p['alt'], '(min-width: 860px) 33vw, 50vw') ?></div>
+            </div>
             <?php endforeach; ?>
-            <div class="bento__quote">
+            <figure class="bento__quote">
                 <p><?= Html::e($quote['text']) ?></p>
                 <cite><?= Html::e($quote['cite']) ?></cite>
-            </div>
+            </figure>
         </div>
     </div>
 </section>

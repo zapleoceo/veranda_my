@@ -12,6 +12,6 @@ use App\Home\View\Icons;
  */
 ?>
 <div class="mob-cta">
-    <a class="mob-cta__primary"   href="<?= Html::e($contacts->reserve) ?>">Забронировать <?= Icons::get('arrow') ?></a>
-    <a class="mob-cta__secondary" href="<?= Html::e($contacts->menu) ?>">Меню</a>
+    <a class="btn btn--primary" href="<?= Html::e($contacts->reserve) ?>">Забронировать <span class="btn__ic"><?= Icons::get('arrow') ?></span></a>
+    <a class="btn btn--ghost" href="<?= Html::e($contacts->menu) ?>">Меню</a>
 </div>

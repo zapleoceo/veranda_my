@@ -12,26 +12,27 @@ use App\Home\View\Icons;
 
 $head = $content->heads()['location'];
 ?>
-<section class="location">
-    <div class="container">
-        <div class="location__inner">
-            <div class="location__media reveal">
-                <?= Html::img('mountain-view', 'Вид на горы со столика Veranda', '(min-width: 780px) 50vw, 100vw') ?>
+<section id="location" class="sec location">
+    <div class="wrap">
+        <div class="location__grid">
+            <div class="location__media frame reveal">
+                <div class="frame__inner">
+                    <?= Html::img('mountain-view', 'Вид на горы со столика Veranda', '(min-width: 860px) 50vw, 100vw') ?>
+                </div>
             </div>
             <div class="reveal">
                 <span class="eyebrow"><?= Html::e($head['eyebrow']) ?></span>
-                <h2 class="h-section"><?= $head['titleHtml'] ?></h2>
+                <h2 class="h2"><?= $head['titleHtml'] ?></h2>
                 <p class="lead"><?= Html::e($head['lead']) ?></p>
-                <div class="location__facts">
-                    <ul>
-                        <li><?= Icons::get('pin') ?> <span><?= Html::e($content->directions()) ?></span></li>
-                        <li><?= Icons::get('phone') ?> <span><a href="<?= Html::e($contacts->tel()) ?>"><?= Html::e($contacts->phoneDisplay) ?></a></span></li>
-                        <li><?= Icons::get('clock') ?> <span><?= Html::e($content->hours()) ?></span></li>
-                    </ul>
-                </div>
+                <p class="location__coords"><?= Html::e($contacts->coords) ?> · гора Хон Чонг</p>
+                <ul class="facts">
+                    <li><span class="facts__ico"><?= Icons::get('pin') ?></span><span class="facts__txt"><?= Html::e($content->directions()) ?></span></li>
+                    <li><span class="facts__ico"><?= Icons::get('phone') ?></span><span class="facts__txt"><a href="<?= Html::e($contacts->tel()) ?>"><?= Html::e($contacts->phoneDisplay) ?></a></span></li>
+                    <li><span class="facts__ico"><?= Icons::get('clock') ?></span><span class="facts__txt"><?= Html::e($content->hours()) ?></span></li>
+                </ul>
                 <div class="location__cta">
-                    <a class="btn btn--red" href="<?= Html::e($contacts->maps) ?>" target="_blank" rel="noopener">Построить маршрут <?= Icons::get('arrow') ?></a>
-                    <a class="btn btn--outline" href="<?= Html::e($contacts->telegram) ?>" target="_blank" rel="noopener">Спросить дорогу</a>
+                    <a class="btn btn--primary" href="<?= Html::e($contacts->maps) ?>" target="_blank" rel="noopener" data-magnetic>Построить маршрут <span class="btn__ic"><?= Icons::get('arrow-ne') ?></span></a>
+                    <a class="btn btn--ghost" href="<?= Html::e($contacts->telegram) ?>" target="_blank" rel="noopener">Спросить дорогу <span class="btn__ic"><?= Icons::get('arrow-ne') ?></span></a>
                 </div>
             </div>
         </div>

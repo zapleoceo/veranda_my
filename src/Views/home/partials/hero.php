@@ -14,16 +14,18 @@ use App\Home\View\Icons;
     <div class="hero__media" aria-hidden="true">
         <?= Html::img('hero-terrace', 'Терраса Veranda с красными фонарями и видом на горы Нячанга', '100vw', true) ?>
     </div>
-    <div class="hero__inner">
-        <div class="hero__eyebrow">
-            <b>Veranda Restaurant &amp; Bar</b><span></span><b>Nha Trang · Vietnam</b>
-        </div>
-        <h1><?= $content->heroTitleHtml() ?></h1>
-        <p class="hero__lead"><?= Html::e($content->heroLead()) ?></p>
+    <div class="hero__veil" aria-hidden="true"></div>
+
+    <div class="wrap hero__inner">
+        <span class="eyebrow">Nha Trang · Vietnam</span>
+        <h1 class="display hero__title"><?= $content->heroTitleHtml() ?></h1>
+        <p class="lead hero__lead"><?= Html::e($content->heroLead()) ?></p>
         <div class="hero__cta">
-            <a class="btn btn--red" href="<?= Html::e($contacts->reserve) ?>">Забронировать столик <?= Icons::get('arrow') ?></a>
-            <a class="btn btn--ghost-light" href="#tonight">Что сегодня вечером</a>
+            <a class="btn btn--primary" href="<?= Html::e($contacts->reserve) ?>" data-magnetic>Забронировать столик <span class="btn__ic"><?= Icons::get('arrow') ?></span></a>
+            <a class="btn btn--ghost" href="#worlds">Что внутри <span class="btn__ic"><?= Icons::get('chevron-down') ?></span></a>
         </div>
     </div>
+
+    <div class="hero__side" aria-hidden="true"><?= Html::e($contacts->coords) ?> · гора Хон Чонг</div>
     <div class="hero__scroll" aria-hidden="true"><span>Scroll</span></div>
 </section>
