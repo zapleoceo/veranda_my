@@ -9,7 +9,7 @@ use App\Home\View\Html;
  * @var \App\Home\Content\Seo $seo
  */
 
-$v = '20260608d'; // cache-bust (4 мира + галерея)
+$v = '20260608e'; // cache-bust (детское видео + текст + быстрее галерея)
 ?>
 <head>
 <meta charset="UTF-8">

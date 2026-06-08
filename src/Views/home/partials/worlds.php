@@ -31,7 +31,14 @@ $sizes = '(min-width: 860px) 50vw, 100vw';
         <?php foreach ($worlds as $w): ?>
         <article class="world reveal<?= $w->reverse ? ' world--reverse' : '' ?>">
             <div class="world__media frame">
-                <?php if ($w->isGallery()): ?>
+                <?php if ($w->hasVideo()): ?>
+                <div class="frame__inner kids-media">
+                    <video class="kids-video" muted loop playsinline preload="none" poster="/assets/img/home/<?= Html::e($w->images[0]) ?>-1400.webp" data-video>
+                        <source src="/assets/video/<?= Html::e($w->video) ?>.webm" type="video/webm">
+                    </video>
+                    <?= Html::img($w->images[0], $w->imageAlt, $sizes, false, 'class="kids-photo"') ?>
+                </div>
+                <?php elseif ($w->isGallery()): ?>
                 <div class="frame__inner gallery" data-gallery>
                     <?php foreach ($w->images as $idx => $img): ?>
                     <?= Html::img($img, $w->imageAlt, $sizes, false, 'class="gallery__slide' . ($idx === 0 ? ' is-active' : '') . '"') ?>

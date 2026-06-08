@@ -89,11 +89,24 @@
             slides[i].classList.add('is-active');
             if (dots[i]) dots[i].classList.add('is-active');
         }
-        function start() { if (reduce) return; stop(); timer = setInterval(function () { show(i + 1); }, 4200); }
+        function start() { if (reduce) return; stop(); timer = setInterval(function () { show(i + 1); }, 2800); }
         function stop() { if (timer) { clearInterval(timer); timer = null; } }
 
         dots.forEach(function (d, n) { d.addEventListener('click', function () { show(n); start(); }); });
         if (fine) { g.addEventListener('pointerenter', stop); g.addEventListener('pointerleave', start); }
         start();
     });
+
+    // ── 7. Видео детского мира: грузим и играем только в зоне видимости ──
+    //    (preload="none" + .play() по пересечению; на мобиле video display:none →
+    //     не пересекается → видео не грузится, остаётся фото).
+    if (!reduce && 'IntersectionObserver' in window) {
+        var vio = new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) {
+                if (e.isIntersecting) { e.target.play().catch(function () {}); }
+                else { e.target.pause(); }
+            });
+        }, { rootMargin: '200px 0px' });
+        document.querySelectorAll('video[data-video]').forEach(function (v) { vio.observe(v); });
+    }
 })();

@@ -35,6 +35,8 @@ final class Venue
         public readonly bool $reverse = false,
         public readonly ?string $secondaryLabel = null,
         public readonly ?string $secondaryUrl = null,
+        /** базовое имя .webm в /assets/video/ — на десктопе показывается вместо фото */
+        public readonly ?string $video = null,
     ) {
     }
 
@@ -46,5 +48,10 @@ final class Venue
     public function isGallery(): bool
     {
         return count($this->images) > 1;
+    }
+
+    public function hasVideo(): bool
+    {
+        return $this->video !== null;
     }
 }
