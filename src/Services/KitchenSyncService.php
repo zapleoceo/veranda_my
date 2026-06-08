@@ -34,17 +34,19 @@ class KitchenSyncService
         $date      = date('Y-m-d');
 
         $synced  = $this->_syncStats($date);
+        $reconciled = $this->_reconcileOpenStatus($date);
         $refreshed = $this->_refreshCloseMetadata($date);
         $prob    = $this->_computeProbCloseAt($date);
         $auto    = $this->_applyAutoExclude($date);
 
         $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
-        $this->_writeRunMeta($date, $durationMs, $synced, $refreshed, $prob, $auto);
+        $this->_writeRunMeta($date, $durationMs, $synced, $reconciled, $refreshed, $prob, $auto);
 
         Logger::get()->info('kitchen_sync.done', [
             'date'          => $date,
             'duration_ms'   => $durationMs,
             'stats_synced'  => $synced,
+            'open_reconciled' => $reconciled,
             'close_refreshed' => $refreshed,
             'prob_set'      => $prob['set'],
             'prob_cleared'  => $prob['cleared'],
@@ -152,6 +154,94 @@ class KitchenSyncService
                 $isHookah ? 1 : 0,
             ]);
         }
+    }
+
+    // ─── 1b. reconcile stale-open status ──────────────────────────────────────
+
+    /**
+     * Closes kitchen_stats rows still marked status=1 locally whose transaction
+     * Poster already reports as closed.
+     *
+     * Why this is needed: _syncStats refreshes a row's status only when
+     * getStatsForPeriod re-emits that exact (transaction, dish, item_seq) — and
+     * it only re-emits rows that still produce kitchen instances. A receipt that
+     * closes after its dishes drop out of re-emission (item_seq shift, a voided
+     * or re-fired dish, or a transient detail-fetch failure) keeps a stale
+     * status=1 row forever. Nothing else corrects it — _refreshCloseMetadata
+     * only touches status>1 rows. The orphan then inflates the "Открыто чеков"
+     * counter (COUNT DISTINCT transaction_id WHERE status=1) and can even fire a
+     * false overdue alert for a dish sitting on an already-closed check.
+     *
+     * Fix: pull the day's authoritative transaction list (lightweight — no
+     * products/history) and close any locally-open transaction Poster reports as
+     * closed. Writing status=2 + transaction_closed_at also lets the downstream
+     * auto-exclude rules retire those dishes correctly.
+     */
+    private function _reconcileOpenStatus(string $date): int
+    {
+        $ks = $this->db->t('kitchen_stats');
+
+        $rows = $this->db->query(
+            "SELECT DISTINCT transaction_id FROM {$ks}
+             WHERE transaction_date = ? AND status = 1",
+            [$date]
+        )->fetchAll();
+        if (empty($rows)) {
+            return 0; // mirror has no open checks today — nothing to reconcile
+        }
+        $localOpen = array_flip(array_map(
+            static fn($r) => (int) ($r['transaction_id'] ?? 0),
+            $rows
+        ));
+
+        // Authoritative status from Poster for this business day. Lightweight:
+        // omit include_products/include_history — we only need status + close ts.
+        $ymd      = str_replace('-', '', $date);
+        $closedAt = []; // tx_id => closed_at|null, only for tx Poster says are closed
+        $offset   = 0;
+        $limit    = 100;
+        try {
+            do {
+                $batch = (array) $this->poster->request('dash.getTransactions', [
+                    'dateFrom' => $ymd,
+                    'dateTo'   => $ymd,
+                    'status'   => 0,
+                    'limit'    => $limit,
+                    'offset'   => $offset,
+                ]);
+                foreach ($batch as $tx) {
+                    $txId = (int) ($tx['transaction_id'] ?? 0);
+                    if ($txId <= 0 || !isset($localOpen[$txId])) {
+                        continue;
+                    }
+                    if ((int) ($tx['status'] ?? 1) > 1) {
+                        $closedAt[$txId] = $this->_resolveClosedAt($tx);
+                    }
+                }
+                $count   = count($batch);
+                $offset += $limit;
+            } while ($count === $limit);
+        } catch (\Throwable $e) {
+            Logger::get()->warning('kitchen_sync.reconcile_failed', ['error' => $e->getMessage()]);
+            return 0;
+        }
+
+        $reconciled = 0;
+        foreach ($closedAt as $txId => $ts) {
+            try {
+                $n = $this->db->query(
+                    "UPDATE {$ks}
+                     SET status = 2,
+                         transaction_closed_at = COALESCE(transaction_closed_at, ?)
+                     WHERE transaction_id = ? AND transaction_date = ? AND status = 1",
+                    [$ts, $txId, $date]
+                )->rowCount();
+                if ($n > 0) {
+                    $reconciled++;
+                }
+            } catch (\Throwable) {}
+        }
+        return $reconciled;
     }
 
     // ─── 2. close metadata refresh ────────────────────────────────────────────
@@ -382,12 +472,14 @@ class KitchenSyncService
         string $date,
         int $durationMs,
         int $synced,
+        int $reconciled,
         int $refreshed,
         array $prob,
         array $auto
     ): void {
         $result = "duration_ms={$durationMs}; date={$date}; synced={$synced}; "
-            . "close_refreshed={$refreshed}; prob_set={$prob['set']}; prob_cleared={$prob['cleared']}; "
+            . "open_reconciled={$reconciled}; close_refreshed={$refreshed}; "
+            . "prob_set={$prob['set']}; prob_cleared={$prob['cleared']}; "
             . 'auto=' . array_sum($auto);
 
         $this->meta->setMany([
