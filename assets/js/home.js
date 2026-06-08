@@ -145,4 +145,42 @@
         }, { rootMargin: '200px 0px' });
         document.querySelectorAll('video[data-video]').forEach(function (v) { vio.observe(v); });
     }
+
+    // ── 8. Карта локации (Leaflet + CARTO dark) — ленивая загрузка ──
+    (function () {
+        var box = document.getElementById('locationMap');
+        if (!box || !('IntersectionObserver' in window)) return;
+        var lat = parseFloat(box.dataset.lat), lng = parseFloat(box.dataset.lng);
+        if (isNaN(lat) || isNaN(lng)) return;
+        var done = false;
+
+        function css(href) { var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l); }
+        function js(src, cb) { var s = document.createElement('script'); s.src = src; s.onload = cb; s.onerror = cb; document.head.appendChild(s); }
+
+        function init() {
+            if (typeof L === 'undefined') return;
+            var map = L.map(box, { zoomControl: false, scrollWheelZoom: false, attributionControl: true }).setView([lat, lng], 15);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 19
+            }).addTo(map);
+            var icon = L.divIcon({
+                className: 'map-pin',
+                html: '<span class="map-pin__pulse"></span><span class="map-pin__dot"></span>',
+                iconSize: [22, 22], iconAnchor: [11, 11]
+            });
+            L.marker([lat, lng], { icon: icon, keyboard: false }).addTo(map);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+            setTimeout(function () { map.invalidateSize(); }, 250);
+        }
+
+        var io = new IntersectionObserver(function (entries, ob) {
+            entries.forEach(function (e) {
+                if (!e.isIntersecting || done) return;
+                done = true; ob.disconnect();
+                css('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+                js('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', init);
+            });
+        }, { rootMargin: '300px' });
+        io.observe(box);
+    })();
 })();
