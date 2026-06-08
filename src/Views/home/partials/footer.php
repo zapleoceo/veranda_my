@@ -37,14 +37,14 @@ use App\Home\View\Icons;
                 <ul>
                     <li><a href="<?= Html::e($contacts->banyaSite) ?>"    target="_blank" rel="noopener">Баня «Сила Духа»</a></li>
                     <li><a href="<?= Html::e($contacts->gamezoneSite) ?>" target="_blank" rel="noopener">GameZone</a></li>
+                    <li><a href="<?= Html::e($contacts->kidsInstagram) ?>" target="_blank" rel="noopener">Ananas Party</a></li>
                 </ul>
             </div>
             <div class="ftr__col">
                 <h4>Контакты</h4>
                 <ul>
                     <li><a href="<?= Html::e($contacts->tel()) ?>"><?= Html::e($contacts->phoneDisplay) ?></a></li>
-                    <li><a href="<?= Html::e($contacts->whatsApp()) ?>" target="_blank" rel="noopener">WhatsApp</a></li>
-                    <li>Nha Trang, Việt Nam</li>
+                    <li><a href="<?= Html::e($contacts->director) ?>" target="_blank" rel="noopener">Написать управляющему</a></li>
                 </ul>
             </div>
         </div>
