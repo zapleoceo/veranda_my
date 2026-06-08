@@ -18,22 +18,48 @@
         window.addEventListener('scroll', onScroll, { passive: true });
     }
 
-    // ── 2. Афиша: пере-выбор «сегодня» на клиенте ────────────────
-    var dayNames = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
-    var today = new Date().getDay();
-    var card = document.querySelector('.tonight__day-card[data-day="' + today + '"]');
-    var dayEl = document.getElementById('tonightDay');
-    var titleEl = document.getElementById('tonightTitle');
-    var noteEl = document.getElementById('tonightNote');
+    // ── 2. Афиша: клик по дню недели → меняет featured (текст+фон+ссылку) ──
+    (function () {
+        var today = new Date().getDay();
+        var bg = document.getElementById('tonightBg');
+        var dayEl = document.getElementById('tonightDay');
+        var titleEl = document.getElementById('tonightTitle');
+        var noteEl = document.getElementById('tonightNote');
+        var ctaEl = document.getElementById('tonightCta');
+        var badgeEl = document.getElementById('tonightBadge');
+        var cards = document.querySelectorAll('.tonight__day-card');
+        if (!cards.length) return;
 
-    if (card && dayEl && titleEl && noteEl) {
-        dayEl.textContent = dayNames[today];
-        titleEl.textContent = card.dataset.title + ' · ' + card.dataset.time;
-        noteEl.textContent = card.dataset.note;
-    }
-    document.querySelectorAll('.tonight__day-card').forEach(function (el) {
-        el.classList.toggle('is-today', Number(el.getAttribute('data-day')) === today);
-    });
+        function setBg(name) {
+            if (!bg || !name || bg.src.indexOf('/' + name + '-') > -1) return; // уже показан
+            var small = '/assets/img/home/' + name + '-700.webp';
+            var large = '/assets/img/home/' + name + '-1400.webp';
+            bg.style.opacity = '0';
+            var pre = new Image();
+            pre.onload = pre.onerror = function () {
+                bg.src = small;
+                bg.srcset = small + ' 700w, ' + large + ' 1400w';
+                bg.style.opacity = '';
+            };
+            pre.src = large;
+        }
+
+        function select(card) {
+            if (!card) return;
+            var d = card.dataset;
+            cards.forEach(function (c) { c.classList.remove('is-active'); });
+            card.classList.add('is-active');
+            if (dayEl) dayEl.textContent = d.dayname;
+            if (titleEl) titleEl.textContent = d.title + ' · ' + d.time;
+            if (noteEl) noteEl.textContent = d.note;
+            if (ctaEl && d.url) ctaEl.href = d.url;
+            if (badgeEl) badgeEl.textContent = (Number(d.day) === today ? 'Сегодня вечером' : 'В афише');
+            setBg(d.image);
+        }
+
+        cards.forEach(function (c) { c.addEventListener('click', function () { select(c); }); });
+        select(document.querySelector('.tonight__day-card[data-day="' + today + '"]') || cards[0]);
+    })();
 
     // ── 3. Reveal при скролле (fade-up + blur, стаггер в CSS) ─────
     if ('IntersectionObserver' in window && !reduce) {

@@ -29,7 +29,7 @@ final class HomeController
 
         $contacts = new Contacts();
         $content = new PageContent();
-        $program = new WeeklyProgram((int) date('w')); // 0=Вс..6=Сб (время заведения)
+        $program = new WeeklyProgram((int) date('w'), $contacts->reserve); // 0=Вс..6=Сб (время заведения)
         $directory = new VenueDirectory($contacts);
 
         $seo = new Seo(
