@@ -11,7 +11,7 @@ body {
     font: 400 17px/1.65 var(--sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    overflow-x: hidden;
+    overflow-x: clip; /* clip, не hidden — иначе body становится скролл-контейнером и ломает IntersectionObserver (reveal/карта) */
 }
 img { display: block; max-width: 100%; height: auto; }
 a { color: inherit; text-decoration: none; }

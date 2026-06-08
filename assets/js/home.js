@@ -146,13 +146,15 @@
         document.querySelectorAll('video[data-video]').forEach(function (v) { vio.observe(v); });
     }
 
-    // ── 8. Карта локации (Leaflet + CARTO dark) — ленивая загрузка ──
+    // ── 8. Карта локации (Leaflet + CARTO dark) — грузим у границы экрана ──
+    //    Триггер и по scroll, и по IntersectionObserver, + начальная проверка —
+    //    надёжно при любых настройках скролл-контейнера. Грузим один раз.
     (function () {
         var box = document.getElementById('locationMap');
-        if (!box || !('IntersectionObserver' in window)) return;
+        if (!box) return;
         var lat = parseFloat(box.dataset.lat), lng = parseFloat(box.dataset.lng);
         if (isNaN(lat) || isNaN(lng)) return;
-        var done = false;
+        var done = false, io = null;
 
         function css(href) { var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l); }
         function js(src, cb) { var s = document.createElement('script'); s.src = src; s.onload = cb; s.onerror = cb; document.head.appendChild(s); }
@@ -173,14 +175,24 @@
             setTimeout(function () { map.invalidateSize(); }, 250);
         }
 
-        var io = new IntersectionObserver(function (entries, ob) {
-            entries.forEach(function (e) {
-                if (!e.isIntersecting || done) return;
-                done = true; ob.disconnect();
-                css('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
-                js('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', init);
-            });
-        }, { rootMargin: '300px' });
-        io.observe(box);
+        function trigger() {
+            if (done) return;
+            var r = box.getBoundingClientRect();
+            if (r.top > (window.innerHeight || 800) + 500 || r.bottom < -500) return; // ещё далеко
+            done = true;
+            window.removeEventListener('scroll', trigger);
+            if (io) io.disconnect();
+            css('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+            js('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', init);
+        }
+
+        if ('IntersectionObserver' in window) {
+            io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (e) { if (e.isIntersecting) trigger(); });
+            }, { rootMargin: '500px' });
+            io.observe(box);
+        }
+        window.addEventListener('scroll', trigger, { passive: true });
+        trigger();
     })();
 })();
