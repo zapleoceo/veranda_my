@@ -177,6 +177,25 @@ class TelegramAlertService
             [$today, $cutoff]
         );
 
+        // «В тайминге» — накопительный дневной счётчик: блюда, ОТДАННЫЕ сегодня
+        // (есть и ticket_sent_at, и ready_pressed_at), чьё время готовки
+        // уложилось в лимит. Это не снимок очереди, а итог за день — поэтому
+        // БЕЗ фильтра status=1: готовые блюда к вечеру почти все на уже
+        // закрытых чеках. Порог — текущий $waitLimit (тот же, что в строке
+        // «Лимит времени»); при смене нагрузки днём классификация сдвигается.
+        // ready_pressed_at >= ticket_sent_at — страховка от битых дельт.
+        [$onTimeBar, $onTimeKitchen] = $this->_countByStation(
+            "SELECT station, COUNT(*) as cnt FROM {$ks}
+             WHERE transaction_date = ?
+               AND ticket_sent_at IS NOT NULL AND ready_pressed_at IS NOT NULL
+               AND ready_pressed_at >= ticket_sent_at
+               AND COALESCE(was_deleted, 0) = 0 {$excludeSql}
+               AND NOT (COALESCE(dish_category_id, 0) = 47 OR COALESCE(dish_sub_category_id, 0) = 47)
+               AND TIMESTAMPDIFF(MINUTE, ticket_sent_at, ready_pressed_at) <= ?
+             GROUP BY station",
+            [$today, $waitLimit]
+        );
+
         $m = new \stdClass();
         $m->openChecksDisplay  = $openChecksDisplay;
         $m->waitLimitMinutes   = $waitLimit;
@@ -184,12 +203,8 @@ class TelegramAlertService
         $m->queueKitchen       = $queueKitchen;
         $m->overdueBar         = $overdueBar;
         $m->overdueKitchen     = $overdueKitchen;
-        // «В тайминге» — неготовые блюда, ещё НЕ просроченные (очередь минус
-        // долгие). overdue — строгое подмножество queue (тот же baseWhere +
-        // ticket_sent_at < cutoff), поэтому разница всегда >= 0; max(0,…)
-        // только страховка от микро-гонки между двумя SELECT'ами.
-        $m->timingBar          = max(0, $queueBar - $overdueBar);
-        $m->timingKitchen      = max(0, $queueKitchen - $overdueKitchen);
+        $m->onTimeBar          = $onTimeBar;
+        $m->onTimeKitchen      = $onTimeKitchen;
         return $m;
     }
 
@@ -259,7 +274,7 @@ class TelegramAlertService
                 . "Долгих блюд: 🍸{$m->overdueBar} / 🍔{$m->overdueKitchen}\n"
                 . "Время обновления: {$lastSync}\n"
                 . "Игноры: {$ignores['items']}|{$ignores['tx']} ⚙️ {$autoClosed}\n"
-                . "В тайминге: 🍸{$m->timingBar} / 🍔{$m->timingKitchen}"
+                . "В тайминге: 🍸{$m->onTimeBar} / 🍔{$m->onTimeKitchen}"
                 . ($srvTag !== '' ? "\nSrv: {$srvTag}" : '');
 
             $prevId   = (int) $this->meta->get('telegram_status_msg_id', '0');
