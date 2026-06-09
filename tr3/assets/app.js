@@ -1860,7 +1860,7 @@
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ table_num: tableNum, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, source_page: sourcePage }),
+          body: JSON.stringify({ table_num: tableLabel, poster_table_id: posterTableId, spot_id: spotId, hall_id: hallId, guests, start, name, phone, comment, preorder, preorder_ru: preorderRu, total_amount: totalAmount, lang: UI_LANG, res_date: resDt, source_page: sourcePage }),
         });
         const j = await res.json().catch(() => null);
         if (!res.ok || !j || !j.ok) throw new Error((j && j.error) ? j.error : t('err_generic'));
