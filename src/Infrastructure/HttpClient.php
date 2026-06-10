@@ -52,6 +52,17 @@ class HttpClient
         return $this->_exec($ch);
     }
 
+    /** GET with custom headers (e.g. User-Agent for Nominatim, Bearer auth) */
+    public function getJsonWithHeaders(string $url, array $params, array $headers): array|null
+    {
+        if ($params) {
+            $url .= '?' . http_build_query($params);
+        }
+        $ch = $this->_init($url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        return $this->_exec($ch);
+    }
+
     /** POST multipart/form-data (for file uploads) */
     public function postMultipart(string $url, array $fields): array|null
     {
