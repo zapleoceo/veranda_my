@@ -45,6 +45,9 @@ use App\Order\Http\Actions\OpenChecksAction        as NewOrderOpenChecksAction;
 use App\Order\Http\Actions\OrderCreateAction       as NewOrderCreateAction;
 use App\Order\Http\Actions\OrderAppendAction       as NewOrderAppendAction;
 use App\Order\Http\Middleware\CsrfMiddleware       as NewOrderCsrfMiddleware;
+use App\OnlineOrder\Http\OnlineOrderController;
+use App\OnlineOrder\Http\Actions\QuoteAction        as OnlineOrderQuoteAction;
+use App\OnlineOrder\Http\Actions\OrderCreateAction  as OnlineOrderCreateAction;
 use App\PosterApp\Http\PosterAppController;
 use App\PosterApp\Http\Actions\WidgetLoginAction      as PosterAppLoginAction;
 use App\PosterApp\Http\Actions\WidgetShiftStartAction as PosterAppShiftStartAction;
@@ -279,6 +282,22 @@ $app->group('/neworder', function (RouteCollectorProxy $g) {
     });
 });
 $app->get('/neworder/assets/{file:.+}', [StaticController::class, 'neworderAssets']);
+
+// /onlineorder — PUBLIC customer-facing delivery checkout (no auth by
+// design: customers order food). Reads are open; both mutations go
+// through the same CSRF + origin guard as /neworder, plus a session
+// submit-throttle and honeypot inside OrderCreateAction. The menu
+// endpoint reuses the /neworder MenuAction — identical live Poster
+// snapshot, one implementation (DRY).
+$app->group('/onlineorder', function (RouteCollectorProxy $g) {
+    $g->get('[/]', [OnlineOrderController::class, 'index']);
+    $g->group('/api', function (RouteCollectorProxy $api) {
+        $api->get('/menu',    NewOrderMenuAction::class);
+        $api->post('/quote',  OnlineOrderQuoteAction::class)->add(NewOrderCsrfMiddleware::class);
+        $api->post('/orders', OnlineOrderCreateAction::class)->add(NewOrderCsrfMiddleware::class);
+    });
+});
+$app->get('/onlineorder/assets/{file:.+}', [StaticController::class, 'onlineorderAssets']);
 
 // /poster-app — JS widget Poster loads inside the POS iframe.
 // GET renders the page; POSTs accept events from the widget. Each

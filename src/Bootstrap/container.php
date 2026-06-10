@@ -352,6 +352,100 @@ return [
     \App\Order\Http\Middleware\CsrfMiddleware::class           => fn()  =>
         new \App\Order\Http\Middleware\CsrfMiddleware(),
 
+    // ─── /onlineorder — public customer delivery checkout ───────
+    // Same SOLID layering as /neworder, delivery-specific concerns
+    // behind interfaces: geocoding (Google ↔ Nominatim), delivery
+    // quoting (Grab live ↔ Maxim ↔ keyless distance tariff ↔ none),
+    // courier dispatch, payment QR, Telegram alerts. These closures
+    // ARE the provider factories — OnlineOrderConfig decides which
+    // implementation backs each interface, swap via .env, zero code.
+    \App\OnlineOrder\Infrastructure\OnlineOrderConfig::class => fn() =>
+        new \App\OnlineOrder\Infrastructure\OnlineOrderConfig(),
+
+    \App\OnlineOrder\Contracts\GeocoderInterface::class => function ($c) {
+        $cfg = $c->get(\App\OnlineOrder\Infrastructure\OnlineOrderConfig::class);
+        // Google needs a server-usable key; Nominatim is the keyless
+        // fallback that works the day the page ships.
+        if ($cfg->geocoderName() === 'google' && $cfg->googleServerKey() !== '') {
+            return new \App\OnlineOrder\Services\GoogleGeocoder($c->get(HttpClient::class), $cfg->googleServerKey());
+        }
+        return new \App\OnlineOrder\Services\NominatimGeocoder($c->get(HttpClient::class));
+    },
+
+    // Concrete ride-hailing providers (each implements quote + dispatch).
+    \App\OnlineOrder\Services\GrabDeliveryProvider::class => fn($c) =>
+        new \App\OnlineOrder\Services\GrabDeliveryProvider(
+            $c->get(\App\OnlineOrder\Infrastructure\OnlineOrderConfig::class),
+            $c->get(HttpClient::class),
+        ),
+    \App\OnlineOrder\Services\MaximDeliveryProvider::class => fn($c) =>
+        new \App\OnlineOrder\Services\MaximDeliveryProvider(
+            $c->get(\App\OnlineOrder\Infrastructure\OnlineOrderConfig::class),
+            $c->get(HttpClient::class),
+        ),
+
+    \App\OnlineOrder\Contracts\DeliveryQuoteProviderInterface::class => function ($c) {
+        $cfg = $c->get(\App\OnlineOrder\Infrastructure\OnlineOrderConfig::class);
+        return match ($cfg->deliveryMode()) {
+            'live'     => $cfg->deliveryProviderName() === 'maxim'
+                ? $c->get(\App\OnlineOrder\Services\MaximDeliveryProvider::class)
+                : $c->get(\App\OnlineOrder\Services\GrabDeliveryProvider::class),
+            'distance' => new \App\OnlineOrder\Services\DistanceTariffProvider($cfg),
+            default    => new \App\OnlineOrder\Services\NullDeliveryProvider($cfg->deliveryProviderName()),
+        };
+    },
+
+    \App\OnlineOrder\Services\DeliveryQuoteService::class => fn($c) =>
+        new \App\OnlineOrder\Services\DeliveryQuoteService(
+            $c->get(\App\OnlineOrder\Infrastructure\OnlineOrderConfig::class),
+            $c->get(\App\OnlineOrder\Contracts\GeocoderInterface::class),
+            $c->get(\App\OnlineOrder\Contracts\DeliveryQuoteProviderInterface::class),
+        ),
+
+    \App\OnlineOrder\Contracts\IncomingOrderServiceInterface::class => fn($c) =>
+        new \App\OnlineOrder\Services\IncomingOrderService(
+            $c->get(PosterApiProviderInterface::class),
+            $c->get(\App\OnlineOrder\Infrastructure\OnlineOrderConfig::class),
+        ),
+    \App\OnlineOrder\Contracts\PaymentQrProviderInterface::class => fn($c) =>
+        new \App\OnlineOrder\Services\VietQrPaymentProvider(
+            $c->get(\App\OnlineOrder\Infrastructure\OnlineOrderConfig::class),
+        ),
+    \App\OnlineOrder\Contracts\OrderNotifierInterface::class => fn() =>
+        new \App\OnlineOrder\Services\TelegramOrderNotifier(),
+
+    \App\OnlineOrder\Http\OnlineOrderController::class => fn($c) =>
+        new \App\OnlineOrder\Http\OnlineOrderController(
+            $c->get(\App\OnlineOrder\Infrastructure\OnlineOrderConfig::class),
+        ),
+    \App\OnlineOrder\Http\Actions\QuoteAction::class => fn($c) =>
+        new \App\OnlineOrder\Http\Actions\QuoteAction(
+            $c->get(\App\OnlineOrder\Services\DeliveryQuoteService::class),
+        ),
+    \App\OnlineOrder\Http\Actions\OrderCreateAction::class => function ($c) {
+        $cfg = $c->get(\App\OnlineOrder\Infrastructure\OnlineOrderConfig::class);
+        // Courier auto-dispatch only exists when a real provider is
+        // live — the same object that quoted (Grab/Maxim implement
+        // both interfaces); null otherwise.
+        $dispatch = null;
+        if ($cfg->hasTaxiDispatch()) {
+            $provider = $c->get(\App\OnlineOrder\Contracts\DeliveryQuoteProviderInterface::class);
+            if ($provider instanceof \App\OnlineOrder\Contracts\TaxiDispatchInterface) {
+                $dispatch = $provider;
+            }
+        }
+        return new \App\OnlineOrder\Http\Actions\OrderCreateAction(
+            $c->get(\App\Order\Contracts\PosterMenuProviderInterface::class),
+            $c->get(\App\OnlineOrder\Services\DeliveryQuoteService::class),
+            $c->get(\App\OnlineOrder\Contracts\IncomingOrderServiceInterface::class),
+            $c->get(\App\OnlineOrder\Contracts\PaymentQrProviderInterface::class),
+            $c->get(\App\OnlineOrder\Contracts\OrderNotifierInterface::class),
+            new \App\OnlineOrder\Infrastructure\SubmitThrottle(),
+            $cfg,
+            $dispatch,
+        );
+    },
+
     // ─── /poster-app — POS iframe widget for PIN-learning + shift tracking ───
     // All Domain/Contracts/Repositories/Services/Actions live under
     // src/PosterApp/ — separate namespace, separate tables, isolated
