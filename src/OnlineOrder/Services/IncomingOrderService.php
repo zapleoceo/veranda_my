@@ -54,7 +54,11 @@ final class IncomingOrderService implements IncomingOrderServiceInterface
 
         $params = [
             'spot_id'      => $this->config->spotId(),
-            'phone'        => $customer->phone,
+            // Poster rejects E.164 "+84..." with error 155 «invalid
+            // field: Client phone» (verified live) — it wants bare
+            // digits and stores "84...". The "+" stays everywhere else
+            // (Telegram alert, Grab dispatch need E.164).
+            'phone'        => ltrim($customer->phone, '+'),
             'first_name'   => $customer->firstName(),
             'service_mode' => 3, // delivery
             'address'      => $address->fullText(),
