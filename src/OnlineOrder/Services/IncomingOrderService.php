@@ -59,20 +59,24 @@ final class IncomingOrderService implements IncomingOrderServiceInterface
             // digits and stores "84...". The "+" stays everywhere else
             // (Telegram alert, Grab dispatch need E.164).
             'phone'        => ltrim($customer->phone, '+'),
-            'first_name'   => $customer->firstName(),
+            'first_name'   => self::posterSafe($customer->firstName()),
             'service_mode' => 3, // delivery
-            'address'      => $address->fullText(),
+            'address'      => self::posterSafe($address->fullText()),
             'products'     => array_map(fn(CartLine $l) => $this->lineToProduct($l), $lines),
-            'comment'      => $this->buildComment($comment, $lines, $lineLabels, $quote),
+            'comment'      => self::posterSafe($this->buildComment($comment, $lines, $lineLabels, $quote)),
         ];
-        if ($customer->lastName() !== '') $params['last_name'] = $customer->lastName();
+        if ($customer->lastName() !== '') $params['last_name'] = self::posterSafe($customer->lastName());
         if ($customer->email !== null)    $params['email']     = $customer->email;
 
         // Structured address block — Poster's delivery UI (and the
         // courier app integrations) read lat/lng from client_address.
-        $clientAddress = ['address1' => $address->text];
-        if ($address->apartment !== '') $clientAddress['address2'] = $address->apartment;
-        if ($address->note !== '')      $clientAddress['comment']  = $address->note;
+        // Verified live: when client_address is present Poster shows
+        // ITS address1 as the order address (the flat `address` param
+        // is overridden) — so address1 must carry the FULL line
+        // (apartment + street + landmark), not the bare street.
+        $clientAddress = ['address1' => self::posterSafe($address->fullText())];
+        if ($address->apartment !== '') $clientAddress['address2'] = self::posterSafe($address->apartment);
+        if ($address->note !== '')      $clientAddress['comment']  = self::posterSafe($address->note);
         if ($address->point !== null) {
             $clientAddress['lat'] = (string)$address->point->lat;
             $clientAddress['lng'] = (string)$address->point->lng;
@@ -132,9 +136,22 @@ final class IncomingOrderService implements IncomingOrderServiceInterface
      * courier info, then per-line notes/extras (labels come from the
      * client purely for human readability — ids are authoritative).
      */
+    /**
+     * Poster's storage is utf8mb3 — any 4-byte UTF-8 character (emoji
+     * etc.) NULLS the whole field on their side (verified live: a
+     * comment starting with 🛵 came back null, the same text without
+     * it survived intact). Strip supplementary-plane chars from every
+     * string we send; the customer's "🌶️ поострее" arrives as
+     * "поострее" instead of vanishing.
+     */
+    private static function posterSafe(string $s): string
+    {
+        return trim((string)preg_replace('/[\x{10000}-\x{10FFFF}\x{FE0F}\x{200D}]/u', '', $s));
+    }
+
     private function buildComment(string $comment, array $lines, array $lineLabels, ?DeliveryQuote $quote): string
     {
-        $parts = ['🛵 ОНЛАЙН-ДОСТАВКА (veranda.my/onlineorder)'];
+        $parts = ['ОНЛАЙН-ДОСТАВКА (veranda.my/onlineorder)'];
         $parts[] = 'Оплата еды: QR-перевод — проверить поступление!';
 
         if ($quote !== null && $quote->available) {
