@@ -10,6 +10,7 @@ RewriteRule ^tr3/api/?$ tr3/api.php [L,QSA]
 RewriteRule ^tr4/?$ tr4/index.php [L,QSA]
 RewriteRule ^tr4/api/?$ tr4/api.php [L,QSA]
 RewriteRule ^neworder/?$ neworder/index.php [L,QSA]
+RewriteRule ^onlineorder/?$ onlineorder/index.php [L,QSA]
 RewriteRule ^poster-app/?$ poster-app/index.php [L,QSA]
 # TableReservation.php был удалён — rewrite больше не нужен.
 
