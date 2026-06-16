@@ -72,6 +72,40 @@ class TelegramBotClient
         return self::_isEditOk($result);
     }
 
+    /**
+     * Edit attempt with a tri-state result so callers can tell an ambiguous
+     * transport failure (retry later — the message is probably still fine) from
+     * an explicit Telegram rejection (the message is gone, a replacement is
+     * warranted). The status-alert loop relies on this: a flaky link must NOT
+     * make it keep posting fresh copies of the status board.
+     *
+     * @return bool|null true  = edited (or "message is not modified");
+     *                   false = terminal rejection (e.g. message to edit not
+     *                           found / can't be edited) → resend is warranted;
+     *                   null  = no/timeout transport or 429/5xx — UNKNOWN, so the
+     *                           caller should skip this tick rather than resend.
+     */
+    public function tryEditStatus(int $messageId, string $text): ?bool
+    {
+        $result = $this->_call('editMessageText', [
+            'chat_id'    => $this->chatId,
+            'message_id' => $messageId,
+            'text'       => $text,
+            'parse_mode' => 'HTML',
+        ]);
+        if ($result === null) {
+            return null; // no HTTP response — network / timeout
+        }
+        if (self::_isEditOk($result)) {
+            return true;
+        }
+        $code = (int) ($result['error_code'] ?? 0);
+        if ($code === 429 || $code >= 500) {
+            return null; // rate-limited / server-side — ambiguous, don't resend
+        }
+        return false; // terminal rejection → message gone, send a replacement
+    }
+
     public function editMessageReplyMarkup(int $messageId, array|null $keyboard = null): bool
     {
         $params = [
