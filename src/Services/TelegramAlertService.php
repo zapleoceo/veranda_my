@@ -292,24 +292,47 @@ class TelegramAlertService
                 return;
             }
 
-            if ($prevId > 0 && $this->bot->editMessageText($prevId, $statusText)) {
-                $currentId = $prevId;
-                $this->meta->set('telegram_status_msg_hash', $currentHash);
-            } else {
-                $currentId = $this->bot->sendMessageGetId($statusText, $this->threadId);
-                if ($currentId) {
+            // Edit the tracked message in place. The tri-state result is what
+            // keeps the chat from filling up with copies when the link to
+            // Telegram is flaky (timeouts were the observed cause of piled-up
+            // status messages):
+            //   true  → edited (or "not modified"): reuse the same message.
+            //   null  → transport/timeout/429/5xx, outcome UNKNOWN: skip this tick
+            //           and retry next minute. NEVER resend here — the original is
+            //           almost always still there, so a resend just spawns a
+            //           duplicate (and that resend may itself time out yet still
+            //           deliver, repeating every minute).
+            //   false → Telegram explicitly rejected (message gone): only then resend.
+            $currentId = null;
+            if ($prevId > 0) {
+                $edit = $this->bot->tryEditStatus($prevId, $statusText);
+                if ($edit === true) {
+                    $currentId = $prevId;
+                    $this->meta->set('telegram_status_msg_hash', $currentHash);
+                } elseif ($edit === null) {
+                    return;
+                }
+                // $edit === false → tracked message is gone, fall through to resend
+            }
+
+            if ($currentId === null) {
+                $newId = $this->bot->sendMessageGetId($statusText, $this->threadId);
+                if ($newId) {
                     $this->meta->setMany([
-                        'telegram_status_msg_id'   => (string) $currentId,
+                        'telegram_status_msg_id'   => (string) $newId,
                         'telegram_status_msg_hash' => $currentHash,
                     ]);
                     if ($prevId > 0) {
                         $this->bot->deleteMessage($prevId);
                     }
+                    $currentId = $newId;
                 } else {
-                    $this->meta->setMany([
-                        'telegram_status_msg_id'   => '0',
-                        'telegram_status_msg_hash' => '',
-                    ]);
+                    // Send returned null (timeout/failure, but Telegram may have
+                    // delivered anyway). Do NOT reset the tracked id to 0 — that
+                    // made every later tick fire another fresh send, piling up
+                    // untracked copies we can never delete. Keep prevId and retry
+                    // the edit next tick instead.
+                    Logger::get()->warning('telegram_alerts.status_send_null', ['prev_id' => $prevId]);
                     return;
                 }
             }
