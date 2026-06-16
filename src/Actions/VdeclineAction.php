@@ -19,7 +19,7 @@ class VdeclineAction implements ActionInterface
             $ctx->bot->answerCallbackQuery($ctx->callbackQueryId, 'Бронь не найдена в БД');
             return '';
         }
-        if (!empty($row['deleted_at'])) {
+        if (ReservationTelegram::isSoftDeleted($row)) {
             $ctx->bot->answerCallbackQuery($ctx->callbackQueryId, 'Бронь уже отказана');
             return '';
         }
