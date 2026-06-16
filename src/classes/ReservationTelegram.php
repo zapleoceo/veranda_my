@@ -83,6 +83,18 @@ class ReservationTelegram {
         return $text;
     }
 
+    /**
+     * A reservation counts as soft-deleted ("отказана") ONLY when deleted_at
+     * holds a real timestamp. NULL, '' and the MySQL zero-date
+     * '0000-00-00 00:00:00' (the column's default on prod) all mean "active".
+     * Mirrors the web check in ReservationsController / reservations_content.php
+     * so Telegram actions and the admin page agree.
+     */
+    public static function isSoftDeleted(array $row): bool {
+        $deletedAt = (string)($row['deleted_at'] ?? '');
+        return $deletedAt !== '' && $deletedAt !== '0000-00-00 00:00:00';
+    }
+
     public static function keyboardActive(int $id): array {
         return [
             [
