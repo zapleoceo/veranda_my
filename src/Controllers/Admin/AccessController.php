@@ -19,6 +19,7 @@ class AccessController
         'employees'      => 'ЗП сотрудников',
         'schedule'       => 'График смен',
         'payday'         => 'Payday',
+        'bloggers'       => 'Блогеры',
         'admin'          => 'УПРАВЛЕНИЕ',
         'roma'           => 'Roma (кальяны)',
         'banya'          => 'Отчет баня',

@@ -62,6 +62,7 @@ use App\Controllers\Admin\MenuController;
 use App\Controllers\Admin\AccessController;
 use App\Controllers\Admin\ReservationsAdminController;
 use App\Controllers\Admin\LogsController;
+use App\Controllers\Admin\BloggersController;
 use App\Controllers\KitchenOnlineController;
 use App\Controllers\RawdataController;
 use App\Controllers\LinksController;
@@ -135,6 +136,7 @@ $app->group('/admin', function (RouteCollectorProxy $group) {
     $group->map(['GET', 'POST'], '/telegram', [TelegramAdminController::class, 'index']);
     $group->map(['GET', 'POST'], '/menu', [MenuController::class, 'index']);
     $group->map(['GET', 'POST'], '/access', [AccessController::class, 'index']);
+    $group->map(['GET', 'POST'], '/bloggers', [BloggersController::class, 'index']);
     $group->map(['GET', 'POST'], '/reservations', [ReservationsAdminController::class, 'index']);
     $group->map(['GET', 'POST'], '/logs', [LogsController::class, 'index']);
 })->add(AuthMiddleware::class);

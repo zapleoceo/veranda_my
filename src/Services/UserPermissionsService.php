@@ -24,6 +24,7 @@ class UserPermissionsService
         'exclude_toggle' => true,
         'telegram_ack'   => false,
         'payday'         => false,
+        'bloggers'       => false,
     ];
 
     private const TTL = 30;
@@ -84,6 +85,7 @@ class UserPermissionsService
             $out['dashboard']    = true;
             $out['rawdata']      = true;
             $out['kitchen_online'] = true;
+            $out['bloggers']     = true;
         }
 
         return $out;
