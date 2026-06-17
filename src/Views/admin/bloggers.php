@@ -64,9 +64,19 @@ tr.off td{opacity:.45}
 #blTable.hide-checks .col-checks,
 #blTable.hide-revenue .col-revenue,
 #blTable.hide-cashbackv .col-cashbackv{display:none}
-.bl-add .fields{display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem .65rem;margin-bottom:.6rem}
+.bl-actions{display:flex;gap:.6rem;align-items:flex-end}
+.bl-add .fields{display:grid;grid-template-columns:1fr 1fr;gap:.5rem .65rem;margin-bottom:.8rem}
+.bl-add .fields .wide{grid-column:1 / -1}
 .bl-add .fields label{margin-bottom:.15rem;font-size:.72rem}
 .bl-add .fields input{width:100%}
+.bl-modal{position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:6vh 1rem;overflow:auto}
+.bl-modal[hidden]{display:none}
+.bl-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6)}
+.bl-modal-card{position:relative;z-index:1;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.5rem;width:100%;max-width:560px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.bl-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.bl-modal-head h2{margin:0}
+.bl-modal-x{background:none;border:none;color:var(--muted);font-size:1.6rem;line-height:1;cursor:pointer;padding:0 .25rem}
+.bl-modal-x:hover{color:var(--text)}
 @media(max-width:680px){.bl-edit-form .fields,.bl-add .fields{grid-template-columns:1fr 1fr}}
 </style>
 
@@ -91,12 +101,15 @@ tr.off td{opacity:.45}
       <button class="btn btn-primary" type="submit">Показать</button>
     </form>
 
-    <div class="bl-cols">
-      <button type="button" class="btn btn-secondary btn-sm" id="colsBtn">Колонки ▾</button>
-      <div class="bl-cols-pop" id="colsPop" style="display:none">
-        <?php foreach ($cols as $key => $label): ?>
-          <label><input type="checkbox" data-col="<?= $esc($key) ?>" checked> <?= $esc($label) ?></label>
-        <?php endforeach; ?>
+    <div class="bl-actions">
+      <button type="button" class="btn btn-primary" id="addBtn">+ Добавить блогера</button>
+      <div class="bl-cols">
+        <button type="button" class="btn btn-secondary btn-sm" id="colsBtn">Колонки ▾</button>
+        <div class="bl-cols-pop" id="colsPop" style="display:none">
+          <?php foreach ($cols as $key => $label): ?>
+            <label><input type="checkbox" data-col="<?= $esc($key) ?>" checked> <?= $esc($label) ?></label>
+          <?php endforeach; ?>
+        </div>
       </div>
     </div>
   </div>
@@ -199,36 +212,42 @@ tr.off td{opacity:.45}
   </div>
 </div>
 
-<div class="card bl-add">
-  <h2>Добавить блогера</h2>
-  <form method="post" action="/admin/bloggers">
-    <input type="hidden" name="create_blogger" value="1">
-    <input type="hidden" name="dateFrom" value="<?= $esc($dateFrom) ?>">
-    <input type="hidden" name="dateTo" value="<?= $esc($dateTo) ?>">
-    <div class="fields">
-      <div>
-        <label>Промокод</label>
-        <input type="text" name="promocode" placeholder="ANNA2026" required>
-      </div>
-      <div>
-        <label>Имя блогера</label>
-        <input type="text" name="name" placeholder="Анна Иванова">
-      </div>
-      <div>
-        <label>Email (gmail)</label>
-        <input type="email" name="email" placeholder="anna@gmail.com">
-      </div>
-      <div>
-        <label>Скидка %</label>
-        <input type="number" name="discount_pct" min="0" max="100" step="0.5" value="0">
-      </div>
-      <div>
-        <label>Кешбек %</label>
-        <input type="number" name="cashback_pct" min="0" max="100" step="0.5" value="0">
-      </div>
+<div class="bl-modal" id="addModal" hidden>
+  <div class="bl-modal-backdrop" data-close></div>
+  <div class="bl-modal-card">
+    <div class="bl-modal-head">
+      <h2>Добавить блогера</h2>
+      <button type="button" class="bl-modal-x" data-close aria-label="Закрыть">&times;</button>
     </div>
-    <button class="btn btn-primary" type="submit">Создать</button>
-  </form>
+    <form method="post" action="/admin/bloggers" class="bl-add">
+      <input type="hidden" name="create_blogger" value="1">
+      <input type="hidden" name="dateFrom" value="<?= $esc($dateFrom) ?>">
+      <input type="hidden" name="dateTo" value="<?= $esc($dateTo) ?>">
+      <div class="fields">
+        <div>
+          <label>Промокод</label>
+          <input type="text" name="promocode" placeholder="ANNA2026" required>
+        </div>
+        <div>
+          <label>Имя блогера</label>
+          <input type="text" name="name" placeholder="Анна Иванова">
+        </div>
+        <div class="wide">
+          <label>Email (gmail)</label>
+          <input type="email" name="email" placeholder="anna@gmail.com">
+        </div>
+        <div>
+          <label>Скидка %</label>
+          <input type="number" name="discount_pct" min="0" max="100" step="0.5" value="0">
+        </div>
+        <div>
+          <label>Кешбек %</label>
+          <input type="number" name="cashback_pct" min="0" max="100" step="0.5" value="0">
+        </div>
+      </div>
+      <button class="btn btn-primary" type="submit">Создать</button>
+    </form>
+  </div>
 </div>
 
 <script>
@@ -276,6 +295,27 @@ tr.off td{opacity:.45}
             if (pop.style.display !== 'none' && !pop.contains(e.target) && e.target !== btn) {
                 pop.style.display = 'none';
             }
+        });
+    }
+
+    // Add-blogger modal (button in the top toolbar)
+    var modal = document.getElementById('addModal');
+    var addBtn = document.getElementById('addBtn');
+    function closeModal() { if (modal) modal.hidden = true; }
+    if (addBtn) {
+        addBtn.addEventListener('click', function () {
+            if (!modal) return;
+            modal.hidden = false;
+            var f = modal.querySelector('input[name="promocode"]');
+            if (f) f.focus();
+        });
+    }
+    if (modal) {
+        modal.querySelectorAll('[data-close]').forEach(function (el) {
+            el.addEventListener('click', closeModal);
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeModal();
         });
     }
 })();
