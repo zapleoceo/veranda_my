@@ -189,6 +189,7 @@ $navSections = [
             '/employees'    => ['label' => 'ЗП сотрудников',  'perm' => 'employees'],
             '/schedule'     => ['label' => 'График смен',     'perm' => 'schedule'],
             '/reservations' => ['label' => 'Брони',           'perm' => 'reservations'],
+            '/admin/bloggers' => ['label' => 'Блогеры',       'perm' => 'bloggers'],
         ],
     ],
     [
