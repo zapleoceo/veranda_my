@@ -95,6 +95,29 @@ class ReservationTelegram {
         return $deletedAt !== '' && $deletedAt !== '0000-00-00 00:00:00';
     }
 
+    /**
+     * Manager text for an already-declined reservation. Takes the original
+     * decliner/time from the row (deleted_by / deleted_at) — used to self-heal
+     * a stale "вPoster/отказать" keyboard clicked on a booking that was already
+     * declined (e.g. via the web admin), so the message redraws to its real state.
+     */
+    public static function buildDeclinedText(array $row): string {
+        $text = trim(self::buildManagerText($row));
+        $who  = trim((string)($row['deleted_by'] ?? ''));
+        $at   = trim((string)($row['deleted_at'] ?? ''));
+        $line = "\n\n❌ <b>Бронь отказана</b>";
+        if ($who !== '') {
+            $line .= ' менеджером ' . htmlspecialchars($who);
+        }
+        if ($at !== '' && $at !== '0000-00-00 00:00:00') {
+            $ts = strtotime($at);
+            if ($ts !== false) {
+                $line .= ' · ' . htmlspecialchars(date('Y-m-d H:i', $ts));
+            }
+        }
+        return $text . $line;
+    }
+
     public static function keyboardActive(int $id): array {
         return [
             [

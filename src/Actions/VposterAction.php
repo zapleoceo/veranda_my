@@ -22,6 +22,12 @@ class VposterAction implements ActionInterface
         }
         if (ReservationTelegram::isSoftDeleted($row)) {
             $ctx->bot->answerCallbackQuery($ctx->callbackQueryId, 'Бронь отказана. Сначала восстановите.');
+            $row = $this->_withHallName($row, $ctx);
+            $ctx->bot->editMessageText(
+                $ctx->messageId,
+                ReservationTelegram::buildDeclinedText($row),
+                ReservationTelegram::keyboardDeclined($ctx->actionId)
+            );
             return '';
         }
         if (Config::get('POSTER_API_TOKEN') === '') {

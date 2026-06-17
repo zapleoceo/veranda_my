@@ -21,6 +21,12 @@ class VdeclineAction implements ActionInterface
         }
         if (ReservationTelegram::isSoftDeleted($row)) {
             $ctx->bot->answerCallbackQuery($ctx->callbackQueryId, 'Бронь уже отказана');
+            $row = $this->_withHallName($row, $ctx);
+            $ctx->bot->editMessageText(
+                $ctx->messageId,
+                ReservationTelegram::buildDeclinedText($row),
+                ReservationTelegram::keyboardDeclined($ctx->actionId)
+            );
             return '';
         }
 
