@@ -45,11 +45,11 @@ final class BloggersController
             [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
         }
 
-        $bloggers = [];
-        $report   = ['rows' => [], 'totals' => ['bloggers' => 0, 'checks' => 0, 'revenue' => 0, 'cashback' => 0]];
+        $report = ['rows' => [], 'totals' => ['bloggers' => 0, 'checks' => 0, 'revenue' => 0, 'cashback' => 0]];
         try {
-            $bloggers = $this->svc->listBloggers();
-            $report   = $this->svc->report($dateFrom, $dateTo);
+            // report() returns every blogger (active first) + the period stats,
+            // so the view renders + edits all of them from one table.
+            $report = $this->svc->report($dateFrom, $dateTo);
         } catch (\Throwable $e) {
             $flash['err'] = $flash['err'] !== '' ? $flash['err'] : ('Ошибка загрузки данных Poster: ' . $e->getMessage());
         }

@@ -73,7 +73,7 @@ class BloggerServiceTest extends TestCase
 
     // ─── report ─────────────────────────────────────────────────────────
 
-    public function test_report_computes_cashback_totals_sorts_and_excludes_inactive(): void
+    public function test_report_lists_all_bloggers_but_totals_cover_active_only(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
             ['client_id' => '1', 'lastname' => 'A', 'comment' => '', 'discount_per' => '0'],
@@ -90,18 +90,21 @@ class BloggerServiceTest extends TestCase
             ->willReturn([
                 1 => ['checks' => 10, 'revenue' => 1000000],
                 2 => ['checks' => 5,  'revenue' => 400000],
-                3 => ['checks' => 99, 'revenue' => 9999999], // inactive → must be ignored
+                3 => ['checks' => 99, 'revenue' => 9999999], // inactive: shown, but out of totals
             ]);
 
         $rep = $this->make()->report('2026-06-01', '2026-06-30');
 
-        $this->assertCount(2, $rep['rows']);
-        // sorted by revenue desc
+        // All three are listed (so any can be edited); active first, then revenue desc.
+        $this->assertCount(3, $rep['rows']);
         $this->assertSame(1, $rep['rows'][0]['client_id']);
         $this->assertSame(100000, $rep['rows'][0]['cashback']); // 1,000,000 × 10%
         $this->assertSame(2, $rep['rows'][1]['client_id']);
         $this->assertSame(20000, $rep['rows'][1]['cashback']);  // 400,000 × 5%
+        $this->assertSame(3, $rep['rows'][2]['client_id']);     // inactive sorts last
+        $this->assertSame(0, $rep['rows'][2]['is_active']);
 
+        // Totals (payout) exclude the inactive blogger.
         $this->assertSame(2,       $rep['totals']['bloggers']);
         $this->assertSame(15,      $rep['totals']['checks']);
         $this->assertSame(1400000, $rep['totals']['revenue']);
