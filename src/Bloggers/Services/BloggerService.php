@@ -66,7 +66,10 @@ final class BloggerService
     }
 
     /**
-     * Per-blogger period report (active bloggers only), sorted by revenue desc.
+     * Per-blogger period report. Every blogger is returned (so the manager can
+     * edit any of them from the report), active first then by revenue desc. The
+     * totals are the payout figures — active bloggers only; inactive rows are
+     * shown for editing but excluded from the totals.
      *
      * @return array{rows: list<array<string,mixed>>, totals: array<string,int>}
      */
@@ -75,11 +78,8 @@ final class BloggerService
         $sales = $this->poster->clientsSales($dateFrom, $dateTo);
 
         $rows = [];
-        $totChecks = $totRevenue = $totCashback = 0;
+        $activeCount = $totChecks = $totRevenue = $totCashback = 0;
         foreach ($this->listBloggers() as $b) {
-            if (!$b['is_active']) {
-                continue;
-            }
             $s        = $sales[$b['client_id']] ?? ['checks' => 0, 'revenue' => 0];
             $checks   = (int) $s['checks'];
             $revenue  = (int) $s['revenue']; // minor units, after discount
@@ -90,16 +90,20 @@ final class BloggerService
                 'revenue'  => $revenue,
                 'cashback' => $cashback,
             ];
-            $totChecks   += $checks;
-            $totRevenue  += $revenue;
-            $totCashback += $cashback;
+            if ($b['is_active']) {
+                $activeCount++;
+                $totChecks   += $checks;
+                $totRevenue  += $revenue;
+                $totCashback += $cashback;
+            }
         }
-        usort($rows, static fn (array $a, array $b): int => $b['revenue'] <=> $a['revenue']);
+        usort($rows, static fn (array $a, array $b): int =>
+            ($b['is_active'] <=> $a['is_active']) ?: ($b['revenue'] <=> $a['revenue']));
 
         return [
             'rows'   => $rows,
             'totals' => [
-                'bloggers' => count($rows),
+                'bloggers' => $activeCount,
                 'checks'   => $totChecks,
                 'revenue'  => $totRevenue,
                 'cashback' => $totCashback,
