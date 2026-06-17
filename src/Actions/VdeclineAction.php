@@ -38,7 +38,7 @@ class VdeclineAction implements ActionInterface
         $ctx->bot->answerCallbackQuery($ctx->callbackQueryId, 'Отказано');
         $ctx->bot->editMessageText(
             $ctx->messageId, $text,
-            [ReservationTelegram::keyboardDeclined($ctx->actionId)]
+            ReservationTelegram::keyboardDeclined($ctx->actionId)
         );
 
         return '';
