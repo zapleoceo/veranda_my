@@ -526,4 +526,18 @@ return [
     // (services + 12 action instances) gets resolved by type-hint.
     // No explicit factory — keeps DI graph simple and avoids the
     // ContainerInterface-injection issue that broke prod earlier.
+
+    // ─── Bloggers (referral system) ───────────────────────────
+    // Poster I/O + local cashback store behind interfaces so BloggerService
+    // stays pure domain logic (unit-tested with fakes). BloggersController
+    // auto-wires from BloggerService.
+    \App\Bloggers\Contracts\PosterClientsGatewayInterface::class => fn($c) =>
+        new \App\Bloggers\Services\PosterClientsGateway($c->get(PosterApiProviderInterface::class)),
+    \App\Bloggers\Contracts\BloggerRepositoryInterface::class => fn($c) =>
+        new \App\Bloggers\Repositories\BloggerRepository($c->get(Database::class)),
+    \App\Bloggers\Services\BloggerService::class => fn($c) =>
+        new \App\Bloggers\Services\BloggerService(
+            $c->get(\App\Bloggers\Contracts\PosterClientsGatewayInterface::class),
+            $c->get(\App\Bloggers\Contracts\BloggerRepositoryInterface::class),
+        ),
 ];
