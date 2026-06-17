@@ -66,7 +66,7 @@ class VposterFixAction implements ActionInterface
             $ctx->bot->editMessageText(
                 $ctx->messageId,
                 trim($baseText) . "\n\n⏰ <b>Время брони уже прошло полностью.</b>",
-                [ReservationTelegram::keyboardStale($ctx->actionId)]
+                ReservationTelegram::keyboardStale($ctx->actionId)
             );
             return '';
         }
@@ -98,7 +98,7 @@ class VposterFixAction implements ActionInterface
             $ctx->bot->editMessageText(
                 $ctx->messageId,
                 $baseText . "\n\n❌ Poster: " . htmlspecialchars((string) $result['error']),
-                [ReservationTelegram::keyboardActive($ctx->actionId)]
+                ReservationTelegram::keyboardActive($ctx->actionId)
             );
             return '';
         }

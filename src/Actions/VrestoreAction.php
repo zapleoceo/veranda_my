@@ -29,7 +29,7 @@ class VrestoreAction implements ActionInterface
         $ctx->bot->answerCallbackQuery($ctx->callbackQueryId, 'Восстановлено');
         $ctx->bot->editMessageText(
             $ctx->messageId, $text,
-            [ReservationTelegram::keyboardActive($ctx->actionId)]
+            ReservationTelegram::keyboardActive($ctx->actionId)
         );
 
         return '';

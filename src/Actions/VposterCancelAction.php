@@ -31,7 +31,7 @@ class VposterCancelAction implements ActionInterface
         $ctx->bot->editMessageText(
             $ctx->messageId,
             $baseText,
-            [ReservationTelegram::keyboardActive($ctx->actionId)]
+            ReservationTelegram::keyboardActive($ctx->actionId)
         );
 
         return '';
