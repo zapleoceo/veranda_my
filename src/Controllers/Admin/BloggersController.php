@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers\Admin;
 
-use App\Bloggers\BloggerService;
+use App\Bloggers\Services\BloggerService;
 use App\Infrastructure\Permissions;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
