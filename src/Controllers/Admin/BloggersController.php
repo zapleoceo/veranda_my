@@ -100,6 +100,7 @@ final class BloggersController
                     (int) ($body['amount_vnd'] ?? 0),
                     (int) ($body['account_id'] ?? 0),
                     $userEmail,
+                    (string) ($body['comment'] ?? ''),
                 );
                 $flash['ok'] = "Выплата проведена (Poster transaction {$txId}).";
             }

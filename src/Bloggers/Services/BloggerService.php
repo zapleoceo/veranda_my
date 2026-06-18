@@ -179,9 +179,11 @@ final class BloggerService
      * Pay cashback to a blogger — records a Poster expense transaction in the
      * payout category tagged with the blogger's client_id. $amountVnd is in VND.
      *
-     * @throws \RuntimeException Returns the created transaction id.
+     * The manager may pass a custom $comment, but the `ID=<client_id>` tag —
+     * which ties the payout to the blogger for paid-matching — is always
+     * enforced. @throws \RuntimeException Returns the created transaction id.
      */
-    public function pay(int $clientId, int $amountVnd, int $accountId, string $by): int
+    public function pay(int $clientId, int $amountVnd, int $accountId, string $by, string $comment = ''): int
     {
         if ($clientId <= 0) {
             throw new \RuntimeException('Не указан блогер.');
@@ -200,7 +202,13 @@ final class BloggerService
                 break;
             }
         }
-        $comment = 'BLOGGER ' . ($promo !== '' ? $promo . ' ' : '') . 'ID=' . $clientId . ($by !== '' ? ' by ' . $by : '');
+
+        $comment = trim($comment);
+        if ($comment === '') {
+            $comment = 'BLOGGER ' . ($promo !== '' ? $promo . ' ' : '') . 'ID=' . $clientId . ($by !== '' ? ' by ' . $by : '');
+        } elseif (!preg_match('/\bID=' . $clientId . '\b/', $comment)) {
+            $comment .= ' ID=' . $clientId;
+        }
 
         return $this->poster->createPayout($this->cfg()['payout_category_id'], $accountId, $amountVnd, $comment);
     }
