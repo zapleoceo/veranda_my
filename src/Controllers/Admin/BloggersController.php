@@ -45,11 +45,14 @@ final class BloggersController
             [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
         }
 
-        $report = ['rows' => [], 'totals' => ['bloggers' => 0, 'checks' => 0, 'revenue' => 0, 'cashback' => 0]];
+        $config   = $this->svc->config();
+        $report   = ['rows' => [], 'totals' => ['bloggers' => 0, 'checks' => 0, 'revenue' => 0, 'cashback' => 0, 'paid' => 0, 'topay' => 0]];
+        $accounts = [];
         try {
-            // report() returns every blogger (active first) + the period stats,
-            // so the view renders + edits all of them from one table.
-            $report = $this->svc->report($dateFrom, $dateTo);
+            // report() returns every blogger (active first) + period stats;
+            // accounts feed the payout dropdown.
+            $report   = $this->svc->report($dateFrom, $dateTo);
+            $accounts = $this->svc->accounts();
         } catch (\Throwable $e) {
             $flash['err'] = $flash['err'] !== '' ? $flash['err'] : ('Ошибка загрузки данных Poster: ' . $e->getMessage());
         }
@@ -88,6 +91,17 @@ final class BloggersController
                 $activate = (string) $body['toggle_active'] === 'activate';
                 $this->svc->setActive((int) ($body['client_id'] ?? 0), $activate);
                 $flash['ok'] = $activate ? 'Блогер активирован.' : 'Блогер деактивирован.';
+            } elseif (isset($body['save_config'])) {
+                $this->svc->saveConfig((int) ($body['group_id'] ?? 0), (int) ($body['payout_category_id'] ?? 0));
+                $flash['ok'] = 'Настройки сохранены.';
+            } elseif (isset($body['pay_blogger'])) {
+                $txId = $this->svc->pay(
+                    (int) ($body['client_id'] ?? 0),
+                    (int) ($body['amount_vnd'] ?? 0),
+                    (int) ($body['account_id'] ?? 0),
+                    $userEmail,
+                );
+                $flash['ok'] = "Выплата проведена (Poster transaction {$txId}).";
             }
         } catch (\Throwable $e) {
             $flash['err'] = $e->getMessage();

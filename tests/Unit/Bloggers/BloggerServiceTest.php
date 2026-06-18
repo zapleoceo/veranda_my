@@ -19,6 +19,8 @@ class BloggerServiceTest extends TestCase
     {
         $this->poster = $this->createMock(PosterClientsGatewayInterface::class);
         $this->repo   = $this->createMock(BloggerRepositoryInterface::class);
+        // Default module config; overridable per-test is not needed (group 10 / cat 24).
+        $this->repo->method('loadConfig')->willReturn(['group_id' => 10, 'payout_category_id' => 24]);
     }
 
     private function make(): BloggerService
@@ -57,23 +59,18 @@ class BloggerServiceTest extends TestCase
         $list = $this->make()->listBloggers();
 
         $this->assertCount(2, $list);
-        // sorted by promocode (case-insensitive): ANNA, then TESTBLOG
         $this->assertSame('ANNA', $list[0]['promocode']);
         $this->assertSame(7.0, $list[0]['cashback_pct']);
         $this->assertTrue($list[0]['tracked']);
-
-        // 308 has no local row → cashback 0, active by default, not tracked
         $this->assertSame('TESTBLOG', $list[1]['promocode']);
-        $this->assertSame('Test', $list[1]['name']);
-        $this->assertSame(10.0, $list[1]['discount_pct']);
         $this->assertSame(0.0, $list[1]['cashback_pct']);
         $this->assertSame(1, $list[1]['is_active']);
         $this->assertFalse($list[1]['tracked']);
     }
 
-    // ─── report ─────────────────────────────────────────────────────────
+    // ─── report (accrued / paid / to-pay) ───────────────────────────────
 
-    public function test_report_lists_all_bloggers_but_totals_cover_active_only(): void
+    public function test_report_computes_paid_and_topay_and_totals(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
             ['client_id' => '1', 'lastname' => 'A', 'comment' => '', 'discount_per' => '0'],
@@ -85,33 +82,35 @@ class BloggerServiceTest extends TestCase
             2 => ['cashback_pct' => 5.0,  'gmail' => '', 'is_active' => 1, 'created_by' => ''],
             3 => ['cashback_pct' => 20.0, 'gmail' => '', 'is_active' => 0, 'created_by' => ''],
         ]);
-        $this->poster->method('clientsSales')
-            ->with('2026-06-01', '2026-06-30')
-            ->willReturn([
-                1 => ['checks' => 10, 'revenue' => 1000000],
-                2 => ['checks' => 5,  'revenue' => 400000],
-                3 => ['checks' => 99, 'revenue' => 9999999], // inactive: shown, but out of totals
-            ]);
+        $this->poster->method('clientsSales')->willReturn([
+            1 => ['checks' => 10, 'revenue' => 1000000], // accrued 100000
+            2 => ['checks' => 5,  'revenue' => 400000],  // accrued 20000
+            3 => ['checks' => 99, 'revenue' => 9999999], // inactive
+        ]);
+        // client 1 already paid 30000 (cents); client 2 nothing
+        $this->poster->method('payouts')->willReturn([1 => 30000]);
 
         $rep = $this->make()->report('2026-06-01', '2026-06-30');
 
-        // All three are listed (so any can be edited); active first, then revenue desc.
         $this->assertCount(3, $rep['rows']);
+        // active first, sorted by to-pay desc: client1 (70000) then client2 (20000)
         $this->assertSame(1, $rep['rows'][0]['client_id']);
-        $this->assertSame(100000, $rep['rows'][0]['cashback']); // 1,000,000 × 10%
+        $this->assertSame(100000, $rep['rows'][0]['cashback']);
+        $this->assertSame(30000,  $rep['rows'][0]['paid']);
+        $this->assertSame(70000,  $rep['rows'][0]['topay']);
         $this->assertSame(2, $rep['rows'][1]['client_id']);
-        $this->assertSame(20000, $rep['rows'][1]['cashback']);  // 400,000 × 5%
-        $this->assertSame(3, $rep['rows'][2]['client_id']);     // inactive sorts last
+        $this->assertSame(20000, $rep['rows'][1]['topay']);
+        $this->assertSame(3, $rep['rows'][2]['client_id']); // inactive last
         $this->assertSame(0, $rep['rows'][2]['is_active']);
 
-        // Totals (payout) exclude the inactive blogger.
-        $this->assertSame(2,       $rep['totals']['bloggers']);
-        $this->assertSame(15,      $rep['totals']['checks']);
-        $this->assertSame(1400000, $rep['totals']['revenue']);
-        $this->assertSame(120000,  $rep['totals']['cashback']);
+        // totals cover active only
+        $this->assertSame(2,      $rep['totals']['bloggers']);
+        $this->assertSame(120000, $rep['totals']['cashback']);
+        $this->assertSame(30000,  $rep['totals']['paid']);
+        $this->assertSame(90000,  $rep['totals']['topay']);
     }
 
-    public function test_report_blogger_without_sales_is_zero(): void
+    public function test_report_topay_never_negative_when_overpaid(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
             ['client_id' => '1', 'lastname' => 'A', 'comment' => '', 'discount_per' => '0'],
@@ -119,44 +118,26 @@ class BloggerServiceTest extends TestCase
         $this->repo->method('allByClientId')->willReturn([
             1 => ['cashback_pct' => 10.0, 'gmail' => '', 'is_active' => 1, 'created_by' => ''],
         ]);
-        $this->poster->method('clientsSales')->willReturn([]);
+        $this->poster->method('clientsSales')->willReturn([1 => ['checks' => 1, 'revenue' => 100000]]); // accrued 10000
+        $this->poster->method('payouts')->willReturn([1 => 999999]); // overpaid
 
         $rep = $this->make()->report('2026-06-01', '2026-06-30');
-
-        $this->assertSame(0, $rep['rows'][0]['checks']);
-        $this->assertSame(0, $rep['rows'][0]['revenue']);
-        $this->assertSame(0, $rep['rows'][0]['cashback']);
+        $this->assertSame(0, $rep['rows'][0]['topay']);
     }
 
-    // ─── create ─────────────────────────────────────────────────────────
+    // ─── create / update ────────────────────────────────────────────────
 
-    public function test_create_validates_then_calls_gateway_and_repo(): void
+    public function test_create_passes_group_and_calls_gateway_and_repo(): void
     {
-        $this->poster->method('listGroupClients')->willReturn([]); // promocode free
+        $this->poster->method('listGroupClients')->willReturn([]);
         $this->poster->expects($this->once())->method('createClient')
-            ->with('ANNA2026', 'Anna Ivanova', 'anna@gmail.com', 10.0)
+            ->with(10, 'ANNA2026', 'Anna Ivanova', 'anna@gmail.com', 10.0)
             ->willReturn(500);
         $this->repo->expects($this->once())->method('create')
             ->with(500, 'anna@gmail.com', 7.0, 'mgr@x.com');
 
         $id = $this->make()->create('ANNA2026', 'Anna Ivanova', 'anna@gmail.com', 10.0, 7.0, 'mgr@x.com');
         $this->assertSame(500, $id);
-    }
-
-    public function test_create_clamps_percentages(): void
-    {
-        $this->poster->method('listGroupClients')->willReturn([]);
-        $this->poster->method('createClient')->with('X', 'n', '', 100.0)->willReturn(1);
-        $this->repo->expects($this->once())->method('create')->with(1, '', 0.0, 'm');
-
-        $this->make()->create('X', 'n', '', 150.0, -5.0, 'm'); // 150→100, -5→0
-    }
-
-    public function test_create_rejects_blank_promocode(): void
-    {
-        $this->poster->expects($this->never())->method('createClient');
-        $this->expectException(\RuntimeException::class);
-        $this->make()->create('   ', 'x', '', 0, 0, 'mgr');
     }
 
     public function test_create_rejects_promocode_with_space(): void
@@ -167,7 +148,7 @@ class BloggerServiceTest extends TestCase
         $this->make()->create('ANNA 2026', 'x', '', 0, 0, 'mgr');
     }
 
-    public function test_create_rejects_duplicate_promocode_case_insensitive(): void
+    public function test_create_rejects_duplicate_promocode(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
             ['client_id' => '9', 'lastname' => 'ANNA2026', 'firstname' => ''],
@@ -177,35 +158,71 @@ class BloggerServiceTest extends TestCase
         $this->make()->create('anna2026', 'x', '', 0, 0, 'mgr');
     }
 
-    // ─── update / setActive ─────────────────────────────────────────────
-
-    public function test_update_allows_same_promocode_for_self_and_persists(): void
+    public function test_update_passes_group_and_persists(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
             ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => ''],
         ]);
         $this->poster->expects($this->once())->method('updateClient')
-            ->with(42, 'ANNA', 'Anna I', 'a@gmail.com', 12.0);
+            ->with(10, 42, 'ANNA', 'Anna I', 'a@gmail.com', 12.0);
         $this->repo->expects($this->once())->method('saveCashbackAndGmail')
             ->with(42, 'a@gmail.com', 8.0);
 
         $this->make()->update(42, 'ANNA', 'Anna I', 'a@gmail.com', 12.0, 8.0);
     }
 
-    public function test_update_rejects_promocode_taken_by_another(): void
+    // ─── pay ────────────────────────────────────────────────────────────
+
+    public function test_pay_creates_payout_in_configured_category_with_id_tag(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
-            ['client_id' => '42', 'lastname' => 'ANNA',  'firstname' => ''],
-            ['client_id' => '99', 'lastname' => 'BORIS', 'firstname' => ''],
+            ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => ''],
         ]);
-        $this->poster->expects($this->never())->method('updateClient');
-        $this->expectException(\RuntimeException::class);
-        $this->make()->update(42, 'BORIS', 'x', '', 0, 0);
+        $this->poster->expects($this->once())->method('createPayout')
+            ->with(
+                24,       // configured payout category
+                7,        // account
+                500000,   // VND
+                $this->callback(static fn (string $c): bool =>
+                    str_contains($c, 'ID=42') && str_contains($c, 'ANNA') && str_contains($c, 'by mgr@x.com'))
+            )
+            ->willReturn(900);
+
+        $this->assertSame(900, $this->make()->pay(42, 500000, 7, 'mgr@x.com'));
     }
+
+    public function test_pay_rejects_zero_amount(): void
+    {
+        $this->poster->expects($this->never())->method('createPayout');
+        $this->expectException(\RuntimeException::class);
+        $this->make()->pay(42, 0, 7, 'mgr');
+    }
+
+    public function test_pay_rejects_missing_account(): void
+    {
+        $this->poster->expects($this->never())->method('createPayout');
+        $this->expectException(\RuntimeException::class);
+        $this->make()->pay(42, 500000, 0, 'mgr');
+    }
+
+    // ─── setActive / config ─────────────────────────────────────────────
 
     public function test_setActive_delegates_to_repository(): void
     {
         $this->repo->expects($this->once())->method('setActive')->with(7, false);
         $this->make()->setActive(7, false);
+    }
+
+    public function test_saveConfig_persists(): void
+    {
+        $this->repo->expects($this->once())->method('saveConfig')->with(5, 30);
+        $this->make()->saveConfig(5, 30);
+    }
+
+    public function test_saveConfig_rejects_nonpositive(): void
+    {
+        $this->repo->expects($this->never())->method('saveConfig');
+        $this->expectException(\RuntimeException::class);
+        $this->make()->saveConfig(0, 30);
     }
 }

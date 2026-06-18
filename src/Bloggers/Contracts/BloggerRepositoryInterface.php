@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Bloggers\Contracts;
 
 /**
- * Local persistence for blogger data that Poster has no field for: cashback %,
- * the gmail↔client link (cabinet login, phase 2) and the active flag.
+ * Local persistence for blogger data Poster has no field for: cashback %, the
+ * gmail↔client link (cabinet login, phase 2), the active flag, and the module
+ * config (which Poster group holds bloggers + which finance category records
+ * payouts).
  */
 interface BloggerRepositoryInterface
 {
@@ -23,4 +25,9 @@ interface BloggerRepositoryInterface
     public function saveCashbackAndGmail(int $clientId, string $gmail, float $cashbackPct): void;
 
     public function setActive(int $clientId, bool $active): void;
+
+    /** @return array{group_id:int,payout_category_id:int} (defaults when unset) */
+    public function loadConfig(): array;
+
+    public function saveConfig(int $groupId, int $payoutCategoryId): void;
 }
