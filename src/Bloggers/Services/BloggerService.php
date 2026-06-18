@@ -71,9 +71,13 @@ final class BloggerService
      * to-pay (all minor units). Totals are the payout figures over active
      * bloggers only.
      *
+     * Pass $onlyClientId to scope the report to a single blogger (used by the
+     * blogger's own mobile cabinet) — then only that row is returned and the
+     * totals cover just them.
+     *
      * @return array{rows: list<array<string,mixed>>, totals: array<string,int>}
      */
-    public function report(string $dateFrom, string $dateTo): array
+    public function report(string $dateFrom, string $dateTo, ?int $onlyClientId = null): array
     {
         $cfg    = $this->cfg();
         $sales  = $this->poster->clientsSales($dateFrom, $dateTo);
@@ -85,6 +89,9 @@ final class BloggerService
         $rows = [];
         $activeCount = $totChecks = $totRevenue = $totCashback = $totPaid = $totToPay = 0;
         foreach ($this->listBloggers() as $b) {
+            if ($onlyClientId !== null && $b['client_id'] !== $onlyClientId) {
+                continue;
+            }
             $s         = $sales[$b['client_id']] ?? ['checks' => 0, 'revenue' => 0];
             $checks    = (int) $s['checks'];
             $revenue   = (int) $s['revenue'];

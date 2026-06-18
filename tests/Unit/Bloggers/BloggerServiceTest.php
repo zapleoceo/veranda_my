@@ -110,6 +110,31 @@ class BloggerServiceTest extends TestCase
         $this->assertSame(90000,  $rep['totals']['topay']);
     }
 
+    public function test_report_scoped_to_one_client_returns_only_that_row(): void
+    {
+        $this->poster->method('listGroupClients')->willReturn([
+            ['client_id' => '1', 'lastname' => 'A', 'comment' => '', 'discount_per' => '0'],
+            ['client_id' => '2', 'lastname' => 'B', 'comment' => '', 'discount_per' => '0'],
+        ]);
+        $this->repo->method('allByClientId')->willReturn([
+            1 => ['cashback_pct' => 10.0, 'gmail' => '', 'is_active' => 1, 'created_by' => ''],
+            2 => ['cashback_pct' => 5.0,  'gmail' => '', 'is_active' => 1, 'created_by' => ''],
+        ]);
+        $this->poster->method('clientsSales')->willReturn([
+            1 => ['checks' => 3, 'revenue' => 200000],
+            2 => ['checks' => 9, 'revenue' => 900000],
+        ]);
+        $this->poster->method('payouts')->willReturn([]);
+
+        $rep = $this->make()->report('2026-06-01', '2026-06-30', 2);
+
+        $this->assertCount(1, $rep['rows']);
+        $this->assertSame(2, $rep['rows'][0]['client_id']);
+        $this->assertSame(45000, $rep['rows'][0]['cashback']); // 900,000 × 5%
+        $this->assertSame(1,      $rep['totals']['bloggers']);
+        $this->assertSame(900000, $rep['totals']['revenue']);
+    }
+
     public function test_report_topay_never_negative_when_overpaid(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
