@@ -8,12 +8,18 @@ use App\Bloggers\Contracts\BloggerRepositoryInterface;
 use App\Infrastructure\Database;
 
 /**
- * Local `bloggers` table: cashback %, gmail↔client link, active flag.
- * Self-creates its schema on first use (same idempotent pattern as the
- * Schedule / PosterApp modules), so there is no separate migration step.
+ * Local `bloggers` table (cashback %, gmail↔client link, active flag) plus the
+ * module config (group id + payout finance-category id), stored as two
+ * `system_meta` keys. Self-creates the `bloggers` table on first use.
  */
 final class BloggerRepository implements BloggerRepositoryInterface
 {
+    public const DEFAULT_GROUP_ID    = 10; // "Blogers" client group
+    public const DEFAULT_CATEGORY_ID = 24; // "Bloggers" finance category
+
+    private const META_GROUP    = 'bloggers_group_id';
+    private const META_CATEGORY = 'bloggers_payout_category_id';
+
     private static bool $schemaReady = false;
 
     public function __construct(private readonly Database $db)
@@ -51,9 +57,6 @@ final class BloggerRepository implements BloggerRepositoryInterface
 
     public function saveCashbackAndGmail(int $clientId, string $gmail, float $cashbackPct): void
     {
-        // The row may not exist yet if the blogger was created directly in
-        // Poster — upsert keeps cashback/gmail in sync without clobbering
-        // is_active / created_by.
         $this->db->query(
             "INSERT INTO {$this->db->t('bloggers')} (poster_client_id, gmail, cashback_pct, created_by)
              VALUES (?, ?, ?, '')
@@ -69,6 +72,42 @@ final class BloggerRepository implements BloggerRepositoryInterface
              ON DUPLICATE KEY UPDATE is_active = VALUES(is_active)",
             [$clientId, $active ? 1 : 0]
         );
+    }
+
+    public function loadConfig(): array
+    {
+        $m   = $this->db->t('system_meta');
+        $kv  = [];
+        try {
+            $rows = $this->db->query(
+                "SELECT meta_key, meta_value FROM {$m} WHERE meta_key IN (?, ?)",
+                [self::META_GROUP, self::META_CATEGORY]
+            )->fetchAll();
+            foreach ($rows as $r) {
+                $kv[(string) $r['meta_key']] = (string) $r['meta_value'];
+            }
+        } catch (\Throwable) {
+            // system_meta missing → fall back to defaults
+        }
+
+        $group    = (int) ($kv[self::META_GROUP] ?? 0);
+        $category = (int) ($kv[self::META_CATEGORY] ?? 0);
+        return [
+            'group_id'           => $group    > 0 ? $group    : self::DEFAULT_GROUP_ID,
+            'payout_category_id' => $category > 0 ? $category : self::DEFAULT_CATEGORY_ID,
+        ];
+    }
+
+    public function saveConfig(int $groupId, int $payoutCategoryId): void
+    {
+        $m = $this->db->t('system_meta');
+        foreach ([[self::META_GROUP, $groupId], [self::META_CATEGORY, $payoutCategoryId]] as [$key, $val]) {
+            $this->db->query(
+                "INSERT INTO {$m} (meta_key, meta_value) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)",
+                [$key, (string) $val]
+            );
+        }
     }
 
     private function ensureSchema(): void
