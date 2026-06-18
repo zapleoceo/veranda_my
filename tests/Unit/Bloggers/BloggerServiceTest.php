@@ -205,6 +205,20 @@ class BloggerServiceTest extends TestCase
         $this->make()->pay(42, 500000, 0, 'mgr');
     }
 
+    public function test_pay_keeps_custom_comment_but_enforces_id_tag(): void
+    {
+        $this->poster->method('listGroupClients')->willReturn([
+            ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => ''],
+        ]);
+        // Custom comment WITHOUT an ID tag → the service must append ID=42.
+        $this->poster->expects($this->once())->method('createPayout')
+            ->with(24, 7, 500000, $this->callback(static fn (string $c): bool =>
+                str_contains($c, 'кешбек за май') && str_contains($c, 'ID=42')))
+            ->willReturn(901);
+
+        $this->assertSame(901, $this->make()->pay(42, 500000, 7, 'mgr@x.com', 'кешбек за май'));
+    }
+
     // ─── setActive / config ─────────────────────────────────────────────
 
     public function test_setActive_delegates_to_repository(): void

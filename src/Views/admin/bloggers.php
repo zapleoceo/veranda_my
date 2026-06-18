@@ -318,7 +318,7 @@ tr.off td{opacity:.45}
       <div class="fields">
         <div class="wide">
           <label>Сумма выплаты (₫)</label>
-          <input type="number" name="amount_vnd" id="payAmount" min="1" step="1000" required>
+          <input type="number" name="amount_vnd" id="payAmount" min="1" step="1" required>
         </div>
         <div class="wide">
           <label>Счёт</label>
@@ -330,6 +330,10 @@ tr.off td{opacity:.45}
             <?php endforeach; endif; ?>
           </select>
         </div>
+        <div class="wide">
+          <label>Комментарий (в транзакцию Poster)</label>
+          <input type="text" name="comment" id="payComment" maxlength="255">
+        </div>
       </div>
       <button class="btn btn-primary" type="submit">Выплатить</button>
     </form>
@@ -338,6 +342,8 @@ tr.off td{opacity:.45}
 
 <script>
 (function () {
+    var payBy = <?= json_encode((string) ($userEmail ?? ''), JSON_UNESCAPED_UNICODE) ?>;
+
     // Inline edit toggle
     document.querySelectorAll('.bl-edit-btn').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -410,6 +416,8 @@ tr.off td{opacity:.45}
             payModal.querySelector('#payPromo').textContent = b.dataset.promo || ('id ' + b.dataset.id);
             var amt = payModal.querySelector('#payAmount');
             amt.value = b.dataset.amount || '';
+            payModal.querySelector('#payComment').value =
+                'BLOGGER ' + (b.dataset.promo ? b.dataset.promo + ' ' : '') + 'ID=' + b.dataset.id + (payBy ? ' by ' + payBy : '');
             payModal.hidden = false;
             amt.focus();
         });
