@@ -62,13 +62,13 @@ final class BloggerCabinetController
     {
         Session::start();
         unset($_SESSION['blogger_client_id'], $_SESSION['blogger_email'], $_SESSION['blogger_name']);
-        return $response->withHeader('Location', '/blogers')->withStatus(302);
+        return $response->withHeader('Location', '/bloggers')->withStatus(302);
     }
 
-    /** Build the Google OAuth URL and stash auth_next=/blogers for the callback. */
+    /** Build the Google OAuth URL and stash auth_next=/bloggers for the callback. */
     private function googleUrl(): string
     {
-        $_SESSION['auth_next'] = '/blogers';
+        $_SESSION['auth_next'] = '/bloggers';
         $params = [
             'client_id'     => Config::require('GOOGLE_CLIENT_ID'),
             'redirect_uri'  => Config::require('GOOGLE_REDIRECT_URI'),
