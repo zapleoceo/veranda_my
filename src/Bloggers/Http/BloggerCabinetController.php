@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Bloggers\Http;
 
 use App\Bloggers\Services\BloggerService;
+use App\Bloggers\Support\BloggerError;
+use App\Bloggers\Support\BloggerLang;
+use App\Home\I18n\Locale;
 use App\Infrastructure\GoogleOAuth;
 use App\Infrastructure\Session;
 use App\OnlineOrder\Infrastructure\SubmitThrottle;
@@ -13,15 +16,14 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
- * Public influencer cabinet at /bloggers — its own mobile-first page (not the
- * admin layout). Bloggers live in a separate session realm (blogger_client_id,
- * NO user_email) so they can only ever see their own data and can never reach
- * /admin/*.
+ * Public influencer cabinet at /bloggers — its own mobile-first, multilingual
+ * (en/ru/vi) page. Locale = ?lang override (persisted to the shared site
+ * `home_lang` cookie) → cookie/browser via Locale::detect(). Bloggers live in
+ * a separate session realm (blogger_client_id, NO user_email).
  *
- * State-changing POSTs are guarded by a synchroniser CSRF token (shared app
- * session token via Csrf); public self-registration additionally has a
- * honeypot + per-session submit throttle to blunt bot/spam flooding of the
- * Poster client list.
+ * State-changing POSTs are CSRF-guarded; public self-registration also has a
+ * honeypot + per-session throttle. Validation errors come back as BloggerError
+ * translation keys and are rendered in the visitor's locale.
  */
 final class BloggerCabinetController
 {
@@ -30,16 +32,37 @@ final class BloggerCabinetController
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         Session::start();
+        $lang = $this->locale($request);
+        $t    = new BloggerLang($lang);
+
         $clientId = (int) ($_SESSION['blogger_client_id'] ?? 0);
 
         return $clientId > 0
-            ? $this->cabinet($request, $response, $clientId)
-            : $this->welcome($request, $response);
+            ? $this->cabinet($request, $response, $clientId, $t, $lang)
+            : $this->welcome($request, $response, $t, $lang);
+    }
+
+    /** ?lang override (persisted to home_lang cookie) → Locale::detect(). */
+    private function locale(ServerRequestInterface $request): string
+    {
+        $q = Locale::normalize((string) ($request->getQueryParams()['lang'] ?? ''));
+        if ($q !== null) {
+            if (!headers_sent()) {
+                setcookie(Locale::COOKIE, $q, [
+                    'expires'  => time() + 31536000,
+                    'path'     => '/',
+                    'samesite' => 'Lax',
+                ]);
+            }
+            $_COOKIE[Locale::COOKIE] = $q;
+            return $q;
+        }
+        return Locale::detect();
     }
 
     // ── Unauthenticated: welcome + registration ───────────────────────────
 
-    private function welcome(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    private function welcome(ServerRequestInterface $request, ResponseInterface $response, BloggerLang $t, string $lang): ResponseInterface
     {
         $flash   = ['ok' => '', 'err' => ''];
         $regData = [];
@@ -48,12 +71,14 @@ final class BloggerCabinetController
             $body    = (array) ($request->getParsedBody() ?? []);
             $regData = $body;
             if (isset($body['register'])) {
-                $regData = $this->handleRegister($body, $flash);
+                $regData = $this->handleRegister($body, $flash, $t);
             }
         }
 
         return $this->html($response, $this->render([
             'mode'      => 'login',
+            'lang'      => $lang,
+            't'         => $t,
             'googleUrl' => $this->googleUrl(),
             'csrf'      => Csrf::token(),
             'flash'     => $flash,
@@ -62,20 +87,20 @@ final class BloggerCabinetController
     }
 
     /** @return array<string,mixed> form data to re-fill on error ([] on success) */
-    private function handleRegister(array $body, array &$flash): array
+    private function handleRegister(array $body, array &$flash, BloggerLang $t): array
     {
         if (!Csrf::verify((string) ($body['csrf_token'] ?? ''))) {
-            $flash['err'] = 'Сессия устарела — обновите страницу и попробуйте ещё раз.';
+            $flash['err'] = $t->t('fl.csrf');
             return $body;
         }
         // Honeypot: real browsers leave it empty, bots fill it. Neutral reply.
         if (trim((string) ($body['website'] ?? '')) !== '') {
-            $flash['err'] = 'Не удалось отправить заявку. Попробуйте позже.';
+            $flash['err'] = $t->t('fl.hp');
             return $body;
         }
         $throttle = new SubmitThrottle(5, 1800, 'bloggers_register_submits');
         if (!$throttle->allow()) {
-            $flash['err'] = 'Слишком много попыток. Подождите немного и попробуйте снова.';
+            $flash['err'] = $t->t('fl.throttle');
             return $body;
         }
 
@@ -84,25 +109,20 @@ final class BloggerCabinetController
                 (string) ($body['promocode'] ?? ''),
                 (string) ($body['name'] ?? ''),
                 (string) ($body['email'] ?? ''),
-                [
-                    'ig' => (string) ($body['ig'] ?? ''),
-                    'tg' => (string) ($body['tg'] ?? ''),
-                    'tt' => (string) ($body['tt'] ?? ''),
-                    'yt' => (string) ($body['yt'] ?? ''),
-                ],
+                $this->socialsFromBody($body),
             );
             $throttle->hit();
-            $flash['ok'] = 'Готово! Войдите через Google тем же адресом — и личный кабинет ваш.';
+            $flash['ok'] = $t->t('fl.reg.ok');
             return [];
         } catch (\Throwable $e) {
-            $flash['err'] = $e->getMessage();
+            $flash['err'] = $this->errorText($e, $t);
             return $body;
         }
     }
 
-    // ── Authenticated blogger cabinet ─────────────────────────────────────
+    // ── Authenticated cabinet ─────────────────────────────────────────────
 
-    private function cabinet(ServerRequestInterface $request, ResponseInterface $response, int $clientId): ResponseInterface
+    private function cabinet(ServerRequestInterface $request, ResponseInterface $response, int $clientId, BloggerLang $t, string $lang): ResponseInterface
     {
         $q        = $request->getQueryParams();
         $dateFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($q['dateFrom'] ?? '')) ? (string) $q['dateFrom'] : date('Y-m-01');
@@ -117,7 +137,7 @@ final class BloggerCabinetController
             $body = (array) ($request->getParsedBody() ?? []);
             if (isset($body['save_self'])) {
                 if (!Csrf::verify((string) ($body['csrf_token'] ?? ''))) {
-                    $flash['err'] = 'Сессия устарела — обновите страницу и сохраните ещё раз.';
+                    $flash['err'] = $t->t('fl.save.csrf');
                 } else {
                     try {
                         $this->svc->selfUpdate(
@@ -126,9 +146,9 @@ final class BloggerCabinetController
                             (float)  ($body['discount_pct'] ?? 0),
                             (float)  ($body['cashback_pct'] ?? 0),
                         );
-                        $flash['ok'] = 'Изменения сохранены.';
+                        $flash['ok'] = $t->t('fl.saved');
                     } catch (\Throwable $e) {
-                        $flash['err'] = $e->getMessage();
+                        $flash['err'] = $this->errorText($e, $t);
                     }
                 }
             }
@@ -143,11 +163,13 @@ final class BloggerCabinetController
                 $checks = $this->svc->checks($dateFrom, $dateTo, $clientId);
             }
         } catch (\Throwable $e) {
-            $flash['err'] = $flash['err'] !== '' ? $flash['err'] : 'Не удалось загрузить отчёт. Попробуйте позже.';
+            $flash['err'] = $flash['err'] !== '' ? $flash['err'] : $t->t('d.load.err');
         }
 
         return $this->html($response, $this->render([
             'mode'     => 'report',
+            'lang'     => $lang,
+            't'        => $t,
             'name'     => (string) ($_SESSION['blogger_name'] ?? ''),
             'csrf'     => Csrf::token(),
             'row'      => $row,
@@ -163,6 +185,23 @@ final class BloggerCabinetController
         Session::start();
         unset($_SESSION['blogger_client_id'], $_SESSION['blogger_email'], $_SESSION['blogger_name']);
         return $response->withHeader('Location', '/bloggers')->withStatus(302);
+    }
+
+    /** Zip social_net[]/social_val[] into a list of {net,val}. @return list<array{net:string,val:string}> */
+    private function socialsFromBody(array $body): array
+    {
+        $nets = is_array($body['social_net'] ?? null) ? $body['social_net'] : [];
+        $vals = is_array($body['social_val'] ?? null) ? $body['social_val'] : [];
+        $out  = [];
+        foreach ($nets as $i => $net) {
+            $out[] = ['net' => (string) $net, 'val' => (string) ($vals[$i] ?? '')];
+        }
+        return $out;
+    }
+
+    private function errorText(\Throwable $e, BloggerLang $t): string
+    {
+        return $e instanceof BloggerError ? $t->t($e->key, $e->params) : $t->t('err.generic');
     }
 
     /** Stash auth_next=/bloggers, then build the Google consent URL. */

@@ -72,7 +72,7 @@ class BloggerServiceTest extends TestCase
     public function test_listBloggers_reads_params_from_comment(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
-            ['client_id' => '50', 'firstname' => '', 'lastname' => 'NEO', 'comment' => 'Neo One | cb=9 | lim=20 | ig=@neo', 'email' => '', 'discount_per' => '3'],
+            ['client_id' => '50', 'firstname' => '', 'lastname' => 'NEO', 'comment' => 'Neo One | cb=9 | lim=20 | s=ig:@neo | s=vk:vk.com/neo', 'email' => '', 'discount_per' => '3'],
         ]);
         $this->repo->method('allByClientId')->willReturn([
             50 => ['cashback_pct' => 0.0, 'is_active' => 1, 'created_by' => ''],
@@ -82,7 +82,8 @@ class BloggerServiceTest extends TestCase
         $this->assertSame('Neo One', $list[0]['name']);
         $this->assertSame(9.0,  $list[0]['cashback_pct']); // comment wins over local 0
         $this->assertSame(20.0, $list[0]['limit_pct']);
-        $this->assertSame('@neo', $list[0]['socials']['ig']);
+        $this->assertSame(['net' => 'ig', 'val' => '@neo'], $list[0]['socials'][0]);
+        $this->assertSame(['net' => 'vk', 'val' => 'vk.com/neo'], $list[0]['socials'][1]);
     }
 
     // ─── report (accrued / paid / to-pay) ───────────────────────────────
@@ -177,7 +178,7 @@ class BloggerServiceTest extends TestCase
                 10,
                 'ANNA2026',
                 $this->callback(static fn (string $c): bool =>
-                    str_contains($c, 'Anna Ivanova') && str_contains($c, 'cb=7') && str_contains($c, 'lim=20') && str_contains($c, 'ig=@anna')),
+                    str_contains($c, 'Anna Ivanova') && str_contains($c, 'cb=7') && str_contains($c, 'lim=20') && str_contains($c, 's=ig:@anna')),
                 'anna@gmail.com',
                 10.0,
             )
@@ -185,7 +186,7 @@ class BloggerServiceTest extends TestCase
         $this->repo->expects($this->once())->method('create')
             ->with(500, 'mgr@x.com');
 
-        $id = $this->make()->create('ANNA2026', 'Anna Ivanova', 'anna@gmail.com', 10.0, 7.0, 20.0, ['ig' => '@anna'], 'mgr@x.com');
+        $id = $this->make()->create('ANNA2026', 'Anna Ivanova', 'anna@gmail.com', 10.0, 7.0, 20.0, [['net' => 'ig', 'val' => '@anna']], 'mgr@x.com');
         $this->assertSame(500, $id);
     }
 
@@ -215,10 +216,11 @@ class BloggerServiceTest extends TestCase
         $this->make()->create('ANNA', 'Anna', '', 10.0, 10.0, 15.0, [], 'mgr'); // 20 > 15
     }
 
-    public function test_update_passes_group_and_encodes_comment(): void
+    public function test_update_encodes_comment_and_preserves_socials(): void
     {
+        // Existing comment carries a social — update() must preserve it.
         $this->poster->method('listGroupClients')->willReturn([
-            ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => ''],
+            ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => '', 'comment' => 'Anna I | cb=1 | lim=10 | s=ig:@keep'],
         ]);
         $this->poster->expects($this->once())->method('updateClient')
             ->with(
@@ -226,12 +228,13 @@ class BloggerServiceTest extends TestCase
                 42,
                 'ANNA',
                 $this->callback(static fn (string $c): bool =>
-                    str_contains($c, 'Anna I') && str_contains($c, 'cb=8') && str_contains($c, 'lim=20')),
+                    str_contains($c, 'Anna I') && str_contains($c, 'cb=8') && str_contains($c, 'lim=20') && str_contains($c, 's=ig:@keep')),
                 'a@gmail.com',
                 12.0,
             );
 
-        $this->make()->update(42, 'ANNA', 'Anna I', 'a@gmail.com', 12.0, 8.0, 20.0, []);
+        // Note: update() no longer takes socials — they are preserved from the comment.
+        $this->make()->update(42, 'ANNA', 'Anna I', 'a@gmail.com', 12.0, 8.0, 20.0);
     }
 
     // ─── register / selfUpdate ──────────────────────────────────────────
@@ -244,7 +247,8 @@ class BloggerServiceTest extends TestCase
                 10,
                 'ANNA',
                 $this->callback(static fn (string $c): bool =>
-                    str_contains($c, 'Anna Ivanova') && str_contains($c, 'cb=0') && str_contains($c, 'lim=5') && str_contains($c, 'ig=@anna')),
+                    str_contains($c, 'Anna Ivanova') && str_contains($c, 'cb=0') && str_contains($c, 'lim=5')
+                    && str_contains($c, 's=ig:@anna') && str_contains($c, 's=tt:@anna_tt')),
                 'anna@gmail.com',
                 0.0,
             )
@@ -253,8 +257,19 @@ class BloggerServiceTest extends TestCase
         $this->repo->expects($this->once())->method('create')->with(700, 'self');
         $this->repo->expects($this->never())->method('setActive');
 
-        $id = $this->make()->register('ANNA', 'Anna Ivanova', 'anna@gmail.com', ['ig' => '@anna']);
+        $id = $this->make()->register('ANNA', 'Anna Ivanova', 'anna@gmail.com', [
+            ['net' => 'ig', 'val' => '@anna'],
+            ['net' => 'tt', 'val' => '@anna_tt'],
+        ]);
         $this->assertSame(700, $id);
+    }
+
+    public function test_register_requires_at_least_two_socials(): void
+    {
+        $this->poster->method('listGroupClients')->willReturn([]);
+        $this->poster->expects($this->never())->method('createClient');
+        $this->expectException(\RuntimeException::class);
+        $this->make()->register('ANNA', 'Anna', 'anna@gmail.com', [['net' => 'ig', 'val' => '@anna']]); // only 1
     }
 
     public function test_register_rejects_duplicate_email(): void
@@ -264,7 +279,10 @@ class BloggerServiceTest extends TestCase
         ]);
         $this->poster->expects($this->never())->method('createClient');
         $this->expectException(\RuntimeException::class);
-        $this->make()->register('NEWPROMO', 'Anna', 'anna@gmail.com', []);
+        $this->make()->register('NEWPROMO', 'Anna', 'anna@gmail.com', [
+            ['net' => 'ig', 'val' => '@a'],
+            ['net' => 'tg', 'val' => '@b'],
+        ]);
     }
 
     public function test_selfUpdate_enforces_per_blogger_limit(): void
@@ -288,7 +306,7 @@ class BloggerServiceTest extends TestCase
                 42,
                 'ANNA',
                 $this->callback(static fn (string $c): bool =>
-                    str_contains($c, 'Anna I') && str_contains($c, 'cb=5') && str_contains($c, 'lim=20') && str_contains($c, 'ig=@a')),
+                    str_contains($c, 'Anna I') && str_contains($c, 'cb=5') && str_contains($c, 'lim=20') && str_contains($c, 's=ig:@a')),
                 'a@b.com',
                 4.0,
             );

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Controllers\Admin;
 
 use App\Bloggers\Services\BloggerService;
+use App\Bloggers\Support\BloggerError;
+use App\Bloggers\Support\BloggerLang;
 use App\Infrastructure\Permissions;
 use App\Order\Infrastructure\Csrf;
 use Psr\Http\Message\ResponseInterface;
@@ -96,7 +98,6 @@ final class BloggersController
                     (float) ($body['discount_pct'] ?? 0),
                     (float) ($body['cashback_pct'] ?? 0),
                     (float) ($body['limit_pct'] ?? 15),
-                    $this->socialsFrom($body),
                 );
                 $flash['ok'] = 'Изменения сохранены.';
             } elseif (isset($body['toggle_active'])) {
@@ -116,20 +117,27 @@ final class BloggersController
                 );
                 $flash['ok'] = "Выплата проведена (Poster transaction {$txId}).";
             }
+        } catch (BloggerError $e) {
+            // Translatable validation error → render in Russian for the manager.
+            $flash['err'] = (new BloggerLang('ru'))->t($e->key, $e->params);
         } catch (\Throwable $e) {
             $flash['err'] = $e->getMessage();
         }
     }
 
-    /** @return array<string,string> social handles from the posted form */
+    /**
+     * Zip the add-modal social_net[]/social_val[] arrays into a list of
+     * {net,val}. @return list<array{net:string,val:string}>
+     */
     private function socialsFrom(array $body): array
     {
-        return [
-            'ig' => (string) ($body['ig'] ?? ''),
-            'tg' => (string) ($body['tg'] ?? ''),
-            'tt' => (string) ($body['tt'] ?? ''),
-            'yt' => (string) ($body['yt'] ?? ''),
-        ];
+        $nets = is_array($body['social_net'] ?? null) ? $body['social_net'] : [];
+        $vals = is_array($body['social_val'] ?? null) ? $body['social_val'] : [];
+        $out  = [];
+        foreach ($nets as $i => $net) {
+            $out[] = ['net' => (string) $net, 'val' => (string) ($vals[$i] ?? '')];
+        }
+        return $out;
     }
 
     private function layout(ResponseInterface $response, string $content, string $path, string $userEmail, array $flash): ResponseInterface

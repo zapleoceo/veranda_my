@@ -30,6 +30,13 @@ $cols = [
     'accrued'     => 'Начислено ₫',
     'paid'        => 'Выплачено ₫',
 ];
+
+// <option> list for the add-modal social picker (admin is RU).
+$blNetOpts = '';
+foreach (\App\Bloggers\Support\SocialNetworks::all() as $code => $label) {
+    $lbl = $code === 'site' ? 'Сайт / другое' : $label;
+    $blNetOpts .= '<option value="' . $esc($code) . '">' . $esc($lbl) . '</option>';
+}
 ?>
 <style>
 .bl-note{color:var(--muted);font-size:.82rem;line-height:1.5;margin-bottom:1rem}
@@ -79,8 +86,14 @@ tr.off td{opacity:.45}
 #blTable.hide-revenue .col-revenue,
 #blTable.hide-accrued .col-accrued,
 #blTable.hide-paid .col-paid{display:none}
-.bl-socials-row{grid-column:1 / -1;display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem .65rem}
-@media(max-width:680px){.bl-socials-row{grid-template-columns:1fr 1fr}}
+.bl-soc-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.2rem}
+.bl-soc-chip{display:inline-flex;gap:.35rem;align-items:center;background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:.25rem .6rem;font-size:.8rem}
+.bl-soc-chip b{color:var(--accent);font-weight:600}
+.bl-soc-empty{color:var(--muted);font-size:.82rem}
+.bl-soc-input{display:flex;gap:.45rem;align-items:center;margin-bottom:.45rem}
+.bl-soc-input select{flex:0 0 38%}
+.bl-soc-input input{flex:1 1 auto}
+.bl-soc-rm{flex:none;width:34px;height:34px;border:1px solid var(--border);background:var(--card2);color:var(--muted);border-radius:7px;cursor:pointer;font-size:1.1rem;line-height:1}
 .bl-add .fields{display:grid;grid-template-columns:1fr 1fr;gap:.5rem .65rem;margin-bottom:.8rem}
 .bl-add .fields .wide{grid-column:1 / -1}
 .bl-add .fields label{margin-bottom:.15rem;font-size:.72rem}
@@ -212,7 +225,6 @@ tr.off td{opacity:.45}
                   <input type="hidden" name="client_id" value="<?= $id ?>">
                   <input type="hidden" name="dateFrom" value="<?= $esc($dateFrom) ?>">
                   <input type="hidden" name="dateTo" value="<?= $esc($dateTo) ?>">
-                  <?php $soc = is_array($r['socials'] ?? null) ? $r['socials'] : []; ?>
                   <div class="fields">
                     <div>
                       <label>Промокод</label>
@@ -238,11 +250,16 @@ tr.off td{opacity:.45}
                       <label>Email (gmail)</label>
                       <input type="email" name="email" value="<?= $esc($r['email']) ?>">
                     </div>
-                    <div class="bl-socials-row">
-                      <div><label>Instagram</label><input type="text" name="ig" value="<?= $esc($soc['ig'] ?? '') ?>" placeholder="@handle"></div>
-                      <div><label>Telegram</label><input type="text" name="tg" value="<?= $esc($soc['tg'] ?? '') ?>" placeholder="@username"></div>
-                      <div><label>TikTok</label><input type="text" name="tt" value="<?= $esc($soc['tt'] ?? '') ?>" placeholder="@handle"></div>
-                      <div><label>YouTube</label><input type="text" name="yt" value="<?= $esc($soc['yt'] ?? '') ?>" placeholder="@канал / ссылка"></div>
+                    <div class="wide">
+                      <label>Соцсети <span style="color:var(--muted);font-weight:400">(меняет инфлюенсер при регистрации / в ЛК)</span></label>
+                      <div class="bl-soc-chips">
+                        <?php $soc = is_array($r['socials'] ?? null) ? $r['socials'] : []; ?>
+                        <?php if (empty($soc)): ?>
+                          <span class="bl-soc-empty">— не указаны</span>
+                        <?php else: foreach ($soc as $s): ?>
+                          <span class="bl-soc-chip"><b><?= $esc(\App\Bloggers\Support\SocialNetworks::label((string) ($s['net'] ?? ''))) ?></b> <?= $esc($s['val'] ?? '') ?></span>
+                        <?php endforeach; endif; ?>
+                      </div>
                     </div>
                   </div>
                   <div class="bl-edit-actions">
@@ -320,10 +337,26 @@ tr.off td{opacity:.45}
           <label>Лимит % (макс. скидка + кешбек)</label>
           <input type="number" name="limit_pct" min="0" max="100" step="0.5" value="15">
         </div>
-        <div><label>Instagram</label><input type="text" name="ig" placeholder="@handle"></div>
-        <div><label>Telegram</label><input type="text" name="tg" placeholder="@username"></div>
-        <div><label>TikTok</label><input type="text" name="tt" placeholder="@handle"></div>
-        <div><label>YouTube</label><input type="text" name="yt" placeholder="@канал / ссылка"></div>
+        <div class="wide">
+          <label>Соцсети</label>
+          <div id="blAddSoc">
+            <?php for ($i = 0; $i < 2; $i++): ?>
+              <div class="bl-soc-input" data-soc-row>
+                <select name="social_net[]"><?= $blNetOpts ?></select>
+                <input type="text" name="social_val[]" placeholder="@ник или ссылка">
+                <button type="button" class="bl-soc-rm" data-soc-remove aria-label="Убрать">&times;</button>
+              </div>
+            <?php endfor; ?>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="blAddSocBtn" style="margin-top:.3rem">+ Соцсеть</button>
+          <template id="blAddSocTpl">
+            <div class="bl-soc-input" data-soc-row>
+              <select name="social_net[]"><?= $blNetOpts ?></select>
+              <input type="text" name="social_val[]" placeholder="@ник или ссылка">
+              <button type="button" class="bl-soc-rm" data-soc-remove aria-label="Убрать">&times;</button>
+            </div>
+          </template>
+        </div>
       </div>
       <button class="btn btn-primary" type="submit">Создать</button>
     </form>
@@ -436,6 +469,19 @@ tr.off td{opacity:.45}
         });
     }
     bindModal(addModal);
+
+    // Dynamic socials in the add modal (network + value rows).
+    var socList = document.getElementById('blAddSoc');
+    var socAdd  = document.getElementById('blAddSocBtn');
+    var socTpl  = document.getElementById('blAddSocTpl');
+    if (socList && socAdd && socTpl && 'content' in socTpl) {
+        socAdd.addEventListener('click', function () { socList.appendChild(socTpl.content.cloneNode(true)); });
+        socList.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-soc-remove]');
+            if (!b) return;
+            if (socList.querySelectorAll('[data-soc-row]').length > 1) b.closest('[data-soc-row]').remove();
+        });
+    }
 
     var payModal = document.getElementById('payModal');
     bindModal(payModal);
