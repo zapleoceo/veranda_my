@@ -5,39 +5,34 @@ declare(strict_types=1);
 namespace App\Bloggers\Support;
 
 /**
- * Encodes/decodes the structured blogger-parameter block stored inside the
+ * Encodes/decodes the structured influencer-parameter block stored inside the
  * Poster client `comment` field. Poster has no custom fields, so every
- * parameter that has no native Poster column lives here. (Discount is the one
- * exception — it stays in Poster's `discount_per` because the POS reads it to
- * apply the discount at checkout.)
+ * parameter without a native column lives here. (Discount is the exception —
+ * it stays in Poster `discount_per`, read by the POS at checkout.)
  *
  * Wire format — one line, segments joined by " | ":
  *
- *     Имя | cb=7 | lim=15 | ig=@anna | tg=@anna | tt=@anna | yt=youtube.com/@a
+ *     Имя | cb=7 | lim=15 | s=ig:@anna | s=tg:@anna | s=ig:@second_acc
  *
  *   - first segment   = display name (free text)
- *   - cb=<n>          = cashback %                      (float)
+ *   - cb=<n>          = cashback %                         (float)
  *   - lim=<n>         = limit %: max of discount+cashback the blogger may set
- *                       (default 15; self-registration starts at 5)
- *   - ig/tg/tt/yt=<v> = social handles/links (empty ones omitted)
+ *   - s=<net>:<value> = a social entry, REPEATABLE (multiple per network OK)
  *
- * Tolerant of the older "Имя | IG: @h | TG: @h" format and of a bare "Имя".
+ * Tolerant of the older fixed-key form (`ig=@h | tg=@h`) and the oldest
+ * label form (`IG: @h`) so existing comments keep working. Socials are a
+ * LIST of {net,val} — ready for a per-entry `verified` flag later.
  */
 final class BloggerMeta
 {
     public const DEFAULT_LIMIT = 15.0;
 
-    /** @var list<string> */
-    public const SOCIAL_KEYS = ['ig', 'tg', 'tt', 'yt'];
-
-    /**
-     * @param array<string,string> $socials key (ig|tg|tt|yt) => handle/link
-     */
+    /** @param list<array{net:string,val:string}> $socials */
     public function __construct(
         public string $name = '',
         public ?float $cashbackPct = null,
         public float $limitPct = self::DEFAULT_LIMIT,
-        public array $socials = ['ig' => '', 'tg' => '', 'tt' => '', 'yt' => ''],
+        public array $socials = [],
     ) {}
 
     public static function decode(string $comment): self
@@ -50,26 +45,30 @@ final class BloggerMeta
             if ($seg === '') {
                 continue;
             }
-            // New format: key=value
-            if (preg_match('/^([a-z]{2,3})=(.*)$/i', $seg, $m)) {
-                $key = strtolower($m[1]);
-                $val = trim($m[2]);
-                if ($key === 'cb') {
-                    $meta->cashbackPct = self::clampPct((float) $val);
-                } elseif ($key === 'lim') {
-                    $meta->limitPct = self::clampPct((float) $val);
-                } elseif (in_array($key, self::SOCIAL_KEYS, true)) {
-                    $meta->socials[$key] = $val;
+            // New repeatable social: s=<net>:<value>  (value may contain ':')
+            if (preg_match('/^s=([a-z0-9]+):(.*)$/i', $seg, $m)) {
+                $meta->addSocial($m[1], $m[2]);
+                continue;
+            }
+            // Numeric params.
+            if (preg_match('/^(cb|lim)=(.*)$/i', $seg, $m)) {
+                if (strtolower($m[1]) === 'cb') {
+                    $meta->cashbackPct = self::clampPct((float) $m[2]);
+                } else {
+                    $meta->limitPct = self::clampPct((float) $m[2]);
                 }
                 continue;
             }
-            // Legacy format: "IG: @h", "TikTok: @h", "YT: link"
+            // Legacy fixed-key socials: ig=@h | tg=@h | tt=@h | yt=link
+            if (preg_match('/^(ig|tg|tt|yt)=(.*)$/i', $seg, $m)) {
+                $meta->addSocial($m[1], $m[2]);
+                continue;
+            }
+            // Oldest label socials: "IG: @h", "TikTok: @h", "YT: link"
             if (preg_match('/^(IG|TG|TikTok|YT):\s*(.+)$/i', $seg, $m)) {
                 $label = strtolower($m[1]);
-                $key   = $label === 'tiktok' ? 'tt' : $label;
-                if (in_array($key, self::SOCIAL_KEYS, true)) {
-                    $meta->socials[$key] = trim($m[2]);
-                }
+                $net   = $label === 'tiktok' ? 'tt' : $label;
+                $meta->addSocial($net, $m[2]);
             }
             // Anything else → ignored (keeps the name clean).
         }
@@ -82,19 +81,28 @@ final class BloggerMeta
         $parts   = [self::clean($this->name)];
         $parts[] = 'cb='  . self::fmt($this->cashbackPct ?? 0.0);
         $parts[] = 'lim=' . self::fmt($this->limitPct);
-        foreach (self::SOCIAL_KEYS as $k) {
-            $v = self::clean((string) ($this->socials[$k] ?? ''));
-            if ($v !== '') {
-                $parts[] = $k . '=' . $v;
+        foreach ($this->socials as $s) {
+            $net = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) ($s['net'] ?? '')));
+            $val = self::clean((string) ($s['val'] ?? ''));
+            if ($net !== '' && $val !== '') {
+                $parts[] = 's=' . $net . ':' . $val;
             }
         }
         return implode(' | ', $parts);
     }
 
-    /** Cashback from the comment, or $fallback when the comment carries none. */
     public function cashbackOr(float $fallback): float
     {
         return $this->cashbackPct ?? $fallback;
+    }
+
+    private function addSocial(string $net, string $val): void
+    {
+        $net = strtolower(preg_replace('/[^a-z0-9]/i', '', $net));
+        $val = trim($val);
+        if ($net !== '' && $val !== '') {
+            $this->socials[] = ['net' => $net, 'val' => $val];
+        }
     }
 
     private static function clampPct(float $p): float

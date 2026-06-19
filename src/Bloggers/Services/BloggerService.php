@@ -6,8 +6,10 @@ namespace App\Bloggers\Services;
 
 use App\Bloggers\Contracts\BloggerRepositoryInterface;
 use App\Bloggers\Contracts\PosterClientsGatewayInterface;
+use App\Bloggers\Support\BloggerError;
 use App\Bloggers\Support\BloggerMeta;
 use App\Bloggers\Support\PosterText;
+use App\Bloggers\Support\SocialNetworks;
 
 /**
  * Bloggers / referral system — domain orchestration.
@@ -210,10 +212,11 @@ final class BloggerService
     // ─── Write ─────────────────────────────────────────────────────────
 
     /**
-     * Manager creates a blogger. discount+cashback ≤ limit enforced.
+     * Manager creates a blogger. discount+cashback ≤ limit enforced. Socials
+     * optional here (the min-2 rule applies to public self-registration only).
      *
-     * @param  array<string,string> $socials
-     * @throws \RuntimeException Returns new client_id.
+     * @param  list<array{net:string,val:string}> $socials
+     * @throws BloggerError Returns new client_id.
      */
     public function create(string $promocode, string $name, string $email, float $discountPct, float $cashbackPct, float $limitPct, array $socials, string $createdBy): int
     {
@@ -236,22 +239,23 @@ final class BloggerService
         $clientId = $this->poster->createClient($this->cfg()['group_id'], $promocode, $meta->encode(), $email, $d);
         $this->invalidateClients();
         if ($clientId <= 0) {
-            throw new \RuntimeException('Poster не вернул client_id при создании.');
+            throw new BloggerError('err.generic');
         }
         $this->repo->create($clientId, $createdBy);
         return $clientId;
     }
 
     /**
-     * Manager edits a blogger (all params). discount+cashback ≤ limit enforced.
+     * Manager edits a blogger. discount+cashback ≤ limit enforced. Socials are
+     * NOT taken here — they are preserved from the existing comment (managed by
+     * the influencer at registration / in their cabinet).
      *
-     * @param  array<string,string> $socials
-     * @throws \RuntimeException
+     * @throws BloggerError
      */
-    public function update(int $clientId, string $promocode, string $name, string $email, float $discountPct, float $cashbackPct, float $limitPct, array $socials): void
+    public function update(int $clientId, string $promocode, string $name, string $email, float $discountPct, float $cashbackPct, float $limitPct): void
     {
         if ($clientId <= 0) {
-            throw new \RuntimeException('Не указан блогер.');
+            throw new BloggerError('err.no_blogger');
         }
         $promocode = $this->normPromocode($promocode);
         $this->assertPromocodeFree($promocode, $clientId);
@@ -262,11 +266,14 @@ final class BloggerService
         $lim = $this->normLimit($limitPct);
         $this->assertWithinLimit($d, $c, $lim);
 
+        // Preserve socials from the current comment.
+        $current = BloggerMeta::decode((string) (($this->posterRow($clientId)['comment']) ?? ''));
+
         $meta = new BloggerMeta(
             name: trim($name),
             cashbackPct: $c,
             limitPct: $lim,
-            socials: $this->normSocials($socials),
+            socials: $current->socials,
         );
 
         $this->poster->updateClient($this->cfg()['group_id'], $clientId, $promocode, $meta->encode(), $email, $d);
@@ -280,8 +287,8 @@ final class BloggerService
      * blogger must contact the owner, who bumps it in /admin/bloggers. Socials
      * go into the comment. (A manager can still deactivate a bad actor.)
      *
-     * @param  array<string,string> $socials
-     * @throws \RuntimeException
+     * @param  list<array{net:string,val:string}> $socials min 2 required
+     * @throws BloggerError
      */
     public function register(string $promocode, string $name, string $email, array $socials): int
     {
@@ -290,16 +297,21 @@ final class BloggerService
 
         $email = strtolower(trim($email));
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new \RuntimeException('Укажите корректный email.');
+            throw new BloggerError('err.email_invalid');
         }
         $name = trim(PosterText::safe($name));
         if ($name === '') {
-            throw new \RuntimeException('Укажите ваше имя.');
+            throw new BloggerError('err.name_required');
+        }
+
+        $socials = $this->normSocials($socials);
+        if (count($socials) < 2) {
+            throw new BloggerError('err.min_socials');
         }
 
         foreach ($this->groupClients() as $c) {
             if (strtolower(trim((string) ($c['email'] ?? ''))) === $email) {
-                throw new \RuntimeException('Этот email уже зарегистрирован в программе.');
+                throw new BloggerError('err.email_dup');
             }
         }
 
@@ -307,13 +319,13 @@ final class BloggerService
             name: $name,
             cashbackPct: 0.0,
             limitPct: self::REGISTER_LIMIT,
-            socials: $this->normSocials($socials),
+            socials: $socials,
         );
 
         $clientId = $this->poster->createClient($this->cfg()['group_id'], $promocode, $meta->encode(), $email, 0.0);
         $this->invalidateClients();
         if ($clientId <= 0) {
-            throw new \RuntimeException('Ошибка при создании аккаунта. Попробуйте позже.');
+            throw new BloggerError('err.generic');
         }
 
         // Active immediately at the 5% cap — the blogger can log in and use
@@ -329,16 +341,16 @@ final class BloggerService
      *
      * Rule: discount % + cashback % ≤ the blogger's own limit %.
      *
-     * @throws \RuntimeException
+     * @throws BloggerError
      */
     public function selfUpdate(int $clientId, string $promocode, float $discountPct, float $cashbackPct): void
     {
         if ($clientId <= 0) {
-            throw new \RuntimeException('Не указан блогер.');
+            throw new BloggerError('err.no_blogger');
         }
         $row = $this->posterRow($clientId);
         if ($row === null) {
-            throw new \RuntimeException('Блогер не найден в системе.');
+            throw new BloggerError('err.not_found');
         }
         $meta = BloggerMeta::decode((string) ($row['comment'] ?? ''));
 
@@ -372,7 +384,7 @@ final class BloggerService
     public function setActive(int $clientId, bool $active): void
     {
         if ($clientId <= 0) {
-            throw new \RuntimeException('Не указан блогер.');
+            throw new BloggerError('err.no_blogger');
         }
         $this->repo->setActive($clientId, $active);
     }
@@ -461,12 +473,26 @@ final class BloggerService
         return null;
     }
 
-    /** @param array<string,string> $s @return array<string,string> whitelisted, trimmed */
-    private function normSocials(array $s): array
+    /**
+     * Whitelist + trim a social list: keep only entries with a known network
+     * code and a non-empty value. Order preserved; duplicates (e.g. two
+     * Instagram accounts) allowed.
+     *
+     * @param  list<array{net?:string,val?:string}> $list
+     * @return list<array{net:string,val:string}>
+     */
+    private function normSocials(array $list): array
     {
         $out = [];
-        foreach (BloggerMeta::SOCIAL_KEYS as $k) {
-            $out[$k] = trim((string) ($s[$k] ?? ''));
+        foreach ($list as $s) {
+            if (!is_array($s)) {
+                continue;
+            }
+            $net = strtolower(trim((string) ($s['net'] ?? '')));
+            $val = trim((string) ($s['val'] ?? ''));
+            if ($net !== '' && $val !== '' && SocialNetworks::isValid($net)) {
+                $out[] = ['net' => $net, 'val' => $val];
+            }
         }
         return $out;
     }
@@ -486,12 +512,11 @@ final class BloggerService
     private function assertWithinLimit(float $discount, float $cashback, float $limit): void
     {
         if ($discount + $cashback > $limit + 0.0001) {
-            throw new \RuntimeException(sprintf(
-                'Скидка (%s%%) + кешбек (%s%%) превышают лимит %s%%.',
-                self::pctStr($discount),
-                self::pctStr($cashback),
-                self::pctStr($limit),
-            ));
+            throw new BloggerError('err.over_limit', [
+                'd' => self::pctStr($discount),
+                'c' => self::pctStr($cashback),
+                'l' => self::pctStr($limit),
+            ]);
         }
     }
 
@@ -506,13 +531,13 @@ final class BloggerService
     {
         $p = PosterText::safe($p);
         if ($p === '') {
-            throw new \RuntimeException('Промокод не может быть пустым.');
+            throw new BloggerError('err.promocode_empty');
         }
         if (preg_match('/\s/u', $p)) {
-            throw new \RuntimeException('Промокод не должен содержать пробелов (его ищут на кассе).');
+            throw new BloggerError('err.promocode_space');
         }
         if (mb_strlen($p) > 50) {
-            throw new \RuntimeException('Промокод слишком длинный (макс. 50 символов).');
+            throw new BloggerError('err.promocode_long');
         }
         return $p;
     }
@@ -527,7 +552,7 @@ final class BloggerService
                 continue;
             }
             if (mb_strtolower(self::promocodeOf($c)) === $needle) {
-                throw new \RuntimeException("Промокод «{$promocode}» уже занят другим блогером.");
+                throw new BloggerError('err.promocode_dup', ['p' => $promocode]);
             }
         }
     }

@@ -15,35 +15,44 @@ class BloggerMetaTest extends TestCase
         $this->assertSame('Anna Ivanova', $m->name);
         $this->assertNull($m->cashbackPct);
         $this->assertSame(15.0, $m->limitPct);
-        $this->assertSame('', $m->socials['ig']);
+        $this->assertSame([], $m->socials);
     }
 
-    public function test_decode_full(): void
+    public function test_decode_full_with_social_list(): void
     {
-        $m = BloggerMeta::decode('Anna | cb=7 | lim=12 | ig=@a | tg=@b | tt=@c | yt=youtube.com/@a');
+        $m = BloggerMeta::decode('Anna | cb=7 | lim=12 | s=ig:@a | s=ig:@second | s=fb:fb.com/anna');
         $this->assertSame('Anna', $m->name);
         $this->assertSame(7.0, $m->cashbackPct);
         $this->assertSame(12.0, $m->limitPct);
-        $this->assertSame('@a', $m->socials['ig']);
-        $this->assertSame('@b', $m->socials['tg']);
-        $this->assertSame('@c', $m->socials['tt']);
-        $this->assertSame('youtube.com/@a', $m->socials['yt']);
+        $this->assertCount(3, $m->socials);
+        $this->assertSame(['net' => 'ig', 'val' => '@a'], $m->socials[0]);
+        $this->assertSame(['net' => 'ig', 'val' => '@second'], $m->socials[1]); // duplicates allowed
+        $this->assertSame(['net' => 'fb', 'val' => 'fb.com/anna'], $m->socials[2]);
+    }
+
+    public function test_social_value_may_contain_colon(): void
+    {
+        $m = BloggerMeta::decode('Anna | s=yt:https://youtube.com/@a');
+        $this->assertSame(['net' => 'yt', 'val' => 'https://youtube.com/@a'], $m->socials[0]);
     }
 
     public function test_decode_tolerates_legacy_socials(): void
     {
-        $m = BloggerMeta::decode('Anna | IG: @a | TG: @b');
-        $this->assertSame('Anna', $m->name);
-        $this->assertSame('@a', $m->socials['ig']);
-        $this->assertSame('@b', $m->socials['tg']);
-        $this->assertNull($m->cashbackPct);
+        $m = BloggerMeta::decode('Anna | ig=@a | TG: @b | tt=@c');
+        $nets = array_column($m->socials, 'net');
+        $this->assertContains('ig', $nets);
+        $this->assertContains('tg', $nets);
+        $this->assertContains('tt', $nets);
         $this->assertSame(15.0, $m->limitPct);
     }
 
-    public function test_encode_format_and_omits_empty_socials(): void
+    public function test_encode_format(): void
     {
-        $m = new BloggerMeta('Anna', 7.0, 12.0, ['ig' => '@a', 'tg' => '', 'tt' => '', 'yt' => '']);
-        $this->assertSame('Anna | cb=7 | lim=12 | ig=@a', $m->encode());
+        $m = new BloggerMeta('Anna', 7.0, 12.0, [
+            ['net' => 'ig', 'val' => '@a'],
+            ['net' => 'vk', 'val' => 'vk.com/anna'],
+        ]);
+        $this->assertSame('Anna | cb=7 | lim=12 | s=ig:@a | s=vk:vk.com/anna', $m->encode());
     }
 
     public function test_encode_replaces_pipe_in_name(): void
@@ -54,14 +63,15 @@ class BloggerMetaTest extends TestCase
 
     public function test_roundtrip_preserves_fields(): void
     {
-        $src = new BloggerMeta('Имя', 5.5, 18.0, ['ig' => '@x', 'tg' => '@y', 'tt' => '', 'yt' => '']);
+        $src = new BloggerMeta('Имя', 5.5, 18.0, [
+            ['net' => 'ig', 'val' => '@x'],
+            ['net' => 'tg', 'val' => '@y'],
+        ]);
         $out = BloggerMeta::decode($src->encode());
         $this->assertSame('Имя', $out->name);
         $this->assertSame(5.5, $out->cashbackPct);
         $this->assertSame(18.0, $out->limitPct);
-        $this->assertSame('@x', $out->socials['ig']);
-        $this->assertSame('@y', $out->socials['tg']);
-        $this->assertSame('', $out->socials['tt']);
+        $this->assertSame($src->socials, $out->socials);
     }
 
     public function test_cashbackOr_uses_fallback_only_when_absent(): void
