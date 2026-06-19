@@ -136,17 +136,21 @@ a{color:inherit}
 .fld{display:flex;flex-direction:column;gap:.32rem;margin-bottom:.85rem}
 .fld label{font-size:.8rem;color:var(--muted);font-weight:500}
 .fld label .req{color:var(--gold)}
-.fld input,.fld select{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-sm);padding:.72rem .85rem;color:var(--text);font-size:16px;width:100%;-webkit-appearance:none;appearance:none}
+.fld input,.fld select{background-color:var(--bg2);border:1px solid var(--line);border-radius:var(--r-sm);padding:.72rem .85rem;color:var(--text);font-size:16px;width:100%;-webkit-appearance:none;appearance:none}
 .fld input:focus,.fld select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
-.fld input::placeholder{color:var(--faint)}
+.fld input::placeholder,.soc-row input::placeholder{color:var(--faint)}
 .fld .hint{font-size:.76rem;color:var(--faint);line-height:1.45}
 .subhead{font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin:.6rem 0 .15rem}
 .subhead .h{font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint);display:block;margin-top:.2rem;font-size:.74rem}
 .hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;opacity:0;pointer-events:none}
 .soc-row{display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center}
-.soc-row select{flex:0 0 40%}
-.soc-row input{flex:1 1 auto}
+.soc-row select,.soc-row input{background-color:var(--bg2);border:1px solid var(--line);border-radius:var(--r-sm);padding:.62rem .7rem;color:var(--text);font-size:16px;-webkit-appearance:none;appearance:none}
+.soc-row select{flex:0 0 42%}
+.soc-row input{flex:1 1 auto;min-width:0}
+.soc-row select:focus,.soc-row input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
 .soc-row .rm{flex:none;width:38px;height:38px;border-radius:9px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-size:1.2rem;line-height:1;cursor:pointer}
+/* Custom caret so styled <select> keeps its dropdown indicator in every browser (incl. Opera/Firefox) */
+.fld select,.soc-row select{-moz-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239aa3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .65rem center;padding-right:2.1rem}
 .soc-add{background:none;border:1px dashed var(--gold-line);color:var(--gold);border-radius:var(--r-sm);padding:.6rem;width:100%;font-size:.88rem;font-weight:600;cursor:pointer;margin-top:.15rem}
 .soc-warn{display:none;color:var(--err);font-size:.8rem;margin-top:.4rem}
 .btn-primary{display:block;width:100%;background:linear-gradient(180deg,#d4a85f,var(--gold));color:#1a1305;border:none;border-radius:var(--r-sm);padding:.92rem;font-size:1rem;font-weight:700;cursor:pointer;margin-top:.6rem}
@@ -346,15 +350,6 @@ $switcher .= '</nav>';
       <div class="stat ok"><div class="l"><?= $tt('d.stat.paid') ?></div><div class="v"><?= $fmtVnd($row['paid']) ?><span class="u">₫</span></div></div>
     </div>
 
-    <?php if (!empty($socials)): ?>
-      <div class="sec-h"><h2><?= $tt('d.socials.h') ?></h2></div>
-      <div class="card"><div class="chips">
-        <?php foreach ($socials as $s): ?>
-          <span class="chip"><b><?= $esc($netLabel((string) ($s['net'] ?? ''))) ?></b><span><?= $esc($s['val'] ?? '') ?></span></span>
-        <?php endforeach; ?>
-      </div></div>
-    <?php endif; ?>
-
     <div class="sec-h"><h2><?= $tt('d.checks.h') ?></h2><span><?= count($checks) ?></span></div>
     <div class="tbl-wrap">
       <?php if (empty($checks)): ?>
@@ -392,7 +387,22 @@ $switcher .= '</nav>';
           <label><?= $tt('d.f.promo') ?></label>
           <input type="text" name="promocode" value="<?= $esc($row['promocode']) ?>" required maxlength="50" pattern="[^\s]+">
         </div>
-        <div class="grid2">
+
+        <?php $editSoc = $socials; while (count($editSoc) < 2) { $editSoc[] = ['net' => '', 'val' => '']; } ?>
+        <div class="subhead"><?= $tt('w.socials.h') ?><span class="h"><?= $tt('w.socials.hint') ?></span></div>
+        <div id="soc-list">
+          <?php foreach ($editSoc as $s): ?>
+            <div class="soc-row" data-soc-row>
+              <select name="social_net[]"><?= $netOptions((string) ($s['net'] ?? '')) ?></select>
+              <input type="text" name="social_val[]" value="<?= $esc($s['val'] ?? '') ?>" placeholder="<?= $tt('social.val.ph') ?>">
+              <button type="button" class="rm" data-soc-remove aria-label="<?= $tt('social.remove') ?>">×</button>
+            </div>
+          <?php endforeach; ?>
+        </div>
+        <button type="button" class="soc-add" id="soc-add"><?= $tt('w.social.add') ?></button>
+        <div class="soc-warn" id="soc-warn"><?= $tt('err.min_socials') ?></div>
+
+        <div class="grid2" style="margin-top:.85rem">
           <div class="fld">
             <label><?= $tt('d.f.disc') ?></label>
             <input id="inp-disc" type="number" name="discount_pct" value="<?= $esc($fmtPct($row['discount_pct'] ?? 0)) ?>" min="0" max="<?= $esc($fmtPct($limit)) ?>" step="0.5" required>
@@ -407,6 +417,14 @@ $switcher .= '</nav>';
       </form>
       <p class="raise"><?= $isStart ? $traw('d.raise.start') : $traw('d.raise.more') ?></p>
     </div>
+
+    <template id="soc-tpl">
+      <div class="soc-row" data-soc-row>
+        <select name="social_net[]"><?= $netOptions('') ?></select>
+        <input type="text" name="social_val[]" placeholder="<?= $tt('social.val.ph') ?>">
+        <button type="button" class="rm" data-soc-remove aria-label="<?= $tt('social.remove') ?>">×</button>
+      </div>
+    </template>
 
     <p class="foot"><?= $tt('d.foot') ?></p>
   <?php endif; ?>
@@ -427,13 +445,15 @@ $switcher .= '</nav>';
       if (!b) return;
       if (list.querySelectorAll('[data-soc-row]').length > 1) b.closest('[data-soc-row]').remove();
     });
+    // Enforce "at least 2 filled" on whichever form holds the social list
+    // (registration on the welcome page, self-edit in the cabinet).
+    var form = list.closest('form');
+    if (form) form.addEventListener('submit', function (e) {
+      var filled = 0;
+      form.querySelectorAll('input[name="social_val[]"]').forEach(function (i) { if (i.value.trim() !== '') filled++; });
+      if (filled < 2) { e.preventDefault(); var w = document.getElementById('soc-warn'); if (w) w.style.display = 'block'; }
+    });
   }
-  var form = document.getElementById('reg-form');
-  if (form) form.addEventListener('submit', function (e) {
-    var filled = 0;
-    form.querySelectorAll('input[name="social_val[]"]').forEach(function (i) { if (i.value.trim() !== '') filled++; });
-    if (filled < 2) { e.preventDefault(); var w = document.getElementById('soc-warn'); if (w) w.style.display = 'block'; }
-  });
 
   // distribution hint
   var disc = document.getElementById('inp-disc');

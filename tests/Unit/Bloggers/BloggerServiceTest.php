@@ -285,6 +285,8 @@ class BloggerServiceTest extends TestCase
         ]);
     }
 
+    private const TWO_SOCIALS = [['net' => 'ig', 'val' => '@a'], ['net' => 'tg', 'val' => '@b']];
+
     public function test_selfUpdate_enforces_per_blogger_limit(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
@@ -292,13 +294,24 @@ class BloggerServiceTest extends TestCase
         ]);
         $this->poster->expects($this->never())->method('updateClient');
         $this->expectException(\RuntimeException::class);
-        $this->make()->selfUpdate(42, 'ANNA', 6.0, 6.0); // 12 > 10
+        $this->make()->selfUpdate(42, 'ANNA', 6.0, 6.0, self::TWO_SOCIALS); // 12 > 10
     }
 
-    public function test_selfUpdate_preserves_name_limit_socials(): void
+    public function test_selfUpdate_requires_two_socials(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
-            ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => '', 'comment' => 'Anna I | cb=0 | lim=20 | ig=@a', 'email' => 'a@b.com'],
+            ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => '', 'comment' => 'Anna | cb=0 | lim=20', 'email' => 'a@b.com'],
+        ]);
+        $this->poster->expects($this->never())->method('updateClient');
+        $this->expectException(\RuntimeException::class);
+        $this->make()->selfUpdate(42, 'ANNA', 1.0, 1.0, [['net' => 'ig', 'val' => '@a']]); // only 1
+    }
+
+    public function test_selfUpdate_updates_socials_and_cashback_keeps_limit(): void
+    {
+        // Existing limit 20 is preserved; socials are REPLACED by the new list.
+        $this->poster->method('listGroupClients')->willReturn([
+            ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => '', 'comment' => 'Anna I | cb=0 | lim=20 | s=ig:@old', 'email' => 'a@b.com'],
         ]);
         $this->poster->expects($this->once())->method('updateClient')
             ->with(
@@ -306,12 +319,16 @@ class BloggerServiceTest extends TestCase
                 42,
                 'ANNA',
                 $this->callback(static fn (string $c): bool =>
-                    str_contains($c, 'Anna I') && str_contains($c, 'cb=5') && str_contains($c, 'lim=20') && str_contains($c, 's=ig:@a')),
+                    str_contains($c, 'Anna I') && str_contains($c, 'cb=5') && str_contains($c, 'lim=20')
+                    && str_contains($c, 's=ig:@new') && str_contains($c, 's=vk:vk/new') && !str_contains($c, '@old')),
                 'a@b.com',
                 4.0,
             );
 
-        $this->make()->selfUpdate(42, 'ANNA', 4.0, 5.0); // 9 ≤ 20
+        $this->make()->selfUpdate(42, 'ANNA', 4.0, 5.0, [
+            ['net' => 'ig', 'val' => '@new'],
+            ['net' => 'vk', 'val' => 'vk/new'],
+        ]);
     }
 
     // ─── pay ────────────────────────────────────────────────────────────
