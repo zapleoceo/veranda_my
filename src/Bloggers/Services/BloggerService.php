@@ -336,14 +336,16 @@ final class BloggerService
     }
 
     /**
-     * Blogger edits their own promocode, discount %, and cashback %.
-     * Name, limit and socials are preserved from the existing comment.
+     * Blogger edits their own promocode, discount %, cashback % and social
+     * profiles. Name and limit are preserved from the existing comment (the
+     * limit is manager-controlled and must never be raisable here).
      *
-     * Rule: discount % + cashback % ≤ the blogger's own limit %.
+     * Rules: discount % + cashback % ≤ the blogger's own limit %; min 2 socials.
      *
+     * @param  list<array{net:string,val:string}> $socials
      * @throws BloggerError
      */
-    public function selfUpdate(int $clientId, string $promocode, float $discountPct, float $cashbackPct): void
+    public function selfUpdate(int $clientId, string $promocode, float $discountPct, float $cashbackPct, array $socials): void
     {
         if ($clientId <= 0) {
             throw new BloggerError('err.no_blogger');
@@ -358,11 +360,17 @@ final class BloggerService
         $c = $this->normPct($cashbackPct);
         $this->assertWithinLimit($d, $c, $meta->limitPct);
 
+        $socials = $this->normSocials($socials);
+        if (count($socials) < 2) {
+            throw new BloggerError('err.min_socials');
+        }
+
         $promocode = $this->normPromocode($promocode);
         $this->assertPromocodeFree($promocode, $clientId);
 
-        // Preserve name / limit / socials; update only the cashback.
+        // Keep name + limit (manager-owned); update cashback + socials.
         $meta->cashbackPct = $c;
+        $meta->socials     = $socials;
 
         $this->poster->updateClient(
             $this->cfg()['group_id'],

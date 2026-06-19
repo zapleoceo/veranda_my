@@ -145,6 +145,7 @@ final class BloggerCabinetController
                             (string) ($body['promocode'] ?? ''),
                             (float)  ($body['discount_pct'] ?? 0),
                             (float)  ($body['cashback_pct'] ?? 0),
+                            $this->socialsFromBody($body),
                         );
                         $flash['ok'] = $t->t('fl.saved');
                     } catch (\Throwable $e) {
