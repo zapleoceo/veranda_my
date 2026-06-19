@@ -49,10 +49,10 @@ class CallbackController
                 $_SESSION['blogger_email']     = $email;
                 $_SESSION['blogger_name']      = trim((string) ($userData['name'] ?? $email));
 
-                $next = (string) ($_SESSION['auth_next'] ?? '/blogger');
+                $next = (string) ($_SESSION['auth_next'] ?? '/blogers');
                 unset($_SESSION['auth_next']);
-                if (!str_starts_with($next, '/blogger')) {
-                    $next = '/blogger';
+                if (!str_starts_with($next, '/blogers')) {
+                    $next = '/blogers';
                 }
                 return $response->withHeader('Location', $next)->withStatus(302);
             }

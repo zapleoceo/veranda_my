@@ -84,10 +84,6 @@ use Slim\Routing\RouteCollectorProxy;
 
 // Root: админ → /admin, гость → главная на языке браузера (/en/, /ru/, /vi/).
 $app->get('/', function ($req, $res) {
-    // blogers.veranda.my → blogger cabinet (subdomain shares this app/docroot).
-    if (str_starts_with($req->getUri()->getHost(), 'blogers.')) {
-        return $res->withHeader('Location', '/blogger')->withStatus(302);
-    }
     if (!empty($_SESSION['user_email'])) {
         return $res->withHeader('Location', '/admin')->withStatus(302);
     }
@@ -201,11 +197,12 @@ $app->get('/tr3', [Tr3Controller::class, 'index']);
 $app->map(['GET', 'POST'], '/tr3/api',     [Tr3Controller::class, 'api']);
 $app->map(['GET', 'POST'], '/tr3/api.php', [Tr3Controller::class, 'api']);
 
-// Blogger cabinet — PUBLIC mobile page (own session realm, no AuthMiddleware;
-// the controller checks $_SESSION['blogger_client_id'] itself). Also the root
-// of blogers.veranda.my once DNS + vhost point the subdomain at this docroot.
-$app->get('/blogger[/]',      [BloggerCabinetController::class, 'index']);
-$app->get('/blogger/logout',  [BloggerCabinetController::class, 'logout']);
+// Blogger cabinet — PUBLIC mobile page at /blogers (own session realm, no
+// AuthMiddleware; the controller checks $_SESSION['blogger_client_id'] itself).
+$app->get('/blogers[/]',     [BloggerCabinetController::class, 'index']);
+$app->get('/blogers/logout', [BloggerCabinetController::class, 'logout']);
+// Back-compat: the earlier /blogger path → /blogers.
+$app->get('/blogger[/]', function ($req, $res) { return $res->withHeader('Location', '/blogers')->withStatus(301); });
 
 // Phase 4: reservations (auth-protected)
 $app->map(['GET', 'POST'], '/reservations[/]', [ReservationsController::class, 'index'])
