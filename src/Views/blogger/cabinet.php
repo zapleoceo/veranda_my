@@ -13,16 +13,17 @@
  * @var string      $dateTo     (report)
  */
 $mode     = $mode ?? 'login';
-$esc      = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-$val      = static fn (string $k) use (&$regData): string => $esc($regData[$k] ?? '');
-$fmtVnd   = static fn ($n): string => number_format((int) round((float) $n / 100), 0, '.', ' ');
-$fmtPct   = static fn ($p): string => rtrim(rtrim(number_format((float) $p, 2, '.', ''), '0'), '.');
 $row      = $row ?? null;
 $checks   = $checks ?? [];
 $regData  = $regData ?? [];
 $dateFrom = $dateFrom ?? date('Y-m-01');
 $dateTo   = $dateTo ?? date('Y-m-d');
 $flash    = $flash ?? ['ok' => '', 'err' => ''];
+$esc      = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+// Arrow fn auto-captures $esc and $regData by value — both defined above.
+$val      = static fn (string $k): string => $esc($regData[$k] ?? '');
+$fmtVnd   = static fn ($n): string => number_format((int) round((float) $n / 100), 0, '.', ' ');
+$fmtPct   = static fn ($p): string => rtrim(rtrim(number_format((float) $p, 2, '.', ''), '0'), '.');
 ?><!DOCTYPE html>
 <html lang="ru">
 <head>
