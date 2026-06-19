@@ -10,14 +10,6 @@ use App\Infrastructure\Session;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
-/**
- * Public blogger cabinet — a separate, mobile-first page (its own minimal
- * layout, NOT the admin sidebar). Reachable at /bloggers.
- *
- * Bloggers live in their own session realm (blogger_client_id, set by
- * CallbackController on Google login), completely separate from staff — they
- * can only ever see their own report.
- */
 final class BloggerCabinetController
 {
     public function __construct(private readonly BloggerService $svc) {}
@@ -27,10 +19,44 @@ final class BloggerCabinetController
         Session::start();
         $clientId = (int) ($_SESSION['blogger_client_id'] ?? 0);
 
+        // ── Unauthenticated: welcome page + registration ──────────────────
         if ($clientId <= 0) {
-            return $this->html($response, $this->render(['mode' => 'login', 'googleUrl' => $this->googleUrl()]));
+            $flash   = ['ok' => '', 'err' => ''];
+            $regData = [];
+
+            if (strtoupper($request->getMethod()) === 'POST') {
+                $body    = (array) ($request->getParsedBody() ?? []);
+                $regData = $body; // pre-fill form on error
+                if (isset($body['register'])) {
+                    try {
+                        $this->svc->register(
+                            (string) ($body['promocode'] ?? ''),
+                            (string) ($body['name'] ?? ''),
+                            (string) ($body['email'] ?? ''),
+                            [
+                                'ig' => (string) ($body['ig'] ?? ''),
+                                'tg' => (string) ($body['tg'] ?? ''),
+                                'tt' => (string) ($body['tt'] ?? ''),
+                                'yt' => (string) ($body['yt'] ?? ''),
+                            ],
+                        );
+                        $flash['ok'] = 'Заявка отправлена! Как только менеджер одобрит её, вы сможете войти через Google.';
+                        $regData     = []; // clear form after success
+                    } catch (\Throwable $e) {
+                        $flash['err'] = $e->getMessage();
+                    }
+                }
+            }
+
+            return $this->html($response, $this->render([
+                'mode'      => 'login',
+                'googleUrl' => $this->googleUrl(),
+                'flash'     => $flash,
+                'regData'   => $regData,
+            ]));
         }
 
+        // ── Authenticated blogger ─────────────────────────────────────────
         $q        = $request->getQueryParams();
         $dateFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($q['dateFrom'] ?? '')) ? (string) $q['dateFrom'] : date('Y-m-01');
         $dateTo   = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($q['dateTo'] ?? ''))   ? (string) $q['dateTo']   : date('Y-m-d');
@@ -40,7 +66,6 @@ final class BloggerCabinetController
 
         $flash = ['ok' => '', 'err' => ''];
 
-        // Handle self-edit POST
         if (strtoupper($request->getMethod()) === 'POST') {
             $body = (array) ($request->getParsedBody() ?? []);
             if (isset($body['save_self'])) {
@@ -88,7 +113,6 @@ final class BloggerCabinetController
         return $response->withHeader('Location', '/bloggers')->withStatus(302);
     }
 
-    /** Build the Google OAuth URL and stash auth_next=/bloggers for the callback. */
     private function googleUrl(): string
     {
         $_SESSION['auth_next'] = '/bloggers';
