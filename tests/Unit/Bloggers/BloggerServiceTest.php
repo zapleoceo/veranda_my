@@ -60,12 +60,29 @@ class BloggerServiceTest extends TestCase
 
         $this->assertCount(2, $list);
         $this->assertSame('ANNA', $list[0]['promocode']);
-        $this->assertSame(7.0, $list[0]['cashback_pct']);
+        $this->assertSame(7.0, $list[0]['cashback_pct']); // fallback from local (comment has no cb)
+        $this->assertSame(15.0, $list[0]['limit_pct']);   // default when comment has no lim
         $this->assertTrue($list[0]['tracked']);
         $this->assertSame('TESTBLOG', $list[1]['promocode']);
         $this->assertSame(0.0, $list[1]['cashback_pct']);
         $this->assertSame(1, $list[1]['is_active']);
         $this->assertFalse($list[1]['tracked']);
+    }
+
+    public function test_listBloggers_reads_params_from_comment(): void
+    {
+        $this->poster->method('listGroupClients')->willReturn([
+            ['client_id' => '50', 'firstname' => '', 'lastname' => 'NEO', 'comment' => 'Neo One | cb=9 | lim=20 | ig=@neo', 'email' => '', 'discount_per' => '3'],
+        ]);
+        $this->repo->method('allByClientId')->willReturn([
+            50 => ['cashback_pct' => 0.0, 'is_active' => 1, 'created_by' => ''],
+        ]);
+
+        $list = $this->make()->listBloggers();
+        $this->assertSame('Neo One', $list[0]['name']);
+        $this->assertSame(9.0,  $list[0]['cashback_pct']); // comment wins over local 0
+        $this->assertSame(20.0, $list[0]['limit_pct']);
+        $this->assertSame('@neo', $list[0]['socials']['ig']);
     }
 
     // ─── report (accrued / paid / to-pay) ───────────────────────────────
@@ -156,12 +173,19 @@ class BloggerServiceTest extends TestCase
     {
         $this->poster->method('listGroupClients')->willReturn([]);
         $this->poster->expects($this->once())->method('createClient')
-            ->with(10, 'ANNA2026', 'Anna Ivanova', 'anna@gmail.com', 10.0)
+            ->with(
+                10,
+                'ANNA2026',
+                $this->callback(static fn (string $c): bool =>
+                    str_contains($c, 'Anna Ivanova') && str_contains($c, 'cb=7') && str_contains($c, 'lim=20') && str_contains($c, 'ig=@anna')),
+                'anna@gmail.com',
+                10.0,
+            )
             ->willReturn(500);
         $this->repo->expects($this->once())->method('create')
-            ->with(500, 7.0, 'mgr@x.com');
+            ->with(500, 'mgr@x.com');
 
-        $id = $this->make()->create('ANNA2026', 'Anna Ivanova', 'anna@gmail.com', 10.0, 7.0, 'mgr@x.com');
+        $id = $this->make()->create('ANNA2026', 'Anna Ivanova', 'anna@gmail.com', 10.0, 7.0, 20.0, ['ig' => '@anna'], 'mgr@x.com');
         $this->assertSame(500, $id);
     }
 
@@ -170,7 +194,7 @@ class BloggerServiceTest extends TestCase
         $this->poster->method('listGroupClients')->willReturn([]);
         $this->poster->expects($this->never())->method('createClient');
         $this->expectException(\RuntimeException::class);
-        $this->make()->create('ANNA 2026', 'x', '', 0, 0, 'mgr');
+        $this->make()->create('ANNA 2026', 'x', '', 0, 0, 15, [], 'mgr');
     }
 
     public function test_create_rejects_duplicate_promocode(): void
@@ -180,20 +204,95 @@ class BloggerServiceTest extends TestCase
         ]);
         $this->poster->expects($this->never())->method('createClient');
         $this->expectException(\RuntimeException::class);
-        $this->make()->create('anna2026', 'x', '', 0, 0, 'mgr');
+        $this->make()->create('anna2026', 'x', '', 0, 0, 15, [], 'mgr');
     }
 
-    public function test_update_passes_group_and_persists(): void
+    public function test_create_rejects_when_discount_plus_cashback_over_limit(): void
+    {
+        $this->poster->method('listGroupClients')->willReturn([]);
+        $this->poster->expects($this->never())->method('createClient');
+        $this->expectException(\RuntimeException::class);
+        $this->make()->create('ANNA', 'Anna', '', 10.0, 10.0, 15.0, [], 'mgr'); // 20 > 15
+    }
+
+    public function test_update_passes_group_and_encodes_comment(): void
     {
         $this->poster->method('listGroupClients')->willReturn([
             ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => ''],
         ]);
         $this->poster->expects($this->once())->method('updateClient')
-            ->with(10, 42, 'ANNA', 'Anna I', 'a@gmail.com', 12.0);
-        $this->repo->expects($this->once())->method('saveCashback')
-            ->with(42, 8.0);
+            ->with(
+                10,
+                42,
+                'ANNA',
+                $this->callback(static fn (string $c): bool =>
+                    str_contains($c, 'Anna I') && str_contains($c, 'cb=8') && str_contains($c, 'lim=20')),
+                'a@gmail.com',
+                12.0,
+            );
 
-        $this->make()->update(42, 'ANNA', 'Anna I', 'a@gmail.com', 12.0, 8.0);
+        $this->make()->update(42, 'ANNA', 'Anna I', 'a@gmail.com', 12.0, 8.0, 20.0, []);
+    }
+
+    // ─── register / selfUpdate ──────────────────────────────────────────
+
+    public function test_register_creates_inactive_blogger_with_default_limit(): void
+    {
+        $this->poster->method('listGroupClients')->willReturn([]); // no dup promo/email
+        $this->poster->expects($this->once())->method('createClient')
+            ->with(
+                10,
+                'ANNA',
+                $this->callback(static fn (string $c): bool =>
+                    str_contains($c, 'Anna Ivanova') && str_contains($c, 'cb=0') && str_contains($c, 'lim=5') && str_contains($c, 'ig=@anna')),
+                'anna@gmail.com',
+                0.0,
+            )
+            ->willReturn(700);
+        $this->repo->expects($this->once())->method('create')->with(700, 'self');
+        $this->repo->expects($this->once())->method('setActive')->with(700, false);
+
+        $id = $this->make()->register('ANNA', 'Anna Ivanova', 'anna@gmail.com', ['ig' => '@anna']);
+        $this->assertSame(700, $id);
+    }
+
+    public function test_register_rejects_duplicate_email(): void
+    {
+        $this->poster->method('listGroupClients')->willReturn([
+            ['client_id' => '1', 'lastname' => 'X', 'firstname' => '', 'email' => 'anna@gmail.com'],
+        ]);
+        $this->poster->expects($this->never())->method('createClient');
+        $this->expectException(\RuntimeException::class);
+        $this->make()->register('NEWPROMO', 'Anna', 'anna@gmail.com', []);
+    }
+
+    public function test_selfUpdate_enforces_per_blogger_limit(): void
+    {
+        $this->poster->method('listGroupClients')->willReturn([
+            ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => '', 'comment' => 'Anna | cb=0 | lim=10', 'email' => 'a@b.com'],
+        ]);
+        $this->poster->expects($this->never())->method('updateClient');
+        $this->expectException(\RuntimeException::class);
+        $this->make()->selfUpdate(42, 'ANNA', 6.0, 6.0); // 12 > 10
+    }
+
+    public function test_selfUpdate_preserves_name_limit_socials(): void
+    {
+        $this->poster->method('listGroupClients')->willReturn([
+            ['client_id' => '42', 'lastname' => 'ANNA', 'firstname' => '', 'comment' => 'Anna I | cb=0 | lim=20 | ig=@a', 'email' => 'a@b.com'],
+        ]);
+        $this->poster->expects($this->once())->method('updateClient')
+            ->with(
+                10,
+                42,
+                'ANNA',
+                $this->callback(static fn (string $c): bool =>
+                    str_contains($c, 'Anna I') && str_contains($c, 'cb=5') && str_contains($c, 'lim=20') && str_contains($c, 'ig=@a')),
+                'a@b.com',
+                4.0,
+            );
+
+        $this->make()->selfUpdate(42, 'ANNA', 4.0, 5.0); // 9 ≤ 20
     }
 
     // ─── pay ────────────────────────────────────────────────────────────

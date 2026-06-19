@@ -24,6 +24,7 @@ $cols = [
     'name'        => 'Имя',
     'discount'    => 'Скидка',
     'cashbackpct' => 'Кешбек %',
+    'limit'       => 'Лимит %',
     'checks'      => 'Чеки',
     'revenue'     => 'Выручка ₫',
     'accrued'     => 'Начислено ₫',
@@ -73,10 +74,13 @@ tr.off td{opacity:.45}
 #blTable.hide-name .col-name,
 #blTable.hide-discount .col-discount,
 #blTable.hide-cashbackpct .col-cashbackpct,
+#blTable.hide-limit .col-limit,
 #blTable.hide-checks .col-checks,
 #blTable.hide-revenue .col-revenue,
 #blTable.hide-accrued .col-accrued,
 #blTable.hide-paid .col-paid{display:none}
+.bl-socials-row{grid-column:1 / -1;display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem .65rem}
+@media(max-width:680px){.bl-socials-row{grid-template-columns:1fr 1fr}}
 .bl-add .fields{display:grid;grid-template-columns:1fr 1fr;gap:.5rem .65rem;margin-bottom:.8rem}
 .bl-add .fields .wide{grid-column:1 / -1}
 .bl-add .fields label{margin-bottom:.15rem;font-size:.72rem}
@@ -160,6 +164,7 @@ tr.off td{opacity:.45}
           <th class="col-name">Имя</th>
           <th class="col-discount num">Скидка</th>
           <th class="col-cashbackpct num">Кешбек&nbsp;%</th>
+          <th class="col-limit num">Лимит&nbsp;%</th>
           <th class="col-checks num">Чеки</th>
           <th class="col-revenue num">Выручка&nbsp;₫</th>
           <th class="col-accrued num">Начислено&nbsp;₫</th>
@@ -178,6 +183,7 @@ tr.off td{opacity:.45}
             <td class="col-name"><?= $esc($r['name']) ?></td>
             <td class="col-discount num"><?= $fmtPct($r['discount_pct']) ?>%</td>
             <td class="col-cashbackpct num"><?= $fmtPct($r['cashback_pct']) ?>%</td>
+            <td class="col-limit num"><?= $fmtPct($r['limit_pct'] ?? 15) ?>%</td>
             <td class="col-checks num"><?= (int) $r['checks'] ?></td>
             <td class="col-revenue num"><?= $fmtVnd($r['revenue']) ?></td>
             <td class="col-accrued num"><?= $fmtVnd($r['cashback']) ?></td>
@@ -197,13 +203,14 @@ tr.off td{opacity:.45}
             </td>
           </tr>
           <tr class="bl-edit-cell" id="edit-<?= $id ?>" hidden>
-            <td colspan="10">
+            <td colspan="11">
               <div class="bl-edit-wrap">
                 <form method="post" action="/admin/bloggers" class="bl-edit-form">
                   <input type="hidden" name="update_blogger" value="1">
                   <input type="hidden" name="client_id" value="<?= $id ?>">
                   <input type="hidden" name="dateFrom" value="<?= $esc($dateFrom) ?>">
                   <input type="hidden" name="dateTo" value="<?= $esc($dateTo) ?>">
+                  <?php $soc = is_array($r['socials'] ?? null) ? $r['socials'] : []; ?>
                   <div class="fields">
                     <div>
                       <label>Промокод</label>
@@ -213,10 +220,6 @@ tr.off td{opacity:.45}
                       <label>Имя</label>
                       <input type="text" name="name" value="<?= $esc($r['name']) ?>">
                     </div>
-                    <div class="wide">
-                      <label>Email (gmail)</label>
-                      <input type="email" name="email" value="<?= $esc($r['email']) ?>">
-                    </div>
                     <div>
                       <label>Скидка %</label>
                       <input type="number" name="discount_pct" min="0" max="100" step="0.5" value="<?= $esc($fmtPct($r['discount_pct'])) ?>">
@@ -224,6 +227,20 @@ tr.off td{opacity:.45}
                     <div>
                       <label>Кешбек %</label>
                       <input type="number" name="cashback_pct" min="0" max="100" step="0.5" value="<?= $esc($fmtPct($r['cashback_pct'])) ?>">
+                    </div>
+                    <div>
+                      <label>Лимит %</label>
+                      <input type="number" name="limit_pct" min="0" max="100" step="0.5" value="<?= $esc($fmtPct($r['limit_pct'] ?? 15)) ?>">
+                    </div>
+                    <div class="wide">
+                      <label>Email (gmail)</label>
+                      <input type="email" name="email" value="<?= $esc($r['email']) ?>">
+                    </div>
+                    <div class="bl-socials-row">
+                      <div><label>Instagram</label><input type="text" name="ig" value="<?= $esc($soc['ig'] ?? '') ?>" placeholder="@handle"></div>
+                      <div><label>Telegram</label><input type="text" name="tg" value="<?= $esc($soc['tg'] ?? '') ?>" placeholder="@username"></div>
+                      <div><label>TikTok</label><input type="text" name="tt" value="<?= $esc($soc['tt'] ?? '') ?>" placeholder="@handle"></div>
+                      <div><label>YouTube</label><input type="text" name="yt" value="<?= $esc($soc['yt'] ?? '') ?>" placeholder="@канал / ссылка"></div>
                     </div>
                   </div>
                   <div class="bl-edit-actions">
@@ -295,6 +312,14 @@ tr.off td{opacity:.45}
           <label>Кешбек %</label>
           <input type="number" name="cashback_pct" min="0" max="100" step="0.5" value="0">
         </div>
+        <div class="wide">
+          <label>Лимит % (макс. скидка + кешбек)</label>
+          <input type="number" name="limit_pct" min="0" max="100" step="0.5" value="15">
+        </div>
+        <div><label>Instagram</label><input type="text" name="ig" placeholder="@handle"></div>
+        <div><label>Telegram</label><input type="text" name="tg" placeholder="@username"></div>
+        <div><label>TikTok</label><input type="text" name="tt" placeholder="@handle"></div>
+        <div><label>YouTube</label><input type="text" name="yt" placeholder="@канал / ссылка"></div>
       </div>
       <button class="btn btn-primary" type="submit">Создать</button>
     </form>

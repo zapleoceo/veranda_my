@@ -74,6 +74,8 @@ final class BloggersController
                     (string) ($body['email'] ?? ''),
                     (float) ($body['discount_pct'] ?? 0),
                     (float) ($body['cashback_pct'] ?? 0),
+                    (float) ($body['limit_pct'] ?? 15),
+                    $this->socialsFrom($body),
                     $userEmail,
                 );
                 $flash['ok'] = "Блогер создан (Poster client_id {$id}).";
@@ -85,6 +87,8 @@ final class BloggersController
                     (string) ($body['email'] ?? ''),
                     (float) ($body['discount_pct'] ?? 0),
                     (float) ($body['cashback_pct'] ?? 0),
+                    (float) ($body['limit_pct'] ?? 15),
+                    $this->socialsFrom($body),
                 );
                 $flash['ok'] = 'Изменения сохранены.';
             } elseif (isset($body['toggle_active'])) {
@@ -107,6 +111,17 @@ final class BloggersController
         } catch (\Throwable $e) {
             $flash['err'] = $e->getMessage();
         }
+    }
+
+    /** @return array<string,string> social handles from the posted form */
+    private function socialsFrom(array $body): array
+    {
+        return [
+            'ig' => (string) ($body['ig'] ?? ''),
+            'tg' => (string) ($body['tg'] ?? ''),
+            'tt' => (string) ($body['tt'] ?? ''),
+            'yt' => (string) ($body['yt'] ?? ''),
+        ];
     }
 
     private function layout(ResponseInterface $response, string $content, string $path, string $userEmail, array $flash): ResponseInterface

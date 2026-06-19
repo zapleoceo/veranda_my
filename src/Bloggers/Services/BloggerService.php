@@ -6,6 +6,7 @@ namespace App\Bloggers\Services;
 
 use App\Bloggers\Contracts\BloggerRepositoryInterface;
 use App\Bloggers\Contracts\PosterClientsGatewayInterface;
+use App\Bloggers\Support\BloggerMeta;
 use App\Bloggers\Support\PosterText;
 
 /**
@@ -16,15 +17,24 @@ use App\Bloggers\Support\PosterText;
  * the discount and accruing the sale to that client_id. Cashback = revenue
  * after discount × cashback%.
  *
+ * Parameter storage: discount lives in Poster's native `discount_per` (the POS
+ * applies it). Everything else — display name, cashback %, per-blogger limit %,
+ * social links — is packed into the Poster client `comment` via BloggerMeta.
+ * The local `bloggers` table holds only the approval flag + creator.
+ *
+ * Limit rule: discount % + cashback % ≤ the blogger's limit % (default 15;
+ * self-registration starts at 5; the manager sets it per blogger).
+ *
  * Payouts mirror /employees: a payout is a Poster expense finance transaction
  * in the configured category, tagged `... ID=<client_id> ...` in the comment;
  * "paid" is read back from finance.getTransactions of that category and matched
- * by the ID tag. "К выплате" = accrued cashback − already paid (≥ 0). The
- * search window for paid transactions runs from the period start through today,
- * so a payout made now for an earlier period is still found.
+ * by the ID tag. "К выплате" = accrued cashback − already paid (≥ 0).
  */
 final class BloggerService
 {
+    /** Default limit % assigned to a self-registered blogger (manager raises it). */
+    public const REGISTER_LIMIT = 5.0;
+
     private ?array $cfgCache = null;
 
     public function __construct(
@@ -35,7 +45,8 @@ final class BloggerService
     // ─── Read ──────────────────────────────────────────────────────────
 
     /**
-     * One row per blogger: Poster card merged with local cashback/active flags.
+     * One row per blogger: Poster card decoded (name/cashback/limit/socials)
+     * merged with the local active flag.
      *
      * @return list<array<string,mixed>>
      */
@@ -48,18 +59,20 @@ final class BloggerService
             if ($id <= 0) {
                 continue;
             }
-            $l = $local[$id] ?? null;
-            // comment format: "Real Name" or "Real Name | IG: @h | TG: @h | ..."
-            $commentRaw = trim((string) ($c['comment'] ?? ''));
-            $commentParts = array_map('trim', explode(' | ', $commentRaw, 2));
+            $l    = $local[$id] ?? null;
+            $meta = BloggerMeta::decode((string) ($c['comment'] ?? ''));
+            // Cashback: comment is authoritative; fall back to the legacy local
+            // column for rows created before the comment held it.
+            $cashback = $meta->cashbackOr((float) ($l['cashback_pct'] ?? 0.0));
             $out[] = [
                 'client_id'    => $id,
                 'promocode'    => self::promocodeOf($c),
-                'name'         => $commentParts[0],
-                'socials'      => $commentParts[1] ?? '',
+                'name'         => $meta->name,
+                'socials'      => $meta->socials,
                 'email'        => trim((string) ($c['email'] ?? '')),
                 'discount_pct' => (float) ($c['discount_per'] ?? 0),
-                'cashback_pct' => $l['cashback_pct'] ?? 0.0,
+                'cashback_pct' => $cashback,
+                'limit_pct'    => $meta->limitPct,
                 'is_active'    => $l !== null ? (int) $l['is_active'] : 1,
                 'total_payed'  => (int) round((float) ($c['total_payed_sum'] ?? 0)),
                 'tracked'      => $l !== null,
@@ -75,9 +88,8 @@ final class BloggerService
      * to-pay (all minor units). Totals are the payout figures over active
      * bloggers only.
      *
-     * Pass $onlyClientId to scope the report to a single blogger (used by the
-     * blogger's own mobile cabinet) — then only that row is returned and the
-     * totals cover just them.
+     * Pass $onlyClientId to scope the report to a single blogger (the mobile
+     * cabinet) — then only that row is returned and the totals cover just them.
      *
      * @return array{rows: list<array<string,mixed>>, totals: array<string,int>}
      */
@@ -137,8 +149,8 @@ final class BloggerService
 
     /**
      * Find a blogger's Poster client_id by their email address (used during
-     * Google OAuth). Matches against the email stored on the Poster client
-     * record (case-insensitive). Returns 0 if not found or not active.
+     * Google OAuth). Matches against the email on the Poster client record
+     * (case-insensitive). Returns 0 if not found or not active.
      */
     public function findByEmail(string $email): int
     {
@@ -178,23 +190,45 @@ final class BloggerService
 
     // ─── Write ─────────────────────────────────────────────────────────
 
-    /** @throws \RuntimeException. Returns new client_id. */
-    public function create(string $promocode, string $name, string $email, float $discountPct, float $cashbackPct, string $createdBy): int
+    /**
+     * Manager creates a blogger. discount+cashback ≤ limit enforced.
+     *
+     * @param  array<string,string> $socials
+     * @throws \RuntimeException Returns new client_id.
+     */
+    public function create(string $promocode, string $name, string $email, float $discountPct, float $cashbackPct, float $limitPct, array $socials, string $createdBy): int
     {
         $promocode = $this->normPromocode($promocode);
         $this->assertPromocodeFree($promocode, null);
         $email = trim($email);
 
-        $clientId = $this->poster->createClient($this->cfg()['group_id'], $promocode, $name, $email, $this->normPct($discountPct));
+        $d   = $this->normPct($discountPct);
+        $c   = $this->normPct($cashbackPct);
+        $lim = $this->normLimit($limitPct);
+        $this->assertWithinLimit($d, $c, $lim);
+
+        $meta = new BloggerMeta(
+            name: trim($name),
+            cashbackPct: $c,
+            limitPct: $lim,
+            socials: $this->normSocials($socials),
+        );
+
+        $clientId = $this->poster->createClient($this->cfg()['group_id'], $promocode, $meta->encode(), $email, $d);
         if ($clientId <= 0) {
             throw new \RuntimeException('Poster не вернул client_id при создании.');
         }
-        $this->repo->create($clientId, $this->normPct($cashbackPct), $createdBy);
+        $this->repo->create($clientId, $createdBy);
         return $clientId;
     }
 
-    /** @throws \RuntimeException */
-    public function update(int $clientId, string $promocode, string $name, string $email, float $discountPct, float $cashbackPct): void
+    /**
+     * Manager edits a blogger (all params). discount+cashback ≤ limit enforced.
+     *
+     * @param  array<string,string> $socials
+     * @throws \RuntimeException
+     */
+    public function update(int $clientId, string $promocode, string $name, string $email, float $discountPct, float $cashbackPct, float $limitPct, array $socials): void
     {
         if ($clientId <= 0) {
             throw new \RuntimeException('Не указан блогер.');
@@ -203,16 +237,25 @@ final class BloggerService
         $this->assertPromocodeFree($promocode, $clientId);
         $email = trim($email);
 
-        $this->poster->updateClient($this->cfg()['group_id'], $clientId, $promocode, $name, $email, $this->normPct($discountPct));
-        $this->repo->saveCashback($clientId, $this->normPct($cashbackPct));
+        $d   = $this->normPct($discountPct);
+        $c   = $this->normPct($cashbackPct);
+        $lim = $this->normLimit($limitPct);
+        $this->assertWithinLimit($d, $c, $lim);
+
+        $meta = new BloggerMeta(
+            name: trim($name),
+            cashbackPct: $c,
+            limitPct: $lim,
+            socials: $this->normSocials($socials),
+        );
+
+        $this->poster->updateClient($this->cfg()['group_id'], $clientId, $promocode, $meta->encode(), $email, $d);
     }
 
     /**
-     * Self-registration: a blogger signs up, account starts inactive (is_active=0)
-     * until a manager approves it in /admin/bloggers.
-     *
-     * $socials is a key→value map of social network handles/links (ig, tg, tt, yt).
-     * They are appended to the Poster client comment: "Name | IG: @h | TG: @h …"
+     * Self-registration: a blogger signs up; the account starts inactive
+     * (is_active=0) until a manager approves it. The limit starts at
+     * REGISTER_LIMIT (5%); the manager raises it. Socials go into the comment.
      *
      * @param  array<string,string> $socials
      * @throws \RuntimeException
@@ -231,37 +274,26 @@ final class BloggerService
             throw new \RuntimeException('Укажите ваше имя.');
         }
 
-        // Check email uniqueness within the group
         foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $c) {
             if (strtolower(trim((string) ($c['email'] ?? ''))) === $email) {
                 throw new \RuntimeException('Этот email уже зарегистрирован в программе.');
             }
         }
 
-        // Build Poster comment: "Name | IG: @h | TG: @h …"
-        $labels = ['ig' => 'IG', 'tg' => 'TG', 'tt' => 'TikTok', 'yt' => 'YT'];
-        $parts  = [PosterText::safe($name)];
-        foreach ($labels as $key => $label) {
-            $val = trim((string) ($socials[$key] ?? ''));
-            if ($val !== '') {
-                $parts[] = $label . ': ' . PosterText::safe($val);
-            }
-        }
-        $comment = implode(' | ', $parts);
-
-        $clientId = $this->poster->createClient(
-            $this->cfg()['group_id'],
-            $promocode,
-            $comment,
-            $email,
-            0.0, // discount starts at 0; manager sets it on approval
+        $meta = new BloggerMeta(
+            name: $name,
+            cashbackPct: 0.0,
+            limitPct: self::REGISTER_LIMIT,
+            socials: $this->normSocials($socials),
         );
+
+        $clientId = $this->poster->createClient($this->cfg()['group_id'], $promocode, $meta->encode(), $email, 0.0);
         if ($clientId <= 0) {
             throw new \RuntimeException('Ошибка при создании аккаунта. Попробуйте позже.');
         }
 
-        // Create local row and immediately set inactive — pending manager approval.
-        $this->repo->create($clientId, 0.0, 'self');
+        // Local row, then immediately inactive — pending manager approval.
+        $this->repo->create($clientId, 'self');
         $this->repo->setActive($clientId, false);
 
         return $clientId;
@@ -269,9 +301,9 @@ final class BloggerService
 
     /**
      * Blogger edits their own promocode, discount %, and cashback %.
-     * Real name and email stay untouched (manager-only fields).
+     * Name, limit and socials are preserved from the existing comment.
      *
-     * Rule: discount_pct + cashback_pct ≤ 15 %.
+     * Rule: discount % + cashback % ≤ the blogger's own limit %.
      *
      * @throws \RuntimeException
      */
@@ -280,37 +312,30 @@ final class BloggerService
         if ($clientId <= 0) {
             throw new \RuntimeException('Не указан блогер.');
         }
+        $row = $this->posterRow($clientId);
+        if ($row === null) {
+            throw new \RuntimeException('Блогер не найден в системе.');
+        }
+        $meta = BloggerMeta::decode((string) ($row['comment'] ?? ''));
+
         $d = $this->normPct($discountPct);
         $c = $this->normPct($cashbackPct);
-        if ($d + $c > 15.0) {
-            throw new \RuntimeException(
-                sprintf('Скидка (%.2f%%) + кешбек (%.2f%%) не могут превышать 15%%.', $d, $c)
-            );
-        }
+        $this->assertWithinLimit($d, $c, $meta->limitPct);
+
         $promocode = $this->normPromocode($promocode);
         $this->assertPromocodeFree($promocode, $clientId);
 
-        // Load current Poster record to preserve comment (real name) and email.
-        $poster = null;
-        foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $pb) {
-            if ((int) ($pb['client_id'] ?? 0) === $clientId) {
-                $poster = $pb;
-                break;
-            }
-        }
-        if ($poster === null) {
-            throw new \RuntimeException('Блогер не найден в системе.');
-        }
+        // Preserve name / limit / socials; update only the cashback.
+        $meta->cashbackPct = $c;
 
         $this->poster->updateClient(
             $this->cfg()['group_id'],
             $clientId,
             $promocode,
-            (string) ($poster['comment'] ?? ''),
-            (string) ($poster['email'] ?? ''),
+            $meta->encode(),
+            (string) ($row['email'] ?? ''),
             $d,
         );
-        $this->repo->saveCashback($clientId, $c);
     }
 
     /** Individual closed checks for the period, filtered to one client. */
@@ -400,9 +425,55 @@ final class BloggerService
         return $this->cfgCache ??= $this->repo->loadConfig();
     }
 
+    /** Raw Poster client row in the blogger group by id, or null. */
+    private function posterRow(int $clientId): ?array
+    {
+        foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $c) {
+            if ((int) ($c['client_id'] ?? 0) === $clientId) {
+                return $c;
+            }
+        }
+        return null;
+    }
+
+    /** @param array<string,string> $s @return array<string,string> whitelisted, trimmed */
+    private function normSocials(array $s): array
+    {
+        $out = [];
+        foreach (BloggerMeta::SOCIAL_KEYS as $k) {
+            $out[$k] = trim((string) ($s[$k] ?? ''));
+        }
+        return $out;
+    }
+
     private function normPct(float $p): float
     {
         return max(0.0, min(100.0, round($p, 2)));
+    }
+
+    /** Limit clamped to (0,100]; a non-positive value falls back to the default. */
+    private function normLimit(float $p): float
+    {
+        $p = $this->normPct($p);
+        return $p > 0 ? $p : BloggerMeta::DEFAULT_LIMIT;
+    }
+
+    private function assertWithinLimit(float $discount, float $cashback, float $limit): void
+    {
+        if ($discount + $cashback > $limit + 0.0001) {
+            throw new \RuntimeException(sprintf(
+                'Скидка (%s%%) + кешбек (%s%%) превышают лимит %s%%.',
+                self::pctStr($discount),
+                self::pctStr($cashback),
+                self::pctStr($limit),
+            ));
+        }
+    }
+
+    private static function pctStr(float $p): string
+    {
+        $s = rtrim(rtrim(number_format($p, 2, '.', ''), '0'), '.');
+        return $s === '' ? '0' : $s;
     }
 
     /** Trimmed, emoji-stripped, no whitespace (typeable at the POS), ≤ 50 chars. */
