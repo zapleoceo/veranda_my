@@ -49,10 +49,14 @@ final class BloggerService
                 continue;
             }
             $l = $local[$id] ?? null;
+            // comment format: "Real Name" or "Real Name | IG: @h | TG: @h | ..."
+            $commentRaw = trim((string) ($c['comment'] ?? ''));
+            $commentParts = array_map('trim', explode(' | ', $commentRaw, 2));
             $out[] = [
                 'client_id'    => $id,
                 'promocode'    => self::promocodeOf($c),
-                'name'         => trim((string) ($c['comment'] ?? '')),
+                'name'         => $commentParts[0],
+                'socials'      => $commentParts[1] ?? '',
                 'email'        => trim((string) ($c['email'] ?? '')),
                 'discount_pct' => (float) ($c['discount_per'] ?? 0),
                 'cashback_pct' => $l['cashback_pct'] ?? 0.0,
@@ -201,6 +205,66 @@ final class BloggerService
 
         $this->poster->updateClient($this->cfg()['group_id'], $clientId, $promocode, $name, $email, $this->normPct($discountPct));
         $this->repo->saveCashback($clientId, $this->normPct($cashbackPct));
+    }
+
+    /**
+     * Self-registration: a blogger signs up, account starts inactive (is_active=0)
+     * until a manager approves it in /admin/bloggers.
+     *
+     * $socials is a key→value map of social network handles/links (ig, tg, tt, yt).
+     * They are appended to the Poster client comment: "Name | IG: @h | TG: @h …"
+     *
+     * @param  array<string,string> $socials
+     * @throws \RuntimeException
+     */
+    public function register(string $promocode, string $name, string $email, array $socials): int
+    {
+        $promocode = $this->normPromocode($promocode);
+        $this->assertPromocodeFree($promocode, null);
+
+        $email = strtolower(trim($email));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \RuntimeException('Укажите корректный email.');
+        }
+        $name = trim(PosterText::safe($name));
+        if ($name === '') {
+            throw new \RuntimeException('Укажите ваше имя.');
+        }
+
+        // Check email uniqueness within the group
+        foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $c) {
+            if (strtolower(trim((string) ($c['email'] ?? ''))) === $email) {
+                throw new \RuntimeException('Этот email уже зарегистрирован в программе.');
+            }
+        }
+
+        // Build Poster comment: "Name | IG: @h | TG: @h …"
+        $labels = ['ig' => 'IG', 'tg' => 'TG', 'tt' => 'TikTok', 'yt' => 'YT'];
+        $parts  = [PosterText::safe($name)];
+        foreach ($labels as $key => $label) {
+            $val = trim((string) ($socials[$key] ?? ''));
+            if ($val !== '') {
+                $parts[] = $label . ': ' . PosterText::safe($val);
+            }
+        }
+        $comment = implode(' | ', $parts);
+
+        $clientId = $this->poster->createClient(
+            $this->cfg()['group_id'],
+            $promocode,
+            $comment,
+            $email,
+            0.0, // discount starts at 0; manager sets it on approval
+        );
+        if ($clientId <= 0) {
+            throw new \RuntimeException('Ошибка при создании аккаунта. Попробуйте позже.');
+        }
+
+        // Create local row and immediately set inactive — pending manager approval.
+        $this->repo->create($clientId, 0.0, 'self');
+        $this->repo->setActive($clientId, false);
+
+        return $clientId;
     }
 
     /**
