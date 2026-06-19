@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controllers\Auth;
 
-use App\Infrastructure\Config;
+use App\Infrastructure\GoogleOAuth;
+use App\Infrastructure\ReturnPath;
 use App\Infrastructure\Session;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -21,7 +22,7 @@ class LoginController
         // internal paths are accepted — never absolute URLs / //host
         // tricks.
         $qNext = (string) ($request->getQueryParams()['next'] ?? '');
-        if ($qNext !== '' && self::isSafeReturnPath($qNext)) {
+        if ($qNext !== '' && ReturnPath::isSafe($qNext)) {
             $_SESSION['auth_next'] = $qNext;
         }
 
@@ -31,15 +32,7 @@ class LoginController
             return $response->withHeader('Location', $next)->withStatus(302);
         }
 
-        $params = [
-            'client_id'     => Config::require('GOOGLE_CLIENT_ID'),
-            'redirect_uri'  => Config::require('GOOGLE_REDIRECT_URI'),
-            'response_type' => 'code',
-            'scope'         => 'email profile',
-            'access_type'   => 'online',
-            'prompt'        => 'select_account',
-        ];
-        $url = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query($params);
+        $url = GoogleOAuth::authorizeUrl();
 
         $html = <<<HTML
         <!DOCTYPE html>
@@ -91,14 +84,5 @@ class LoginController
         @session_destroy();
 
         return $response->withHeader('Location', '/login')->withStatus(302);
-    }
-
-    /** Only redirect back to internal paths (no open-redirect risk). */
-    private static function isSafeReturnPath(string $path): bool
-    {
-        if ($path === '' || $path[0] !== '/') return false;
-        if (str_starts_with($path, '//'))     return false;
-        if (str_starts_with($path, '/login')) return false;
-        return true;
     }
 }

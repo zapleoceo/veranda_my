@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Middleware;
 
+use App\Infrastructure\ReturnPath;
 use App\Infrastructure\Session;
 use App\Services\UserPermissionsService;
 use Psr\Http\Message\ResponseFactoryInterface;
@@ -30,7 +31,7 @@ class AuthMiddleware implements MiddlewareInterface
             $uri  = $request->getUri();
             $path = $uri->getPath();
             $next = $path . (($q = $uri->getQuery()) !== '' ? '?' . $q : '');
-            if (self::isSafeReturnPath($path)) {
+            if (ReturnPath::isSafe($path)) {
                 $_SESSION['auth_next'] = $next;
             }
 
@@ -92,16 +93,5 @@ class AuthMiddleware implements MiddlewareInterface
         $ct = strtolower($r->getHeaderLine('Content-Type'));
         if ($ct !== '' && str_contains($ct, 'application/json')) return true;
         return false;
-    }
-
-    /** Only redirect back to internal paths (no open-redirect risk). */
-    private static function isSafeReturnPath(string $path): bool
-    {
-        if ($path === '' || $path[0] !== '/') return false;
-        if (str_starts_with($path, '//'))     return false;
-        if (str_starts_with($path, '/login')) return false;
-        if (str_starts_with($path, '/logout')) return false;
-        if (str_starts_with($path, '/auth/')) return false;
-        return true;
     }
 }

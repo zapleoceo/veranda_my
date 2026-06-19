@@ -100,6 +100,7 @@ tr.off td{opacity:.45}
   <summary>⚙ Настройки модуля</summary>
   <form method="post" action="/admin/bloggers">
     <input type="hidden" name="save_config" value="1">
+    <input type="hidden" name="csrf_token" value="<?= $esc($csrf ?? '') ?>">
     <input type="hidden" name="dateFrom" value="<?= $esc($dateFrom) ?>">
     <input type="hidden" name="dateTo" value="<?= $esc($dateTo) ?>">
     <div class="bl-cfg-fields">
@@ -207,6 +208,7 @@ tr.off td{opacity:.45}
               <div class="bl-edit-wrap">
                 <form method="post" action="/admin/bloggers" class="bl-edit-form">
                   <input type="hidden" name="update_blogger" value="1">
+                  <input type="hidden" name="csrf_token" value="<?= $esc($csrf ?? '') ?>">
                   <input type="hidden" name="client_id" value="<?= $id ?>">
                   <input type="hidden" name="dateFrom" value="<?= $esc($dateFrom) ?>">
                   <input type="hidden" name="dateTo" value="<?= $esc($dateTo) ?>">
@@ -250,6 +252,7 @@ tr.off td{opacity:.45}
                 </form>
                 <div class="bl-edit-actions" style="margin-top:.55rem">
                   <form method="post" action="/admin/bloggers">
+                    <input type="hidden" name="csrf_token" value="<?= $esc($csrf ?? '') ?>">
                     <input type="hidden" name="client_id" value="<?= $id ?>">
                     <input type="hidden" name="dateFrom" value="<?= $esc($dateFrom) ?>">
                     <input type="hidden" name="dateTo" value="<?= $esc($dateTo) ?>">
@@ -289,6 +292,7 @@ tr.off td{opacity:.45}
     </div>
     <form method="post" action="/admin/bloggers" class="bl-add">
       <input type="hidden" name="create_blogger" value="1">
+      <input type="hidden" name="csrf_token" value="<?= $esc($csrf ?? '') ?>">
       <input type="hidden" name="dateFrom" value="<?= $esc($dateFrom) ?>">
       <input type="hidden" name="dateTo" value="<?= $esc($dateTo) ?>">
       <div class="fields">
@@ -336,6 +340,7 @@ tr.off td{opacity:.45}
     </div>
     <form method="post" action="/admin/bloggers" class="bl-add">
       <input type="hidden" name="pay_blogger" value="1">
+      <input type="hidden" name="csrf_token" value="<?= $esc($csrf ?? '') ?>">
       <input type="hidden" name="client_id" id="payClientId" value="">
       <input type="hidden" name="dateFrom" value="<?= $esc($dateFrom) ?>">
       <input type="hidden" name="dateTo" value="<?= $esc($dateTo) ?>">

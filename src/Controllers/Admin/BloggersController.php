@@ -6,6 +6,7 @@ namespace App\Controllers\Admin;
 
 use App\Bloggers\Services\BloggerService;
 use App\Infrastructure\Permissions;
+use App\Order\Infrastructure\Csrf;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -45,6 +46,7 @@ final class BloggersController
             [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
         }
 
+        $csrf     = Csrf::token();
         $config   = $this->svc->config();
         $report   = ['rows' => [], 'totals' => ['bloggers' => 0, 'checks' => 0, 'revenue' => 0, 'cashback' => 0, 'paid' => 0, 'topay' => 0]];
         $accounts = [];
@@ -66,6 +68,12 @@ final class BloggersController
 
     private function handlePost(array $body, string $userEmail, array &$flash): void
     {
+        // CSRF gate for every mutation (create/update/toggle/config/pay —
+        // the last two move money/config). Synchroniser token, fail-closed.
+        if (!Csrf::verify((string) ($body['csrf_token'] ?? ''))) {
+            $flash['err'] = 'Сессия устарела — обновите страницу и повторите действие.';
+            return;
+        }
         try {
             if (isset($body['create_blogger'])) {
                 $id = $this->svc->create(

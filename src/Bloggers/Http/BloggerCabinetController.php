@@ -5,11 +5,24 @@ declare(strict_types=1);
 namespace App\Bloggers\Http;
 
 use App\Bloggers\Services\BloggerService;
-use App\Infrastructure\Config;
+use App\Infrastructure\GoogleOAuth;
 use App\Infrastructure\Session;
+use App\OnlineOrder\Infrastructure\SubmitThrottle;
+use App\Order\Infrastructure\Csrf;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
+/**
+ * Public influencer cabinet at /bloggers — its own mobile-first page (not the
+ * admin layout). Bloggers live in a separate session realm (blogger_client_id,
+ * NO user_email) so they can only ever see their own data and can never reach
+ * /admin/*.
+ *
+ * State-changing POSTs are guarded by a synchroniser CSRF token (shared app
+ * session token via Csrf); public self-registration additionally has a
+ * honeypot + per-session submit throttle to blunt bot/spam flooding of the
+ * Poster client list.
+ */
 final class BloggerCabinetController
 {
     public function __construct(private readonly BloggerService $svc) {}
@@ -19,44 +32,78 @@ final class BloggerCabinetController
         Session::start();
         $clientId = (int) ($_SESSION['blogger_client_id'] ?? 0);
 
-        // ── Unauthenticated: welcome page + registration ──────────────────
-        if ($clientId <= 0) {
-            $flash   = ['ok' => '', 'err' => ''];
-            $regData = [];
+        return $clientId > 0
+            ? $this->cabinet($request, $response, $clientId)
+            : $this->welcome($request, $response);
+    }
 
-            if (strtoupper($request->getMethod()) === 'POST') {
-                $body    = (array) ($request->getParsedBody() ?? []);
-                $regData = $body; // pre-fill form on error
-                if (isset($body['register'])) {
-                    try {
-                        $this->svc->register(
-                            (string) ($body['promocode'] ?? ''),
-                            (string) ($body['name'] ?? ''),
-                            (string) ($body['email'] ?? ''),
-                            [
-                                'ig' => (string) ($body['ig'] ?? ''),
-                                'tg' => (string) ($body['tg'] ?? ''),
-                                'tt' => (string) ($body['tt'] ?? ''),
-                                'yt' => (string) ($body['yt'] ?? ''),
-                            ],
-                        );
-                        $flash['ok'] = 'Заявка отправлена! Как только менеджер одобрит её, вы сможете войти через Google.';
-                        $regData     = []; // clear form after success
-                    } catch (\Throwable $e) {
-                        $flash['err'] = $e->getMessage();
-                    }
-                }
+    // ── Unauthenticated: welcome + registration ───────────────────────────
+
+    private function welcome(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $flash   = ['ok' => '', 'err' => ''];
+        $regData = [];
+
+        if (strtoupper($request->getMethod()) === 'POST') {
+            $body    = (array) ($request->getParsedBody() ?? []);
+            $regData = $body;
+            if (isset($body['register'])) {
+                $regData = $this->handleRegister($body, $flash);
             }
-
-            return $this->html($response, $this->render([
-                'mode'      => 'login',
-                'googleUrl' => $this->googleUrl(),
-                'flash'     => $flash,
-                'regData'   => $regData,
-            ]));
         }
 
-        // ── Authenticated blogger ─────────────────────────────────────────
+        return $this->html($response, $this->render([
+            'mode'      => 'login',
+            'googleUrl' => $this->googleUrl(),
+            'csrf'      => Csrf::token(),
+            'flash'     => $flash,
+            'regData'   => $regData,
+        ]));
+    }
+
+    /** @return array<string,mixed> form data to re-fill on error ([] on success) */
+    private function handleRegister(array $body, array &$flash): array
+    {
+        if (!Csrf::verify((string) ($body['csrf_token'] ?? ''))) {
+            $flash['err'] = 'Сессия устарела — обновите страницу и попробуйте ещё раз.';
+            return $body;
+        }
+        // Honeypot: real browsers leave it empty, bots fill it. Neutral reply.
+        if (trim((string) ($body['website'] ?? '')) !== '') {
+            $flash['err'] = 'Не удалось отправить заявку. Попробуйте позже.';
+            return $body;
+        }
+        $throttle = new SubmitThrottle(5, 1800, 'bloggers_register_submits');
+        if (!$throttle->allow()) {
+            $flash['err'] = 'Слишком много попыток. Подождите немного и попробуйте снова.';
+            return $body;
+        }
+
+        try {
+            $this->svc->register(
+                (string) ($body['promocode'] ?? ''),
+                (string) ($body['name'] ?? ''),
+                (string) ($body['email'] ?? ''),
+                [
+                    'ig' => (string) ($body['ig'] ?? ''),
+                    'tg' => (string) ($body['tg'] ?? ''),
+                    'tt' => (string) ($body['tt'] ?? ''),
+                    'yt' => (string) ($body['yt'] ?? ''),
+                ],
+            );
+            $throttle->hit();
+            $flash['ok'] = 'Готово! Войдите через Google тем же адресом — и личный кабинет ваш.';
+            return [];
+        } catch (\Throwable $e) {
+            $flash['err'] = $e->getMessage();
+            return $body;
+        }
+    }
+
+    // ── Authenticated blogger cabinet ─────────────────────────────────────
+
+    private function cabinet(ServerRequestInterface $request, ResponseInterface $response, int $clientId): ResponseInterface
+    {
         $q        = $request->getQueryParams();
         $dateFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($q['dateFrom'] ?? '')) ? (string) $q['dateFrom'] : date('Y-m-01');
         $dateTo   = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($q['dateTo'] ?? ''))   ? (string) $q['dateTo']   : date('Y-m-d');
@@ -69,16 +116,20 @@ final class BloggerCabinetController
         if (strtoupper($request->getMethod()) === 'POST') {
             $body = (array) ($request->getParsedBody() ?? []);
             if (isset($body['save_self'])) {
-                try {
-                    $this->svc->selfUpdate(
-                        $clientId,
-                        (string) ($body['promocode'] ?? ''),
-                        (float)  ($body['discount_pct'] ?? 0),
-                        (float)  ($body['cashback_pct'] ?? 0),
-                    );
-                    $flash['ok'] = 'Изменения сохранены.';
-                } catch (\Throwable $e) {
-                    $flash['err'] = $e->getMessage();
+                if (!Csrf::verify((string) ($body['csrf_token'] ?? ''))) {
+                    $flash['err'] = 'Сессия устарела — обновите страницу и сохраните ещё раз.';
+                } else {
+                    try {
+                        $this->svc->selfUpdate(
+                            $clientId,
+                            (string) ($body['promocode'] ?? ''),
+                            (float)  ($body['discount_pct'] ?? 0),
+                            (float)  ($body['cashback_pct'] ?? 0),
+                        );
+                        $flash['ok'] = 'Изменения сохранены.';
+                    } catch (\Throwable $e) {
+                        $flash['err'] = $e->getMessage();
+                    }
                 }
             }
         }
@@ -98,6 +149,7 @@ final class BloggerCabinetController
         return $this->html($response, $this->render([
             'mode'     => 'report',
             'name'     => (string) ($_SESSION['blogger_name'] ?? ''),
+            'csrf'     => Csrf::token(),
             'row'      => $row,
             'checks'   => $checks,
             'dateFrom' => $dateFrom,
@@ -113,18 +165,11 @@ final class BloggerCabinetController
         return $response->withHeader('Location', '/bloggers')->withStatus(302);
     }
 
+    /** Stash auth_next=/bloggers, then build the Google consent URL. */
     private function googleUrl(): string
     {
         $_SESSION['auth_next'] = '/bloggers';
-        $params = [
-            'client_id'     => Config::require('GOOGLE_CLIENT_ID'),
-            'redirect_uri'  => Config::require('GOOGLE_REDIRECT_URI'),
-            'response_type' => 'code',
-            'scope'         => 'email profile',
-            'access_type'   => 'online',
-            'prompt'        => 'select_account',
-        ];
-        return 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query($params);
+        return GoogleOAuth::authorizeUrl();
     }
 
     private function render(array $vars): string
