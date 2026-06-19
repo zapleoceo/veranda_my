@@ -197,12 +197,10 @@ $app->get('/tr3', [Tr3Controller::class, 'index']);
 $app->map(['GET', 'POST'], '/tr3/api',     [Tr3Controller::class, 'api']);
 $app->map(['GET', 'POST'], '/tr3/api.php', [Tr3Controller::class, 'api']);
 
-// Blogger cabinet — PUBLIC mobile page at /blogers (own session realm, no
+// Blogger cabinet — PUBLIC mobile page at /bloggers (own session realm, no
 // AuthMiddleware; the controller checks $_SESSION['blogger_client_id'] itself).
-$app->get('/blogers[/]',     [BloggerCabinetController::class, 'index']);
-$app->get('/blogers/logout', [BloggerCabinetController::class, 'logout']);
-// Back-compat: the earlier /blogger path → /blogers.
-$app->get('/blogger[/]', function ($req, $res) { return $res->withHeader('Location', '/blogers')->withStatus(301); });
+$app->get('/bloggers[/]',     [BloggerCabinetController::class, 'index']);
+$app->get('/bloggers/logout', [BloggerCabinetController::class, 'logout']);
 
 // Phase 4: reservations (auth-protected)
 $app->map(['GET', 'POST'], '/reservations[/]', [ReservationsController::class, 'index'])
