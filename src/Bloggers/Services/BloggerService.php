@@ -131,6 +131,35 @@ final class BloggerService
         ];
     }
 
+    /**
+     * Find a blogger's Poster client_id by their email address (used during
+     * Google OAuth). Matches against the email stored on the Poster client
+     * record (case-insensitive). Returns 0 if not found or not active.
+     */
+    public function findByEmail(string $email): int
+    {
+        if ($email === '') {
+            return 0;
+        }
+        $needle = strtolower(trim($email));
+        $local  = $this->repo->allByClientId();
+        try {
+            foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $c) {
+                $clientEmail = strtolower(trim((string) ($c['email'] ?? '')));
+                if ($clientEmail === '' || $clientEmail !== $needle) {
+                    continue;
+                }
+                $id = (int) ($c['client_id'] ?? 0);
+                if ($id > 0 && isset($local[$id]) && $local[$id]['is_active']) {
+                    return $id;
+                }
+            }
+        } catch (\Throwable) {
+            // Poster API unavailable — fail closed
+        }
+        return 0;
+    }
+
     /** Finance accounts for the payout dropdown. @return array<int,string> */
     public function accounts(): array
     {
@@ -156,7 +185,7 @@ final class BloggerService
         if ($clientId <= 0) {
             throw new \RuntimeException('Poster не вернул client_id при создании.');
         }
-        $this->repo->create($clientId, $email, $this->normPct($cashbackPct), $createdBy);
+        $this->repo->create($clientId, $this->normPct($cashbackPct), $createdBy);
         return $clientId;
     }
 
@@ -171,7 +200,7 @@ final class BloggerService
         $email = trim($email);
 
         $this->poster->updateClient($this->cfg()['group_id'], $clientId, $promocode, $name, $email, $this->normPct($discountPct));
-        $this->repo->saveCashbackAndGmail($clientId, $email, $this->normPct($cashbackPct));
+        $this->repo->saveCashback($clientId, $this->normPct($cashbackPct));
     }
 
     public function setActive(int $clientId, bool $active): void

@@ -8,9 +8,12 @@ use App\Bloggers\Contracts\BloggerRepositoryInterface;
 use App\Infrastructure\Database;
 
 /**
- * Local `bloggers` table (cashback %, gmail↔client link, active flag) plus the
- * module config (group id + payout finance-category id), stored as two
- * `system_meta` keys. Self-creates the `bloggers` table on first use.
+ * Local `bloggers` table (cashback %, active flag) plus the module config
+ * (group id + payout finance-category id), stored as two `system_meta` keys.
+ * Self-creates the `bloggers` table on first use.
+ *
+ * Blogger email is NOT stored locally — it lives on the Poster client record
+ * and is looked up from there during Google OAuth.
  */
 final class BloggerRepository implements BloggerRepositoryInterface
 {
@@ -30,14 +33,13 @@ final class BloggerRepository implements BloggerRepositoryInterface
     public function allByClientId(): array
     {
         $rows = $this->db->query(
-            "SELECT poster_client_id, gmail, cashback_pct, is_active, created_by FROM {$this->db->t('bloggers')}"
+            "SELECT poster_client_id, cashback_pct, is_active, created_by FROM {$this->db->t('bloggers')}"
         )->fetchAll();
 
         $out = [];
         foreach ($rows as $r) {
             $out[(int) $r['poster_client_id']] = [
                 'cashback_pct' => (float) $r['cashback_pct'],
-                'gmail'        => (string) $r['gmail'],
                 'is_active'    => (int) $r['is_active'],
                 'created_by'   => (string) $r['created_by'],
             ];
@@ -45,23 +47,23 @@ final class BloggerRepository implements BloggerRepositoryInterface
         return $out;
     }
 
-    public function create(int $clientId, string $gmail, float $cashbackPct, string $createdBy): void
+    public function create(int $clientId, float $cashbackPct, string $createdBy): void
     {
         $this->db->query(
-            "INSERT INTO {$this->db->t('bloggers')} (poster_client_id, gmail, cashback_pct, is_active, created_by)
-             VALUES (?, ?, ?, 1, ?)
-             ON DUPLICATE KEY UPDATE gmail = VALUES(gmail), cashback_pct = VALUES(cashback_pct), is_active = 1",
-            [$clientId, $gmail, $cashbackPct, $createdBy]
+            "INSERT INTO {$this->db->t('bloggers')} (poster_client_id, cashback_pct, is_active, created_by)
+             VALUES (?, ?, 1, ?)
+             ON DUPLICATE KEY UPDATE cashback_pct = VALUES(cashback_pct), is_active = 1",
+            [$clientId, $cashbackPct, $createdBy]
         );
     }
 
-    public function saveCashbackAndGmail(int $clientId, string $gmail, float $cashbackPct): void
+    public function saveCashback(int $clientId, float $cashbackPct): void
     {
         $this->db->query(
-            "INSERT INTO {$this->db->t('bloggers')} (poster_client_id, gmail, cashback_pct, created_by)
-             VALUES (?, ?, ?, '')
-             ON DUPLICATE KEY UPDATE gmail = VALUES(gmail), cashback_pct = VALUES(cashback_pct)",
-            [$clientId, $gmail, $cashbackPct]
+            "INSERT INTO {$this->db->t('bloggers')} (poster_client_id, cashback_pct, created_by)
+             VALUES (?, ?, '')
+             ON DUPLICATE KEY UPDATE cashback_pct = VALUES(cashback_pct)",
+            [$clientId, $cashbackPct]
         );
     }
 
@@ -120,7 +122,6 @@ final class BloggerRepository implements BloggerRepositoryInterface
             "CREATE TABLE IF NOT EXISTS {$t} (
                 id               INT UNSIGNED   NOT NULL AUTO_INCREMENT,
                 poster_client_id INT UNSIGNED   NOT NULL,
-                gmail            VARCHAR(255)   NOT NULL DEFAULT '',
                 cashback_pct     DECIMAL(5,2)   NOT NULL DEFAULT 0,
                 is_active        TINYINT(1)     NOT NULL DEFAULT 1,
                 created_by       VARCHAR(255)   NOT NULL DEFAULT '',

@@ -53,7 +53,7 @@ class BloggerServiceTest extends TestCase
             ['client_id' => '77',  'firstname' => '', 'lastname' => 'ANNA',     'comment' => 'Anna I', 'email' => '', 'discount_per' => '5', 'total_payed_sum' => '500000'],
         ]);
         $this->repo->method('allByClientId')->willReturn([
-            77 => ['cashback_pct' => 7.0, 'gmail' => 'anna@gmail.com', 'is_active' => 1, 'created_by' => 'mgr'],
+            77 => ['cashback_pct' => 7.0, 'is_active' => 1, 'created_by' => 'mgr'],
         ]);
 
         $list = $this->make()->listBloggers();
@@ -78,9 +78,9 @@ class BloggerServiceTest extends TestCase
             ['client_id' => '3', 'lastname' => 'C', 'comment' => '', 'discount_per' => '0'],
         ]);
         $this->repo->method('allByClientId')->willReturn([
-            1 => ['cashback_pct' => 10.0, 'gmail' => '', 'is_active' => 1, 'created_by' => ''],
-            2 => ['cashback_pct' => 5.0,  'gmail' => '', 'is_active' => 1, 'created_by' => ''],
-            3 => ['cashback_pct' => 20.0, 'gmail' => '', 'is_active' => 0, 'created_by' => ''],
+            1 => ['cashback_pct' => 10.0, 'is_active' => 1, 'created_by' => ''],
+            2 => ['cashback_pct' => 5.0,  'is_active' => 1, 'created_by' => ''],
+            3 => ['cashback_pct' => 20.0, 'is_active' => 0, 'created_by' => ''],
         ]);
         $this->poster->method('clientsSales')->willReturn([
             1 => ['checks' => 10, 'revenue' => 1000000], // accrued 100000
@@ -117,8 +117,8 @@ class BloggerServiceTest extends TestCase
             ['client_id' => '2', 'lastname' => 'B', 'comment' => '', 'discount_per' => '0'],
         ]);
         $this->repo->method('allByClientId')->willReturn([
-            1 => ['cashback_pct' => 10.0, 'gmail' => '', 'is_active' => 1, 'created_by' => ''],
-            2 => ['cashback_pct' => 5.0,  'gmail' => '', 'is_active' => 1, 'created_by' => ''],
+            1 => ['cashback_pct' => 10.0, 'is_active' => 1, 'created_by' => ''],
+            2 => ['cashback_pct' => 5.0,  'is_active' => 1, 'created_by' => ''],
         ]);
         $this->poster->method('clientsSales')->willReturn([
             1 => ['checks' => 3, 'revenue' => 200000],
@@ -141,7 +141,7 @@ class BloggerServiceTest extends TestCase
             ['client_id' => '1', 'lastname' => 'A', 'comment' => '', 'discount_per' => '0'],
         ]);
         $this->repo->method('allByClientId')->willReturn([
-            1 => ['cashback_pct' => 10.0, 'gmail' => '', 'is_active' => 1, 'created_by' => ''],
+            1 => ['cashback_pct' => 10.0, 'is_active' => 1, 'created_by' => ''],
         ]);
         $this->poster->method('clientsSales')->willReturn([1 => ['checks' => 1, 'revenue' => 100000]]); // accrued 10000
         $this->poster->method('payouts')->willReturn([1 => 999999]); // overpaid
@@ -159,7 +159,7 @@ class BloggerServiceTest extends TestCase
             ->with(10, 'ANNA2026', 'Anna Ivanova', 'anna@gmail.com', 10.0)
             ->willReturn(500);
         $this->repo->expects($this->once())->method('create')
-            ->with(500, 'anna@gmail.com', 7.0, 'mgr@x.com');
+            ->with(500, 7.0, 'mgr@x.com');
 
         $id = $this->make()->create('ANNA2026', 'Anna Ivanova', 'anna@gmail.com', 10.0, 7.0, 'mgr@x.com');
         $this->assertSame(500, $id);
@@ -190,8 +190,8 @@ class BloggerServiceTest extends TestCase
         ]);
         $this->poster->expects($this->once())->method('updateClient')
             ->with(10, 42, 'ANNA', 'Anna I', 'a@gmail.com', 12.0);
-        $this->repo->expects($this->once())->method('saveCashbackAndGmail')
-            ->with(42, 'a@gmail.com', 8.0);
+        $this->repo->expects($this->once())->method('saveCashback')
+            ->with(42, 8.0);
 
         $this->make()->update(42, 'ANNA', 'Anna I', 'a@gmail.com', 12.0, 8.0);
     }
