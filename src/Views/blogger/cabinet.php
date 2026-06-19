@@ -138,7 +138,7 @@ details.edit-section[open] summary::before{transform:rotate(90deg)}
   <?php if (!empty($flash['err'])): ?><div class="flash-err"><?= $esc($flash['err']) ?></div><?php endif; ?>
 
   <div class="hero">
-    <h1>Блогерская<br>программа <span>Veranda</span></h1>
+    <h1>Инфлюенсерская<br>программа <span>Veranda</span></h1>
     <p>Делитесь промокодом с подписчиками — они получают скидку, вы зарабатываете кешбек с каждого их визита.</p>
   </div>
 
@@ -180,7 +180,7 @@ details.edit-section[open] summary::before{transform:rotate(90deg)}
   <!-- Self-registration -->
   <details class="reg" <?= !empty($flash['err']) ? 'open' : '' ?>>
     <summary>
-      Хочу стать блогером Veranda
+      Хочу стать инфлюенсером Veranda
       <span class="badge">Заявка</span>
     </summary>
     <form class="reg-form" method="post" action="/bloggers">
@@ -285,6 +285,7 @@ details.edit-section[open] summary::before{transform:rotate(90deg)}
       <?php endif; ?>
     </div>
 
+    <?php $limit = (float) ($row['limit_pct'] ?? 15); ?>
     <details class="edit-section">
       <summary>Редактировать параметры</summary>
       <form class="edit-card" method="post" action="/bloggers?dateFrom=<?= $esc($dateFrom) ?>&dateTo=<?= $esc($dateTo) ?>">
@@ -296,14 +297,14 @@ details.edit-section[open] summary::before{transform:rotate(90deg)}
         <div class="pct-row">
           <div class="fld">
             <label>Скидка гостям, %</label>
-            <input id="inp-disc" type="number" name="discount_pct" value="<?= $esc($fmtPct($row['discount_pct'] ?? 0)) ?>" min="0" max="15" step="0.01" required>
+            <input id="inp-disc" type="number" name="discount_pct" value="<?= $esc($fmtPct($row['discount_pct'] ?? 0)) ?>" min="0" max="<?= $esc($fmtPct($limit)) ?>" step="0.01" required>
           </div>
           <div class="fld">
             <label>Кешбек мне, %</label>
-            <input id="inp-cash" type="number" name="cashback_pct" value="<?= $esc($fmtPct($row['cashback_pct'] ?? 0)) ?>" min="0" max="15" step="0.01" required>
+            <input id="inp-cash" type="number" name="cashback_pct" value="<?= $esc($fmtPct($row['cashback_pct'] ?? 0)) ?>" min="0" max="<?= $esc($fmtPct($limit)) ?>" step="0.01" required>
           </div>
         </div>
-        <div id="pct-hint" class="pct-hint"></div>
+        <div id="pct-hint" class="pct-hint" data-limit="<?= $esc($fmtPct($limit)) ?>"></div>
         <button type="submit" class="save-btn">Сохранить</button>
       </form>
     </details>
@@ -318,10 +319,12 @@ details.edit-section[open] summary::before{transform:rotate(90deg)}
   var cash = document.getElementById('inp-cash');
   var hint = document.getElementById('pct-hint');
   if (!disc || !cash || !hint) return;
+  var limit = parseFloat(hint.getAttribute('data-limit')) || 15;
   function update() {
     var s = Math.round((parseFloat(disc.value) + parseFloat(cash.value)) * 100) / 100;
-    hint.textContent = 'Итого ' + (isNaN(s) ? 0 : s.toFixed(2)) + '% из 15% максимум';
-    hint.className   = 'pct-hint ' + (s > 15 ? 'over' : 'ok');
+    if (isNaN(s)) s = 0;
+    hint.textContent = 'Итого ' + s.toFixed(2) + '% из ' + limit + '% максимум';
+    hint.className   = 'pct-hint ' + (s > limit ? 'over' : 'ok');
   }
   disc.addEventListener('input', update);
   cash.addEventListener('input', update);

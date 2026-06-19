@@ -47,23 +47,13 @@ final class BloggerRepository implements BloggerRepositoryInterface
         return $out;
     }
 
-    public function create(int $clientId, float $cashbackPct, string $createdBy): void
+    public function create(int $clientId, string $createdBy): void
     {
         $this->db->query(
-            "INSERT INTO {$this->db->t('bloggers')} (poster_client_id, cashback_pct, is_active, created_by)
-             VALUES (?, ?, 1, ?)
-             ON DUPLICATE KEY UPDATE cashback_pct = VALUES(cashback_pct), is_active = 1",
-            [$clientId, $cashbackPct, $createdBy]
-        );
-    }
-
-    public function saveCashback(int $clientId, float $cashbackPct): void
-    {
-        $this->db->query(
-            "INSERT INTO {$this->db->t('bloggers')} (poster_client_id, cashback_pct, created_by)
-             VALUES (?, ?, '')
-             ON DUPLICATE KEY UPDATE cashback_pct = VALUES(cashback_pct)",
-            [$clientId, $cashbackPct]
+            "INSERT INTO {$this->db->t('bloggers')} (poster_client_id, is_active, created_by)
+             VALUES (?, 1, ?)
+             ON DUPLICATE KEY UPDATE is_active = 1",
+            [$clientId, $createdBy]
         );
     }
 
