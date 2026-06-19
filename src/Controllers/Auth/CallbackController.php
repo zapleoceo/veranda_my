@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers\Auth;
 
+use App\Bloggers\Services\BloggerService;
 use App\Infrastructure\Config;
 use App\Infrastructure\Database;
 use App\Infrastructure\Session;
@@ -12,7 +13,10 @@ use Psr\Http\Message\ServerRequestInterface;
 
 class CallbackController
 {
-    public function __construct(private readonly Database $db) {}
+    public function __construct(
+        private readonly Database $db,
+        private readonly BloggerService $bloggerService,
+    ) {}
 
     public function handle(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
@@ -42,8 +46,9 @@ class CallbackController
             // Not staff — maybe a blogger. Bloggers live in their own session
             // realm (blogger_client_id, NO user_email) so they can NEVER reach
             // /admin/* (AuthMiddleware authenticates on user_email). They only
-            // get the separate /blogger cabinet, scoped to their own data.
-            $bloggerId = $this->_findBlogger($email);
+            // get the separate /bloggers cabinet, scoped to their own data.
+            // Blogger email = Poster client email (group 10); no local copy needed.
+            $bloggerId = $this->bloggerService->findByEmail($email);
             if ($bloggerId > 0) {
                 $_SESSION['blogger_client_id'] = $bloggerId;
                 $_SESSION['blogger_email']     = $email;
@@ -68,27 +73,12 @@ class CallbackController
 
         $next = $_SESSION['auth_next'] ?? '/admin';
         unset($_SESSION['auth_next']);
+        // Blogger cabinet is not for staff — redirect to admin panel.
+        if (str_starts_with((string) $next, '/bloggers')) {
+            $next = '/admin';
+        }
 
         return $response->withHeader('Location', $next)->withStatus(302);
-    }
-
-    /** Active blogger's Poster client_id by login email, or 0. */
-    private function _findBlogger(string $email): int
-    {
-        if ($email === '') {
-            return 0;
-        }
-        try {
-            $t   = $this->db->t('bloggers');
-            $row = $this->db->query(
-                "SELECT poster_client_id FROM {$t} WHERE gmail = ? AND is_active = 1 LIMIT 1",
-                [$email]
-            )->fetch();
-            return (int) ($row['poster_client_id'] ?? 0);
-        } catch (\Throwable) {
-            // bloggers table not created yet → no bloggers exist
-            return 0;
-        }
     }
 
     private function _exchangeCode(string $code): array|null
