@@ -35,7 +35,24 @@ class CallbackController
             return $response->withHeader('Location', '/login?error=oauth')->withStatus(302);
         }
 
-        $email = $userData['email'] ?? '';
+        $email   = $userData['email'] ?? '';
+        $authNext = (string) ($_SESSION['auth_next'] ?? '');
+        unset($_SESSION['auth_next']);
+
+        // If the login was initiated from /bloggers, check the blogger group
+        // first — even if the person is also staff (owner testing their own
+        // cabinet should land in the cabinet, not the admin panel).
+        if (str_starts_with($authNext, '/bloggers')) {
+            $bloggerId = $this->bloggerService->findByEmail($email);
+            if ($bloggerId > 0) {
+                $_SESSION['blogger_client_id'] = $bloggerId;
+                $_SESSION['blogger_email']     = $email;
+                $_SESSION['blogger_name']      = trim((string) ($userData['name'] ?? $email));
+                return $response->withHeader('Location', '/bloggers')->withStatus(302);
+            }
+            // Not a blogger — fall through to staff check below.
+        }
+
         $users = $this->db->t('users');
         $user  = $this->db->query(
             "SELECT * FROM {$users} WHERE email = ? AND is_active = 1",
@@ -43,23 +60,13 @@ class CallbackController
         )->fetch();
 
         if (!$user) {
-            // Not staff — maybe a blogger. Bloggers live in their own session
-            // realm (blogger_client_id, NO user_email) so they can NEVER reach
-            // /admin/* (AuthMiddleware authenticates on user_email). They only
-            // get the separate /bloggers cabinet, scoped to their own data.
-            // Blogger email = Poster client email (group 10); no local copy needed.
+            // Not staff — maybe a blogger arriving via /login (not /bloggers).
             $bloggerId = $this->bloggerService->findByEmail($email);
             if ($bloggerId > 0) {
                 $_SESSION['blogger_client_id'] = $bloggerId;
                 $_SESSION['blogger_email']     = $email;
                 $_SESSION['blogger_name']      = trim((string) ($userData['name'] ?? $email));
-
-                $next = (string) ($_SESSION['auth_next'] ?? '/bloggers');
-                unset($_SESSION['auth_next']);
-                if (!str_starts_with($next, '/bloggers')) {
-                    $next = '/bloggers';
-                }
-                return $response->withHeader('Location', $next)->withStatus(302);
+                return $response->withHeader('Location', '/bloggers')->withStatus(302);
             }
             return $response->withHeader('Location', '/login?error=access')->withStatus(302);
         }
@@ -71,12 +78,7 @@ class CallbackController
             $_SESSION['user_avatar'] = $pic;
         }
 
-        $next = $_SESSION['auth_next'] ?? '/admin';
-        unset($_SESSION['auth_next']);
-        // Blogger cabinet is not for staff — redirect to admin panel.
-        if (str_starts_with((string) $next, '/bloggers')) {
-            $next = '/admin';
-        }
+        $next = $authNext !== '' && !str_starts_with($authNext, '/bloggers') ? $authNext : '/admin';
 
         return $response->withHeader('Location', $next)->withStatus(302);
     }
