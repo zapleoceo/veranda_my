@@ -126,17 +126,24 @@ final class PosterClientsGateway implements PosterClientsGatewayInterface
 
     public function clientChecks(string $dateFrom, string $dateTo, int $clientId): array
     {
+        // status=2 — closed only (1=open, 3=deleted). Also guard against
+        // delete=1 rows that Poster sometimes returns despite the filter.
         $resp = $this->poster->client()->request('dash.getTransactions', [
             'dateFrom' => str_replace('-', '', $dateFrom),
             'dateTo'   => str_replace('-', '', $dateTo),
+            'status'   => 2,
         ]);
 
         $out = [];
         if (is_array($resp)) {
             foreach ($resp as $row) {
-                if ((int) ($row['client_id'] ?? 0) === $clientId) {
-                    $out[] = $row;
+                if ((int) ($row['client_id'] ?? 0) !== $clientId) {
+                    continue;
                 }
+                if ((int) ($row['delete'] ?? 0) === 1) {
+                    continue;
+                }
+                $out[] = $row;
             }
         }
         // Sort descending by date
