@@ -124,6 +124,26 @@ final class PosterClientsGateway implements PosterClientsGatewayInterface
         return (int) (is_array($resp) ? ($resp[0] ?? 0) : $resp);
     }
 
+    public function clientChecks(string $dateFrom, string $dateTo, int $clientId): array
+    {
+        $resp = $this->poster->client()->request('dash.getTransactions', [
+            'dateFrom' => str_replace('-', '', $dateFrom),
+            'dateTo'   => str_replace('-', '', $dateTo),
+        ]);
+
+        $out = [];
+        if (is_array($resp)) {
+            foreach ($resp as $row) {
+                if ((int) ($row['client_id'] ?? 0) === $clientId) {
+                    $out[] = $row;
+                }
+            }
+        }
+        // Sort descending by date
+        usort($out, static fn ($a, $b): int => strcmp((string) ($b['date_close'] ?? ''), (string) ($a['date_close'] ?? '')));
+        return $out;
+    }
+
     public function financeAccounts(): array
     {
         $resp = $this->poster->client()->request('finance.getAccounts');

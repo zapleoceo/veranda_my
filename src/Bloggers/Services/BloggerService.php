@@ -203,6 +203,58 @@ final class BloggerService
         $this->repo->saveCashback($clientId, $this->normPct($cashbackPct));
     }
 
+    /**
+     * Blogger edits their own promocode, discount %, and cashback %.
+     * Real name and email stay untouched (manager-only fields).
+     *
+     * Rule: discount_pct + cashback_pct ≤ 15 %.
+     *
+     * @throws \RuntimeException
+     */
+    public function selfUpdate(int $clientId, string $promocode, float $discountPct, float $cashbackPct): void
+    {
+        if ($clientId <= 0) {
+            throw new \RuntimeException('Не указан блогер.');
+        }
+        $d = $this->normPct($discountPct);
+        $c = $this->normPct($cashbackPct);
+        if ($d + $c > 15.0) {
+            throw new \RuntimeException(
+                sprintf('Скидка (%.2f%%) + кешбек (%.2f%%) не могут превышать 15%%.', $d, $c)
+            );
+        }
+        $promocode = $this->normPromocode($promocode);
+        $this->assertPromocodeFree($promocode, $clientId);
+
+        // Load current Poster record to preserve comment (real name) and email.
+        $poster = null;
+        foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $pb) {
+            if ((int) ($pb['client_id'] ?? 0) === $clientId) {
+                $poster = $pb;
+                break;
+            }
+        }
+        if ($poster === null) {
+            throw new \RuntimeException('Блогер не найден в системе.');
+        }
+
+        $this->poster->updateClient(
+            $this->cfg()['group_id'],
+            $clientId,
+            $promocode,
+            (string) ($poster['comment'] ?? ''),
+            (string) ($poster['email'] ?? ''),
+            $d,
+        );
+        $this->repo->saveCashback($clientId, $c);
+    }
+
+    /** Individual closed checks for the period, filtered to one client. */
+    public function checks(string $dateFrom, string $dateTo, int $clientId): array
+    {
+        return $this->poster->clientChecks($dateFrom, $dateTo, $clientId);
+    }
+
     public function setActive(int $clientId, bool $active): void
     {
         if ($clientId <= 0) {

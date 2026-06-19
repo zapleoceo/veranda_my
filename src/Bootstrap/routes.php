@@ -199,7 +199,7 @@ $app->map(['GET', 'POST'], '/tr3/api.php', [Tr3Controller::class, 'api']);
 
 // Blogger cabinet — PUBLIC mobile page at /bloggers (own session realm, no
 // AuthMiddleware; the controller checks $_SESSION['blogger_client_id'] itself).
-$app->get('/bloggers[/]',     [BloggerCabinetController::class, 'index']);
+$app->map(['GET', 'POST'], '/bloggers[/]', [BloggerCabinetController::class, 'index']);
 $app->get('/bloggers/logout', [BloggerCabinetController::class, 'logout']);
 
 // Phase 4: reservations (auth-protected)
