@@ -35,12 +35,31 @@ final class BloggerService
     /** Default limit % assigned to a self-registered blogger (manager raises it). */
     public const REGISTER_LIMIT = 5.0;
 
-    private ?array $cfgCache = null;
+    private ?array $cfgCache     = null;
+    private ?array $clientsCache = null;
 
     public function __construct(
         private readonly PosterClientsGatewayInterface $poster,
         private readonly BloggerRepositoryInterface $repo,
     ) {}
+
+    /**
+     * Request-scoped cache of the Poster blogger group. listBloggers / report /
+     * posterRow / assertPromocodeFree all read it, so one save previously did
+     * several getClients(num:1000) scans — now a single fetch per request,
+     * invalidated after any client mutation.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function groupClients(): array
+    {
+        return $this->clientsCache ??= $this->poster->listGroupClients($this->cfg()['group_id']);
+    }
+
+    private function invalidateClients(): void
+    {
+        $this->clientsCache = null;
+    }
 
     // ─── Read ──────────────────────────────────────────────────────────
 
@@ -54,7 +73,7 @@ final class BloggerService
     {
         $local = $this->repo->allByClientId();
         $out   = [];
-        foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $c) {
+        foreach ($this->groupClients() as $c) {
             $id = (int) ($c['client_id'] ?? 0);
             if ($id <= 0) {
                 continue;
@@ -160,7 +179,7 @@ final class BloggerService
         $needle = strtolower(trim($email));
         $local  = $this->repo->allByClientId();
         try {
-            foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $c) {
+            foreach ($this->groupClients() as $c) {
                 $clientEmail = strtolower(trim((string) ($c['email'] ?? '')));
                 if ($clientEmail === '' || $clientEmail !== $needle) {
                     continue;
@@ -215,6 +234,7 @@ final class BloggerService
         );
 
         $clientId = $this->poster->createClient($this->cfg()['group_id'], $promocode, $meta->encode(), $email, $d);
+        $this->invalidateClients();
         if ($clientId <= 0) {
             throw new \RuntimeException('Poster не вернул client_id при создании.');
         }
@@ -250,12 +270,15 @@ final class BloggerService
         );
 
         $this->poster->updateClient($this->cfg()['group_id'], $clientId, $promocode, $meta->encode(), $email, $d);
+        $this->invalidateClients();
     }
 
     /**
-     * Self-registration: a blogger signs up; the account starts inactive
-     * (is_active=0) until a manager approves it. The limit starts at
-     * REGISTER_LIMIT (5%); the manager raises it. Socials go into the comment.
+     * Self-registration: anyone may sign up and start using their promocode
+     * immediately — the safety is the low REGISTER_LIMIT (5%) cap on
+     * discount+cashback, not a manual approval gate. To raise the limit the
+     * blogger must contact the owner, who bumps it in /admin/bloggers. Socials
+     * go into the comment. (A manager can still deactivate a bad actor.)
      *
      * @param  array<string,string> $socials
      * @throws \RuntimeException
@@ -274,7 +297,7 @@ final class BloggerService
             throw new \RuntimeException('Укажите ваше имя.');
         }
 
-        foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $c) {
+        foreach ($this->groupClients() as $c) {
             if (strtolower(trim((string) ($c['email'] ?? ''))) === $email) {
                 throw new \RuntimeException('Этот email уже зарегистрирован в программе.');
             }
@@ -288,13 +311,14 @@ final class BloggerService
         );
 
         $clientId = $this->poster->createClient($this->cfg()['group_id'], $promocode, $meta->encode(), $email, 0.0);
+        $this->invalidateClients();
         if ($clientId <= 0) {
             throw new \RuntimeException('Ошибка при создании аккаунта. Попробуйте позже.');
         }
 
-        // Local row, then immediately inactive — pending manager approval.
+        // Active immediately at the 5% cap — the blogger can log in and use
+        // their promocode right away (manager raises the limit later).
         $this->repo->create($clientId, 'self');
-        $this->repo->setActive($clientId, false);
 
         return $clientId;
     }
@@ -336,6 +360,7 @@ final class BloggerService
             (string) ($row['email'] ?? ''),
             $d,
         );
+        $this->invalidateClients();
     }
 
     /** Individual closed checks for the period, filtered to one client. */
@@ -428,7 +453,7 @@ final class BloggerService
     /** Raw Poster client row in the blogger group by id, or null. */
     private function posterRow(int $clientId): ?array
     {
-        foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $c) {
+        foreach ($this->groupClients() as $c) {
             if ((int) ($c['client_id'] ?? 0) === $clientId) {
                 return $c;
             }
@@ -496,7 +521,7 @@ final class BloggerService
     private function assertPromocodeFree(string $promocode, ?int $exceptClientId): void
     {
         $needle = mb_strtolower($promocode);
-        foreach ($this->poster->listGroupClients($this->cfg()['group_id']) as $c) {
+        foreach ($this->groupClients() as $c) {
             $id = (int) ($c['client_id'] ?? 0);
             if ($exceptClientId !== null && $id === $exceptClientId) {
                 continue;

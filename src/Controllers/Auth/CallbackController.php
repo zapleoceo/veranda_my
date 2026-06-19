@@ -7,6 +7,7 @@ namespace App\Controllers\Auth;
 use App\Bloggers\Services\BloggerService;
 use App\Infrastructure\Config;
 use App\Infrastructure\Database;
+use App\Infrastructure\ReturnPath;
 use App\Infrastructure\Session;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -35,20 +36,19 @@ class CallbackController
             return $response->withHeader('Location', '/login?error=oauth')->withStatus(302);
         }
 
-        $email   = $userData['email'] ?? '';
+        $email    = (string) ($userData['email'] ?? '');
+        $verified = filter_var($userData['email_verified'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $authNext = (string) ($_SESSION['auth_next'] ?? '');
         unset($_SESSION['auth_next']);
 
         // If the login was initiated from /bloggers, check the blogger group
         // first — even if the person is also staff (owner testing their own
-        // cabinet should land in the cabinet, not the admin panel).
-        if (str_starts_with($authNext, '/bloggers')) {
-            $bloggerId = $this->bloggerService->findByEmail($email);
-            if ($bloggerId > 0) {
-                $_SESSION['blogger_client_id'] = $bloggerId;
-                $_SESSION['blogger_email']     = $email;
-                $_SESSION['blogger_name']      = trim((string) ($userData['name'] ?? $email));
-                return $response->withHeader('Location', '/bloggers')->withStatus(302);
+        // cabinet should land in the cabinet, not the admin panel). Blogger
+        // identity is bound to a Google-verified email only.
+        if ($verified && str_starts_with($authNext, '/bloggers')) {
+            $resp = $this->_bloggerLogin($email, $userData, $response);
+            if ($resp !== null) {
+                return $resp;
             }
             // Not a blogger — fall through to staff check below.
         }
@@ -61,12 +61,11 @@ class CallbackController
 
         if (!$user) {
             // Not staff — maybe a blogger arriving via /login (not /bloggers).
-            $bloggerId = $this->bloggerService->findByEmail($email);
-            if ($bloggerId > 0) {
-                $_SESSION['blogger_client_id'] = $bloggerId;
-                $_SESSION['blogger_email']     = $email;
-                $_SESSION['blogger_name']      = trim((string) ($userData['name'] ?? $email));
-                return $response->withHeader('Location', '/bloggers')->withStatus(302);
+            if ($verified) {
+                $resp = $this->_bloggerLogin($email, $userData, $response);
+                if ($resp !== null) {
+                    return $resp;
+                }
             }
             return $response->withHeader('Location', '/login?error=access')->withStatus(302);
         }
@@ -78,9 +77,31 @@ class CallbackController
             $_SESSION['user_avatar'] = $pic;
         }
 
-        $next = $authNext !== '' && !str_starts_with($authNext, '/bloggers') ? $authNext : '/admin';
+        // Re-validate the stashed return path at the redirect site (defence in
+        // depth — never trust auth_next blindly). Blogger paths are not for staff.
+        $next = '/admin';
+        if ($authNext !== '' && !str_starts_with($authNext, '/bloggers') && ReturnPath::isSafe($authNext)) {
+            $next = $authNext;
+        }
 
         return $response->withHeader('Location', $next)->withStatus(302);
+    }
+
+    /**
+     * Bind an active blogger to a separate session realm (blogger_client_id,
+     * NO user_email → cannot reach /admin/*). Returns the redirect to the
+     * cabinet, or null when the email is not an active blogger.
+     */
+    private function _bloggerLogin(string $email, array $userData, ResponseInterface $response): ?ResponseInterface
+    {
+        $bloggerId = $this->bloggerService->findByEmail($email);
+        if ($bloggerId <= 0) {
+            return null;
+        }
+        $_SESSION['blogger_client_id'] = $bloggerId;
+        $_SESSION['blogger_email']     = $email;
+        $_SESSION['blogger_name']      = trim((string) ($userData['name'] ?? $email));
+        return $response->withHeader('Location', '/bloggers')->withStatus(302);
     }
 
     private function _exchangeCode(string $code): array|null

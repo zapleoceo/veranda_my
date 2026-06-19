@@ -236,7 +236,7 @@ class BloggerServiceTest extends TestCase
 
     // ─── register / selfUpdate ──────────────────────────────────────────
 
-    public function test_register_creates_inactive_blogger_with_default_limit(): void
+    public function test_register_creates_active_blogger_with_5pct_limit(): void
     {
         $this->poster->method('listGroupClients')->willReturn([]); // no dup promo/email
         $this->poster->expects($this->once())->method('createClient')
@@ -249,8 +249,9 @@ class BloggerServiceTest extends TestCase
                 0.0,
             )
             ->willReturn(700);
+        // Active immediately — the 5% cap is the protection, not an approval gate.
         $this->repo->expects($this->once())->method('create')->with(700, 'self');
-        $this->repo->expects($this->once())->method('setActive')->with(700, false);
+        $this->repo->expects($this->never())->method('setActive');
 
         $id = $this->make()->register('ANNA', 'Anna Ivanova', 'anna@gmail.com', ['ig' => '@anna']);
         $this->assertSame(700, $id);
