@@ -12,8 +12,7 @@ use Psr\Http\Message\ServerRequestInterface;
 
 /**
  * Public blogger cabinet — a separate, mobile-first page (its own minimal
- * layout, NOT the admin sidebar). Reachable at /blogger, and at the root of the
- * blogers.veranda.my subdomain once DNS + vhost point there.
+ * layout, NOT the admin sidebar). Reachable at /bloggers.
  *
  * Bloggers live in their own session realm (blogger_client_id, set by
  * CallbackController on Google login), completely separate from staff — they
@@ -39,22 +38,46 @@ final class BloggerCabinetController
             [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
         }
 
-        $row = null;
-        $err = '';
+        $flash = ['ok' => '', 'err' => ''];
+
+        // Handle self-edit POST
+        if (strtoupper($request->getMethod()) === 'POST') {
+            $body = (array) ($request->getParsedBody() ?? []);
+            if (isset($body['save_self'])) {
+                try {
+                    $this->svc->selfUpdate(
+                        $clientId,
+                        (string) ($body['promocode'] ?? ''),
+                        (float)  ($body['discount_pct'] ?? 0),
+                        (float)  ($body['cashback_pct'] ?? 0),
+                    );
+                    $flash['ok'] = 'Изменения сохранены.';
+                } catch (\Throwable $e) {
+                    $flash['err'] = $e->getMessage();
+                }
+            }
+        }
+
+        $row    = null;
+        $checks = [];
         try {
             $report = $this->svc->report($dateFrom, $dateTo, $clientId);
             $row    = $report['rows'][0] ?? null;
+            if ($row !== null) {
+                $checks = $this->svc->checks($dateFrom, $dateTo, $clientId);
+            }
         } catch (\Throwable $e) {
-            $err = 'Не удалось загрузить отчёт. Попробуйте позже.';
+            $flash['err'] = $flash['err'] !== '' ? $flash['err'] : 'Не удалось загрузить отчёт. Попробуйте позже.';
         }
 
         return $this->html($response, $this->render([
             'mode'     => 'report',
             'name'     => (string) ($_SESSION['blogger_name'] ?? ''),
             'row'      => $row,
+            'checks'   => $checks,
             'dateFrom' => $dateFrom,
             'dateTo'   => $dateTo,
-            'err'      => $err,
+            'flash'    => $flash,
         ]));
     }
 

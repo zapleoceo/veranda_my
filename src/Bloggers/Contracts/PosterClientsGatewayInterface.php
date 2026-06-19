@@ -51,4 +51,12 @@ interface PosterClientsGatewayInterface
 
     /** @return array<int,string> finance accounts: id => name */
     public function financeAccounts(): array;
+
+    /**
+     * Closed checks for the period filtered by client_id. Each row is the raw
+     * Poster dash.getTransactions entry (date_close, payed_sum, discount_sum …).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function clientChecks(string $dateFrom, string $dateTo, int $clientId): array;
 }
