@@ -24,8 +24,11 @@ final class AddZoneAction
         if ($request->getMethod() !== 'POST') {
             return $this->json->fail($response, 'POST required', 405);
         }
-        if (!$this->lock->isOwner((string) ($_SESSION['user_email'] ?? ''))) {
-            return $this->json->locked($response, $this->lock->current());
+        $actor     = (string) ($_SESSION['user_email'] ?? '');
+        $actorName = (string) ($_SESSION['user_name']  ?? $actor);
+        $blocker = $this->lock->claimForWrite($actor, $actorName);
+        if ($blocker !== null) {
+            return $this->json->locked($response, $blocker);
         }
         $body = json_decode((string) $request->getBody(), true);
         $name = trim((string) ($body['name'] ?? ''));
