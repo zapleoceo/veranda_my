@@ -915,7 +915,12 @@
                 applyLockState({ owned: false, lock: e.lock });
                 savePending  = false;
                 saveFailures = 0;
-                toast('Сохранение запрещено: страница редактируется другим пользователем.', 'err');
+                // The banner is sticky, but if the editor is scrolled deep
+                // into the grid, pull it into view + name the holder in the
+                // toast so they know WHO holds it and that «Перехватить» exists.
+                const who = e.lock?.email || e.lock?.name || 'другой пользователь';
+                document.getElementById('schLockBanner')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                toast(`Сохранение запрещено — редактирует ${who}. Жми «Перехватить» наверху, чтобы забрать правку.`, 'err');
                 return;
             }
             if (e.code === 'CONFLICT') {
