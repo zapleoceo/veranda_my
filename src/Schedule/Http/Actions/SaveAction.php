@@ -24,9 +24,12 @@ final class SaveAction
         if ($request->getMethod() !== 'POST') {
             return $this->json->fail($response, 'POST required', 405);
         }
-        $actor = (string) ($_SESSION['user_email'] ?? '');
-        if (!$this->lock->isOwner($actor)) {
-            return $this->json->locked($response, $this->lock->current());
+        $actor     = (string) ($_SESSION['user_email'] ?? '');
+        $actorName = (string) ($_SESSION['user_name']  ?? $actor);
+        // Free lock → reclaim & proceed; only blocked if someone else is live.
+        $blocker = $this->lock->claimForWrite($actor, $actorName);
+        if ($blocker !== null) {
+            return $this->json->locked($response, $blocker);
         }
         $body = json_decode((string) $request->getBody(), true);
         if (!is_array($body) || !isset($body['state']) || !is_array($body['state'])) {

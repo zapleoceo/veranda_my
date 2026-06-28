@@ -98,4 +98,35 @@ final class PageLockService
         $current = $this->current();
         return $current !== null && (string) ($current['email'] ?? '') === $email;
     }
+
+    /**
+     * Write-guard used by every save/mutate Action.
+     *
+     * Returns null when the caller may write — either they already own the
+     * lock, OR it's free (no live holder) and we (re)claim it for them here.
+     * Returns the blocking holder's record ONLY when someone ELSE actively
+     * holds the lock (within TTL).
+     *
+     * Why this exists: previously a write simply checked isOwner() and, on
+     * false, returned the current lock. But if YOUR OWN lock had TTL-expired
+     * (a heartbeat gap — tab backgrounded, laptop asleep) the lock was free,
+     * current() was null, and the client got "redactiruet null" → the banner
+     * said «редактирует другой пользователь» with no name, even though nobody
+     * was editing. Reclaiming a free lock here makes that impossible: a
+     * blocked write now always names a real, live holder.
+     */
+    public function claimForWrite(string $email, string $name): ?array
+    {
+        $current = $this->current();
+        // Held by a different, live operator → block and name them.
+        if ($current !== null && (string) ($current['email'] ?? '') !== $email) {
+            return $current;
+        }
+        // Free, or already ours → (re)claim for this actor and allow.
+        // (These routes sit behind AuthMiddleware, so $email is always set.)
+        if ($email !== '') {
+            $this->acquire($email, $name);
+        }
+        return null;
+    }
 }
