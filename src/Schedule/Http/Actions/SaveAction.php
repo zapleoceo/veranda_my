@@ -55,11 +55,12 @@ final class SaveAction
                 // state + new version so the client can re-sync without
                 // a second round trip.
                 return $this->json->write($response, [
-                    'ok'       => false,
-                    'conflict' => true,
-                    'error'    => 'Кто-то другой сохранил график. Обновите страницу, чтобы увидеть актуальную версию.',
-                    'version'  => $result['version'],
-                    'state'    => $result['state'],
+                    'ok'          => false,
+                    'conflict'    => true,
+                    'error'       => 'Кто-то другой сохранил график. Обновите страницу, чтобы увидеть актуальную версию.',
+                    'version'     => $result['version'],
+                    'state'       => $result['state'],
+                    'last_editor' => $result['last_editor'] ?? '',
                 ], 409);
             }
 
