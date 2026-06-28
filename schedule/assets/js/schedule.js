@@ -155,8 +155,10 @@
         // so callers can refetch + reload (handled by runSave).
         if (res.status === 409 && j && j.conflict) {
             const err = new Error(j.error || 'Конфликт версий');
-            err.code  = 'CONFLICT';
-            err.state = j.state || null;
+            err.code       = 'CONFLICT';
+            err.state      = j.state || null;
+            err.version    = j.version;
+            err.lastEditor = j.last_editor || '';
             throw err;
         }
         // 423 Locked — another operator holds the page-edit lock.
@@ -924,12 +926,12 @@
                 return;
             }
             if (e.code === 'CONFLICT') {
-                // Another operator saved between our load and this POST.
-                // Force a reload — overlay first so the user can't keep
-                // typing into a soon-to-be-replaced grid.
-                toast('Другой пользователь изменил график. Перезагружаю…', 'err');
-                document.body.classList.add('sch-blocking-overlay');
-                setTimeout(() => location.reload(), 1500);
+                // The draft version moved under us — someone (maybe our own
+                // other tab) saved first. NEVER auto-reload: that silently
+                // drops this tab's edits. Ask the operator what to do.
+                savePending = false;     // don't auto-retry into the same conflict
+                saveFailures = 0;
+                showConflictModal(e);
                 return;
             }
             saveFailures++;
@@ -949,6 +951,64 @@
     document.getElementById('schSaveBtn')?.addEventListener('click', (ev) =>
         withBtnPending(ev.currentTarget, () => flushSave(),
             { pending: 'Сохраняем…', success: 'Сохранено ✓' }).catch(() => {}));
+
+    // ════════════════ Save-conflict resolver ════════════════
+    // A 409 means the draft version moved under us. We DON'T auto-reload
+    // (that drops this tab's edits without consent). Instead: name who did
+    // it (our own other tab vs another user) and let the operator choose —
+    // overwrite with our version, take theirs, or leave it to copy by hand.
+    function showConflictModal(err) {
+        const modal = document.getElementById('schModalConflict');
+        if (!modal) return;
+        const whoEl = document.getElementById('schConflictWho');
+        const mine  = String(App.lock?.actor || '').toLowerCase();
+        const other = String(err?.lastEditor || '').toLowerCase();
+        if (whoEl) {
+            if (other && other === mine) {
+                whoEl.innerHTML = 'Ты сохранил правки в <b>другой своей вкладке</b> (или на другом устройстве) — эта вкладка отстала от актуальной версии.';
+            } else if (other) {
+                whoEl.innerHTML = `График сохранил <b>${esc(err.lastEditor)}</b>. Если он сейчас в редакторе — попроси его выйти со страницы (или нажми «Перехватить»).`;
+            } else {
+                whoEl.textContent = 'График изменили в другой вкладке или сессии.';
+            }
+        }
+        modal.classList.add('visible');
+    }
+    document.getElementById('schConflictReload')?.addEventListener('click', () => {
+        document.body.classList.add('sch-blocking-overlay');
+        location.reload();
+    });
+    document.getElementById('schConflictCancel')?.addEventListener('click', () => {
+        document.getElementById('schModalConflict')?.classList.remove('visible');
+        toast('Правки остались в этой вкладке, но НЕ сохранены. Реши конфликт, чтобы сохранить.', 'err');
+    });
+    document.getElementById('schConflictOverwrite')?.addEventListener('click', async (ev) => {
+        const btn = ev.currentTarget;
+        try {
+            // Force-save: omit `version` → server skips the optimistic check
+            // and overwrites the draft with our state.
+            const j = await withBtnPending(btn,
+                () => api('save', { method: 'POST', body: { state: App.state } }),
+                { pending: 'Сохраняю…', success: 'Сохранено' });
+            App.stateVer  = j.version || App.stateVer;
+            App.snapshots = j.snapshots || App.snapshots;
+            App.dirty = false;
+            renderSnapshots();
+            document.getElementById('schModalConflict')?.classList.remove('visible');
+            toast('Сохранено — твоя версия теперь актуальная ✓');
+        } catch (e2) {
+            if (e2.code === 'SESSION_EXPIRED') return handleSessionExpired(e2);
+            if (e2.code === 'LOCKED') {
+                // Someone grabbed the live lock in the meantime → can't overwrite.
+                document.getElementById('schModalConflict')?.classList.remove('visible');
+                applyLockState({ owned: false, lock: e2.lock });
+                const who = e2.lock?.email || e2.lock?.name || 'другой пользователь';
+                toast(`Сейчас редактирует ${who} — нажми «Перехватить», потом сохрани.`, 'err');
+                return;
+            }
+            toast('Ошибка сохранения: ' + e2.message, 'err');
+        }
+    });
 
     // Create a new NAMED version — separate endpoint, never updates draft.
     async function saveAsVersion(ev) {

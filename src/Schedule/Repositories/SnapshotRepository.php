@@ -45,7 +45,7 @@ final class SnapshotRepository implements SnapshotRepositoryInterface
     {
         $t       = $this->db->t(self::TABLE);
         $payload = json_encode($state, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-        $row     = $this->db->query("SELECT id, version, json_data FROM {$t} WHERE is_current = 1 ORDER BY id DESC LIMIT 1")->fetch();
+        $row     = $this->db->query("SELECT id, version, json_data, created_by FROM {$t} WHERE is_current = 1 ORDER BY id DESC LIMIT 1")->fetch();
         if ($row) {
             $id          = (int) $row['id'];
             $currentVer  = (int) ($row['version'] ?? 0);
@@ -55,9 +55,12 @@ final class SnapshotRepository implements SnapshotRepositoryInterface
             if ($expectedVersion !== null && $expectedVersion !== $currentVer) {
                 $stored = json_decode((string) $row['json_data'], true);
                 return [
-                    'conflict' => true,
-                    'version'  => $currentVer,
-                    'state'    => is_array($stored) ? $stored : null,
+                    'conflict'    => true,
+                    'version'     => $currentVer,
+                    'state'       => is_array($stored) ? $stored : null,
+                    // Who bumped the version — lets the UI say whether it was
+                    // the operator's own other tab or a different user.
+                    'last_editor' => (string) ($row['created_by'] ?? ''),
                 ];
             }
             $newVer = $currentVer + 1;
