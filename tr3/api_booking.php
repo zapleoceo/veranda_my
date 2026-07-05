@@ -104,29 +104,39 @@ function tr3_api_submit_booking(array $ctx): void {
 
   if ($waPhoneNorm === '' && $tgUid <= 0) api_error(400, 'Мессенджер не привязан');
 
-  $existing = null;
+  // Duplicate guard: at most one ACTIVE reservation per
+  // (contact phone + table + start time). Intentionally ignores name / guests /
+  // duration so a slightly different re-submission (e.g. «Мария» vs «Мария
+  // Рыбакова», 2 vs 5 гостей) can't push a second booking for the same slot to
+  // the managers. Declined bookings (deleted_at set) free the slot again.
+  $dupe = null;
   try {
-    $existing = $db->query(
-      "SELECT * FROM {$resTable}
-       WHERE start_time = ?
-         AND duration = ?
-         AND guests = ?
-         AND poster_table_id = ?
-         AND phone = ?
-         AND name = ?
-       ORDER BY id DESC
-       LIMIT 1",
+    $dupe = $db->query(
+      "SELECT id, name FROM {$resTable}
+        WHERE start_time = ?
+          AND poster_table_id = ?
+          AND phone = ?
+          AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+        ORDER BY id DESC
+        LIMIT 1",
       [
         $startDt->format('Y-m-d H:i:s'),
-        $duration_m,
-        $guests,
         $posterTableId,
         $phoneNorm,
-        $name,
       ]
     )->fetch();
   } catch (\Throwable $e) {
-    $existing = null;
+    $dupe = null;
+  }
+  if (is_array($dupe) && !empty($dupe['id'])) {
+    $dupName    = trim((string)($dupe['name'] ?? ''));
+    $dupTable   = $tableLabel !== '' ? $tableLabel : $tableNum;
+    $dupMessage = str_replace(
+      ['{table}', '{time}', '{name}'],
+      [$dupTable, $startDt->format('H:i'), $dupName !== '' ? $dupName : $name],
+      $trFor('dup_exists')
+    );
+    api_error(409, $dupMessage);
   }
 
   $tgToken = trim((string)($_ENV['TELEGRAM_BOT_TOKEN'] ?? $_ENV['TG_BOT_TOKEN'] ?? ''));
@@ -137,12 +147,9 @@ function tr3_api_submit_booking(array $ctx): void {
   $qrCode = '';
   $resId = 0;
   $msgId = 0;
-  if (is_array($existing) && !empty($existing['id'])) {
-    $resId = (int)$existing['id'];
-    $qrCode = preg_replace('/[^A-Z0-9]/', '', strtoupper((string)($existing['qr_code'] ?? '')));
-    $qrUrl = (string)($existing['qr_url'] ?? '');
-    $msgId = (int)($existing['tg_message_id'] ?? 0);
-  } else {
+  {
+    // Always a fresh booking here — duplicates (phone+table+time) were already
+    // rejected with 409 above, so there is nothing to reuse.
     for ($i = 0; $i < 8; $i++) {
       $qrCode .= $alphabet[random_int(0, strlen($alphabet) - 1)];
     }
