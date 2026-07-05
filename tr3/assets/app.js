@@ -2217,13 +2217,22 @@
           if (typeof updatePreorderUi === 'function') updatePreorderUi();
           if (typeof syncSubmitState === 'function') syncSubmitState();
 
-          const preorderOkModal = document.getElementById('preorderOkModal');
-          const preorderOkBtn = document.getElementById('preorderOkBtn');
-          if (preorderOkModal && preorderOkBtn && preorder && guests > 5) {
-            setModal(preorderOkModal, true);
-            preorderOkBtn.onclick = () => setModal(preorderOkModal, false);
-          } else {
-            setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableLabel, guests: String(guests), name, phone }));
+          // Universal success confirmation. Every accepted booking now shows a
+          // clear card (was preorder-only) so the guest gets explicit on-site
+          // feedback that the booking went through; full details also arrive in
+          // their messenger. Preorder note is appended when relevant.
+          setOutput(fmtVars(t('submit_success'), { start: (fmtStartHuman(start) || start), table: tableLabel, guests: String(guests), name, phone }));
+          const okModal = document.getElementById('preorderOkModal');
+          const okBtn   = document.getElementById('preorderOkBtn');
+          const okTitle = document.getElementById('preorderOkTitle');
+          const okText  = document.getElementById('preorderOkText');
+          if (okModal && okText) {
+            if (okTitle) okTitle.textContent = t('booking_accepted_title');
+            let okBody = t('booking_accepted_msg');
+            if (preorder && guests > 5) okBody += ' ' + t('preorder_accepted_msg');
+            okText.textContent = okBody;
+            if (okBtn) okBtn.onclick = () => setModal(okModal, false);
+            setModal(okModal, true);
           }
         } catch (err) {
           const errMsg = String(err && err.message ? err.message : err);
